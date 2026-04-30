@@ -56,6 +56,8 @@ struct GeneralSettings: View {
                 LanguageSection()
                 Divider()
                 MagicCutoutSection()
+                Divider()
+                LabsSection()
                 #if !APP_STORE
                 Divider()
                 UpdatesSection()
@@ -63,6 +65,41 @@ struct GeneralSettings: View {
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
+        }
+    }
+}
+
+// MARK: - Labs (experimental, off by default)
+
+/// UserDefaults key gating the Fill in Body action behind a feature flag
+/// so we can keep iterating on quality without exposing it to real users.
+/// EditorView reads this to decide whether to render the "More" menu.
+public let kFillBodyEnabledKey = "labs.fillBodyEnabled"
+
+private struct LabsSection: View {
+    @AppStorage(kFillBodyEnabledKey) private var fillBodyEnabled: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.labsTitle).font(.headline)
+            Text(Loc.labsDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(Loc.labsFillBodyTitle)
+                        .font(.body.weight(.medium))
+                    Text(Loc.labsFillBodyDesc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Toggle("", isOn: $fillBodyEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
         }
     }
 }

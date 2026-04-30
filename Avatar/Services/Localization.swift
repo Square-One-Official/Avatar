@@ -127,6 +127,20 @@ enum Loc {
            : "Dit portret ziet er al compleet uit \u{2014} geen aanvulling nodig."
     }
 
+    // MARK: Settings – Labs (experimental features, off by default)
+    static var labsTitle: String { en ? "Labs" : "Labs" }
+    static var labsDesc: String {
+        en ? "Experimental features under active development. May change, break, or disappear without notice."
+           : "Experimentele functies in ontwikkeling. Kunnen veranderen, kapotgaan of verdwijnen zonder aankondiging."
+    }
+    static var labsFillBodyTitle: String {
+        en ? "Fill in Body (preview)" : "Vul lichaam aan (preview)"
+    }
+    static var labsFillBodyDesc: String {
+        en ? "Show the \u{201C}More\u{201D} dropdown in the editor with the Fill in Body action. Off by default while we tune quality."
+           : "Toon het \u{201C}Meer\u{201D}-menu in de editor met Vul lichaam aan. Standaard uit terwijl we de kwaliteit afstellen."
+    }
+
     static var proUpgradeSignInFirst: String {
         en ? "Please sign in first to manage your subscription."
            : "Meld je eerst aan om je abonnement te beheren."

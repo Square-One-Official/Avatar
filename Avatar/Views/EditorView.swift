@@ -46,6 +46,10 @@ struct EditorView: View {
     /// same eye height and head size. Persisted across app launches.
     @AppStorage("showAlignmentGuide") private var showAlignmentGuide = false
 
+    /// Labs flag — gates the "More" dropdown (Fill in Body etc.) behind
+    /// the Settings → Labs toggle. Off by default while we tune quality.
+    @AppStorage(kFillBodyEnabledKey) private var fillBodyEnabled: Bool = false
+
     // Drag/snap state
     @State private var isDragging = false
     @State private var snappedX = false
@@ -547,12 +551,15 @@ struct EditorView: View {
             }
 
             // "More" — extensible dropdown for Pro AI edits, always pinned
-            // to the bottom of the section. Currently houses Fill in Body;
+            // to the bottom of the section. Currently houses Fill in Body
+            // (gated behind Settings → Labs while we tune output quality);
             // future additions (Colorise, background swap, etc.) slot in
             // alongside without restructuring the inspector. Rendered as a
             // Menu using the same chrome as the regular enhance cards so
             // the section reads as one column of equally-weighted actions.
-            moreMagicEditsMenu
+            if fillBodyEnabled {
+                moreMagicEditsMenu
+            }
         }
     }
 
