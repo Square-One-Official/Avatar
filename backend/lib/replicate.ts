@@ -52,8 +52,10 @@ export async function magicCutout(input: {
  * re-extract the matte before handing the result to the client).
  */
 export const FILL_BODY_PROMPT =
-  "natural continuation of the person's shoulders, torso and clothing; " +
-  "matching skin tone and lighting; photograph, photorealistic, same outfit";
+  "Extend the photo: continue the person's shoulders, upper torso and " +
+  "clothing naturally below and beside the head. Same person, same outfit, " +
+  "same skin tone and studio lighting. Photorealistic photograph, sharp " +
+  "focus, no extra people, no extra heads, no text.";
 
 export async function outpaintBody(input: {
   imageDataUrl: string;
@@ -65,9 +67,10 @@ export async function outpaintBody(input: {
       image: input.imageDataUrl,
       mask: input.maskDataUrl,
       prompt: input.prompt ?? FILL_BODY_PROMPT,
-      // Tuned for body outpainting on portrait crops; revisit after
-      // empirical sampling.
-      guidance: 60,
+      // Defaults from Flux Fill Pro's Replicate page. Earlier guidance=60
+      // produced near-no-op fills (model preserved white background instead
+      // of generating shoulders) — 30 follows the prompt without collapsing.
+      guidance: 30,
       num_inference_steps: 50,
       safety_tolerance: 2,
       output_format: "png",

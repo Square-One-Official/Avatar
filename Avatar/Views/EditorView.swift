@@ -523,12 +523,14 @@ struct EditorView: View {
 
     // MARK: Enhance section (lives inside the Portrait tab)
 
-    /// True only when this portrait still carries a free Apple-pipeline cutout
-    /// AND the user is now in a position to re-render it with Magic Cutout.
+    /// True whenever this portrait still carries a free Apple-pipeline cutout.
+    /// The card is a one-shot offer to re-cut via cloud Magic Cutout —
+    /// independent of the persistent "Magic Cutout" import toggle. Clicking
+    /// runs cloud regardless of the toggle, and surfaces the paywall if the
+    /// user has neither Pro nor free-trial credit left.
     private var showMagicCutoutUpgradeCard: Bool {
         portrait.originalImageData != nil
             && !portrait.cutoutUsedMagic
-            && ImportFlow.shouldUseMagicCutout(appState: appState)
     }
 
     @ViewBuilder private var enhanceSection: some View {

@@ -9,11 +9,13 @@ import sharp from "sharp";
  *   to preserve client-side.
  * - Sides equal: handles circle-cropped sources where shoulders are clipped.
  *
- * Tuned for typical portrait crops. Push higher if shoulders still clip;
- * push lower to reduce Replicate spend per call.
+ * Tuned conservatively: large white areas confuse Flux Fill Pro into
+ * leaving them blank or filling them with vague background. ~40% bottom
+ * + ~15% sides is enough to reconstruct shoulders/upper torso on a
+ * typical chest-up crop without overwhelming the model.
  */
-export const PAD_BOTTOM_RATIO = 0.6;
-export const PAD_SIDES_RATIO = 0.25;
+export const PAD_BOTTOM_RATIO = 0.4;
+export const PAD_SIDES_RATIO = 0.15;
 
 export type OutpaintInputs = {
   imageDataUrl: string;

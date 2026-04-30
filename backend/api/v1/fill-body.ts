@@ -126,6 +126,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       cutout: cutoutBytes.toString("base64"),
       credits_remaining: creditsRemaining,
+      // Padding the server applied to the original cutout, in source-pixel
+      // space. The client uses these to shift `offsetX/Y` deterministically
+      // so the user's manual head position is preserved without depending
+      // on Vision re-detecting the same eye coordinates in the new image.
+      pad_left: inputs.padLeft,
+      pad_top: inputs.padTop,
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);

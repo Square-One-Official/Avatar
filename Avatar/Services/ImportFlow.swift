@@ -287,12 +287,19 @@ enum ImportFlow {
         }
     }
 
-    /// Re-runs the cutout pipeline on an existing portrait, overwriting the
-    /// cached PNG + face rect but preserving the user's manual transform
-    /// (offset/scale) and any other editor state. Used by the editor's
-    /// "Opnieuw uitknippen" action so users can re-render a portrait after
-    /// pipeline improvements without losing their framing.
+    /// Re-runs the cutout pipeline on an existing portrait via cloud Magic
+    /// Cutout, overwriting the cached PNG + face rect but preserving the
+    /// user's manual transform (offset/scale) and other editor state.
+    ///
+    /// One-shot — bypasses the persistent `magicCutoutPrefs.enabled` toggle.
+    /// The toggle controls *import* defaults; redo is an explicit per-portrait
+    /// opt-in. Gated on entitlement (`canUseProCutout`): non-entitled users
+    /// see the paywall instead of running the call.
     static func reprocess(portrait: Portrait, context: ModelContext, appState: AppState) {
+        guard appState.proEntitlement.canUseProCutout else {
+            appState.showProUpgradeSheet = true
+            return
+        }
         guard let data = portrait.originalImageData else {
             appState.warn(Loc.noOriginalForRecutout)
             return
@@ -306,22 +313,14 @@ enum ImportFlow {
         appState.dismissBanner()
         dlog("[Reprocess] start id=\(portrait.id) \(cg.width)x\(cg.height)")
 
-        let useCloud = shouldUseMagicCutout(appState: appState)
         let portraitID = portrait.id
         Task.detached(priority: .userInitiated) {
             do {
-                let processed: ProcessedSubject
-                let usedMagic: Bool
-                if useCloud {
-                    let result = try await runCloudWithFallback(cg: cg, appState: appState)
-                    processed = result.subject
-                    usedMagic = result.usedMagic
-                } else {
-                    processed = try ImageProcessor.process(image: cg, birefnetModel: nil)
-                    usedMagic = false
-                }
+                let result = try await runCloudWithFallback(cg: cg, appState: appState)
+                let processed = result.subject
+                let usedMagic = result.usedMagic
                 let pngData = ImageProcessor.pngData(from: processed.cutout) ?? Data()
-                dlog("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero)")
+                dlog("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero) usedMagic=\(usedMagic)")
 
                 await MainActor.run {
                     // Re-fetch the portrait on the main actor to avoid
@@ -452,14 +451,18 @@ enum ImportFlow {
 
         Task.detached(priority: .userInitiated) {
             do {
-                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
-                guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
+                let result = try await backend.fillBody(imagePNG: cutoutData)
+                guard let newCutoutCG = ImageProcessor.cgImage(from: result.cutoutPNG) else {
                     throw BackendError.decode
                 }
-                // Run face/body detection on the new cutout. The detector
-                // works on alpha-PNGs the same as on RGB sources — Vision
-                // sees the visible pixels.
+                // Run face/body detection on the new cutout — purely to
+                // refresh the alignment metadata so future BulkAlign /
+                // export passes see the new geometry. Position
+                // preservation does NOT depend on this detection: we use
+                // the server's deterministic pad_left/pad_top instead.
                 let detected = try ImageProcessor.process(image: newCutoutCG, birefnetModel: nil)
+                dlog("[FillBody] new cutout \(newCutoutCG.width)×\(newCutoutCG.height) " +
+                     "padL=\(result.padLeft) padT=\(result.padTop)")
 
                 await MainActor.run {
                     let descriptor = FetchDescriptor<Portrait>(
@@ -471,37 +474,29 @@ enum ImportFlow {
                         return
                     }
                     snap.write(into: fresh)
-                    fresh.cutoutPNG = newCutoutPNG
+                    fresh.cutoutPNG = result.cutoutPNG
                     if let face = detected.faceRect { fresh.faceRect = face }
                     fresh.eyeCenter = detected.eyeCenter
                     fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
                     fresh.bodyBottomY = Double(detected.bodyBottomY)
-                    // Preserve canvas-space eye position by adjusting offset
-                    // for the change in head pixel position. Scale stays put.
-                    let preservedOffset = preservedFillBodyOffset(
-                        oldOffsetX: snap.offsetX,
-                        oldOffsetY: snap.offsetY,
-                        scale: snap.scale,
-                        oldEye: CGPoint(x: snap.eyeCenterX, y: snap.eyeCenterY),
-                        oldInterEye: snap.interEyeDistance,
-                        oldFaceRect: CGRect(x: snap.faceRectX, y: snap.faceRectY,
-                                            width: snap.faceRectW, height: snap.faceRectH),
-                        newEye: detected.eyeCenter,
-                        newInterEye: detected.interEyeDistance,
-                        newFaceRect: detected.faceRect
-                    )
-                    fresh.offsetX = preservedOffset.x
-                    fresh.offsetY = preservedOffset.y
+                    // Position preservation: the head shifted right by
+                    // `padLeft` and down by `padTop` pixels inside the new
+                    // (larger) cutout. Compensate by shifting offsetX/Y left
+                    // and up by the same number of canvas-space pixels
+                    // (= padding * scale). Eye/face positions on the canvas
+                    // are mathematically unchanged. `scale` stays put.
+                    fresh.offsetX = snap.offsetX - Double(result.padLeft) * snap.scale
+                    fresh.offsetY = snap.offsetY - Double(result.padTop) * snap.scale
                     fresh.isFillBodyApplied = true
                     fresh.updatedAt = Date()
                     try? context.save()
 
                     // Sync local credit counter so the sidebar updates without
                     // waiting for the next /v1/account refresh.
-                    appState.proEntitlement.credits = creditsRemaining
+                    appState.proEntitlement.credits = result.creditsRemaining
                     appState.invalidateCutout(for: fresh)
                     appState.isProcessing = false
-                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(creditsRemaining)")
+                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(result.creditsRemaining)")
                 }
             } catch let err as BackendError {
                 await MainActor.run {
@@ -754,46 +749,3 @@ private struct FillBodySnapshot {
     }
 }
 
-/// Computes a new (offsetX, offsetY) such that the head's canvas-space
-/// position is unchanged after Fill in Body. Mirrors the renderer in
-/// `EditorView.CanvasPreview` (image at top-left = (offsetX, offsetY) scaled
-/// by `scale`), so a pixel at cutout-coord `(px, py)` lands at canvas coord
-/// `(offsetX + px*scale, offsetY + py*scale)`.
-///
-/// Anchor preference (matches `AutoAligner.computeTransform`):
-///   1. eye centre when both old + new have valid eye landmarks
-///   2. face-rect midpoint when both have a non-zero face rect
-///   3. fall back to the previous offset (no change) — better than guessing
-@MainActor
-private func preservedFillBodyOffset(
-    oldOffsetX: Double, oldOffsetY: Double,
-    scale: Double,
-    oldEye: CGPoint, oldInterEye: Double,
-    oldFaceRect: CGRect,
-    newEye: CGPoint?, newInterEye: CGFloat?,
-    newFaceRect: CGRect?
-) -> (x: Double, y: Double) {
-    let oldAnchor: CGPoint?
-    let newAnchor: CGPoint?
-    if oldInterEye > 0, let newEye, let nied = newInterEye, nied > 0 {
-        oldAnchor = oldEye
-        newAnchor = newEye
-    } else if oldFaceRect.width > 0,
-              let nf = newFaceRect, nf.width > 0 {
-        oldAnchor = CGPoint(x: oldFaceRect.midX, y: oldFaceRect.midY)
-        newAnchor = CGPoint(x: nf.midX, y: nf.midY)
-    } else {
-        oldAnchor = nil
-        newAnchor = nil
-    }
-    guard let oa = oldAnchor, let na = newAnchor else {
-        return (oldOffsetX, oldOffsetY)
-    }
-    // Preserve canvas-space anchor:
-    //   oldOffset + oa * scale == newOffset + na * scale
-    //   => newOffset = oldOffset + (oa - na) * scale
-    return (
-        oldOffsetX + (Double(oa.x) - Double(na.x)) * scale,
-        oldOffsetY + (Double(oa.y) - Double(na.y)) * scale
-    )
-}

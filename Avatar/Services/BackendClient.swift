@@ -99,15 +99,40 @@ final class BackendClient {
     /// using Replicate Flux Fill Pro, then re-extracts a clean alpha matte
     /// via BiRefNet server-side. Returns a transparent-PNG cutout with the
     /// reconstructed shoulders/torso baked in, plus the user's updated
-    /// credit balance. Costs 1 credit; no free trial.
+    /// credit balance and the padding offsets the server applied. Costs
+    /// 1 credit; no free trial.
+    ///
+    /// `padLeft` / `padTop` are pixel offsets in the response cutout's
+    /// coordinate space — exactly how far the original head/body content
+    /// shifted right/down inside the new (larger) cutout. The caller uses
+    /// them to update `offsetX/Y` deterministically, so the user's manual
+    /// head position is preserved without re-detecting the eyes.
+    ///
     /// On 402 (no credits) the caller surfaces the upgrade sheet; other
     /// errors propagate so the caller can show the failure toast.
-    func fillBody(imagePNG: Data) async throws -> (Data, Int) {
+    struct FillBodyResult {
+        let cutoutPNG: Data
+        let creditsRemaining: Int
+        let padLeft: Int
+        let padTop: Int
+    }
+    private struct FillBodyResponse: Decodable {
+        let cutout: String
+        let creditsRemaining: Int
+        let padLeft: Int
+        let padTop: Int
+    }
+    func fillBody(imagePNG: Data) async throws -> FillBodyResult {
         struct Body: Encodable { let image: String }
         let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
-        let resp: CutoutResponse = try await request("/v1/fill-body", method: "POST", body: body)
+        let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else { throw BackendError.decode }
-        return (data, resp.creditsRemaining)
+        return FillBodyResult(
+            cutoutPNG: data,
+            creditsRemaining: resp.creditsRemaining,
+            padLeft: resp.padLeft,
+            padTop: resp.padTop
+        )
     }
 
     // MARK: POST /v1/checkout/subscribe
