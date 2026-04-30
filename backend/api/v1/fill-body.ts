@@ -17,9 +17,12 @@ export const config = {
 /**
  * POST /v1/fill-body
  *
- * Body:    { image: <base64 PNG with alpha — the current cutout> }
+ * Body:    { image: <base64 PNG with alpha — the current cutout>,
+ *            pad_bottom_px?: number,
+ *            pad_sides_px?: number }
  * Returns: 200 { cutout: <base64 PNG with alpha — extended cutout>,
- *                credits_remaining: int }
+ *                credits_remaining: int,
+ *                pad_left: int, pad_top: int }
  *          402 { error: "insufficient_credits", credits_remaining: 0 }
  *          401 { error: "unauthorized" }
  *          429 { error: "rate_limited" }
@@ -27,6 +30,12 @@ export const config = {
  * Reconstructs missing shoulders/torso/sides on a cropped portrait. Costs
  * 1 credit per call — no free trial (unlike Magic Cutout). Dev-allowlisted
  * users skip the credit gate so the developer can iterate.
+ *
+ * The client should pass `pad_bottom_px` / `pad_sides_px` matching its
+ * current scale & framing so generated body content lands inside the
+ * visible canvas. Server clamps both values to a sensible floor + cap
+ * (see `prepareOutpaintInputs`); omitting either falls back to a default
+ * ratio of the source dimensions.
  *
  * Pipeline (single user-visible operation, two Replicate calls internally):
  *   1. Pad the cutout (white below + sides), build a mask.
@@ -88,8 +97,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 1. Pad + mask, then Flux Fill Pro.
-    const inputs = await prepareOutpaintInputs(inputBytes);
+    // 1. Pad + mask, then Flux Fill Pro. Pad sizes are caller-driven so
+    //    generated body content lands inside the user's visible canvas at
+    //    their preserved scale; defaults + caps in `prepareOutpaintInputs`
+    //    handle missing or oversize values.
+    const padBottomPxRaw = req.body?.pad_bottom_px;
+    const padSidesPxRaw = req.body?.pad_sides_px;
+    const padBottomPx =
+      typeof padBottomPxRaw === "number" && Number.isFinite(padBottomPxRaw) && padBottomPxRaw >= 0
+        ? padBottomPxRaw : undefined;
+    const padSidesPx =
+      typeof padSidesPxRaw === "number" && Number.isFinite(padSidesPxRaw) && padSidesPxRaw >= 0
+        ? padSidesPxRaw : undefined;
+    const inputs = await prepareOutpaintInputs(inputBytes, { padBottomPx, padSidesPx });
     const filledUrl = await outpaintBody({
       imageDataUrl: inputs.imageDataUrl,
       maskDataUrl: inputs.maskDataUrl,

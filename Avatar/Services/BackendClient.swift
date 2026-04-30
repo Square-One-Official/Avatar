@@ -122,9 +122,29 @@ final class BackendClient {
         let padLeft: Int
         let padTop: Int
     }
-    func fillBody(imagePNG: Data) async throws -> FillBodyResult {
-        struct Body: Encodable { let image: String }
-        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+    /// `padBottomPx` / `padSidesPx` request specific outpainting amounts in
+    /// the source-cutout's pixel space. Pass these so generated body content
+    /// lands inside the user's visible canvas at their preserved scale —
+    /// the server clamps to a sensible floor + cap (15-150% bottom,
+    /// 5-60% per side) so out-of-range values are still safe.
+    /// Pass `nil` for either to fall back to the server's default ratio.
+    func fillBody(
+        imagePNG: Data,
+        padBottomPx: Int? = nil,
+        padSidesPx: Int? = nil
+    ) async throws -> FillBodyResult {
+        struct Body: Encodable {
+            let image: String
+            let padBottomPx: Int?
+            let padSidesPx: Int?
+        }
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let body = try encoder.encode(Body(
+            image: imagePNG.base64EncodedString(),
+            padBottomPx: padBottomPx,
+            padSidesPx: padSidesPx
+        ))
         let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else { throw BackendError.decode }
         return FillBodyResult(

@@ -1,21 +1,28 @@
 import sharp from "sharp";
 
 /**
- * Outpainting padding ratios for Fill in Body.
+ * Default outpainting padding ratios for Fill in Body. These are the
+ * server-side fallback when the client doesn't request a specific amount.
+ *
+ * The client SHOULD pass exact pixel padding tailored to the user's
+ * current scale & framing — that way generated body content lands
+ * exactly inside the visible canvas at the user's preserved zoom rather
+ * than extending off-canvas where the user can't see it.
  *
  * Padding is asymmetric on purpose:
- * - Bottom only (no top): keeps the head/eyes at the SAME y-coordinate within
- *   the canvas the model sees, so the user's manual eye anchoring is easier
- *   to preserve client-side.
- * - Sides equal: handles circle-cropped sources where shoulders are clipped.
- *
- * Tuned conservatively: large white areas confuse Flux Fill Pro into
- * leaving them blank or filling them with vague background. ~40% bottom
- * + ~15% sides is enough to reconstruct shoulders/upper torso on a
- * typical chest-up crop without overwhelming the model.
+ * - Bottom only (no top): keeps the head/eyes at the same y-coordinate
+ *   within the canvas the model sees.
+ * - Sides equal: handles circle-cropped sources where shoulders clip.
  */
-export const PAD_BOTTOM_RATIO = 0.4;
-export const PAD_SIDES_RATIO = 0.15;
+export const DEFAULT_PAD_BOTTOM_RATIO = 0.5;
+export const DEFAULT_PAD_SIDES_RATIO = 0.15;
+
+/** Hard caps so a misbehaving client can't request a giant Replicate input. */
+export const MAX_PAD_BOTTOM_RATIO = 1.5; // up to 150% of original height below
+export const MAX_PAD_SIDES_RATIO = 0.6;  // up to 60% of original width per side
+/** Floor so we always extend a little for circle crops / future re-alignment. */
+export const MIN_PAD_BOTTOM_RATIO = 0.15;
+export const MIN_PAD_SIDES_RATIO = 0.05;
 
 export type OutpaintInputs = {
   imageDataUrl: string;
@@ -28,17 +35,29 @@ export type OutpaintInputs = {
   padTop: number;
 };
 
+export type PadRequest = {
+  /** Pixels of padding below the original cutout. Undefined → use default ratio. */
+  padBottomPx?: number;
+  /** Pixels of padding on each side (left = right). Undefined → use default ratio. */
+  padSidesPx?: number;
+};
+
 /**
  * Prepares the inputs for Flux Fill Pro outpainting:
  * 1. Flatten the alpha cutout onto white (Flux expects RGB).
- * 2. Extend the canvas down + sideways with white fill.
+ * 2. Extend the canvas down + sideways with white fill, by the requested
+ *    pixel amount (or default ratio of the original cutout if unspecified).
  * 3. Build a black/white mask: black = keep original pixels, white = generate.
+ *
+ * Requested padding is clamped against floor + cap: 15-150% of original
+ * height below, 5-60% of original width per side.
  *
  * Both images are returned as data URLs so they can be sent to Replicate
  * without intermediate hosting.
  */
 export async function prepareOutpaintInputs(
   cutoutPng: Buffer,
+  request: PadRequest = {},
 ): Promise<OutpaintInputs> {
   const meta = await sharp(cutoutPng).metadata();
   if (!meta.width || !meta.height) {
@@ -47,8 +66,19 @@ export async function prepareOutpaintInputs(
   const originalWidth = meta.width;
   const originalHeight = meta.height;
 
-  const padBottom = Math.round(originalHeight * PAD_BOTTOM_RATIO);
-  const padSides = Math.round(originalWidth * PAD_SIDES_RATIO);
+  const requestedBottom = request.padBottomPx ?? originalHeight * DEFAULT_PAD_BOTTOM_RATIO;
+  const requestedSides = request.padSidesPx ?? originalWidth * DEFAULT_PAD_SIDES_RATIO;
+
+  const padBottom = clamp(
+    Math.round(requestedBottom),
+    Math.round(originalHeight * MIN_PAD_BOTTOM_RATIO),
+    Math.round(originalHeight * MAX_PAD_BOTTOM_RATIO),
+  );
+  const padSides = clamp(
+    Math.round(requestedSides),
+    Math.round(originalWidth * MIN_PAD_SIDES_RATIO),
+    Math.round(originalWidth * MAX_PAD_SIDES_RATIO),
+  );
   const padLeft = padSides;
   const padRight = padSides;
   const padTop = 0;
@@ -102,4 +132,8 @@ export async function prepareOutpaintInputs(
     padLeft,
     padTop,
   };
+}
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, value));
 }

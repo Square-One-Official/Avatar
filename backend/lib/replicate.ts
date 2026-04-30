@@ -52,10 +52,12 @@ export async function magicCutout(input: {
  * re-extract the matte before handing the result to the client).
  */
 export const FILL_BODY_PROMPT =
-  "Extend the photo: continue the person's shoulders, upper torso and " +
-  "clothing naturally below and beside the head. Same person, same outfit, " +
-  "same skin tone and studio lighting. Photorealistic photograph, sharp " +
-  "focus, no extra people, no extra heads, no text.";
+  "Outpaint the missing body. Extend the existing person downward and " +
+  "outward into the masked area: full shoulders, complete upper torso, " +
+  "chest, and clothing continuing all the way to the bottom of the frame. " +
+  "Match the existing skin tone, fabric, colour, and studio lighting " +
+  "exactly. One person only. Photorealistic photograph, sharp focus. " +
+  "No extra heads, no duplicate faces, no text, no logos.";
 
 export async function outpaintBody(input: {
   imageDataUrl: string;

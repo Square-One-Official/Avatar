@@ -448,10 +448,24 @@ enum ImportFlow {
         let snap = FillBodySnapshot(from: portrait)
         let portraitID = portrait.id
         let backend = appState.backend
+        // Compute padding tailored to the user's current scale + framing,
+        // so the body content the model generates lands inside the visible
+        // canvas at the user's preserved zoom — not extending off-screen.
+        // Server clamps to a sensible floor + cap.
+        let padRequest = fillBodyPadRequest(
+            cutoutWidth: ImageProcessor.cgImage(from: cutoutData)?.width,
+            cutoutHeight: ImageProcessor.cgImage(from: cutoutData)?.height,
+            portrait: portrait
+        )
+        dlog("[FillBody] requesting pad bottom=\(padRequest.bottomPx ?? -1) sides=\(padRequest.sidesPx ?? -1)")
 
         Task.detached(priority: .userInitiated) {
             do {
-                let result = try await backend.fillBody(imagePNG: cutoutData)
+                let result = try await backend.fillBody(
+                    imagePNG: cutoutData,
+                    padBottomPx: padRequest.bottomPx,
+                    padSidesPx: padRequest.sidesPx
+                )
                 guard let newCutoutCG = ImageProcessor.cgImage(from: result.cutoutPNG) else {
                     throw BackendError.decode
                 }
@@ -747,5 +761,47 @@ private struct FillBodySnapshot {
         p.preFillOffsetX = offsetX; p.preFillOffsetY = offsetY
         p.preFillScale = scale
     }
+}
+
+/// How much padding to ask the backend to add when outpainting this portrait.
+/// We compute the pixel padding needed so the model's generated body lands
+/// inside the visible canvas at the user's current scale — i.e., we extend
+/// the cutout downward / sideways exactly enough to cover the empty canvas
+/// space below the existing body bottom and beside the cutout edges.
+///
+/// Returning `nil` for either value falls back to the server's default ratio
+/// (used when we can't read cutout dimensions or the portrait has no usable
+/// body bottom landmark yet).
+@MainActor
+private func fillBodyPadRequest(
+    cutoutWidth: Int?,
+    cutoutHeight: Int?,
+    portrait: Portrait
+) -> (bottomPx: Int?, sidesPx: Int?) {
+    guard let cw = cutoutWidth, let ch = cutoutHeight, portrait.scale > 0 else {
+        return (nil, nil)
+    }
+    let canvas = CanvasConstants.editCanvas
+    let scale = portrait.scale
+
+    // Bottom: distance from current body bottom to the canvas bottom (with
+    // a small overshoot so the body looks like it continues out of frame),
+    // converted to source-cutout pixels via the user's scale.
+    let bodyBottomCanvasY = portrait.offsetY + portrait.bodyBottomY * scale
+    let targetBottomCanvasY = Double(canvas.height) * (1.0 + Double(AutoAligner.bodyOvershoot))
+    let neededBottomCanvas = max(0, targetBottomCanvasY - bodyBottomCanvasY)
+    let padBottomPx = Int((neededBottomCanvas / scale).rounded())
+
+    // Sides: distance from each cutout edge to the canvas edge, converted
+    // to source pixels. We use the larger of the two for symmetric padding
+    // since the model fills both sides identically.
+    let cutoutLeftCanvas = portrait.offsetX
+    let cutoutRightCanvas = portrait.offsetX + Double(cw) * scale
+    let neededLeftCanvas = max(0, 0 - cutoutLeftCanvas)
+    let neededRightCanvas = max(0, Double(canvas.width) - cutoutRightCanvas)
+    let neededSidesCanvas = max(neededLeftCanvas, neededRightCanvas)
+    let padSidesPx = Int((neededSidesCanvas / scale).rounded())
+
+    return (padBottomPx, padSidesPx)
 }
 
