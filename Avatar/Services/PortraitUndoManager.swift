@@ -34,6 +34,33 @@ enum PortraitUndoManager {
         let adjShadows: Double
         let adjWhites: Double
         let adjBlacks: Double
+        // Cutout + landmarks (mutated by Magic Retouch / Fill in Body)
+        let cutoutPNG: Data?
+        let faceRectX: Double
+        let faceRectY: Double
+        let faceRectW: Double
+        let faceRectH: Double
+        let eyeCenterX: Double
+        let eyeCenterY: Double
+        let interEyeDistance: Double
+        let bodyBottomY: Double
+        // Magic Retouch
+        let isMagicRetouched: Bool
+        let preRetouchPNG: Data?
+        // Fill in Body
+        let isFillBodyApplied: Bool
+        let preFillBodyPNG: Data?
+        let preFillFaceRectX: Double
+        let preFillFaceRectY: Double
+        let preFillFaceRectW: Double
+        let preFillFaceRectH: Double
+        let preFillEyeCenterX: Double
+        let preFillEyeCenterY: Double
+        let preFillInterEyeDistance: Double
+        let preFillBodyBottomY: Double
+        let preFillOffsetX: Double
+        let preFillOffsetY: Double
+        let preFillScale: Double
         // Metadata
         let name: String
         let tags: String
@@ -58,6 +85,30 @@ enum PortraitUndoManager {
             adjShadows: p.adjShadows,
             adjWhites: p.adjWhites,
             adjBlacks: p.adjBlacks,
+            cutoutPNG: p.cutoutPNG,
+            faceRectX: p.faceRectX,
+            faceRectY: p.faceRectY,
+            faceRectW: p.faceRectW,
+            faceRectH: p.faceRectH,
+            eyeCenterX: p.eyeCenterX,
+            eyeCenterY: p.eyeCenterY,
+            interEyeDistance: p.interEyeDistance,
+            bodyBottomY: p.bodyBottomY,
+            isMagicRetouched: p.isMagicRetouched,
+            preRetouchPNG: p.preRetouchPNG,
+            isFillBodyApplied: p.isFillBodyApplied,
+            preFillBodyPNG: p.preFillBodyPNG,
+            preFillFaceRectX: p.preFillFaceRectX,
+            preFillFaceRectY: p.preFillFaceRectY,
+            preFillFaceRectW: p.preFillFaceRectW,
+            preFillFaceRectH: p.preFillFaceRectH,
+            preFillEyeCenterX: p.preFillEyeCenterX,
+            preFillEyeCenterY: p.preFillEyeCenterY,
+            preFillInterEyeDistance: p.preFillInterEyeDistance,
+            preFillBodyBottomY: p.preFillBodyBottomY,
+            preFillOffsetX: p.preFillOffsetX,
+            preFillOffsetY: p.preFillOffsetY,
+            preFillScale: p.preFillScale,
             name: p.name,
             tags: p.tags,
             updatedAt: p.updatedAt
@@ -160,9 +211,35 @@ enum PortraitUndoManager {
         portrait.adjShadows = snap.adjShadows
         portrait.adjWhites = snap.adjWhites
         portrait.adjBlacks = snap.adjBlacks
+        let cutoutChanged = portrait.cutoutPNG != snap.cutoutPNG
+        portrait.cutoutPNG = snap.cutoutPNG
+        portrait.faceRectX = snap.faceRectX
+        portrait.faceRectY = snap.faceRectY
+        portrait.faceRectW = snap.faceRectW
+        portrait.faceRectH = snap.faceRectH
+        portrait.eyeCenterX = snap.eyeCenterX
+        portrait.eyeCenterY = snap.eyeCenterY
+        portrait.interEyeDistance = snap.interEyeDistance
+        portrait.bodyBottomY = snap.bodyBottomY
+        portrait.isMagicRetouched = snap.isMagicRetouched
+        portrait.preRetouchPNG = snap.preRetouchPNG
+        portrait.isFillBodyApplied = snap.isFillBodyApplied
+        portrait.preFillBodyPNG = snap.preFillBodyPNG
+        portrait.preFillFaceRectX = snap.preFillFaceRectX
+        portrait.preFillFaceRectY = snap.preFillFaceRectY
+        portrait.preFillFaceRectW = snap.preFillFaceRectW
+        portrait.preFillFaceRectH = snap.preFillFaceRectH
+        portrait.preFillEyeCenterX = snap.preFillEyeCenterX
+        portrait.preFillEyeCenterY = snap.preFillEyeCenterY
+        portrait.preFillInterEyeDistance = snap.preFillInterEyeDistance
+        portrait.preFillBodyBottomY = snap.preFillBodyBottomY
+        portrait.preFillOffsetX = snap.preFillOffsetX
+        portrait.preFillOffsetY = snap.preFillOffsetY
+        portrait.preFillScale = snap.preFillScale
         portrait.name = snap.name
         portrait.tags = snap.tags
         portrait.updatedAt = snap.updatedAt
+        if cutoutChanged { appState?.invalidateCutout(for: portrait) }
         appState?.invalidateAdjusted(for: portrait)
     }
 }

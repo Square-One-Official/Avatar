@@ -64,9 +64,9 @@ enum Loc {
     // MARK: Editor – Background
     static var background: String      { en ? "Background" : "Achtergrond" }
 
-    // MARK: Editor – Position & Scale
-    static var positionScale: String   { en ? "Position & Scale" : "Positie & Schaal" }
+    // MARK: Editor – Alignment
     static var autoAlignFace: String   { en ? "Auto-align to face" : "Auto-uitlijnen op gezicht" }
+    /// Undo action name for handle-based scale changes on the canvas.
     static var scale: String           { en ? "Scale" : "Schaal" }
 
     // MARK: Editor – Edit section
@@ -94,6 +94,51 @@ enum Loc {
     static var magicRetouchUndoHelp: String {
         en ? "Revert to the original cutout without Magic Retouch."
            : "Herstel de originele uitknip zonder Magic Retouch."
+    }
+
+    // MARK: Editor – More magic edits (dropdown of Replicate-backed Pro tools)
+    static var moreMagicEdits: String {
+        en ? "More" : "Meer"
+    }
+    static var moreMagicEditsHelp: String {
+        en ? "Pro AI edits — fill in body and more."
+           : "Pro AI-bewerkingen — vul lichaam aan en meer."
+    }
+    static var fillBody: String {
+        en ? "Fill in body" : "Vul lichaam aan"
+    }
+    static var fillBodyUndo: String {
+        en ? "Undo fill in body" : "Lichaam aanvullen ongedaan maken"
+    }
+    static var fillBodyHelp: String {
+        en ? "Reconstruct shoulders and torso when the photo is cropped."
+           : "Reconstrueer schouders en bovenlichaam als de foto is bijgesneden."
+    }
+    static var fillBodyAlready: String {
+        en ? "Body fill is already applied to this portrait."
+           : "Lichaam aanvullen staat al aan voor dit portret."
+    }
+    static var fillBodyFailed: String {
+        en ? "Couldn't fill in the body. Please try again."
+           : "Kon het lichaam niet aanvullen. Probeer het opnieuw."
+    }
+    static var fillBodyAlreadyComplete: String {
+        en ? "This portrait already looks complete \u{2014} no fill needed."
+           : "Dit portret ziet er al compleet uit \u{2014} geen aanvulling nodig."
+    }
+
+    // MARK: Settings – Labs (experimental features, off by default)
+    static var labsTitle: String { en ? "Labs" : "Labs" }
+    static var labsDesc: String {
+        en ? "Experimental features under active development. May change, break, or disappear without notice."
+           : "Experimentele functies in ontwikkeling. Kunnen veranderen, kapotgaan of verdwijnen zonder aankondiging."
+    }
+    static var labsFillBodyTitle: String {
+        en ? "Fill in Body (preview)" : "Vul lichaam aan (preview)"
+    }
+    static var labsFillBodyDesc: String {
+        en ? "Show the \u{201C}More\u{201D} dropdown in the editor with the Fill in Body action. Off by default while we tune quality."
+           : "Toon het \u{201C}Meer\u{201D}-menu in de editor met Vul lichaam aan. Standaard uit terwijl we de kwaliteit afstellen."
     }
 
     static var proUpgradeSignInFirst: String {
@@ -334,9 +379,6 @@ enum Loc {
     // MARK: Editor – Sidebar tabs
     static var tabPortrait: String     { en ? "Portrait" : "Portret" }
     static var tabAdjust: String       { en ? "Adjust" : "Afstellen" }
-    static var actualSize: String      { en ? "Actual size" : "Werkelijke grootte" }
-    static var zoomOut: String         { en ? "Zoom out" : "Uitzoomen" }
-    static var zoomIn: String          { en ? "Zoom in" : "Inzoomen" }
 
     // MARK: Editor – Library section
     static var library: String         { en ? "Library" : "Bibliotheek" }
@@ -400,6 +442,45 @@ enum Loc {
             "Even twijfelen…",
             "Bijna klaar, echt waar…",
         ]
+    }
+
+    /// Status messages shown during Fill in Body. The cutout-flavoured
+    /// scissors/hair copy doesn't fit when the work is reconstructing a
+    /// torso, so this set leans into "drawing the rest of the person."
+    /// Same length as `processingStatuses` so the per-index dwell times
+    /// in `ProcessingStatusView` line up either way.
+    static var fillBodyProcessingStatuses: [String] {
+        en ? [
+            "Sketching the rest of the body…",
+            "Adding the shoulders…",
+            "Tailoring the shirt…",
+            "Did someone order arms?",
+            "Filling in the torso…",
+            "Smoothing the contours…",
+            "Matching the lighting…",
+            "Borrowing a dress form…",
+            "Polishing the result…",
+            "Almost there, promise…",
+        ] : [
+            "De rest van het lichaam schetsen…",
+            "Schouders toevoegen…",
+            "Het shirt op maat maken…",
+            "Wie had er armen besteld?",
+            "Romp invullen…",
+            "Contouren bijwerken…",
+            "Belichting matchen…",
+            "Even een paspop lenen…",
+            "Het resultaat polijsten…",
+            "Bijna klaar, echt waar…",
+        ]
+    }
+
+    /// Returns the message rotation that fits the current processing kind.
+    static func processingStatuses(for kind: ProcessingKind) -> [String] {
+        switch kind {
+        case .cutout:   return processingStatuses
+        case .fillBody: return fillBodyProcessingStatuses
+        }
     }
 
     // MARK: Editor – Background picker context menu

@@ -56,12 +56,31 @@ struct BatchConfirmRequest {
     let onCancel: () -> Void
 }
 
+/// What kind of work the processing overlay is currently displaying.
+/// Drives the loader's rotating status copy: a cutout/import call sees
+/// scissors-and-hair messages, a Fill in Body call sees body-reframing
+/// messages. Reset to `.cutout` automatically when `isProcessing` flips
+/// back to false, so a subsequent operation defaults to the right copy
+/// without each call site having to clean up.
+enum ProcessingKind {
+    case cutout
+    case fillBody
+}
+
 @MainActor
 @Observable
 final class AppState {
     var selectedPortraitID: UUID?
     var isImporting = false
-    var isProcessing = false
+    var isProcessing = false {
+        didSet {
+            if !isProcessing { processingKind = .cutout }
+        }
+    }
+    /// Drives the rotating status copy in `ProcessingStatusView`. Set this
+    /// BEFORE flipping `isProcessing` to true. Auto-resets to `.cutout`
+    /// when `isProcessing` flips back to false.
+    var processingKind: ProcessingKind = .cutout
     /// Currently shown error/warning banner. Use the `warn`, `fail`, `note`,
     /// or `report(_:)` helpers below — never assign directly — so every entry
     /// goes through severity classification and any policy decisions

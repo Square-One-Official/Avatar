@@ -3,10 +3,16 @@ import SwiftUI
 /// Loader card that rotates through playful status messages while a photo
 /// is being processed. Each message has its own dwell time, so punchlines
 /// linger and the whole sequence doesn't feel like a fixed loop restarting.
+/// The message set is picked from `appState.processingKind` so a Magic
+/// Cutout import shows scissors-and-hair copy and a Fill in Body call
+/// shows body-reframing copy.
 struct ProcessingStatusView: View {
     @State private var index = 0
+    @Environment(AppState.self) private var appState
 
-    private var messages: [String] { Loc.processingStatuses }
+    private var messages: [String] {
+        Loc.processingStatuses(for: appState.processingKind)
+    }
 
     /// Per-message dwell times. Varying the cadence masks the loop —
     /// punchlines ("that's a lot of hair…") get an extra beat, transitions

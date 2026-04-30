@@ -46,6 +46,10 @@ struct EditorView: View {
     /// same eye height and head size. Persisted across app launches.
     @AppStorage("showAlignmentGuide") private var showAlignmentGuide = false
 
+    /// Labs flag — gates the "More" dropdown (Fill in Body etc.) behind
+    /// the Settings → Labs toggle. Off by default while we tune quality.
+    @AppStorage(kFillBodyEnabledKey) private var fillBodyEnabled: Bool = false
+
     // Drag/snap state
     @State private var isDragging = false
     @State private var snappedX = false
@@ -69,6 +73,12 @@ struct EditorView: View {
     // the new portrait, so the editor switches to it on completion.
     @State private var isDropping = false
     @State private var showInspector = true
+
+    // "More magic edits" dropdown — hover-revealed chrome, custom popover so
+    // we can match the trigger's width and gap exactly.
+    @State private var isMoreOpen = false
+    @State private var isMoreHovering = false
+    @State private var moreButtonWidth: CGFloat = 0
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
     #endif
@@ -374,20 +384,16 @@ struct EditorView: View {
             .padding(.top, 10)
             .padding(.bottom, 4)
 
-            Form {
-                Group {
-                    switch editorTab {
-                    case .portrait: portraitTab
-                    case .adjust:   adjustTab
-                    }
+            Group {
+                switch editorTab {
+                case .portrait: portraitTab
+                case .adjust:   adjustTabContainer
                 }
-                .id(editorTab)
-                .transition(
-                    .opacity.animation(.easeOut(duration: 0.18))
-                )
             }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
+            .id(editorTab)
+            .transition(
+                .opacity.animation(.easeOut(duration: 0.18))
+            )
         }
         .background(Color.appCanvas)
         .confirmationDialog(
@@ -415,124 +421,104 @@ struct EditorView: View {
     // MARK: Portrait tab
 
     @ViewBuilder private var portraitTab: some View {
-        Section {
-            HStack(spacing: 8) {
-                Image(systemName: "person.crop.circle")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                TextField(Loc.employeeName, text: $portrait.name)
-                    .textFieldStyle(.plain)
-                    .onChange(of: portrait.name) { _, _ in try? context.save() }
-            }
-            HStack(spacing: 8) {
-                Image(systemName: "tag")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16)
-                TextField(Loc.role, text: $portrait.tags)
-                    .textFieldStyle(.plain)
-                    .onChange(of: portrait.tags) { _, _ in try? context.save() }
-            }
-        } header: {
-            Text(Loc.info)
-        }
-
-        Section {
-            BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
-        } header: {
-            Text(Loc.background)
-        }
-
-        Section {
-            scaleControl
-            Button {
-                autoAlign()
-            } label: {
-                Label(Loc.autoAlignFace, systemImage: "face.smiling")
-            }
-            .disabled(portrait.faceRect == .zero)
-        } header: {
-            Text(Loc.positionScale)
-        }
-
-        enhanceSection
-    }
-
-    private var scaleControl: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Button {
-                    stepScale(by: -0.1)
-                } label: {
-                    Image(systemName: "minus.magnifyingglass")
-                }
-                .buttonStyle(.borderless)
-                .help(Loc.zoomOut)
-                .disabled(portrait.scale <= 0.05)
-
-                ZStack {
-                    Slider(
-                        value: Binding(
-                            get: { portrait.scale },
-                            set: {
-                                trackSliderUndo(actionName: Loc.scale)
-                                portrait.scale = $0
-                                portrait.updatedAt = Date()
-                                try? context.save()
-                            }
-                        ),
-                        in: 0.05...4.0
-                    )
-                    // "Actual size" tick at 1.0x on the 0.05…4.0 range.
-                    GeometryReader { geo in
-                        let fraction = (1.0 - 0.05) / (4.0 - 0.05)
-                        Rectangle()
-                            .fill(Color.secondary.opacity(0.45))
-                            .frame(width: 1.5, height: 6)
-                            .position(x: geo.size.width * fraction, y: geo.size.height / 2)
-                            .help(Loc.actualSize)
+        ScrollView {
+            VStack(spacing: 18) {
+                inspectorSection(title: Loc.info) {
+                    VStack(spacing: 0) {
+                        infoRow(symbol: "person.crop.circle",
+                                placeholder: Loc.employeeName,
+                                text: $portrait.name)
+                        Divider()
+                            .padding(.vertical, 10)
+                        infoRow(symbol: "tag",
+                                placeholder: Loc.role,
+                                text: $portrait.tags)
                     }
-                    .allowsHitTesting(false)
                 }
 
-                Button {
-                    stepScale(by: 0.1)
-                } label: {
-                    Image(systemName: "plus.magnifyingglass")
+                inspectorSection(title: Loc.background) {
+                    BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
                 }
-                .buttonStyle(.borderless)
-                .help(Loc.zoomIn)
-                .disabled(portrait.scale >= 4.0)
 
-                Text(String(format: "%.2fx", portrait.scale))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 48, alignment: .trailing)
+                inspectorSection(title: Loc.edit) {
+                    enhanceSectionBody
+                }
             }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
     }
 
-    private func stepScale(by delta: Double) {
-        trackSliderUndo(actionName: Loc.scale)
-        portrait.scale = min(4.0, max(0.05, portrait.scale + delta))
-        portrait.updatedAt = Date()
-        try? context.save()
-        #if os(macOS)
-        haptics.perform(.generic, performanceTime: .now)
-        #endif
+    private var adjustTabContainer: some View {
+        Form { adjustTab }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private func infoRow(symbol: String, placeholder: String, text: Binding<String>) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .onChange(of: text.wrappedValue) { _, _ in try? context.save() }
+        }
+    }
+
+    /// Section card chrome: a subtle elevated surface (`appSurface`) above the
+    /// sidebar's `appCanvas`, with a small uppercase header. Mirrors the layered
+    /// look of `PillSegmentedControl` so the inspector reads as one family.
+    @ViewBuilder
+    private func inspectorSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .tracking(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+            content()
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                        )
+                )
+        }
     }
 
     // MARK: Enhance section (lives inside the Portrait tab)
 
-    /// True only when this portrait still carries a free Apple-pipeline cutout
-    /// AND the user is now in a position to re-render it with Magic Cutout.
+    /// True whenever this portrait still carries a free Apple-pipeline cutout.
+    /// The card is a one-shot offer to re-cut via cloud Magic Cutout —
+    /// independent of the persistent "Magic Cutout" import toggle. Clicking
+    /// runs cloud regardless of the toggle, and surfaces the paywall if the
+    /// user has neither Pro nor free-trial credit left.
     private var showMagicCutoutUpgradeCard: Bool {
         portrait.originalImageData != nil
             && !portrait.cutoutUsedMagic
-            && ImportFlow.shouldUseMagicCutout(appState: appState)
     }
 
-    @ViewBuilder private var enhanceSection: some View {
-        Section {
+    @ViewBuilder private var enhanceSectionBody: some View {
+        VStack(spacing: 10) {
+            enhanceCard(
+                title: Loc.autoAlignFace,
+                systemImage: "face.smiling",
+                disabled: portrait.faceRect == .zero,
+                help: Loc.autoAlignFace
+            ) {
+                autoAlign()
+            }
+
             enhanceCard(
                 title: portrait.isMagicRetouched ? Loc.magicRetouchUndo : Loc.magicRetouch,
                 systemImage: portrait.isMagicRetouched ? "arrow.uturn.backward" : "wand.and.sparkles",
@@ -563,9 +549,87 @@ struct EditorView: View {
                     ImportFlow.reprocess(portrait: portrait, context: context, appState: appState)
                 }
             }
-        } header: {
-            Text(Loc.edit)
+
+            // "More" — extensible dropdown for Pro AI edits, always pinned
+            // to the bottom of the section. Currently houses Fill in Body
+            // (gated behind Settings → Labs while we tune output quality);
+            // future additions (Colorise, background swap, etc.) slot in
+            // alongside without restructuring the inspector. Rendered as a
+            // Menu using the same chrome as the regular enhance cards so
+            // the section reads as one column of equally-weighted actions.
+            if fillBodyEnabled {
+                moreMagicEditsMenu
+            }
         }
+    }
+
+    @ViewBuilder private var moreMagicEditsMenu: some View {
+        let disabled = portrait.cutoutPNG == nil || appState.isProcessing
+        let showChrome = isMoreHovering || isMoreOpen
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) { isMoreOpen.toggle() }
+        } label: {
+            ZStack {
+                // Card chrome — revealed on hover / when the dropdown is open.
+                enhanceCardLabel(
+                    title: Loc.moreMagicEdits,
+                    systemImage: "sparkles",
+                    active: portrait.isFillBodyApplied,
+                    trailingSystemImage: "chevron.down"
+                )
+                .opacity(showChrome ? 1 : 0)
+
+                // Default text-only state.
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .regular))
+                    Text(Loc.moreMagicEdits)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(.secondary)
+                .opacity(showChrome ? 0 : 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isMoreHovering = hovering }
+        }
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
+        .help(Loc.moreMagicEditsHelp)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: MoreButtonWidthKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(MoreButtonWidthKey.self) { moreButtonWidth = $0 }
+        .overlay(alignment: .bottom) {
+            if isMoreOpen {
+                fillBodyDropdown
+                    .frame(width: moreButtonWidth)
+                    .alignmentGuide(.bottom) { d in d[.top] - 8 }
+                    .transition(.opacity.combined(with: .offset(y: -4)))
+                    .zIndex(1)
+            }
+        }
+    }
+
+    @ViewBuilder private var fillBodyDropdown: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.12)) { isMoreOpen = false }
+            if portrait.isFillBodyApplied {
+                ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            } else {
+                ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            }
+        } label: {
+            enhanceCardLabel(
+                title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
+                systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical",
+                active: portrait.isFillBodyApplied
+            )
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 
     @ViewBuilder
@@ -578,27 +642,57 @@ struct EditorView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(active ? Color.accentColor : Color.primary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
-                    )
-                    .symbolEffect(.bounce, value: active)
-                Text(title)
-                    .fontWeight(.medium)
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
+            enhanceCardLabel(title: title, systemImage: systemImage, active: active)
         }
         .buttonStyle(PressableButtonStyle())
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .help(help)
+    }
+
+    /// The elevated-card visual chrome shared by `enhanceCard` (Button) and
+    /// the "More magic edits" Menu so both sit identically in the section.
+    /// `trailingSystemImage` adds an indicator (e.g. chevron) when the
+    /// label is acting as a Menu opener.
+    @ViewBuilder
+    private func enhanceCardLabel(
+        title: String,
+        systemImage: String,
+        active: Bool = false,
+        trailingSystemImage: String? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(active ? Color.accentColor : Color.primary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
+                )
+                .symbolEffect(.bounce, value: active)
+            Text(title)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.primary)
+            Spacer(minLength: 0)
+            if let trailing = trailingSystemImage {
+                Image(systemName: trailing)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: Adjust tab
@@ -794,6 +888,13 @@ struct EditorView: View {
             undoManager: undoManager
         )
         if result.skipped > 0 { bulkSkippedCount = result.skipped }
+    }
+}
+
+private struct MoreButtonWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

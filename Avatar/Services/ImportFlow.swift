@@ -287,12 +287,19 @@ enum ImportFlow {
         }
     }
 
-    /// Re-runs the cutout pipeline on an existing portrait, overwriting the
-    /// cached PNG + face rect but preserving the user's manual transform
-    /// (offset/scale) and any other editor state. Used by the editor's
-    /// "Opnieuw uitknippen" action so users can re-render a portrait after
-    /// pipeline improvements without losing their framing.
+    /// Re-runs the cutout pipeline on an existing portrait via cloud Magic
+    /// Cutout, overwriting the cached PNG + face rect but preserving the
+    /// user's manual transform (offset/scale) and other editor state.
+    ///
+    /// One-shot — bypasses the persistent `magicCutoutPrefs.enabled` toggle.
+    /// The toggle controls *import* defaults; redo is an explicit per-portrait
+    /// opt-in. Gated on entitlement (`canUseProCutout`): non-entitled users
+    /// see the paywall instead of running the call.
     static func reprocess(portrait: Portrait, context: ModelContext, appState: AppState) {
+        guard appState.proEntitlement.canUseProCutout else {
+            appState.showProUpgradeSheet = true
+            return
+        }
         guard let data = portrait.originalImageData else {
             appState.warn(Loc.noOriginalForRecutout)
             return
@@ -306,22 +313,14 @@ enum ImportFlow {
         appState.dismissBanner()
         dlog("[Reprocess] start id=\(portrait.id) \(cg.width)x\(cg.height)")
 
-        let useCloud = shouldUseMagicCutout(appState: appState)
         let portraitID = portrait.id
         Task.detached(priority: .userInitiated) {
             do {
-                let processed: ProcessedSubject
-                let usedMagic: Bool
-                if useCloud {
-                    let result = try await runCloudWithFallback(cg: cg, appState: appState)
-                    processed = result.subject
-                    usedMagic = result.usedMagic
-                } else {
-                    processed = try ImageProcessor.process(image: cg, birefnetModel: nil)
-                    usedMagic = false
-                }
+                let result = try await runCloudWithFallback(cg: cg, appState: appState)
+                let processed = result.subject
+                let usedMagic = result.usedMagic
                 let pngData = ImageProcessor.pngData(from: processed.cutout) ?? Data()
-                dlog("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero)")
+                dlog("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero) usedMagic=\(usedMagic)")
 
                 await MainActor.run {
                     // Re-fetch the portrait on the main actor to avoid
@@ -422,6 +421,187 @@ enum ImportFlow {
         portrait.updatedAt = Date()
         try? context.save()
         appState.invalidateCutout(for: portrait)
+    }
+
+    // MARK: - Fill in Body (Pro identity-preserving reframe)
+
+    /// Calls `/v1/fill-body`. The server runs Gemini 2.5 Flash to analyse
+    /// the portrait, decides whether anything is actually clipped, and
+    /// (only if so) calls Flux Kontext Pro with a prompt naming the
+    /// SPECIFIC missing parts before re-extracting alpha via BiRefNet.
+    /// On the no-op branch (portrait already complete) no credit is
+    /// charged and the cutout is left untouched — we just show a toast.
+    /// On the updated branch, we re-detect face/body and re-align the
+    /// new cutout via `AutoAligner.computeTransform` (the same auto-align
+    /// used at import) so the result frames consistently with every other
+    /// portrait in the user's library. Undo restores the user's pre-fill
+    /// transform exactly if they prefer it. Costs 1 credit on success;
+    /// failures and no-ops don't deduct.
+    static func fillBody(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
+        guard !portrait.isFillBodyApplied else {
+            appState.note(Loc.fillBodyAlready)
+            return
+        }
+        guard let cutoutData = portrait.cutoutPNG else {
+            appState.note(Loc.noCutoutAvailable)
+            return
+        }
+
+        // Set kind before isProcessing so the loader picks up the
+        // body-reframing copy from the very first frame. Auto-resets to
+        // `.cutout` when isProcessing flips back to false.
+        appState.processingKind = .fillBody
+        appState.isProcessing = true
+        appState.dismissBanner()
+        dlog("[FillBody] start id=\(portrait.id) bytes=\(cutoutData.count)")
+
+        // Snapshot every field we're about to mutate so undo is lossless.
+        let snap = FillBodySnapshot(from: portrait)
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
+        let portraitID = portrait.id
+        let backend = appState.backend
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let outcome = try await backend.fillBody(imagePNG: cutoutData)
+
+                // Gemini analysed the cutout and concluded nothing is
+                // clipped. No credit was charged server-side; tell the user
+                // and leave their portrait untouched.
+                if case .alreadyComplete(let creditsRemaining) = outcome {
+                    await MainActor.run {
+                        appState.proEntitlement.credits = creditsRemaining
+                        appState.isProcessing = false
+                        appState.note(Loc.fillBodyAlreadyComplete)
+                        dlog("[FillBody] DONE no-op id=\(portraitID) credits=\(creditsRemaining)")
+                    }
+                    return
+                }
+
+                guard case .updated(let newCutoutPNG, let creditsRemaining) = outcome else {
+                    return  // Exhaustive switch; unreachable.
+                }
+                guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
+                    throw BackendError.decode
+                }
+                let detected = try ImageProcessor.process(image: newCutoutCG, birefnetModel: nil)
+                let newCutoutSize = CGSize(width: newCutoutCG.width, height: newCutoutCG.height)
+                dlog("[FillBody] new cutout \(newCutoutCG.width)×\(newCutoutCG.height) " +
+                     "eye=\(detected.eyeCenter.map { "\($0.x),\($0.y)" } ?? "nil") " +
+                     "bodyBottom=\(detected.bodyBottomY)")
+
+                await MainActor.run {
+                    let descriptor = FetchDescriptor<Portrait>(
+                        predicate: #Predicate { $0.id == portraitID }
+                    )
+                    guard let fresh = try? context.fetch(descriptor).first else {
+                        appState.isProcessing = false
+                        appState.warn(Loc.portraitNotFound)
+                        return
+                    }
+                    snap.write(into: fresh)
+                    fresh.cutoutPNG = newCutoutPNG
+                    if let face = detected.faceRect { fresh.faceRect = face }
+                    fresh.eyeCenter = detected.eyeCenter
+                    fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
+                    fresh.bodyBottomY = Double(detected.bodyBottomY)
+
+                    // Use the same auto-align logic that runs at import time
+                    // so a Fill in Body result frames consistently with every
+                    // other portrait in the library. Undo restores the
+                    // user's pre-fill transform if they prefer it.
+                    let transform = AutoAligner.computeTransform(
+                        faceRect: detected.faceRect ?? .zero,
+                        eyeCenter: detected.eyeCenter,
+                        interEyeDistance: detected.interEyeDistance,
+                        cutoutSize: newCutoutSize,
+                        bodyBottomY: detected.bodyBottomY
+                    )
+                    fresh.scale = Double(transform.scale)
+                    fresh.offsetX = Double(transform.offset.width)
+                    fresh.offsetY = Double(transform.offset.height)
+                    fresh.isFillBodyApplied = true
+                    fresh.updatedAt = Date()
+                    try? context.save()
+
+                    PortraitUndoManager.registerFromSnapshots(
+                        before: undoBefore,
+                        after: PortraitUndoManager.snapshot(of: fresh),
+                        context: context,
+                        undoManager: undoManager,
+                        appState: appState,
+                        actionName: Loc.fillBody
+                    )
+
+                    // Sync local credit counter so the sidebar updates without
+                    // waiting for the next /v1/account refresh.
+                    appState.proEntitlement.credits = creditsRemaining
+                    appState.invalidateCutout(for: fresh)
+                    appState.isProcessing = false
+                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(creditsRemaining) " +
+                         "scale=\(fresh.scale) offset=(\(fresh.offsetX),\(fresh.offsetY))")
+                }
+            } catch let err as BackendError {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    switch err {
+                    case .noCredits:
+                        appState.showProUpgradeSheet = true
+                    default:
+                        if !appState.report(err) {
+                            appState.warn(Loc.fillBodyFailed)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    appState.warn(Loc.fillBodyFailed)
+                }
+            }
+        }
+    }
+
+    /// Reverts Fill in Body by restoring the snapshotted cutout and geometry.
+    /// One-shot: credits are not refunded (the Replicate call already happened).
+    static func undoFillBody(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
+        guard portrait.isFillBodyApplied, let original = portrait.preFillBodyPNG else { return }
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
+        portrait.cutoutPNG = original
+        portrait.faceRectX = portrait.preFillFaceRectX
+        portrait.faceRectY = portrait.preFillFaceRectY
+        portrait.faceRectW = portrait.preFillFaceRectW
+        portrait.faceRectH = portrait.preFillFaceRectH
+        portrait.eyeCenterX = portrait.preFillEyeCenterX
+        portrait.eyeCenterY = portrait.preFillEyeCenterY
+        portrait.interEyeDistance = portrait.preFillInterEyeDistance
+        portrait.bodyBottomY = portrait.preFillBodyBottomY
+        portrait.offsetX = portrait.preFillOffsetX
+        portrait.offsetY = portrait.preFillOffsetY
+        portrait.scale = portrait.preFillScale
+        portrait.preFillBodyPNG = nil
+        portrait.isFillBodyApplied = false
+        portrait.updatedAt = Date()
+        try? context.save()
+        appState.invalidateCutout(for: portrait)
+        PortraitUndoManager.registerFromSnapshots(
+            before: undoBefore,
+            after: PortraitUndoManager.snapshot(of: portrait),
+            context: context,
+            undoManager: undoManager,
+            appState: appState,
+            actionName: Loc.fillBodyUndo
+        )
     }
 
     // MARK: - Import Pipeline
@@ -591,3 +771,43 @@ enum ImportFlow {
         }
     }
 }
+
+// MARK: - Fill in Body helpers
+
+/// Snapshot of every Portrait field Fill in Body mutates. Captured before the
+/// async backend call so the result-handler can write it into `preFill*`
+/// fields atomically and undo can restore exact prior state.
+private struct FillBodySnapshot {
+    let cutoutPNG: Data?
+    let faceRectX: Double, faceRectY: Double, faceRectW: Double, faceRectH: Double
+    let eyeCenterX: Double, eyeCenterY: Double
+    let interEyeDistance: Double
+    let bodyBottomY: Double
+    let offsetX: Double, offsetY: Double
+    let scale: Double
+
+    @MainActor
+    init(from p: Portrait) {
+        cutoutPNG = p.cutoutPNG
+        faceRectX = p.faceRectX; faceRectY = p.faceRectY
+        faceRectW = p.faceRectW; faceRectH = p.faceRectH
+        eyeCenterX = p.eyeCenterX; eyeCenterY = p.eyeCenterY
+        interEyeDistance = p.interEyeDistance
+        bodyBottomY = p.bodyBottomY
+        offsetX = p.offsetX; offsetY = p.offsetY
+        scale = p.scale
+    }
+
+    @MainActor
+    func write(into p: Portrait) {
+        p.preFillBodyPNG = cutoutPNG
+        p.preFillFaceRectX = faceRectX; p.preFillFaceRectY = faceRectY
+        p.preFillFaceRectW = faceRectW; p.preFillFaceRectH = faceRectH
+        p.preFillEyeCenterX = eyeCenterX; p.preFillEyeCenterY = eyeCenterY
+        p.preFillInterEyeDistance = interEyeDistance
+        p.preFillBodyBottomY = bodyBottomY
+        p.preFillOffsetX = offsetX; p.preFillOffsetY = offsetY
+        p.preFillScale = scale
+    }
+}
+

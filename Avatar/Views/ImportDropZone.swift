@@ -169,6 +169,10 @@ private struct PortraitCard: View {
 ///      paywall sheet.
 private struct ProUpsellBanner: View {
     @Environment(AppState.self) private var appState
+    // Bound to the same UserDefaults key as `MagicCutoutPreferences.enabled`.
+    // The prefs object's computed property isn't @Observable-tracked, so a
+    // binding through it writes through but never re-renders the toggle.
+    @AppStorage("magicCutoutEnabled") private var magicCutoutEnabled: Bool = true
     @State private var hovering = false
 
     private var proGreen: Color {
@@ -216,15 +220,13 @@ private struct ProUpsellBanner: View {
     @ViewBuilder
     private var trailingControl: some View {
         if trialRemaining > 0 {
-            // Flipping the toggle persists immediately via the
-            // MagicCutoutPreferences.enabled UserDefaults setter.
-            Toggle("", isOn: Binding(
-                get: { appState.magicCutoutPrefs.enabled },
-                set: { appState.magicCutoutPrefs.enabled = $0 }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .tint(proGreen)
+            // @AppStorage writes the same UserDefaults key that
+            // `MagicCutoutPreferences.enabled` reads, so import-flow gating
+            // through `prefs.enabled` continues to see the right value.
+            Toggle("", isOn: $magicCutoutEnabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(proGreen)
         } else {
             Button {
                 appState.showProUpgradeSheet = true
