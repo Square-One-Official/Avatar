@@ -444,6 +444,10 @@ enum ImportFlow {
             return
         }
 
+        // Set kind before isProcessing so the loader picks up the
+        // body-reframing copy from the very first frame. Auto-resets to
+        // `.cutout` when isProcessing flips back to false.
+        appState.processingKind = .fillBody
         appState.isProcessing = true
         appState.dismissBanner()
         dlog("[FillBody] start id=\(portrait.id) bytes=\(cutoutData.count)")

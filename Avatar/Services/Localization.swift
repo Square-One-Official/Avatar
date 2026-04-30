@@ -426,6 +426,45 @@ enum Loc {
         ]
     }
 
+    /// Status messages shown during Fill in Body. The cutout-flavoured
+    /// scissors/hair copy doesn't fit when the work is reconstructing a
+    /// torso, so this set leans into "drawing the rest of the person."
+    /// Same length as `processingStatuses` so the per-index dwell times
+    /// in `ProcessingStatusView` line up either way.
+    static var fillBodyProcessingStatuses: [String] {
+        en ? [
+            "Sketching the rest of the body…",
+            "Adding the shoulders…",
+            "Tailoring the shirt…",
+            "Did someone order arms?",
+            "Filling in the torso…",
+            "Smoothing the contours…",
+            "Matching the lighting…",
+            "Borrowing a dress form…",
+            "Polishing the result…",
+            "Almost there, promise…",
+        ] : [
+            "De rest van het lichaam schetsen…",
+            "Schouders toevoegen…",
+            "Het shirt op maat maken…",
+            "Wie had er armen besteld?",
+            "Romp invullen…",
+            "Contouren bijwerken…",
+            "Belichting matchen…",
+            "Even een paspop lenen…",
+            "Het resultaat polijsten…",
+            "Bijna klaar, echt waar…",
+        ]
+    }
+
+    /// Returns the message rotation that fits the current processing kind.
+    static func processingStatuses(for kind: ProcessingKind) -> [String] {
+        switch kind {
+        case .cutout:   return processingStatuses
+        case .fillBody: return fillBodyProcessingStatuses
+        }
+    }
+
     // MARK: Editor – Background picker context menu
     static var rename: String          { en ? "Rename…" : "Hernoem…" }
     static var setDefault: String      { en ? "Set as default" : "Maak standaard" }
