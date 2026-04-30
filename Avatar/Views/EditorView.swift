@@ -69,6 +69,12 @@ struct EditorView: View {
     // the new portrait, so the editor switches to it on completion.
     @State private var isDropping = false
     @State private var showInspector = true
+
+    // "More magic edits" dropdown — hover-revealed chrome, custom popover so
+    // we can match the trigger's width and gap exactly.
+    @State private var isMoreOpen = false
+    @State private var isMoreHovering = false
+    @State private var moreButtonWidth: CGFloat = 0
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
     #endif
@@ -552,32 +558,71 @@ struct EditorView: View {
 
     @ViewBuilder private var moreMagicEditsMenu: some View {
         let disabled = portrait.cutoutPNG == nil || appState.isProcessing
-        Menu {
-            Button {
-                if portrait.isFillBodyApplied {
-                    ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState)
-                } else {
-                    ImportFlow.fillBody(portrait: portrait, context: context, appState: appState)
-                }
-            } label: {
-                Label(
-                    portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
-                    systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical"
-                )
-            }
+        let showChrome = isMoreHovering || isMoreOpen
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) { isMoreOpen.toggle() }
         } label: {
-            enhanceCardLabel(
-                title: Loc.moreMagicEdits,
-                systemImage: "sparkles",
-                active: portrait.isFillBodyApplied,
-                trailingSystemImage: "chevron.down"
-            )
+            ZStack {
+                // Card chrome — revealed on hover / when the dropdown is open.
+                enhanceCardLabel(
+                    title: Loc.moreMagicEdits,
+                    systemImage: "sparkles",
+                    active: portrait.isFillBodyApplied,
+                    trailingSystemImage: "chevron.down"
+                )
+                .opacity(showChrome ? 1 : 0)
+
+                // Default text-only state.
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .regular))
+                    Text(Loc.moreMagicEdits)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(.secondary)
+                .opacity(showChrome ? 0 : 1)
+            }
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isMoreHovering = hovering }
+        }
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .help(Loc.moreMagicEditsHelp)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: MoreButtonWidthKey.self, value: geo.size.width)
+            }
+        )
+        .onPreferenceChange(MoreButtonWidthKey.self) { moreButtonWidth = $0 }
+        .overlay(alignment: .bottom) {
+            if isMoreOpen {
+                fillBodyDropdown
+                    .frame(width: moreButtonWidth)
+                    .alignmentGuide(.bottom) { d in d[.top] - 8 }
+                    .transition(.opacity.combined(with: .offset(y: -4)))
+                    .zIndex(1)
+            }
+        }
+    }
+
+    @ViewBuilder private var fillBodyDropdown: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.12)) { isMoreOpen = false }
+            if portrait.isFillBodyApplied {
+                ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            } else {
+                ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            }
+        } label: {
+            enhanceCardLabel(
+                title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
+                systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical",
+                active: portrait.isFillBodyApplied
+            )
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 
     @ViewBuilder
@@ -836,6 +881,13 @@ struct EditorView: View {
             undoManager: undoManager
         )
         if result.skipped > 0 { bulkSkippedCount = result.skipped }
+    }
+}
+
+private struct MoreButtonWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

@@ -425,17 +425,24 @@ enum ImportFlow {
 
     // MARK: - Fill in Body (Pro identity-preserving reframe)
 
-    /// Calls `/v1/fill-body` to reframe the portrait into a complete
-    /// upper-body shot via Replicate's google/nano-banana, then re-detects
-    /// face/body on the new cutout and re-frames it as a canonical
-    /// headshot via `fillBodyTransform` (eye pinned at canvas Y = 0.37,
-    /// inter-eye distance = 0.20 × canvas height). The user's prior
-    /// `scale` / `offset` are intentionally discarded: the regenerated
-    /// image has different dimensions and body content, so reusing the
-    /// old transform produced a small misframed result. Undo restores
-    /// the original transform exactly.
-    /// Costs 1 credit; failures don't deduct.
-    static func fillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
+    /// Calls `/v1/fill-body`. The server runs Gemini 2.5 Flash to analyse
+    /// the portrait, decides whether anything is actually clipped, and
+    /// (only if so) calls Flux Kontext Pro with a prompt naming the
+    /// SPECIFIC missing parts before re-extracting alpha via BiRefNet.
+    /// On the no-op branch (portrait already complete) no credit is
+    /// charged and the cutout is left untouched — we just show a toast.
+    /// On the updated branch, we re-detect face/body and re-align the
+    /// new cutout via `AutoAligner.computeTransform` (the same auto-align
+    /// used at import) so the result frames consistently with every other
+    /// portrait in the user's library. Undo restores the user's pre-fill
+    /// transform exactly if they prefer it. Costs 1 credit on success;
+    /// failures and no-ops don't deduct.
+    static func fillBody(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
         guard !portrait.isFillBodyApplied else {
             appState.note(Loc.fillBodyAlready)
             return
@@ -455,12 +462,30 @@ enum ImportFlow {
 
         // Snapshot every field we're about to mutate so undo is lossless.
         let snap = FillBodySnapshot(from: portrait)
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
         let portraitID = portrait.id
         let backend = appState.backend
 
         Task.detached(priority: .userInitiated) {
             do {
-                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
+                let outcome = try await backend.fillBody(imagePNG: cutoutData)
+
+                // Gemini analysed the cutout and concluded nothing is
+                // clipped. No credit was charged server-side; tell the user
+                // and leave their portrait untouched.
+                if case .alreadyComplete(let creditsRemaining) = outcome {
+                    await MainActor.run {
+                        appState.proEntitlement.credits = creditsRemaining
+                        appState.isProcessing = false
+                        appState.note(Loc.fillBodyAlreadyComplete)
+                        dlog("[FillBody] DONE no-op id=\(portraitID) credits=\(creditsRemaining)")
+                    }
+                    return
+                }
+
+                guard case .updated(let newCutoutPNG, let creditsRemaining) = outcome else {
+                    return  // Exhaustive switch; unreachable.
+                }
                 guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
                     throw BackendError.decode
                 }
@@ -486,15 +511,16 @@ enum ImportFlow {
                     fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
                     fresh.bodyBottomY = Double(detected.bodyBottomY)
 
-                    // Always re-frame to a canonical headshot position. The
-                    // user's pre-fill scale/offset can't transfer meaningfully
-                    // onto a regenerated image with different dimensions and
-                    // body content; pretending otherwise gave us a small
-                    // misframed result. Undo restores the original transform
-                    // exactly if the user dislikes the new framing.
-                    let transform = fillBodyTransform(
-                        detected: detected,
-                        cutoutSize: newCutoutSize
+                    // Use the same auto-align logic that runs at import time
+                    // so a Fill in Body result frames consistently with every
+                    // other portrait in the library. Undo restores the
+                    // user's pre-fill transform if they prefer it.
+                    let transform = AutoAligner.computeTransform(
+                        faceRect: detected.faceRect ?? .zero,
+                        eyeCenter: detected.eyeCenter,
+                        interEyeDistance: detected.interEyeDistance,
+                        cutoutSize: newCutoutSize,
+                        bodyBottomY: detected.bodyBottomY
                     )
                     fresh.scale = Double(transform.scale)
                     fresh.offsetX = Double(transform.offset.width)
@@ -502,6 +528,15 @@ enum ImportFlow {
                     fresh.isFillBodyApplied = true
                     fresh.updatedAt = Date()
                     try? context.save()
+
+                    PortraitUndoManager.registerFromSnapshots(
+                        before: undoBefore,
+                        after: PortraitUndoManager.snapshot(of: fresh),
+                        context: context,
+                        undoManager: undoManager,
+                        appState: appState,
+                        actionName: Loc.fillBody
+                    )
 
                     // Sync local credit counter so the sidebar updates without
                     // waiting for the next /v1/account refresh.
@@ -534,8 +569,14 @@ enum ImportFlow {
 
     /// Reverts Fill in Body by restoring the snapshotted cutout and geometry.
     /// One-shot: credits are not refunded (the Replicate call already happened).
-    static func undoFillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
+    static func undoFillBody(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
         guard portrait.isFillBodyApplied, let original = portrait.preFillBodyPNG else { return }
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
         portrait.cutoutPNG = original
         portrait.faceRectX = portrait.preFillFaceRectX
         portrait.faceRectY = portrait.preFillFaceRectY
@@ -553,6 +594,14 @@ enum ImportFlow {
         portrait.updatedAt = Date()
         try? context.save()
         appState.invalidateCutout(for: portrait)
+        PortraitUndoManager.registerFromSnapshots(
+            before: undoBefore,
+            after: PortraitUndoManager.snapshot(of: portrait),
+            context: context,
+            undoManager: undoManager,
+            appState: appState,
+            actionName: Loc.fillBodyUndo
+        )
     }
 
     // MARK: - Import Pipeline
@@ -760,56 +809,5 @@ private struct FillBodySnapshot {
         p.preFillOffsetX = offsetX; p.preFillOffsetY = offsetY
         p.preFillScale = scale
     }
-}
-
-/// The canonical transform for a Fill in Body result.
-///
-/// Pins the eye at the standard canvas position (X = 0.5, Y = 0.37) with
-/// a tighter inter-eye ratio than AutoAligner's default, so the head
-/// fills the canvas like a passport / LinkedIn headshot. Any body content
-/// the model generated below the chest extends past the canvas bottom
-/// by design — that's the desired portrait crop.
-///
-/// Body-aware scaling (`bodyBottomY`) is intentionally NOT applied —
-/// that logic shrinks the head to fit the entire body in the canvas,
-/// which is exactly the wrong outcome when a portrait crop is the
-/// target. The user can still drag / scale manually if they want to
-/// see more body, and Undo restores their original framing.
-@MainActor
-private func fillBodyTransform(
-    detected: ProcessedSubject,
-    cutoutSize: CGSize
-) -> AlignTransform {
-    let canvas = CanvasConstants.editCanvas
-    if let eye = detected.eyeCenter,
-       let ied = detected.interEyeDistance, ied > 0 {
-        // 0.20 = ~1.7× AutoAligner's default 0.12. Calibrated for
-        // headshot framing (head fills ~60% of canvas height, shoulders
-        // span the canvas width, anything below the upper chest goes
-        // off-screen). Tweak if real-world results land too tight or
-        // too loose.
-        let targetEyeRatio: CGFloat = 0.20
-        let scale = (canvas.height * targetEyeRatio) / ied
-        let targetEyeX = canvas.width * CanvasConstants.targetEyeCenterX
-        let targetEyeY = canvas.height * CanvasConstants.targetEyeCenterY
-        return AlignTransform(
-            scale: scale,
-            offset: CGSize(
-                width: targetEyeX - eye.x * scale,
-                height: targetEyeY - eye.y * scale
-            )
-        )
-    }
-    // No eye landmarks — fall back to AutoAligner's face-rect path with
-    // body-aware scaling disabled so we still get a head-centred crop
-    // rather than a body-fits-canvas one.
-    return AutoAligner.computeTransform(
-        faceRect: detected.faceRect ?? .zero,
-        eyeCenter: nil,
-        interEyeDistance: nil,
-        cutoutSize: cutoutSize,
-        bodyBottomY: 0,
-        canvas: canvas
-    )
 }
 

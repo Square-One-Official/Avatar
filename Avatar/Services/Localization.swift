@@ -122,6 +122,10 @@ enum Loc {
         en ? "Couldn't fill in the body. Please try again."
            : "Kon het lichaam niet aanvullen. Probeer het opnieuw."
     }
+    static var fillBodyAlreadyComplete: String {
+        en ? "This portrait already looks complete \u{2014} no fill needed."
+           : "Dit portret ziet er al compleet uit \u{2014} geen aanvulling nodig."
+    }
 
     static var proUpgradeSignInFirst: String {
         en ? "Please sign in first to manage your subscription."

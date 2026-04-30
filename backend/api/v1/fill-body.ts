@@ -6,7 +6,7 @@ import {
   logCredit,
 } from "../../lib/supabase.js";
 import { flattenOnGrey } from "../../lib/image.js";
-import { editPortrait, magicCutout } from "../../lib/replicate.js";
+import { analyzePortrait, editPortrait, magicCutout } from "../../lib/replicate.js";
 
 export const config = {
   api: {
@@ -18,28 +18,26 @@ export const config = {
  * POST /v1/fill-body
  *
  * Body:    { image: <base64 PNG with alpha — the current cutout> }
- * Returns: 200 { cutout: <base64 PNG with alpha — extended cutout>,
- *                credits_remaining: int }
- *          402 { error: "insufficient_credits", credits_remaining: 0 }
- *          401 { error: "unauthorized" }
- *          429 { error: "rate_limited" }
+ * Returns: 200 success
+ *            { cutout: <base64 PNG>, credits_remaining: int, no_changes: false }
+ *          200 no-op (portrait was already complete — no credit charged)
+ *            { cutout: null, credits_remaining: int, no_changes: true,
+ *              reason: <short text from the analyser> }
+ *          402 insufficient_credits (only on the success path)
+ *          401 unauthorized
+ *          429 rate_limited
  *
- * Reconstructs the person's full upper body on a cropped portrait. Costs
- * 1 credit per call — no free trial (unlike Magic Cutout). Dev-allowlisted
- * users skip the credit gate so the developer can iterate.
+ * Pipeline:
+ *   1. Flatten alpha → grey so the analyser sees a clean silhouette.
+ *   2. Gemini 2.5 Flash decides whether the portrait is already complete or
+ *      what specific body parts are clipped. Always runs (cheap, ~$0.001).
+ *   3. If complete → respond { no_changes: true } and return without
+ *      charging a credit. Client shows "already complete" toast.
+ *   4. Otherwise → check credits (402 if empty), then Flux Kontext Pro
+ *      with a prompt naming the specific clipped parts, BiRefNet to
+ *      re-extract alpha, log 1 credit, return new cutout.
  *
- * Pipeline (single user-visible operation, two Replicate calls internally):
- *   1. Flatten the alpha cutout onto neutral grey so Nano Banana gets a
- *      normal RGB photo to reframe.
- *   2. Nano Banana regenerates the portrait with the full upper body
- *      visible while preserving face / hair / clothing identity.
- *   3. BiRefNet re-extracts a clean alpha matte from the result so the
- *      client receives a transparent-PNG cutout (same shape as /v1/cutout).
- *      We absorb the BiRefNet cost; the user pays one credit.
- *
- * Errors before deduction don't charge. Errors during either Replicate
- * call don't charge either — credit is only logged after we have the
- * final bytes in hand.
+ * Errors before the credit-deducting Replicate call don't charge.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -82,6 +80,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureUser(user.id);
 
+    // Step 1 + 2: flatten + analyse. Always runs, regardless of credit
+    // balance, so we can no-op on already-complete portraits without
+    // refusing the user a free check.
+    const flattened = await flattenOnGrey(inputBytes);
+    const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
+    const analysis = await analyzePortrait({ imageDataUrl: flattenedDataUrl });
+
+    if (analysis.complete) {
+      const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
+      res.status(200).json({
+        cutout: null,
+        credits_remaining: creditsRemaining,
+        no_changes: true,
+        reason: "portrait_already_complete",
+      });
+      return;
+    }
+
+    // Step 3: credit gate. Only checked once we know we're going to do
+    // billable work.
     if (!isDevUser) {
       const credits = await currentCredits(user.id);
       if (credits < 1) {
@@ -90,21 +108,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 1. Flatten alpha → grey so Nano Banana sees a normal RGB studio photo.
-    const flattened = await flattenOnGrey(inputBytes);
-    const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
-
-    // 2. Nano Banana — instruction-based reframe with identity preservation.
-    const reframedUrl = await editPortrait({ imageDataUrl: flattenedDataUrl });
+    // Step 4: Flux Kontext Pro with a prompt that names the SPECIFIC
+    // clipped parts Gemini identified.
+    const reframedUrl = await editPortrait({
+      imageDataUrl: flattenedDataUrl,
+      missing: analysis.missing,
+    });
     const reframedDownload = await fetch(reframedUrl);
     if (!reframedDownload.ok) {
-      throw new Error(`Nano Banana result fetch failed: ${reframedDownload.status}`);
+      throw new Error(`Kontext result fetch failed: ${reframedDownload.status}`);
     }
     const reframedBytes = Buffer.from(await reframedDownload.arrayBuffer());
     const reframedDataUrl = `data:image/png;base64,${reframedBytes.toString("base64")}`;
 
-    // 3. Re-extract alpha so the client receives a transparent cutout
-    //    consistent with /v1/cutout's shape.
+    // Step 5: BiRefNet to re-extract alpha so the client receives a
+    // transparent cutout consistent with /v1/cutout's shape.
     const cutoutUrl = await magicCutout({ imageDataUrl: reframedDataUrl });
     const cutoutDownload = await fetch(cutoutUrl);
     if (!cutoutDownload.ok) {
@@ -121,11 +139,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const creditsRemaining =
-      isDevUser ? 999 : await currentCredits(user.id);
+    const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
     res.status(200).json({
       cutout: cutoutBytes.toString("base64"),
       credits_remaining: creditsRemaining,
+      no_changes: false,
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);
