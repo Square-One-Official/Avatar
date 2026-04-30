@@ -424,6 +424,129 @@ enum ImportFlow {
         appState.invalidateCutout(for: portrait)
     }
 
+    // MARK: - Fill in Body (Pro outpainting)
+
+    /// Calls `/v1/fill-body` to outpaint the cropped portrait, then re-runs
+    /// face/body detection on the result and updates `offsetX/Y` so the
+    /// eye position on the canvas stays exactly where the user had it.
+    /// `scale` is preserved untouched — the user's chosen zoom is sacred.
+    /// Costs 1 credit; failures don't deduct.
+    static func fillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
+        guard !portrait.isFillBodyApplied else {
+            appState.note(Loc.fillBodyAlready)
+            return
+        }
+        guard let cutoutData = portrait.cutoutPNG else {
+            appState.note(Loc.noCutoutAvailable)
+            return
+        }
+
+        appState.isProcessing = true
+        appState.dismissBanner()
+        dlog("[FillBody] start id=\(portrait.id) bytes=\(cutoutData.count)")
+
+        // Snapshot every field we're about to mutate so undo is lossless.
+        let snap = FillBodySnapshot(from: portrait)
+        let portraitID = portrait.id
+        let backend = appState.backend
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
+                guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
+                    throw BackendError.decode
+                }
+                // Run face/body detection on the new cutout. The detector
+                // works on alpha-PNGs the same as on RGB sources — Vision
+                // sees the visible pixels.
+                let detected = try ImageProcessor.process(image: newCutoutCG, birefnetModel: nil)
+
+                await MainActor.run {
+                    let descriptor = FetchDescriptor<Portrait>(
+                        predicate: #Predicate { $0.id == portraitID }
+                    )
+                    guard let fresh = try? context.fetch(descriptor).first else {
+                        appState.isProcessing = false
+                        appState.warn(Loc.portraitNotFound)
+                        return
+                    }
+                    snap.write(into: fresh)
+                    fresh.cutoutPNG = newCutoutPNG
+                    if let face = detected.faceRect { fresh.faceRect = face }
+                    fresh.eyeCenter = detected.eyeCenter
+                    fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
+                    fresh.bodyBottomY = Double(detected.bodyBottomY)
+                    // Preserve canvas-space eye position by adjusting offset
+                    // for the change in head pixel position. Scale stays put.
+                    let preservedOffset = preservedFillBodyOffset(
+                        oldOffsetX: snap.offsetX,
+                        oldOffsetY: snap.offsetY,
+                        scale: snap.scale,
+                        oldEye: CGPoint(x: snap.eyeCenterX, y: snap.eyeCenterY),
+                        oldInterEye: snap.interEyeDistance,
+                        oldFaceRect: CGRect(x: snap.faceRectX, y: snap.faceRectY,
+                                            width: snap.faceRectW, height: snap.faceRectH),
+                        newEye: detected.eyeCenter,
+                        newInterEye: detected.interEyeDistance,
+                        newFaceRect: detected.faceRect
+                    )
+                    fresh.offsetX = preservedOffset.x
+                    fresh.offsetY = preservedOffset.y
+                    fresh.isFillBodyApplied = true
+                    fresh.updatedAt = Date()
+                    try? context.save()
+
+                    // Sync local credit counter so the sidebar updates without
+                    // waiting for the next /v1/account refresh.
+                    appState.proEntitlement.credits = creditsRemaining
+                    appState.invalidateCutout(for: fresh)
+                    appState.isProcessing = false
+                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(creditsRemaining)")
+                }
+            } catch let err as BackendError {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    switch err {
+                    case .noCredits:
+                        appState.showProUpgradeSheet = true
+                    default:
+                        if !appState.report(err) {
+                            appState.warn(Loc.fillBodyFailed)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    appState.warn(Loc.fillBodyFailed)
+                }
+            }
+        }
+    }
+
+    /// Reverts Fill in Body by restoring the snapshotted cutout and geometry.
+    /// One-shot: credits are not refunded (the Replicate call already happened).
+    static func undoFillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
+        guard portrait.isFillBodyApplied, let original = portrait.preFillBodyPNG else { return }
+        portrait.cutoutPNG = original
+        portrait.faceRectX = portrait.preFillFaceRectX
+        portrait.faceRectY = portrait.preFillFaceRectY
+        portrait.faceRectW = portrait.preFillFaceRectW
+        portrait.faceRectH = portrait.preFillFaceRectH
+        portrait.eyeCenterX = portrait.preFillEyeCenterX
+        portrait.eyeCenterY = portrait.preFillEyeCenterY
+        portrait.interEyeDistance = portrait.preFillInterEyeDistance
+        portrait.bodyBottomY = portrait.preFillBodyBottomY
+        portrait.offsetX = portrait.preFillOffsetX
+        portrait.offsetY = portrait.preFillOffsetY
+        portrait.scale = portrait.preFillScale
+        portrait.preFillBodyPNG = nil
+        portrait.isFillBodyApplied = false
+        portrait.updatedAt = Date()
+        try? context.save()
+        appState.invalidateCutout(for: portrait)
+    }
+
     // MARK: - Import Pipeline
 
     /// Returns true when the user is allowed to run Magic Cutout *and* has
@@ -590,4 +713,87 @@ enum ImportFlow {
             }
         }
     }
+}
+
+// MARK: - Fill in Body helpers
+
+/// Snapshot of every Portrait field Fill in Body mutates. Captured before the
+/// async backend call so the result-handler can write it into `preFill*`
+/// fields atomically and undo can restore exact prior state.
+private struct FillBodySnapshot {
+    let cutoutPNG: Data?
+    let faceRectX: Double, faceRectY: Double, faceRectW: Double, faceRectH: Double
+    let eyeCenterX: Double, eyeCenterY: Double
+    let interEyeDistance: Double
+    let bodyBottomY: Double
+    let offsetX: Double, offsetY: Double
+    let scale: Double
+
+    @MainActor
+    init(from p: Portrait) {
+        cutoutPNG = p.cutoutPNG
+        faceRectX = p.faceRectX; faceRectY = p.faceRectY
+        faceRectW = p.faceRectW; faceRectH = p.faceRectH
+        eyeCenterX = p.eyeCenterX; eyeCenterY = p.eyeCenterY
+        interEyeDistance = p.interEyeDistance
+        bodyBottomY = p.bodyBottomY
+        offsetX = p.offsetX; offsetY = p.offsetY
+        scale = p.scale
+    }
+
+    @MainActor
+    func write(into p: Portrait) {
+        p.preFillBodyPNG = cutoutPNG
+        p.preFillFaceRectX = faceRectX; p.preFillFaceRectY = faceRectY
+        p.preFillFaceRectW = faceRectW; p.preFillFaceRectH = faceRectH
+        p.preFillEyeCenterX = eyeCenterX; p.preFillEyeCenterY = eyeCenterY
+        p.preFillInterEyeDistance = interEyeDistance
+        p.preFillBodyBottomY = bodyBottomY
+        p.preFillOffsetX = offsetX; p.preFillOffsetY = offsetY
+        p.preFillScale = scale
+    }
+}
+
+/// Computes a new (offsetX, offsetY) such that the head's canvas-space
+/// position is unchanged after Fill in Body. Mirrors the renderer in
+/// `EditorView.CanvasPreview` (image at top-left = (offsetX, offsetY) scaled
+/// by `scale`), so a pixel at cutout-coord `(px, py)` lands at canvas coord
+/// `(offsetX + px*scale, offsetY + py*scale)`.
+///
+/// Anchor preference (matches `AutoAligner.computeTransform`):
+///   1. eye centre when both old + new have valid eye landmarks
+///   2. face-rect midpoint when both have a non-zero face rect
+///   3. fall back to the previous offset (no change) — better than guessing
+@MainActor
+private func preservedFillBodyOffset(
+    oldOffsetX: Double, oldOffsetY: Double,
+    scale: Double,
+    oldEye: CGPoint, oldInterEye: Double,
+    oldFaceRect: CGRect,
+    newEye: CGPoint?, newInterEye: CGFloat?,
+    newFaceRect: CGRect?
+) -> (x: Double, y: Double) {
+    let oldAnchor: CGPoint?
+    let newAnchor: CGPoint?
+    if oldInterEye > 0, let newEye, let nied = newInterEye, nied > 0 {
+        oldAnchor = oldEye
+        newAnchor = newEye
+    } else if oldFaceRect.width > 0,
+              let nf = newFaceRect, nf.width > 0 {
+        oldAnchor = CGPoint(x: oldFaceRect.midX, y: oldFaceRect.midY)
+        newAnchor = CGPoint(x: nf.midX, y: nf.midY)
+    } else {
+        oldAnchor = nil
+        newAnchor = nil
+    }
+    guard let oa = oldAnchor, let na = newAnchor else {
+        return (oldOffsetX, oldOffsetY)
+    }
+    // Preserve canvas-space anchor:
+    //   oldOffset + oa * scale == newOffset + na * scale
+    //   => newOffset = oldOffset + (oa - na) * scale
+    return (
+        oldOffsetX + (Double(oa.x) - Double(na.x)) * scale,
+        oldOffsetY + (Double(oa.y) - Double(na.y)) * scale
+    )
 }

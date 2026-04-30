@@ -96,6 +96,33 @@ enum Loc {
            : "Herstel de originele uitknip zonder Magic Retouch."
     }
 
+    // MARK: Editor – More magic edits (dropdown of Replicate-backed Pro tools)
+    static var moreMagicEdits: String {
+        en ? "More magic edits" : "Meer magische bewerkingen"
+    }
+    static var moreMagicEditsHelp: String {
+        en ? "Pro AI edits — fill in body and more."
+           : "Pro AI-bewerkingen — vul lichaam aan en meer."
+    }
+    static var fillBody: String {
+        en ? "Fill in body" : "Vul lichaam aan"
+    }
+    static var fillBodyUndo: String {
+        en ? "Undo fill in body" : "Lichaam aanvullen ongedaan maken"
+    }
+    static var fillBodyHelp: String {
+        en ? "Reconstruct shoulders and torso when the photo is cropped."
+           : "Reconstrueer schouders en bovenlichaam als de foto is bijgesneden."
+    }
+    static var fillBodyAlready: String {
+        en ? "Body fill is already applied to this portrait."
+           : "Lichaam aanvullen staat al aan voor dit portret."
+    }
+    static var fillBodyFailed: String {
+        en ? "Couldn't fill in the body. Please try again."
+           : "Kon het lichaam niet aanvullen. Probeer het opnieuw."
+    }
+
     static var proUpgradeSignInFirst: String {
         en ? "Please sign in first to manage your subscription."
            : "Meld je eerst aan om je abonnement te beheren."

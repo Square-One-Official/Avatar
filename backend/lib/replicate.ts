@@ -35,11 +35,59 @@ export async function magicCutout(input: {
     },
   })) as unknown;
 
+  return extractUrl(output, "magicCutout");
+}
+
+/**
+ * Outpaint a portrait using Flux Fill Pro. The caller supplies a padded
+ * RGB image and a black/white mask (black = keep, white = generate).
+ *
+ * Model: `black-forest-labs/flux-fill-pro`, currently SOTA for inpaint /
+ * outpaint of photographic content. Replicate's `replicate.run("slug")`
+ * shortcut resolves to the latest version automatically; if Replicate
+ * starts returning 404s for the unversioned slug, pin a version hash here
+ * the same way `MODEL_VERSION` does for BiRefNet.
+ *
+ * Returns the URL of the result image (RGB, no alpha — caller must
+ * re-extract the matte before handing the result to the client).
+ */
+export const FILL_BODY_PROMPT =
+  "natural continuation of the person's shoulders, torso and clothing; " +
+  "matching skin tone and lighting; photograph, photorealistic, same outfit";
+
+export async function outpaintBody(input: {
+  imageDataUrl: string;
+  maskDataUrl: string;
+  prompt?: string;
+}): Promise<string> {
+  const output = (await replicate.run("black-forest-labs/flux-fill-pro", {
+    input: {
+      image: input.imageDataUrl,
+      mask: input.maskDataUrl,
+      prompt: input.prompt ?? FILL_BODY_PROMPT,
+      // Tuned for body outpainting on portrait crops; revisit after
+      // empirical sampling.
+      guidance: 60,
+      num_inference_steps: 50,
+      safety_tolerance: 2,
+      output_format: "png",
+    },
+  })) as unknown;
+
+  return extractUrl(output, "outpaintBody");
+}
+
+/**
+ * Replicate's SDK output is one of: a string URL, an array of URLs, or a
+ * File-like object with a `.url()` method, depending on model + SDK
+ * version. Normalise to a single URL string.
+ */
+function extractUrl(output: unknown, source: string): string {
   if (typeof output === "string") return output;
   if (Array.isArray(output) && typeof output[0] === "string") return output[0];
   if (output && typeof output === "object" && "url" in output) {
     const fn = (output as { url: () => string }).url;
     if (typeof fn === "function") return fn();
   }
-  throw new Error("Unexpected Replicate output shape from magicCutout");
+  throw new Error(`Unexpected Replicate output shape from ${source}`);
 }

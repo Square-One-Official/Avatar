@@ -94,6 +94,22 @@ final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/fill-body
+    /// Fill in Body — outpaints the cropped portrait downward and sideways
+    /// using Replicate Flux Fill Pro, then re-extracts a clean alpha matte
+    /// via BiRefNet server-side. Returns a transparent-PNG cutout with the
+    /// reconstructed shoulders/torso baked in, plus the user's updated
+    /// credit balance. Costs 1 credit; no free trial.
+    /// On 402 (no credits) the caller surfaces the upgrade sheet; other
+    /// errors propagate so the caller can show the failure toast.
+    func fillBody(imagePNG: Data) async throws -> (Data, Int) {
+        struct Body: Encodable { let image: String }
+        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+        let resp: CutoutResponse = try await request("/v1/fill-body", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.cutout) else { throw BackendError.decode }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/checkout/subscribe
     /// Start a subscription checkout. Server picks the tier from the user
     /// account (single Pro tier currently). Returns a Stripe URL or a

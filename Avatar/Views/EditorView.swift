@@ -547,6 +547,14 @@ struct EditorView: View {
                 }
             }
 
+            // "More magic edits" — extensible dropdown for Pro AI edits.
+            // Currently houses Fill in Body; future additions (Colorise,
+            // background swap, etc.) slot in alongside without restructuring
+            // the inspector. We render it as a Menu using the same chrome
+            // as the regular enhance cards so the section reads as one row
+            // of equally-weighted actions.
+            moreMagicEditsMenu
+
             // Re-cutout is intentionally hidden by default — we promise the
             // initial cutout is right the first time. The single exception:
             // an existing cutout produced by the free Apple pipeline while the
@@ -568,6 +576,36 @@ struct EditorView: View {
         }
     }
 
+    @ViewBuilder private var moreMagicEditsMenu: some View {
+        let disabled = portrait.cutoutPNG == nil || appState.isProcessing
+        Menu {
+            Button {
+                if portrait.isFillBodyApplied {
+                    ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState)
+                } else {
+                    ImportFlow.fillBody(portrait: portrait, context: context, appState: appState)
+                }
+            } label: {
+                Label(
+                    portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
+                    systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical"
+                )
+            }
+        } label: {
+            enhanceCardLabel(
+                title: Loc.moreMagicEdits,
+                systemImage: "sparkles",
+                active: portrait.isFillBodyApplied,
+                trailingSystemImage: "chevron.down"
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
+        .help(Loc.moreMagicEditsHelp)
+    }
+
     @ViewBuilder
     private func enhanceCard(
         title: String,
@@ -578,27 +616,47 @@ struct EditorView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(active ? Color.accentColor : Color.primary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
-                    )
-                    .symbolEffect(.bounce, value: active)
-                Text(title)
-                    .fontWeight(.medium)
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
+            enhanceCardLabel(title: title, systemImage: systemImage, active: active)
         }
         .buttonStyle(PressableButtonStyle())
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .help(help)
+    }
+
+    /// The visual chrome shared by `enhanceCard` (Button) and the
+    /// "More magic edits" Menu so both sit identically in the section.
+    /// `trailingSystemImage` adds an indicator (e.g. chevron) when the
+    /// label is acting as a Menu opener.
+    @ViewBuilder
+    private func enhanceCardLabel(
+        title: String,
+        systemImage: String,
+        active: Bool = false,
+        trailingSystemImage: String? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(active ? Color.accentColor : Color.primary)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
+                )
+                .symbolEffect(.bounce, value: active)
+            Text(title)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.primary)
+            Spacer(minLength: 0)
+            if let trailing = trailingSystemImage {
+                Image(systemName: trailing)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     // MARK: Adjust tab

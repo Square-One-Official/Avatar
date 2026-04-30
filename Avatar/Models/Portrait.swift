@@ -67,6 +67,30 @@ final class Portrait {
     /// it when a free Apple-pipeline cutout exists and the user is now Pro.
     var cutoutUsedMagic: Bool = false
 
+    // MARK: - Fill in Body (Pro outpainting via Replicate)
+    /// True when the current `cutoutPNG` is the Replicate-extended version with
+    /// reconstructed shoulders/torso. Drives the menu label and prevents
+    /// double-application.
+    var isFillBodyApplied: Bool = false
+    /// Snapshot of the cutout BEFORE Fill in Body, so undo restores the exact
+    /// original bytes (lossless).
+    @Attribute(.externalStorage) var preFillBodyPNG: Data?
+    /// Snapshot of the geometry fields BEFORE Fill in Body. Required because
+    /// the new cutout has different pixel dimensions, a new face/eye position,
+    /// and we shift `offsetX/Y` to keep the head at the same canvas position.
+    /// Undo must restore all of these, not just the PNG.
+    var preFillFaceRectX: Double = 0
+    var preFillFaceRectY: Double = 0
+    var preFillFaceRectW: Double = 0
+    var preFillFaceRectH: Double = 0
+    var preFillEyeCenterX: Double = 0
+    var preFillEyeCenterY: Double = 0
+    var preFillInterEyeDistance: Double = 0
+    var preFillBodyBottomY: Double = 0
+    var preFillOffsetX: Double = 0
+    var preFillOffsetY: Double = 0
+    var preFillScale: Double = 1
+
     init(
         id: UUID = UUID(),
         name: String = "",
