@@ -865,6 +865,13 @@ private func isWellFramed(
     let minRight = Double(canvas.width) * 0.6
     if leftCanvas > maxLeft || rightCanvas < minRight { return false }
 
+    // Reject overflow: if either side extends WAY past the canvas, the
+    // user will see a clipped shoulder/arm. AutoAligner picks a smaller
+    // scale that fits the cutout in frame.
+    let minLeft = Double(canvas.width) * -0.2
+    let maxRight = Double(canvas.width) * 1.2
+    if leftCanvas < minLeft || rightCanvas > maxRight { return false }
+
     return true
 }
 

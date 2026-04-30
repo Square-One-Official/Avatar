@@ -60,11 +60,14 @@ export async function magicCutout(input: {
  * re-extract the matte via `magicCutout` before handing it to the client).
  */
 export const FILL_BODY_INSTRUCTION =
-  "Reframe this portrait as a complete upper-body shot. Show the person " +
-  "from the top of the head down to the waist. Keep the exact same face, " +
-  "skin tone, hair, and clothing. Add the missing shoulders, full upper " +
-  "torso, and clothing continuing naturally to the waist. Studio portrait, " +
-  "neutral grey background, soft photographic lighting, sharp focus.";
+  "Reframe this image as a head-and-shoulders studio portrait. Show the " +
+  "person from the top of the head down to the upper chest only — a " +
+  "classic LinkedIn / passport-style framing. Keep the exact same face, " +
+  "skin tone, hair, and clothing. Add only the missing shoulders and " +
+  "upper-chest area. DO NOT add arms below the shoulders, hands, waist, " +
+  "belt, trousers, or any lower body. Centred composition. Studio " +
+  "portrait, neutral grey background, soft photographic lighting, sharp " +
+  "focus.";
 
 export async function editPortrait(input: {
   imageDataUrl: string;
