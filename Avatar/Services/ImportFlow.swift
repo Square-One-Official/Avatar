@@ -427,12 +427,13 @@ enum ImportFlow {
 
     /// Calls `/v1/fill-body` to reframe the portrait into a complete
     /// upper-body shot via Replicate's google/nano-banana, then re-detects
-    /// face/body on the new cutout and chooses the best transform:
-    ///   * preserve the user's eye CANVAS position when the result is
-    ///     well framed (head not chopped, body visible, shoulders not
-    ///     floating)
-    ///   * fall back to a fresh `AutoAligner.computeTransform` when
-    ///     preserving would leave the result clearly misaligned
+    /// face/body on the new cutout and re-frames it as a canonical
+    /// headshot via `fillBodyTransform` (eye pinned at canvas Y = 0.37,
+    /// inter-eye distance = 0.20 × canvas height). The user's prior
+    /// `scale` / `offset` are intentionally discarded: the regenerated
+    /// image has different dimensions and body content, so reusing the
+    /// old transform produced a small misframed result. Undo restores
+    /// the original transform exactly.
     /// Costs 1 credit; failures don't deduct.
     static func fillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
         guard !portrait.isFillBodyApplied else {
@@ -485,10 +486,15 @@ enum ImportFlow {
                     fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
                     fresh.bodyBottomY = Double(detected.bodyBottomY)
 
-                    let transform = chooseFillBodyTransform(
-                        snapshot: snap,
-                        newCutoutSize: newCutoutSize,
-                        detected: detected
+                    // Always re-frame to a canonical headshot position. The
+                    // user's pre-fill scale/offset can't transfer meaningfully
+                    // onto a regenerated image with different dimensions and
+                    // body content; pretending otherwise gave us a small
+                    // misframed result. Undo restores the original transform
+                    // exactly if the user dislikes the new framing.
+                    let transform = fillBodyTransform(
+                        detected: detected,
+                        cutoutSize: newCutoutSize
                     )
                     fresh.scale = Double(transform.scale)
                     fresh.offsetX = Double(transform.offset.width)
@@ -756,49 +762,21 @@ private struct FillBodySnapshot {
     }
 }
 
-/// Choose the canvas transform for the regenerated cutout.
+/// The canonical transform for a Fill in Body result.
 ///
-/// Per product spec ("keep the position the user has set; only re-frame
-/// if it's not right in frame"), this prefers the user's prior eye
-/// canvas position with their `scale` unchanged. If preserving would
-/// produce a clearly misaligned result (head chopped, body invisible,
-/// shoulders floating in space) it falls back to a fresh
-/// `AutoAligner.computeTransform` instead.
-@MainActor
-private func chooseFillBodyTransform(
-    snapshot snap: FillBodySnapshot,
-    newCutoutSize: CGSize,
-    detected: ProcessedSubject
-) -> AlignTransform {
-    let canvas = CanvasConstants.editCanvas
-
-    // Try eye-anchored preservation first. Falls through to face-rect
-    // mid-point if either side is missing eye landmarks (rare but real).
-    if snap.scale > 0,
-       let preserved = preservedTransform(snap: snap, detected: detected),
-       isWellFramed(transform: preserved,
-                    cutoutSize: newCutoutSize,
-                    detected: detected,
-                    canvas: canvas) {
-        dlog("[FillBody] using preserved transform")
-        return preserved
-    }
-
-    dlog("[FillBody] preserved framing rejected — falling back to head-shoulders transform")
-    return headShouldersTransform(detected: detected, cutoutSize: newCutoutSize)
-}
-
-/// Pin the eye at the canonical canvas position with a tighter inter-eye
-/// ratio than AutoAligner's default — the head fills the canvas like a
-/// passport / LinkedIn shot. Any body content the model generated below
-/// the chest extends past the canvas bottom by design (off-screen).
+/// Pins the eye at the standard canvas position (X = 0.5, Y = 0.37) with
+/// a tighter inter-eye ratio than AutoAligner's default, so the head
+/// fills the canvas like a passport / LinkedIn headshot. Any body content
+/// the model generated below the chest extends past the canvas bottom
+/// by design — that's the desired portrait crop.
 ///
-/// This deliberately ignores body-aware scaling (`bodyBottomY`) — that
-/// logic shrinks the head to fit the entire body in the canvas, which is
-/// exactly the wrong outcome when a portrait crop is the target. The user
-/// can still drag / scale manually if they want to see more body.
+/// Body-aware scaling (`bodyBottomY`) is intentionally NOT applied —
+/// that logic shrinks the head to fit the entire body in the canvas,
+/// which is exactly the wrong outcome when a portrait crop is the
+/// target. The user can still drag / scale manually if they want to
+/// see more body, and Undo restores their original framing.
 @MainActor
-private func headShouldersTransform(
+private func fillBodyTransform(
     detected: ProcessedSubject,
     cutoutSize: CGSize
 ) -> AlignTransform {
@@ -833,85 +811,5 @@ private func headShouldersTransform(
         bodyBottomY: 0,
         canvas: canvas
     )
-}
-
-/// Eye-anchored (or face-anchored) transform that puts the new cutout's
-/// anchor at the SAME canvas pixel position the old anchor occupied,
-/// keeping `scale` unchanged. Returns nil when neither cutout has a
-/// usable anchor, in which case the caller should auto-align.
-@MainActor
-private func preservedTransform(
-    snap: FillBodySnapshot,
-    detected: ProcessedSubject
-) -> AlignTransform? {
-    let oldAnchor: CGPoint
-    let newAnchor: CGPoint
-    if snap.interEyeDistance > 0,
-       let newEye = detected.eyeCenter,
-       let newIED = detected.interEyeDistance, newIED > 0 {
-        oldAnchor = CGPoint(x: snap.eyeCenterX, y: snap.eyeCenterY)
-        newAnchor = newEye
-    } else if snap.faceRectW > 0,
-              let newFace = detected.faceRect, newFace.width > 0 {
-        oldAnchor = CGPoint(x: snap.faceRectX + snap.faceRectW / 2,
-                            y: snap.faceRectY + snap.faceRectH / 2)
-        newAnchor = CGPoint(x: newFace.midX, y: newFace.midY)
-    } else {
-        return nil
-    }
-    let oldAnchorCanvasX = snap.offsetX + Double(oldAnchor.x) * snap.scale
-    let oldAnchorCanvasY = snap.offsetY + Double(oldAnchor.y) * snap.scale
-    let newOffsetX = oldAnchorCanvasX - Double(newAnchor.x) * snap.scale
-    let newOffsetY = oldAnchorCanvasY - Double(newAnchor.y) * snap.scale
-    return AlignTransform(
-        scale: CGFloat(snap.scale),
-        offset: CGSize(width: newOffsetX, height: newOffsetY)
-    )
-}
-
-/// Heuristic that rejects an obviously-bad framing of the regenerated
-/// cutout. First-pass thresholds — tighten or loosen after empirical
-/// testing on real portraits.
-@MainActor
-private func isWellFramed(
-    transform t: AlignTransform,
-    cutoutSize: CGSize,
-    detected: ProcessedSubject,
-    canvas: CGSize
-) -> Bool {
-    // Eye y must land in the upper half-ish of the canvas — not chopped
-    // off the top (negative) and not pushed below where a face would
-    // naturally sit in a portrait.
-    if let eye = detected.eyeCenter {
-        let eyeCanvasY = Double(t.offset.height) + Double(eye.y) * Double(t.scale)
-        let minEyeY = Double(canvas.height) * 0.15
-        let maxEyeY = Double(canvas.height) * 0.55
-        if eyeCanvasY < minEyeY || eyeCanvasY > maxEyeY { return false }
-    }
-
-    // Body bottom must be visible (or just past the canvas), not vastly
-    // overshooting (which would mean the body extends way off-screen).
-    let bodyBottomCanvasY = Double(t.offset.height) + Double(detected.bodyBottomY) * Double(t.scale)
-    let minBottom = Double(canvas.height) * 0.7
-    let maxBottom = Double(canvas.height) * 1.2
-    if bodyBottomCanvasY < minBottom || bodyBottomCanvasY > maxBottom { return false }
-
-    // Cutout horizontal coverage: edges should sit roughly at or beyond
-    // the canvas sides. Floating in the middle (large left edge, small
-    // right edge) means shoulders aren't filling the frame.
-    let leftCanvas = Double(t.offset.width)
-    let rightCanvas = Double(t.offset.width) + Double(cutoutSize.width) * Double(t.scale)
-    let maxLeft = Double(canvas.width) * 0.4
-    let minRight = Double(canvas.width) * 0.6
-    if leftCanvas > maxLeft || rightCanvas < minRight { return false }
-
-    // Reject overflow: if either side extends WAY past the canvas, the
-    // user will see a clipped shoulder/arm. AutoAligner picks a smaller
-    // scale that fits the cutout in frame.
-    let minLeft = Double(canvas.width) * -0.2
-    let maxRight = Double(canvas.width) * 1.2
-    if leftCanvas < minLeft || rightCanvas > maxRight { return false }
-
-    return true
 }
 
