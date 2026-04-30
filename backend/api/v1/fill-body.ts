@@ -5,8 +5,8 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { prepareOutpaintInputs } from "../../lib/image.js";
-import { magicCutout, outpaintBody } from "../../lib/replicate.js";
+import { flattenOnGrey } from "../../lib/image.js";
+import { editPortrait, magicCutout } from "../../lib/replicate.js";
 
 export const config = {
   api: {
@@ -17,29 +17,22 @@ export const config = {
 /**
  * POST /v1/fill-body
  *
- * Body:    { image: <base64 PNG with alpha — the current cutout>,
- *            pad_bottom_px?: number,
- *            pad_sides_px?: number }
+ * Body:    { image: <base64 PNG with alpha — the current cutout> }
  * Returns: 200 { cutout: <base64 PNG with alpha — extended cutout>,
- *                credits_remaining: int,
- *                pad_left: int, pad_top: int }
+ *                credits_remaining: int }
  *          402 { error: "insufficient_credits", credits_remaining: 0 }
  *          401 { error: "unauthorized" }
  *          429 { error: "rate_limited" }
  *
- * Reconstructs missing shoulders/torso/sides on a cropped portrait. Costs
+ * Reconstructs the person's full upper body on a cropped portrait. Costs
  * 1 credit per call — no free trial (unlike Magic Cutout). Dev-allowlisted
  * users skip the credit gate so the developer can iterate.
  *
- * The client should pass `pad_bottom_px` / `pad_sides_px` matching its
- * current scale & framing so generated body content lands inside the
- * visible canvas. Server clamps both values to a sensible floor + cap
- * (see `prepareOutpaintInputs`); omitting either falls back to a default
- * ratio of the source dimensions.
- *
  * Pipeline (single user-visible operation, two Replicate calls internally):
- *   1. Pad the cutout (white below + sides), build a mask.
- *   2. Flux Fill Pro fills the masked region with photorealistic body.
+ *   1. Flatten the alpha cutout onto neutral grey so Nano Banana gets a
+ *      normal RGB photo to reframe.
+ *   2. Nano Banana regenerates the portrait with the full upper body
+ *      visible while preserving face / hair / clothing identity.
  *   3. BiRefNet re-extracts a clean alpha matte from the result so the
  *      client receives a transparent-PNG cutout (same shape as /v1/cutout).
  *      We absorb the BiRefNet cost; the user pays one credit.
@@ -97,35 +90,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 1. Pad + mask, then Flux Fill Pro. Pad sizes are caller-driven so
-    //    generated body content lands inside the user's visible canvas at
-    //    their preserved scale; defaults + caps in `prepareOutpaintInputs`
-    //    handle missing or oversize values.
-    const padBottomPxRaw = req.body?.pad_bottom_px;
-    const padSidesPxRaw = req.body?.pad_sides_px;
-    const padBottomPx =
-      typeof padBottomPxRaw === "number" && Number.isFinite(padBottomPxRaw) && padBottomPxRaw >= 0
-        ? padBottomPxRaw : undefined;
-    const padSidesPx =
-      typeof padSidesPxRaw === "number" && Number.isFinite(padSidesPxRaw) && padSidesPxRaw >= 0
-        ? padSidesPxRaw : undefined;
-    const inputs = await prepareOutpaintInputs(inputBytes, { padBottomPx, padSidesPx });
-    const filledUrl = await outpaintBody({
-      imageDataUrl: inputs.imageDataUrl,
-      maskDataUrl: inputs.maskDataUrl,
-    });
+    // 1. Flatten alpha → grey so Nano Banana sees a normal RGB studio photo.
+    const flattened = await flattenOnGrey(inputBytes);
+    const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
 
-    const filledDownload = await fetch(filledUrl);
-    if (!filledDownload.ok) {
-      throw new Error(`Flux result fetch failed: ${filledDownload.status}`);
+    // 2. Nano Banana — instruction-based reframe with identity preservation.
+    const reframedUrl = await editPortrait({ imageDataUrl: flattenedDataUrl });
+    const reframedDownload = await fetch(reframedUrl);
+    if (!reframedDownload.ok) {
+      throw new Error(`Nano Banana result fetch failed: ${reframedDownload.status}`);
     }
-    const filledBytes = Buffer.from(await filledDownload.arrayBuffer());
-    const filledDataUrl = `data:image/png;base64,${filledBytes.toString("base64")}`;
+    const reframedBytes = Buffer.from(await reframedDownload.arrayBuffer());
+    const reframedDataUrl = `data:image/png;base64,${reframedBytes.toString("base64")}`;
 
-    // 2. Re-extract alpha so the client receives a transparent cutout.
-    //    BiRefNet handles the previously-white padding cleanly because the
-    //    fill pipeline replaced white with photographic body content.
-    const cutoutUrl = await magicCutout({ imageDataUrl: filledDataUrl });
+    // 3. Re-extract alpha so the client receives a transparent cutout
+    //    consistent with /v1/cutout's shape.
+    const cutoutUrl = await magicCutout({ imageDataUrl: reframedDataUrl });
     const cutoutDownload = await fetch(cutoutUrl);
     if (!cutoutDownload.ok) {
       throw new Error(`BiRefNet result fetch failed: ${cutoutDownload.status}`);
@@ -137,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         userId: user.id,
         delta: -1,
         reason: "fill_body",
-        ref: filledUrl,
+        ref: reframedUrl,
       });
     }
 
@@ -146,12 +126,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       cutout: cutoutBytes.toString("base64"),
       credits_remaining: creditsRemaining,
-      // Padding the server applied to the original cutout, in source-pixel
-      // space. The client uses these to shift `offsetX/Y` deterministically
-      // so the user's manual head position is preserved without depending
-      // on Vision re-detecting the same eye coordinates in the new image.
-      pad_left: inputs.padLeft,
-      pad_top: inputs.padTop,
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);

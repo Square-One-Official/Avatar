@@ -39,47 +39,49 @@ export async function magicCutout(input: {
 }
 
 /**
- * Outpaint a portrait using Flux Fill Pro. The caller supplies a padded
- * RGB image and a black/white mask (black = keep, white = generate).
+ * Reframe a portrait using Google Nano Banana, an instruction-based,
+ * identity-preserving image editor. Takes the existing photo + a natural-
+ * language reframe instruction; returns a regenerated portrait with the
+ * SAME face/hair/clothing but new framing (full upper-body in our case).
  *
- * Model: `black-forest-labs/flux-fill-pro`, currently SOTA for inpaint /
- * outpaint of photographic content. Replicate's `replicate.run("slug")`
- * shortcut resolves to the latest version automatically; if Replicate
- * starts returning 404s for the unversioned slug, pin a version hash here
- * the same way `MODEL_VERSION` does for BiRefNet.
+ * Why Nano Banana over Flux Fill Pro: generic inpainters fill masked
+ * regions to be visually consistent with their surroundings; given a
+ * person on white background they extend the white background, not the
+ * body. Nano Banana's model card specifically calls out identity
+ * preservation across regenerations — the right tool for "extend the
+ * person, keep the face exactly."
+ *
+ * Replicate's `replicate.run("slug")` shortcut resolves to the latest
+ * version. If we hit a 404 on the unversioned slug, pin a hash from
+ * https://replicate.com/google/nano-banana/versions the same way
+ * `MODEL_VERSION` does for BiRefNet.
  *
  * Returns the URL of the result image (RGB, no alpha — caller must
- * re-extract the matte before handing the result to the client).
+ * re-extract the matte via `magicCutout` before handing it to the client).
  */
-export const FILL_BODY_PROMPT =
-  "Outpaint the missing body. Extend the existing person downward and " +
-  "outward into the masked area: full shoulders, complete upper torso, " +
-  "chest, and clothing continuing all the way to the bottom of the frame. " +
-  "Match the existing skin tone, fabric, colour, and studio lighting " +
-  "exactly. One person only. Photorealistic photograph, sharp focus. " +
-  "No extra heads, no duplicate faces, no text, no logos.";
+export const FILL_BODY_INSTRUCTION =
+  "Reframe this portrait as a complete upper-body shot. Show the person " +
+  "from the top of the head down to the waist. Keep the exact same face, " +
+  "skin tone, hair, and clothing. Add the missing shoulders, full upper " +
+  "torso, and clothing continuing naturally to the waist. Studio portrait, " +
+  "neutral grey background, soft photographic lighting, sharp focus.";
 
-export async function outpaintBody(input: {
+export async function editPortrait(input: {
   imageDataUrl: string;
-  maskDataUrl: string;
   prompt?: string;
 }): Promise<string> {
-  const output = (await replicate.run("black-forest-labs/flux-fill-pro", {
+  const output = (await replicate.run("google/nano-banana", {
     input: {
-      image: input.imageDataUrl,
-      mask: input.maskDataUrl,
-      prompt: input.prompt ?? FILL_BODY_PROMPT,
-      // Defaults from Flux Fill Pro's Replicate page. Earlier guidance=60
-      // produced near-no-op fills (model preserved white background instead
-      // of generating shoulders) — 30 follows the prompt without collapsing.
-      guidance: 30,
-      num_inference_steps: 50,
-      safety_tolerance: 2,
+      // `image_input` is an array on Replicate's nano-banana — verified
+      // against https://replicate.com/google/nano-banana/llms.txt
+      // (single-element array for single-image edits).
+      image_input: [input.imageDataUrl],
+      prompt: input.prompt ?? FILL_BODY_INSTRUCTION,
       output_format: "png",
     },
   })) as unknown;
 
-  return extractUrl(output, "outpaintBody");
+  return extractUrl(output, "editPortrait");
 }
 
 /**

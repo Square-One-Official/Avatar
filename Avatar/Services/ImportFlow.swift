@@ -423,12 +423,16 @@ enum ImportFlow {
         appState.invalidateCutout(for: portrait)
     }
 
-    // MARK: - Fill in Body (Pro outpainting)
+    // MARK: - Fill in Body (Pro identity-preserving reframe)
 
-    /// Calls `/v1/fill-body` to outpaint the cropped portrait, then re-runs
-    /// face/body detection on the result and updates `offsetX/Y` so the
-    /// eye position on the canvas stays exactly where the user had it.
-    /// `scale` is preserved untouched — the user's chosen zoom is sacred.
+    /// Calls `/v1/fill-body` to reframe the portrait into a complete
+    /// upper-body shot via Replicate's google/nano-banana, then re-detects
+    /// face/body on the new cutout and chooses the best transform:
+    ///   * preserve the user's eye CANVAS position when the result is
+    ///     well framed (head not chopped, body visible, shoulders not
+    ///     floating)
+    ///   * fall back to a fresh `AutoAligner.computeTransform` when
+    ///     preserving would leave the result clearly misaligned
     /// Costs 1 credit; failures don't deduct.
     static func fillBody(portrait: Portrait, context: ModelContext, appState: AppState) {
         guard !portrait.isFillBodyApplied else {
@@ -448,35 +452,18 @@ enum ImportFlow {
         let snap = FillBodySnapshot(from: portrait)
         let portraitID = portrait.id
         let backend = appState.backend
-        // Compute padding tailored to the user's current scale + framing,
-        // so the body content the model generates lands inside the visible
-        // canvas at the user's preserved zoom — not extending off-screen.
-        // Server clamps to a sensible floor + cap.
-        let padRequest = fillBodyPadRequest(
-            cutoutWidth: ImageProcessor.cgImage(from: cutoutData)?.width,
-            cutoutHeight: ImageProcessor.cgImage(from: cutoutData)?.height,
-            portrait: portrait
-        )
-        dlog("[FillBody] requesting pad bottom=\(padRequest.bottomPx ?? -1) sides=\(padRequest.sidesPx ?? -1)")
 
         Task.detached(priority: .userInitiated) {
             do {
-                let result = try await backend.fillBody(
-                    imagePNG: cutoutData,
-                    padBottomPx: padRequest.bottomPx,
-                    padSidesPx: padRequest.sidesPx
-                )
-                guard let newCutoutCG = ImageProcessor.cgImage(from: result.cutoutPNG) else {
+                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
+                guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
                     throw BackendError.decode
                 }
-                // Run face/body detection on the new cutout — purely to
-                // refresh the alignment metadata so future BulkAlign /
-                // export passes see the new geometry. Position
-                // preservation does NOT depend on this detection: we use
-                // the server's deterministic pad_left/pad_top instead.
                 let detected = try ImageProcessor.process(image: newCutoutCG, birefnetModel: nil)
+                let newCutoutSize = CGSize(width: newCutoutCG.width, height: newCutoutCG.height)
                 dlog("[FillBody] new cutout \(newCutoutCG.width)×\(newCutoutCG.height) " +
-                     "padL=\(result.padLeft) padT=\(result.padTop)")
+                     "eye=\(detected.eyeCenter.map { "\($0.x),\($0.y)" } ?? "nil") " +
+                     "bodyBottom=\(detected.bodyBottomY)")
 
                 await MainActor.run {
                     let descriptor = FetchDescriptor<Portrait>(
@@ -488,29 +475,31 @@ enum ImportFlow {
                         return
                     }
                     snap.write(into: fresh)
-                    fresh.cutoutPNG = result.cutoutPNG
+                    fresh.cutoutPNG = newCutoutPNG
                     if let face = detected.faceRect { fresh.faceRect = face }
                     fresh.eyeCenter = detected.eyeCenter
                     fresh.interEyeDistance = Double(detected.interEyeDistance ?? 0)
                     fresh.bodyBottomY = Double(detected.bodyBottomY)
-                    // Position preservation: the head shifted right by
-                    // `padLeft` and down by `padTop` pixels inside the new
-                    // (larger) cutout. Compensate by shifting offsetX/Y left
-                    // and up by the same number of canvas-space pixels
-                    // (= padding * scale). Eye/face positions on the canvas
-                    // are mathematically unchanged. `scale` stays put.
-                    fresh.offsetX = snap.offsetX - Double(result.padLeft) * snap.scale
-                    fresh.offsetY = snap.offsetY - Double(result.padTop) * snap.scale
+
+                    let transform = chooseFillBodyTransform(
+                        snapshot: snap,
+                        newCutoutSize: newCutoutSize,
+                        detected: detected
+                    )
+                    fresh.scale = Double(transform.scale)
+                    fresh.offsetX = Double(transform.offset.width)
+                    fresh.offsetY = Double(transform.offset.height)
                     fresh.isFillBodyApplied = true
                     fresh.updatedAt = Date()
                     try? context.save()
 
                     // Sync local credit counter so the sidebar updates without
                     // waiting for the next /v1/account refresh.
-                    appState.proEntitlement.credits = result.creditsRemaining
+                    appState.proEntitlement.credits = creditsRemaining
                     appState.invalidateCutout(for: fresh)
                     appState.isProcessing = false
-                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(result.creditsRemaining)")
+                    dlog("[FillBody] DONE id=\(fresh.id) credits=\(creditsRemaining) " +
+                         "scale=\(fresh.scale) offset=(\(fresh.offsetX),\(fresh.offsetY))")
                 }
             } catch let err as BackendError {
                 await MainActor.run {
@@ -763,45 +752,115 @@ private struct FillBodySnapshot {
     }
 }
 
-/// How much padding to ask the backend to add when outpainting this portrait.
-/// We compute the pixel padding needed so the model's generated body lands
-/// inside the visible canvas at the user's current scale — i.e., we extend
-/// the cutout downward / sideways exactly enough to cover the empty canvas
-/// space below the existing body bottom and beside the cutout edges.
+/// Choose the canvas transform for the regenerated cutout.
 ///
-/// Returning `nil` for either value falls back to the server's default ratio
-/// (used when we can't read cutout dimensions or the portrait has no usable
-/// body bottom landmark yet).
+/// Per product spec ("keep the position the user has set; only re-frame
+/// if it's not right in frame"), this prefers the user's prior eye
+/// canvas position with their `scale` unchanged. If preserving would
+/// produce a clearly misaligned result (head chopped, body invisible,
+/// shoulders floating in space) it falls back to a fresh
+/// `AutoAligner.computeTransform` instead.
 @MainActor
-private func fillBodyPadRequest(
-    cutoutWidth: Int?,
-    cutoutHeight: Int?,
-    portrait: Portrait
-) -> (bottomPx: Int?, sidesPx: Int?) {
-    guard let cw = cutoutWidth, let ch = cutoutHeight, portrait.scale > 0 else {
-        return (nil, nil)
-    }
+private func chooseFillBodyTransform(
+    snapshot snap: FillBodySnapshot,
+    newCutoutSize: CGSize,
+    detected: ProcessedSubject
+) -> AlignTransform {
     let canvas = CanvasConstants.editCanvas
-    let scale = portrait.scale
 
-    // Bottom: distance from current body bottom to the canvas bottom (with
-    // a small overshoot so the body looks like it continues out of frame),
-    // converted to source-cutout pixels via the user's scale.
-    let bodyBottomCanvasY = portrait.offsetY + portrait.bodyBottomY * scale
-    let targetBottomCanvasY = Double(canvas.height) * (1.0 + Double(AutoAligner.bodyOvershoot))
-    let neededBottomCanvas = max(0, targetBottomCanvasY - bodyBottomCanvasY)
-    let padBottomPx = Int((neededBottomCanvas / scale).rounded())
+    // Try eye-anchored preservation first. Falls through to face-rect
+    // mid-point if either side is missing eye landmarks (rare but real).
+    if snap.scale > 0,
+       let preserved = preservedTransform(snap: snap, detected: detected),
+       isWellFramed(transform: preserved,
+                    cutoutSize: newCutoutSize,
+                    detected: detected,
+                    canvas: canvas) {
+        dlog("[FillBody] using preserved transform")
+        return preserved
+    }
 
-    // Sides: distance from each cutout edge to the canvas edge, converted
-    // to source pixels. We use the larger of the two for symmetric padding
-    // since the model fills both sides identically.
-    let cutoutLeftCanvas = portrait.offsetX
-    let cutoutRightCanvas = portrait.offsetX + Double(cw) * scale
-    let neededLeftCanvas = max(0, 0 - cutoutLeftCanvas)
-    let neededRightCanvas = max(0, Double(canvas.width) - cutoutRightCanvas)
-    let neededSidesCanvas = max(neededLeftCanvas, neededRightCanvas)
-    let padSidesPx = Int((neededSidesCanvas / scale).rounded())
+    dlog("[FillBody] preserved framing rejected — falling back to AutoAligner")
+    return AutoAligner.computeTransform(
+        faceRect: detected.faceRect ?? .zero,
+        eyeCenter: detected.eyeCenter,
+        interEyeDistance: detected.interEyeDistance,
+        cutoutSize: newCutoutSize,
+        bodyBottomY: detected.bodyBottomY,
+        canvas: canvas
+    )
+}
 
-    return (padBottomPx, padSidesPx)
+/// Eye-anchored (or face-anchored) transform that puts the new cutout's
+/// anchor at the SAME canvas pixel position the old anchor occupied,
+/// keeping `scale` unchanged. Returns nil when neither cutout has a
+/// usable anchor, in which case the caller should auto-align.
+@MainActor
+private func preservedTransform(
+    snap: FillBodySnapshot,
+    detected: ProcessedSubject
+) -> AlignTransform? {
+    let oldAnchor: CGPoint
+    let newAnchor: CGPoint
+    if snap.interEyeDistance > 0,
+       let newEye = detected.eyeCenter,
+       let newIED = detected.interEyeDistance, newIED > 0 {
+        oldAnchor = CGPoint(x: snap.eyeCenterX, y: snap.eyeCenterY)
+        newAnchor = newEye
+    } else if snap.faceRectW > 0,
+              let newFace = detected.faceRect, newFace.width > 0 {
+        oldAnchor = CGPoint(x: snap.faceRectX + snap.faceRectW / 2,
+                            y: snap.faceRectY + snap.faceRectH / 2)
+        newAnchor = CGPoint(x: newFace.midX, y: newFace.midY)
+    } else {
+        return nil
+    }
+    let oldAnchorCanvasX = snap.offsetX + Double(oldAnchor.x) * snap.scale
+    let oldAnchorCanvasY = snap.offsetY + Double(oldAnchor.y) * snap.scale
+    let newOffsetX = oldAnchorCanvasX - Double(newAnchor.x) * snap.scale
+    let newOffsetY = oldAnchorCanvasY - Double(newAnchor.y) * snap.scale
+    return AlignTransform(
+        scale: CGFloat(snap.scale),
+        offset: CGSize(width: newOffsetX, height: newOffsetY)
+    )
+}
+
+/// Heuristic that rejects an obviously-bad framing of the regenerated
+/// cutout. First-pass thresholds — tighten or loosen after empirical
+/// testing on real portraits.
+@MainActor
+private func isWellFramed(
+    transform t: AlignTransform,
+    cutoutSize: CGSize,
+    detected: ProcessedSubject,
+    canvas: CGSize
+) -> Bool {
+    // Eye y must land in the upper half-ish of the canvas — not chopped
+    // off the top (negative) and not pushed below where a face would
+    // naturally sit in a portrait.
+    if let eye = detected.eyeCenter {
+        let eyeCanvasY = Double(t.offset.height) + Double(eye.y) * Double(t.scale)
+        let minEyeY = Double(canvas.height) * 0.15
+        let maxEyeY = Double(canvas.height) * 0.55
+        if eyeCanvasY < minEyeY || eyeCanvasY > maxEyeY { return false }
+    }
+
+    // Body bottom must be visible (or just past the canvas), not vastly
+    // overshooting (which would mean the body extends way off-screen).
+    let bodyBottomCanvasY = Double(t.offset.height) + Double(detected.bodyBottomY) * Double(t.scale)
+    let minBottom = Double(canvas.height) * 0.7
+    let maxBottom = Double(canvas.height) * 1.2
+    if bodyBottomCanvasY < minBottom || bodyBottomCanvasY > maxBottom { return false }
+
+    // Cutout horizontal coverage: edges should sit roughly at or beyond
+    // the canvas sides. Floating in the middle (large left edge, small
+    // right edge) means shoulders aren't filling the frame.
+    let leftCanvas = Double(t.offset.width)
+    let rightCanvas = Double(t.offset.width) + Double(cutoutSize.width) * Double(t.scale)
+    let maxLeft = Double(canvas.width) * 0.4
+    let minRight = Double(canvas.width) * 0.6
+    if leftCanvas > maxLeft || rightCanvas < minRight { return false }
+
+    return true
 }
 

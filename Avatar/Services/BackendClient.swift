@@ -95,64 +95,21 @@ final class BackendClient {
     }
 
     // MARK: POST /v1/fill-body
-    /// Fill in Body — outpaints the cropped portrait downward and sideways
-    /// using Replicate Flux Fill Pro, then re-extracts a clean alpha matte
-    /// via BiRefNet server-side. Returns a transparent-PNG cutout with the
-    /// reconstructed shoulders/torso baked in, plus the user's updated
-    /// credit balance and the padding offsets the server applied. Costs
-    /// 1 credit; no free trial.
-    ///
-    /// `padLeft` / `padTop` are pixel offsets in the response cutout's
-    /// coordinate space — exactly how far the original head/body content
-    /// shifted right/down inside the new (larger) cutout. The caller uses
-    /// them to update `offsetX/Y` deterministically, so the user's manual
-    /// head position is preserved without re-detecting the eyes.
+    /// Fill in Body — reframes the cropped portrait into a complete
+    /// upper-body shot via Replicate's google/nano-banana (identity-
+    /// preserving instruction editor), then re-extracts a clean alpha
+    /// matte via BiRefNet server-side. Same response shape as `cutout`:
+    /// transparent-PNG cutout + updated credit balance. Costs 1 credit;
+    /// no free trial.
     ///
     /// On 402 (no credits) the caller surfaces the upgrade sheet; other
     /// errors propagate so the caller can show the failure toast.
-    struct FillBodyResult {
-        let cutoutPNG: Data
-        let creditsRemaining: Int
-        let padLeft: Int
-        let padTop: Int
-    }
-    private struct FillBodyResponse: Decodable {
-        let cutout: String
-        let creditsRemaining: Int
-        let padLeft: Int
-        let padTop: Int
-    }
-    /// `padBottomPx` / `padSidesPx` request specific outpainting amounts in
-    /// the source-cutout's pixel space. Pass these so generated body content
-    /// lands inside the user's visible canvas at their preserved scale —
-    /// the server clamps to a sensible floor + cap (15-150% bottom,
-    /// 5-60% per side) so out-of-range values are still safe.
-    /// Pass `nil` for either to fall back to the server's default ratio.
-    func fillBody(
-        imagePNG: Data,
-        padBottomPx: Int? = nil,
-        padSidesPx: Int? = nil
-    ) async throws -> FillBodyResult {
-        struct Body: Encodable {
-            let image: String
-            let padBottomPx: Int?
-            let padSidesPx: Int?
-        }
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        let body = try encoder.encode(Body(
-            image: imagePNG.base64EncodedString(),
-            padBottomPx: padBottomPx,
-            padSidesPx: padSidesPx
-        ))
-        let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
+    func fillBody(imagePNG: Data) async throws -> (Data, Int) {
+        struct Body: Encodable { let image: String }
+        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+        let resp: CutoutResponse = try await request("/v1/fill-body", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else { throw BackendError.decode }
-        return FillBodyResult(
-            cutoutPNG: data,
-            creditsRemaining: resp.creditsRemaining,
-            padLeft: resp.padLeft,
-            padTop: resp.padTop
-        )
+        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/checkout/subscribe
