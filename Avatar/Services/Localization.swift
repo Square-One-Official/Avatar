@@ -98,7 +98,7 @@ enum Loc {
 
     // MARK: Editor – More magic edits (dropdown of Replicate-backed Pro tools)
     static var moreMagicEdits: String {
-        en ? "More magic edits" : "Meer magische bewerkingen"
+        en ? "More" : "Meer"
     }
     static var moreMagicEditsHelp: String {
         en ? "Pro AI edits — fill in body and more."

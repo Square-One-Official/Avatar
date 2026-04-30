@@ -523,14 +523,6 @@ struct EditorView: View {
                 }
             }
 
-            // "More magic edits" — extensible dropdown for Pro AI edits.
-            // Currently houses Fill in Body; future additions (Colorise,
-            // background swap, etc.) slot in alongside without restructuring
-            // the inspector. We render it as a Menu using the same chrome
-            // as the regular enhance cards so the section reads as one row
-            // of equally-weighted actions.
-            moreMagicEditsMenu
-
             // Re-cutout is intentionally hidden by default — we promise the
             // initial cutout is right the first time. The single exception:
             // an existing cutout produced by the free Apple pipeline while the
@@ -547,6 +539,14 @@ struct EditorView: View {
                     ImportFlow.reprocess(portrait: portrait, context: context, appState: appState)
                 }
             }
+
+            // "More" — extensible dropdown for Pro AI edits, always pinned
+            // to the bottom of the section. Currently houses Fill in Body;
+            // future additions (Colorise, background swap, etc.) slot in
+            // alongside without restructuring the inspector. Rendered as a
+            // Menu using the same chrome as the regular enhance cards so
+            // the section reads as one column of equally-weighted actions.
+            moreMagicEditsMenu
         }
     }
 

@@ -59,15 +59,14 @@ export async function magicCutout(input: {
  * Returns the URL of the result image (RGB, no alpha — caller must
  * re-extract the matte via `magicCutout` before handing it to the client).
  */
+// Kept intentionally short. Replicate's own Nano Banana prompting guide
+// recommends "direct, minimalist instruction"; longer prompts with multiple
+// clauses gave the model surface area to interpret each clause as a separate
+// composition element, producing collages with hallucinated extra people.
+// The "One person only." sentence is the explicit anti-collage guard.
 export const FILL_BODY_INSTRUCTION =
-  "Reframe this image as a head-and-shoulders studio portrait. Show the " +
-  "person from the top of the head down to the upper chest only — a " +
-  "classic LinkedIn / passport-style framing. Keep the exact same face, " +
-  "skin tone, hair, and clothing. Add only the missing shoulders and " +
-  "upper-chest area. DO NOT add arms below the shoulders, hands, waist, " +
-  "belt, trousers, or any lower body. Centred composition. Studio " +
-  "portrait, neutral grey background, soft photographic lighting, sharp " +
-  "focus.";
+  "A studio portrait of this person, head and shoulders, plain grey " +
+  "background. Same face, same hair, same shirt. One person only.";
 
 export async function editPortrait(input: {
   imageDataUrl: string;
