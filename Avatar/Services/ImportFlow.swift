@@ -443,6 +443,13 @@ enum ImportFlow {
         appState: AppState,
         undoManager: UndoManager? = nil
     ) {
+        // Pro-only feature — non-entitled users get the paywall instead of
+        // running the call. Distinct from Magic Cutout's `canUseProCutout`
+        // because Fill in Body has no free-trial allowance.
+        guard appState.proEntitlement.isPro else {
+            appState.showProUpgradeSheet = true
+            return
+        }
         guard !portrait.isFillBodyApplied else {
             appState.note(Loc.fillBodyAlready)
             return

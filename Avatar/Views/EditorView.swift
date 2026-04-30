@@ -74,11 +74,12 @@ struct EditorView: View {
     @State private var isDropping = false
     @State private var showInspector = true
 
-    // "More magic edits" dropdown — hover-revealed chrome, custom popover so
-    // we can match the trigger's width and gap exactly.
+    // "More magic edits" — hover reveals card chrome; click reveals a
+    // floating dropdown 8pt below the trigger (overlay, not inline — must
+    // not push siblings down).
     @State private var isMoreOpen = false
     @State private var isMoreHovering = false
-    @State private var moreButtonWidth: CGFloat = 0
+    @State private var moreTriggerHeight: CGFloat = 0
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
     #endif
@@ -177,8 +178,22 @@ struct EditorView: View {
                         .transition(.opacity)
                 }
             }
+            // Banner overlay — `appState.note(...)` / `warn(...)` / `fail(...)`
+            // set this. Previously only ImportDropZone rendered the banner,
+            // so any toast triggered while the editor was on screen (e.g.
+            // Fill in Body's "already complete" no-op) flipped silently.
+            .overlay(alignment: .bottom) {
+                if let banner = appState.errorBanner {
+                    StatusChip(severity: banner.severity,
+                               message: banner.message,
+                               onDismiss: { appState.dismissBanner() })
+                        .padding(.bottom, 24)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
             .animation(.easeOut(duration: 0.15), value: isDropping)
             .animation(.easeOut(duration: 0.15), value: appState.isProcessing)
+            .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
     }
 
     // MARK: - Canvas
@@ -558,37 +573,70 @@ struct EditorView: View {
             // Menu using the same chrome as the regular enhance cards so
             // the section reads as one column of equally-weighted actions.
             if fillBodyEnabled {
-                moreMagicEditsMenu
+                moreMagicEditsSection
             }
         }
     }
 
-    @ViewBuilder private var moreMagicEditsMenu: some View {
+    /// "More" trigger with a floating dropdown overlaid 8pt below it.
+    /// We capture the trigger's height via a PreferenceKey, then place the
+    /// dropdown using `.overlay(alignment: .topLeading)` + `offset(y: height + 8)`.
+    /// Overlay (not VStack) keeps the dropdown out of the layout flow so
+    /// nothing below shifts when it opens — true menu behaviour, not accordion.
+    /// `zIndex(1)` ensures the dropdown renders over any sibling section that
+    /// follows in the inspector column.
+    @ViewBuilder private var moreMagicEditsSection: some View {
+        moreMagicEditsTrigger
+            .background(
+                GeometryReader { g in
+                    Color.clear.preference(key: MoreTriggerHeightKey.self, value: g.size.height)
+                }
+            )
+            .onPreferenceChange(MoreTriggerHeightKey.self) { moreTriggerHeight = $0 }
+            .overlay(alignment: .topLeading) {
+                if isMoreOpen {
+                    fillBodyDropdown
+                        .frame(maxWidth: .infinity)
+                        .offset(y: moreTriggerHeight + 8)
+                        .transition(
+                            .asymmetric(
+                                insertion: .opacity.combined(with: .offset(y: -6)),
+                                removal: .opacity
+                            )
+                        )
+                }
+            }
+            .zIndex(1)
+    }
+
+    /// Default state: text-only "✨ More". Hover/open state: same content in
+    /// the same position, with the card fill + border faded in. Position never
+    /// shifts — only the surrounding chrome appears.
+    @ViewBuilder private var moreMagicEditsTrigger: some View {
         let disabled = portrait.cutoutPNG == nil || appState.isProcessing
         let showChrome = isMoreHovering || isMoreOpen
         Button {
-            withAnimation(.easeOut(duration: 0.15)) { isMoreOpen.toggle() }
+            withAnimation(.easeOut(duration: 0.18)) { isMoreOpen.toggle() }
         } label: {
-            ZStack {
-                // Card chrome — revealed on hover / when the dropdown is open.
-                enhanceCardLabel(
-                    title: Loc.moreMagicEdits,
-                    systemImage: "sparkles",
-                    active: portrait.isFillBodyApplied,
-                    trailingSystemImage: "chevron.down"
-                )
-                .opacity(showChrome ? 1 : 0)
-
-                // Default text-only state.
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .regular))
-                    Text(Loc.moreMagicEdits)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(.secondary)
-                .opacity(showChrome ? 0 : 1)
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .regular))
+                Text(Loc.moreMagicEdits)
+                    .fontWeight(.medium)
             }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(showChrome ? 0.04 : 0))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(showChrome ? 0.08 : 0), lineWidth: 1)
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { hovering in
@@ -597,26 +645,11 @@ struct EditorView: View {
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .help(Loc.moreMagicEditsHelp)
-        .background(
-            GeometryReader { geo in
-                Color.clear.preference(key: MoreButtonWidthKey.self, value: geo.size.width)
-            }
-        )
-        .onPreferenceChange(MoreButtonWidthKey.self) { moreButtonWidth = $0 }
-        .overlay(alignment: .bottom) {
-            if isMoreOpen {
-                fillBodyDropdown
-                    .frame(width: moreButtonWidth)
-                    .alignmentGuide(.bottom) { d in d[.top] - 8 }
-                    .transition(.opacity.combined(with: .offset(y: -4)))
-                    .zIndex(1)
-            }
-        }
     }
 
     @ViewBuilder private var fillBodyDropdown: some View {
         Button {
-            withAnimation(.easeOut(duration: 0.12)) { isMoreOpen = false }
+            withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
             if portrait.isFillBodyApplied {
                 ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
             } else {
@@ -626,7 +659,8 @@ struct EditorView: View {
             enhanceCardLabel(
                 title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
                 systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical",
-                active: portrait.isFillBodyApplied
+                active: portrait.isFillBodyApplied,
+                showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
             )
         }
         .buttonStyle(PressableButtonStyle())
@@ -659,7 +693,8 @@ struct EditorView: View {
         title: String,
         systemImage: String,
         active: Bool = false,
-        trailingSystemImage: String? = nil
+        trailingSystemImage: String? = nil,
+        showProBadge: Bool = false
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
@@ -676,6 +711,9 @@ struct EditorView: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.primary)
             Spacer(minLength: 0)
+            if showProBadge {
+                ProBadge()
+            }
             if let trailing = trailingSystemImage {
                 Image(systemName: trailing)
                     .font(.system(size: 11, weight: .semibold))
@@ -888,13 +926,6 @@ struct EditorView: View {
             undoManager: undoManager
         )
         if result.skipped > 0 { bulkSkippedCount = result.skipped }
-    }
-}
-
-private struct MoreButtonWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
