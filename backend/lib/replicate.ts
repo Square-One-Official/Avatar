@@ -39,51 +39,51 @@ export async function magicCutout(input: {
 }
 
 /**
- * Reframe a portrait using Google Nano Banana, an instruction-based,
- * identity-preserving image editor. Takes the existing photo + a natural-
- * language reframe instruction; returns a regenerated portrait with the
- * SAME face/hair/clothing but new framing (full upper-body in our case).
+ * Reframe a portrait using Black Forest Labs' Flux Kontext Pro — an
+ * instruction-based photo editor designed for "edit this single image"
+ * rather than multi-image fusion.
  *
- * Why Nano Banana over Flux Fill Pro: generic inpainters fill masked
- * regions to be visually consistent with their surroundings; given a
- * person on white background they extend the white background, not the
- * body. Nano Banana's model card specifically calls out identity
- * preservation across regenerations — the right tool for "extend the
- * person, keep the face exactly."
+ * Why Kontext Pro over Nano Banana: Nano Banana's signature is multi-
+ * image fusion, and even with a single-image input + an explicit
+ * "one person only" prompt it kept producing collages with hallucinated
+ * second subjects and (on the last test) an outright identity swap.
+ * Kontext Pro is purpose-built for instruction edits with character
+ * consistency, and Replicate's benchmark called out its photographic
+ * skin/cloth quality as best-in-class.
  *
  * Replicate's `replicate.run("slug")` shortcut resolves to the latest
- * version. If we hit a 404 on the unversioned slug, pin a hash from
- * https://replicate.com/google/nano-banana/versions the same way
- * `MODEL_VERSION` does for BiRefNet.
+ * version automatically. If we hit a 404 on the unversioned slug, pin
+ * a hash from https://replicate.com/black-forest-labs/flux-kontext-pro/versions
+ * the same way `MODEL_VERSION` does for BiRefNet.
  *
  * Returns the URL of the result image (RGB, no alpha — caller must
  * re-extract the matte via `magicCutout` before handing it to the client).
  */
-// Kept intentionally short. Replicate's own Nano Banana prompting guide
-// recommends "direct, minimalist instruction"; longer prompts with multiple
-// clauses gave the model surface area to interpret each clause as a separate
-// composition element, producing collages with hallucinated extra people.
-//
-// "Professional headshot" is the industry term for the tight head-and-
-// shoulders crop we want — earlier wording like "head and shoulders studio
-// portrait" caused the model to include the full upper body, arms, and
-// belt. The "One person only." sentence is the explicit anti-collage guard.
+// Kept short — long, multi-clause prompts gave Nano Banana surface area
+// to interpret each clause as a separate composition element. Same risk
+// applies less to Kontext Pro (it doesn't do fusion), but minimal direct
+// instruction is good practice either way.
 export const FILL_BODY_INSTRUCTION =
-  "A professional headshot of this person, plain grey background. " +
-  "Same face, same hair, same shirt. One person only.";
+  "Reframe as a professional headshot. Keep the exact same face, hair, " +
+  "skin, and shirt. Plain neutral grey background. One person only.";
 
 export async function editPortrait(input: {
   imageDataUrl: string;
   prompt?: string;
 }): Promise<string> {
-  const output = (await replicate.run("google/nano-banana", {
+  const output = (await replicate.run("black-forest-labs/flux-kontext-pro", {
     input: {
-      // `image_input` is an array on Replicate's nano-banana — verified
-      // against https://replicate.com/google/nano-banana/llms.txt
-      // (single-element array for single-image edits).
-      image_input: [input.imageDataUrl],
+      // Single-string `input_image` (not an array). Schema verified from
+      // https://replicate.com/black-forest-labs/flux-kontext-pro/llms.txt.
+      input_image: input.imageDataUrl,
       prompt: input.prompt ?? FILL_BODY_INSTRUCTION,
+      // Preserve source dimensions so BiRefNet downstream gets the same
+      // aspect ratio it would have for any other cutout.
+      aspect_ratio: "match_input_image",
       output_format: "png",
+      // Max permitted with an input image. Lower values may refuse on
+      // perfectly innocuous portraits.
+      safety_tolerance: 2,
     },
   })) as unknown;
 
