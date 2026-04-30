@@ -427,10 +427,7 @@ struct EditorView: View {
                 }
 
                 inspectorSection(title: Loc.background) {
-                    VStack(spacing: 12) {
-                        BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
-                        autoAlignButton
-                    }
+                    BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
                 }
 
                 inspectorSection(title: Loc.edit) {
@@ -459,32 +456,6 @@ struct EditorView: View {
                 .textFieldStyle(.plain)
                 .onChange(of: text.wrappedValue) { _, _ in try? context.save() }
         }
-    }
-
-    private var autoAlignButton: some View {
-        let disabled = portrait.faceRect == .zero
-        return Button {
-            autoAlign()
-        } label: {
-            Label(Loc.autoAlignFace, systemImage: "face.smiling")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 14)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(Color.primary.opacity(0.05))
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                        )
-                )
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(PressableButtonStyle())
-        .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
     }
 
     /// Section card chrome: a subtle elevated surface (`appSurface`) above the
@@ -527,6 +498,15 @@ struct EditorView: View {
 
     @ViewBuilder private var enhanceSectionBody: some View {
         VStack(spacing: 10) {
+            enhanceCard(
+                title: Loc.autoAlignFace,
+                systemImage: "face.smiling",
+                disabled: portrait.faceRect == .zero,
+                help: Loc.autoAlignFace
+            ) {
+                autoAlign()
+            }
+
             enhanceCard(
                 title: portrait.isMagicRetouched ? Loc.magicRetouchUndo : Loc.magicRetouch,
                 systemImage: portrait.isMagicRetouched ? "arrow.uturn.backward" : "wand.and.sparkles",
