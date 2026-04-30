@@ -116,7 +116,13 @@ private struct LanguageSection: View {
 }
 
 private struct MagicCutoutSection: View {
-    @Environment(MagicCutoutPreferences.self) private var prefs
+    // Bound directly to UserDefaults via @AppStorage instead of going
+    // through `MagicCutoutPreferences`. The prefs object exposes `enabled`
+    // as a plain computed property over UserDefaults, which `@Observable`
+    // does not track — so a binding through `prefs.enabled` writes
+    // through but never re-renders the toggle. @AppStorage observes the
+    // same key directly, which is what makes the switch follow clicks.
+    @AppStorage("magicCutoutEnabled") private var enabled: Bool = true
     @Environment(AppState.self) private var appState
 
     var body: some View {
@@ -146,10 +152,10 @@ private struct MagicCutoutSection: View {
                 Spacer(minLength: 0)
 
                 Toggle("", isOn: Binding(
-                    get: { appState.proEntitlement.isPro && prefs.enabled },
+                    get: { appState.proEntitlement.isPro && enabled },
                     set: { newValue in
                         if appState.proEntitlement.isPro {
-                            prefs.enabled = newValue
+                            enabled = newValue
                         } else if newValue {
                             appState.pendingMagicCutoutEnable = true
                             appState.showProUpgradeSheetInSettings = true

@@ -63,10 +63,14 @@ export async function magicCutout(input: {
 // recommends "direct, minimalist instruction"; longer prompts with multiple
 // clauses gave the model surface area to interpret each clause as a separate
 // composition element, producing collages with hallucinated extra people.
-// The "One person only." sentence is the explicit anti-collage guard.
+//
+// "Professional headshot" is the industry term for the tight head-and-
+// shoulders crop we want — earlier wording like "head and shoulders studio
+// portrait" caused the model to include the full upper body, arms, and
+// belt. The "One person only." sentence is the explicit anti-collage guard.
 export const FILL_BODY_INSTRUCTION =
-  "A studio portrait of this person, head and shoulders, plain grey " +
-  "background. Same face, same hair, same shirt. One person only.";
+  "A professional headshot of this person, plain grey background. " +
+  "Same face, same hair, same shirt. One person only.";
 
 export async function editPortrait(input: {
   imageDataUrl: string;

@@ -784,13 +784,53 @@ private func chooseFillBodyTransform(
         return preserved
     }
 
-    dlog("[FillBody] preserved framing rejected — falling back to AutoAligner")
+    dlog("[FillBody] preserved framing rejected — falling back to head-shoulders transform")
+    return headShouldersTransform(detected: detected, cutoutSize: newCutoutSize)
+}
+
+/// Pin the eye at the canonical canvas position with a tighter inter-eye
+/// ratio than AutoAligner's default — the head fills the canvas like a
+/// passport / LinkedIn shot. Any body content the model generated below
+/// the chest extends past the canvas bottom by design (off-screen).
+///
+/// This deliberately ignores body-aware scaling (`bodyBottomY`) — that
+/// logic shrinks the head to fit the entire body in the canvas, which is
+/// exactly the wrong outcome when a portrait crop is the target. The user
+/// can still drag / scale manually if they want to see more body.
+@MainActor
+private func headShouldersTransform(
+    detected: ProcessedSubject,
+    cutoutSize: CGSize
+) -> AlignTransform {
+    let canvas = CanvasConstants.editCanvas
+    if let eye = detected.eyeCenter,
+       let ied = detected.interEyeDistance, ied > 0 {
+        // 0.20 = ~1.7× AutoAligner's default 0.12. Calibrated for
+        // headshot framing (head fills ~60% of canvas height, shoulders
+        // span the canvas width, anything below the upper chest goes
+        // off-screen). Tweak if real-world results land too tight or
+        // too loose.
+        let targetEyeRatio: CGFloat = 0.20
+        let scale = (canvas.height * targetEyeRatio) / ied
+        let targetEyeX = canvas.width * CanvasConstants.targetEyeCenterX
+        let targetEyeY = canvas.height * CanvasConstants.targetEyeCenterY
+        return AlignTransform(
+            scale: scale,
+            offset: CGSize(
+                width: targetEyeX - eye.x * scale,
+                height: targetEyeY - eye.y * scale
+            )
+        )
+    }
+    // No eye landmarks — fall back to AutoAligner's face-rect path with
+    // body-aware scaling disabled so we still get a head-centred crop
+    // rather than a body-fits-canvas one.
     return AutoAligner.computeTransform(
         faceRect: detected.faceRect ?? .zero,
-        eyeCenter: detected.eyeCenter,
-        interEyeDistance: detected.interEyeDistance,
-        cutoutSize: newCutoutSize,
-        bodyBottomY: detected.bodyBottomY,
+        eyeCenter: nil,
+        interEyeDistance: nil,
+        cutoutSize: cutoutSize,
+        bodyBottomY: 0,
         canvas: canvas
     )
 }
