@@ -64,9 +64,9 @@ enum Loc {
     // MARK: Editor – Background
     static var background: String      { en ? "Background" : "Achtergrond" }
 
-    // MARK: Editor – Position & Scale
-    static var positionScale: String   { en ? "Position & Scale" : "Positie & Schaal" }
+    // MARK: Editor – Alignment
     static var autoAlignFace: String   { en ? "Auto-align to face" : "Auto-uitlijnen op gezicht" }
+    /// Undo action name for handle-based scale changes on the canvas.
     static var scale: String           { en ? "Scale" : "Schaal" }
 
     // MARK: Editor – Edit section
@@ -334,9 +334,6 @@ enum Loc {
     // MARK: Editor – Sidebar tabs
     static var tabPortrait: String     { en ? "Portrait" : "Portret" }
     static var tabAdjust: String       { en ? "Adjust" : "Afstellen" }
-    static var actualSize: String      { en ? "Actual size" : "Werkelijke grootte" }
-    static var zoomOut: String         { en ? "Zoom out" : "Uitzoomen" }
-    static var zoomIn: String          { en ? "Zoom in" : "Inzoomen" }
 
     // MARK: Editor – Library section
     static var library: String         { en ? "Library" : "Bibliotheek" }
