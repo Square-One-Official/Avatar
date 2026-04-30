@@ -10,22 +10,18 @@ struct PressableButtonStyle: ButtonStyle {
     }
 }
 
+#if !APP_STORE
 struct SidebarUpdateCard: View {
     @Environment(UpdateManager.self) private var updater
+    @State private var hovering = false
 
     var body: some View {
         if case let .readyToRelaunch(version) = updater.state {
             VStack(spacing: 10) {
-                Image("AppLogo")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .foregroundStyle(.primary)
-
                 VStack(spacing: 2) {
                     Text(Loc.updatedTo(version))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
                         .lineLimit(1)
                     Text(Loc.relaunchToApply)
                         .font(.system(size: 12))
@@ -33,26 +29,43 @@ struct SidebarUpdateCard: View {
                         .lineLimit(1)
                 }
 
-                Button(Loc.relaunch) {
+                Button {
                     updater.relaunchAndInstall()
+                } label: {
+                    Text(Loc.relaunch)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.15))
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.accentColor.opacity(0.30))
+                        )
+                        .contentShape(Capsule())
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(PressableButtonStyle())
             }
             .frame(maxWidth: .infinity)
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(.controlBackgroundColor))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.ultraThinMaterial)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(hovering ? 0.14 : 0.08))
             )
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.15), value: hovering)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 }
+#endif

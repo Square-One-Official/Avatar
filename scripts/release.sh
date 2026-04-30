@@ -1,54 +1,54 @@
 #!/usr/bin/env bash
 #
-# release.sh — Build, sign, notarize en publiceer een Avatar release.
+# release.sh — Build, sign, notarize, and publish an Avatar release.
 #
-# Gebruik:
+# Usage:
 #   ./scripts/release.sh 1.1 2
 #   (MARKETING_VERSION=1.1, CURRENT_PROJECT_VERSION=2)
 #
-# Vereisten:
+# Requirements:
 #   - Xcode command-line tools
 #   - xcodegen (brew install xcodegen)
-#   - gh CLI (brew install gh), ingelogd
-#   - Sparkle's sign_update tool (zie stap 0)
+#   - gh CLI (brew install gh), authenticated
+#   - Sparkle's sign_update tool (see step 0)
 #   - Apple Developer ID certificate in Keychain
-#   - App-specific password voor notarytool: opgeslagen als Keychain profiel "AC_PASSWORD"
+#   - App-specific password for notarytool: stored as Keychain profile "AC_PASSWORD"
 #     (xcrun notarytool store-credentials "AC_PASSWORD" ...)
 #
 set -euo pipefail
 
-VERSION="${1:?Gebruik: release.sh <versie> <build>  (bv. release.sh 1.1 2)}"
-BUILD="${2:?Gebruik: release.sh <versie> <build>  (bv. release.sh 1.1 2)}"
+VERSION="${1:?Usage: release.sh <version> <build>  (e.g. release.sh 1.1 2)}"
+BUILD="${2:?Usage: release.sh <version> <build>  (e.g. release.sh 1.1 2)}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
 ARCHIVE_PATH="$BUILD_DIR/Avatar.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
-ZIP_NAME="Avatar-${VERSION}.zip"
-ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
+DMG_NAME="Aaavatar-${VERSION}.dmg"
+DMG_PATH="$BUILD_DIR/$DMG_NAME"
 SCHEME="Avatar"
 
-# Sparkle sign_update — zoek in DerivedData of stel SIGN_UPDATE_PATH in
+# Sparkle sign_update — searches DerivedData, override with SIGN_UPDATE_PATH
 SIGN_UPDATE="${SIGN_UPDATE_PATH:-$(find ~/Library/Developer/Xcode/DerivedData -name sign_update -type f 2>/dev/null | head -1)}"
 if [[ -z "$SIGN_UPDATE" ]]; then
-  echo "❌ sign_update niet gevonden. Stel SIGN_UPDATE_PATH in of bouw het project eerst in Xcode."
+  echo "❌ sign_update not found. Set SIGN_UPDATE_PATH or build the project in Xcode first."
   exit 1
 fi
 
-echo "📦 Release Avatar v${VERSION} (build ${BUILD})"
+echo "📦 Releasing Avatar v${VERSION} (build ${BUILD})"
 
-# 1. Versie bumpen in project.yml
-echo "→ Versie bumpen in project.yml..."
+# 1. Bump version in project.yml
+echo "→ Bumping version in project.yml..."
 sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"${VERSION}\"/" "$PROJECT_DIR/project.yml"
 sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" "$PROJECT_DIR/project.yml"
 
-# 2. Xcode project regenereren
+# 2. Regenerate Xcode project
 echo "→ xcodegen generate..."
 cd "$PROJECT_DIR"
 xcodegen generate
 
-# 3. Archiveren
-echo "→ Archiveren..."
+# 3. Archive
+echo "→ Archiving..."
 rm -rf "$BUILD_DIR"
 xcodebuild \
   -project Avatar.xcodeproj \
@@ -57,9 +57,9 @@ xcodebuild \
   -archivePath "$ARCHIVE_PATH" \
   archive
 
-# 4. Exporteren
-echo "→ Exporteren..."
-# Maak een minimale export-opties plist
+# 4. Export
+echo "→ Exporting..."
+# Minimal export-options plist
 EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
 cat > "$EXPORT_OPTIONS" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -78,68 +78,65 @@ xcodebuild \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist "$EXPORT_OPTIONS"
 
-# 5. Zippen
-echo "→ Zippen..."
-cd "$EXPORT_DIR"
-ditto -c -k --keepParent Avatar.app "$ZIP_PATH"
+# 5. Build DMG
+echo "→ Building DMG..."
+hdiutil create -volname "Aaavatar" \
+  -srcfolder "$EXPORT_DIR/Avatar.app" \
+  -ov -format UDZO \
+  "$DMG_PATH"
 
-# 6. Notariseren
-echo "→ Notariseren..."
-xcrun notarytool submit "$ZIP_PATH" \
+# 6. Notarize (DMG)
+echo "→ Notarizing..."
+xcrun notarytool submit "$DMG_PATH" \
   --keychain-profile "AC_PASSWORD" \
   --wait
 
-# 7. Staple (op de .app, niet de zip)
+# 7. Staple onto the DMG itself (Gatekeeper accepts this offline)
 echo "→ Stapling..."
-xcrun stapler staple "$EXPORT_DIR/Avatar.app"
+xcrun stapler staple "$DMG_PATH"
 
-# Na staple opnieuw zippen (zodat de zip de gestapled app bevat)
-rm -f "$ZIP_PATH"
-cd "$EXPORT_DIR"
-ditto -c -k --keepParent Avatar.app "$ZIP_PATH"
-
-# 8. EdDSA signatuur
-echo "→ EdDSA signeren..."
-SIGNATURE_OUTPUT=$("$SIGN_UPDATE" "$ZIP_PATH")
+# 8. EdDSA signature
+echo "→ Signing with EdDSA..."
+SIGNATURE_OUTPUT=$("$SIGN_UPDATE" "$DMG_PATH")
 echo "   $SIGNATURE_OUTPUT"
 
-# Parse edSignature en length
+# Parse edSignature and length
 ED_SIGNATURE=$(echo "$SIGNATURE_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' | cut -d'"' -f2)
-LENGTH=$(stat -f%z "$ZIP_PATH")
+LENGTH=$(stat -f%z "$DMG_PATH")
 
-# 9. Appcast updaten
-echo "→ Appcast updaten..."
+# 9. Update appcast
+echo "→ Updating appcast..."
 PUBDATE=$(date -R)
 NEW_ITEM=$(cat <<ITEM
     <item>
-      <title>Versie ${VERSION}</title>
+      <title>Version ${VERSION}</title>
       <pubDate>${PUBDATE}</pubDate>
       <sparkle:version>${BUILD}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure
-        url="https://github.com/thierrzz/Avatar/releases/download/v${VERSION}/${ZIP_NAME}"
+        url="https://github.com/thierrzz/Avatar/releases/download/v${VERSION}/${DMG_NAME}"
         length="${LENGTH}"
-        type="application/octet-stream"
+        type="application/x-apple-diskimage"
         sparkle:edSignature="${ED_SIGNATURE}" />
     </item>
 ITEM
 )
 
-# Voeg het nieuwe item in na <channel> (voor bestaande items)
+# Insert the new item right after <channel> (above existing items)
 cd "$PROJECT_DIR"
 sed -i '' "/<channel>/a\\
 ${NEW_ITEM}
 " appcast.xml
 
 # 10. GitHub Release
-echo "→ GitHub Release aanmaken..."
-gh release create "v${VERSION}" "$ZIP_PATH" \
-  --title "Avatar v${VERSION}" \
+echo "→ Creating GitHub Release..."
+gh release create "v${VERSION}" "$DMG_PATH" \
+  --title "Aaavatar v${VERSION}" \
   --generate-notes
 
 echo ""
-echo "✅ Release v${VERSION} gepubliceerd!"
+echo "✅ Release v${VERSION} published!"
 echo ""
-echo "Vergeet niet:"
-echo "  1. Controleer appcast.xml en commit+push"
+echo "Don't forget:"
+echo "  1. Verify appcast.xml and commit + push"

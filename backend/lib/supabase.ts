@@ -71,3 +71,91 @@ export async function ensureUser(userId: string): Promise<void> {
     .upsert({ id: userId }, { onConflict: "id" });
   if (error) throw error;
 }
+
+/**
+ * Free-tier Magic Cutout trial allowance. Free accounts get this many
+ * BiRefNet cutouts before they need to subscribe. Enforced server-side
+ * so reinstalling the app can't reset the counter.
+ */
+export const FREE_CUTOUTS_ALLOWANCE = 2;
+
+/** Returns how many free Magic Cutout calls this user has spent so far. */
+export async function freeCutoutsUsed(userId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("free_cutouts_used")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  const used = (data as { free_cutouts_used: number } | null)?.free_cutouts_used;
+  return typeof used === "number" ? used : 0;
+}
+
+/**
+ * Atomically claims one free-trial cutout slot. Returns the new count on
+ * success, or null when the user has already exhausted the allowance.
+ * Single-statement UPDATE inside the SQL function (see migration 003) is
+ * the race-safe gate.
+ */
+export async function tryConsumeFreeCutout(userId: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc("try_consume_free_cutout", {
+    p_user: userId,
+    p_allowance: FREE_CUTOUTS_ALLOWANCE,
+  });
+  if (error) throw error;
+  return typeof data === "number" ? data : null;
+}
+
+/**
+ * Lifetime free-tier import allowance. The 5-portrait library cap is now
+ * enforced as "5 imports ever", not "5 portraits at a time" — deleting a
+ * portrait no longer frees a slot. Mirrored client-side in
+ * `FreeTier.maxPortraits`.
+ */
+export const FREE_IMPORTS_ALLOWANCE = 5;
+
+export type ImportClaimResult = {
+  allowed: boolean;
+  userUsed: number;
+  deviceUsed: number;
+  allowance: number;
+};
+
+/**
+ * Atomic anti-cheat gate for free-tier imports. Pass `userId = null` for
+ * anonymous (signed-out) callers — only the device counter is consulted.
+ * The SQL function (see migration 004) increments both counters in a
+ * single statement; concurrent calls cannot push past the cap.
+ */
+export async function tryConsumeFreeImport(
+  userId: string | null,
+  fingerprint: string,
+): Promise<ImportClaimResult> {
+  const { data, error } = await supabase.rpc("try_consume_free_import", {
+    p_user: userId,
+    p_fingerprint: fingerprint,
+    p_allowance: FREE_IMPORTS_ALLOWANCE,
+  });
+  if (error) throw error;
+  const obj = (data ?? {}) as Record<string, unknown>;
+  return {
+    allowed: obj.allowed === true,
+    userUsed: typeof obj.user_used === "number" ? obj.user_used : 0,
+    deviceUsed: typeof obj.device_used === "number" ? obj.device_used : 0,
+    allowance: typeof obj.allowance === "number"
+      ? obj.allowance
+      : FREE_IMPORTS_ALLOWANCE,
+  };
+}
+
+/** Read-only: how many lifetime free imports this user has consumed. */
+export async function freeImportsUsedForUser(userId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("free_imports_used")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  const used = (data as { free_imports_used: number } | null)?.free_imports_used;
+  return typeof used === "number" ? used : 0;
+}

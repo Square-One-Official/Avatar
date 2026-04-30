@@ -1,410 +1,43 @@
 import Foundation
-import CoreML
 
-/// Manages the optional BiRefNet CoreML model for high-quality hair matting.
-///
-/// The model is NOT bundled with the app. Users install it via the
-/// "AI Model" settings tab which downloads a pre-compiled `.mlmodelc`
-/// archive from a hosted URL and extracts it into
-/// `~/Library/Application Support/Avatar/Models/`.
-///
-/// Usage: inject as `@Environment(ModelManager.self)` and call
-/// `modelManager.isAvailable` to decide which segmentation pipeline to use.
+/// User preference for the Pro Magic Cutout feature. The cutout itself runs
+/// server-side via Replicate (`851-labs/background-remover`); this class only
+/// persists whether the toggle is on. The processing path is gated by both
+/// `ProEntitlement.canUseProCutout` and `enabled` — see
+/// `ImportFlow.shouldUseMagicCutout`.
 @MainActor
 @Observable
-final class ModelManager {
+final class MagicCutoutPreferences {
 
-    // MARK: - Public state
+    private static let prefKey = "magicCutoutEnabled"
 
-    enum Status: Equatable {
-        case notInstalled
-        case downloading(progress: Double)   // 0.0–1.0
-        case ready
-        case error(String)
-    }
-
-    private(set) var status: Status = .notInstalled
-
-    /// Quick check — avoids loading the model from disk every time.
-    var isAvailable: Bool { status == .ready }
-
-    /// Whether we're currently downloading.
-    var isDownloading: Bool {
-        if case .downloading = status { return true }
-        return false
-    }
-
-    /// User preference: even when installed, user can opt out.
-    /// Stored as UserDefaults so it persists across launches.
-    var useAdvancedModel: Bool {
+    /// Default-on so new users see Pro cutout quality on their very first
+    /// import (server enforces the free-trial cap). Existing users who
+    /// already toggled it off keep their choice — `register(defaults:)`
+    /// only fills in the value when the key is missing.
+    var enabled: Bool {
         get { UserDefaults.standard.bool(forKey: Self.prefKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.prefKey) }
     }
 
-    /// Whether the user dismissed the editor hint banner.
-    var hintDismissed: Bool {
-        get { UserDefaults.standard.bool(forKey: Self.hintDismissedKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.hintDismissedKey) }
-    }
-
-    // MARK: - Model access
-
-    /// Returns the cached compiled CoreML model if it has already been loaded
-    /// into memory. Never performs a synchronous load — first-time loads must
-    /// go through `loadModelAsync()` to keep the main thread responsive (the
-    /// Neural Engine program compile on `MLModel.init` can block for several
-    /// seconds on first use and would otherwise freeze the UI mid-drop).
-    func loadModel() -> MLModel? {
-        guard status == .ready else { return nil }
-        return cachedModel
-    }
-
-    /// Loads the compiled CoreML model, performing the heavy
-    /// `MLModel(contentsOf:configuration:)` call on a background executor so
-    /// the main thread stays responsive. Safe to call repeatedly — subsequent
-    /// calls return the cached instance.
-    func loadModelAsync() async -> MLModel? {
-        guard status == .ready else { return nil }
-        if let cached = cachedModel { return cached }
-
-        let compiledURL = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        guard FileManager.default.fileExists(atPath: compiledURL.path) else {
-            status = .notInstalled
-            return nil
-        }
-
-        do {
-            let model = try await Self.loadCompiled(at: compiledURL)
-            cachedModel = model
-            return model
-        } catch {
-            print("[ModelManager] Failed to load model: \(error)")
-            status = .error(Loc.modelLoadFailed(error.localizedDescription))
-            return nil
-        }
-    }
-
-    /// Background-thread model loader. Isolated to a detached task so the
-    /// Neural Engine compile step does not stall the main actor.
-    nonisolated private static func loadCompiled(at url: URL) async throws -> MLModel {
-        try await Task.detached(priority: .userInitiated) {
-            let config = MLModelConfiguration()
-            // BiRefNet v4 fails to build a plan on both ANE and GPU on current
-            // Apple Silicon: ANECCompile rejects an oversized conv tile
-            // (Given:103680 > Max:65536 KMEM) and MPS_BUFFERS_ENGINE rejects
-            // a dtype in the graph. `.cpuAndGPU` tried to dodge ANE but
-            // CoreML still compiles plans for all available units at load,
-            // so the GPU failure took the whole load down. Pin to CPU-only
-            // until the ANE-friendly RVM v5 replacement ships.
-            config.computeUnits = .cpuOnly
-            let model = try MLModel(contentsOf: url, configuration: config)
-            print("[ModelManager] Advanced matte model loaded on computeUnits=\(config.computeUnits.rawValue) (0=cpuOnly, 1=cpuAndGPU, 2=all, 3=cpuAndNE)")
-            return model
-        }.value
-    }
-
-    /// Starts a background load of the compiled model if one isn't already in
-    /// memory. Called on launch / after install so the first drop doesn't pay
-    /// the multi-second Neural Engine compile cost on the main thread.
-    func warmUp() {
-        guard status == .ready, cachedModel == nil else { return }
-        Task { [weak self] in
-            _ = await self?.loadModelAsync()
-            print("[ModelManager] warm-up complete")
-        }
-    }
-
-    // MARK: - Download & Install
-
-    /// Downloads the pre-compiled BiRefNet model from the hosted URL,
-    /// extracts it, and installs it into the models directory.
-    func downloadAndInstall() {
-        guard !isDownloading else { return }
-
-        // Check if the model is already on disk (e.g. installed by the
-        // conversion script or a previous session). Skip the download only
-        // when the on-disk version matches what the app currently expects;
-        // otherwise we re-download to pick up fixes.
-        let existing = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        if FileManager.default.fileExists(atPath: existing.path),
-           installedModelVersion == Self.currentModelVersion {
-            status = .ready
-            if !UserDefaults.standard.bool(forKey: Self.prefKey) {
-                useAdvancedModel = true
-            }
-            warmUp()
-            print("[ModelManager] Model already on disk, skipping download")
-            return
-        }
-
-        status = .downloading(progress: 0)
-
-        let delegate = DownloadDelegate()
-        delegate.onProgress = { [weak self] progress in
-            Task { @MainActor in
-                self?.status = .downloading(progress: progress)
-            }
-        }
-        delegate.onComplete = { [weak self] tempURL, error in
-            Task { @MainActor in
-                guard let self else { return }
-                if let error {
-                    if (error as NSError).code == NSURLErrorCancelled {
-                        self.status = .notInstalled
-                    } else {
-                        self.status = .error(Loc.downloadFailed(error.localizedDescription))
-                    }
-                    return
-                }
-                guard let tempURL else {
-                    self.status = .error(Loc.downloadNoFile)
-                    return
-                }
-                do {
-                    try self.extractAndInstall(from: tempURL)
-                    try? FileManager.default.removeItem(at: tempURL)
-                    self.status = .ready
-                    self.useAdvancedModel = true
-                    print("[ModelManager] Model downloaded and installed successfully")
-                } catch {
-                    try? FileManager.default.removeItem(at: tempURL)
-                    self.status = .error(Loc.installFailed(error.localizedDescription))
-                    print("[ModelManager] Install failed: \(error)")
-                }
-            }
-        }
-        self.downloadDelegate = delegate
-
-        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        let task = session.downloadTask(with: Self.modelDownloadURL)
-        downloadTask = task
-        task.resume()
-        print("[ModelManager] Download started from: \(Self.modelDownloadURL)")
-    }
-
-    /// Cancels an in-progress download.
-    func cancelDownload() {
-        downloadTask?.cancel()
-        downloadTask = nil
-        downloadDelegate = nil
-        status = .notInstalled
-        print("[ModelManager] Download cancelled")
-    }
-
-    // MARK: - Refresh / check
-
-    /// Re-scans the models directory for the compiled model. If an older
-    /// version of the model is found on disk (mismatching `currentModelVersion`),
-    /// it is removed so the app can re-download the corrected build — users
-    /// who installed the v1 model had a cutout with missing ImageNet
-    /// normalization and need the v2 asset.
-    func refresh() {
-        cachedModel = nil
-        let file = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        if FileManager.default.fileExists(atPath: file.path) {
-            if installedModelVersion != Self.currentModelVersion {
-                print("[ModelManager] Installed model version '\(installedModelVersion ?? "unknown")' " +
-                      "does not match expected '\(Self.currentModelVersion)' — removing for re-download")
-                try? FileManager.default.removeItem(at: file)
-                try? FileManager.default.removeItem(at: Self.versionSidecarURL)
-                status = .notInstalled
-                return
-            }
-            status = .ready
-            if !UserDefaults.standard.bool(forKey: Self.prefKey) {
-                useAdvancedModel = true
-            }
-            print("[ModelManager] Model found at: \(file.path) (version \(Self.currentModelVersion))")
-            warmUp()
-        } else {
-            status = .notInstalled
-            print("[ModelManager] Model not found at: \(file.path)")
-        }
-    }
-
-    /// Removes the installed model from disk to free space.
-    func deleteModel() {
-        let file = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        try? FileManager.default.removeItem(at: file)
-        try? FileManager.default.removeItem(at: Self.versionSidecarURL)
-        cachedModel = nil
-        status = .notInstalled
-        useAdvancedModel = false
-        print("[ModelManager] Model deleted")
-    }
-
-    /// Formatted total size of the installed model directory, or nil if not present.
-    var installedSize: String? {
-        let dir = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        guard FileManager.default.fileExists(atPath: dir.path) else { return nil }
-        let totalBytes = (try? FileManager.default.contentsOfDirectory(
-            at: dir, includingPropertiesForKeys: [.fileSizeKey]
-        ).reduce(into: Int64(0)) { sum, url in
-            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            sum += Int64(size)
-        }) ?? 0
-        guard totalBytes > 0 else { return nil }
-        return ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
-    }
-
-    // MARK: - Initialisation
-
     init() {
-        let file = Self.modelsDirectory.appendingPathComponent(Self.compiledModelName)
-        if FileManager.default.fileExists(atPath: file.path) {
-            if installedModelVersion == Self.currentModelVersion {
-                status = .ready
-                warmUp()
-            } else {
-                print("[ModelManager] Stale model version on disk — scheduling refresh")
-                Task { @MainActor [weak self] in self?.refresh() }
-            }
-        }
+        UserDefaults.standard.register(defaults: [Self.prefKey: true])
+        Self.removeLegacyLocalModel()
     }
 
-    // MARK: - Private
-
-    private var cachedModel: MLModel?
-    private var downloadTask: URLSessionDownloadTask?
-    private var downloadDelegate: DownloadDelegate?
-
-    private static let prefKey = "useAdvancedHairModel"
-    private static let hintDismissedKey = "advancedModelHintDismissed"
-
-    /// The compiled CoreML model directory name.
-    static let compiledModelName = "BiRefNet.mlmodelc"
-
-    /// Identifier for the expected model build. Bumped whenever the released
-    /// `.mlmodelc` changes (new weights, new preprocessing, etc.). Existing
-    /// users with a mismatching install will be auto-migrated on launch.
-    /// - v2: swapped generic DIS weights for BiRefNet-portrait and baked
-    ///   ImageNet normalization into the graph (fixed leaky backgrounds).
-    /// - v3: switched from BiRefNet-portrait (segmentation) to
-    ///   BiRefNet-matting for continuous alpha on hair strands and fur.
-    /// - v4: reverted to BiRefNet-portrait — the matting variant only
-    ///   predicts alpha, not unmixed foreground, so mid-alpha pixels
-    ///   became translucent subject over coloured backgrounds. Hair
-    ///   softness is now synthesised in Swift via a fringe-band feather
-    ///   so we keep the bimodal body mask and still get soft edges.
-    /// - v5: replaced BiRefNet with RobustVideoMatting (RVM, MobileNetV3
-    ///   backbone). v4 BiRefNet failed to compile on ANE (KMEM tile too
-    ///   large) and GPU (MPS dtype mismatch), so every install was
-    ///   silently falling back to Vision. RVM is ~15 MB (vs ~500 MB),
-    ///   designed specifically for portrait hair strands, and predicts
-    ///   both alpha and unmixed foreground — the `pha` output feeds the
-    ///   existing Swift fringe-feather + blur-fusion pipeline unchanged.
-    ///   The compiled directory name `BiRefNet.mlmodelc` is kept to avoid
-    ///   rippling a rename through every call site; see follow-up work to
-    ///   rename to `AdvancedMatte.mlmodelc`.
-    static let currentModelVersion = "v5"
-
-    /// Filename of the version sidecar written next to the .mlmodelc on install.
-    private static let versionSidecarName = ".model_version"
-
-    private static var versionSidecarURL: URL {
-        modelsDirectory.appendingPathComponent(versionSidecarName)
-    }
-
-    /// URL of the pre-compiled model archive. Bumping the path component
-    /// (e.g. `rvm-v5`) isolates each release so existing users who migrate
-    /// don't hit cached CDN copies of the old build. The archive filename
-    /// stays `BiRefNet.mlmodelc.zip` for now — the compiled dir name is
-    /// referenced in several places and a rename is tracked as a follow-up.
-    static let modelDownloadURL = URL(string: "https://github.com/thierrzz/Avatar/releases/download/rvm-\(currentModelVersion)/BiRefNet.mlmodelc.zip")!
-
-    /// Reads the version string written into the models directory at install
-    /// time. Returns nil when no sidecar is present (e.g. v1 installs, which
-    /// predate version tracking).
-    private var installedModelVersion: String? {
-        guard let data = try? Data(contentsOf: Self.versionSidecarURL),
-              let s = String(data: data, encoding: .utf8)?
-                  .trimmingCharacters(in: .whitespacesAndNewlines),
-              !s.isEmpty else { return nil }
-        return s
-    }
-
-    static var modelsDirectory: URL {
+    private static func removeLegacyLocalModel() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
-                                                   in: .userDomainMask).first!
-        return appSupport
+                                                   in: .userDomainMask).first
+        guard let modelsDir = appSupport?
             .appendingPathComponent("Avatar")
-            .appendingPathComponent("Models")
-    }
-
-    /// Extracts a downloaded zip archive into the models directory.
-    private func extractAndInstall(from zipURL: URL) throws {
-        let modelsDir = Self.modelsDirectory
-        try FileManager.default.createDirectory(at: modelsDir,
-                                                 withIntermediateDirectories: true)
-
-        let destDir = modelsDir.appendingPathComponent(Self.compiledModelName)
-        if FileManager.default.fileExists(atPath: destDir.path) {
-            try FileManager.default.removeItem(at: destDir)
+            .appendingPathComponent("Models") else { return }
+        let mlmodelc = modelsDir.appendingPathComponent("BiRefNet.mlmodelc")
+        if FileManager.default.fileExists(atPath: mlmodelc.path) {
+            try? FileManager.default.removeItem(at: mlmodelc)
         }
-
-        // Use macOS built-in ditto to extract the zip archive.
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        process.arguments = ["-xk", zipURL.path, modelsDir.path]
-        process.standardOutput = nil
-        process.standardError = nil
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw NSError(domain: "ModelManager", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey:
-                                        Loc.extractionFailed(process.terminationStatus)])
-        }
-        guard FileManager.default.fileExists(atPath: destDir.path) else {
-            throw NSError(domain: "ModelManager", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey:
-                                        Loc.modelNotFoundAfterExtract])
-        }
-        // Stamp the install with the current model version so future launches
-        // can detect and auto-migrate stale builds.
-        try? Self.currentModelVersion.write(to: Self.versionSidecarURL,
-                                            atomically: true, encoding: .utf8)
-        print("[ModelManager] Extracted model to: \(destDir.path) (version \(Self.currentModelVersion))")
-    }
-}
-
-// MARK: - URLSession Download Delegate
-
-/// Bridges URLSession download callbacks to the @Observable ModelManager.
-private class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
-    var onProgress: ((Double) -> Void)?
-    var onComplete: ((URL?, Error?) -> Void)?
-
-    func urlSession(_ session: URLSession,
-                    downloadTask: URLSessionDownloadTask,
-                    didFinishDownloadingTo location: URL) {
-        // The temp file is deleted when this method returns — copy it first.
-        let tempCopy = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + ".zip")
-        do {
-            try FileManager.default.copyItem(at: location, to: tempCopy)
-            onComplete?(tempCopy, nil)
-        } catch {
-            onComplete?(nil, error)
-        }
-    }
-
-    func urlSession(_ session: URLSession,
-                    downloadTask: URLSessionDownloadTask,
-                    didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64,
-                    totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        onProgress?(progress)
-    }
-
-    func urlSession(_ session: URLSession,
-                    task: URLSessionTask,
-                    didCompleteWithError error: Error?) {
-        if let error {
-            onComplete?(nil, error)
+        let sidecar = modelsDir.appendingPathComponent(".model_version")
+        if FileManager.default.fileExists(atPath: sidecar.path) {
+            try? FileManager.default.removeItem(at: sidecar)
         }
     }
 }

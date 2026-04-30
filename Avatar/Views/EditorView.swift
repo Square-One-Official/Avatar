@@ -8,8 +8,6 @@ struct EditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.undoManager) private var undoManager
     @Environment(AppState.self) private var appState
-    @Environment(ModelManager.self) private var modelManager
-    @Environment(UpscaleModelManager.self) private var upscaleManager
     @Query(sort: \BackgroundPreset.createdAt) private var backgrounds: [BackgroundPreset]
     @Query private var allPortraits: [Portrait]
 
@@ -22,9 +20,6 @@ struct EditorView: View {
     @State private var showExport = false
     @State private var showBulkAlignConfirm = false
     @State private var bulkSkippedCount: Int? = nil
-    @State private var showDeleteConfirm = false
-    @State private var showUpscalePopover = false
-    @State private var pendingUpscaleAfterInstall = false
 
     /// Which pane the right-hand inspector is showing. Persisted across launches.
     @AppStorage("editorTab") private var editorTab: EditorTab = .portrait
@@ -36,6 +31,12 @@ struct EditorView: View {
             switch self {
             case .portrait: return Loc.tabPortrait
             case .adjust:   return Loc.tabAdjust
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .portrait: return "person.crop.square"
+            case .adjust:   return "slider.horizontal.3"
             }
         }
     }
@@ -112,8 +113,19 @@ struct EditorView: View {
                 }
 
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Toggle(isOn: $showAlignmentGuide) {
-                        Label(Loc.alignmentGuide, systemImage: "face.dashed")
+                    Menu {
+                        Toggle(isOn: $showAlignmentGuide) {
+                            Label(Loc.alignmentShowGuide, systemImage: "rectangle.dashed")
+                        }
+                        Divider()
+                        Button {
+                            showBulkAlignConfirm = true
+                        } label: {
+                            Label(Loc.alignAllPortraits, systemImage: "rectangle.3.group")
+                        }
+                        .disabled(alignableCount < 2)
+                    } label: {
+                        Label(Loc.alignmentGuide, systemImage: "viewfinder")
                     }
                     .help(Loc.alignmentGuideHelp)
 
@@ -123,40 +135,26 @@ struct EditorView: View {
                         Label(Loc.inspector, systemImage: "sidebar.trailing")
                     }
                     .help(Loc.inspectorHelp)
+                    .keyboardShortcut("i", modifiers: [.command, .option])
 
                     Button {
                         showExport = true
                     } label: {
                         Label(Loc.export, systemImage: "square.and.arrow.up")
                     }
-
-                    Menu {
-                        Button {
-                            showBulkAlignConfirm = true
-                        } label: {
-                            Label(Loc.alignAllPortraits, systemImage: "rectangle.3.group")
-                        }
-                        .disabled(alignableCount < 2)
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            showDeleteConfirm = true
-                        } label: {
-                            Label(Loc.deletePortrait, systemImage: "trash")
-                        }
-                    } label: {
-                        Label(Loc.more, systemImage: "ellipsis.circle")
-                    }
-                    .help(Loc.moreHelp)
+                    .help(Loc.exportHelp)
+                    .keyboardShortcut("e", modifiers: .command)
+                    .buttonStyle(.borderedProminent)
                 }
             }
             .sheet(isPresented: $showExport) {
                 ExportSheet(portrait: portrait, background: selectedBackground)
             }
             .onDrop(of: [.fileURL, .image], isTargeted: $isDropping) { providers in
-                PortraitDropHandler.handle(providers: providers, context: context, appState: appState,
-                                           modelManager: modelManager)
+                PortraitDropHandler.handle(providers: providers,
+                                           existingPortraitCount: allPortraits.count,
+                                           context: context,
+                                           appState: appState)
             }
             .overlay {
                 if isDropping {
@@ -186,7 +184,7 @@ struct EditorView: View {
             let side = max(40, fitSide * canvasZoom)
             ZStack {
                 // Background tap = deselect (dismiss handles).
-                Color(.windowBackgroundColor)
+                Color.appCanvas
                     .contentShape(Rectangle())
                     .onTapGesture { imageSelected = false }
 
@@ -227,25 +225,6 @@ struct EditorView: View {
             .contentShape(Rectangle())
             .gesture(magnifyGesture)
             .onExitCommand { imageSelected = false }
-            .overlay(alignment: .bottomTrailing) {
-                dimensionsCaption
-                    .padding(10)
-            }
-        }
-    }
-
-    /// Live "W × H px" readout showing the current cutout pixel size.
-    /// Doubles/quadruples after an AI upscale so the user can see the effect.
-    @ViewBuilder
-    private var dimensionsCaption: some View {
-        let size = cutoutSize
-        if size.width > 0, size.height > 0 {
-            Text(Loc.dimensionsLabel(Int(size.width), Int(size.height)))
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.ultraThinMaterial, in: Capsule())
         }
     }
 
@@ -385,25 +364,32 @@ struct EditorView: View {
 
     private var controlsPanel: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $editorTab) {
-                ForEach(EditorTab.allCases) { tab in
-                    Text(tab.label).tag(tab)
+            PillSegmentedControl(
+                selection: $editorTab,
+                segments: EditorTab.allCases.map {
+                    .init(tag: $0, label: $0.label, symbol: $0.symbol)
                 }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            )
             .padding(.horizontal, 12)
             .padding(.top, 10)
             .padding(.bottom, 4)
 
             Form {
-                switch editorTab {
-                case .portrait: portraitTab
-                case .adjust:   adjustTab
+                Group {
+                    switch editorTab {
+                    case .portrait: portraitTab
+                    case .adjust:   adjustTab
+                    }
                 }
+                .id(editorTab)
+                .transition(
+                    .opacity.animation(.easeOut(duration: 0.18))
+                )
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
         }
+        .background(Color.appCanvas)
         .confirmationDialog(
             Loc.alignAllQuestion,
             isPresented: $showBulkAlignConfirm,
@@ -413,19 +399,6 @@ struct EditorView: View {
             Button(Loc.cancel, role: .cancel) { }
         } message: {
             Text(Loc.alignConfirmMessage(alignableCount))
-        }
-        .confirmationDialog(
-            Loc.deleteQuestion,
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button(Loc.deletePortrait, role: .destructive) {
-                context.delete(portrait)
-                appState.selectedPortraitID = nil
-            }
-            Button(Loc.cancel, role: .cancel) { }
-        } message: {
-            Text(Loc.deleteMessage)
         }
         .alert(Loc.alignComplete, isPresented: Binding(
             get: { bulkSkippedCount != nil },
@@ -550,21 +523,16 @@ struct EditorView: View {
 
     // MARK: Enhance section (lives inside the Portrait tab)
 
+    /// True only when this portrait still carries a free Apple-pipeline cutout
+    /// AND the user is now in a position to re-render it with Magic Cutout.
+    private var showMagicCutoutUpgradeCard: Bool {
+        portrait.originalImageData != nil
+            && !portrait.cutoutUsedMagic
+            && ImportFlow.shouldUseMagicCutout(appState: appState)
+    }
+
     @ViewBuilder private var enhanceSection: some View {
         Section {
-            enhanceCard(
-                title: Loc.reCutout,
-                systemImage: "wand.and.stars",
-                disabled: portrait.originalImageData == nil || appState.isProcessing,
-                help: modelManager.isAvailable && modelManager.useAdvancedModel
-                    ? Loc.reCutoutHelpAdvanced : Loc.reCutoutHelpApple
-            ) {
-                ImportFlow.reprocess(portrait: portrait, context: context, appState: appState,
-                                     modelManager: modelManager)
-            }
-
-            upscaleEnhanceCard()
-
             enhanceCard(
                 title: portrait.isMagicRetouched ? Loc.magicRetouchUndo : Loc.magicRetouch,
                 systemImage: portrait.isMagicRetouched ? "arrow.uturn.backward" : "wand.and.sparkles",
@@ -579,11 +547,21 @@ struct EditorView: View {
                 }
             }
 
-            // MARK: Extend Body (Pro feature)
-            extendBodyCard
-
-            if !modelManager.isAvailable && !modelManager.hintDismissed {
-                AdvancedModelHint(modelManager: modelManager)
+            // Re-cutout is intentionally hidden by default — we promise the
+            // initial cutout is right the first time. The single exception:
+            // an existing cutout produced by the free Apple pipeline while the
+            // user is now Pro with Magic Cutout enabled. In that case we
+            // surface a one-shot "redo with Magic Cutout" affordance, which
+            // disappears again once the upgraded cutout lands.
+            if showMagicCutoutUpgradeCard {
+                enhanceCard(
+                    title: Loc.redoWithMagicCutout,
+                    systemImage: "wand.and.stars",
+                    disabled: appState.isProcessing,
+                    help: Loc.redoWithMagicCutoutHelp
+                ) {
+                    ImportFlow.reprocess(portrait: portrait, context: context, appState: appState)
+                }
             }
         } header: {
             Text(Loc.edit)
@@ -597,7 +575,6 @@ struct EditorView: View {
         disabled: Bool,
         help: String,
         active: Bool = false,
-        showProBadge: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -615,9 +592,6 @@ struct EditorView: View {
                 Text(title)
                     .fontWeight(.medium)
                 Spacer(minLength: 0)
-                if showProBadge {
-                    ProBadge()
-                }
             }
             .contentShape(Rectangle())
         }
@@ -625,159 +599,6 @@ struct EditorView: View {
         .disabled(disabled)
         .opacity(disabled ? 0.45 : 1)
         .help(help)
-    }
-
-    @ViewBuilder
-    private func upscaleEnhanceCard() -> some View {
-        let modelReady = upscaleManager.isAnyInstalled
-        let isDownloading = upscaleManager.isDownloading
-        let hardDisabled = portrait.originalImageData == nil
-            || appState.isProcessing
-            || (portrait.isUpscaled && portrait.preUpscaleOriginalData == nil)
-        let title: String = portrait.isUpscaled
-            ? Loc.undoUpscale
-            : Loc.upscaleNx(upscaleManager.selectedVariant.factor)
-        let help: String = {
-            if portrait.isUpscaled { return Loc.undoUpscaleHelp }
-            if isDownloading { return Loc.upscaleHelpDownloading }
-            if !modelReady { return Loc.upscaleHelpTapToInstall }
-            return Loc.upscaleHelp
-        }()
-        let icon = portrait.isUpscaled
-            ? "arrow.uturn.backward"
-            : "arrow.up.left.and.arrow.down.right"
-
-        Button {
-            if portrait.isUpscaled {
-                ImportFlow.undoUpscale(portrait: portrait, context: context, appState: appState)
-            } else if modelReady {
-                ImportFlow.upscale(portrait: portrait, context: context, appState: appState,
-                                   modelManager: modelManager, upscaleManager: upscaleManager)
-            } else {
-                showUpscalePopover = true
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(portrait.isUpscaled ? Color.accentColor : Color.primary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(portrait.isUpscaled
-                                  ? Color.accentColor.opacity(0.15)
-                                  : Color.secondary.opacity(0.12))
-                    )
-                    .symbolEffect(.bounce, value: portrait.isUpscaled)
-                Text(title).fontWeight(.medium)
-                Spacer(minLength: 0)
-                if !portrait.isUpscaled && !modelReady {
-                    if isDownloading {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(.secondary)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableButtonStyle())
-        .disabled(hardDisabled)
-        .opacity(hardDisabled ? 0.45 : 1)
-        .help(help)
-        .popover(isPresented: $showUpscalePopover, arrowEdge: .trailing) {
-            UpscaleInstallPopover(
-                manager: upscaleManager,
-                onRequestUpscale: {
-                    if upscaleManager.isAnyInstalled {
-                        showUpscalePopover = false
-                        ImportFlow.upscale(portrait: portrait, context: context, appState: appState,
-                                           modelManager: modelManager, upscaleManager: upscaleManager)
-                    } else {
-                        pendingUpscaleAfterInstall = true
-                    }
-                },
-                onDismiss: {
-                    showUpscalePopover = false
-                    pendingUpscaleAfterInstall = false
-                }
-            )
-        }
-        .onChange(of: upscaleManager.isAnyInstalled) { _, nowInstalled in
-            guard nowInstalled,
-                  showUpscalePopover,
-                  pendingUpscaleAfterInstall,
-                  !portrait.isUpscaled else { return }
-            pendingUpscaleAfterInstall = false
-            showUpscalePopover = false
-            ImportFlow.upscale(portrait: portrait, context: context, appState: appState,
-                               modelManager: modelManager, upscaleManager: upscaleManager)
-        }
-    }
-
-    // MARK: Extend Body (Pro feature)
-
-    /// Auto-detect: body is considered "cropped" when the lowest body pixel
-    /// sits within a small tolerance of the cutout's bottom edge.
-    private var bodyNeedsExtension: Bool {
-        let h = cutoutSize.height
-        guard h > 0, portrait.bodyBottomY > 0 else { return false }
-        return portrait.bodyBottomY >= Double(h) - 4
-    }
-
-    /// `true` when the user should see the paywall on tap (not signed in, no
-    /// subscription, or out of credits). Pro users with credits go straight
-    /// to the outpaint action.
-    private var extendBodyNeedsUpgrade: Bool {
-        !appState.proEntitlement.isPro || !appState.proEntitlement.hasCredits
-    }
-
-    @ViewBuilder
-    private var extendBodyCard: some View {
-        let isExtended = portrait.isBodyExtended
-        let hasCutout = portrait.cutoutPNG != nil
-        // Pro users: disable when cutout exists but body is already complete
-        // (no work to do). Non-pro users: always clickable so the paywall can
-        // sell them the feature.
-        let disabled = !hasCutout
-            || appState.isProcessing
-            || (isExtended && portrait.preExtendBodyCutoutPNG == nil)
-            || (!extendBodyNeedsUpgrade && !bodyNeedsExtension && !isExtended)
-
-        let help: String = {
-            if !hasCutout { return Loc.extendBodyNoCutout }
-            if !appState.auth.isSignedIn { return Loc.extendBodyRequiresSignIn }
-            if isExtended { return Loc.extendBodyUndoHelp }
-            if !bodyNeedsExtension && !extendBodyNeedsUpgrade {
-                return Loc.extendBodyAlreadyComplete
-            }
-            return Loc.extendBodyHelp
-        }()
-
-        enhanceCard(
-            title: isExtended ? Loc.extendBodyUndo : Loc.extendBody,
-            systemImage: isExtended ? "arrow.uturn.backward" : "person.crop.rectangle.badge.plus",
-            disabled: disabled,
-            help: help,
-            active: isExtended,
-            showProBadge: extendBodyNeedsUpgrade && !isExtended
-        ) {
-            if isExtended {
-                ImportFlow.undoExtendBody(portrait: portrait, context: context, appState: appState)
-            } else if !appState.auth.isSignedIn {
-                appState.showSignInPrompt = true
-                appState.showProUpgradeSheet = true
-            } else if extendBodyNeedsUpgrade {
-                appState.showProUpgradeSheet = true
-            } else {
-                ImportFlow.extendBody(portrait: portrait, context: context, appState: appState,
-                                      modelManager: modelManager)
-            }
-        }
     }
 
     // MARK: Adjust tab
@@ -1322,61 +1143,6 @@ private struct ProcessingOverlay: View {
     }
 }
 
-// MARK: - Advanced model hint
-
-/// Small banner shown in the editor's controls panel when the advanced AI
-/// model is not yet downloaded. Dismissible — stored in UserDefaults via
-/// ModelManager.hintDismissed.
-struct AdvancedModelHint: View {
-    let modelManager: ModelManager
-    @Environment(AppState.self) private var appState
-    @Environment(\.openSettings) private var openSettings
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(.tint)
-                .font(.caption)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Loc.betterHairAvailable)
-                    .font(.caption.weight(.medium))
-                Text(Loc.advancedModelHint)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Button(Loc.openSettings) {
-                    appState.selectedSettingsTab = .aiModel
-                    openSettings()
-                }
-                .font(.caption2)
-                .controlSize(.small)
-            }
-
-            Spacer(minLength: 0)
-
-            Button {
-                modelManager.hintDismissed = true
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(PressableButtonStyle())
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.accentColor.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 0.5)
-                )
-        )
-    }
-}
-
 // MARK: - Live preview canvas
 //
 // Built from native SwiftUI views (background layer + Image with scaleEffect/offset)
@@ -1460,14 +1226,25 @@ struct BackgroundPicker: View {
     @Query private var portraits: [Portrait]
     @State private var showAddPopover = false
 
+    /// Single source of truth for which chip the picker should highlight. Mirrors the
+    /// canvas-side `selectedBackground` resolution so exactly one chip lights up — even
+    /// if the data has multiple `isDefault==true` entries from a prior corrupted state.
+    private var effectiveBackgroundID: UUID? {
+        if let id = portrait.backgroundPresetID,
+           backgrounds.contains(where: { $0.id == id }) {
+            return id
+        }
+        return backgrounds.first(where: { $0.isDefault })?.id ?? backgrounds.first?.id
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                let activeID = effectiveBackgroundID
                 ForEach(backgrounds) { bg in
                     BackgroundChip(
                         preset: bg,
-                        isSelected: portrait.backgroundPresetID == bg.id
-                            || (portrait.backgroundPresetID == nil && bg.isDefault),
+                        isSelected: bg.id == activeID,
                         onSelect: { select(bg) },
                         onSetDefault: { setDefault(bg) },
                         onDelete: { delete(bg) }
@@ -1703,7 +1480,7 @@ struct AddBackgroundButton: View {
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(.controlBackgroundColor))
+                        .fill(Color.appSurface)
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(
                             Color.secondary.opacity(0.4),
@@ -1770,119 +1547,3 @@ struct AddBackgroundButton: View {
     }
 }
 
-private struct UpscaleInstallPopover: View {
-    let manager: UpscaleModelManager
-    let onRequestUpscale: () -> Void
-    let onDismiss: () -> Void
-
-    @State private var variant: UpscaleModelManager.Variant
-
-    init(manager: UpscaleModelManager,
-         onRequestUpscale: @escaping () -> Void,
-         onDismiss: @escaping () -> Void) {
-        self.manager = manager
-        self.onRequestUpscale = onRequestUpscale
-        self.onDismiss = onDismiss
-        self._variant = State(initialValue: manager.selectedVariant)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(Loc.upscalePopoverTitle).font(.headline)
-                Text(Loc.upscalePopoverBlurb)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Picker("", selection: $variant) {
-                Text(Loc.upscaleVariant2x).tag(UpscaleModelManager.Variant.x2)
-                Text(Loc.upscaleVariant4x).tag(UpscaleModelManager.Variant.x4)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .onChange(of: variant) { _, new in
-                manager.selectedVariant = new
-            }
-            statusBlock
-        }
-        .padding(16)
-        .frame(width: 300)
-        .onDisappear { onDismiss() }
-    }
-
-    @ViewBuilder
-    private var statusBlock: some View {
-        switch manager.status(for: variant) {
-        case .notInstalled:
-            VStack(alignment: .leading, spacing: 8) {
-                Text(Loc.upscaleApproxSize)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Button {
-                    manager.selectedVariant = variant
-                    manager.downloadAndInstall(variant)
-                    onRequestUpscale()
-                } label: {
-                    Label(Loc.installAndUpscale, systemImage: "arrow.down.circle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-            }
-
-        case .downloading(let progress):
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(Loc.downloading).foregroundStyle(.secondary).font(.caption)
-                    Spacer()
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption).monospacedDigit()
-                        .foregroundStyle(.tertiary)
-                }
-                ProgressView(value: progress)
-                HStack {
-                    Spacer()
-                    Button(Loc.cancel) { manager.cancelDownload(variant) }
-                        .controlSize(.small)
-                }
-            }
-
-        case .ready:
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text(Loc.modelAvailable)
-                }
-                Button {
-                    manager.selectedVariant = variant
-                    onRequestUpscale()
-                } label: {
-                    Label(Loc.upscaleNow, systemImage: "arrow.up.left.and.arrow.down.right")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-
-        case .error(let message):
-            VStack(alignment: .leading, spacing: 8) {
-                Label(Loc.error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack {
-                    Spacer()
-                    Button(Loc.retry) {
-                        manager.downloadAndInstall(variant)
-                        onRequestUpscale()
-                    }
-                    .controlSize(.small)
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-        }
-    }
-}

@@ -95,5 +95,49 @@ Pas deze aan om de huisstijl te matchen (kleinere koppen, meer ruimte boven, etc
 ## Bekend / nog niet in v1
 
 - Geen batch-import van meerdere foto's tegelijk
-- Geen code-signing/notarization (de `.app` werkt lokaal; voor distributie moet je een Developer ID configureren)
 - Geen undo/redo voor canvas-aanpassingen (auto-save bij elke wijziging)
+
+## Distributie
+
+Twee kanalen, beide vanuit dezelfde codebase:
+
+- **DMG / website (`Avatar`-target)** — Sparkle auto-update via `appcast.xml`. Stripe-paywall voor Pro Magic Cutout.
+- **Mac App Store (`Avatar-MAS`-target)** — `APP_STORE` compile-flag schakelt Sparkle uit en zet IAP/StoreKit aan. Update via App Store. Aparte entitlements ([Avatar-MAS.entitlements](Avatar/Avatar-MAS.entitlements)).
+
+Schakelt automatisch tussen builds via Xcode-scheme of `xcodebuild -scheme {Avatar|Avatar-MAS} -configuration Release`.
+
+### Eenmalige setup
+
+```bash
+# 1. App-specific password genereren op appleid.apple.com
+#    → Sign-In and Security → App-specific passwords → +
+# 2. Opslaan in Keychain als notarytool-profile (voor DMG-notarization):
+xcrun notarytool store-credentials "AC_PASSWORD" \
+  --apple-id thierryemmery@gmail.com \
+  --team-id 5J92MMGKTX \
+  --password <app-specific-password>
+```
+
+Voor App Store-upload heb je een Apple ID + app-specific password nodig die als argumenten aan `xcrun altool --upload-package` worden meegegeven, of een API-key via `xcrun notarytool` (zelfde profile werkt).
+
+### DMG-release publiceren
+
+```bash
+./scripts/release.sh 1.1 2   # MARKETING_VERSION=1.1, build=2
+```
+
+Dit script archiveert de `Avatar`-target, notariseert via Apple, staplet, ondertekent met Sparkle EdDSA, update `appcast.xml`, en publiceert naar GitHub Releases.
+
+### Mac App Store-build uploaden
+
+```bash
+xcodebuild -project Avatar.xcodeproj -scheme Avatar-MAS -configuration Release \
+  -archivePath build/Avatar-MAS.xcarchive archive
+
+xcodebuild -exportArchive \
+  -archivePath build/Avatar-MAS.xcarchive \
+  -exportPath build/mas-export \
+  -exportOptionsPlist scripts/ExportOptions-MAS.plist
+```
+
+Het laatste commando uploadt direct naar App Store Connect (via `destination: upload` in [ExportOptions-MAS.plist](scripts/ExportOptions-MAS.plist)). Daarna kies je in App Store Connect de geüploade build voor de juiste versie en submit je voor review.

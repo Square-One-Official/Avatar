@@ -28,6 +28,10 @@ enum Loc {
 
     // MARK: General
     static var cancel: String          { en ? "Cancel" : "Annuleer" }
+    static var somethingWentWrong: String {
+        en ? "Something went wrong. Please try again."
+           : "Er ging iets mis. Probeer het nog eens."
+    }
     static var delete: String          { en ? "Delete" : "Verwijder" }
     static var portraitsPlural: String { en ? "Portraits" : "portretten" }
     static var ok: String              { "OK" }
@@ -46,10 +50,12 @@ enum Loc {
     static var redo: String            { en ? "Redo" : "Stap vooruit" }
     static var redoHelp: String        { en ? "Redo (⌘⇧Z)" : "Opnieuw (⌘⇧Z)" }
     static var alignmentGuide: String  { en ? "Alignment Guide" : "Uitlijnhulp" }
-    static var alignmentGuideHelp: String { en ? "Show eye and head guides on the canvas" : "Toon oog- en hoofdhulplijnen op het canvas" }
+    static var alignmentGuideHelp: String { en ? "Toggle the on-canvas guide and align all portraits" : "Schakel de hulplijn in/uit en lijn alle portretten uit" }
+    static var alignmentShowGuide: String { en ? "Show guide on canvas" : "Toon hulplijn op canvas" }
     static var inspector: String       { "Inspector" }
     static var inspectorHelp: String   { en ? "Show or hide the inspector" : "Toon of verberg de instellingen" }
     static var export: String          { en ? "Export" : "Exporteer" }
+    static var exportHelp: String      { en ? "Export portrait (⌘E)" : "Exporteer portret (⌘E)" }
 
     // MARK: Editor – Info section
     static var employeeName: String    { en ? "Name" : "Naam" }
@@ -65,60 +71,12 @@ enum Loc {
 
     // MARK: Editor – Edit section
     static var edit: String            { en ? "Edit" : "Bewerken" }
-    static var reCutout: String        { en ? "Re-cutout" : "Opnieuw uitknippen" }
-    static var reCutoutHelpAdvanced: String {
-        en ? "Re-cuts this portrait with the advanced AI model for better hair quality."
-           : "Knipt dit portret opnieuw uit met het geavanceerde AI-model voor betere haarkwaliteit."
+    static var redoWithMagicCutout: String {
+        en ? "Redo with Magic Cutout" : "Opnieuw met Magic Cutout"
     }
-    static var reCutoutHelpApple: String {
-        en ? "Re-cuts this portrait with the Apple pipeline. Position and scale are preserved."
-           : "Knipt dit portret opnieuw uit met de Apple-pipeline. Positie en schaal blijven behouden."
-    }
-    static var upscale2x: String       { en ? "Upscale (2x)" : "Opschalen (2x)" }
-    static func upscaleNx(_ factor: Int) -> String {
-        en ? "Upscale (\(factor)×)" : "Opschalen (\(factor)×)"
-    }
-    static var undoUpscale: String     { en ? "Undo Upscale" : "Opschalen ongedaan maken" }
-    static var alreadyUpscaled: String {
-        en ? "This portrait has already been upscaled."
-           : "Dit portret is al opgeschaald."
-    }
-    static var upscaleHelp: String {
-        en ? "Uses an on-device AI model to recover detail and sharpen edges. Re-cuts the portrait from the higher-resolution result."
-           : "Gebruikt een on-device AI-model om details te herstellen en randen te verscherpen. Knipt het portret opnieuw uit vanaf het hogere-resolutiebeeld."
-    }
-    static var upscaleHelpNotInstalled: String {
-        en ? "Install the AI upscale model in Settings → AI Model to enable this."
-           : "Installeer het AI-opschaalmodel via Instellingen → AI-model om dit in te schakelen."
-    }
-    static var upscaleHelpTapToInstall: String {
-        en ? "Tap to install the AI upscale model."
-           : "Tik om het AI-opschaalmodel te installeren."
-    }
-    static var upscaleHelpDownloading: String {
-        en ? "Downloading the AI upscale model…"
-           : "AI-opschaalmodel wordt gedownload…"
-    }
-    static var upscalePopoverTitle: String {
-        en ? "AI upscale model" : "AI-opschaalmodel"
-    }
-    static var upscalePopoverBlurb: String {
-        en ? "Reconstructs detail in low-resolution photos using an on-device Real-ESRGAN model."
-           : "Herstelt details in foto's met lage resolutie met een on-device Real-ESRGAN-model."
-    }
-    static var upscaleApproxSize: String {
-        en ? "~50–100 MB download, installed once."
-           : "~50–100 MB download, eenmalig installeren."
-    }
-    static var installAndUpscale: String {
-        en ? "Install & upscale" : "Installeer & opschalen"
-    }
-    static var upscaleNow: String {
-        en ? "Upscale now" : "Opschalen"
-    }
-    static var undoUpscaleHelp: String {
-        en ? "Revert to the original (non-upscaled) photo."
-           : "Herstel naar de originele (niet-opgeschaalde) foto."
+    static var redoWithMagicCutoutHelp: String {
+        en ? "This cutout was made with the basic model. Re-cut it with Magic Cutout for sharper edges."
+           : "Deze uitknip is gemaakt met het basismodel. Knip opnieuw uit met Magic Cutout voor scherpere randen."
     }
     static var magicRetouchDone: String { "Magic Retouch ✓" }
     static var magicRetouch: String    { "Magic Retouch" }
@@ -126,8 +84,8 @@ enum Loc {
         en ? "Undo Magic Retouch" : "Magic Retouch ongedaan maken"
     }
     static var magicRetouchAlready: String {
-        en ? "Magic Retouch has already been applied. Use 'Re-cutout' to revert."
-           : "Magic Retouch is al toegepast. Gebruik 'Opnieuw uitknippen' om te herstellen."
+        en ? "Magic Retouch is already on for this portrait."
+           : "Magic Retouch staat al aan voor dit portret."
     }
     static var magicRetouchHelp: String {
         en ? "Automatically enhances colors, exposure, and shadows for studio quality."
@@ -138,79 +96,55 @@ enum Loc {
            : "Herstel de originele uitknip zonder Magic Retouch."
     }
 
-    // MARK: Editor – Extend Body (Pro)
-    static var extendBody: String           { en ? "Extend Body" : "Body aanvullen" }
-    static var extendBodyUndo: String       { en ? "Undo Extend Body" : "Body aanvullen ongedaan maken" }
-    static var extendBodyHelp: String {
-        en ? "Use AI to generate missing shoulders and torso when your photo is cropped."
-           : "Gebruik AI om ontbrekende schouders en torso te genereren bij een afgekapte foto."
-    }
-    static var extendBodyUndoHelp: String {
-        en ? "Revert to the original (non-extended) cutout."
-           : "Herstel de originele (niet-uitgebreide) uitknip."
-    }
-    static var extendBodyAlreadyComplete: String {
-        en ? "Body is already fully visible — nothing to extend."
-           : "De body is al volledig zichtbaar — niets om aan te vullen."
-    }
-    static var extendBodyRequiresSignIn: String {
-        en ? "Sign in with Google to use Extend Body."
-           : "Meld je aan met Google om Body aanvullen te gebruiken."
-    }
-    static var extendBodyNoCutout: String {
-        en ? "Import a photo first." : "Importeer eerst een foto."
-    }
-    static func extendBodyFailed(_ err: String) -> String {
-        en ? "Extend Body failed: \(err)" : "Body aanvullen mislukt: \(err)"
-    }
-
-    // MARK: Paywall – Pro upgrade sheet
-    static var extendBodyUpgradeTitle: String {
-        en ? "Extend Body" : "Body aanvullen"
-    }
-    static var extendBodyUpgradeHeadline: String {
-        en ? "Extend Body is a Pro feature"
-           : "Body aanvullen is een Pro-functie"
-    }
-    static var extendBodyUpgradeSubtitle: String {
-        en ? "Generate missing shoulders and torso with AI. Choose a plan to get monthly credits."
-           : "Genereer ontbrekende schouders en torso met AI. Kies een abonnement voor maandelijkse credits."
-    }
-    static var extendBodyUpgradePopular: String {
-        en ? "Most popular" : "Populair"
-    }
-    static var extendBodyUpgradePerMonth: String {
-        en ? "/month" : "/maand"
-    }
-    static func extendBodyUpgradeCreditsPerMonth(_ n: Int) -> String {
-        en ? "\(n) extensions per month" : "\(n) aanvullingen per maand"
-    }
-    static var extendBodyUpgradeCTA: String {
-        en ? "Upgrade" : "Kies abonnement"
-    }
-    static var extendBodyUpgradeStarterDesc: String {
-        en ? "Enough for occasional cleanups — 20 generations each month."
-           : "Genoeg voor af en toe een aanvulling — 20 generaties per maand."
-    }
-    static var extendBodyUpgradePlusDesc: String {
-        en ? "Our most popular plan. 50 generations each month for regular work."
-           : "Ons populairste abonnement. 50 generaties per maand voor regelmatig werk."
-    }
-    static var extendBodyUpgradeStudioDesc: String {
-        en ? "For teams and power users. 150 generations each month."
-           : "Voor teams en power users. 150 generaties per maand."
-    }
-    static var extendBodyUpgradeFinePrint: String {
-        en ? "Cancel anytime. Credits reset at the start of each billing period."
-           : "Op elk moment opzegbaar. Credits resetten aan het begin van elke factuurperiode."
-    }
-    static var extendBodyUpgradeSignInFirst: String {
+    static var proUpgradeSignInFirst: String {
         en ? "Please sign in first to manage your subscription."
            : "Meld je eerst aan om je abonnement te beheren."
     }
 
-    // MARK: Pro settings section
-    static var proSectionTitle: String      { en ? "Extend Body (Pro)" : "Body aanvullen (Pro)" }
+    static var proUpgradeSignInToContinue: String {
+        en ? "Sign in to start your subscription."
+           : "Meld je aan om je abonnement te starten."
+    }
+    /// Shown as a chip after a Magic Cutout call falls back to the basic
+    /// cutout because the user's session expired or was never set up.
+    /// Non-blocking — the basic cutout already produced a result.
+    static var magicCutoutSignedOut: String {
+        en ? "Signed out. Used the basic cutout. Sign in via Settings for Magic Cutout."
+           : "Niet aangemeld. We gebruikten de basisuitsnijder. Meld je aan via Instellingen voor Magic Cutout."
+    }
+
+    // MARK: First-launch welcome sheet
+    static var welcomeTitle: String {
+        en ? "Welcome to Avatar" : "Welkom bij Avatar"
+    }
+    static var welcomeBody: String {
+        en ? "Sign in with Google to keep your Pro subscription and credits in sync across your Macs. Your photos stay on your device — we only store your email and credit balance."
+           : "Meld je aan met Google om je Pro-abonnement en credits gesynchroniseerd te houden tussen je Macs. Je foto's blijven op je apparaat — we bewaren alleen je e-mailadres en credits."
+    }
+    static var welcomeMaybeLater: String {
+        en ? "Maybe later" : "Misschien later"
+    }
+    static var signInWithGoogle: String {
+        en ? "Sign in with Google" : "Aanmelden met Google"
+    }
+
+    // MARK: Account / Pro settings section
+    static var accountSectionTitle: String  { en ? "Account" : "Account" }
+    static var accountNotSignedIn: String   { en ? "Not signed in" : "Niet aangemeld" }
+    static var accountSignInRationale: String {
+        en ? "Sign in with Google to unlock Pro features and tie your subscription to your account. Your photos and edits stay on your Mac. We only store your email and credit balance."
+           : "Meld je aan met Google om Pro-functies te ontgrendelen en je abonnement aan je account te koppelen. Je foto's en bewerkingen blijven op je Mac. We bewaren alleen je e-mailadres en credits."
+    }
+    static var accountEmailLabel: String    { en ? "Email" : "E-mail" }
+    static var accountEmailFromGoogle: String {
+        en ? "Email comes from your Google account. Sign out to use a different one."
+           : "Je e-mailadres komt van je Google-account. Meld je af om een ander te gebruiken."
+    }
+    static var proSectionTitle: String      { en ? "Pro" : "Pro" }
+    static var proSectionSubtitle: String {
+        en ? "Magic Cutout, monthly credits included"
+           : "Magic Cutout, met maandelijkse credits"
+    }
     static var proSignInWithGoogle: String  { en ? "Sign in with Google" : "Aanmelden met Google" }
     static var proSignOut: String           { en ? "Sign out" : "Afmelden" }
     static var proCurrentPlan: String       { en ? "Plan" : "Abonnement" }
@@ -223,6 +157,163 @@ enum Loc {
         en ? "No active subscription." : "Geen actief abonnement."
     }
     static var proUpgradeNow: String         { en ? "Upgrade" : "Upgraden" }
+
+    // MARK: Magic Cutout (Pro)
+    static var magicCutoutTitle: String {
+        en ? "Magic Cutout" : "Magic Cutout"
+    }
+    static var magicCutoutSubtitle: String {
+        en ? "Premium AI cutout, 1 credit per image"
+           : "Premium AI-uitsnede, 1 credit per foto"
+    }
+    static var magicCutoutDescription: String {
+        en ? "Cloud-powered AI cutout with state-of-the-art hair detail and clean body edges. Falls back to the basic cutout when offline."
+           : "AI-uitsnede in de cloud met topkwaliteit haardetails en strakke lichaamsranden. Valt terug op de basisuitsnede als je offline bent."
+    }
+    static var magicCutoutOfflineToast: String {
+        en ? "Offline. Magic Cutout needs internet. Using basic cutout for now. No credits used."
+           : "Geen verbinding. Magic Cutout is even niet beschikbaar. We gebruiken nu de basisuitsnijder. Geen credits gebruikt."
+    }
+    static func magicCutoutBatchConfirm(_ count: Int, credits: Int) -> String {
+        en ? "Importing \(count) photos will use \(credits) credits. Continue?"
+           : "\(count) foto's importeren kost \(credits) credits. Doorgaan?"
+    }
+    static func magicCutoutUseCredits(_ credits: Int) -> String {
+        en ? "Use \(credits) credits" : "Gebruik \(credits) credits"
+    }
+    static var magicCutoutProBadge: String {
+        en ? "Pro" : "Pro"
+    }
+    static var magicCutoutOutOfCredits: String {
+        en ? "You're out of credits. Top up to keep using Magic Cutout."
+           : "Je credits zijn op. Koop bij om Magic Cutout te blijven gebruiken."
+    }
+    static var magicCutoutProRequired: String {
+        en ? "Pro required. €4.99/month for 200 credits."
+           : "Pro vereist. €4,99/maand voor 200 credits."
+    }
+    /// Shown when the backend returns an HTTP error code (4xx/5xx other than
+    /// 401/402). Status and detail are kept in `print()` logs only — users
+    /// see a friendly message that names the fallback and reassures about
+    /// billing.
+    static func magicCutoutServerError(_ code: Int, _ message: String?) -> String {
+        let _ = (code, message) // routed to logs via the call site
+        return en
+            ? "Magic Cutout had a hiccup. Using the basic cutout instead. No credits charged."
+            : "Magic Cutout had even een dipje. We gebruiken nu de basisuitsnijder. Geen credits afgeschreven."
+    }
+    /// Shown when the backend response can't be decoded (unexpected shape,
+    /// invalid base64, etc.). Distinct from the offline toast.
+    static var magicCutoutDecodeError: String {
+        en ? "Magic Cutout sent something we couldn't read. Using the basic cutout. No credits charged."
+           : "Magic Cutout stuurde iets wat we niet konden lezen. We gebruiken nu de basisuitsnijder. Geen credits afgeschreven."
+    }
+
+    // MARK: Pro paywall
+    static var proUpgradeTitle: String {
+        en ? "Go Pro" : "Word Pro"
+    }
+    static var proUpgradeHeadline: String {
+        en ? "Unlock all the power"
+           : "Ontgrendel alle kracht"
+    }
+    static var proUpgradeSubtitle: String {
+        en ? "Unlock all the power. Cancel anytime."
+           : "Ontgrendel alle kracht. Op elk moment opzegbaar."
+    }
+    static var proPlanName: String { "Pro" }
+    static var proPlanPrice: String { "€4,99" }
+    static var proPerMonth: String {
+        en ? "/month" : "/maand"
+    }
+    static var proSubscribeCTA: String {
+        en ? "Subscribe" : "Abonneer"
+    }
+    static var proPlanDescription: String {
+        en ? "200 credits each month. Magic Cutout uses 1 credit. Resets monthly."
+           : "200 credits per maand. Magic Cutout kost 1 credit. Reset elke maand."
+    }
+    static var proPlanFeaturesHeader: String {
+        en ? "Includes" : "Inclusief"
+    }
+    static var proPlanFeatureUnlimited: String {
+        en ? "Unlimited portrait library"
+           : "Onbeperkte portretbibliotheek"
+    }
+    static func proPlanFeatureBatch(_ max: Int) -> String {
+        en ? "Import up to \(max) photos in one go"
+           : "Importeer tot \(max) foto's in één keer"
+    }
+    static var proPlanFeatureCutout: String {
+        en ? "Pristine background removal"
+           : "Vlekkeloze vrijstaande foto's"
+    }
+    static var proPlanFeatureHair: String {
+        en ? "Crispy hair, every time"
+           : "Haarscherpe randen, elke keer"
+    }
+    static var proPlanFeatureCredits: String {
+        en ? "200 credits per month" : "200 credits per maand"
+    }
+    static var proUpgradeFinePrint: String {
+        en ? "Cancel anytime. Credits reset at the start of each billing period. Top-up credits never expire."
+           : "Op elk moment opzegbaar. Credits resetten aan het begin van elke factuurperiode. Bijgekochte credits vervallen nooit."
+    }
+
+    // MARK: Top-up
+    static var topupCardTitle: String {
+        en ? "Buy 200 credits" : "Koop 200 credits"
+    }
+    static var topupCardPrice: String { "€4,99" }
+    static var topupCardDescription: String {
+        en ? "200 extra credits, on top of your monthly grant. They never expire."
+           : "200 extra credits, bovenop je maandelijkse tegoed. Vervallen nooit."
+    }
+    static var topupCTA: String {
+        en ? "Buy credits" : "Koop credits"
+    }
+    static var topupOneTime: String {
+        en ? "One-time" : "Eenmalig"
+    }
+
+    // Out-of-credits paywall (shown to active Pro users who hit 0 credits).
+    static var topupHeadline: String {
+        en ? "You're out of credits this month"
+           : "Je credits zijn op deze maand"
+    }
+    static func topupSubtitleResetsOn(_ date: String) -> String {
+        en ? "Top up to keep going, or wait until your next renewal on \(date)."
+           : "Koop credits bij om door te gaan, of wacht tot je volgende verlenging op \(date)."
+    }
+    static var topupSubtitleNoDate: String {
+        en ? "Top up to keep going, or wait until your next renewal."
+           : "Koop credits bij om door te gaan, of wacht tot je volgende verlenging."
+    }
+    static var buyMoreCredits: String {
+        en ? "Buy more credits" : "Koop meer credits"
+    }
+
+    // MARK: Settings - credits readout
+    static func creditsRemaining(_ n: Int) -> String {
+        en ? "\(n) credits remaining" : "\(n) credits over"
+    }
+    static func creditsResetOn(_ date: String) -> String {
+        en ? "Resets \(date)" : "Reset op \(date)"
+    }
+    static var creditsBalanceTitle: String {
+        en ? "Credits" : "Credits"
+    }
+    static var creditsBalanceDesc: String {
+        en ? "Buy extra credits so you can keep editing portraits when your monthly grant runs out. Top-up credits never expire."
+           : "Koop extra credits zodat je kunt blijven bewerken als je maandelijkse tegoed op is. Bijgekochte credits vervallen nooit."
+    }
+    static var creditsBalanceLabel: String {
+        en ? "Current balance" : "Huidig saldo"
+    }
+    static func creditsCount(_ n: Int) -> String {
+        en ? (n == 1 ? "1 credit" : "\(n) credits")
+           : (n == 1 ? "1 credit" : "\(n) credits")
+    }
 
     // MARK: Legal links
     static var termsOfService: String       { en ? "Terms of Service" : "Algemene voorwaarden" }
@@ -242,12 +333,7 @@ enum Loc {
 
     // MARK: Editor – Sidebar tabs
     static var tabPortrait: String     { en ? "Portrait" : "Portret" }
-    static var tabEnhance: String      { en ? "Enhance" : "Verfraaien" }
     static var tabAdjust: String       { en ? "Adjust" : "Afstellen" }
-    static var more: String            { en ? "More" : "Meer" }
-    static var moreHelp: String        { en ? "Library actions and delete" : "Bibliotheekacties en verwijderen" }
-    static var deleteQuestion: String  { en ? "Delete this portrait?" : "Dit portret verwijderen?" }
-    static var deleteMessage: String   { en ? "This cannot be undone." : "Dit kan niet ongedaan worden gemaakt." }
     static var actualSize: String      { en ? "Actual size" : "Werkelijke grootte" }
     static var zoomOut: String         { en ? "Zoom out" : "Uitzoomen" }
     static var zoomIn: String          { en ? "Zoom in" : "Inzoomen" }
@@ -259,7 +345,6 @@ enum Loc {
         en ? "Applies the same face size and eye height to \(count) portraits."
            : "Past dezelfde gezichtsgrootte en ooghoogte toe op \(count) portretten."
     }
-    static var deletePortrait: String  { en ? "Delete portrait" : "Verwijder portret" }
 
     // MARK: Editor – Bulk align dialog
     static var alignAllQuestion: String { en ? "Align all portraits?" : "Alle portretten uitlijnen?" }
@@ -272,8 +357,8 @@ enum Loc {
     }
     static var alignComplete: String   { en ? "Alignment complete" : "Uitlijnen voltooid" }
     static func skippedPortraits(_ n: Int) -> String {
-        en ? "\(n) \(n == 1 ? "portrait skipped" : "portraits skipped") — no face found."
-           : "\(n) \(n == 1 ? "portret overgeslagen" : "portretten overgeslagen") — geen gezicht gevonden."
+        en ? "\(n) \(n == 1 ? "portrait skipped" : "portraits skipped"), no face found."
+           : "\(n) \(n == 1 ? "portret overgeslagen" : "portretten overgeslagen"), geen gezicht gevonden."
     }
 
     // MARK: Editor – Undo action names
@@ -317,46 +402,6 @@ enum Loc {
         ]
     }
 
-    /// Playful rotating status messages shown while an Upscale is running.
-    /// Pixel-themed so it actually reads as "making the image bigger / sharper"
-    /// rather than the cutout pipeline's hair/background copy.
-    static var upscaleStatuses: [String] {
-        en ? [
-            "Summoning extra pixels…",
-            "Zooming in on the details…",
-            "Teaching pixels to multiply…",
-            "Wow, that's a lot of pixels…",
-            "Sharpening every edge…",
-            "Smoothing out the jaggies…",
-            "Restoring fine textures…",
-            "Asking each pixel twice…",
-            "Polishing up close…",
-            "Almost there, promise…",
-        ] : [
-            "Extra pixels oproepen…",
-            "Inzoomen op details…",
-            "Pixels leren vermenigvuldigen…",
-            "Oef, dat is veel pixels…",
-            "Elke rand scherper maken…",
-            "Kartels gladstrijken…",
-            "Fijne texturen herstellen…",
-            "Elke pixel twee keer vragen…",
-            "Van dichtbij polijsten…",
-            "Bijna klaar, echt waar…",
-        ]
-    }
-
-    // MARK: Editor – Advanced model hint
-    static var betterHairAvailable: String {
-        en ? "Better hair quality available"
-           : "Betere haarkwaliteit beschikbaar"
-    }
-    static var advancedModelHint: String {
-        en ? "Install the advanced AI model via Settings > AI Model for sharper hair contours."
-           : "Installeer het geavanceerde AI-model via Instellingen > AI Model voor scherpere haarcontouren."
-    }
-    static var openSettings: String    { en ? "Open Settings" : "Open Instellingen" }
-
     // MARK: Editor – Background picker context menu
     static var rename: String          { en ? "Rename…" : "Hernoem…" }
     static var setDefault: String      { en ? "Set as default" : "Maak standaard" }
@@ -376,6 +421,15 @@ enum Loc {
     static var uploadImage: String     { en ? "Upload image…" : "Upload afbeelding…" }
     static var chooseColor: String     { en ? "Choose a color" : "Kies een kleur" }
     static var color: String           { en ? "Color" : "Kleur" }
+
+    // MARK: Settings – Tabs
+    static var settingsGeneral: String { en ? "General" : "Algemeen" }
+    static var settingsAccount: String { en ? "Account" : "Account" }
+    static var appearance: String      { en ? "Appearance" : "Weergave" }
+    static var appearanceDesc: String {
+        en ? "Choose how Avatar looks. Dark uses a deeper near-black palette."
+           : "Kies hoe Avatar eruitziet. Donker gebruikt een dieper bijna-zwart palet."
+    }
 
     // MARK: Settings – Backgrounds tab
     static var backgrounds: String     { en ? "Backgrounds" : "Achtergronden" }
@@ -408,16 +462,13 @@ enum Loc {
     static var installModel: String    { en ? "Install model" : "Installeer model" }
     static var downloading: String     { en ? "Downloading…" : "Downloaden..." }
     static var modelAvailable: String  { en ? "Model available" : "Model beschikbaar" }
-    static func sizeOnDisk(_ size: String) -> String {
-        en ? "Size on disk: \(size)" : "Grootte op schijf: \(size)"
-    }
     static var useAdvancedModel: String {
         en ? "Use advanced model for cutout"
            : "Gebruik geavanceerd model bij uitknippen"
     }
     static var advancedModelToggleHelp: String {
-        en ? "When enabled, new and re-cut portraits are processed with the advanced model. Existing portraits are not automatically reprocessed — use 'Re-cutout' in the editor."
-           : "Wanneer ingeschakeld worden nieuwe en opnieuw uitgeknipte portretten verwerkt met het geavanceerde model. Bestaande portretten worden niet automatisch opnieuw verwerkt — gebruik 'Opnieuw uitknippen' in de editor."
+        en ? "When enabled, new and re-cut portraits are processed with the advanced model. Existing portraits are not automatically reprocessed. Use 'Re-cutout' in the editor."
+           : "Wanneer ingeschakeld worden nieuwe en opnieuw uitgeknipte portretten verwerkt met het geavanceerde model. Bestaande portretten worden niet automatisch opnieuw verwerkt. Gebruik 'Opnieuw uitknippen' in de editor."
     }
 
     // MARK: Settings – Updates tab
@@ -446,9 +497,10 @@ enum Loc {
     // MARK: Export sheet
     static var exportPortrait: String  { en ? "Export portrait" : "Exporteer portret" }
     static var exportHere: String      { en ? "Export here" : "Exporteer hier" }
-    static var noImageToExport: String { en ? "No image to export." : "Geen afbeelding om te exporteren." }
+    static var noImageToExport: String { en ? "Nothing to export yet." : "Nog niets om te exporteren." }
     static func exportFailed(_ names: String) -> String {
-        en ? "Failed: \(names)" : "Mislukt: \(names)"
+        en ? "Couldn't export: \(names)"
+           : "Niet gelukt om te exporteren: \(names)"
     }
     static func filesSaved(_ count: Int) -> String {
         en ? "\(count) file\(count == 1 ? "" : "s") saved"
@@ -474,8 +526,33 @@ enum Loc {
     static var importPhotoHelp: String { en ? "Import a new portrait photo" : "Importeer een nieuwe portretfoto" }
 
     // MARK: Import drop zone
-    static var dropHere: String        { en ? "Drop a portrait photo here" : "Sleep een portretfoto hierheen" }
-    static var orUseButton: String     { en ? "or use the + button at the top" : "of gebruik de + knop bovenin" }
+    static var dropHere: String {
+        en ? "Drop one or multiple portrait photos here"
+           : "Sleep één of meerdere portretfoto's hierheen"
+    }
+    static var orBrowseFiles: String {
+        en ? "or browse files" : "of blader bestanden"
+    }
+    static var dropZoneProTitle: String {
+        en ? "Magic Cutout" : "Magic Cutout"
+    }
+    /// Subtitle shown while the free user still has trial cutouts left.
+    /// `n` = remaining free calls, normally 1 or 2. The "first 2 are on us"
+    /// framing is what makes the toggle land — switch off → save your trial,
+    /// switch on → use Pro now.
+    static func dropZoneProFreeRemaining(_ n: Int) -> String {
+        en ? "First \(FreeTier.freeMagicCutoutAllowance) are on us · \(n) left"
+           : "De eerste \(FreeTier.freeMagicCutoutAllowance) zijn van ons · nog \(n)"
+    }
+    /// Subtitle once the free trial is exhausted — banner flips back to the
+    /// classic Upgrade pill.
+    static var dropZoneProExhausted: String {
+        en ? "Free trial used — Upgrade to keep using"
+           : "Gratis proef opgebruikt — upgrade om door te gaan"
+    }
+    static var dropZoneProUpgrade: String {
+        en ? "Upgrade" : "Upgrade"
+    }
 
     // MARK: Sidebar update card
     static func updatedTo(_ version: String) -> String {
@@ -483,85 +560,96 @@ enum Loc {
     }
     static var relaunchToApply: String { en ? "Relaunch to apply" : "Start opnieuw om toe te passen" }
 
+    // MARK: Sidebar Pro quota card / Pro upsell toast
+    static func proQuotaTitle(remaining: Int, total: Int) -> String {
+        if remaining == 0 {
+            return en ? "Library full, \(total) of \(total) used"
+                      : "Bibliotheek vol, \(total) van \(total) gebruikt"
+        }
+        return en ? "\(remaining) of \(total) left"
+                  : "\(remaining) van \(total) over"
+    }
+    static var proQuotaSubtitle: String {
+        en ? "Upgrade to Pro to unlock more"
+           : "Upgrade naar Pro om meer te ontgrendelen"
+    }
+    static var proQuotaTooltip: String {
+        en ? "Free accounts can keep up to \(FreeTier.maxPortraits) portraits. Upgrade to Pro for unlimited."
+           : "Gratis accounts kunnen tot \(FreeTier.maxPortraits) portretten bewaren. Upgrade naar Pro voor onbeperkt."
+    }
+    static var proQuotaUpgradeCTA: String {
+        en ? "Upgrade" : "Upgrade"
+    }
+    static func proUpsellBatchLimit(_ max: Int) -> String {
+        en ? "Importing more than \(max) at once is a Pro feature."
+           : "Meer dan \(max) tegelijk importeren is een Pro-functie."
+    }
+    static func proBatchCapExceeded(_ max: Int) -> String {
+        en ? "Imports are capped at \(max) at a time to keep things smooth. Try again with fewer."
+           : "Imports zijn beperkt tot \(max) tegelijk om alles soepel te houden. Probeer het met minder."
+    }
+
     // MARK: Import flow errors
-    static var dropPhotoNotFound: String     { en ? "Could not find the dropped photo." : "Kon de gesleepte foto niet vinden." }
-    static var dropImageUnreadable: String   { en ? "Could not read the dropped image." : "Kon de gesleepte afbeelding niet lezen." }
+    //
+    // Voice rules (apply to anything the user reads when something goes wrong):
+    //   1. Lead with what happened in plain words ("That image" not "The dropped resource")
+    //   2. Suggest a next step when one exists ("Try a different file")
+    //   3. Use "we" not "the system"; use "couldn't" not "cannot"
+    //   4. Never paste raw exception strings unless we already understand they
+    //      are user-readable (POSIX file errors are; stack traces aren't)
+    static var dropPhotoNotFound: String {
+        en ? "We couldn't find that photo. Try dragging it again."
+           : "We konden die foto niet vinden. Sleep hem nog eens."
+    }
+    static var dropImageUnreadable: String {
+        en ? "That image looks unreadable. Try a different file."
+           : "Die afbeelding lijkt onleesbaar. Probeer een ander bestand."
+    }
     static var imported: String              { en ? "Imported" : "Geïmporteerd" }
-    static var unknownFileType: String       { en ? "Unknown file type dropped." : "Onbekend bestandstype gesleept." }
+    static var unknownFileType: String {
+        en ? "That isn't an image we can use. JPEG, PNG, or HEIC works best."
+           : "Dat is geen afbeelding die we kunnen gebruiken. JPEG, PNG of HEIC werkt het beste."
+    }
     static func cannotReadFile(_ err: String) -> String {
-        en ? "Cannot read file: \(err)" : "Kan bestand niet lezen: \(err)"
+        en ? "Couldn't open that file. \(err)"
+           : "Kon dat bestand niet openen. \(err)"
     }
-    static var cannotDecodeImage: String     { en ? "Cannot decode image." : "Kan afbeelding niet decoderen." }
+    static var cannotDecodeImage: String {
+        en ? "Couldn't open that image. JPEG, PNG, or HEIC works best."
+           : "Kon die afbeelding niet openen. JPEG, PNG of HEIC werkt het beste."
+    }
     static var noOriginalForRecutout: String {
-        en ? "No original photo saved — cannot re-cutout."
-           : "Geen originele foto bewaard — kan niet opnieuw uitknippen."
+        en ? "The original photo wasn't saved, so we can't redo the cutout."
+           : "De originele foto is niet bewaard, dus we kunnen de uitknip niet opnieuw maken."
     }
-    static var cannotDecodeOriginal: String  { en ? "Cannot decode original image." : "Kan originele afbeelding niet decoderen." }
-    static var portraitNotFound: String      { en ? "Portrait no longer found." : "Portret niet meer gevonden." }
-    static var noOriginalForUpscale: String  {
-        en ? "No original photo saved — cannot upscale."
-           : "Geen originele foto bewaard — kan niet opschalen."
+    static var cannotDecodeOriginal: String {
+        en ? "Couldn't reopen the original photo for this portrait."
+           : "Kon de originele foto van dit portret niet opnieuw openen."
     }
-    static var upscaleFailed: String         { en ? "Upscale failed." : "Opschalen mislukt." }
-    static var cannotSaveUpscaled: String    { en ? "Cannot save upscaled image." : "Kan opgeschaalde afbeelding niet opslaan." }
+    static var portraitNotFound: String {
+        en ? "That portrait isn't here anymore."
+           : "Dat portret is hier niet meer."
+    }
     static func recutoutFailed(_ err: String) -> String {
-        en ? "Re-cutout failed: \(err)" : "Opnieuw uitknippen mislukt: \(err)"
+        en ? "Magic Cutout couldn't finish. \(err)"
+           : "Magic Cutout kon niet worden voltooid. \(err)"
     }
-    static func upscaleFailedErr(_ err: String) -> String {
-        en ? "Upscale failed: \(err)" : "Opschalen mislukt: \(err)"
+    static var noCutoutAvailable: String {
+        en ? "No cutout to enhance yet."
+           : "Nog geen uitknip om te verfraaien."
     }
-    static var noCutoutAvailable: String     { en ? "No cutout available." : "Geen uitknip beschikbaar." }
-    static var magicRetouchFailed: String    { en ? "Magic Retouch failed." : "Magic Retouch mislukt." }
+    static var magicRetouchFailed: String {
+        en ? "Magic Retouch didn't take. Try again."
+           : "Magic Retouch lukte niet. Probeer het nog eens."
+    }
     static func processingFailed(_ err: String) -> String {
-        en ? "Processing failed: \(err)" : "Verwerken mislukt: \(err)"
-    }
-
-    // MARK: Model manager errors
-    static func modelLoadFailed(_ err: String) -> String {
-        en ? "Failed to load model: \(err)" : "Model laden mislukt: \(err)"
-    }
-    static func upscaleModelLoadFailed(_ err: String) -> String {
-        en ? "Failed to load upscale model: \(err)" : "Opschaalmodel laden mislukt: \(err)"
-    }
-    static var upscaleModelNotInstalled: String {
-        en ? "No AI upscale model installed. Open Settings → AI Model to install one."
-           : "Geen AI-opschaalmodel geïnstalleerd. Open Instellingen → AI-model om er één te installeren."
-    }
-
-    // MARK: Upscale Settings UI
-    static var upscaleSectionTitle: String {
-        en ? "AI Upscale" : "AI-opschalen"
-    }
-    static var upscaleSectionDesc: String {
-        en ? "Reconstructs detail in low-resolution photos using an on-device Real-ESRGAN model. Choose a scale factor below."
-           : "Herstelt details in foto's met lage resolutie met behulp van een on-device Real-ESRGAN-model. Kies hieronder een schaalfactor."
-    }
-    static var upscaleVariant2x: String { en ? "2× (faster, lighter)" : "2× (sneller, lichter)" }
-    static var upscaleVariant4x: String { en ? "4× (stronger quality)" : "4× (sterkere kwaliteit)" }
-    static var upscaleActiveVariantLabel: String {
-        en ? "Active variant" : "Actieve variant"
+        en ? "We hit a snag processing this photo. \(err)"
+           : "We liepen vast bij het verwerken van deze foto. \(err)"
     }
 
     // MARK: Editor dimensions caption
     static func dimensionsLabel(_ w: Int, _ h: Int) -> String {
         en ? "\(w) × \(h) px" : "\(w) × \(h) px"
     }
-    static func downloadFailed(_ err: String) -> String {
-        en ? "Download failed: \(err)" : "Download mislukt: \(err)"
-    }
-    static var downloadNoFile: String {
-        en ? "Download failed: no file received" : "Download mislukt: geen bestand ontvangen"
-    }
-    static func installFailed(_ err: String) -> String {
-        en ? "Installation failed: \(err)" : "Installatie mislukt: \(err)"
-    }
-    static func extractionFailed(_ code: Int32) -> String {
-        en ? "Extraction failed (ditto exit \(code))" : "Uitpakken mislukt (ditto exit \(code))"
-    }
-    static var modelNotFoundAfterExtract: String {
-        en ? "Model not found after extraction" : "Model niet gevonden na uitpakken"
-    }
 
-    // MARK: Seed data
-    static var defaultBg: String       { en ? "Default" : "Standaard" }
 }

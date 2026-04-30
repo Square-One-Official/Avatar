@@ -1,12 +1,15 @@
 {
   "version": 2,
   "functions": {
-    "api/extend-body.ts": {
-      "maxDuration": 120,
+    "api/v1/cutout.ts": {
+      "maxDuration": 60,
       "memory": 1024
     },
     "api/stripe-webhook.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/v1/(.*)", "destination": "/api/v1/$1" }
+  ]
 }

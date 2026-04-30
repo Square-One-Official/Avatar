@@ -2,85 +2,227 @@ import Foundation
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
-import CoreML
 
 /// Centralised drop-handler used by every view that should accept a portrait
 /// drag-and-drop (the empty-state import zone AND the editor surface, so users
 /// can drop a fresh photo at any time without going back to an empty state).
 @MainActor
 enum PortraitDropHandler {
+    /// Handles a drag-and-drop of one or more image providers. Single-image
+    /// drops run immediately. Pro users dropping more than
+    /// `BatchConfirmRequest.threshold` images at once get a confirm dialog
+    /// (each Magic Cutout call costs 1 credit), so a stray drop of a 500-
+    /// photo folder doesn't burn a month of credits in one go. Free users
+    /// process locally for free but are gated by `FreeTier.maxBatchImport`
+    /// (toast → upsell) and `FreeTier.maxPortraits` (paywall sheet).
+    /// `existingPortraitCount` is the current library size — pass
+    /// `allPortraits.count` from the calling view's @Query.
     static func handle(providers: [NSItemProvider],
+                       existingPortraitCount: Int,
                        context: ModelContext,
-                       appState: AppState,
-                       modelManager: ModelManager? = nil) -> Bool {
-        guard let provider = providers.first else { return false }
-        // Show feedback immediately — the loaders below are async.
+                       appState: AppState) -> Bool {
+        guard !providers.isEmpty else { return false }
+
+        // Free-tier gates run first — Pro users skip these entirely.
+        // We always return `true` so the drop is consumed (not bounced back
+        // by the system) even when the upsell short-circuits the import.
+        guard FreeTierGate.allowImport(incoming: providers.count,
+                                       existingPortraitCount: existingPortraitCount,
+                                       appState: appState) else {
+            return true
+        }
+
+        // Pro hard cap on batch size — memory safety. Surfaces an info toast
+        // (no Upgrade CTA) since the user is already paying.
+        if appState.proEntitlement.isPro
+            && providers.count > ProLimits.maxBatchImport {
+            appState.showProInfo(Loc.proBatchCapExceeded(ProLimits.maxBatchImport))
+            return true
+        }
+
+        // Decide whether to confirm before processing the batch.
+        let useCloud = ImportFlow.shouldUseMagicCutout(appState: appState)
+        if useCloud && providers.count > BatchConfirmRequest.threshold {
+            appState.batchConfirm = BatchConfirmRequest(
+                count: providers.count,
+                credits: providers.count, // 1 credit per image
+                onConfirm: {
+                    appState.batchConfirm = nil
+                    processAll(providers: providers, context: context,
+                               appState: appState)
+                },
+                onCancel: {
+                    appState.batchConfirm = nil
+                }
+            )
+            return true
+        }
+
+        processAll(providers: providers, context: context,
+                   appState: appState)
+        return true
+    }
+
+    /// Iterates the dropped providers and dispatches each to ImportFlow.
+    /// Items run serially behind the scenes (each `importFile`/`importData`
+    /// kicks its own `Task.detached`); on the cloud path the backend is
+    /// expected to rate-limit if needed. Errors on individual items surface
+    /// in `appState.lastError` and don't halt the batch.
+    private static func processAll(providers: [NSItemProvider],
+                                   context: ModelContext,
+                                   appState: AppState) {
         appState.isProcessing = true
-
         let fileURLType = UTType.fileURL.identifier
-        if provider.hasItemConformingToTypeIdentifier(fileURLType) {
-            provider.loadDataRepresentation(forTypeIdentifier: fileURLType) { data, _ in
-                guard let data,
-                      let urlString = String(data: data, encoding: .utf8),
-                      let url = URL(string: urlString) ?? URL(dataRepresentation: data, relativeTo: nil)
-                else {
-                    Task { @MainActor in
-                        appState.isProcessing = false
-                        appState.lastError = Loc.dropPhotoNotFound
-                        print("[Drop] failed to decode file URL")
-                    }
-                    return
-                }
-                Task { @MainActor in
-                    ImportFlow.importFile(url: url, context: context, appState: appState,
-                                         modelManager: modelManager)
-                }
-            }
-            return true
-        }
-
         let imageType = UTType.image.identifier
-        if provider.hasItemConformingToTypeIdentifier(imageType) {
-            provider.loadDataRepresentation(forTypeIdentifier: imageType) { data, _ in
-                guard let data else {
-                    Task { @MainActor in
-                        appState.isProcessing = false
-                        appState.lastError = Loc.dropImageUnreadable
+        // ModelContainer is Sendable; ModelContext is not. Capture the container
+        // across the @Sendable loadDataRepresentation boundary, then re-derive
+        // the main context inside the @MainActor task.
+        let container = context.container
+
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(fileURLType) {
+                provider.loadDataRepresentation(forTypeIdentifier: fileURLType) { data, _ in
+                    guard let data,
+                          let urlString = String(data: data, encoding: .utf8),
+                          let url = URL(string: urlString) ?? URL(dataRepresentation: data, relativeTo: nil)
+                    else {
+                        Task { @MainActor in
+                            appState.warn(Loc.dropPhotoNotFound)
+                            dlog("[Drop] failed to decode file URL")
+                        }
+                        return
                     }
-                    return
+                    Task { @MainActor in
+                        ImportFlow.importFile(url: url, context: container.mainContext, appState: appState)
+                    }
                 }
-                Task { @MainActor in
-                    ImportFlow.importData(data, suggestedName: Loc.imported,
-                                          context: context, appState: appState,
-                                          modelManager: modelManager)
+            } else if provider.hasItemConformingToTypeIdentifier(imageType) {
+                provider.loadDataRepresentation(forTypeIdentifier: imageType) { data, _ in
+                    guard let data else {
+                        Task { @MainActor in
+                            appState.warn(Loc.dropImageUnreadable)
+                        }
+                        return
+                    }
+                    Task { @MainActor in
+                        ImportFlow.importData(data, suggestedName: Loc.imported,
+                                              context: container.mainContext, appState: appState)
+                    }
                 }
+            } else {
+                appState.warn(Loc.unknownFileType)
+            }
+        }
+    }
+}
+
+/// Free-tier import gating used by all import entry points (drop, file
+/// picker, raw `importFile` from MainWindow). Returns `true` when the
+/// caller should proceed; returns `false` after surfacing the appropriate
+/// upsell (toast or paywall sheet) so the caller skips the import.
+@MainActor
+enum FreeTierGate {
+    /// Gate a request to import `incoming` new portraits. Pro users always
+    /// pass. Free users at the lifetime cap trigger the paywall; over-batch
+    /// triggers a soft upsell toast.
+    ///
+    /// `existingPortraitCount` is intentionally ignored — the cap is
+    /// "5 imports ever", not "5 portraits in the library". Library count
+    /// was the cheat hole: delete a portrait → free a slot. The real cap
+    /// lives server-side in `users.free_imports_used` /
+    /// `device_imports.free_imports_used`; this client check is a fast
+    /// pre-flight using `proEntitlement.freeImportsRemaining` so we don't
+    /// fire a network call when we already know the request will fail.
+    /// `ImportFlow.claimImportSlot` is the authoritative gate.
+    static func allowImport(incoming: Int,
+                            existingPortraitCount: Int,
+                            appState: AppState) -> Bool {
+        _ = existingPortraitCount  // retained for ABI; no longer authoritative
+        if appState.proEntitlement.isPro {
+            // Pro users only hit the technical batch cap.
+            if incoming > ProLimits.maxBatchImport {
+                appState.showProInfo(Loc.proBatchCapExceeded(ProLimits.maxBatchImport))
+                return false
             }
             return true
         }
 
-        appState.isProcessing = false
-        appState.lastError = Loc.unknownFileType
-        return false
+        let remaining = appState.proEntitlement.freeImportsRemaining
+        if remaining <= 0 {
+            appState.showProUpgradeSheet = true
+            return false
+        }
+        if incoming > FreeTier.maxBatchImport {
+            appState.showProUpsell(Loc.proUpsellBatchLimit(FreeTier.maxBatchImport))
+            return false
+        }
+        if incoming > remaining {
+            // User can still import some, but not all of this batch — same
+            // "Upgrade to keep going" UX as a hard exhaustion.
+            appState.showProUpgradeSheet = true
+            return false
+        }
+        return true
     }
 }
 
 @MainActor
 enum ImportFlow {
+    /// Reserves one server-side import slot before the pipeline runs.
+    /// Pro users return immediately with `allowed=true`. Free users hit
+    /// the per-account + per-device counters; either at the cap → paywall.
+    /// On transport failure we **fail open** (allow the import) so an
+    /// offline user isn't held hostage by their flaky Wi-Fi; the next
+    /// online claim will reconcile against the server. Returns true when
+    /// the caller should proceed with the pipeline.
+    @MainActor
+    private static func claimImportSlot(appState: AppState) async -> Bool {
+        if appState.proEntitlement.isPro { return true }
+        do {
+            let resp = try await appState.backend.claimImport()
+            appState.proEntitlement.freeImportsUsed = resp.importsUsed
+            appState.proEntitlement.freeImportsRemaining = resp.importsRemaining
+            return true
+        } catch BackendError.noCredits {
+            // Server says the cap is hit. Keep state consistent with that.
+            appState.proEntitlement.freeImportsRemaining = 0
+            appState.showProUpgradeSheet = true
+            appState.isProcessing = false
+            return false
+        } catch BackendError.unauthorized, BackendError.notSignedIn {
+            // Token went bad mid-session — drop to the device-only path on
+            // the next claim. Don't gate the import on this; surfacing a
+            // sign-in prompt mid-import is worse than a forgiving allow.
+            return true
+        } catch {
+            // Transport / server error — fail open. The Magic Cutout call
+            // (if any) has its own credit gate and will surface the
+            // offline toast there.
+            dlog("[Import] claim failed, allowing import: \(error)")
+            return true
+        }
+    }
+
     /// Reads a portrait file from disk, runs subject-lift + face detection,
     /// computes auto-alignment, and inserts a new Portrait into SwiftData.
-    /// File I/O, image decode, and the BiRefNet model load all happen on a
-    /// background task so the main thread stays responsive during large
-    /// HEIC/PNG reads and the first-time Neural Engine compile.
-    static func importFile(url: URL, context: ModelContext, appState: AppState,
-                           modelManager: ModelManager? = nil) {
+    /// File I/O and image decode happen on a background task so the main
+    /// thread stays responsive during large HEIC/PNG reads.
+    static func importFile(url: URL, context: ModelContext, appState: AppState) {
         appState.isProcessing = true
-        appState.lastError = nil
-        print("[Import] start url=\(url.path)")
+        appState.dismissBanner()
+        dlog("[Import] start url=\(url.path)")
 
-        let useAdvanced = modelManager?.useAdvancedModel == true
+        let useCloud = shouldUseMagicCutout(appState: appState)
         let suggestedName = url.deletingPathExtension().lastPathComponent
+        // Capture Sendable container; runPipeline derives the main context.
+        let container = context.container
 
         Task.detached(priority: .userInitiated) {
+            // Reserve the server-side slot first so the cheat path
+            // (delete-then-reimport) is closed before we even decode.
+            let allowed = await claimImportSlot(appState: appState)
+            guard allowed else { return }
+
             // Re-anchor the security-scoped access on the background thread
             // that will actually read the file.
             let needsScope = url.startAccessingSecurityScopedResource()
@@ -91,53 +233,57 @@ enum ImportFlow {
                 data = try Data(contentsOf: url)
             } catch {
                 await MainActor.run {
-                    appState.lastError = Loc.cannotReadFile(error.localizedDescription)
+                    appState.warn(Loc.cannotReadFile(error.localizedDescription))
                     appState.isProcessing = false
-                    print("[Import] FAILED Data(contentsOf:) error=\(error)")
+                    dlog("[Import] FAILED Data(contentsOf:) error=\(error)")
                 }
                 return
             }
-            print("[Import] read bytes=\(data.count)")
+            dlog("[Import] read bytes=\(data.count)")
 
             guard let cg = ImageProcessor.cgImage(from: data) else {
                 await MainActor.run {
-                    appState.lastError = Loc.cannotDecodeImage
+                    appState.warn(Loc.cannotDecodeImage)
                     appState.isProcessing = false
-                    print("[Import] FAILED CGImage decode (data was \(data.count) bytes)")
+                    dlog("[Import] FAILED CGImage decode (data was \(data.count) bytes)")
                 }
                 return
             }
-            print("[Import] loaded CGImage \(cg.width)x\(cg.height)")
+            dlog("[Import] loaded CGImage \(cg.width)x\(cg.height)")
 
-            let birefnet: MLModel? = useAdvanced ? await modelManager?.loadModelAsync() : nil
             await runPipeline(cg: cg, originalData: data, suggestedName: suggestedName,
-                              context: context, appState: appState, birefnetModel: birefnet)
+                              container: container, appState: appState,
+                              useCloud: useCloud)
         }
     }
 
     /// Variant for when raw image bytes are already in memory (e.g. dragged from
     /// another app, no file URL).
     static func importData(_ data: Data, suggestedName: String,
-                           context: ModelContext, appState: AppState,
-                           modelManager: ModelManager? = nil) {
+                           context: ModelContext, appState: AppState) {
         appState.isProcessing = true
-        appState.lastError = nil
-        print("[Import] start data bytes=\(data.count)")
+        appState.dismissBanner()
+        dlog("[Import] start data bytes=\(data.count)")
 
-        let useAdvanced = modelManager?.useAdvancedModel == true
+        let useCloud = shouldUseMagicCutout(appState: appState)
+        let container = context.container
 
         Task.detached(priority: .userInitiated) {
+            // Same anti-cheat gate as importFile — see claimImportSlot.
+            let allowed = await claimImportSlot(appState: appState)
+            guard allowed else { return }
+
             guard let cg = ImageProcessor.cgImage(from: data) else {
                 await MainActor.run {
-                    appState.lastError = Loc.cannotDecodeImage
+                    appState.warn(Loc.cannotDecodeImage)
                     appState.isProcessing = false
-                    print("[Import] FAILED CGImage decode from raw data")
+                    dlog("[Import] FAILED CGImage decode from raw data")
                 }
                 return
             }
-            let birefnet: MLModel? = useAdvanced ? await modelManager?.loadModelAsync() : nil
             await runPipeline(cg: cg, originalData: data, suggestedName: suggestedName,
-                              context: context, appState: appState, birefnetModel: birefnet)
+                              container: container, appState: appState,
+                              useCloud: useCloud)
         }
     }
 
@@ -146,31 +292,36 @@ enum ImportFlow {
     /// (offset/scale) and any other editor state. Used by the editor's
     /// "Opnieuw uitknippen" action so users can re-render a portrait after
     /// pipeline improvements without losing their framing.
-    static func reprocess(portrait: Portrait, context: ModelContext, appState: AppState,
-                          modelManager: ModelManager? = nil) {
+    static func reprocess(portrait: Portrait, context: ModelContext, appState: AppState) {
         guard let data = portrait.originalImageData else {
-            appState.lastError = Loc.noOriginalForRecutout
+            appState.warn(Loc.noOriginalForRecutout)
             return
         }
         guard let cg = ImageProcessor.cgImage(from: data) else {
-            appState.lastError = Loc.cannotDecodeOriginal
+            appState.warn(Loc.cannotDecodeOriginal)
             return
         }
 
         appState.isProcessing = true
-        appState.lastError = nil
-        print("[Reprocess] start id=\(portrait.id) \(cg.width)x\(cg.height)")
+        appState.dismissBanner()
+        dlog("[Reprocess] start id=\(portrait.id) \(cg.width)x\(cg.height)")
 
-        let useAdvanced = modelManager?.useAdvancedModel == true
+        let useCloud = shouldUseMagicCutout(appState: appState)
         let portraitID = portrait.id
         Task.detached(priority: .userInitiated) {
-            // Load the advanced model off the main thread — the first-time
-            // Neural Engine compile otherwise freezes the UI.
-            let birefnet: MLModel? = useAdvanced ? await modelManager?.loadModelAsync() : nil
             do {
-                let processed = try ImageProcessor.process(image: cg, birefnetModel: birefnet)
+                let processed: ProcessedSubject
+                let usedMagic: Bool
+                if useCloud {
+                    let result = try await runCloudWithFallback(cg: cg, appState: appState)
+                    processed = result.subject
+                    usedMagic = result.usedMagic
+                } else {
+                    processed = try ImageProcessor.process(image: cg, birefnetModel: nil)
+                    usedMagic = false
+                }
                 let pngData = ImageProcessor.pngData(from: processed.cutout) ?? Data()
-                print("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero)")
+                dlog("[Reprocess] done bytes=\(pngData.count) face=\(processed.faceRect ?? .zero)")
 
                 await MainActor.run {
                     // Re-fetch the portrait on the main actor to avoid
@@ -180,7 +331,7 @@ enum ImportFlow {
                     )
                     guard let fresh = try? context.fetch(descriptor).first else {
                         appState.isProcessing = false
-                        appState.lastError = Loc.portraitNotFound
+                        appState.warn(Loc.portraitNotFound)
                         return
                     }
                     fresh.cutoutPNG = pngData
@@ -190,6 +341,7 @@ enum ImportFlow {
                     fresh.bodyBottomY = Double(processed.bodyBottomY)
                     fresh.isMagicRetouched = false
                     fresh.preRetouchPNG = nil
+                    fresh.cutoutUsedMagic = usedMagic
                     fresh.updatedAt = Date()
                     try? context.save()
                     // Purge any cached decoded cutout so the editor shows the
@@ -199,172 +351,12 @@ enum ImportFlow {
                 }
             } catch {
                 await MainActor.run {
-                    appState.lastError = Loc.recutoutFailed(error.localizedDescription)
+                    appState.warn(Loc.recutoutFailed(error.localizedDescription))
                     appState.isProcessing = false
-                    print("[Reprocess] ERROR \(error)")
+                    dlog("[Reprocess] ERROR \(error)")
                 }
             }
         }
-    }
-
-    // MARK: - Upscale
-
-    /// Runs an on-device Real-ESRGAN super-resolution model on the portrait's
-    /// original image (2× or 4× depending on the selected variant), then
-    /// re-runs the cutout pipeline from the higher-resolution source. Caller
-    /// is expected to guarantee `upscaleManager.isAnyInstalled` — the UI
-    /// disables the Upscale button otherwise.
-    static func upscale(portrait: Portrait, context: ModelContext, appState: AppState,
-                        modelManager: ModelManager? = nil,
-                        upscaleManager: UpscaleModelManager) {
-        guard !portrait.isUpscaled else {
-            appState.lastError = Loc.alreadyUpscaled
-            return
-        }
-        guard let data = portrait.originalImageData else {
-            appState.lastError = Loc.noOriginalForUpscale
-            return
-        }
-        guard let cg = ImageProcessor.cgImage(from: data) else {
-            appState.lastError = Loc.cannotDecodeOriginal
-            return
-        }
-        guard upscaleManager.isAnyInstalled else {
-            appState.lastError = Loc.upscaleModelNotInstalled
-            return
-        }
-
-        appState.processingKind = .upscale
-        appState.isProcessing = true
-        appState.lastError = nil
-        print("[Upscale] start id=\(portrait.id) \(cg.width)×\(cg.height)")
-
-        let useAdvanced = modelManager?.useAdvancedModel == true
-        let portraitID = portrait.id
-        Task.detached(priority: .userInitiated) {
-            guard let active = await upscaleManager.activeModelAsync() else {
-                await MainActor.run {
-                    appState.lastError = Loc.upscaleModelNotInstalled
-                    appState.isProcessing = false
-                }
-                return
-            }
-            let upscaleModel = active.model
-            let factor = active.variant.factor
-            let birefnet: MLModel? = useAdvanced ? await modelManager?.loadModelAsync() : nil
-
-            do {
-                // 1. AI super-resolve the original image.
-                let upscaled = try ImageProcessor.upscale(image: cg, using: upscaleModel, factor: factor)
-                print("[Upscale] upscaled to \(upscaled.width)×\(upscaled.height) (×\(factor))")
-
-                // 2. Re-encode the upscaled original for persistent storage.
-                guard let upscaledData = ImageProcessor.pngData(from: upscaled) else {
-                    await MainActor.run {
-                        appState.lastError = Loc.cannotSaveUpscaled
-                        appState.isProcessing = false
-                    }
-                    return
-                }
-
-                // 3. Re-run the cutout pipeline from the higher-resolution source.
-                let processed = try ImageProcessor.process(image: upscaled, birefnetModel: birefnet)
-                let pngData = ImageProcessor.pngData(from: processed.cutout) ?? Data()
-                print("[Upscale] pipeline done cutout=\(processed.cutout.width)×\(processed.cutout.height) face=\(processed.faceRect ?? .zero)")
-
-                await MainActor.run {
-                    let descriptor = FetchDescriptor<Portrait>(
-                        predicate: #Predicate { $0.id == portraitID }
-                    )
-                    guard let fresh = try? context.fetch(descriptor).first else {
-                        appState.isProcessing = false
-                        appState.lastError = Loc.portraitNotFound
-                        return
-                    }
-                    // Snapshot pre-upscale state so Upscale can be toggled off.
-                    fresh.preUpscaleOriginalData = fresh.originalImageData
-                    fresh.preUpscaleCutoutPNG = fresh.cutoutPNG
-                    fresh.preUpscaleFaceRectX = fresh.faceRectX
-                    fresh.preUpscaleFaceRectY = fresh.faceRectY
-                    fresh.preUpscaleFaceRectW = fresh.faceRectW
-                    fresh.preUpscaleFaceRectH = fresh.faceRectH
-                    if let eye = fresh.eyeCenter {
-                        fresh.preUpscaleEyeCenterX = Double(eye.x)
-                        fresh.preUpscaleEyeCenterY = Double(eye.y)
-                        fresh.preUpscaleHasEyes = true
-                    } else {
-                        fresh.preUpscaleHasEyes = false
-                    }
-                    fresh.preUpscaleInterEyeDistance = fresh.interEyeDistance
-                    fresh.preUpscaleBodyBottomY = fresh.bodyBottomY
-                    fresh.preUpscaleFactor = factor
-
-                    fresh.originalImageData = upscaledData
-                    fresh.cutoutPNG = pngData
-                    fresh.faceRect = processed.faceRect ?? .zero
-                    fresh.eyeCenter = processed.eyeCenter
-                    fresh.interEyeDistance = Double(processed.interEyeDistance ?? 0)
-                    fresh.bodyBottomY = Double(processed.bodyBottomY)
-                    // The cutout is now `factor`× larger in pixels. Divide the
-                    // canvas scale by the same factor so visual size stays
-                    // stable; exports downsample from a genuinely higher-res
-                    // cutout, which is where the win shows up.
-                    fresh.scale /= Double(factor)
-                    fresh.isUpscaled = true
-                    fresh.isMagicRetouched = false
-                    fresh.preRetouchPNG = nil
-                    fresh.updatedAt = Date()
-                    try? context.save()
-                    appState.invalidateCutout(for: fresh)
-                    appState.isProcessing = false
-                    print("[Upscale] DONE id=\(fresh.id) factor=\(factor)")
-                }
-            } catch {
-                await MainActor.run {
-                    appState.lastError = Loc.upscaleFailedErr(error.localizedDescription)
-                    appState.isProcessing = false
-                    print("[Upscale] ERROR \(error)")
-                }
-            }
-        }
-    }
-
-    /// Reverts an Upscale by restoring the pre-upscale snapshot (original data,
-    /// cutout, face metrics) and doubling the manual scale back to compensate.
-    static func undoUpscale(portrait: Portrait, context: ModelContext, appState: AppState) {
-        guard portrait.isUpscaled,
-              let origData = portrait.preUpscaleOriginalData,
-              let cutoutData = portrait.preUpscaleCutoutPNG else {
-            return
-        }
-        portrait.originalImageData = origData
-        portrait.cutoutPNG = cutoutData
-        portrait.faceRectX = portrait.preUpscaleFaceRectX
-        portrait.faceRectY = portrait.preUpscaleFaceRectY
-        portrait.faceRectW = portrait.preUpscaleFaceRectW
-        portrait.faceRectH = portrait.preUpscaleFaceRectH
-        if portrait.preUpscaleHasEyes {
-            portrait.eyeCenterX = portrait.preUpscaleEyeCenterX
-            portrait.eyeCenterY = portrait.preUpscaleEyeCenterY
-        } else {
-            portrait.eyeCenterX = 0
-            portrait.eyeCenterY = 0
-        }
-        portrait.interEyeDistance = portrait.preUpscaleInterEyeDistance
-        portrait.bodyBottomY = portrait.preUpscaleBodyBottomY
-        // Restore the visual scale (was divided by the factor at upscale time).
-        let storedFactor = portrait.preUpscaleFactor > 0 ? portrait.preUpscaleFactor : 2
-        portrait.scale *= Double(storedFactor)
-        portrait.isUpscaled = false
-        // Magic Retouch was cleared at upscale time; pre-upscale cutout is raw.
-        portrait.isMagicRetouched = false
-        portrait.preRetouchPNG = nil
-        // Drop the snapshot — re-running Upscale will take a fresh one.
-        portrait.preUpscaleOriginalData = nil
-        portrait.preUpscaleCutoutPNG = nil
-        portrait.updatedAt = Date()
-        try? context.save()
-        appState.invalidateCutout(for: portrait)
     }
 
     // MARK: - Magic Retouch
@@ -375,30 +367,30 @@ enum ImportFlow {
     /// still layer on top at render time. "Opnieuw uitknippen" serves as undo.
     static func magicRetouch(portrait: Portrait, context: ModelContext, appState: AppState) {
         guard !portrait.isMagicRetouched else {
-            appState.lastError = Loc.magicRetouchAlready
+            appState.note(Loc.magicRetouchAlready)
             return
         }
         guard let cutoutData = portrait.cutoutPNG,
               let cutoutCG = ImageProcessor.cgImage(from: cutoutData) else {
-            appState.lastError = Loc.noCutoutAvailable
+            appState.note(Loc.noCutoutAvailable)
             return
         }
 
         appState.isProcessing = true
-        appState.lastError = nil
-        print("[MagicRetouch] start id=\(portrait.id) \(cutoutCG.width)×\(cutoutCG.height)")
+        appState.dismissBanner()
+        dlog("[MagicRetouch] start id=\(portrait.id) \(cutoutCG.width)×\(cutoutCG.height)")
 
         let portraitID = portrait.id
         Task.detached(priority: .userInitiated) {
             guard let enhanced = ImageProcessor.magicRetouch(image: cutoutCG) else {
                 await MainActor.run {
-                    appState.lastError = Loc.magicRetouchFailed
+                    appState.warn(Loc.magicRetouchFailed)
                     appState.isProcessing = false
                 }
                 return
             }
             let pngData = ImageProcessor.pngData(from: enhanced) ?? Data()
-            print("[MagicRetouch] done bytes=\(pngData.count)")
+            dlog("[MagicRetouch] done bytes=\(pngData.count)")
 
             await MainActor.run {
                 let descriptor = FetchDescriptor<Portrait>(
@@ -406,7 +398,7 @@ enum ImportFlow {
                 )
                 guard let fresh = try? context.fetch(descriptor).first else {
                     appState.isProcessing = false
-                    appState.lastError = Loc.portraitNotFound
+                    appState.warn(Loc.portraitNotFound)
                     return
                 }
                 fresh.preRetouchPNG = fresh.cutoutPNG
@@ -416,7 +408,7 @@ enum ImportFlow {
                 try? context.save()
                 appState.invalidateCutout(for: fresh)
                 appState.isProcessing = false
-                print("[MagicRetouch] DONE id=\(fresh.id)")
+                dlog("[MagicRetouch] DONE id=\(fresh.id)")
             }
         }
     }
@@ -432,123 +424,115 @@ enum ImportFlow {
         appState.invalidateCutout(for: portrait)
     }
 
-    // MARK: - Extend Body (Pro)
-
-    /// Calls the backend (Replicate flux-fill-pro proxy) to outpaint missing
-    /// shoulders/torso, re-segments the result, and replaces `cutoutPNG`.
-    /// Snapshots the pre-extend state so the operation can be toggled off.
-    ///
-    /// Precondition: the caller must already have verified that the user is
-    /// signed in *and* has at least one credit. If the backend returns 402
-    /// anyway (race), this method re-opens the upgrade sheet.
-    static func extendBody(portrait: Portrait, context: ModelContext, appState: AppState,
-                           modelManager: ModelManager? = nil) {
-        guard !portrait.isBodyExtended else {
-            appState.lastError = Loc.extendBodyAlreadyComplete
-            return
-        }
-        guard portrait.cutoutPNG != nil else {
-            appState.lastError = Loc.extendBodyNoCutout
-            return
-        }
-
-        appState.isProcessing = true
-        appState.lastError = nil
-        let portraitID = portrait.id
-        let backend = appState.backend
-        print("[ExtendBody] start id=\(portraitID)")
-
-        Task {
-            do {
-                let result = try await ExtendBodyService.extend(
-                    portrait: portrait, backend: backend, modelManager: modelManager
-                )
-
-                let descriptor = FetchDescriptor<Portrait>(
-                    predicate: #Predicate { $0.id == portraitID }
-                )
-                guard let fresh = try? context.fetch(descriptor).first else {
-                    appState.isProcessing = false
-                    appState.lastError = Loc.portraitNotFound
-                    return
-                }
-
-                // Snapshot pre-extend state so the op can be toggled off.
-                fresh.preExtendBodyCutoutPNG = fresh.cutoutPNG
-                fresh.preExtendBodyBodyBottomY = fresh.bodyBottomY
-                fresh.preExtendBodyOffsetX = fresh.offsetX
-                fresh.preExtendBodyOffsetY = fresh.offsetY
-                fresh.preExtendBodyScale = fresh.scale
-
-                // Apply new cutout + metadata.
-                fresh.cutoutPNG = result.cutoutPNG
-                fresh.bodyBottomY = Double(result.bodyBottomY)
-                if let face = result.faceRect { fresh.faceRect = face }
-                if let eye = result.eyeCenter {
-                    fresh.eyeCenterX = Double(eye.x)
-                    fresh.eyeCenterY = Double(eye.y)
-                }
-                if let d = result.interEyeDistance {
-                    fresh.interEyeDistance = Double(d)
-                }
-                fresh.isBodyExtended = true
-                fresh.updatedAt = Date()
-                try? context.save()
-
-                // Refresh entitlement so the credits counter reflects the spend.
-                appState.refreshEntitlement()
-
-                appState.invalidateCutout(for: fresh)
-                appState.isProcessing = false
-                print("[ExtendBody] DONE id=\(fresh.id)")
-            } catch BackendError.notSignedIn {
-                appState.isProcessing = false
-                appState.showSignInPrompt = true
-            } catch BackendError.noCredits {
-                appState.isProcessing = false
-                appState.showProUpgradeSheet = true
-                appState.refreshEntitlement()
-            } catch {
-                appState.isProcessing = false
-                let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                appState.lastError = Loc.extendBodyFailed(msg)
-                print("[ExtendBody] ERROR \(error)")
-            }
-        }
-    }
-
-    /// Reverts Extend Body by restoring the pre-extend snapshot.
-    static func undoExtendBody(portrait: Portrait, context: ModelContext, appState: AppState) {
-        guard portrait.isBodyExtended,
-              let original = portrait.preExtendBodyCutoutPNG else { return }
-        portrait.cutoutPNG = original
-        portrait.bodyBottomY = portrait.preExtendBodyBodyBottomY
-        portrait.offsetX = portrait.preExtendBodyOffsetX
-        portrait.offsetY = portrait.preExtendBodyOffsetY
-        portrait.scale = portrait.preExtendBodyScale
-        portrait.isBodyExtended = false
-        portrait.preExtendBodyCutoutPNG = nil
-        portrait.updatedAt = Date()
-        try? context.save()
-        appState.invalidateCutout(for: portrait)
-    }
-
     // MARK: - Import Pipeline
 
-    /// Runs the cutout + auto-align pipeline and inserts a Portrait. Must be
-    /// called from a background context (the ImageProcessor work is CPU/ANE
-    /// heavy); it hops back to the main actor only for the SwiftData write.
+    /// Returns true when the user is allowed to run Magic Cutout *and* has
+    /// the toggle on. "Allowed" means either Pro, or a free user with
+    /// trial cutouts remaining (`canUseProCutout`). Drives the pipeline
+    /// branch: cloud Magic Cutout (Replicate) versus Apple Subject Lift.
+    /// Cloud errors fall back to Subject Lift via `runCloudWithFallback`;
+    /// failed calls never spend a credit nor a free-trial slot.
+    @MainActor
+    static func shouldUseMagicCutout(appState: AppState) -> Bool {
+        appState.proEntitlement.canUseProCutout && appState.magicCutoutPrefs.enabled
+    }
+
+    /// Runs Magic Cutout against the backend, hopping to MainActor for
+    /// state mutations. On `noCredits` opens the paywall; on
+    /// `unauthorized` opens the sign-in prompt; on any other error sets
+    /// the offline toast on `appState.lastError`. In every error case
+    /// falls back to the synchronous Apple Subject Lift so the user
+    /// still gets a result and never spends a credit on a failed call.
+    /// Result of a (possibly cloud-backed) cutout. `usedMagic` is only true
+    /// when the cloud call actually succeeded — fallback to Apple Subject
+    /// Lift returns false so the editor can offer a "redo with Magic"
+    /// affordance later.
+    struct CutoutResult {
+        let subject: ProcessedSubject
+        let usedMagic: Bool
+    }
+
+    nonisolated private static func runCloudWithFallback(
+        cg: CGImage, appState: AppState
+    ) async throws -> CutoutResult {
+        let backend = await MainActor.run { appState.backend }
+        do {
+            let result = try await ImageProcessor.processCloud(image: cg, backend: backend)
+            await MainActor.run {
+                let ent = appState.proEntitlement
+                ent.credits = result.creditsRemaining
+                // If the user had no credits, the server consumed a
+                // free-trial slot. Mirror it locally so the dropzone
+                // counter ticks immediately; the next /v1/account
+                // refresh reconciles with server truth.
+                if !ent.isPro && ent.credits == 0 && ent.freeCutoutsRemaining > 0 {
+                    ent.freeCutoutsUsed += 1
+                    ent.freeCutoutsRemaining -= 1
+                }
+            }
+            return CutoutResult(subject: result.subject, usedMagic: true)
+        } catch let err as BackendError {
+            // Cloud-cutout context needs its own copy ("using basic cutout,
+            // no credits charged") that the generic `appState.report(_:)`
+            // doesn't carry. So we route here directly. For account-level
+            // errors (noCredits, auth) we still defer to the dedicated
+            // surfaces — paywall sheet and sign-in alert — and skip the
+            // banner entirely so the user isn't told the same thing twice.
+            await MainActor.run {
+                switch err {
+                case .noCredits:
+                    appState.showProUpgradeSheet = true
+                case .unauthorized, .notSignedIn:
+                    // Don't pop a global alert mid-import — the basic
+                    // cutout already ran, so the user got their result.
+                    // A chip nudges them toward Settings without blocking.
+                    appState.warn(Loc.magicCutoutSignedOut)
+                case .transport, .rateLimited:
+                    // Recoverable: Wi-Fi blip or rate limit. Try again.
+                    appState.warn(Loc.magicCutoutOfflineToast)
+                case .server(let code, let message):
+                    // Log the raw status/detail for devs; show friendly copy.
+                    dlog("[Magic Cutout] server error \(code) \(message ?? "")")
+                    appState.fail(Loc.magicCutoutServerError(code, message))
+                case .decode:
+                    appState.fail(Loc.magicCutoutDecodeError)
+                case .proRequired:
+                    // Should be caught by the entitlement gate before we
+                    // ever reach the cloud call. If we still get here
+                    // something is out of sync, so escalate.
+                    appState.fail(err.errorDescription ?? Loc.somethingWentWrong)
+                }
+            }
+            // Fallback runs sync off main. Apple Subject Lift never charges.
+            let subject = try ImageProcessor.process(image: cg, birefnetModel: nil)
+            return CutoutResult(subject: subject, usedMagic: false)
+        } catch {
+            await MainActor.run { appState.warn(Loc.magicCutoutOfflineToast) }
+            let subject = try ImageProcessor.process(image: cg, birefnetModel: nil)
+            return CutoutResult(subject: subject, usedMagic: false)
+        }
+    }
+
     nonisolated private static func runPipeline(
         cg: CGImage, originalData data: Data,
         suggestedName: String,
-        context: ModelContext, appState: AppState,
-        birefnetModel: MLModel? = nil
+        container: ModelContainer, appState: AppState,
+        useCloud: Bool = false
     ) async {
         do {
-            let processed = try ImageProcessor.process(image: cg, birefnetModel: birefnetModel)
+            let processed: ProcessedSubject
+            let usedMagic: Bool
+            if useCloud {
+                let result = try await runCloudWithFallback(cg: cg, appState: appState)
+                processed = result.subject
+                usedMagic = result.usedMagic
+            } else {
+                processed = try ImageProcessor.process(image: cg, birefnetModel: nil)
+                usedMagic = false
+            }
             let cutoutSize = CGSize(width: processed.cutout.width, height: processed.cutout.height)
             let face = processed.faceRect ?? .zero
-            print("[Import] subject lift OK cutout=\(processed.cutout.width)x\(processed.cutout.height) face=\(face)")
+            dlog("[Import] subject lift OK cutout=\(processed.cutout.width)x\(processed.cutout.height) face=\(face)")
 
             let bodyBottom = processed.bodyBottomY
             let transform = (processed.faceRect != nil)
@@ -559,15 +543,25 @@ enum ImportFlow {
                     cutoutSize: cutoutSize,
                     bodyBottomY: bodyBottom)
                 : AutoAligner.fitTransform(cutoutSize: cutoutSize)
-            print("[Import] transform scale=\(transform.scale) offset=\(transform.offset) bodyBottom=\(bodyBottom) eyes=\(processed.eyeCenter as Any) IPD=\(processed.interEyeDistance as Any)")
+            dlog("[Import] transform scale=\(transform.scale) offset=\(transform.offset) bodyBottom=\(bodyBottom) eyes=\(processed.eyeCenter as Any) IPD=\(processed.interEyeDistance as Any)")
 
             let pngData = ImageProcessor.pngData(from: processed.cutout) ?? Data()
-            print("[Import] PNG encoded bytes=\(pngData.count)")
+            dlog("[Import] PNG encoded bytes=\(pngData.count)")
             if pngData.isEmpty {
-                print("[Import] WARNING pngData is empty — cutout will be invisible!")
+                dlog("[Import] WARNING pngData is empty — cutout will be invisible!")
             }
 
             await MainActor.run {
+                let context = container.mainContext
+                // Bind the new portrait to the user's current default so a corrupted
+                // multi-default data state can't make the picker / canvas disagree.
+                var defaultDescriptor = FetchDescriptor<BackgroundPreset>(
+                    predicate: #Predicate { $0.isDefault == true },
+                    sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+                )
+                defaultDescriptor.fetchLimit = 1
+                let defaultBgID = (try? context.fetch(defaultDescriptor))?.first?.id
+
                 let portrait = Portrait(
                     name: suggestedName,
                     cutoutPNG: pngData,
@@ -578,19 +572,21 @@ enum ImportFlow {
                     bodyBottomY: Double(bodyBottom),
                     offsetX: Double(transform.offset.width),
                     offsetY: Double(transform.offset.height),
-                    scale: Double(transform.scale)
+                    scale: Double(transform.scale),
+                    backgroundPresetID: defaultBgID
                 )
+                portrait.cutoutUsedMagic = usedMagic
                 context.insert(portrait)
                 try? context.save()
                 appState.selectedPortraitID = portrait.id
                 appState.isProcessing = false
-                print("[Import] DONE id=\(portrait.id)")
+                dlog("[Import] DONE id=\(portrait.id)")
             }
         } catch {
             await MainActor.run {
-                appState.lastError = Loc.processingFailed(error.localizedDescription)
+                appState.warn(Loc.processingFailed(error.localizedDescription))
                 appState.isProcessing = false
-                print("[Import] ERROR \(error)")
+                dlog("[Import] ERROR \(error)")
             }
         }
     }

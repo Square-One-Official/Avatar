@@ -57,42 +57,15 @@ final class Portrait {
     var adjBlacks: Double = 0          // tone curve black-point offset
 
     // MARK: - Enhancement flags
-    /// Whether the original image has been upscaled via CILanczosScaleTransform.
-    /// Prevents double-upscaling and communicates state to the UI.
-    var isUpscaled: Bool = false
     /// Whether Magic Retouch has been baked into the current cutoutPNG.
     /// Prevents double-application and communicates state to the UI.
     var isMagicRetouched: Bool = false
     /// Stores the pre-retouch cutout so Magic Retouch can be toggled off.
     @Attribute(.externalStorage) var preRetouchPNG: Data?
-
-    // MARK: - Pre-upscale snapshot (so Upscale can be toggled off)
-    /// Original (1×) image data captured before Upscale ran.
-    @Attribute(.externalStorage) var preUpscaleOriginalData: Data?
-    /// Cutout PNG captured before Upscale ran.
-    @Attribute(.externalStorage) var preUpscaleCutoutPNG: Data?
-    var preUpscaleFaceRectX: Double = 0
-    var preUpscaleFaceRectY: Double = 0
-    var preUpscaleFaceRectW: Double = 0
-    var preUpscaleFaceRectH: Double = 0
-    var preUpscaleEyeCenterX: Double = 0
-    var preUpscaleEyeCenterY: Double = 0
-    var preUpscaleHasEyes: Bool = false
-    var preUpscaleInterEyeDistance: Double = 0
-    var preUpscaleBodyBottomY: Double = 0
-    /// Which scale factor (2 or 4) produced the current upscale. Undo uses this
-    /// to multiply `scale` back by the same factor. Legacy portraits default to 2.
-    var preUpscaleFactor: Int = 2
-
-    // MARK: - Pre-extend-body snapshot (so Extend Body can be toggled off)
-    /// Whether the cutout has been extended downward via AI outpainting.
-    var isBodyExtended: Bool = false
-    /// Cutout PNG captured before Extend Body ran.
-    @Attribute(.externalStorage) var preExtendBodyCutoutPNG: Data?
-    var preExtendBodyBodyBottomY: Double = 0
-    var preExtendBodyOffsetX: Double = 0
-    var preExtendBodyOffsetY: Double = 0
-    var preExtendBodyScale: Double = 1
+    /// True when the current cutoutPNG was produced by the cloud Magic Cutout
+    /// model. Drives the "redo with Magic Cutout" affordance: we only surface
+    /// it when a free Apple-pipeline cutout exists and the user is now Pro.
+    var cutoutUsedMagic: Bool = false
 
     init(
         id: UUID = UUID(),

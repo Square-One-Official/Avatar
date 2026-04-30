@@ -17,6 +17,12 @@ final class AuthManager {
     private(set) var email: String?
     /// True while an OAuth round-trip is in flight.
     var isSigningIn: Bool = false
+    /// Last sign-in failure surfaced to the UI. Cleared when a sign-in
+    /// attempt starts. Settings reads this so the user sees *why* clicking
+    /// "Open Avatar" from the browser didn't sign them in (instead of the
+    /// silent regression where they'd land back on the signed-out card with
+    /// no feedback).
+    private(set) var lastSignInError: String?
 
     var isSignedIn: Bool { accessToken != nil }
 
@@ -46,6 +52,7 @@ final class AuthManager {
     /// handler forwards to `completeSignIn(from:)`.
     func startSignIn() {
         isSigningIn = true
+        lastSignInError = nil
         do {
             let url = try supabase.auth.getOAuthSignInURL(
                 provider: .google,
@@ -53,19 +60,31 @@ final class AuthManager {
             )
             NSWorkspace.shared.open(url)
         } catch {
+            dlog("[Auth] getOAuthSignInURL failed: \(error)")
+            lastSignInError = error.localizedDescription
             isSigningIn = false
         }
     }
 
     /// Called by the URL scheme handler when the browser returns with an
     /// OAuth code or fragment. Exchanges it for a session and persists it.
+    /// Eagerly mirrors the new session into `accessToken`/`email` so the UI
+    /// flips immediately — without this, we relied on the `authStateChanges`
+    /// async stream, and races there left users stuck on the signed-out card
+    /// after clicking "Open Avatar" from the browser.
     func completeSignIn(from url: URL) async {
         defer { isSigningIn = false }
+        dlog("[Auth] completeSignIn from \(url.absoluteString)")
         do {
-            _ = try await supabase.auth.session(from: url)
+            let session = try await supabase.auth.session(from: url)
+            accessToken = session.accessToken
+            email = session.user.email
+            lastSignInError = nil
+            dlog("[Auth] sign-in succeeded for \(session.user.email ?? "<no email>")")
         } catch {
-            // Session exchange failed — leave state signed-out. The SDK
-            // keeps logs; surfacing the error to the UI is the caller's job.
+            dlog("[Auth] session(from:) failed: \(error)")
+            lastSignInError = (error as? LocalizedError)?.errorDescription
+                ?? error.localizedDescription
         }
     }
 

@@ -8,15 +8,31 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: "2.6.0"
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.0.0"
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "0.9.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: "5J92MMGKTX"
     CODE_SIGN_STYLE: Automatic
-    CODE_SIGN_IDENTITY: "Apple Development"
     ENABLE_HARDENED_RUNTIME: YES
+    # CIColorKernel(source:) is "deprecated since macOS 10.14" but Apple still
+    # ships it on macOS 26.4. Migrating the three matting kernels to Metal
+    # Shading Language + a bundled .metallib is real work for zero functional
+    # gain today. This define removes the deprecation attribute from the
+    # CoreImage headers so the warnings stop drowning the build log.
+    GCC_PREPROCESSOR_DEFINITIONS: "$(inherited) CI_SILENCE_GL_DEPRECATION=1"
+  configs:
+    Debug:
+      CODE_SIGN_IDENTITY: "Apple Development"
+    Release:
+      CODE_SIGN_IDENTITY: "Developer ID Application"
+      CODE_SIGN_STYLE: Manual
+      PROVISIONING_PROFILE_SPECIFIER: ""
+
 targets:
   Avatar:
     type: application
@@ -26,9 +42,12 @@ targets:
       - path: Avatar
         excludes:
           - "Info.plist"
+          - "Info-MAS.plist"
           - "Avatar.entitlements"
+          - "Avatar-MAS.entitlements"
     dependencies:
       - package: Sparkle
+      - package: Supabase
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
@@ -44,6 +63,7 @@ targets:
         NSHumanReadableCopyright: "Avatar"
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
+        ITSAppUsesNonExemptEncryption: false
         SUFeedURL: "https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml"
         SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
         SUEnableAutomaticChecks: true
@@ -64,3 +84,50 @@ targets:
         ENABLE_PREVIEWS: YES
         COMBINE_HIDPI_IMAGES: YES
         CODE_SIGN_ENTITLEMENTS: Avatar/Avatar.entitlements
+
+  Avatar-MAS:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Avatar
+        excludes:
+          - "Info.plist"
+          - "Info-MAS.plist"
+          - "Avatar.entitlements"
+          - "Avatar-MAS.entitlements"
+    dependencies:
+      - package: Supabase
+    resources:
+      - path: Avatar/Assets.xcassets
+      - path: Avatar/Resources
+    info:
+      path: Avatar/Info-MAS.plist
+      properties:
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: Avatar
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Avatar"
+        NSPrincipalClass: NSApplication
+        LSApplicationCategoryType: public.app-category.photography
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: nl.avatar.app.scheme
+            CFBundleURLSchemes:
+              - aaavatar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.avatar.app
+        PRODUCT_NAME: Avatar
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        COMBINE_HIDPI_IMAGES: YES
+        CODE_SIGN_ENTITLEMENTS: Avatar/Avatar-MAS.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: APP_STORE
+      configs:
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Distribution"

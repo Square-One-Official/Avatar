@@ -49,11 +49,15 @@ enum ImageProcessor {
         let personSeg = VNGeneratePersonSegmentationRequest()
         personSeg.qualityLevel = .accurate
         personSeg.outputPixelFormat = kCVPixelFormatType_OneComponent8
+        // Face detection is co-loaded so `refineAlphaMatte` can build a
+        // spatial "hair zone" that surgically softens only head/beard
+        // silhouette edges. Body and face skin remain on the strict path.
+        let faceReq = VNDetectFaceRectanglesRequest()
 
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        // Run in one perform() so Vision can share resources; person seg is
-        // allowed to fail without aborting the whole pipeline.
-        try handler.perform([foreground, personSeg])
+        // Run in one perform() so Vision can share resources; person seg
+        // and face detection are both allowed to fail without aborting.
+        try handler.perform([foreground, personSeg, faceReq])
 
         guard let fgObservation = foreground.results?.first else {
             throw ImageProcessorError.noSubjectFound
@@ -78,21 +82,61 @@ enum ImageProcessor {
             return scaleMaskToExtent(CIImage(cvPixelBuffer: buffer), extent: extent)
         }()
 
-        // 3. Combine the two masks into a single refined alpha matte.
-        //    The original image is passed as a guide for edge-aware refinement
-        //    so the matte aligns with true hair/edge boundaries in the photo.
-        let refinedMask = refineAlphaMatte(foreground: fgMask, personSeg: personMask, guide: originalCI, extent: extent)
+        // 3. Largest face rect (image-pixel coords, top-left origin). nil
+        //    when no face was found — the matte refinement falls back to
+        //    the strict-everywhere pipeline so non-portraits behave as today.
+        let faceRect = largestFaceRect(observations: faceReq.results,
+                                       imageSize: extent.size)
 
-        // 4. Re-composite original RGB with the new alpha. Using the original
-        //    colors (instead of Vision's pre-masked buffer) avoids the dark
-        //    halo that appears when blurring premultiplied edge pixels.
-        //    `CIMaskToAlpha` turns the grayscale matte into an alpha channel
-        //    so `CIBlendWithMask` reads opacity correctly regardless of
-        //    whether Vision gave us a luminance- or alpha-coded buffer.
+        // 4. Combine the masks into a single refined alpha matte.
+        //    Inside the hair zone (above the head + around the chin) we
+        //    keep the soft guided-filter matte so fine hair/beard strands
+        //    survive against background. Outside the zone, and anywhere
+        //    away from the silhouette edge, we use the existing strict
+        //    matte so shoulders/shirt/face remain crisp and untouched.
+        let refined = refineAlphaMatte(foreground: fgMask, personSeg: personMask,
+                                       guide: originalCI, faceRect: faceRect,
+                                       extent: extent)
+
+        // 5. Foreground RGB. By default we use the original photo so the
+        //    cutout colours match the source exactly. When a hair zone
+        //    was detected we additionally run blur-fusion (Forte & Pitié,
+        //    ICIP 2021) to recover the *unmixed* foreground colour at
+        //    semi-transparent strands — without this, the original photo
+        //    background bleeds through because each hair-edge pixel is
+        //    `α·F + (1−α)·B_old`. The decontaminated RGB is then mixed in
+        //    only inside the hair edge ring, so face/skin/shoulder colours
+        //    stay byte-for-byte identical to the source.
+        let foregroundRGB: CIImage = {
+            guard let softAlpha = refined.softAlpha,
+                  let region = refined.decontamRegion else {
+                return originalCI
+            }
+            // Aggressive blur-fusion radii: portraits typically fill the
+            // frame, so the standard 90px first-pass is barely 15% of the
+            // head — not enough to reliably gather solid (α≈1) hair pixels
+            // for the F_hat estimate. 180px gives enough range to sample
+            // interior hair colour from far enough away that blonde tones
+            // dominate over edge-contaminated samples. 8px second pass
+            // recovers local detail.
+            let unmixed = refineForeground(source: originalCI, alpha: softAlpha,
+                                            extent: extent,
+                                            pass1Radius: 180, pass2Radius: 8)
+            return unmixed.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: originalCI,  // region=0 → original
+                "inputMaskImage": region                 // region=1 → unmixed
+            ]).cropped(to: extent)
+        }()
+
+        // 6. Re-composite the (possibly-decontaminated) RGB with the new
+        //    alpha. `CIMaskToAlpha` turns the grayscale matte into an
+        //    alpha channel so `CIBlendWithMask` reads opacity correctly
+        //    regardless of whether Vision gave us a luminance- or alpha-
+        //    coded buffer.
         let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
             .cropped(to: extent)
-        let alphaMatte = refinedMask.applyingFilter("CIMaskToAlpha")
-        let composed = originalCI.applyingFilter("CIBlendWithMask", parameters: [
+        let alphaMatte = refined.matte.applyingFilter("CIMaskToAlpha")
+        let composed = foregroundRGB.applyingFilter("CIBlendWithMask", parameters: [
             "inputBackgroundImage": clearBG,
             "inputMaskImage": alphaMatte
         ]).cropped(to: extent)
@@ -111,12 +155,31 @@ enum ImageProcessor {
     /// The `guide` parameter is the original RGB image. It drives a guided-filter
     /// pass that snaps the soft matte boundary onto real luminance edges in the
     /// photo — recovering fine hair strands that morphology alone would clip.
+    /// Output of the matte refinement: the final alpha matte the composite
+    /// uses, plus optional context the caller needs to surgically
+    /// decontaminate hair RGB.
+    ///
+    /// • `softAlpha` is the continuous guided matte (used as the alpha
+    ///   input for blur-fusion).
+    /// • `decontamRegion` is a wider mask covering every pixel inside the
+    ///   hair zone with any visible alpha — this is what scopes the RGB
+    ///   decontamination, so flying-out strands that sit beyond the matte-
+    ///   blend ring still get unmixed colour.
+    ///
+    /// Both are nil when no face was detected.
+    struct RefinedMatte {
+        let matte: CIImage
+        let softAlpha: CIImage?
+        let decontamRegion: CIImage?
+    }
+
     private static func refineAlphaMatte(
         foreground: CIImage,
         personSeg: CIImage?,
         guide: CIImage,
+        faceRect: CGRect?,
         extent: CGRect
-    ) -> CIImage {
+    ) -> RefinedMatte {
         // Union with person segmentation (max) — hair strands the foreground
         // mask chops off usually survive in the person matte. We gate the
         // union through a slightly dilated foreground mask so person-seg
@@ -151,9 +214,12 @@ enum ImageProcessor {
             "inputEpsilon": 0.0001
         ]).cropped(to: extent)
 
+        // ── Strict matte (existing behaviour) ────────────────────────────
         // Tighten the edge: erode by <1px to kill background-colour bleed,
         // then a gentle blur smooths aliasing, then a contrast curve makes
         // the matte commit (either hair or transparent — no muddy halo).
+        // This produces clean shoulder/shirt/face boundaries and is what
+        // the rest of the silhouette continues to use.
         let eroded = guided.applyingFilter("CIMorphologyMinimum", parameters: [
             kCIInputRadiusKey: 0.7
         ])
@@ -171,11 +237,182 @@ enum ImageProcessor {
         // above 1.0 (e.g. 1.0*1.15-0.05 = 1.10). Without clamping, that
         // >1.0 matte value flows into CIBlendWithMask and multiplies the
         // original RGB by >1, causing visible overexposure of the cutout.
-        let clamped = contrast.applyingFilter("CIColorClamp", parameters: [
+        let strictMatte = contrast.applyingFilter("CIColorClamp", parameters: [
             "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
-        ])
-        return clamped.cropped(to: extent)
+        ]).cropped(to: extent)
+
+        // Without a face rect we have no reliable way to delineate the
+        // hair zone — return the strict matte everywhere (= today's
+        // behaviour). This keeps non-portrait subjects untouched.
+        guard let faceRect = faceRect else {
+            return RefinedMatte(matte: strictMatte, softAlpha: nil, decontamRegion: nil)
+        }
+
+        // ── Soft matte (hair/beard zone only) ────────────────────────────
+        // The guided matte preserves continuous alpha — fine hair strands
+        // that the strict matte's erosion + 1.15·α-0.05 contrast curve
+        // would zap (anything below α≈0.043) survive here. We intentionally
+        // skip both transformations to keep the soft falloff intact.
+        let softMatteRaw = guided
+
+        // Hair-colour alpha attenuation. Apple's mask treats inter-curl
+        // openings inside the head silhouette as foreground (α≈0.4-0.8)
+        // even when the actual pixel is the original studio bg colour —
+        // composing those pixels makes the old background bleed through
+        // the new backdrop. We sample local hair colour from confidently-
+        // solid pixels (combined > 0.95, restricted to the hair zone) and
+        // attenuate alpha for pixels whose RGB doesn't match. Solid skin
+        // / body are protected by gating on softMatte<0.95 inside the
+        // kernel.
+        let hairZone = buildHairZoneMask(faceRect: faceRect, extent: extent)
+        let solidHairAmplified = combined.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 20, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 20, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 20, w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 20),
+            "inputBiasVector": CIVector(x: -19, y: -19, z: -19, w: -19)
+        ]).applyingFilter("CIColorClamp", parameters: [
+            "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
+        ]).cropped(to: extent)
+        let hairOnlyMask = solidHairAmplified.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: hairZone
+        ]).cropped(to: extent)
+        let hairOnlyRGB = guide.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: hairOnlyMask
+        ]).cropped(to: extent)
+        let hairBlur = hairOnlyRGB.applyingFilter("CIGaussianBlur", parameters: [
+            kCIInputRadiusKey: 80.0
+        ]).cropped(to: extent)
+        let maskBlur = hairOnlyMask.applyingFilter("CIGaussianBlur", parameters: [
+            kCIInputRadiusKey: 80.0
+        ]).cropped(to: extent)
+        let softMatte = colorAttenuationKernel?.apply(
+            extent: extent,
+            arguments: [guide, hairBlur, maskBlur, softMatteRaw, hairZone]
+        )?.cropped(to: extent) ?? softMatteRaw
+
+        // ── Silhouette edge band × the hair zone built above ─────────────
+        // Multiplying by the silhouette edge band (dilate − erode of
+        // `combined`, 20px) restricts the soft-matte treatment to actual
+        // cutout boundary pixels in that zone — body interior and any
+        // non-edge pixel inside the hair zone bounding box are unaffected,
+        // so face skin and shoulders never shift.
+        let edgeOuter = combined.applyingFilter("CIMorphologyMaximum", parameters: [
+            kCIInputRadiusKey: 20.0
+        ]).cropped(to: extent)
+        let edgeInner = combined.applyingFilter("CIMorphologyMinimum", parameters: [
+            kCIInputRadiusKey: 20.0
+        ]).cropped(to: extent)
+        let edgeBand = edgeOuter.applyingFilter("CISubtractBlendMode", parameters: [
+            kCIInputBackgroundImageKey: edgeInner
+        ]).cropped(to: extent)
+        let hairEdgeRing = hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: edgeBand
+        ]).cropped(to: extent)
+
+        // Blend: where the hair-edge ring is white, take the soft matte;
+        // where it's black, take the strict matte. CIBlendWithMask uses
+        // its `inputImage` as foreground (white-mask) and its
+        // `inputBackgroundImage` as background (black-mask).
+        let blended = softMatte.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: strictMatte,
+            "inputMaskImage": hairEdgeRing
+        ]).cropped(to: extent)
+
+        // ── Decontamination region (wider than the matte-blend ring) ─────
+        // Color contamination can extend well past the matte-blend edge
+        // ring — flying hair strands 30-50px beyond Apple's silhouette
+        // boundary still sit at α=0.005-0.3 and carry the old background.
+        // We build a distinct region for the RGB step: every pixel inside
+        // the hair zone with any visible soft alpha. Aggressive amplify-
+        // and-clamp (×200, [0,1]) is more reliable than CIColorThreshold
+        // on the guided matte's RGBA shape — anything above α≈0.005
+        // becomes 1.0, anything genuinely 0 stays 0. At α=1 (solid hair
+        // interior) blur-fusion is mathematically a no-op (F=I), so it's
+        // safe to swap in unmixed RGB across the whole non-zero-alpha
+        // zone.
+        let alphaPresent = softMatte.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 200, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 200, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 200, w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 200)
+        ]).applyingFilter("CIColorClamp", parameters: [
+            "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
+        ]).cropped(to: extent)
+        let decontamRegion = hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: alphaPresent
+        ]).cropped(to: extent)
+
+        return RefinedMatte(matte: blended, softAlpha: softMatte, decontamRegion: decontamRegion)
+    }
+
+    /// Builds a soft-edged grayscale mask that's 1.0 around the head/hair
+    /// and beard territory and 0.0 elsewhere. Two CIRadialGradients (crown
+    /// + beard) are unioned via lighten. Coordinates flip from the rest of
+    /// the codebase's top-left origin to CIImage's bottom-left origin so
+    /// CIRadialGradient places the centres correctly.
+    private static func buildHairZoneMask(faceRect: CGRect, extent: CGRect) -> CIImage {
+        let imageH = extent.height
+        let faceCenterX = faceRect.midX
+        let faceTopY_BL    = imageH - faceRect.minY  // top of face in CI coords
+        let faceBottomY_BL = imageH - faceRect.maxY  // bottom of face in CI coords
+        let faceW = faceRect.width
+        let faceH = faceRect.height
+
+        // Crown ellipse — centred a touch above the forehead. Wide enough
+        // to catch temple hair (1.4× face width at the soft edge) and tall
+        // enough that the crown of the head sits inside the falloff.
+        let crownCenter = CIVector(x: faceCenterX, y: faceTopY_BL + faceH * 0.2)
+        let crown = CIFilter(name: "CIRadialGradient", parameters: [
+            "inputCenter": crownCenter,
+            "inputRadius0": faceW * 0.6,   // hard-1.0 interior
+            "inputRadius1": faceW * 1.4,   // soft falloff to 0
+            "inputColor0": CIColor(red: 1, green: 1, blue: 1, alpha: 1),
+            "inputColor1": CIColor(red: 0, green: 0, blue: 0, alpha: 1)
+        ])!.outputImage!.cropped(to: extent)
+
+        // Beard ellipse — smaller, centred just below the chin. Captures
+        // beard and stubble that overhangs the neck/background line.
+        let beardCenter = CIVector(x: faceCenterX, y: faceBottomY_BL - faceH * 0.1)
+        let beard = CIFilter(name: "CIRadialGradient", parameters: [
+            "inputCenter": beardCenter,
+            "inputRadius0": faceW * 0.3,
+            "inputRadius1": faceW * 0.7,
+            "inputColor0": CIColor(red: 1, green: 1, blue: 1, alpha: 1),
+            "inputColor1": CIColor(red: 0, green: 0, blue: 0, alpha: 1)
+        ])!.outputImage!.cropped(to: extent)
+
+        // Union via lighten = max(crown, beard).
+        return crown.applyingFilter("CILightenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: beard
+        ]).cropped(to: extent)
+    }
+
+    /// Picks the largest face from a Vision face-detection result and
+    /// returns its rect in image pixel coords with origin TOP-LEFT (the
+    /// convention used elsewhere in this file). Returns nil when no face
+    /// is detected so the caller can keep the strict matte everywhere.
+    private static func largestFaceRect(observations: [VNFaceObservation]?,
+                                        imageSize: CGSize) -> CGRect? {
+        guard let observations, !observations.isEmpty else { return nil }
+        let largest = observations.max {
+            $0.boundingBox.width * $0.boundingBox.height
+                < $1.boundingBox.width * $1.boundingBox.height
+        }!
+        // Vision returns normalised coords with origin BOTTOM-LEFT. Flip Y
+        // so the rect matches what `detectFace` etc. produce.
+        let bb = largest.boundingBox
+        let w = imageSize.width
+        let h = imageSize.height
+        return CGRect(
+            x: bb.minX * w,
+            y: (1 - bb.maxY) * h,
+            width: bb.width * w,
+            height: bb.height * h
+        )
     }
 
     /// Scales a Vision-produced mask image up to the source image's extent and
@@ -373,7 +610,7 @@ enum ImageProcessor {
 
         // Render to a pixel buffer for CoreML input.
         guard let inputBuffer = createPixelBuffer(from: resized, size: inputSize) else {
-            print("[BiRefNet] Failed to create input buffer, falling back to Vision")
+            dlog("[BiRefNet] Failed to create input buffer, falling back to Vision")
             return try subjectLift(image: image)
         }
 
@@ -386,7 +623,7 @@ enum ImageProcessor {
         do {
             prediction = try model.prediction(from: input)
         } catch {
-            print("[BiRefNet] Inference failed: \(error), falling back to Vision")
+            dlog("[BiRefNet] Inference failed: \(error), falling back to Vision")
             return try subjectLift(image: image)
         }
 
@@ -404,7 +641,7 @@ enum ImageProcessor {
             if let feature = prediction.featureValue(for: name),
                let buffer = feature.imageBufferValue {
                 maskCI = CIImage(cvPixelBuffer: buffer)
-                print("[BiRefNet] Got image output for '\(name)'")
+                dlog("[BiRefNet] Got image output for '\(name)'")
                 break
             }
         }
@@ -413,7 +650,7 @@ enum ImageProcessor {
                 if let feature = prediction.featureValue(for: name),
                    let buffer = feature.imageBufferValue {
                     maskCI = CIImage(cvPixelBuffer: buffer)
-                    print("[BiRefNet] Got image output for '\(name)' (scan)")
+                    dlog("[BiRefNet] Got image output for '\(name)' (scan)")
                     break
                 }
             }
@@ -425,7 +662,7 @@ enum ImageProcessor {
         }
 
         guard let rawMask = maskCI else {
-            print("[BiRefNet] No output mask found, falling back to Vision")
+            dlog("[BiRefNet] No output mask found, falling back to Vision")
             return try subjectLift(image: image)
         }
 
@@ -495,7 +732,7 @@ enum ImageProcessor {
 
         let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         guard let cg = ciContext.createCGImage(composed, from: extent, format: .RGBA8, colorSpace: outputCS) else {
-            print("[BiRefNet] CGImage creation failed, falling back to Vision")
+            dlog("[BiRefNet] CGImage creation failed, falling back to Vision")
             return try subjectLift(image: image)
         }
         return cg
@@ -512,12 +749,13 @@ enum ImageProcessor {
     /// `FB_blur_fusion_foreground_estimator_2` and BiRefNet's built-in
     /// `refine_foreground` flag.
     private static func refineForeground(
-        source: CIImage, alpha: CIImage, extent: CGRect
+        source: CIImage, alpha: CIImage, extent: CGRect,
+        pass1Radius: Double = 90, pass2Radius: Double = 6
     ) -> CIImage {
         let pass1 = blurFusionPass(I: source, F: source, B: source,
-                                   alpha: alpha, radius: 90, extent: extent)
+                                   alpha: alpha, radius: pass1Radius, extent: extent)
         let pass2 = blurFusionPass(I: source, F: pass1.F, B: pass1.B,
-                                   alpha: alpha, radius: 6, extent: extent)
+                                   alpha: alpha, radius: pass2Radius, extent: extent)
         return pass2.F
     }
 
@@ -546,11 +784,11 @@ enum ImageProcessor {
         let blurredFA    = blur(fa)
         let blurredBInv  = blur(bInv)
 
-        let newF = blurFusionKernel.apply(
+        let newF = blurFusionKernel?.apply(
             extent: extent,
             arguments: [I, alpha, blurredAlpha, blurredFA, blurredBInv]
         ) ?? F
-        let newB = computeBlurredBKernel.apply(
+        let newB = computeBlurredBKernel?.apply(
             extent: extent,
             arguments: [blurredAlpha, blurredBInv]
         ) ?? B
@@ -561,7 +799,7 @@ enum ImageProcessor {
     /// Core of the blur-fusion step: divide the blurred weighted images
     /// back out to get `F_hat`, `B_hat`, then add a correction term so the
     /// result reconstructs the observed `I` at the current α.
-    private static let blurFusionKernel: CIColorKernel = {
+    private static let blurFusionKernel: CIColorKernel? = {
         let src = """
         kernel vec4 blurFusion(__sample I, __sample alpha,
                                __sample blurredAlpha,
@@ -577,15 +815,12 @@ enum ImageProcessor {
             return vec4(F, 1.0);
         }
         """
-        guard let kernel = CIColorKernel(source: src) else {
-            fatalError("[ImageProcessor] blurFusion kernel failed to compile")
-        }
-        return kernel
+        return CIColorKernel(source: src)
     }()
 
     /// Computes the blurred background estimate used as the prior for the
     /// next blur-fusion pass.
-    private static let computeBlurredBKernel: CIColorKernel = {
+    private static let computeBlurredBKernel: CIColorKernel? = {
         let src = """
         kernel vec4 computeBlurredB(__sample blurredAlpha,
                                     __sample blurredBInv) {
@@ -594,10 +829,45 @@ enum ImageProcessor {
             return vec4(clamp(B, 0.0, 1.0), 1.0);
         }
         """
-        guard let kernel = CIColorKernel(source: src) else {
-            fatalError("[ImageProcessor] computeBlurredB kernel failed to compile")
+        return CIColorKernel(source: src)
+    }()
+
+    /// Hair-colour-distance alpha attenuation. Inside the hair zone, where
+    /// soft alpha is already partial (< 0.95 — i.e. potential edge / inter-
+    /// strand opening), we measure how far the pixel's RGB lies from the
+    /// locally averaged "solid hair" colour. Far → almost certainly the
+    /// original studio background bleeding through Apple's mask in a hair
+    /// opening; we attenuate alpha so the pixel becomes transparent and
+    /// the new backdrop shows through instead. At α ≥ 0.95 (solid hair,
+    /// solid skin, solid body) the gate is 0 and alpha passes through
+    /// untouched — face and shoulders cannot be affected.
+    ///
+    /// `hairBlur` and `maskBlur` are the mask-weighted blurred originals;
+    /// the local hair colour is `hairBlur / maskBlur` (mask-weighted mean).
+    /// Where `maskBlur` is near 0 (no nearby solid hair) we skip attenuation
+    /// rather than emit garbage from a divide-by-zero estimate.
+    private static let colorAttenuationKernel: CIColorKernel? = {
+        let src = """
+        kernel vec4 colorAttenuate(__sample I, __sample hairBlur,
+                                   __sample maskBlur, __sample softMatte,
+                                   __sample hairZone) {
+            float eps = 1e-4;
+            float maskW = maskBlur.r + eps;
+            vec3 localHair = hairBlur.rgb / maskW;
+            float dist = length(I.rgb - localHair);
+            // 0.0..0.15 keep, 0.40+ kill. Smooth ramp avoids hard banding.
+            float atten = 1.0 - smoothstep(0.15, 0.40, dist);
+            // Only attenuate at α<0.95 — protects solid skin/hair/body.
+            float partialGate = 1.0 - smoothstep(0.85, 0.99, softMatte.r);
+            // Only inside hair zone — protects everything outside.
+            float effective = mix(1.0, atten, partialGate * hairZone.r);
+            float newAlpha = softMatte.r * effective;
+            // Bail out where there's no nearby solid-hair reference.
+            if (maskBlur.r < 0.01) newAlpha = softMatte.r;
+            return vec4(newAlpha, newAlpha, newAlpha, 1.0);
         }
-        return kernel
+        """
+        return CIColorKernel(source: src)
     }()
 
     /// Decode an IEEE 754 binary16 (half-precision) bit-pattern to Float32.
@@ -673,7 +943,7 @@ enum ImageProcessor {
                     bytes[i] = UInt8(min(255, max(0, f * 255)))
                 }
             default:
-                print("[BiRefNet] Unsupported MultiArray data type: \(multiArray.dataType)")
+                dlog("[BiRefNet] Unsupported MultiArray data type: \(multiArray.dataType)")
                 continue
             }
 
@@ -688,7 +958,7 @@ enum ImageProcessor {
                 continue
             }
 
-            print("[BiRefNet] Got MultiArray output for '\(name)' shape=\(shape)")
+            dlog("[BiRefNet] Got MultiArray output for '\(name)' shape=\(shape)")
             return CIImage(cgImage: cgMask)
         }
         return nil
@@ -723,10 +993,10 @@ enum ImageProcessor {
         let cutout: CGImage
         if let model = birefnetModel {
             cutout = try birefnetLift(image: image, model: model)
-            print("[Process] Used BiRefNet pipeline")
+            dlog("[Process] Used BiRefNet pipeline")
         } else {
             cutout = try subjectLift(image: image)
-            print("[Process] Used Apple Vision pipeline")
+            dlog("[Process] Used Apple Vision pipeline")
         }
         // Detect on the original image (better signal than masked cutout);
         // coordinates remain valid because the cutout has the same dimensions.
@@ -742,6 +1012,43 @@ enum ImageProcessor {
             interEyeDistance: faceResult?.interEyeDistance,
             bodyBottomY: bodyBottom
         )
+    }
+
+    /// Cloud (Magic Cutout) entry point. Sends the image to the backend's
+    /// `/api/cutout` endpoint, which proxies to fal.ai BiRefNet and deducts
+    /// 1 credit on success.
+    ///
+    /// Throws `BackendError.noCredits` (caller surfaces the upgrade sheet)
+    /// and `BackendError.unauthorized` (caller surfaces the sign-in prompt)
+    /// directly. For network/transport/server errors the caller is expected
+    /// to fall back to the local `process(image:)` path (Apple Subject Lift)
+    /// and show the offline toast — see `ImportFlow` for the policy.
+    static func processCloud(
+        image: CGImage,
+        backend: BackendClient
+    ) async throws -> (subject: ProcessedSubject, creditsRemaining: Int) {
+        guard let png = pngData(from: image) else {
+            throw BackendError.decode
+        }
+        let (cutoutPNG, creditsRemaining) = try await backend.cutout(imagePNG: png)
+        guard let cutout = cgImage(from: cutoutPNG) else {
+            throw BackendError.decode
+        }
+        dlog("[Process] Used Magic Cutout (cloud) — \(creditsRemaining) credits remaining")
+
+        // Detection runs on the original — same rationale as `process(image:)`.
+        let faceResult = detectFaceLandmarks(in: image)
+        let bodyBottom = detectBodyPoseBottom(in: image)
+            ?? contentBottomFromAlpha(of: cutout)
+            ?? CGFloat(cutout.height)
+        let subject = ProcessedSubject(
+            cutout: cutout,
+            faceRect: faceResult?.faceRect,
+            eyeCenter: faceResult?.eyeCenter,
+            interEyeDistance: faceResult?.interEyeDistance,
+            bodyBottomY: bodyBottom
+        )
+        return (subject, creditsRemaining)
     }
 
     // MARK: - Helpers
@@ -778,270 +1085,6 @@ enum ImageProcessor {
     static func pngData(from image: CGImage) -> Data? {
         let rep = NSBitmapImageRep(cgImage: image)
         return rep.representation(using: .png, properties: [:])
-    }
-
-    // MARK: - Upscale (AI super-resolution)
-
-    enum UpscaleError: Error {
-        case pixelBufferCreationFailed
-        case modelInputMissing
-        case modelOutputMissing
-        case outputPixelBufferInvalid
-        case sourceTooLarge
-    }
-
-    /// The converted Real-ESRGAN models accept a single fixed 512×512 input
-    /// (RRDBNet's pixel-unshuffle forces this — dynamic shapes generate a
-    /// rank-6 reshape that Core ML rejects). We fit the source into this
-    /// square with aspect-preserving padding, run the model, then crop the
-    /// padded region back out of the N× output. Tiling is a follow-up.
-    private static let fixedUpscaleInputSize: Int = 512
-
-    /// Runs a Real-ESRGAN super-resolution model on the input image and returns
-    /// a CGImage at `factor`× resolution. Throws `UpscaleError` when the model's
-    /// I/O doesn't match expectations (logged); the caller surfaces it to the UI.
-    ///
-    /// Input/output contract (fixed by the `coremltools` conversion):
-    /// - Input: single image feature named `input` accepting BGRA8 CVPixelBuffer.
-    /// - Output: single image feature named `output` returning BGRA8 CVPixelBuffer
-    ///   at `factor`× the input dimensions.
-    /// If the converted model uses different feature names we fall back to
-    /// whatever the model's description declares, so the code doesn't break
-    /// the first time we swap in a differently-named checkpoint.
-    static func upscale(image: CGImage, using model: MLModel, factor: Int) throws -> CGImage {
-        // 1. Fit source into a fixed SxS square with aspect-preserving padding.
-        //    The model only accepts S×S; we crop padding back out of the output.
-        let S = fixedUpscaleInputSize
-        let srcW = CGFloat(image.width)
-        let srcH = CGFloat(image.height)
-        let longEdge = max(srcW, srcH)
-        let fit = CGFloat(S) / longEdge
-        let contentW = Int((srcW * fit).rounded())
-        let contentH = Int((srcH * fit).rounded())
-
-        guard let padded = paddedSquare(image: image, contentSize: CGSize(width: contentW, height: contentH), side: S) else {
-            throw UpscaleError.sourceTooLarge
-        }
-        print("[Upscale] source \(image.width)×\(image.height) → \(contentW)×\(contentH) in \(S)² before ML")
-
-        // 2. CGImage → CVPixelBuffer (BGRA8) at the model's expected spec.
-        guard let pixelBuffer = makePixelBuffer(from: padded) else {
-            throw UpscaleError.pixelBufferCreationFailed
-        }
-
-        // 3. Run the model. Discover feature names dynamically so we're robust
-        //    to naming differences between the 2× and 4× checkpoints.
-        let inputName = model.modelDescription.inputDescriptionsByName.keys.first ?? "input"
-        let provider = try MLDictionaryFeatureProvider(dictionary: [
-            inputName: MLFeatureValue(pixelBuffer: pixelBuffer)
-        ])
-
-        let output = try model.prediction(from: provider)
-
-        // 4. Extract the first image-typed output (PixelBuffer or MLMultiArray).
-        let outputName = model.modelDescription.outputDescriptionsByName.keys.first ?? "output"
-        guard let feature = output.featureValue(for: outputName) else {
-            throw UpscaleError.modelOutputMissing
-        }
-
-        let fullOutput: CGImage
-        if let buf = feature.imageBufferValue, let cg = cgImage(fromPixelBuffer: buf) {
-            fullOutput = cg
-        } else if let array = feature.multiArrayValue, let cg = cgImage(fromMultiArray: array) {
-            fullOutput = cg
-        } else {
-            throw UpscaleError.modelOutputMissing
-        }
-
-        // 5. Crop out the padded margin so the result matches the source AR at
-        //    factor× resolution.
-        let cropW = contentW * factor
-        let cropH = contentH * factor
-        let cropRect = CGRect(x: 0, y: 0, width: cropW, height: cropH)
-        guard let cropped = fullOutput.cropping(to: cropRect) else { return fullOutput }
-        return cropped
-    }
-
-    // MARK: - Pad-to-square helper (for fixed-shape ML input)
-
-    /// Resizes `image` to `contentSize` (Lanczos) and composites it at the
-    /// top-left of an `side`×`side` black square. Top-left origin matters:
-    /// the caller crops the output with CGRect(0, 0, contentW*factor,
-    /// contentH*factor) regardless of aspect ratio, so padding on the right
-    /// and bottom keeps that crop correct.
-    private static func paddedSquare(image: CGImage, contentSize: CGSize, side: Int) -> CGImage? {
-        guard let resized = lanczosResize(image: image, to: contentSize) else { return nil }
-        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        let ctx = CGContext(
-            data: nil,
-            width: side,
-            height: side,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: cs,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
-        guard let ctx else { return nil }
-        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
-        ctx.fill(CGRect(x: 0, y: 0, width: side, height: side))
-        // CGContext origin is bottom-left — draw so the content sits at the top-left.
-        let drawY = side - Int(contentSize.height.rounded())
-        ctx.draw(resized, in: CGRect(x: 0, y: drawY, width: Int(contentSize.width.rounded()), height: Int(contentSize.height.rounded())))
-        return ctx.makeImage()
-    }
-
-    // MARK: - Lanczos helper (kept only for pre-ML resize)
-
-    /// Resizes a CGImage to an exact target size using Lanczos interpolation.
-    /// Used to fit oversized inputs before running the super-resolution model.
-    private static func lanczosResize(image: CGImage, to size: CGSize) -> CGImage? {
-        let source = CIImage(cgImage: image)
-        let sx = size.width / CGFloat(image.width)
-        let sy = size.height / CGFloat(image.height)
-        let scale = min(sx, sy)
-        let aspect = sx / sy
-
-        let filter = CIFilter.lanczosScaleTransform()
-        filter.inputImage = source
-        filter.scale = Float(scale)
-        filter.aspectRatio = Float(aspect)
-        guard let out = filter.outputImage else { return nil }
-        let cs = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        return ciContext.createCGImage(out, from: out.extent, format: .RGBA8, colorSpace: cs)
-    }
-
-    // MARK: - CVPixelBuffer conversion
-
-    /// Creates a BGRA8 CVPixelBuffer from a CGImage. BGRA8 is the format most
-    /// `coremltools`-converted image inputs expect, and it's what `CIContext.render`
-    /// writes natively without an extra colour conversion step.
-    private static func makePixelBuffer(from image: CGImage) -> CVPixelBuffer? {
-        let width = image.width
-        let height = image.height
-        let attrs: [CFString: Any] = [
-            kCVPixelBufferCGImageCompatibilityKey: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-            kCVPixelBufferIOSurfacePropertiesKey: [:]
-        ]
-        var buffer: CVPixelBuffer?
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            width, height,
-            kCVPixelFormatType_32BGRA,
-            attrs as CFDictionary,
-            &buffer
-        )
-        guard status == kCVReturnSuccess, let pixelBuffer = buffer else { return nil }
-
-        CVPixelBufferLockBaseAddress(pixelBuffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-
-        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
-        let cs = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGBitmapInfo.byteOrder32Little.rawValue
-            | CGImageAlphaInfo.premultipliedFirst.rawValue
-        guard let ctx = CGContext(
-            data: base,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-            space: cs,
-            bitmapInfo: bitmapInfo
-        ) else { return nil }
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return pixelBuffer
-    }
-
-    /// Converts a BGRA CVPixelBuffer returned by a Core ML image output to a CGImage.
-    private static func cgImage(fromPixelBuffer pb: CVPixelBuffer) -> CGImage? {
-        let ciImage = CIImage(cvPixelBuffer: pb)
-        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        return ciContext.createCGImage(ciImage, from: ciImage.extent, format: .RGBA8, colorSpace: cs)
-    }
-
-    /// Fallback path for converted models that emit a float MLMultiArray in
-    /// shape [C=3, H, W] with values in [0,1]. Real-ESRGAN outputs this shape
-    /// when the CoreML conversion treats output as a tensor rather than an
-    /// image feature. Writes RGB bytes into an RGBA8 buffer with alpha=255.
-    private static func cgImage(fromMultiArray array: MLMultiArray) -> CGImage? {
-        let shape = array.shape.map { $0.intValue }
-        // Expect [C, H, W] or [1, C, H, W]. Find the last three dims.
-        guard shape.count >= 3 else { return nil }
-        let last3 = shape.suffix(3)
-        let channels = last3[last3.startIndex]
-        let height = last3[last3.startIndex + 1]
-        let width = last3[last3.startIndex + 2]
-        guard channels == 3, width > 0, height > 0 else { return nil }
-
-        // Strides per element (in logical units of dataType).
-        let strides = array.strides.map { $0.intValue }
-        let last3Strides = strides.suffix(3)
-        let cStride = last3Strides[last3Strides.startIndex]
-        let hStride = last3Strides[last3Strides.startIndex + 1]
-        let wStride = last3Strides[last3Strides.startIndex + 2]
-
-        let pixelCount = width * height
-        var bytes = [UInt8](repeating: 0, count: pixelCount * 4)
-
-        let pointer = array.dataPointer
-
-        @inline(__always) func byte(_ v: Float) -> UInt8 {
-            let clamped = max(0, min(1, v))
-            return UInt8(clamped * 255)
-        }
-
-        switch array.dataType {
-        case .float32:
-            let base = pointer.bindMemory(to: Float.self, capacity: array.count)
-            for y in 0..<height {
-                for x in 0..<width {
-                    let r = base[0 * cStride + y * hStride + x * wStride]
-                    let g = base[1 * cStride + y * hStride + x * wStride]
-                    let b = base[2 * cStride + y * hStride + x * wStride]
-                    let idx = (y * width + x) * 4
-                    bytes[idx + 0] = byte(r)
-                    bytes[idx + 1] = byte(g)
-                    bytes[idx + 2] = byte(b)
-                    bytes[idx + 3] = 255
-                }
-            }
-        case .float16:
-            // Read Float16 as UInt16 bit-patterns and widen via a manual
-            // decoder — `Float(Float16(bitPattern:))` does not compile on
-            // the x86_64 slice of a universal build.
-            let base = pointer.bindMemory(to: UInt16.self, capacity: array.count)
-            for y in 0..<height {
-                for x in 0..<width {
-                    let r = ImageProcessor.float16BitsToFloat(base[0 * cStride + y * hStride + x * wStride])
-                    let g = ImageProcessor.float16BitsToFloat(base[1 * cStride + y * hStride + x * wStride])
-                    let b = ImageProcessor.float16BitsToFloat(base[2 * cStride + y * hStride + x * wStride])
-                    let idx = (y * width + x) * 4
-                    bytes[idx + 0] = byte(r)
-                    bytes[idx + 1] = byte(g)
-                    bytes[idx + 2] = byte(b)
-                    bytes[idx + 3] = 255
-                }
-            }
-        default:
-            return nil
-        }
-
-        guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
-        let cs = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        return CGImage(
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
-            space: cs,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-        )
     }
 
     // MARK: - Magic Retouch
@@ -1093,8 +1136,7 @@ enum ImageProcessor {
         temp.targetNeutral = CIVector(x: 6700, y: 0)
         if let out = temp.outputImage { current = out }
 
-        // 5. CISharpenLuminance — micro-contrast for perceived crispness
-        //    (lighter than the upscale chain since this is native resolution).
+        // 5. CISharpenLuminance — micro-contrast for perceived crispness.
         let sharpen = CIFilter.sharpenLuminance()
         sharpen.inputImage = current
         sharpen.sharpness = 0.25

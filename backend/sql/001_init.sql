@@ -33,7 +33,7 @@ create table if not exists public.credit_ledger (
   id bigserial primary key,
   user_id uuid not null references public.users(id) on delete cascade,
   delta int not null,                           -- + grant, - spend
-  reason text not null,                         -- 'period_renewal' | 'extend_body' | 'refund' | 'initial_grant'
+  reason text not null,                         -- 'period_renewal' | 'magic_cutout' | 'refund' | 'initial_grant'
   ref text,                                     -- stripe invoice id or replicate prediction id
   created_at timestamptz not null default now()
 );

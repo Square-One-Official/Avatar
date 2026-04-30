@@ -1,34 +1,230 @@
 import SwiftUI
 import SwiftData
 import AppKit
+#if !APP_STORE
 import Sparkle
+#endif
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         @Bindable var appState = appState
         TabView(selection: $appState.selectedSettingsTab) {
+            GeneralSettings()
+                .tabItem { Label(Loc.settingsGeneral, systemImage: "gearshape") }
+                .tag(SettingsTab.general)
             BackgroundsSettings()
                 .tabItem { Label(Loc.backgrounds, systemImage: "photo.on.rectangle") }
                 .tag(SettingsTab.backgrounds)
-            ExportPresetsSettings()
-                .tabItem { Label(Loc.exportPresets, systemImage: "square.and.arrow.up.on.square") }
-                .tag(SettingsTab.exportPresets)
-            AIModelSettings()
-                .tabItem { Label("AI Model", systemImage: "brain") }
-                .tag(SettingsTab.aiModel)
-            UpdatesSettings()
-                .tabItem { Label(Loc.updates, systemImage: "arrow.triangle.2.circlepath") }
-                .tag(SettingsTab.updates)
-            LanguageSettings()
-                .tabItem { Label(Loc.language, systemImage: "globe") }
-                .tag(SettingsTab.language)
+            AccountSettings()
+                .tabItem { Label(Loc.settingsAccount, systemImage: "person.crop.circle") }
+                .tag(SettingsTab.account)
         }
         .frame(width: 640, height: 460)
         .padding()
+        .background(Color.appCanvas)
+        .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
+        .onAppear {
+            appState.selectedSettingsTab = .general
+        }
+        // SwiftUI keeps the Settings view alive between Cmd+, presses, so
+        // onAppear only fires once. Reset the tab whenever the window becomes
+        // key so re-opening always lands on General.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            appState.selectedSettingsTab = .general
+        }
+        // Dedicated boolean keeps the Settings sheet separate from the main
+        // window's. Sharing one flag let MainWindow's `.sheet()` steal focus,
+        // which auto-dismisses macOS preferences panes.
+        .sheet(isPresented: $appState.showProUpgradeSheetInSettings) {
+            ProUpgradeSheet()
+                .environment(appState)
+        }
     }
 }
+
+// MARK: - General
+
+struct GeneralSettings: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                AppearanceSection()
+                Divider()
+                LanguageSection()
+                Divider()
+                MagicCutoutSection()
+                #if !APP_STORE
+                Divider()
+                UpdatesSection()
+                #endif
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+private struct AppearanceSection: View {
+    @AppStorage("appearanceMode") private var appearanceRaw: String = AppearanceMode.dark.rawValue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.appearance).font(.headline)
+            Text(Loc.appearanceDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Picker(Loc.appearance, selection: Binding(
+                get: { AppearanceMode(rawValue: appearanceRaw) ?? .dark },
+                set: { appearanceRaw = $0.rawValue }
+            )) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+    }
+}
+
+private struct LanguageSection: View {
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.language).font(.headline)
+            Text(Loc.languageDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Picker(Loc.language, selection: Binding(
+                get: { appState.language },
+                set: { appState.language = $0 }
+            )) {
+                ForEach(Lang.allCases) { lang in
+                    Text(lang.label).tag(lang)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+    }
+}
+
+private struct MagicCutoutSection: View {
+    @Environment(MagicCutoutPreferences.self) private var prefs
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.magicCutoutTitle).font(.headline)
+
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(Loc.magicCutoutSubtitle)
+                            .font(.body.weight(.medium))
+                        if !appState.proEntitlement.isPro {
+                            Text(Loc.magicCutoutProBadge)
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(.tint))
+                        }
+                    }
+                    Text(Loc.magicCutoutDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Toggle("", isOn: Binding(
+                    get: { appState.proEntitlement.isPro && prefs.enabled },
+                    set: { newValue in
+                        if appState.proEntitlement.isPro {
+                            prefs.enabled = newValue
+                        } else if newValue {
+                            appState.pendingMagicCutoutEnable = true
+                            appState.showProUpgradeSheetInSettings = true
+                        }
+                    }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
+        }
+    }
+}
+
+#if !APP_STORE
+private struct UpdatesSection: View {
+    @Environment(UpdateManager.self) private var updater
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "–"
+    }
+
+    var body: some View {
+        @Bindable var updater = updater
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.updates).font(.headline)
+
+            HStack {
+                Text(Loc.currentVersion)
+                Spacer()
+                Text("\(appVersion) (\(buildNumber))")
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(Loc.autoCheckUpdates, isOn: Binding(
+                get: { updater.automaticallyChecksForUpdates },
+                set: { updater.automaticallyChecksForUpdates = $0 }
+            ))
+
+            HStack {
+                Button(Loc.checkNow) {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.canCheckForUpdates)
+
+                Spacer()
+
+                if let date = updater.lastUpdateCheckDate {
+                    Text(Loc.lastChecked(date.formatted(.relative(presentation: .named))))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if case .readyToRelaunch(let version) = updater.state {
+                HStack {
+                    Label(Loc.versionReady(version),
+                          systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                    .foregroundStyle(.tint)
+                    Spacer()
+                    Button(Loc.relaunch) {
+                        updater.relaunchAndInstall()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+        }
+    }
+}
+#endif
 
 // MARK: - Backgrounds
 
@@ -141,7 +337,7 @@ private struct BackgroundSettingsCard: View {
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.controlBackgroundColor))
+                .fill(Color.appSurface)
         )
     }
 
@@ -152,204 +348,195 @@ private struct BackgroundSettingsCard: View {
     }
 }
 
-// MARK: - Export presets
+// MARK: - Account
 
-struct ExportPresetsSettings: View {
-    @Environment(\.modelContext) private var context
-    @Query(sort: \ExportPreset.sortOrder) private var presets: [ExportPreset]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(Loc.exportPresets).font(.headline)
-                Spacer()
-                Button {
-                    let next = (presets.map(\.sortOrder).max() ?? 0) + 1
-                    let p = ExportPreset(name: Loc.new, width: 512, height: 512,
-                                         shape: .square, isBuiltIn: false, sortOrder: next)
-                    context.insert(p)
-                    try? context.save()
-                } label: { Label(Loc.addPreset, systemImage: "plus") }
-            }
-
-            Table(presets) {
-                TableColumn(Loc.name) { p in
-                    TextField("", text: Binding(get: { p.name }, set: { p.name = $0; try? context.save() }))
-                }
-                TableColumn(Loc.width) { p in
-                    TextField("", value: Binding(
-                        get: { p.width },
-                        set: { p.width = max(16, $0); try? context.save() }
-                    ), format: .number)
-                }
-                TableColumn(Loc.height) { p in
-                    TextField("", value: Binding(
-                        get: { p.height },
-                        set: { p.height = max(16, $0); try? context.save() }
-                    ), format: .number)
-                }
-                TableColumn(Loc.shape) { p in
-                    Picker("", selection: Binding(
-                        get: { p.shape },
-                        set: { p.shape = $0; try? context.save() }
-                    )) {
-                        ForEach(ExportShape.allCases) { s in Text(s.label).tag(s) }
-                    }
-                    .labelsHidden()
-                }
-                TableColumn("") { p in
-                    Button {
-                        context.delete(p)
-                        try? context.save()
-                    } label: { Image(systemName: "trash") }
-                    .buttonStyle(.plain)
-                    .disabled(p.isBuiltIn)
-                }
-                .width(28)
-            }
-        }
-    }
-}
-
-// MARK: - AI Model (Hair Quality)
-
-struct AIModelSettings: View {
-    @Environment(ModelManager.self) private var modelManager
-    @Environment(UpscaleModelManager.self) private var upscaleManager
+struct AccountSettings: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                birefnetSection
-                Divider()
-                upscaleSection
-                Divider()
-                proSection
+            VStack(alignment: .leading, spacing: 16) {
+                if appState.auth.isSignedIn, let email = appState.auth.email {
+                    profileCard(email: email)
+                    if appState.proEntitlement.isPro {
+                        creditsCard
+                    } else {
+                        upgradeCard
+                    }
+                } else {
+                    GroupBox { signedOutProfile }
+                }
+
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
         }
     }
 
-    // MARK: - Upscale section
+    private func avatarCircle(for email: String) -> some View {
+        let initial = email.first.map { String($0).uppercased() } ?? "?"
+        return ZStack {
+            Circle()
+                .fill(LinearGradient(
+                    colors: [Color(red: 0.55, green: 0.40, blue: 0.95),
+                             Color(red: 0.40, green: 0.55, blue: 0.95)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+            Text(initial)
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 64, height: 64)
+    }
+
+    // MARK: Profile card (identity)
 
     @ViewBuilder
-    private var upscaleSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(Loc.upscaleSectionTitle).font(.headline)
-            Text(Loc.upscaleSectionDesc)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private func profileCard(email: String) -> some View {
+        GroupBox {
+            HStack(alignment: .center, spacing: 16) {
+                avatarCircle(for: email)
 
-            UpscaleVariantCard(variant: .x2)
-            UpscaleVariantCard(variant: .x4)
-
-            if upscaleManager.isAnyInstalled {
-                GroupBox {
-                    HStack {
-                        Text(Loc.upscaleActiveVariantLabel)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(email)
                             .font(.body.weight(.medium))
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { upscaleManager.selectedVariant },
-                            set: { upscaleManager.selectedVariant = $0 }
-                        )) {
-                            Text(Loc.upscaleVariant2x).tag(UpscaleModelManager.Variant.x2)
-                            Text(Loc.upscaleVariant4x).tag(UpscaleModelManager.Variant.x4)
+                        if appState.proEntitlement.isPro {
+                            Text(Loc.proPlanName)
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(.tint))
                         }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .fixedSize()
                     }
-                    .padding(4)
+                    Text(Loc.accountEmailFromGoogle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+
+                Spacer(minLength: 0)
+
+                Button(Loc.proSignOut) {
+                    appState.auth.signOut()
+                    appState.proEntitlement.clear()
+                }
+                .controlSize(.small)
             }
+            .padding(8)
         }
     }
 
-    // MARK: - Pro / Extend Body section
+    // MARK: Credits / balance card (Pro only)
 
     @ViewBuilder
-    private var proSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(Loc.proSectionTitle).font(.headline)
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "person.crop.rectangle.badge.plus")
-                            .font(.title2)
-                            .foregroundStyle(.tint)
-                            .frame(width: 32)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(Loc.extendBody).font(.body.weight(.medium))
-                            Text(Loc.extendBodyHelp)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    Divider()
-
-                    if !appState.auth.isSignedIn {
-                        Button {
-                            appState.auth.startSignIn()
-                        } label: {
-                            Label(Loc.proSignInWithGoogle, systemImage: "person.crop.circle.badge.checkmark")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    } else {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                if let email = appState.auth.email {
-                                    Text(email).font(.caption).foregroundStyle(.secondary)
-                                }
-                                if let tier = appState.proEntitlement.tier {
-                                    HStack(spacing: 6) {
-                                        Text(Loc.proCurrentPlan + ":")
-                                        Text(tier.displayName).fontWeight(.medium)
-                                    }
-                                    Text("\(Loc.proCreditsRemaining): \(appState.proEntitlement.credits)")
-                                    if let renews = appState.proEntitlement.renewsAt {
-                                        Text("\(Loc.proRenewsAt): \(renews.formatted(date: .abbreviated, time: .omitted))")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                } else {
-                                    Text(Loc.proNoSubscription)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 6) {
-                                if appState.proEntitlement.isPro {
-                                    Button(Loc.proManageSubscription) {
-                                        Task { await openPortal() }
-                                    }
-                                    .controlSize(.small)
-                                } else {
-                                    Button(Loc.proUpgradeNow) {
-                                        appState.showProUpgradeSheet = true
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
-                                }
-                                Button(Loc.proSignOut) {
-                                    appState.auth.signOut()
-                                    appState.proEntitlement.clear()
-                                }
-                                .controlSize(.small)
-                            }
-                        }
-                    }
+    private var creditsCard: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(Loc.creditsBalanceTitle)
+                        .font(.headline)
+                    Text(Loc.creditsBalanceDesc)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(4)
+
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(Loc.creditsCount(appState.proEntitlement.credits))
+                            .font(.system(size: 22, weight: .semibold))
+                        Text(Loc.creditsBalanceLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let renews = appState.proEntitlement.monthlyResetAt {
+                            Text(Loc.creditsResetOn(renews.formatted(date: .abbreviated, time: .omitted)))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button(Loc.buyMoreCredits) {
+                        Task { await buyTopup() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                Divider()
+                HStack {
+                    Spacer()
+                    Button(Loc.proManageSubscription) {
+                        Task { await openPortal() }
+                    }
+                    .controlSize(.small)
+                }
+            }
+            .padding(8)
+        }
+    }
+
+    // MARK: Upgrade card (signed in, not Pro)
+
+    @ViewBuilder
+    private var upgradeCard: some View {
+        GroupBox {
+            HStack(alignment: .center, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(Loc.proSectionTitle)
+                        .font(.headline)
+                    Text(Loc.proSectionSubtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Button(Loc.proUpgradeNow) {
+                    appState.showProUpgradeSheetInSettings = true
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(8)
+        }
+    }
+
+    @ViewBuilder
+    private var signedOutProfile: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "person.crop.circle")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(Loc.accountNotSignedIn).font(.body.weight(.medium))
+                    Text(Loc.accountSignInRationale)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            if let err = appState.auth.lastSignInError {
+                StatusChip(severity: .danger, message: err, style: .soft)
+            }
+            HStack {
+                Spacer()
+                Button {
+                    appState.auth.startSignIn()
+                } label: {
+                    Label(Loc.proSignInWithGoogle, systemImage: "person.crop.circle.badge.checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
         }
+        .padding(8)
     }
 
     @MainActor
@@ -357,353 +544,28 @@ struct AIModelSettings: View {
         do {
             let url = try await appState.backend.openPortal()
             NSWorkspace.shared.open(url)
+        } catch let err as BackendError {
+            appState.report(err)
         } catch {
-            appState.lastError = (error as? LocalizedError)?.errorDescription
+            appState.fail((error as? LocalizedError)?.errorDescription ?? Loc.somethingWentWrong)
         }
     }
 
-    // MARK: - Existing BiRefNet section (renamed from `body`)
-
-    @ViewBuilder
-    private var birefnetSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(Loc.aiHairQuality).font(.headline)
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "wand.and.stars.inverse")
-                            .font(.title2)
-                            .foregroundStyle(.tint)
-                            .frame(width: 32)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(Loc.advancedCutoutModel)
-                                .font(.body.weight(.medium))
-                            Text(Loc.advancedModelDesc)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    Divider()
-
-                    switch modelManager.status {
-                    case .notInstalled:
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "circle.dashed")
-                                    .foregroundStyle(.secondary)
-                                Text(Loc.modelNotInstalled)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Text(Loc.downloadModelPrompt)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-
-                            Button(Loc.installModel) {
-                                modelManager.downloadAndInstall()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        }
-
-                    case .downloading(let progress):
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text(Loc.downloading)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            ProgressView(value: progress)
-
-                            HStack {
-                                Text("\(Int(progress * 100))%")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                Spacer()
-                                Button(Loc.cancel) {
-                                    modelManager.cancelDownload()
-                                }
-                                .controlSize(.small)
-                            }
-                        }
-
-                    case .ready:
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                    Text(Loc.modelAvailable)
-                                }
-                                if let size = modelManager.installedSize {
-                                    Text(Loc.sizeOnDisk(size))
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                            Spacer()
-                            Button(Loc.delete, role: .destructive) {
-                                modelManager.deleteModel()
-                            }
-                            .controlSize(.small)
-                        }
-
-                        Divider()
-
-                        Toggle(Loc.useAdvancedModel,
-                               isOn: Binding(
-                                get: { modelManager.useAdvancedModel },
-                                set: { modelManager.useAdvancedModel = $0 }
-                               ))
-                        Text(Loc.advancedModelToggleHelp)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                    case .error(let message):
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Label(Loc.error, systemImage: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.red)
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button(Loc.retry) {
-                                modelManager.downloadAndInstall()
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-                }
-                .padding(4)
+    @MainActor
+    private func buyTopup() async {
+        do {
+            switch try await appState.backend.topup(pack: .credits200) {
+            case .web(let url):
+                NSWorkspace.shared.open(url)
+            case .storeKit:
+                // DMG-build does not support StoreKit. Backend should not
+                // return a StoreKit product ID here; treat as decode error.
+                throw BackendError.decode
             }
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Upscale variant card
-
-/// Install / progress / ready / error card for a single Real-ESRGAN variant.
-/// Shape mirrors the BiRefNet card but without the "use model" toggle —
-/// the active variant is chosen globally via the segmented picker above.
-private struct UpscaleVariantCard: View {
-    let variant: UpscaleModelManager.Variant
-    @Environment(UpscaleModelManager.self) private var manager
-
-    private var title: String {
-        variant == .x2 ? Loc.upscaleVariant2x : Loc.upscaleVariant4x
-    }
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                        .frame(width: 28)
-                    Text(title).font(.body.weight(.medium))
-                    Spacer()
-                }
-                Divider()
-
-                switch manager.status(for: variant) {
-                case .notInstalled:
-                    HStack {
-                        HStack(spacing: 4) {
-                            Image(systemName: "circle.dashed")
-                                .foregroundStyle(.secondary)
-                            Text(Loc.modelNotInstalled)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(Loc.installModel) {
-                            manager.downloadAndInstall(variant)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    }
-
-                case .downloading(let progress):
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(Loc.downloading)
-                                .foregroundStyle(.secondary)
-                        }
-                        ProgressView(value: progress)
-                        HStack {
-                            Text("\(Int(progress * 100))%")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                            Spacer()
-                            Button(Loc.cancel) {
-                                manager.cancelDownload(variant)
-                            }
-                            .controlSize(.small)
-                        }
-                    }
-
-                case .ready:
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text(Loc.modelAvailable)
-                            }
-                            if let size = manager.installedSize(for: variant) {
-                                Text(Loc.sizeOnDisk(size))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        Spacer()
-                        Button(Loc.delete, role: .destructive) {
-                            manager.deleteModel(variant)
-                        }
-                        .controlSize(.small)
-                    }
-
-                case .error(let message):
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label(Loc.error, systemImage: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.red)
-                            Text(message)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(Loc.retry) {
-                            manager.downloadAndInstall(variant)
-                        }
-                        .controlSize(.small)
-                    }
-                }
-            }
-            .padding(4)
-        }
-    }
-}
-
-// MARK: - Updates
-
-struct UpdatesSettings: View {
-    @Environment(UpdateManager.self) private var updater
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "–"
-    }
-
-    var body: some View {
-        @Bindable var updater = updater
-
-        VStack(alignment: .leading, spacing: 16) {
-            Text(Loc.updates).font(.headline)
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(Loc.currentVersion)
-                        Spacer()
-                        Text("\(appVersion) (\(buildNumber))")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Divider()
-
-                    Toggle(Loc.autoCheckUpdates,
-                           isOn: Binding(
-                            get: { updater.automaticallyChecksForUpdates },
-                            set: { updater.automaticallyChecksForUpdates = $0 }
-                           ))
-
-                    Divider()
-
-                    HStack {
-                        Button(Loc.checkNow) {
-                            updater.checkForUpdates()
-                        }
-                        .disabled(!updater.canCheckForUpdates)
-
-                        Spacer()
-
-                        if let date = updater.lastUpdateCheckDate {
-                            Text(Loc.lastChecked(date.formatted(.relative(presentation: .named))))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if case .readyToRelaunch(let version) = updater.state {
-                        Divider()
-                        HStack {
-                            Label(Loc.versionReady(version),
-                                  systemImage: "arrow.triangle.2.circlepath.circle.fill")
-                            .foregroundStyle(.tint)
-                            Spacer()
-                            Button(Loc.relaunch) {
-                                updater.relaunchAndInstall()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        }
-                    }
-                }
-                .padding(4)
-            }
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Language
-
-struct LanguageSettings: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(Loc.language).font(.headline)
-
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(Loc.languageDesc)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Picker(Loc.language, selection: Binding(
-                        get: { appState.language },
-                        set: { appState.language = $0 }
-                    )) {
-                        ForEach(Lang.allCases) { lang in
-                            Text(lang.label).tag(lang)
-                        }
-                    }
-                    .pickerStyle(.radioGroup)
-                }
-                .padding(4)
-            }
-
-            Spacer()
+        } catch let err as BackendError {
+            appState.report(err)
+        } catch {
+            appState.fail((error as? LocalizedError)?.errorDescription ?? Loc.somethingWentWrong)
         }
     }
 }

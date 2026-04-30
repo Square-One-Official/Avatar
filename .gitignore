@@ -35,3 +35,4 @@ Carthage/Build
 # RVM model source — cloned at conversion time by scripts/convert_rvm.py,
 # not part of our source tree.
 RobustVideoMatting/
+.vercel

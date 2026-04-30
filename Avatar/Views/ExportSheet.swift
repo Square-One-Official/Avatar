@@ -8,6 +8,7 @@ struct ExportSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \ExportPreset.sortOrder) private var presets: [ExportPreset]
 
     @State private var selected: Set<UUID> = []
@@ -63,12 +64,10 @@ struct ExportSheet: View {
 
             HStack {
                 if let doneMessage {
-                    Label(doneMessage, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    StatusChip(severity: .success, message: doneMessage, style: .soft)
                 }
                 if let errorMessage {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                    StatusChip(severity: .danger, message: errorMessage, style: .soft)
                 }
                 Spacer()
                 Button(Loc.close) { dismiss() }
@@ -87,6 +86,8 @@ struct ExportSheet: View {
             .padding()
         }
         .frame(width: 640, height: 520)
+        .background(Color.appCanvas)
+        .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
         .onAppear {
             if let first = presets.first { globalShape = first.shape }
         }
@@ -209,7 +210,7 @@ private struct PresetCard: View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(.controlBackgroundColor))
+                    .fill(Color.appSurface)
                 Group {
                     if preset.shape == .circle {
                         Circle()

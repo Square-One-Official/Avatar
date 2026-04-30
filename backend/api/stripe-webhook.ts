@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type Stripe from "stripe";
-import { stripe, creditsForTier, tierFromPriceId, type Tier } from "../lib/stripe.js";
+import {
+  stripe,
+  creditsForTier,
+  creditsForPack,
+  tierFromPriceId,
+  packFromPriceId,
+  type Tier,
+} from "../lib/stripe.js";
 import { supabase } from "../lib/supabase.js";
 
 // Stripe webhook signature verification requires the raw request body.
@@ -67,6 +74,27 @@ async function grantPeriodCredits(opts: {
   }
 }
 
+/**
+ * Grants a one-time topup pack's credits. Idempotency uses the same
+ * (reason, ref) unique-index pattern as period renewals — see
+ * `sql/002_v1_extensions.sql` for the index on reason='topup_pack'.
+ */
+async function grantTopupCredits(opts: {
+  userId: string;
+  credits: number;
+  invoiceId: string;
+}) {
+  const { error } = await supabase.from("credit_ledger").insert({
+    user_id: opts.userId,
+    delta: opts.credits,
+    reason: "topup_pack",
+    ref: opts.invoiceId,
+  });
+  if (error && !/duplicate key/i.test(error.message)) {
+    throw error;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -101,6 +129,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await supabase
             .from("users")
             .upsert({ id: userId, stripe_customer_id: customerId }, { onConflict: "id" });
+        }
+
+        // One-time top-up packs (mode: "payment", flow: "topup") grant credits
+        // here. Subscription renewals are handled by `invoice.paid` instead.
+        if (session.mode === "payment" && session.metadata?.flow === "topup" && userId) {
+          const pack = session.metadata?.pack as string | undefined;
+          // Look up the line item to validate the price ID instead of trusting
+          // the metadata blindly. (Stripe metadata is client-controlled at
+          // create time but we set it ourselves, so this is mostly defence.)
+          const lines = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+          const priceId = lines.data[0]?.price?.id;
+          const validatedPack = packFromPriceId(priceId);
+          if (validatedPack && validatedPack === pack) {
+            await grantTopupCredits({
+              userId,
+              credits: creditsForPack(validatedPack),
+              invoiceId: session.id,
+            });
+          } else {
+            console.warn(
+              "topup checkout.session.completed without recognised price",
+              { sessionId: session.id, priceId, metaPack: pack },
+            );
+          }
         }
         break;
       }

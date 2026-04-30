@@ -4,7 +4,9 @@ import SwiftData
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
     @Environment(AppState.self) private var appState
+    #if !APP_STORE
     @Environment(UpdateManager.self) private var updater
+    #endif
     @Query(sort: \Portrait.updatedAt, order: .reverse) private var portraits: [Portrait]
     @Query private var backgrounds: [BackgroundPreset]
     @Binding var selection: UUID?
@@ -27,7 +29,7 @@ struct LibraryView: View {
                     .textFieldStyle(.plain)
             }
             .padding(8)
-            .background(Color(.controlBackgroundColor))
+            .background(Color.appSurface)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .padding([.horizontal, .top], 12)
 
@@ -46,6 +48,7 @@ struct LibraryView: View {
                         PortraitRow(portrait: p, background: background(for: p))
                             .tag(p.id)
                             .transition(.opacity.combined(with: .move(edge: .top)))
+                            .listRowBackground(Color.clear)
                             .contextMenu {
                                 let targets = contextTargets(for: p)
                                 Button(targets.count > 1
@@ -59,14 +62,24 @@ struct LibraryView: View {
                 }
                 .animation(.easeOut(duration: 0.2), value: filtered.map(\.id))
                 .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
                 .onDeleteCommand {
                     delete(filtered.filter { multiSelection.contains($0.id) })
                 }
             }
 
-            DebugProToggle()
+            #if !APP_STORE
             SidebarUpdateCard()
+            #endif
+
+            if !appState.proEntitlement.isPro {
+                SidebarProQuotaCard()
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.isPro)
+        .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
+        .background(Color.appCanvas)
         .onAppear {
             multiSelection = selection.map { [$0] } ?? []
         }
@@ -80,7 +93,9 @@ struct LibraryView: View {
                 multiSelection = desired
             }
         }
+        #if !APP_STORE
         .animation(.easeOut(duration: 0.3), value: updater.state)
+        #endif
     }
 
     private func contextTargets(for portrait: Portrait) -> [Portrait] {

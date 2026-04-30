@@ -1,3 +1,4 @@
+#if !APP_STORE
 import Foundation
 import SwiftUI
 import Combine
@@ -159,3 +160,4 @@ private final class InAppUserDriver: NSObject, SPUUserDriver {
         Task { @MainActor in manager?.updateState(.idle) }
     }
 }
+#endif
