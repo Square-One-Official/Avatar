@@ -929,6 +929,13 @@ struct EditorView: View {
     }
 }
 
+private struct MoreTriggerHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Bounding box with corner handles
 
 /// Click-to-select overlay: tap the image to show a dashed outline and four
