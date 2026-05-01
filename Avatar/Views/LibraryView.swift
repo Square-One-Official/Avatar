@@ -20,18 +20,36 @@ struct LibraryView: View {
         }
     }
 
+    private var selectedPortraits: [Portrait] {
+        filtered.filter { appState.selectedPortraitIDs.contains($0.id) }
+    }
+
     var body: some View {
         @Bindable var state = appState
         VStack(spacing: 0) {
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(Loc.searchPlaceholder, text: $search)
-                    .textFieldStyle(.plain)
+            HStack(spacing: 8) {
+                HStack {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField(Loc.searchPlaceholder, text: $search)
+                        .textFieldStyle(.plain)
+                }
+                .padding(8)
+                .background(Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                if appState.selectedPortraitIDs.count >= 2 {
+                    Button {
+                        export(selectedPortraits)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .help("\(Loc.export) \(appState.selectedPortraitIDs.count) \(Loc.portraitsPlural)")
+                    .transition(.opacity.combined(with: .scale))
+                }
             }
-            .padding(8)
-            .background(Color.appSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
             .padding([.horizontal, .top], 12)
+            .animation(.easeOut(duration: 0.15), value: appState.selectedPortraitIDs.count >= 2)
 
             if filtered.isEmpty {
                 ContentUnavailableView(

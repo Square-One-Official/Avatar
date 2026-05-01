@@ -17,12 +17,15 @@ struct ExportSheet: View {
     @State private var errorMessage: String?
     @State private var globalShape: ExportShape = .square
 
-    /// Convenience initialiser for the single-portrait flow used by EditorView.
+    /// Single-portrait flow used by the Editor toolbar.
     init(portrait: Portrait, background: BackgroundPreset?) {
         self.portraits = [portrait]
         self.backgroundResolver = { _ in background }
     }
 
+    /// Multi-portrait flow used by the library context menu and sidebar
+    /// Export button. The resolver lets the caller pick the right background
+    /// per portrait without us re-querying SwiftData inside the sheet.
     init(portraits: [Portrait], backgroundResolver: @escaping (Portrait) -> BackgroundPreset?) {
         self.portraits = portraits
         self.backgroundResolver = backgroundResolver
