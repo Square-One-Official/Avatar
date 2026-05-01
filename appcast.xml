@@ -7,5 +7,17 @@
       Meest recente bovenaan.
       edSignature genereer je met: ./sign_update Avatar-X.X.zip
     -->
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 13:21:18 +0200</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19422403"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="HOEO50QfDy1uxACN6Uqfa3NfnhCmso2PF24A0y0XVAePKoV0Tid0vjKr22/1sDFhYS0FvbJeh7cOq+vBD/r5Dg==" />
+    </item>
   </channel>
 </rss>
