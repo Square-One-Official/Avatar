@@ -3,6 +3,18 @@
   <channel>
     <item>
       <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 14:59:02 +0200</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19418997"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="Wpns98L1/aixV/XvMl9Dtthd1dEhom/ceytDgo/xwQ2JPTT2Ro8pIwnKFAX10THlkNGmaJTtOhAxkkGKYySDCg==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
       <pubDate>Fri, 01 May 2026 14:30:30 +0200</pubDate>
       <sparkle:version>4</sparkle:version>
       <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
