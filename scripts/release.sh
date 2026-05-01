@@ -29,11 +29,23 @@ DMG_NAME="Aaavatar-${VERSION}.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
 SCHEME="Avatar"
 
-# Sparkle sign_update — searches DerivedData, override with SIGN_UPDATE_PATH
-SIGN_UPDATE="${SIGN_UPDATE_PATH:-$(find ~/Library/Developer/Xcode/DerivedData -name sign_update -type f 2>/dev/null | head -1)}"
-if [[ -z "$SIGN_UPDATE" ]]; then
-  echo "❌ sign_update not found. Set SIGN_UPDATE_PATH or build the project in Xcode first."
-  exit 1
+# Sparkle sign_update — pin to a stable cache path so the macOS Keychain ACL
+# approval ("Always Allow access to this private key") survives across Xcode
+# rebuilds. DerivedData paths change per workspace state, and the ACL is
+# bound to the full file path, so a fresh `find … head -1` would re-prompt
+# every release. Override with SIGN_UPDATE_PATH if needed.
+SIGN_UPDATE_CACHE_DIR="$HOME/Library/Caches/avatar-release"
+SIGN_UPDATE="$SIGN_UPDATE_CACHE_DIR/sign_update"
+if [[ ! -x "$SIGN_UPDATE" || -n "${SIGN_UPDATE_PATH:-}" ]]; then
+  SIGN_UPDATE_SRC="${SIGN_UPDATE_PATH:-$(find ~/Library/Developer/Xcode/DerivedData -path '*/artifacts/sparkle/Sparkle/bin/sign_update' -type f 2>/dev/null | head -1)}"
+  if [[ -z "$SIGN_UPDATE_SRC" ]]; then
+    echo "❌ sign_update not found. Build the project in Xcode (or set SIGN_UPDATE_PATH)."
+    exit 1
+  fi
+  echo "→ Pinning sign_update to $SIGN_UPDATE..."
+  mkdir -p "$SIGN_UPDATE_CACHE_DIR"
+  cp "$SIGN_UPDATE_SRC" "$SIGN_UPDATE"
+  chmod +x "$SIGN_UPDATE"
 fi
 
 echo "📦 Releasing Avatar v${VERSION} (build ${BUILD})"
@@ -125,35 +137,62 @@ ED_SIGNATURE=$(echo "$SIGNATURE_OUTPUT" | grep -o 'sparkle:edSignature="[^"]*"' 
 LENGTH=$(stat -f%z "$DMG_PATH")
 
 # 9. Update appcast
+#    BSD `sed` chokes on multi-line `a\` inserts (the heredoc payload has
+#    embedded newlines, which `sed` reads as the start of new commands).
+#    Use Python to do a literal "insert after the first <channel>" instead.
 echo "→ Updating appcast..."
 PUBDATE=$(date -R)
-NEW_ITEM=$(cat <<ITEM
-    <item>
-      <title>Version ${VERSION}</title>
-      <pubDate>${PUBDATE}</pubDate>
-      <sparkle:version>${BUILD}</sparkle:version>
-      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure
-        url="https://github.com/thierrzz/Avatar/releases/download/v${VERSION}/${DMG_NAME}"
-        length="${LENGTH}"
-        type="application/x-apple-diskimage"
-        sparkle:edSignature="${ED_SIGNATURE}" />
-    </item>
-ITEM
-)
-
-# Insert the new item right after <channel> (above existing items)
 cd "$PROJECT_DIR"
-sed -i '' "/<channel>/a\\
-${NEW_ITEM}
-" appcast.xml
+APPCAST_PATH="$PROJECT_DIR/appcast.xml" \
+APPCAST_VERSION="$VERSION" \
+APPCAST_BUILD="$BUILD" \
+APPCAST_PUBDATE="$PUBDATE" \
+APPCAST_LENGTH="$LENGTH" \
+APPCAST_DMG_NAME="$DMG_NAME" \
+APPCAST_ED_SIGNATURE="$ED_SIGNATURE" \
+python3 - <<'PY'
+import os
+path = os.environ["APPCAST_PATH"]
+item = (
+    "    <item>\n"
+    f"      <title>Version {os.environ['APPCAST_VERSION']}</title>\n"
+    f"      <pubDate>{os.environ['APPCAST_PUBDATE']}</pubDate>\n"
+    f"      <sparkle:version>{os.environ['APPCAST_BUILD']}</sparkle:version>\n"
+    f"      <sparkle:shortVersionString>{os.environ['APPCAST_VERSION']}</sparkle:shortVersionString>\n"
+    "      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>\n"
+    "      <enclosure\n"
+    f"        url=\"https://github.com/thierrzz/Avatar/releases/download/v{os.environ['APPCAST_VERSION']}/{os.environ['APPCAST_DMG_NAME']}\"\n"
+    f"        length=\"{os.environ['APPCAST_LENGTH']}\"\n"
+    "        type=\"application/x-apple-diskimage\"\n"
+    f"        sparkle:edSignature=\"{os.environ['APPCAST_ED_SIGNATURE']}\" />\n"
+    "    </item>\n"
+)
+with open(path) as f:
+    text = f.read()
+needle = "<channel>"
+i = text.index(needle) + len(needle)
+# Skip past the trailing newline so the inserted block lines up with siblings.
+if text[i:i+1] == "\n":
+    i += 1
+text = text[:i] + item + text[i:]
+with open(path, "w") as f:
+    f.write(text)
+PY
 
 # 10. GitHub Release
+#     Idempotent: if the tag already exists (re-running for a higher BUILD
+#     under the same MARKETING_VERSION, e.g. shipping a hotfix without
+#     bumping the public version), upload the new DMG over the old asset
+#     instead of failing.
 echo "→ Creating GitHub Release..."
-gh release create "v${VERSION}" "$DMG_PATH" \
-  --title "Aaavatar v${VERSION}" \
-  --generate-notes
+if gh release view "v${VERSION}" >/dev/null 2>&1; then
+  echo "   release v${VERSION} already exists — clobbering DMG asset"
+  gh release upload "v${VERSION}" "$DMG_PATH" --clobber
+else
+  gh release create "v${VERSION}" "$DMG_PATH" \
+    --title "Aaavatar v${VERSION}" \
+    --generate-notes
+fi
 
 echo ""
 echo "✅ Release v${VERSION} published!"
