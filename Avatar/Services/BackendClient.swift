@@ -106,9 +106,26 @@ final class BackendClient {
         let cutout: String
         let creditsRemaining: Int
     }
-    func fillBody(imagePNG: Data) async throws -> (Data, Int) {
-        struct Body: Encodable { let image: String }
-        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+    /// Normalised face rectangle (0..1, top-left origin) of the input cutout.
+    /// The backend uses this to lock the face region as never-paint in the
+    /// outpaint mask — strict rule: Fill in Body must never modify the face,
+    /// even when alpha gaps suggest missing parts. When the client cannot
+    /// detect a face the field is omitted and the backend falls back to a
+    /// top-of-bbox heuristic.
+    struct FaceBox: Encodable {
+        let x: Double
+        let y: Double
+        let width: Double
+        let height: Double
+    }
+    func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+        struct Body: Encodable {
+            let image: String
+            let face: FaceBox?
+        }
+        let body = try JSONEncoder().encode(
+            Body(image: imagePNG.base64EncodedString(), face: faceBox)
+        )
         let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {
             throw BackendError.decode

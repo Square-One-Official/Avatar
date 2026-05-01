@@ -482,7 +482,31 @@ enum ImportFlow {
 
         Task.detached(priority: .userInitiated) {
             do {
-                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
+                // Detect the face on the pre-fill cutout so the backend can
+                // lock that region as never-paint in the outpaint mask. The
+                // strict rule is: Fill in Body must never modify the face,
+                // even when alpha gaps suggest missing parts. Vision is
+                // reliable for the head-and-shoulders framing the app uses;
+                // on the rare miss the backend falls back to a top-of-bbox
+                // heuristic so we still get partial protection.
+                let faceBox: BackendClient.FaceBox? = {
+                    guard let cg = ImageProcessor.cgImage(from: cutoutData),
+                          let rect = ImageProcessor.detectFace(in: cg) else {
+                        return nil
+                    }
+                    let w = CGFloat(cg.width), h = CGFloat(cg.height)
+                    guard w > 0, h > 0 else { return nil }
+                    return BackendClient.FaceBox(
+                        x: Double(rect.minX / w),
+                        y: Double(rect.minY / h),
+                        width: Double(rect.width / w),
+                        height: Double(rect.height / h)
+                    )
+                }()
+
+                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(
+                    imagePNG: cutoutData, faceBox: faceBox
+                )
 
                 guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
                     throw BackendError.decode

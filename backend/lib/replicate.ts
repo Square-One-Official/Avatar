@@ -64,12 +64,21 @@ export async function outpaintPortrait(input: {
   // the model will happily invent context to fill the margin (an
   // earlier version produced a microphone-stick on one side). Repeat
   // the empty-background directive — FLUX responds to emphasis.
+  //
+  // The face-preservation clause is absolute: even if part of the face
+  // is missing or cropped, the model must NOT invent or modify facial
+  // features. The mask already enforces this physically (face zone is
+  // black = preserve), but stating the rule in the prompt is a second
+  // safety net for any feathered seam pixels near the face.
   const prompt =
     "A studio portrait of one person, head and upper chest only, " +
     "centered. Plain empty neutral grey background, completely empty, " +
     "no objects, no props, no microphone, no instruments, no hands raised, " +
     "no accessories, no other people, no text. Keep the face, hair, skin, " +
-    "and clothing untouched. Photographic, soft natural lighting, single subject.";
+    "and clothing untouched. Do not modify the face under any circumstances; " +
+    "if any part of the face appears missing or incomplete, leave it as is — " +
+    "do not invent, redraw, or extend facial features. " +
+    "Photographic, soft natural lighting, single subject.";
 
   const output = (await replicate.run("black-forest-labs/flux-fill-pro", {
     input: {

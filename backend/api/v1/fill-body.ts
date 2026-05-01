@@ -70,6 +70,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Optional face bbox from the client (Apple Vision on the pre-fill
+  // cutout). Normalised 0..1, top-left origin. Drives the strict
+  // face-protection mask in padForOutpaint. Anything malformed is
+  // dropped silently — the heuristic fallback still protects the head.
+  let faceBox: { x: number; y: number; width: number; height: number } | undefined;
+  const rawFace = req.body?.face;
+  if (rawFace && typeof rawFace === "object") {
+    const f = rawFace as Record<string, unknown>;
+    if (
+      typeof f.x === "number" &&
+      typeof f.y === "number" &&
+      typeof f.width === "number" &&
+      typeof f.height === "number" &&
+      f.x >= 0 && f.y >= 0 &&
+      f.width > 0 && f.height > 0 &&
+      f.x + f.width <= 1.001 &&
+      f.y + f.height <= 1.001
+    ) {
+      faceBox = { x: f.x, y: f.y, width: f.width, height: f.height };
+    }
+  }
+
   const devEmails = (process.env.DEV_UNLIMITED_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
@@ -81,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Step 1: build the outpaint inputs. Pure server-side image work,
     // no Replicate calls — safe to do before the credit gate.
-    const { padded, mask } = await padForOutpaint(inputBytes);
+    const { padded, mask } = await padForOutpaint(inputBytes, { face: faceBox });
     const paddedDataUrl = `data:image/png;base64,${padded.toString("base64")}`;
     const maskDataUrl = `data:image/png;base64,${mask.toString("base64")}`;
 

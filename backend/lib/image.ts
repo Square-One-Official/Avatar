@@ -45,8 +45,22 @@ const CANVAS_W = 768;
 const CANVAS_H = 1024;
 const GREY = { r: 200, g: 200, b: 200 };
 
+/**
+ * Optional face bbox in normalised input-image coords (0..1, top-left
+ * origin). When provided, the outpaint mask hard-locks that region (plus a
+ * generous margin for hair/ears/neck) as never-paint. Source: Apple Vision
+ * face detection on the client, before upload.
+ */
+export interface FaceBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export async function padForOutpaint(
-  cutoutPng: Buffer
+  cutoutPng: Buffer,
+  options?: { face?: FaceBox }
 ): Promise<{ padded: Buffer; mask: Buffer }> {
   const src = sharp(cutoutPng).ensureAlpha();
   const meta = await src.metadata();
@@ -56,13 +70,19 @@ export async function padForOutpaint(
 
   // Find the tight alpha bbox so we know where the actual person is.
   // `trim()` on alpha returns the cropped image plus its offset within
-  // the original; we use that offset to compute scale + placement.
+  // the original; we use that offset to compute scale + placement, and
+  // also to project the (original-image) face bbox into canvas coords.
   const trimmed = await sharp(cutoutPng)
     .ensureAlpha()
     .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
     .toBuffer({ resolveWithObject: true });
   const bboxW = trimmed.info.width;
   const bboxH = trimmed.info.height;
+  // sharp returns trim offsets as negative numbers — the amount removed
+  // from each side. Negate to get the bbox origin within the original
+  // image (in pixels, top-left).
+  const bboxOriginX = -(trimmed.info.trimOffsetLeft ?? 0);
+  const bboxOriginY = -(trimmed.info.trimOffsetTop ?? 0);
 
   // Scale the trimmed cutout so the person fills ~70% of the canvas
   // height while staying within ~85% of the canvas width. Tall canvas
@@ -130,7 +150,7 @@ export async function padForOutpaint(
     .png()
     .toBuffer();
 
-  const mask = await sharp({
+  const featheredMask = await sharp({
     create: {
       width: CANVAS_W,
       height: CANVAS_H,
@@ -143,5 +163,112 @@ export async function padForOutpaint(
     .png()
     .toBuffer();
 
+  // Hard face guard: a rectangle forced black (= preserve) on the mask,
+  // regardless of alpha. The rule is absolute — Fill in Body must NEVER
+  // modify the face, even when alpha gaps exist there (cutout glitch,
+  // half-missing chin, hair holes). FLUX Fill cannot paint into a
+  // black-mask region. Two strategies, in order of preference:
+  //   1. Client-detected face bbox (Apple Vision), projected through
+  //      the trim → resize → placement pipeline into canvas pixels and
+  //      expanded to cover hair/ears/neck. Reliable for any framing.
+  //   2. Fallback heuristic: the top 55% of the person bbox. Used when
+  //      the client couldn't detect a face (rare with portrait input).
+  // The unblurred rectangle also overrides the 4px feather along the
+  // silhouette in the face zone — feather still applies below.
+  const guard = computeFaceGuardRect({
+    face: options?.face,
+    meta: { width: meta.width, height: meta.height },
+    bboxOriginX,
+    bboxOriginY,
+    scale,
+    drawW,
+    drawH,
+    left,
+    top,
+  });
+  const faceGuard = await sharp({
+    create: {
+      width: guard.width,
+      height: guard.height,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+  const mask = await sharp(featheredMask)
+    .composite([{ input: faceGuard, left: guard.left, top: guard.top }])
+    .png()
+    .toBuffer();
+
   return { padded, mask };
+}
+
+/**
+ * Compute the never-paint rectangle (in canvas pixels) that locks the
+ * face region of the outpaint mask. When a client-detected face bbox is
+ * available we project it through the same trim → resize → placement
+ * transform that produced the padded canvas, then expand by face-relative
+ * margins to cover hair (top), ears (sides), and a slice of neck (bottom).
+ * The bottom margin is intentionally modest so Fill in Body can still
+ * extend the chest/torso below the neck. When no face bbox is available
+ * we fall back to the top 55% of the person bbox — a heuristic that holds
+ * for the head-and-shoulders framing the app produces.
+ */
+function computeFaceGuardRect(args: {
+  face?: FaceBox;
+  meta: { width: number; height: number };
+  bboxOriginX: number;
+  bboxOriginY: number;
+  scale: number;
+  drawW: number;
+  drawH: number;
+  left: number;
+  top: number;
+}): { left: number; top: number; width: number; height: number } {
+  const { face, meta, bboxOriginX, bboxOriginY, scale, drawW, drawH, left, top } = args;
+
+  if (face) {
+    // Original-image pixels.
+    const fxOrig = face.x * meta.width;
+    const fyOrig = face.y * meta.height;
+    const fwOrig = face.width * meta.width;
+    const fhOrig = face.height * meta.height;
+
+    // Trimmed-bbox pixels.
+    const fxTrim = fxOrig - bboxOriginX;
+    const fyTrim = fyOrig - bboxOriginY;
+
+    // Canvas pixels (trimmed → resized → placed).
+    const fxCanvas = left + fxTrim * scale;
+    const fyCanvas = top + fyTrim * scale;
+    const fwCanvas = fwOrig * scale;
+    const fhCanvas = fhOrig * scale;
+
+    // Margins relative to face dimensions: hair generously above, ears
+    // on the sides, a small slice of neck below. Numbers tuned for the
+    // typical Vision face bbox (eyebrows-to-chin, temple-to-temple).
+    const padTop = fhCanvas * 0.9;
+    const padBottom = fhCanvas * 0.35;
+    const padSides = fwCanvas * 0.55;
+
+    const guardLeft = Math.max(0, Math.round(fxCanvas - padSides));
+    const guardTop = Math.max(0, Math.round(fyCanvas - padTop));
+    const guardRight = Math.min(CANVAS_W, Math.round(fxCanvas + fwCanvas + padSides));
+    const guardBottom = Math.min(CANVAS_H, Math.round(fyCanvas + fhCanvas + padBottom));
+
+    const w = Math.max(1, guardRight - guardLeft);
+    const h = Math.max(1, guardBottom - guardTop);
+    return { left: guardLeft, top: guardTop, width: w, height: h };
+  }
+
+  // Heuristic fallback: top 55% of the person bbox.
+  const FACE_GUARD_RATIO = 0.55;
+  return {
+    left,
+    top,
+    width: drawW,
+    height: Math.max(1, Math.round(drawH * FACE_GUARD_RATIO)),
+  };
 }
