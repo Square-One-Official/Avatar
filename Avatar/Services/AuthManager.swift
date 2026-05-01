@@ -6,8 +6,10 @@ import Auth
 /// Thin wrapper around `SupabaseClient.auth`. Owns the single `SupabaseClient`
 /// used by the app, exposes a minimal, observable surface for views, and
 /// keeps the synchronous `accessToken` / `email` / `isSignedIn` fields that
-/// `BackendClient` and the Settings UI read. Sessions persist in the system
-/// Keychain via `KeychainLocalStorage` (SDK default on Apple platforms).
+/// `BackendClient` and the Settings UI read. Sessions persist in a sandboxed
+/// file via `FileAuthStorage` — Keychain ACLs are tied to the binary's code
+/// signature, so every release would otherwise re-prompt "Always Allow"
+/// multiple times per launch.
 @MainActor
 @Observable
 final class AuthManager {
@@ -39,6 +41,9 @@ final class AuthManager {
         self.supabase = SupabaseClient(
             supabaseURL: SupabaseConfig.url,
             supabaseKey: SupabaseConfig.publishableKey,
+            options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(storage: FileAuthStorage())
+            )
         )
         observeAuthState()
     }

@@ -59,6 +59,7 @@
 		6F3610CB62B56FF6FF361E03 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		6F88BA1D977E666AE9CE8B16 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = F1CAAB87E8E174A425083C2F /* logo.png */; };
 		6F8B473ACB0AABDCB73F0EE6 /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
+		78A5AFD8FEAA9E85A10389FC /* FileAuthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96955F87205367E1A31005B8 /* FileAuthStorage.swift */; };
 		7B0D63D306F803879F03E8D5 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F2F205DF0F4E95E419512499 /* Supabase */; };
 		7D574F80D57D4493F636E0CB /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877D5A42F98746FCC7A61452 /* MainWindow.swift */; };
 		7D7CE1745B5155D4E4B97CA2 /* Mesh 01.png in Resources */ = {isa = PBXBuildFile; fileRef = 7457F57817461EFCE4333729 /* Mesh 01.png */; };
@@ -102,6 +103,7 @@
 		D84A73DA71CEC5D750C30163 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */; };
 		DCD584C8769017840D8AC9CB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */; };
 		DEE477EB98F989CA1467A0A1 /* Compositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFBA66AF626E08F10F1333C /* Compositor.swift */; };
+		E04984253BD9437942C1DE92 /* FileAuthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96955F87205367E1A31005B8 /* FileAuthStorage.swift */; };
 		E0F821475D2B3ADDEC22840B /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5D10603D8C4CBCEBF63691 /* ExportSheet.swift */; };
 		E20E4C1FAB7C8E7057EBF08F /* Mesh 02.png in Resources */ = {isa = PBXBuildFile; fileRef = E21A227552D65C64EBB609A5 /* Mesh 02.png */; };
 		E591BE03D14322F93DF5CBB5 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29693AE9839C2E40136C758E /* SupabaseConfig.swift */; };
@@ -145,6 +147,7 @@
 		84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillSegmentedControl.swift; sourceTree = "<group>"; };
 		877D5A42F98746FCC7A61452 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		947924202C732493D553BD14 /* Mesh 03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 03.png"; sourceTree = "<group>"; };
+		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
 		A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessor.swift; sourceTree = "<group>"; };
 		A67F34619015B892E51F8BA0 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
@@ -210,6 +213,7 @@
 				DE931792D085D73E20E9D67F /* DebugLog.swift */,
 				D7D7267E27D224F2446B9E76 /* DeviceFingerprint.swift */,
 				A67F34619015B892E51F8BA0 /* ExportService.swift */,
+				96955F87205367E1A31005B8 /* FileAuthStorage.swift */,
 				8024D84C778A83045FEA287D /* ImageAdjustments.swift */,
 				A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */,
 				B313E53EBD6AC732524D4690 /* ImportFlow.swift */,
@@ -448,6 +452,7 @@
 				7DC1C04306F4A82722999943 /* ExportPreset.swift in Sources */,
 				82491CEFF1852DDF363A9E13 /* ExportService.swift in Sources */,
 				E0F821475D2B3ADDEC22840B /* ExportSheet.swift in Sources */,
+				78A5AFD8FEAA9E85A10389FC /* FileAuthStorage.swift in Sources */,
 				B3B24CB78F4451A09882A78E /* GoogleGMark.swift in Sources */,
 				1897B785C302A96575308BB7 /* GoogleSignInButton.swift in Sources */,
 				1B6646132381C29B4FE739BB /* ImageAdjustments.swift in Sources */,
@@ -498,6 +503,7 @@
 				F0D56262FE85216D1648099E /* ExportPreset.swift in Sources */,
 				9CDEBB9401C040885B7B35B8 /* ExportService.swift in Sources */,
 				16F9AC78F685F11C91A31369 /* ExportSheet.swift in Sources */,
+				E04984253BD9437942C1DE92 /* FileAuthStorage.swift in Sources */,
 				FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */,
 				F75326EE95AD345F1B6AB7E3 /* GoogleSignInButton.swift in Sources */,
 				6B544FC0626AD4CC467ECC79 /* ImageAdjustments.swift in Sources */,
