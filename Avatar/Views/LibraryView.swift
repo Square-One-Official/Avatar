@@ -9,24 +9,27 @@ struct LibraryView: View {
     #endif
     @Query(sort: \Portrait.updatedAt, order: .reverse) private var portraits: [Portrait]
     @Query private var backgrounds: [BackgroundPreset]
-    @Binding var selection: UUID?
     @State private var search = ""
-
-    private var filtered: [Portrait] {
-        guard !search.isEmpty else { return portraits }
-        let q = search.lowercased()
-        return portraits.filter {
-            $0.name.lowercased().contains(q) || $0.tags.lowercased().contains(q)
-        }
-    }
-
-    private var selectedPortraits: [Portrait] {
-        filtered.filter { appState.selectedPortraitIDs.contains($0.id) }
-    }
+    /// Cached filter result. Rebuilt only when `portraits` or `search` change,
+    /// not on every body invalidation. The previous computed-property version
+    /// re-ran the O(N) filter every time the body re-evaluated (selection
+    /// change, animation tick, pro-quota update, etc.).
+    @State private var filtered: [Portrait] = []
+    /// Stable identity list used as the `value:` of the List's animation.
+    /// Storing this avoids allocating `filtered.map(\.id)` on every render.
+    @State private var filteredIDs: [UUID] = []
 
     var body: some View {
         @Bindable var state = appState
-        VStack(spacing: 0) {
+        // Compute the current selection-set facets ONCE per body so per-row
+        // context menus don't rescan the filtered list. `multiTargets` is
+        // empty when there's a single selection — the row falls back to `[p]`.
+        let selectedSet = appState.selectedPortraitIDs
+        let multiTargets: [Portrait] = selectedSet.count > 1
+            ? filtered.filter { selectedSet.contains($0.id) }
+            : []
+
+        return VStack(spacing: 0) {
             HStack(spacing: 8) {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -37,19 +40,19 @@ struct LibraryView: View {
                 .background(Color.appSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                if appState.selectedPortraitIDs.count >= 2 {
+                if selectedSet.count >= 2 {
                     Button {
-                        export(selectedPortraits)
+                        export(multiTargets)
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
                     .buttonStyle(.borderedProminent)
-                    .help("\(Loc.export) \(appState.selectedPortraitIDs.count) \(Loc.portraitsPlural)")
+                    .help("\(Loc.export) \(selectedSet.count) \(Loc.portraitsPlural)")
                     .transition(.opacity.combined(with: .scale))
                 }
             }
             .padding([.horizontal, .top], 12)
-            .animation(.easeOut(duration: 0.15), value: appState.selectedPortraitIDs.count >= 2)
+            .animation(.easeOut(duration: 0.15), value: selectedSet.count >= 2)
 
             if filtered.isEmpty {
                 ContentUnavailableView(
@@ -68,7 +71,9 @@ struct LibraryView: View {
                             .transition(.opacity.combined(with: .move(edge: .top)))
                             .listRowBackground(Color.clear)
                             .contextMenu {
-                                let targets = contextTargets(for: p)
+                                let targets: [Portrait] = (selectedSet.contains(p.id) && selectedSet.count > 1)
+                                    ? multiTargets
+                                    : [p]
                                 Button(targets.count > 1
                                        ? "\(Loc.export) \(targets.count) \(Loc.portraitsPlural)"
                                        : Loc.export) {
@@ -84,52 +89,41 @@ struct LibraryView: View {
                             }
                     }
                 }
-                .animation(.easeOut(duration: 0.2), value: filtered.map(\.id))
+                .animation(.easeOut(duration: 0.2), value: filteredIDs)
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
-                .onDeleteCommand {
-                    delete(filtered.filter { appState.selectedPortraitIDs.contains($0.id) })
-                }
             }
 
             #if !APP_STORE
             SidebarUpdateCard()
+                .animation(.easeOut(duration: 0.3), value: updater.state)
             #endif
 
             if !appState.proEntitlement.isPro {
                 SidebarProQuotaCard()
                     .transition(.opacity)
+                    .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
             }
         }
         .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.isPro)
-        .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
         .background(Color.appCanvas)
-        .onAppear {
-            if appState.selectedPortraitIDs.isEmpty, let id = selection {
-                appState.selectedPortraitIDs = [id]
-            }
-        }
-        .onChange(of: appState.selectedPortraitIDs) { _, newValue in
-            let single: UUID? = newValue.count == 1 ? newValue.first : nil
-            if selection != single { selection = single }
-        }
-        .onChange(of: selection) { _, newValue in
-            let desired: Set<UUID> = newValue.map { [$0] } ?? []
-            if appState.selectedPortraitIDs.count <= 1 && appState.selectedPortraitIDs != desired {
-                appState.selectedPortraitIDs = desired
-            }
-        }
-        #if !APP_STORE
-        .animation(.easeOut(duration: 0.3), value: updater.state)
-        #endif
+        .onAppear { recomputeFiltered() }
+        .onChange(of: portraits) { _, _ in recomputeFiltered() }
+        .onChange(of: search) { _, _ in recomputeFiltered() }
     }
 
-    private func contextTargets(for portrait: Portrait) -> [Portrait] {
-        let selected = appState.selectedPortraitIDs
-        if selected.contains(portrait.id) && selected.count > 1 {
-            return filtered.filter { selected.contains($0.id) }
+    private func recomputeFiltered() {
+        let next: [Portrait]
+        if search.isEmpty {
+            next = portraits
+        } else {
+            let q = search.lowercased()
+            next = portraits.filter {
+                $0.name.lowercased().contains(q) || $0.tags.lowercased().contains(q)
+            }
         }
-        return [portrait]
+        filtered = next
+        filteredIDs = next.map(\.id)
     }
 
     private func export(_ portraits: [Portrait]) {
@@ -142,7 +136,6 @@ struct LibraryView: View {
         let ids = Set(portraits.map(\.id))
         for p in portraits { context.delete(p) }
         appState.selectedPortraitIDs.subtract(ids)
-        if let sel = selection, ids.contains(sel) { selection = nil }
     }
 
     /// Resolves the background each portrait should be drawn against.
@@ -187,9 +180,19 @@ private struct PortraitRow: View {
 private struct Thumbnail: View {
     let portrait: Portrait
     let background: BackgroundPreset?
+    @Environment(AppState.self) private var appState
 
     var body: some View {
-        // Reuse the same live preview composition as the editor for visual consistency.
-        CanvasPreview(portrait: portrait, background: background)
+        // Flat cached thumbnail — one Image, no GeometryReader, no per-row CI
+        // chain or Compositor work after the first paint per (portrait, bg)
+        // pair. Falls back to a neutral surface while the cutout decodes.
+        if let img = appState.thumbnail(for: portrait, background: background) {
+            Image(decorative: img, scale: 1)
+                .resizable()
+                .interpolation(.medium)
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Color.appSurface
+        }
     }
 }

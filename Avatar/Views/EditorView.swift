@@ -876,13 +876,21 @@ struct EditorView: View {
                                 haptics.perform(.alignment, performanceTime: .now)
                                 #endif
                             }
+                            // Live preview only mutates the model in memory; the
+                            // SwiftData save and updatedAt bump are deferred to
+                            // drag-end via onEditingChanged. The adjustedCutout
+                            // cache self-invalidates on key mismatch so we don't
+                            // need to clear it per tick.
                             value.wrappedValue = snapped
-                            portrait.updatedAt = Date()
-                            appState.invalidateAdjusted(for: portrait)
-                            try? context.save()
                         }
                     ),
-                    in: range
+                    in: range,
+                    onEditingChanged: { editing in
+                        if !editing {
+                            portrait.updatedAt = Date()
+                            try? context.save()
+                        }
+                    }
                 )
                 // Subtle tick mark on the track at the neutral position.
                 GeometryReader { geo in

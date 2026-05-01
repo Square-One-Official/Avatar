@@ -20,7 +20,7 @@ struct MainWindow: View {
     var body: some View {
         @Bindable var state = appState
         NavigationSplitView {
-            LibraryView(selection: $state.selectedPortraitID)
+            LibraryView()
                 .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 360)
         } detail: {
             ZStack(alignment: .bottom) {

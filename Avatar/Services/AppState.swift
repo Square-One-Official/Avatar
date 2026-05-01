@@ -70,12 +70,30 @@ enum ProcessingKind {
 @MainActor
 @Observable
 final class AppState {
-    var selectedPortraitID: UUID?
+    /// Single-selection facet of the sidebar selection. Bridged to
+    /// `selectedPortraitIDs` via `didSet` so callers can write either side
+    /// without each call site mirroring manually. The guards make the cross-
+    /// writes idempotent so SwiftUI doesn't see redundant churn.
+    var selectedPortraitID: UUID? {
+        didSet {
+            let desired: Set<UUID> = selectedPortraitID.map { [$0] } ?? []
+            if selectedPortraitIDs.count <= 1 && selectedPortraitIDs != desired {
+                selectedPortraitIDs = desired
+            }
+        }
+    }
     /// Full multi-selection set from the sidebar. `selectedPortraitID` mirrors
     /// this when exactly one row is selected; this set is the source of truth
     /// when the user marquee-selects more than one. Routed through AppState
     /// so the detail pane can render a grid instead of the drop zone.
-    var selectedPortraitIDs: Set<UUID> = []
+    var selectedPortraitIDs: Set<UUID> = [] {
+        didSet {
+            let single: UUID? = selectedPortraitIDs.count == 1 ? selectedPortraitIDs.first : nil
+            if selectedPortraitID != single {
+                selectedPortraitID = single
+            }
+        }
+    }
     /// Drives the library-side ExportSheet. Non-empty = sheet open and the IDs
     /// inside are the portraits to export. Routed through AppState so both the
     /// sidebar context-menu and the top-right toolbar Export button can trigger
@@ -256,15 +274,34 @@ final class AppState {
         didSet { UserDefaults.standard.set(language.rawValue, forKey: "appLanguage") }
     }
 
+    // Image caches are pure memoization — they must NOT participate in
+    // @Observable tracking. Otherwise every cache-miss write inside a view
+    // body (`adjustedCutout(for:)` etc.) invalidates every other view that
+    // ever read from the same dict, producing an O(N²) re-render cascade
+    // across the sidebar thumbnails + editor canvas. View invalidation is
+    // already driven by the underlying Portrait / BackgroundPreset models.
+
     /// In-memory cache of decoded cutout CGImages keyed by portrait id,
     /// so the editor doesn't re-decode on every redraw.
+    @ObservationIgnored
     private var cutoutCache: [UUID: CGImage] = [:]
     /// In-memory cache of the adjusted cutout (base cutout + CIFilter chain),
     /// keyed by portrait id. Stored with the adjustments' hash so we can
     /// invalidate as soon as any slider changes value.
+    @ObservationIgnored
     private var adjustedCutoutCache: [UUID: (key: Int, image: CGImage)] = [:]
     /// In-memory cache of decoded background images keyed by preset id.
+    @ObservationIgnored
     private var backgroundCache: [UUID: CGImage] = [:]
+    /// Composited thumbnail cache for the Library sidebar. Holds a flat
+    /// CGImage at thumbnail resolution per portrait so each row paints with
+    /// a single Image, not a live CanvasPreview (GeometryReader + CI chain).
+    /// Keyed by portrait id; the stored hash captures every input that
+    /// affects the rendered pixels.
+    @ObservationIgnored
+    private var thumbnailCache: [UUID: (key: Int, image: CGImage)] = [:]
+    /// Pixel side for sidebar thumbnails. 44pt visible @2x.
+    private static let thumbnailPixelSize: CGFloat = 88
 
     func cutout(for portrait: Portrait) -> CGImage? {
         if let cached = cutoutCache[portrait.id] { return cached }
@@ -295,10 +332,12 @@ final class AppState {
     func invalidateCutout(for portrait: Portrait) {
         cutoutCache.removeValue(forKey: portrait.id)
         adjustedCutoutCache.removeValue(forKey: portrait.id)
+        thumbnailCache.removeValue(forKey: portrait.id)
     }
 
     func invalidateAdjusted(for portrait: Portrait) {
         adjustedCutoutCache.removeValue(forKey: portrait.id)
+        thumbnailCache.removeValue(forKey: portrait.id)
     }
 
     func backgroundImage(for preset: BackgroundPreset) -> CGImage? {
@@ -313,5 +352,62 @@ final class AppState {
 
     func invalidateBackground(_ preset: BackgroundPreset) {
         backgroundCache.removeValue(forKey: preset.id)
+        // Background changed → any thumbnail composited against this preset
+        // is stale. Cheap to drop the whole map; thumbnails repopulate lazily.
+        thumbnailCache.removeAll(keepingCapacity: true)
+    }
+
+    /// Returns a flattened CGImage suitable for a sidebar thumbnail. Cheap on
+    /// cache hit (dictionary lookup); on miss runs a single Compositor.render
+    /// at `thumbnailPixelSize` which is ~88px square — orders of magnitude
+    /// less work than the full editor canvas. The hash key folds in every
+    /// input that affects pixels (cutout content, transform, adjustments,
+    /// background identity + content), so the cache self-invalidates.
+    func thumbnail(for portrait: Portrait, background: BackgroundPreset?) -> CGImage? {
+        var hasher = Hasher()
+        hasher.combine(portrait.id)
+        hasher.combine(portrait.cutoutPNG?.count ?? 0)
+        hasher.combine(portrait.scale)
+        hasher.combine(portrait.offsetX)
+        hasher.combine(portrait.offsetY)
+        hasher.combine(ImageAdjustments(from: portrait).hashValue)
+        if let bg = background {
+            hasher.combine(bg.id)
+            switch bg.kind {
+            case .image:
+                hasher.combine(bg.imageData?.count ?? 0)
+            case .color:
+                let c = bg.colorComponents
+                hasher.combine(c.0); hasher.combine(c.1); hasher.combine(c.2); hasher.combine(c.3)
+            }
+        } else {
+            hasher.combine(0)
+        }
+        let key = hasher.finalize()
+
+        if let hit = thumbnailCache[portrait.id], hit.key == key {
+            return hit.image
+        }
+
+        guard let cutout = adjustedCutout(for: portrait) else { return nil }
+        let bgLayer = BackgroundLayer.resolve(preset: background, fallback: nil)
+        let transform = AlignTransform(
+            scale: CGFloat(portrait.scale),
+            offset: CGSize(width: portrait.offsetX, height: portrait.offsetY)
+        )
+        let size = CGSize(width: Self.thumbnailPixelSize, height: Self.thumbnailPixelSize)
+        guard let img = Compositor.render(
+            cutout: cutout,
+            background: bgLayer,
+            transform: transform,
+            outputSize: size,
+            shape: .square
+        ) else { return nil }
+        thumbnailCache[portrait.id] = (key, img)
+        return img
+    }
+
+    func invalidateThumbnail(for portrait: Portrait) {
+        thumbnailCache.removeValue(forKey: portrait.id)
     }
 }
