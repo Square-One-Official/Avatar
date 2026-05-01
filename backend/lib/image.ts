@@ -100,15 +100,28 @@ export async function padForOutpaint(
   // person's alpha is opaque (= "keep"). Slight blur feathers the
   // boundary so the inpaint model blends instead of leaving a hard
   // line at the silhouette edge.
-  const personAlpha = await sharp(resized)
+  //
+  // Pull the person's alpha out as raw bytes (1 byte/px, 0=transparent,
+  // 255=opaque). Inverting gives us a single-channel mask where the
+  // person is black and the background is white — exactly what FLUX
+  // Fill wants.
+  const alphaRaw = await sharp(resized)
     .extractChannel("alpha")
-    .toBuffer();
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  // Convert alpha (255 = person) into mask-keep (0 = person, 255 = bg).
-  const inverted = await sharp(personAlpha, {
-    raw: { width: drawW, height: drawH, channels: 1 },
+  const invertedBytes = Buffer.alloc(alphaRaw.data.length);
+  for (let i = 0; i < alphaRaw.data.length; i++) {
+    invertedBytes[i] = 255 - alphaRaw.data[i]!;
+  }
+
+  const personMaskPng = await sharp(invertedBytes, {
+    raw: {
+      width: alphaRaw.info.width,
+      height: alphaRaw.info.height,
+      channels: 1,
+    },
   })
-    .negate({ alpha: false })
     .png()
     .toBuffer();
 
@@ -120,7 +133,7 @@ export async function padForOutpaint(
       background: { r: 255, g: 255, b: 255 },
     },
   })
-    .composite([{ input: inverted, left, top }])
+    .composite([{ input: personMaskPng, left, top }])
     .blur(4)
     .png()
     .toBuffer();
