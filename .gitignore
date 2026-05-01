@@ -36,3 +36,4 @@ Carthage/Build
 # not part of our source tree.
 RobustVideoMatting/
 .vercel
+build_release.log
