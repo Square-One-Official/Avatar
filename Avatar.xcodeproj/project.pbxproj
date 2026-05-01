@@ -110,6 +110,12 @@
 		F75326EE95AD345F1B6AB7E3 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B1818524625F66274E218 /* GoogleSignInButton.swift */; };
 		FA2169F93286D9C1CFAA2E9E /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
+		AD4E6F8B2C5F739AE4DFBEC5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 8B2E4C6F0A3D5179E2BD9CA3 /* ZIPFoundation */; };
+		BE5F708C3D6A84ABF5EFCFD6 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 9C3F5D7A1B4E628EF3CEADB4 /* ZIPFoundation */; };
+		C1A7E8D5F4B3260E9182AC34 /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B8F9E6A5C4371FA293BD45 /* LibraryArchive.swift */; };
+		E3C9FAE7B6D5482FB3A4CE56 /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2B8F9E6A5C4371FA293BD45 /* LibraryArchive.swift */; };
+		F4DA0BF8C7E6593FC4B5DF67 /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EB1CA9D8F7604FD5C6E078 /* LibraryImportSheet.swift */; };
+		B6FB2DA9E8089A5FE6D7F189 /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EB1CA9D8F7604FD5C6E078 /* LibraryImportSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -165,6 +171,8 @@
 		F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDropZone.swift; sourceTree = "<group>"; };
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2B8F9E6A5C4371FA293BD45 /* LibraryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryArchive.swift; sourceTree = "<group>"; };
+		A5EB1CA9D8F7604FD5C6E078 /* LibraryImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryImportSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -174,6 +182,7 @@
 			files = (
 				BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */,
 				35BA180F51EA4E407C8CE194 /* Supabase in Frameworks */,
+				AD4E6F8B2C5F739AE4DFBEC5 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -182,6 +191,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7B0D63D306F803879F03E8D5 /* Supabase in Frameworks */,
+				BE5F708C3D6A84ABF5EFCFD6 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,6 +213,7 @@
 				8024D84C778A83045FEA287D /* ImageAdjustments.swift */,
 				A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */,
 				B313E53EBD6AC732524D4690 /* ImportFlow.swift */,
+				D2B8F9E6A5C4371FA293BD45 /* LibraryArchive.swift */,
 				349CA2BF8E0D0316D4C6EC9F /* Localization.swift */,
 				355D09CA2450C106801EAD77 /* ModelManager.swift */,
 				7194822E14F9864C38869D98 /* PortraitUndoManager.swift */,
@@ -278,6 +289,7 @@
 				E550B398D542F0234C2B9396 /* GoogleGMark.swift */,
 				C67B1818524625F66274E218 /* GoogleSignInButton.swift */,
 				F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */,
+				A5EB1CA9D8F7604FD5C6E078 /* LibraryImportSheet.swift */,
 				48EF633AE84A1D2EF9412998 /* LibraryView.swift */,
 				877D5A42F98746FCC7A61452 /* MainWindow.swift */,
 				84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */,
@@ -312,6 +324,7 @@
 			name = "Avatar-MAS";
 			packageProductDependencies = (
 				F2F205DF0F4E95E419512499 /* Supabase */,
+				9C3F5D7A1B4E628EF3CEADB4 /* ZIPFoundation */,
 			);
 			productName = "Avatar-MAS";
 			productReference = DD21EBC5B96234F7E98D39FF /* Avatar-MAS.app */;
@@ -333,6 +346,7 @@
 			packageProductDependencies = (
 				24422B485569134EE9164799 /* Sparkle */,
 				2908C8F495E33C31BC66686B /* Supabase */,
+				8B2E4C6F0A3D5179E2BD9CA3 /* ZIPFoundation */,
 			);
 			productName = Avatar;
 			productReference = FB7ECB473A580210DC4D2672 /* Avatar.app */;
@@ -367,6 +381,7 @@
 			packageReferences = (
 				C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				7A1F3B5E9C2D406F1AC8B921 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7BE0948B8680DB6BA122634A /* Products */;
@@ -439,6 +454,8 @@
 				552DB890E25DC4C7C13EB602 /* ImageProcessor.swift in Sources */,
 				C426F97DB055D12226E5CC8F /* ImportDropZone.swift in Sources */,
 				64648D9B5A8DECE691F6A435 /* ImportFlow.swift in Sources */,
+				E3C9FAE7B6D5482FB3A4CE56 /* LibraryArchive.swift in Sources */,
+				B6FB2DA9E8089A5FE6D7F189 /* LibraryImportSheet.swift in Sources */,
 				65A80B4FBB8130ACF0310601 /* LibraryView.swift in Sources */,
 				8BA79F365F5F7B49329FF371 /* Localization.swift in Sources */,
 				7D574F80D57D4493F636E0CB /* MainWindow.swift in Sources */,
@@ -487,6 +504,8 @@
 				170942BEC19C7093EBEA2F63 /* ImageProcessor.swift in Sources */,
 				B7EDC4EF58F5F0EDBAE8E873 /* ImportDropZone.swift in Sources */,
 				605465E10F824BC86E259CC6 /* ImportFlow.swift in Sources */,
+				C1A7E8D5F4B3260E9182AC34 /* LibraryArchive.swift in Sources */,
+				F4DA0BF8C7E6593FC4B5DF67 /* LibraryImportSheet.swift in Sources */,
 				A6AB056EC5348AFDA387F49E /* LibraryView.swift in Sources */,
 				D43723746F3532F825382CAB /* Localization.swift in Sources */,
 				58C7C65381A278B69B016DDB /* MainWindow.swift in Sources */,
@@ -768,6 +787,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		7A1F3B5E9C2D406F1AC8B921 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.18;
+			};
+		};
 		C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -788,6 +815,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		8B2E4C6F0A3D5179E2BD9CA3 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1F3B5E9C2D406F1AC8B921 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+		9C3F5D7A1B4E628EF3CEADB4 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A1F3B5E9C2D406F1AC8B921 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 		F2F205DF0F4E95E419512499 /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;

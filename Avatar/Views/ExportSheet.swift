@@ -3,8 +3,8 @@ import SwiftData
 import AppKit
 
 struct ExportSheet: View {
-    let portrait: Portrait
-    let background: BackgroundPreset?
+    let portraits: [Portrait]
+    let backgroundResolver: (Portrait) -> BackgroundPreset?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
@@ -17,10 +17,31 @@ struct ExportSheet: View {
     @State private var errorMessage: String?
     @State private var globalShape: ExportShape = .square
 
+    /// Convenience initialiser for the single-portrait flow used by EditorView.
+    init(portrait: Portrait, background: BackgroundPreset?) {
+        self.portraits = [portrait]
+        self.backgroundResolver = { _ in background }
+    }
+
+    init(portraits: [Portrait], backgroundResolver: @escaping (Portrait) -> BackgroundPreset?) {
+        self.portraits = portraits
+        self.backgroundResolver = backgroundResolver
+    }
+
+    private var titleText: String {
+        portraits.count > 1
+            ? "\(Loc.exportPortrait) (\(portraits.count))"
+            : Loc.exportPortrait
+    }
+
+    private var totalFileCount: Int {
+        selected.count * portraits.count
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(Loc.exportPortrait)
+                Text(titleText)
                     .font(.title3.weight(.semibold))
                 Spacer()
                 Picker(Loc.shape, selection: $globalShape) {
@@ -77,11 +98,11 @@ struct ExportSheet: View {
                     if isExporting {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text(Loc.exportCount(selected.count))
+                        Text(Loc.exportCount(totalFileCount))
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(selected.isEmpty || isExporting)
+                .disabled(selected.isEmpty || isExporting || portraits.isEmpty)
             }
             .padding()
         }
@@ -101,24 +122,41 @@ struct ExportSheet: View {
         panel.prompt = Loc.exportHere
         guard panel.runModal() == .OK, let dir = panel.url else { return }
 
-        guard let cutout = appState.adjustedCutout(for: portrait) else {
-            errorMessage = Loc.noImageToExport
-            return
-        }
-        let bgLayer = BackgroundLayer.resolve(
-            preset: background,
-            fallback: background.flatMap { appState.backgroundImage(for: $0) }
-        )
-        let transform = AlignTransform(
-            scale: CGFloat(portrait.scale),
-            offset: CGSize(width: portrait.offsetX, height: portrait.offsetY)
-        )
-        // Capture all main-actor / model state up-front so the background task is
-        // self-contained and Sendable.
-        let portraitName = portrait.name
         let jobs: [ExportJob] = presets
             .filter { selected.contains($0.id) }
             .map { ExportJob(name: $0.name, width: $0.width, height: $0.height, shape: $0.shape) }
+
+        // Capture all main-actor / model state up-front so the background task
+        // is self-contained and Sendable.
+        var portraitJobs: [PortraitExportData] = []
+        var prepFailed: [String] = []
+        for portrait in portraits {
+            let displayName = portrait.name.isEmpty ? Loc.portrait : portrait.name
+            guard let cutout = appState.adjustedCutout(for: portrait) else {
+                prepFailed.append(displayName)
+                continue
+            }
+            let bg = backgroundResolver(portrait)
+            let bgLayer = BackgroundLayer.resolve(
+                preset: bg,
+                fallback: bg.flatMap { appState.backgroundImage(for: $0) }
+            )
+            let transform = AlignTransform(
+                scale: CGFloat(portrait.scale),
+                offset: CGSize(width: portrait.offsetX, height: portrait.offsetY)
+            )
+            portraitJobs.append(PortraitExportData(
+                name: portrait.name,
+                cutout: cutout,
+                background: bgLayer,
+                transform: transform
+            ))
+        }
+
+        if portraitJobs.isEmpty {
+            errorMessage = Loc.noImageToExport
+            return
+        }
 
         isExporting = true
         errorMessage = nil
@@ -126,17 +164,15 @@ struct ExportSheet: View {
 
         Task.detached(priority: .userInitiated) {
             let result = ExportRunner.run(
+                portraits: portraitJobs,
                 jobs: jobs,
-                portraitName: portraitName,
-                cutout: cutout,
-                background: bgLayer,
-                transform: transform,
                 directory: dir
             )
             await MainActor.run {
                 isExporting = false
-                if !result.failed.isEmpty {
-                    errorMessage = Loc.exportFailed(result.failed.joined(separator: ", "))
+                let allFailures = prepFailed + result.failed
+                if !allFailures.isEmpty {
+                    errorMessage = Loc.exportFailed(allFailures.joined(separator: ", "))
                 }
                 doneMessage = Loc.filesSaved(result.written)
             }
@@ -152,38 +188,45 @@ private struct ExportJob: Sendable {
     let shape: ExportShape
 }
 
+/// Sendable bundle of everything needed to render one portrait off the main actor.
+private struct PortraitExportData: @unchecked Sendable {
+    let name: String
+    let cutout: CGImage
+    let background: BackgroundLayer
+    let transform: AlignTransform
+}
+
 private enum ExportRunner {
     struct Result { let written: Int; let failed: [String] }
 
     static func run(
+        portraits: [PortraitExportData],
         jobs: [ExportJob],
-        portraitName: String,
-        cutout: CGImage,
-        background: BackgroundLayer,
-        transform: AlignTransform,
         directory: URL
     ) -> Result {
         var written = 0
         var failed: [String] = []
-        for job in jobs {
-            let outSize = CGSize(width: job.width, height: job.height)
-            guard let img = Compositor.render(
-                cutout: cutout,
-                background: background,
-                transform: transform,
-                outputSize: outSize,
-                shape: job.shape
-            ) else {
-                failed.append(job.name); continue
-            }
-            let safe = sanitize(portraitName.isEmpty ? Loc.portrait : portraitName)
-            let safePreset = sanitize(job.name)
-            let url = directory.appendingPathComponent("\(safe)_\(safePreset).png")
-            do {
-                try ExportService.writePNG(img, to: url)
-                written += 1
-            } catch {
-                failed.append(job.name)
+        for portrait in portraits {
+            let safeName = sanitize(portrait.name.isEmpty ? Loc.portrait : portrait.name)
+            for job in jobs {
+                let outSize = CGSize(width: job.width, height: job.height)
+                guard let img = Compositor.render(
+                    cutout: portrait.cutout,
+                    background: portrait.background,
+                    transform: portrait.transform,
+                    outputSize: outSize,
+                    shape: job.shape
+                ) else {
+                    failed.append("\(portrait.name)/\(job.name)"); continue
+                }
+                let safePreset = sanitize(job.name)
+                let url = directory.appendingPathComponent("\(safeName)_\(safePreset).png")
+                do {
+                    try ExportService.writePNG(img, to: url)
+                    written += 1
+                } catch {
+                    failed.append("\(portrait.name)/\(job.name)")
+                }
             }
         }
         return Result(written: written, failed: failed)

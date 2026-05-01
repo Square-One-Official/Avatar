@@ -5,6 +5,7 @@ struct MainWindow: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var context
     @Query(sort: \Portrait.updatedAt, order: .reverse) private var portraits: [Portrait]
+    @Query private var backgrounds: [BackgroundPreset]
 
     /// First-launch flag. Controls whether `WelcomeSignInSheet` should be
     /// presented over the main window. The sheet itself flips this true on
@@ -23,8 +24,12 @@ struct MainWindow: View {
                 .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 360)
         } detail: {
             ZStack(alignment: .bottom) {
-                if let id = state.selectedPortraitID,
-                   let portrait = portraits.first(where: { $0.id == id }) {
+                if state.selectedPortraitIDs.count > 1 {
+                    MultiSelectionView(
+                        portraits: portraits.filter { state.selectedPortraitIDs.contains($0.id) }
+                    )
+                } else if let id = state.selectedPortraitID,
+                          let portrait = portraits.first(where: { $0.id == id }) {
                     EditorView(portrait: portrait)
                 } else {
                     ImportDropZone()
@@ -52,7 +57,25 @@ struct MainWindow: View {
                     }
                     .help(Loc.importPhotoHelp)
                 }
+                if state.selectedPortraitIDs.count > 1 {
+                    Button {
+                        state.libraryExportPortraitIDs = state.selectedPortraitIDs
+                    } label: {
+                        Label(Loc.export, systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .help("\(Loc.export) \(state.selectedPortraitIDs.count) \(Loc.portraitsPlural)")
+                }
             }
+        }
+        .sheet(isPresented: Binding(
+            get: { !state.libraryExportPortraitIDs.isEmpty },
+            set: { if !$0 { state.libraryExportPortraitIDs = [] } }
+        )) {
+            ExportSheet(
+                portraits: portraits.filter { state.libraryExportPortraitIDs.contains($0.id) },
+                backgroundResolver: { background(for: $0) }
+            )
         }
         .sheet(isPresented: $state.showProUpgradeSheet) {
             ProUpgradeSheet()
@@ -99,6 +122,14 @@ struct MainWindow: View {
         }
     }
 
+    private func background(for portrait: Portrait) -> BackgroundPreset? {
+        if let id = portrait.backgroundPresetID,
+           let bg = backgrounds.first(where: { $0.id == id }) {
+            return bg
+        }
+        return backgrounds.first(where: { $0.isDefault }) ?? backgrounds.first
+    }
+
     private func pickFile() {
         #if os(macOS)
         let panel = NSOpenPanel()
@@ -112,5 +143,74 @@ struct MainWindow: View {
             ImportFlow.importFile(url: url, context: context, appState: appState)
         }
         #endif
+    }
+}
+
+/// Detail-pane surface shown when the sidebar has more than one row selected.
+/// Replaces the import drop zone with a thumbnail grid of the chosen portraits
+/// so the selection is always reflected in the main view, not just the sidebar.
+struct MultiSelectionView: View {
+    let portraits: [Portrait]
+    @Environment(AppState.self) private var appState
+    @Query private var backgrounds: [BackgroundPreset]
+
+    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 16)]
+
+    /// Order the grid by the sidebar order (most-recently-updated first).
+    private var sortedPortraits: [Portrait] {
+        portraits.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(Loc.portraitsSelected(portraits.count))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(sortedPortraits) { portrait in
+                        Cell(portrait: portrait, background: background(for: portrait))
+                            .onTapGesture {
+                                appState.selectedPortraitIDs = [portrait.id]
+                            }
+                    }
+                }
+            }
+            .padding(24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.appCanvas)
+    }
+
+    private func background(for portrait: Portrait) -> BackgroundPreset? {
+        if let id = portrait.backgroundPresetID,
+           let bg = backgrounds.first(where: { $0.id == id }) {
+            return bg
+        }
+        return backgrounds.first(where: { $0.isDefault }) ?? backgrounds.first
+    }
+
+    private struct Cell: View {
+        let portrait: Portrait
+        let background: BackgroundPreset?
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                CanvasPreview(portrait: portrait, background: background)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                    )
+                Text(portrait.name.isEmpty ? Loc.unnamed : portrait.name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 2)
+            }
+        }
     }
 }

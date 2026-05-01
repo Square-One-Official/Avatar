@@ -34,6 +34,12 @@ enum Loc {
     }
     static var delete: String          { en ? "Delete" : "Verwijder" }
     static var portraitsPlural: String { en ? "Portraits" : "portretten" }
+    static func portraitsSelected(_ count: Int) -> String {
+        if count == 1 {
+            return en ? "1 portrait selected" : "1 portret geselecteerd"
+        }
+        return en ? "\(count) portraits selected" : "\(count) portretten geselecteerd"
+    }
     static var ok: String              { "OK" }
     static var name: String            { en ? "Name" : "Naam" }
     static var add: String             { en ? "Add" : "Toevoegen" }
@@ -139,6 +145,120 @@ enum Loc {
     static var labsFillBodyDesc: String {
         en ? "Show the \u{201C}More\u{201D} dropdown in the editor with the Fill in Body action. Off by default while we tune quality."
            : "Toon het \u{201C}Meer\u{201D}-menu in de editor met Vul lichaam aan. Standaard uit terwijl we de kwaliteit afstellen."
+    }
+
+    // MARK: Settings – Library back-up (export / import)
+    static var librarySectionTitle: String {
+        en ? "Library back-up" : "Bibliotheek back-up"
+    }
+    static var librarySectionDesc: String {
+        en ? "Export every portrait \u{2014} including its background, name, role and edits \u{2014} as a single file. Someone else can import that file to load the same library."
+           : "Exporteer al je portretten \u{2014} inclusief achtergrond, naam, rol en bewerkingen \u{2014} als één bestand. Iemand anders kan dat bestand importeren om dezelfde bibliotheek te laden."
+    }
+    static var libraryExportButton: String {
+        en ? "Export library\u{2026}" : "Bibliotheek exporteren\u{2026}"
+    }
+    static var libraryImportButton: String {
+        en ? "Import library\u{2026}" : "Bibliotheek importeren\u{2026}"
+    }
+    static var libraryExportEmpty: String {
+        en ? "Nothing to export \u{2014} your library is empty."
+           : "Niets om te exporteren \u{2014} je bibliotheek is leeg."
+    }
+    static func libraryExportSuccess(_ count: Int) -> String {
+        if count == 1 {
+            return en ? "Exported 1 portrait." : "1 portret geëxporteerd."
+        }
+        return en ? "Exported \(count) portraits." : "\(count) portretten geëxporteerd."
+    }
+    static func libraryExportFailed(_ message: String) -> String {
+        en ? "Export failed: \(message)" : "Exporteren mislukt: \(message)"
+    }
+    static var libraryExportFailedGeneric: String {
+        en ? "Couldn't write the back-up file." : "Kon het back-upbestand niet schrijven."
+    }
+    static var libraryImportNotAnArchive: String {
+        en ? "That file isn't a readable Avatar back-up."
+           : "Dit bestand is geen leesbare Avatar back-up."
+    }
+    static var libraryImportMissingManifest: String {
+        en ? "This zip doesn't contain an Avatar library."
+           : "Deze zip bevat geen Avatar-bibliotheek."
+    }
+    static func libraryImportSchemaTooNew(_ version: Int) -> String {
+        en ? "This back-up was made with a newer version of Avatar (schema v\(version)). Update the app to import it."
+           : "Deze back-up is gemaakt met een nieuwere versie van Avatar (schema v\(version)). Werk de app bij om hem te importeren."
+    }
+    static func libraryImportFailed(_ message: String) -> String {
+        en ? "Import failed: \(message)" : "Importeren mislukt: \(message)"
+    }
+
+    // Conflict-resolution sheet
+    static var libraryImportSheetTitle: String {
+        en ? "Import library" : "Bibliotheek importeren"
+    }
+    static func libraryImportSheetSummary(new: Int, conflicts: Int) -> String {
+        let newPart = (new == 1)
+            ? (en ? "1 new portrait" : "1 nieuw portret")
+            : (en ? "\(new) new portraits" : "\(new) nieuwe portretten")
+        let conflictPart = (conflicts == 1)
+            ? (en ? "1 portrait already exists with the same ID"
+                  : "1 portret bestaat al met hetzelfde ID")
+            : (en ? "\(conflicts) portraits already exist with the same ID"
+                  : "\(conflicts) portretten bestaan al met hetzelfde ID")
+        if conflicts == 0 {
+            return en ? "Found \(newPart) to add."
+                      : "\(newPart) klaar om toe te voegen."
+        }
+        return en ? "Found \(newPart). \(conflictPart)."
+                  : "\(newPart). \(conflictPart)."
+    }
+    static var libraryImportSheetQuestion: String {
+        en ? "How should existing portraits be handled?"
+           : "Hoe moeten bestaande portretten worden behandeld?"
+    }
+    static var libraryImportOptionAlwaysNewTitle: String {
+        en ? "Add as new" : "Toevoegen als nieuw"
+    }
+    static var libraryImportOptionAlwaysNewDesc: String {
+        en ? "Imported portraits get a fresh ID, so duplicates may appear next to existing ones. Safe default when importing someone else's library."
+           : "Geïmporteerde portretten krijgen een nieuwe ID, dus duplicaten kunnen naast bestaande verschijnen. Veilige standaard bij het importeren van iemand anders' bibliotheek."
+    }
+    static var libraryImportOptionOverwriteTitle: String {
+        en ? "Overwrite existing" : "Bestaande overschrijven"
+    }
+    static var libraryImportOptionOverwriteDesc: String {
+        en ? "Replace existing portraits that share an ID with the imported version. Use to restore your own back-up."
+           : "Vervang bestaande portretten met hetzelfde ID door de geïmporteerde versie. Gebruik dit om je eigen back-up terug te zetten."
+    }
+    static var libraryImportOptionSkipTitle: String {
+        en ? "Skip existing" : "Bestaande overslaan"
+    }
+    static var libraryImportOptionSkipDesc: String {
+        en ? "Keep existing portraits as they are. Only portraits with a new ID are added."
+           : "Behoud bestaande portretten zoals ze zijn. Alleen portretten met een nieuwe ID worden toegevoegd."
+    }
+    static var libraryImportConfirm: String {
+        en ? "Import" : "Importeren"
+    }
+    static func libraryImportSummary(added: Int, overwritten: Int, skipped: Int) -> String {
+        var parts: [String] = []
+        if added > 0 {
+            parts.append(en ? "\(added) added" : "\(added) toegevoegd")
+        }
+        if overwritten > 0 {
+            parts.append(en ? "\(overwritten) overwritten" : "\(overwritten) overschreven")
+        }
+        if skipped > 0 {
+            parts.append(en ? "\(skipped) skipped" : "\(skipped) overgeslagen")
+        }
+        if parts.isEmpty {
+            return en ? "Nothing imported." : "Niets geïmporteerd."
+        }
+        return (en ? "Imported: " : "Geïmporteerd: ") + parts.joined(separator: ", ") + "."
+    }
+    static var libraryExportFilenamePrefix: String {
+        en ? "Avatar library" : "Avatar-bibliotheek"
     }
 
     static var proUpgradeSignInFirst: String {

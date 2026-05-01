@@ -71,6 +71,16 @@ enum ProcessingKind {
 @Observable
 final class AppState {
     var selectedPortraitID: UUID?
+    /// Full multi-selection set from the sidebar. `selectedPortraitID` mirrors
+    /// this when exactly one row is selected; this set is the source of truth
+    /// when the user marquee-selects more than one. Routed through AppState
+    /// so the detail pane can render a grid instead of the drop zone.
+    var selectedPortraitIDs: Set<UUID> = []
+    /// Drives the library-side ExportSheet. Non-empty = sheet open and the IDs
+    /// inside are the portraits to export. Routed through AppState so both the
+    /// sidebar context-menu and the top-right toolbar Export button can trigger
+    /// the same sheet without each owning duplicate state.
+    var libraryExportPortraitIDs: Set<UUID> = []
     var isImporting = false
     var isProcessing = false {
         didSet {
