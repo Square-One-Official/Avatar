@@ -11,11 +11,14 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: "2.0.0"
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: "0.9.20"
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    MARKETING_VERSION: "0.9.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "2"
     DEVELOPMENT_TEAM: "5J92MMGKTX"
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
@@ -48,6 +51,7 @@ targets:
     dependencies:
       - package: Sparkle
       - package: Supabase
+      - package: ZIPFoundation
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
@@ -98,6 +102,7 @@ targets:
           - "Avatar-MAS.entitlements"
     dependencies:
       - package: Supabase
+      - package: ZIPFoundation
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
