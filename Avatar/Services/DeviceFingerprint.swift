@@ -1,66 +1,36 @@
 import Foundation
-import Security
 
 /// Stable per-Mac identifier for the free-tier anti-cheat layer. Generated
-/// once on first launch and parked in the macOS Keychain; survives a full
-/// app uninstall + reinstall, but does NOT survive a Mac wipe or a move
-/// to a different Mac. We deliberately do NOT touch hardware identifiers
-/// (`IOPlatformExpertDevice` UUID, MAC address, serial number) so the app
-/// remains friendly to org-managed Macs where IT departments push back on
-/// any system-level snooping. A user-private Keychain item is the same
-/// kind of storage the system already grants every sandboxed app.
+/// once on first access and parked in `UserDefaults` (the standard `.plist`
+/// in `~/Library/Containers/.../Preferences` for sandboxed builds, or
+/// `~/Library/Preferences/nl.avatar.app.plist` outside the sandbox).
 ///
-/// The fingerprint is sent to the backend via the `X-Device-Fingerprint`
-/// header on every authenticated request and on the auth-optional
-/// `/v1/import-claim` endpoint, where it gates a per-device counter that
-/// blocks the "create a fresh Google account to reset the trial" cheat.
+/// Survives a full app uninstall + reinstall on the same Mac (the prefs file
+/// lives outside the app bundle), but does not leak to the backend before
+/// the user signs in — the value is only read when `BackendClient` builds a
+/// request, and is sent in the `X-Device-Fingerprint` header gating the
+/// per-device counter on `/v1/import-claim`.
+///
+/// We deliberately do NOT touch hardware identifiers (`IOPlatformExpertDevice`
+/// UUID, MAC address, serial number) so the app remains friendly to
+/// org-managed Macs where IT pushes back on system-level snooping. We also
+/// don't use the Keychain: the ACL on a Keychain item is bound to the binary
+/// signature, which means every certificate change (Apple Development →
+/// Developer ID, dev → MAS) triggers a "type your login password" prompt
+/// for an orphaned item from a previous install. The threat model here is
+/// "create a fresh Google account on the same Mac to reset the trial",
+/// which a plain UserDefaults UUID defeats just as effectively.
 enum DeviceFingerprint {
-    private static let service = "nl.aaavatar.Avatar.DeviceFingerprint"
-    private static let account = "device_id"
+    private static let key = "nl.aaavatar.Avatar.DeviceFingerprint.id"
 
-    /// Returns the stored UUID, generating one on first access. Idempotent
-    /// and thread-safe (Keychain ops are serialized by the system).
+    /// Returns the stored UUID, generating one on first access. Idempotent.
     static var current: String {
-        if let existing = read() { return existing }
-        let new = UUID().uuidString
-        store(new)
-        // Re-read so two racing first-launch threads converge on the same
-        // value (the loser's `store` is a no-op due to the duplicate check).
-        return read() ?? new
-    }
-
-    private static func read() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess,
-              let data = item as? Data,
-              let id = String(data: data, encoding: .utf8) else {
-            return nil
+        let defaults = UserDefaults.standard
+        if let existing = defaults.string(forKey: key), !existing.isEmpty {
+            return existing
         }
-        return id
-    }
-
-    private static func store(_ id: String) {
-        guard let data = id.data(using: .utf8) else { return }
-        // AfterFirstUnlockThisDeviceOnly: usable as soon as the user has
-        // logged in once after boot, never restored to a different Mac
-        // via Time Machine / migration assistant — exactly the lifetime
-        // we want for a per-device counter.
-        let attrs: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-        ]
-        SecItemDelete(attrs as CFDictionary)
-        SecItemAdd(attrs as CFDictionary, nil)
+        let new = UUID().uuidString
+        defaults.set(new, forKey: key)
+        return new
     }
 }

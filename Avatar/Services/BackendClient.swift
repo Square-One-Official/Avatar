@@ -60,7 +60,7 @@ final class BackendClient {
     /// Atomic anti-cheat gate. Must be called before every import (Subject
     /// Lift OR Magic Cutout) by free-tier users. The server checks the
     /// per-account counter (`users.free_imports_used`) and the per-device
-    /// counter keyed on the Keychain `DeviceFingerprint` — if either is at
+    /// counter keyed on the local `DeviceFingerprint` — if either is at
     /// the cap the call returns 402 and the caller surfaces the paywall.
     /// Pro users get a short-circuit `allowed: true` without consuming any
     /// counter. Works without a signed-in session (anonymous mode hits
