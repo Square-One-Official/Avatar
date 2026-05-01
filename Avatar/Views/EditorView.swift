@@ -80,7 +80,6 @@ struct EditorView: View {
     @State private var isMoreOpen = false
     @State private var isMoreHovering = false
     @State private var isFillBodyHovering = false
-    @State private var moreTriggerHeight: CGFloat = 0
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
     #endif
@@ -195,6 +194,34 @@ struct EditorView: View {
             .animation(.easeOut(duration: 0.15), value: isDropping)
             .animation(.easeOut(duration: 0.15), value: appState.isProcessing)
             .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
+            // Floating "More" dropdown rendered at root so its dismiss-catcher
+            // can cover the entire window. The catcher (Color.clear behind the
+            // panel) closes the menu on any outside click; clicks on the
+            // dropdown's button reach the button because it sits in front of
+            // the catcher in the ZStack.
+            .overlayPreferenceValue(MoreTriggerAnchorKey.self) { anchor in
+                GeometryReader { proxy in
+                    if isMoreOpen, let anchor {
+                        let rect = proxy[anchor]
+                        ZStack(alignment: .topLeading) {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
+                                }
+                            fillBodyDropdown
+                                .frame(width: rect.width)
+                                .offset(x: rect.minX, y: rect.maxY + 8)
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .opacity.combined(with: .offset(y: -6)),
+                                        removal: .opacity
+                                    )
+                                )
+                        }
+                    }
+                }
+            }
     }
 
     // MARK: - Canvas
@@ -579,35 +606,14 @@ struct EditorView: View {
         }
     }
 
-    /// "More" trigger with a floating dropdown overlaid 8pt below it.
-    /// We capture the trigger's height via a PreferenceKey, then place the
-    /// dropdown using `.overlay(alignment: .topLeading)` + `offset(y: height + 8)`.
-    /// Overlay (not VStack) keeps the dropdown out of the layout flow so
-    /// nothing below shifts when it opens — true menu behaviour, not accordion.
-    /// `zIndex(1)` ensures the dropdown renders over any sibling section that
-    /// follows in the inspector column.
+    /// "More" trigger only — the dropdown itself is rendered at the body
+    /// level via `overlayPreferenceValue` (see `body`). Local overlay is
+    /// avoided so we can place a transparent dismiss-catcher *behind* the
+    /// dropdown that closes the menu on any outside click without blocking
+    /// clicks on the menu items themselves.
     @ViewBuilder private var moreMagicEditsSection: some View {
         moreMagicEditsTrigger
-            .background(
-                GeometryReader { g in
-                    Color.clear.preference(key: MoreTriggerHeightKey.self, value: g.size.height)
-                }
-            )
-            .onPreferenceChange(MoreTriggerHeightKey.self) { moreTriggerHeight = $0 }
-            .overlay(alignment: .topLeading) {
-                if isMoreOpen {
-                    fillBodyDropdown
-                        .frame(maxWidth: .infinity)
-                        .offset(y: moreTriggerHeight + 8)
-                        .transition(
-                            .asymmetric(
-                                insertion: .opacity.combined(with: .offset(y: -6)),
-                                removal: .opacity
-                            )
-                        )
-                }
-            }
-            .zIndex(1)
+            .anchorPreference(key: MoreTriggerAnchorKey.self, value: .bounds) { $0 }
     }
 
     /// Default state: text-only "✨ More". Hover/open state: same content in
@@ -978,10 +984,10 @@ struct EditorView: View {
     }
 }
 
-private struct MoreTriggerHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+private struct MoreTriggerAnchorKey: PreferenceKey {
+    static let defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
     }
 }
 
