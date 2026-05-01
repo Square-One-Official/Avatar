@@ -17,7 +17,12 @@ enum UpdateState: Equatable {
 @Observable
 final class UpdateManager: NSObject {
     private(set) var state: UpdateState = .idle
-    private(set) var canCheckForUpdates = false
+    /// Mirrors `SPUUpdater.canCheckForUpdates`. Defaults to `true` so the
+    /// "Check Now" button is enabled at first paint, before Sparkle's KVO
+    /// has had a chance to publish. Sparkle flips this to `false` for the
+    /// duration of an active check and back to `true` when it ends — that
+    /// is the only time the button should be disabled.
+    private(set) var canCheckForUpdates = true
 
     private var updater: SPUUpdater!
     private var userDriver: InAppUserDriver!
@@ -45,12 +50,24 @@ final class UpdateManager: NSObject {
         )
         do {
             try updater.start()
+            // Capture the post-start value synchronously. Don't trust the
+            // publisher to deliver an initial value — Sparkle's KVO has been
+            // observed to skip the initial publish, leaving the button stuck
+            // disabled if `canCheckForUpdates` defaulted to false.
+            canCheckForUpdates = updater.canCheckForUpdates
         } catch {
+            // start() failure shouldn't disable the manual check button —
+            // Sparkle may still recover, and `checkForUpdates()` is safe to
+            // call regardless. Surface the error in `state`.
             state = .error(error.localizedDescription)
         }
 
+        // DispatchQueue.main delivers in all run-loop modes. RunLoop.main
+        // only delivers in default mode and silently queues during control
+        // tracking (segmented pickers, sheets), which can leave the mirror
+        // stale until the user clicks elsewhere.
         updater.publisher(for: \.canCheckForUpdates)
-            .receive(on: RunLoop.main)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] value in
                 self?.canCheckForUpdates = value
             }
