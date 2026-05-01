@@ -559,6 +559,11 @@ enum ImportFlow {
                     switch err {
                     case .noCredits:
                         appState.showProUpgradeSheet = true
+                    case .server, .decode:
+                        // Don't leak raw backend error codes to the user
+                        // ("fill_body_failed" landed in a toast verbatim).
+                        // The localized Loc.fillBodyFailed reads cleanly.
+                        appState.warn(Loc.fillBodyFailed)
                     default:
                         if !appState.report(err) {
                             appState.warn(Loc.fillBodyFailed)

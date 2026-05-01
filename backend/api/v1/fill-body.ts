@@ -147,6 +147,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);
+    // Replicate rate-limits (low balance, burst exceeded, etc.) bubble up
+    // as 429s. Propagate them so the client's existing rateLimited handler
+    // surfaces "Too many requests. Please wait a moment." instead of the
+    // catch-all 500 — much friendlier than "fill_body_failed" in a toast.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("status 429") ||
+      msg.includes("Too Many Requests") ||
+      msg.toLowerCase().includes("throttled")
+    ) {
+      res.status(429).json({ error: "rate_limited" });
+      return;
+    }
     res.status(500).json({ error: "fill_body_failed" });
   }
 }
