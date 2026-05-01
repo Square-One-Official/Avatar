@@ -60,10 +60,16 @@ export async function outpaintPortrait(input: {
   imageDataUrl: string;
   maskDataUrl: string;
 }): Promise<string> {
+  // Negative phrasing matters: without "no objects/props/hands/etc"
+  // the model will happily invent context to fill the margin (an
+  // earlier version produced a microphone-stick on one side). Repeat
+  // the empty-background directive — FLUX responds to emphasis.
   const prompt =
-    "Complete the portrait of one person, head and upper chest, " +
-    "neutral grey studio background. Keep the face, hair, skin, and " +
-    "clothing untouched. Photographic, natural lighting, single subject.";
+    "A studio portrait of one person, head and upper chest only, " +
+    "centered. Plain empty neutral grey background, completely empty, " +
+    "no objects, no props, no microphone, no instruments, no hands raised, " +
+    "no accessories, no other people, no text. Keep the face, hair, skin, " +
+    "and clothing untouched. Photographic, soft natural lighting, single subject.";
 
   const output = (await replicate.run("black-forest-labs/flux-fill-pro", {
     input: {

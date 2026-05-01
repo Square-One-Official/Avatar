@@ -35,11 +35,14 @@ export async function flattenOnGrey(cutoutPng: Buffer): Promise<Buffer> {
  *   - Resize so the bbox occupies ~60% of the target canvas height,
  *     centered horizontally, biased toward the upper third vertically
  *     (head-and-upper-chest framing leaves room *below* the torso).
- *   - Output canvas: 1024x1024 — large enough for FLUX inpaint to
- *     produce convincing skin/cloth detail, small enough to keep
- *     wall-clock under ~10s and stay well below Replicate's 1MP cap.
+ *   - Output canvas: 768x1024 (3:4 portrait). Square canvases gave the
+ *     model so much horizontal margin to fill that it hallucinated
+ *     props (a microphone-stick in one early test). Portrait shape
+ *     constrains the side margins to ~10–15% each, leaving the model
+ *     no room to invent a scene.
  */
-const OUTPAINT_CANVAS = 1024;
+const CANVAS_W = 768;
+const CANVAS_H = 1024;
 const GREY = { r: 200, g: 200, b: 200 };
 
 export async function padForOutpaint(
@@ -61,11 +64,13 @@ export async function padForOutpaint(
   const bboxW = trimmed.info.width;
   const bboxH = trimmed.info.height;
 
-  // Scale the trimmed cutout so its longer edge fits inside ~60% of
-  // the canvas — leaves a comfortable margin on every side for the
-  // model to extend into.
-  const targetMax = Math.round(OUTPAINT_CANVAS * 0.6);
-  const scale = Math.min(targetMax / bboxW, targetMax / bboxH, 1);
+  // Scale the trimmed cutout so the person fills ~70% of the canvas
+  // height while staying within ~85% of the canvas width. Tall canvas
+  // + tall person = the only fillable area is below-chest, which is
+  // exactly what we want extended.
+  const heightTarget = CANVAS_H * 0.7;
+  const widthCap = CANVAS_W * 0.85;
+  const scale = Math.min(heightTarget / bboxH, widthCap / bboxW, 1);
   const drawW = Math.max(1, Math.round(bboxW * scale));
   const drawH = Math.max(1, Math.round(bboxH * scale));
 
@@ -74,19 +79,19 @@ export async function padForOutpaint(
     .png()
     .toBuffer();
 
-  // Place the person centered horizontally, slightly above center
-  // vertically (so the model adds chest/shoulders below, not weird
-  // hair extensions above).
-  const left = Math.round((OUTPAINT_CANVAS - drawW) / 2);
-  const top = Math.round(OUTPAINT_CANVAS * 0.18);
+  // Place the person centered horizontally, with the head near the
+  // top (small ~6% top margin) so the model fills downward into the
+  // chest/torso region rather than upward into hair extensions.
+  const left = Math.round((CANVAS_W - drawW) / 2);
+  const top = Math.round(CANVAS_H * 0.06);
 
   // Padded RGB: grey canvas with the cutout composited on top.
   // `flatten` after composite drops the alpha so the inpaint model
   // sees a normal RGB photo (most expect 3-channel input).
   const padded = await sharp({
     create: {
-      width: OUTPAINT_CANVAS,
-      height: OUTPAINT_CANVAS,
+      width: CANVAS_W,
+      height: CANVAS_H,
       channels: 4,
       background: { ...GREY, alpha: 1 },
     },
@@ -127,8 +132,8 @@ export async function padForOutpaint(
 
   const mask = await sharp({
     create: {
-      width: OUTPAINT_CANVAS,
-      height: OUTPAINT_CANVAS,
+      width: CANVAS_W,
+      height: CANVAS_H,
       channels: 3,
       background: { r: 255, g: 255, b: 255 },
     },

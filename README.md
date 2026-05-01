@@ -122,11 +122,15 @@ Voor App Store-upload heb je een Apple ID + app-specific password nodig die als 
 
 ### DMG-release publiceren
 
+Eenmalig: `brew install create-dmg` (nodig voor de gestileerde installer-window met app-icoon, Applications-shortcut en drag-and-drop pijl).
+
 ```bash
 ./scripts/release.sh 1.1 2   # MARKETING_VERSION=1.1, build=2
 ```
 
-Dit script archiveert de `Avatar`-target, notariseert via Apple, staplet, ondertekent met Sparkle EdDSA, update `appcast.xml`, en publiceert naar GitHub Releases.
+Dit script archiveert de `Avatar`-target, bouwt een gestileerde DMG, notariseert via Apple, staplet, ondertekent met Sparkle EdDSA, update `appcast.xml`, en publiceert naar GitHub Releases.
+
+De achtergrond van het DMG-venster wordt gegenereerd door `scripts/dmg-assets/build-background.py` (Pillow). Pas de constanten boven in dat script aan om de boog, kleuren of caption te tweaken; commit daarna de gegenereerde `background.tiff`.
 
 ### Mac App Store-build uploaden
 

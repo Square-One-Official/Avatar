@@ -9,6 +9,7 @@
 # Requirements:
 #   - Xcode command-line tools
 #   - xcodegen (brew install xcodegen)
+#   - create-dmg (brew install create-dmg)
 #   - gh CLI (brew install gh), authenticated
 #   - Sparkle's sign_update tool (see step 0)
 #   - Apple Developer ID certificate in Keychain
@@ -78,12 +79,31 @@ xcodebuild \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist "$EXPORT_OPTIONS"
 
-# 5. Build DMG
+# 5. Build DMG (styled — background, positioned icons, Applications shortcut)
 echo "→ Building DMG..."
-hdiutil create -volname "Aaavatar" \
-  -srcfolder "$EXPORT_DIR/Avatar.app" \
-  -ov -format UDZO \
-  "$DMG_PATH"
+if ! command -v create-dmg >/dev/null 2>&1; then
+  echo "❌ create-dmg not found. Install with: brew install create-dmg"
+  exit 1
+fi
+
+DMG_BACKGROUND="$PROJECT_DIR/scripts/dmg-assets/background.tiff"
+if [[ ! -f "$DMG_BACKGROUND" ]]; then
+  echo "→ Rendering DMG background..."
+  python3 "$PROJECT_DIR/scripts/dmg-assets/build-background.py"
+fi
+
+rm -f "$DMG_PATH"
+create-dmg \
+  --volname "Aaavatar" \
+  --background "$DMG_BACKGROUND" \
+  --window-size 660 420 \
+  --icon-size 128 \
+  --icon "Avatar.app" 165 215 \
+  --app-drop-link 495 215 \
+  --hide-extension "Avatar.app" \
+  --no-internet-enable \
+  "$DMG_PATH" \
+  "$EXPORT_DIR/Avatar.app"
 
 # 6. Notarize (DMG)
 echo "→ Notarizing..."
