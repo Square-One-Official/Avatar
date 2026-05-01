@@ -11,7 +11,6 @@ struct LibraryView: View {
     @Query private var backgrounds: [BackgroundPreset]
     @Binding var selection: UUID?
     @State private var search = ""
-    @State private var multiSelection: Set<UUID> = []
 
     private var filtered: [Portrait] {
         guard !search.isEmpty else { return portraits }
@@ -22,6 +21,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
+        @Bindable var state = appState
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -43,7 +43,7 @@ struct LibraryView: View {
                 )
                 .frame(maxHeight: .infinity)
             } else {
-                List(selection: $multiSelection) {
+                List(selection: $state.selectedPortraitIDs) {
                     ForEach(filtered) { p in
                         PortraitRow(portrait: p, background: background(for: p))
                             .tag(p.id)
@@ -51,6 +51,12 @@ struct LibraryView: View {
                             .listRowBackground(Color.clear)
                             .contextMenu {
                                 let targets = contextTargets(for: p)
+                                Button(targets.count > 1
+                                       ? "\(Loc.export) \(targets.count) \(Loc.portraitsPlural)"
+                                       : Loc.export) {
+                                    export(targets)
+                                }
+                                Divider()
                                 Button(targets.count > 1
                                        ? "\(Loc.delete) \(targets.count) \(Loc.portraitsPlural)"
                                        : Loc.delete,
@@ -64,7 +70,7 @@ struct LibraryView: View {
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
                 .onDeleteCommand {
-                    delete(filtered.filter { multiSelection.contains($0.id) })
+                    delete(filtered.filter { appState.selectedPortraitIDs.contains($0.id) })
                 }
             }
 
@@ -81,16 +87,18 @@ struct LibraryView: View {
         .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
         .background(Color.appCanvas)
         .onAppear {
-            multiSelection = selection.map { [$0] } ?? []
+            if appState.selectedPortraitIDs.isEmpty, let id = selection {
+                appState.selectedPortraitIDs = [id]
+            }
         }
-        .onChange(of: multiSelection) { _, newValue in
+        .onChange(of: appState.selectedPortraitIDs) { _, newValue in
             let single: UUID? = newValue.count == 1 ? newValue.first : nil
             if selection != single { selection = single }
         }
         .onChange(of: selection) { _, newValue in
             let desired: Set<UUID> = newValue.map { [$0] } ?? []
-            if multiSelection.count <= 1 && multiSelection != desired {
-                multiSelection = desired
+            if appState.selectedPortraitIDs.count <= 1 && appState.selectedPortraitIDs != desired {
+                appState.selectedPortraitIDs = desired
             }
         }
         #if !APP_STORE
@@ -99,17 +107,23 @@ struct LibraryView: View {
     }
 
     private func contextTargets(for portrait: Portrait) -> [Portrait] {
-        if multiSelection.contains(portrait.id) && multiSelection.count > 1 {
-            return filtered.filter { multiSelection.contains($0.id) }
+        let selected = appState.selectedPortraitIDs
+        if selected.contains(portrait.id) && selected.count > 1 {
+            return filtered.filter { selected.contains($0.id) }
         }
         return [portrait]
+    }
+
+    private func export(_ portraits: [Portrait]) {
+        guard !portraits.isEmpty else { return }
+        appState.libraryExportPortraitIDs = Set(portraits.map(\.id))
     }
 
     private func delete(_ portraits: [Portrait]) {
         guard !portraits.isEmpty else { return }
         let ids = Set(portraits.map(\.id))
         for p in portraits { context.delete(p) }
-        multiSelection.subtract(ids)
+        appState.selectedPortraitIDs.subtract(ids)
         if let sel = selection, ids.contains(sel) { selection = nil }
     }
 

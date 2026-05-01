@@ -79,6 +79,7 @@ struct EditorView: View {
     // not push siblings down).
     @State private var isMoreOpen = false
     @State private var isMoreHovering = false
+    @State private var isFillBodyHovering = false
     @State private var moreTriggerHeight: CGFloat = 0
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
@@ -647,7 +648,35 @@ struct EditorView: View {
         .help(Loc.moreMagicEditsHelp)
     }
 
+    /// Floating menu panel. Distinct dark surface (separate from the inspector
+    /// background) so items read clearly; subtle border + shadow give it lift.
+    /// Item rows are flat (no per-row card chrome) — the panel is the surface,
+    /// hover provides per-row affordance.
     @ViewBuilder private var fillBodyDropdown: some View {
+        VStack(spacing: 0) {
+            fillBodyDropdownItem
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.black.opacity(0.55))
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.regularMaterial)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 8)
+        )
+    }
+
+    @ViewBuilder private var fillBodyDropdownItem: some View {
+        let title = portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody
+        let icon = portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical"
+        let active = portrait.isFillBodyApplied
+        let showProBadge = !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
         Button {
             withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
             if portrait.isFillBodyApplied {
@@ -656,14 +685,34 @@ struct EditorView: View {
                 ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
             }
         } label: {
-            enhanceCardLabel(
-                title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
-                systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical",
-                active: portrait.isFillBodyApplied,
-                showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .regular))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(active ? Color.accentColor : Color.primary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(active ? Color.accentColor.opacity(0.15) : Color.white.opacity(0.08))
+                    )
+                Text(title)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.primary)
+                Spacer(minLength: 0)
+                if showProBadge { ProBadge() }
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(isFillBodyHovering ? 0.08 : 0))
             )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(PressableButtonStyle())
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.10)) { isFillBodyHovering = hovering }
+        }
     }
 
     @ViewBuilder
@@ -926,6 +975,13 @@ struct EditorView: View {
             undoManager: undoManager
         )
         if result.skipped > 0 { bulkSkippedCount = result.skipped }
+    }
+}
+
+private struct MoreTriggerHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

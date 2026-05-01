@@ -57,6 +57,8 @@ struct GeneralSettings: View {
                 Divider()
                 MagicCutoutSection()
                 Divider()
+                LibrarySection()
+                Divider()
                 LabsSection()
                 #if !APP_STORE
                 Divider()
@@ -65,6 +67,85 @@ struct GeneralSettings: View {
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
+        }
+    }
+}
+
+// MARK: - Library back-up (export / import)
+
+private struct LibrarySection: View {
+    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
+    @Query private var portraits: [Portrait]
+    @Query private var backgrounds: [BackgroundPreset]
+
+    @State private var pendingPreview: LibraryArchive.ImportPreview?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Loc.librarySectionTitle).font(.headline)
+            Text(Loc.librarySectionDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button {
+                    runExport()
+                } label: {
+                    Label(Loc.libraryExportButton, systemImage: "square.and.arrow.up")
+                }
+                .disabled(portraits.isEmpty)
+
+                Button {
+                    runImport()
+                } label: {
+                    Label(Loc.libraryImportButton, systemImage: "square.and.arrow.down")
+                }
+
+                Spacer()
+            }
+        }
+        .sheet(item: $pendingPreview) { preview in
+            LibraryImportSheet(preview: preview)
+                .environment(appState)
+        }
+    }
+
+    private func runExport() {
+        guard !portraits.isEmpty else {
+            appState.note(Loc.libraryExportEmpty)
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        let date = Date().formatted(.iso8601.year().month().day())
+        panel.nameFieldStringValue = "\(Loc.libraryExportFilenamePrefix) \(date).zip"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try LibraryArchive.export(portraits: portraits,
+                                       backgrounds: backgrounds,
+                                       to: url)
+            appState.note(Loc.libraryExportSuccess(portraits.count))
+        } catch {
+            let msg = (error as? LocalizedError)?.errorDescription
+                ?? error.localizedDescription
+            appState.fail(Loc.libraryExportFailed(msg))
+        }
+    }
+
+    private func runImport() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.zip]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            pendingPreview = try LibraryArchive.preview(from: url, context: context)
+        } catch {
+            let msg = (error as? LocalizedError)?.errorDescription
+                ?? error.localizedDescription
+            appState.fail(Loc.libraryImportFailed(msg))
         }
     }
 }
