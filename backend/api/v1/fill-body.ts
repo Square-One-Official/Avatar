@@ -5,8 +5,8 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { flattenOnGrey } from "../../lib/image.js";
-import { analyzePortrait, editPortrait, magicCutout } from "../../lib/replicate.js";
+import { padForOutpaint } from "../../lib/image.js";
+import { magicCutout, outpaintPortrait } from "../../lib/replicate.js";
 
 export const config = {
   api: {
@@ -19,23 +19,22 @@ export const config = {
  *
  * Body:    { image: <base64 PNG with alpha — the current cutout> }
  * Returns: 200 success
- *            { cutout: <base64 PNG>, credits_remaining: int, no_changes: false }
- *          200 no-op (portrait was already complete — no credit charged)
- *            { cutout: null, credits_remaining: int, no_changes: true,
- *              reason: <short text from the analyser> }
- *          402 insufficient_credits (only on the success path)
+ *            { cutout: <base64 PNG>, credits_remaining: int }
+ *          402 insufficient_credits
  *          401 unauthorized
  *          429 rate_limited
  *
- * Pipeline:
- *   1. Flatten alpha → grey so the analyser sees a clean silhouette.
- *   2. Gemini 2.5 Flash decides whether the portrait is already complete or
- *      what specific body parts are clipped. Always runs (cheap, ~$0.001).
- *   3. If complete → respond { no_changes: true } and return without
- *      charging a credit. Client shows "already complete" toast.
- *   4. Otherwise → check credits (402 if empty), then Flux Kontext Pro
- *      with a prompt naming the specific clipped parts, BiRefNet to
- *      re-extract alpha, log 1 credit, return new cutout.
+ * Pipeline (real outpainting, not instruction-edit):
+ *   1. Build outpaint inputs from the cutout PNG: a padded grey canvas
+ *      with the person composited on top, plus a white-on-fill mask.
+ *      The original RGBA pixels are preserved bit-for-bit, so identity
+ *      can't drift.
+ *   2. Check credits (402 if empty).
+ *   3. Run FLUX.1 Fill Pro on (image, mask). It only paints into the
+ *      masked region.
+ *   4. Re-extract alpha via BiRefNet (`magicCutout`) so the client gets
+ *      a transparent cutout consistent with `/v1/cutout`'s output shape.
+ *   5. Log 1 credit, return the new cutout.
  *
  * Errors before the credit-deducting Replicate call don't charge.
  */
@@ -80,25 +79,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureUser(user.id);
 
-    // Step 1 + 2: flatten + analyse. Always runs, regardless of credit
-    // balance, so we can no-op on already-complete portraits without
-    // refusing the user a free check.
-    const flattened = await flattenOnGrey(inputBytes);
-    const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
-    const analysis = await analyzePortrait({ imageDataUrl: flattenedDataUrl });
+    // Step 1: build the outpaint inputs. Pure server-side image work,
+    // no Replicate calls — safe to do before the credit gate.
+    const { padded, mask } = await padForOutpaint(inputBytes);
+    const paddedDataUrl = `data:image/png;base64,${padded.toString("base64")}`;
+    const maskDataUrl = `data:image/png;base64,${mask.toString("base64")}`;
 
-    if (analysis.complete) {
-      const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
-      res.status(200).json({
-        cutout: null,
-        credits_remaining: creditsRemaining,
-        no_changes: true,
-        reason: "portrait_already_complete",
-      });
-      return;
-    }
-
-    // Step 3: credit gate. Only checked once we know we're going to do
+    // Step 2: credit gate. Only checked once we know we're going to do
     // billable work.
     if (!isDevUser) {
       const credits = await currentCredits(user.id);
@@ -108,22 +95,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Step 4: Flux Kontext Pro with a prompt that names the SPECIFIC
-    // clipped parts Gemini identified.
-    const reframedUrl = await editPortrait({
-      imageDataUrl: flattenedDataUrl,
-      missing: analysis.missing,
+    // Step 3: FLUX Fill Pro paints into the masked margin only.
+    const filledUrl = await outpaintPortrait({
+      imageDataUrl: paddedDataUrl,
+      maskDataUrl,
     });
-    const reframedDownload = await fetch(reframedUrl);
-    if (!reframedDownload.ok) {
-      throw new Error(`Kontext result fetch failed: ${reframedDownload.status}`);
+    const filledDownload = await fetch(filledUrl);
+    if (!filledDownload.ok) {
+      throw new Error(`Flux Fill result fetch failed: ${filledDownload.status}`);
     }
-    const reframedBytes = Buffer.from(await reframedDownload.arrayBuffer());
-    const reframedDataUrl = `data:image/png;base64,${reframedBytes.toString("base64")}`;
+    const filledBytes = Buffer.from(await filledDownload.arrayBuffer());
+    const filledDataUrl = `data:image/png;base64,${filledBytes.toString("base64")}`;
 
-    // Step 5: BiRefNet to re-extract alpha so the client receives a
+    // Step 4: BiRefNet to re-extract alpha so the client receives a
     // transparent cutout consistent with /v1/cutout's shape.
-    const cutoutUrl = await magicCutout({ imageDataUrl: reframedDataUrl });
+    const cutoutUrl = await magicCutout({ imageDataUrl: filledDataUrl });
     const cutoutDownload = await fetch(cutoutUrl);
     if (!cutoutDownload.ok) {
       throw new Error(`BiRefNet result fetch failed: ${cutoutDownload.status}`);
@@ -135,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         userId: user.id,
         delta: -1,
         reason: "fill_body",
-        ref: reframedUrl,
+        ref: filledUrl,
       });
     }
 
@@ -143,7 +129,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       cutout: cutoutBytes.toString("base64"),
       credits_remaining: creditsRemaining,
-      no_changes: false,
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);

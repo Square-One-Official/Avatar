@@ -446,6 +446,13 @@ enum ImportFlow {
         // Pro-only feature — non-entitled users get the paywall instead of
         // running the call. Distinct from Magic Cutout's `canUseProCutout`
         // because Fill in Body has no free-trial allowance.
+        // Re-entry guard: if a previous Fill in Body (or any other
+        // processing) is still in flight, swallow the call rather than
+        // firing a parallel backend request. The dropdown button is also
+        // disabled while processing, but a stale closure could still reach
+        // here — belt and suspenders against the 429s users were seeing
+        // from rapid double-clicks.
+        guard !appState.isProcessing else { return }
         guard appState.proEntitlement.isPro else {
             appState.showProUpgradeSheet = true
             return
@@ -475,24 +482,8 @@ enum ImportFlow {
 
         Task.detached(priority: .userInitiated) {
             do {
-                let outcome = try await backend.fillBody(imagePNG: cutoutData)
+                let (newCutoutPNG, creditsRemaining) = try await backend.fillBody(imagePNG: cutoutData)
 
-                // Gemini analysed the cutout and concluded nothing is
-                // clipped. No credit was charged server-side; tell the user
-                // and leave their portrait untouched.
-                if case .alreadyComplete(let creditsRemaining) = outcome {
-                    await MainActor.run {
-                        appState.proEntitlement.credits = creditsRemaining
-                        appState.isProcessing = false
-                        appState.note(Loc.fillBodyAlreadyComplete)
-                        dlog("[FillBody] DONE no-op id=\(portraitID) credits=\(creditsRemaining)")
-                    }
-                    return
-                }
-
-                guard case .updated(let newCutoutPNG, let creditsRemaining) = outcome else {
-                    return  // Exhaustive switch; unreachable.
-                }
                 guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
                     throw BackendError.decode
                 }

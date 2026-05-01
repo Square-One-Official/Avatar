@@ -683,6 +683,12 @@ struct EditorView: View {
         let icon = portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical"
         let active = portrait.isFillBodyApplied
         let showProBadge = !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
+        // Mirror the trigger's `isProcessing` guard. Without this, once the
+        // dropdown is open the inner button stays live during a running
+        // Fill in Body, and every extra tap spawns a parallel backend
+        // request — that's what was tripping the server-side rate limiter
+        // into "Too many requests" toasts.
+        let busy = appState.isProcessing
         Button {
             withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
             if portrait.isFillBodyApplied {
@@ -719,6 +725,8 @@ struct EditorView: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.10)) { isFillBodyHovering = hovering }
         }
+        .disabled(busy)
+        .opacity(busy ? 0.45 : 1)
     }
 
     @ViewBuilder

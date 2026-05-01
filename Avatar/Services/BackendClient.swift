@@ -95,39 +95,25 @@ final class BackendClient {
     }
 
     // MARK: POST /v1/fill-body
-    /// Fill in Body — analyses the portrait with Gemini 2.5 Flash to decide
-    /// what (if anything) is clipped, conditionally calls Flux Kontext Pro
-    /// to extend just those parts, and re-extracts alpha via BiRefNet.
-    ///
-    /// Returns either:
-    ///   * `.alreadyComplete` — the analyser said nothing is clipped, no
-    ///     credit was charged. Caller should show "already complete" toast
-    ///     and leave the existing cutout in place.
-    ///   * `.updated(cutoutPNG:creditsRemaining:)` — fresh cutout with the
-    ///     missing parts filled in. 1 credit was charged.
+    /// Fill in Body — sends the cutout PNG to the backend, which builds a
+    /// padded canvas + mask and runs FLUX.1 Fill Pro to outpaint the
+    /// missing shoulders/chest, then re-extracts alpha via BiRefNet.
+    /// Returns the new cutout PNG and the user's updated credit balance.
     ///
     /// On 402 (no credits) the caller surfaces the upgrade sheet; other
     /// errors propagate so the caller can show the failure toast.
-    enum FillBodyOutcome {
-        case alreadyComplete(creditsRemaining: Int)
-        case updated(cutoutPNG: Data, creditsRemaining: Int)
-    }
     private struct FillBodyResponse: Decodable {
-        let cutout: String?
+        let cutout: String
         let creditsRemaining: Int
-        let noChanges: Bool
     }
-    func fillBody(imagePNG: Data) async throws -> FillBodyOutcome {
+    func fillBody(imagePNG: Data) async throws -> (Data, Int) {
         struct Body: Encodable { let image: String }
         let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
         let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
-        if resp.noChanges {
-            return .alreadyComplete(creditsRemaining: resp.creditsRemaining)
-        }
-        guard let cutout = resp.cutout, let data = Data(base64Encoded: cutout) else {
+        guard let data = Data(base64Encoded: resp.cutout) else {
             throw BackendError.decode
         }
-        return .updated(cutoutPNG: data, creditsRemaining: resp.creditsRemaining)
+        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/checkout/subscribe
