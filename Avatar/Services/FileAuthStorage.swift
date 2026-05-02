@@ -64,6 +64,18 @@ struct FileAuthStorage: AuthLocalStorage {
         try FileManager.default.removeItem(at: url)
     }
 
+    /// True iff at least one auth blob is on disk. Used by `MainWindow` to
+    /// detect "user upgraded from a Keychain build and has nothing in the
+    /// new file storage" so we can re-show the sign-in sheet instead of
+    /// silently rendering a signed-out state.
+    func hasAnySession() -> Bool {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil
+        )) ?? []
+        return !contents.isEmpty
+    }
+
     private func fileURL(for key: String) -> URL {
         // Whitelist filename characters so a key like `supabase.auth.token`
         // round-trips cleanly. Anything outside is hex-escaped to keep the

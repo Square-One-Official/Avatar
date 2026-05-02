@@ -11,6 +11,10 @@ struct MainWindow: View {
     /// presented over the main window. The sheet itself flips this true on
     /// either sign-in or "Maybe later" so the surface never reappears.
     @AppStorage("hasSeenWelcomeSignIn") private var hasSeenWelcomeSignIn = false
+    /// One-shot guard for the file-storage migration (build 6+). Without
+    /// this, every signed-out launch would re-show the welcome sheet for
+    /// users who chose to stay signed-out. Sticky across launches.
+    @AppStorage("hasRunFileAuthMigration") private var hasRunFileAuthMigration = false
     /// Drives the `.sheet(isPresented:)` binding. Decoupled from
     /// `hasSeenWelcomeSignIn` so flipping the AppStorage during dismissal
     /// (e.g. on successful sign-in) doesn't fight the sheet's own dismiss
@@ -103,14 +107,26 @@ struct MainWindow: View {
         }
         .task {
             // Refresh Pro entitlement on launch so the badge/credits are accurate.
-            // Supabase restores the keychain session asynchronously, so this
+            // Supabase restores the file-backed session asynchronously, so this
             // first call typically fires before `auth.isSignedIn` flips true —
             // the `onChange` below catches that transition and re-fires.
             appState.refreshEntitlement()
+
+            // Storage migration (build 6+): a returning user whose previous
+            // session lived in the Keychain has nothing in the new file
+            // storage. Re-arm the welcome sheet so they get a clear sign-in
+            // prompt instead of a silent signed-out state. Runs at most
+            // once, regardless of subsequent sign-out behaviour.
+            if !hasRunFileAuthMigration {
+                hasRunFileAuthMigration = true
+                if hasSeenWelcomeSignIn && !FileAuthStorage().hasAnySession() {
+                    hasSeenWelcomeSignIn = false
+                }
+            }
+
             // First-launch welcome. Sheet only presents if the user has
             // never seen it AND isn't already signed in (a returning user
-            // who reinstalls and whose Keychain still holds a session
-            // shouldn't be asked to sign in again).
+            // whose session restored shouldn't be asked to sign in again).
             if !hasSeenWelcomeSignIn && !appState.auth.isSignedIn {
                 showWelcomeSheet = true
             } else if !hasSeenWelcomeSignIn {
