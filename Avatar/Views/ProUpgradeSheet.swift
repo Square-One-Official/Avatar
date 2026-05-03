@@ -199,8 +199,13 @@ struct ProUpgradeSheet: View {
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background(
-                Capsule().fill(selected ? Color.appSurface : Color.clear)
-                    .shadow(color: selected ? Color.black.opacity(0.10) : .clear, radius: 3, x: 0, y: 1)
+                Capsule()
+                    .fill(selected ? Color.primary.opacity(0.10) : Color.clear)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.primary.opacity(selected ? 0.08 : 0), lineWidth: 1)
+                    )
+                    .shadow(color: selected ? Color.black.opacity(0.25) : .clear, radius: 3, x: 0, y: 1)
             )
             .contentShape(Capsule())
         }
