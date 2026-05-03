@@ -1,18 +1,20 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
 import { ensureUser, supabase } from "../../../lib/supabase.js";
-import { priceIdForTier, stripe } from "../../../lib/stripe.js";
+import { isSubscriptionInterval, priceIdForTier, stripe } from "../../../lib/stripe.js";
 
 const APP_SCHEME = process.env.APP_URL_SCHEME ?? "aaavatar";
 
 /**
  * POST /v1/checkout/subscribe
  *
- * Body:    {} — no input. Server picks the single Pro tier; if we ever
- *               re-introduce multi-tier pricing the body grows a `tier` field.
+ * Body:    { interval?: "month" | "year" } — billing cadence. Defaults to
+ *               "month" when omitted (back-compat with v1 clients that
+ *               don't yet send the field). Yearly Pro is €49,90 (17%
+ *               cheaper, "2 months free"). Monthly stays €4,99.
  * Returns: 200 { url: string } — hosted Stripe Checkout URL (DMG build path)
  *          200 { storekit_product_id: string } — App Store build path (deferred)
- *          401 / 500
+ *          400 / 401 / 500
  *
  * Note: only one of `url` / `storekit_product_id` is set. The DMG build will
  * always get a `url`. The App Store build (later) will get a product id and
@@ -27,9 +29,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const proPriceId = priceIdForTier("pro");
+  // Parse + default the interval. Older clients that POST {} get monthly.
+  const rawInterval = (req.body as { interval?: unknown } | null | undefined)?.interval;
+  const interval = rawInterval === undefined
+    ? "month"
+    : isSubscriptionInterval(rawInterval) ? rawInterval : null;
+  if (interval === null) {
+    res.status(400).json({ error: "invalid_interval" });
+    return;
+  }
+
+  const proPriceId = priceIdForTier("pro", interval);
   if (!proPriceId) {
-    console.error("/v1/checkout/subscribe: PRICE_ID_PRO is not configured");
+    const envName = interval === "year" ? "PRICE_ID_PRO_ANNUAL" : "PRICE_ID_PRO";
+    console.error(`/v1/checkout/subscribe: ${envName} is not configured`);
     res.status(500).json({ error: "pricing_misconfigured" });
     return;
   }
@@ -71,9 +84,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // `customer_tax_location_invalid`.
       customer_update: { address: "auto" },
       subscription_data: {
-        metadata: { supabase_user_id: user.id, tier: "pro" },
+        metadata: { supabase_user_id: user.id, tier: "pro", interval },
       },
-      metadata: { supabase_user_id: user.id, tier: "pro", flow: "subscribe" },
+      metadata: {
+        supabase_user_id: user.id,
+        tier: "pro",
+        interval,
+        flow: "subscribe",
+      },
     });
 
     res.status(200).json({ url: session.url });

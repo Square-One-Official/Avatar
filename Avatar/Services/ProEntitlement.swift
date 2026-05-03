@@ -5,13 +5,16 @@ import Foundation
 /// sheet for the library ceiling. Pro users have no enforced limits beyond
 /// the batch-confirm threshold in `BatchConfirmRequest.threshold`.
 enum FreeTier {
-    /// Lifetime free imports a free account may run. Enforced server-side
-    /// via `users.free_imports_used` AND `device_imports.free_imports_used`
-    /// (Keychain UUID). Deleting a portrait does NOT free a slot —
-    /// otherwise the cap is trivially defeated by import-then-delete.
-    /// Bump this only after re-evaluating the trial economics.
+    /// Lifetime free imports a free account may run. Splits into 3 AI
+    /// (Magic Cutout trial) + 3 basic (Subject Lift) imports — see
+    /// `freeMagicCutoutAllowance` for the AI portion. Enforced
+    /// server-side via `users.free_imports_used` AND
+    /// `device_imports.free_imports_used` (Keychain UUID). Deleting a
+    /// portrait does NOT free a slot — otherwise the cap is trivially
+    /// defeated by import-then-delete. Bump this only after
+    /// re-evaluating the trial economics.
     /// Mirrors `FREE_IMPORTS_ALLOWANCE` in `backend/lib/supabase.ts`.
-    static let maxPortraits = 5
+    static let maxPortraits = 6
 
     /// Maximum number of images a free user can drop / pick in a single
     /// import. Two is enough to feel useful (couple shot, before/after) but
@@ -22,8 +25,10 @@ enum FreeTier {
     /// Free Magic Cutout trial allowance — number of cloud cutouts a free
     /// user may run before the toggle is gated. Mirrors the backend constant
     /// `FREE_CUTOUTS_ALLOWANCE` in `lib/supabase.ts`. Used only for copy /
-    /// progress UI; server is the actual gate.
-    static let freeMagicCutoutAllowance = 2
+    /// progress UI; server is the actual gate. Reverse-trial pattern:
+    /// experience the premium model first, then drop to the basic
+    /// (Subject Lift) for the remaining 3 imports.
+    static let freeMagicCutoutAllowance = 3
 }
 
 /// Hard ceilings that apply to Pro users. These are technical/safety
@@ -59,13 +64,37 @@ enum ProTier: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Display price in EUR (informational only — Stripe is source of truth).
     var monthlyPriceEUR: String { "€4,99" }
+
+    /// Display price for the yearly plan (€49,90 = 10× monthly = 2 months
+    /// free, 17% discount). Stripe is source of truth.
+    var annualPriceEUR: String { "€49,90" }
+
+    /// Per-month equivalent when billed annually, for "€4,16/mo billed
+    /// annually" copy in the paywall.
+    var annualPricePerMonthEUR: String { "€4,16" }
+}
+
+/// Billing cadence chosen by the user in the paywall. Sent to the
+/// backend on `/v1/checkout/subscribe` to route to the right Stripe
+/// price ID. Default in-app is `.year` so the better value is anchored.
+enum SubscriptionInterval: String, Codable, CaseIterable, Identifiable, Sendable {
+    case month
+    case year
+
+    var id: String { rawValue }
 }
 
 /// One-time credit pack the user can buy on top of (or instead of) a
 /// subscription. Topped-up credits never expire and stack with the
 /// monthly grant. Raw value matches the Stripe price lookup key.
+///
+/// Pricing ladder uses the decoy effect — bigger pack = better value
+/// per credit. The middle pack (`credits200`) anchors; `credits750`
+/// makes it look reasonable; `credits50` removes the impulse barrier.
 enum CreditPack: String, Codable, CaseIterable, Identifiable, Sendable {
+    case credits50
     case credits200
+    case credits750
 
     var id: String { rawValue }
 
@@ -73,15 +102,41 @@ enum CreditPack: String, Codable, CaseIterable, Identifiable, Sendable {
     /// purchase. Source of truth is server-side; this is for UI only.
     var credits: Int {
         switch self {
+        case .credits50: return 50
         case .credits200: return 200
+        case .credits750: return 750
         }
     }
 
     /// Display price in EUR. Stripe is source of truth.
     var priceEUR: String {
         switch self {
+        case .credits50: return "€1,99"
         case .credits200: return "€4,99"
+        case .credits750: return "€14,99"
         }
+    }
+
+    /// Cents per credit, used for the "best value" calculation in the
+    /// paywall. Lower = better deal. Pure UI math; never sent to server.
+    var centsPerCredit: Double {
+        switch self {
+        case .credits50: return 199.0 / 50.0   // 3.98¢
+        case .credits200: return 499.0 / 200.0 // 2.50¢
+        case .credits750: return 1499.0 / 750.0 // 2.00¢ — anchor
+        }
+    }
+
+    /// True for the pack with the best per-credit price — drives the
+    /// "BESTE WAARDE" badge in the paywall.
+    var isBestValue: Bool {
+        self == .credits750
+    }
+
+    /// Stable display order in the paywall, smallest → largest. Matches
+    /// the decoy reading direction (impulse → anchor).
+    static var displayOrder: [CreditPack] {
+        [.credits50, .credits200, .credits750]
     }
 }
 
@@ -141,6 +196,19 @@ final class ProEntitlement {
     /// True when a free user has at least one import slot left — Pro users
     /// are unlimited. UI gates against this instead of the library count.
     var canImport: Bool { isPro || freeImportsRemaining > 0 }
+
+    /// Free imports the user has remaining of the BASIC (Subject Lift)
+    /// portion of the trial. Computed from total remaining minus AI
+    /// remaining, clamped to [0, 3]. Drives the second dot-row in
+    /// `SidebarProQuotaCard` so users see the two phases of free.
+    var freeBasicImportsRemaining: Int {
+        let basicAllowance = max(0, FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance)
+        let aiRemaining = freeCutoutsRemaining
+        // Total free imports left = the import-counter remaining; basic
+        // = total - AI (clamped to the basic allowance).
+        let basicLeft = freeImportsRemaining - aiRemaining
+        return min(basicAllowance, max(0, basicLeft))
+    }
 
     /// Resets all state (e.g. on sign-out). Free-trial counters reset to
     /// the full allowance — but they're rehydrated from /v1/account the

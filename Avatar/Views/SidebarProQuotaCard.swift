@@ -1,20 +1,30 @@
 import SwiftUI
 
-/// Subtle bottom-of-sidebar nudge for free users: shows how many lifetime
-/// imports are left in the free trial and routes a tap to the paywall.
-/// Reads directly from `proEntitlement.freeImportsUsed` (server-tracked,
-/// survives delete-then-reimport) — NOT the current library count.
-/// Hidden once the user is Pro. Sits below `SidebarUpdateCard` so a
-/// pending update relaunch always reads as the higher-priority CTA.
+/// Subtle bottom-of-sidebar nudge for free users: shows the two-tier
+/// reverse trial — AI generations on top, basic generations below — and
+/// routes a tap to the paywall. Reads from `proEntitlement` (server-
+/// tracked, survives delete-then-reimport). Hidden once the user is Pro.
+/// Sits below `SidebarUpdateCard` so a pending update relaunch always
+/// reads as the higher-priority CTA.
+///
+/// **Why two rows.** A single 6-dot strip would visually merge the two
+/// phases of free into one homogenous resource. Splitting it makes the
+/// model legible: "AI is the premium thing, basic is the fallback." The
+/// drop in fill weight between rows mirrors the drop in quality.
 struct SidebarProQuotaCard: View {
     @Environment(AppState.self) private var appState
     @State private var hovering = false
-    @State private var pressed = false
 
-    private var capacity: Int { FreeTier.maxPortraits }
-    private var used: Int { min(capacity, appState.proEntitlement.freeImportsUsed) }
-    private var remaining: Int { max(0, capacity - used) }
-    private var atLimit: Bool { remaining == 0 }
+    private var aiCapacity: Int { FreeTier.freeMagicCutoutAllowance }
+    private var aiRemaining: Int { max(0, min(aiCapacity, appState.proEntitlement.freeCutoutsRemaining)) }
+    private var aiUsed: Int { aiCapacity - aiRemaining }
+
+    private var basicCapacity: Int { max(0, FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) }
+    private var basicRemaining: Int { appState.proEntitlement.freeBasicImportsRemaining }
+    private var basicUsed: Int { basicCapacity - basicRemaining }
+
+    private var atLimit: Bool { aiRemaining == 0 && basicRemaining == 0 }
+    private var aiExhausted: Bool { aiRemaining == 0 }
 
     /// Same brand periwinkle the import drop zone uses, so the upsell reads
     /// as a continuation of the import surface rather than a new motif.
@@ -26,18 +36,37 @@ struct SidebarProQuotaCard: View {
         Button {
             appState.showProUpgradeSheet = true
         } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                QuotaDots(used: used, capacity: capacity, brand: brand, atLimit: atLimit)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Loc.proQuotaTitle(remaining: remaining, total: capacity))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(atLimit ? brand : .primary.opacity(0.85))
-                        .lineLimit(1)
-                    Text(Loc.proQuotaSubtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+            VStack(alignment: .leading, spacing: 10) {
+                // AI row — premium tier, brand-colored when filled.
+                QuotaRow(
+                    label: Loc.proQuotaAIRow(remaining: aiRemaining, total: aiCapacity),
+                    used: aiUsed,
+                    capacity: aiCapacity,
+                    fillColor: brand,
+                    emptyOpacity: aiExhausted ? 0.35 : 0.18,
+                    isPremium: true,
+                    isExhausted: aiExhausted
+                )
+
+                // Basic row — neutral tone signals the quality drop. Renders
+                // dimmed once the AI row is fully spent (this is the user's
+                // "now we're in the fallback" moment).
+                QuotaRow(
+                    label: Loc.proQuotaBasicRow(remaining: basicRemaining, total: basicCapacity),
+                    used: basicUsed,
+                    capacity: basicCapacity,
+                    fillColor: Color.primary.opacity(0.55),
+                    emptyOpacity: 0.12,
+                    isPremium: false,
+                    isExhausted: basicRemaining == 0
+                )
+                .opacity(aiExhausted ? 1.0 : 0.78)
+
+                // CTA strip — only escalates copy when fully out.
+                Text(atLimit ? Loc.proQuotaUpgradeCTA : Loc.proQuotaSubtitle)
+                    .font(.system(size: 11, weight: atLimit ? .semibold : .regular))
+                    .foregroundStyle(atLimit ? brand : Color.secondary)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
@@ -57,33 +86,52 @@ struct SidebarProQuotaCard: View {
         .padding(.bottom, 10)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.15), value: hovering)
+        // Spring on the visual transition between AI-active and AI-exhausted
+        // states — matches the rest of the app's spring vocabulary
+        // (`PillSegmentedControl`).
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: aiExhausted)
         .help(Loc.proQuotaTooltip)
     }
 }
 
-/// Five horizontal dots, filled left-to-right by `used`. At-limit state
-/// switches the empty dots to brand-tinted to reinforce the CTA without
-/// changing layout.
+/// One label + dot strip. Used twice in `SidebarProQuotaCard` to show
+/// the AI tier and the basic tier as visually distinct rows.
+private struct QuotaRow: View {
+    let label: String
+    let used: Int
+    let capacity: Int
+    let fillColor: Color
+    let emptyOpacity: Double
+    let isPremium: Bool
+    let isExhausted: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            QuotaDots(used: used, capacity: capacity, fillColor: fillColor, emptyOpacity: emptyOpacity)
+            Text(label)
+                .font(.system(size: 11, weight: isPremium ? .semibold : .regular))
+                .foregroundStyle(isExhausted ? fillColor : Color.primary.opacity(0.82))
+                .lineLimit(1)
+        }
+    }
+}
+
+/// Horizontal dot strip, filled left-to-right by `used`. Capacity drives
+/// the dot count, so this works for both the 3-dot AI row and the 3-dot
+/// basic row (and any other future capacity).
 private struct QuotaDots: View {
     let used: Int
     let capacity: Int
-    let brand: Color
-    let atLimit: Bool
+    let fillColor: Color
+    let emptyOpacity: Double
 
     var body: some View {
         HStack(spacing: 5) {
             ForEach(0..<capacity, id: \.self) { idx in
                 Circle()
-                    .fill(fill(for: idx))
+                    .fill(idx < used ? fillColor : fillColor.opacity(emptyOpacity))
                     .frame(width: 6, height: 6)
             }
         }
-    }
-
-    private func fill(for idx: Int) -> Color {
-        if idx < used {
-            return atLimit ? brand : Color.primary.opacity(0.55)
-        }
-        return atLimit ? brand.opacity(0.35) : Color.primary.opacity(0.14)
     }
 }

@@ -135,10 +135,16 @@ final class BackendClient {
 
     // MARK: POST /v1/checkout/subscribe
     /// Start a subscription checkout. Server picks the tier from the user
-    /// account (single Pro tier currently). Returns a Stripe URL or a
-    /// StoreKit product ID — caller branches on the `CheckoutResult`.
-    func subscribe() async throws -> CheckoutResult {
-        let resp: CheckoutResponse = try await request("/v1/checkout/subscribe", method: "POST")
+    /// account (single Pro tier currently); the caller picks the billing
+    /// cadence via `interval` (defaults to monthly so older call sites
+    /// keep working unchanged). Returns a Stripe URL or a StoreKit
+    /// product ID — caller branches on the `CheckoutResult`.
+    func subscribe(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
+        struct Body: Encodable { let interval: String }
+        let body = try JSONEncoder().encode(Body(interval: interval.rawValue))
+        let resp: CheckoutResponse = try await request(
+            "/v1/checkout/subscribe", method: "POST", body: body
+        )
         return try resp.toResult()
     }
 

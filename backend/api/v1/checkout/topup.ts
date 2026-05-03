@@ -1,16 +1,18 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
 import { activeSubscription, ensureUser, supabase } from "../../../lib/supabase.js";
-import { priceIdForPack, stripe, type CreditPack } from "../../../lib/stripe.js";
+import { isCreditPack, priceIdForPack, stripe, type CreditPack } from "../../../lib/stripe.js";
 
 const APP_SCHEME = process.env.APP_URL_SCHEME ?? "aaavatar";
-
-const VALID_PACKS: CreditPack[] = ["credits200"];
 
 /**
  * POST /v1/checkout/topup
  *
- * Body:    { pack: "credits200" }
+ * Body:    { pack: "credits50" | "credits200" | "credits750" }
+ *           Pricing ladder (see lib/stripe.ts):
+ *             credits50  €1,99  →  50 credits  (impulse)
+ *             credits200 €4,99  → 200 credits  (standard, anchor middle)
+ *             credits750 €14,99 → 750 credits  (best value, ~20% extra)
  * Returns: 200 { url: string } — hosted Stripe Checkout URL (DMG build path)
  *          200 { storekit_product_id: string } — App Store build (deferred)
  *          400 { error: "invalid_pack" }
@@ -28,11 +30,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = await requireUser(req, res);
   if (!user) return;
 
-  const pack = (req.body?.pack ?? "") as CreditPack;
-  if (!VALID_PACKS.includes(pack)) {
+  const rawPack = (req.body as { pack?: unknown } | null | undefined)?.pack;
+  if (!isCreditPack(rawPack)) {
     res.status(400).json({ error: "invalid_pack" });
     return;
   }
+  const pack: CreditPack = rawPack;
 
   // Top-ups are only sold to active subscribers — credits are useless without
   // Pro since the gated feature (Magic Cutout) requires it.

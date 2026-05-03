@@ -74,10 +74,11 @@ export async function ensureUser(userId: string): Promise<void> {
 
 /**
  * Free-tier Magic Cutout trial allowance. Free accounts get this many
- * BiRefNet cutouts before they need to subscribe. Enforced server-side
- * so reinstalling the app can't reset the counter.
+ * BiRefNet cutouts before they need to subscribe (or fall back to the
+ * basic Subject Lift). Enforced server-side so reinstalling the app
+ * can't reset the counter.
  */
-export const FREE_CUTOUTS_ALLOWANCE = 2;
+export const FREE_CUTOUTS_ALLOWANCE = 3;
 
 /** Returns how many free Magic Cutout calls this user has spent so far. */
 export async function freeCutoutsUsed(userId: string): Promise<number> {
@@ -107,12 +108,13 @@ export async function tryConsumeFreeCutout(userId: string): Promise<number | nul
 }
 
 /**
- * Lifetime free-tier import allowance. The 5-portrait library cap is now
- * enforced as "5 imports ever", not "5 portraits at a time" — deleting a
- * portrait no longer frees a slot. Mirrored client-side in
+ * Lifetime free-tier import allowance. The 6-portrait library cap is
+ * enforced as "6 imports ever", not "6 portraits at a time" — deleting a
+ * portrait no longer frees a slot. Splits into 3 AI (Magic Cutout trial)
+ * + 3 basic (Subject Lift) imports. Mirrored client-side in
  * `FreeTier.maxPortraits`.
  */
-export const FREE_IMPORTS_ALLOWANCE = 5;
+export const FREE_IMPORTS_ALLOWANCE = 6;
 
 export type ImportClaimResult = {
   allowed: boolean;

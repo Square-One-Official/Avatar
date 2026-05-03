@@ -4,6 +4,7 @@ import {
   stripe,
   creditsForTier,
   creditsForPack,
+  intervalFromPriceId,
   tierFromPriceId,
   packFromPriceId,
   type Tier,
@@ -184,10 +185,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const tier = tierFromPriceId(priceId);
         if (!tier) break;
 
+        // For YEARLY subs we still only grant ONE month of credits up front.
+        // The remaining 11 months are granted by the
+        // /api/cron/grant-yearly-credits Vercel cron job (one per month).
+        // This avoids a 2400-credit cost spike if a yearly subscriber
+        // burns through everything and immediately churns.
+        // The ref includes ":0" so the cron can use ":1"…":11" without
+        // colliding with the up-front grant.
+        const interval = intervalFromPriceId(priceId);
+        const ref = interval === "year" ? `${invoice.id}:0` : invoice.id;
+
         await grantPeriodCredits({
           userId,
           tier,
-          invoiceId: invoice.id,
+          invoiceId: ref,
         });
         break;
       }

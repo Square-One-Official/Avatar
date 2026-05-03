@@ -2,32 +2,48 @@ import SwiftUI
 import AppKit
 
 /// Paywall presented when a user hits a gated action — Magic Cutout toggle
-/// or any 402 from the backend. State-aware: free users see a single
-/// Subscribe card; Pro users out of credits see a single Top-up card.
-/// Both routes hand off to Stripe Checkout in the default browser; return is
-/// handled by the `aaavatar://` URL scheme handler which refreshes
+/// or any 402 from the backend. State-aware:
+///
+/// - Free / lapsed users see the **Subscribe** flow with a Monthly/Yearly
+///   toggle. Yearly is selected by default ("2 months free" anchor) so
+///   the better-value path is the path of no clicks.
+/// - Active Pro users out of credits see the **Top-up** flow with a
+///   3-pack ladder (€1,99 / €4,99 / €14,99) — the largest pack carries
+///   a "Best value" badge to anchor against.
+///
+/// Both routes hand off to Stripe Checkout in the default browser; return
+/// is handled by the `aaavatar://` URL scheme handler which refreshes
 /// `ProEntitlement` and dismisses the sheet.
 struct ProUpgradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var busy: Bool = false
     @State private var errorMessage: String?
-    /// Set when Subscribe is tapped while the user isn't signed in. Swaps the
-    /// "Subscribe" CTA for the Google sign-in button so the user can resolve
-    /// the prerequisite without leaving the paywall. Once `auth.isSignedIn`
-    /// flips true we auto-resume the subscribe call so the user only has to
-    /// click once to express intent.
     @State private var awaitingSignIn: Bool = false
+    /// Which top-up pack the user has highlighted. Defaults to the
+    /// best-value pack so a single-click "Buy" path picks the anchor.
+    @State private var selectedPack: CreditPack = .credits750
+    /// Mounted state for the staggered entrance of the pack cards.
+    /// Reduced-motion accessibility skips the stagger by initialising
+    /// to true via the .onAppear branch.
+    @State private var packsMounted: Bool = false
 
-    /// Top-up is only relevant once the user has an active Pro subscription —
-    /// credits are useless without Pro since the gated feature requires it.
-    /// Grace-period (`.lapsed`) is treated as "no longer Pro" for paywall
-    /// purposes: prompt to renew, not to top up.
     private var showsTopup: Bool {
         appState.proEntitlement.isPro
             && appState.proEntitlement.subscriptionStatus == .active
+    }
+
+    /// Selected billing cadence for the subscribe flow. Source of truth
+    /// lives on `AppState` so the choice survives sheet dismissal +
+    /// re-open within the same launch (small UX win).
+    private var interval: Binding<SubscriptionInterval> {
+        Binding(
+            get: { appState.selectedSubscriptionInterval },
+            set: { appState.selectedSubscriptionInterval = $0 }
+        )
     }
 
     var body: some View {
@@ -45,25 +61,37 @@ struct ProUpgradeSheet: View {
             }
             .padding(24)
         }
-        .frame(width: 440)
+        // Top-up needs a bit more horizontal room for the 3 packs to breathe
+        // without each card feeling cramped. Subscribe stays at 440.
+        .frame(width: showsTopup ? 520 : 460)
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
         .animation(.easeOut(duration: 0.18), value: errorMessage)
+        // Spring matches PillSegmentedControl elsewhere in the app — same
+        // motion vocabulary so the sheet feels native to the product.
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: appState.selectedSubscriptionInterval)
+        .onAppear {
+            if reduceMotion {
+                packsMounted = true
+            } else {
+                // Defer one tick so the @starting-style equivalent (initial
+                // false) takes effect before flipping to true.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(20))
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+                        packsMounted = true
+                    }
+                }
+            }
+        }
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in
-            // Auto-resume Subscribe once the user finishes Google OAuth in
-            // the browser and the URL-scheme callback flips auth on. The
-            // user clicked Subscribe once; they shouldn't have to click it
-            // again after sign-in.
             if signedIn && awaitingSignIn {
                 awaitingSignIn = false
                 Task { await startSubscribe() }
             }
         }
         .onDisappear {
-            // If the user closes the sheet without completing checkout, drop
-            // the toggle-driven intent so a later upgrade via a different
-            // entry point doesn't silently flip the toggle on.
             if appState.pendingMagicCutoutEnable && !appState.proEntitlement.isPro {
                 appState.pendingMagicCutoutEnable = false
             }
@@ -94,8 +122,6 @@ struct ProUpgradeSheet: View {
         .padding(.vertical, 16)
     }
 
-    // MARK: Headline
-
     private var headline: some View {
         Text(headlineText)
             .font(.callout)
@@ -121,23 +147,86 @@ struct ProUpgradeSheet: View {
     @ViewBuilder
     private var card: some View {
         if showsTopup {
-            topupCard
+            topupSection
         } else {
+            subscribeSection
+        }
+    }
+
+    // MARK: - Subscribe (free → Pro) flow
+
+    /// Subscribe flow with monthly/yearly toggle on top + price card below.
+    /// The toggle anchoring is critical: yearly is the default selection,
+    /// so the user reads the "2 months free" line first and the monthly
+    /// price reads as the "downgrade" instead of the "default."
+    private var subscribeSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            intervalToggle
             subscribeCard
         }
     }
 
+    private var intervalToggle: some View {
+        // Two-segment pill with the savings badge baked into the Yearly
+        // segment. Built natively (not via PillSegmentedControl) because
+        // we need the savings badge to render *inside* the segment.
+        HStack(spacing: 4) {
+            intervalSegment(.year, label: Loc.billingIntervalYear, accessory: yearlyBadge)
+            intervalSegment(.month, label: Loc.billingIntervalMonth, accessory: nil)
+        }
+        .padding(3)
+        .background(
+            Capsule().fill(Color.secondary.opacity(0.10))
+        )
+    }
+
+    private func intervalSegment(
+        _ value: SubscriptionInterval,
+        label: String,
+        accessory: AnyView?
+    ) -> some View {
+        let selected = interval.wrappedValue == value
+        return Button {
+            interval.wrappedValue = value
+        } label: {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
+                if let accessory { accessory }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
+            .background(
+                Capsule().fill(selected ? Color.appSurface : Color.clear)
+                    .shadow(color: selected ? Color.black.opacity(0.10) : .clear, radius: 3, x: 0, y: 1)
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableButtonStyle(pressedScale: 0.97))
+    }
+
+    private var yearlyBadge: AnyView {
+        AnyView(
+            Text(Loc.yearlyPlanSavings)
+                .font(.system(size: 9, weight: .bold))
+                .tracking(0.3)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(brandColor))
+        )
+    }
+
     private var subscribeCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(Loc.proPlanName).font(.headline)
+            // Plan name flips with the interval so the headline always
+            // matches what the user is buying.
+            Text(interval.wrappedValue == .year ? Loc.yearlyPlanTitle : Loc.monthlyPlanTitle)
+                .font(.headline)
 
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(Loc.proPlanPrice)
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                Text(Loc.proPerMonth)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
+            priceBlock
 
             VStack(alignment: .leading, spacing: 8) {
                 featureRow(Loc.proPlanFeatureUnlimited)
@@ -147,11 +236,7 @@ struct ProUpgradeSheet: View {
                 featureRow(Loc.proPlanFeatureCredits)
             }
 
-            // Primary action morphs between Subscribe and Sign-in. The
-            // sign-in branch only appears after the user clicked Subscribe
-            // and we discovered they weren't signed in — never as a
-            // first-impression CTA. Once auth flips true, the subscribe
-            // call resumes automatically (see `.onChange` below).
+            // CTA morphs between Subscribe and Sign-in (unchanged from before).
             ZStack {
                 if awaitingSignIn {
                     VStack(alignment: .leading, spacing: 10) {
@@ -180,33 +265,144 @@ struct ProUpgradeSheet: View {
         )
     }
 
-    private var topupCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(Loc.topupCardTitle).font(.headline)
-
+    /// Big rounded price + cadence label. For yearly, also shows the
+    /// per-month equivalent ("€4,16/mo billed annually") below — concrete
+    /// numbers help users reason about the savings (Emil: prefer concrete
+    /// values over abstract %).
+    private var priceBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(Loc.topupCardPrice)
+                Text(interval.wrappedValue == .year ? ProTier.pro.annualPriceEUR : ProTier.pro.monthlyPriceEUR)
                     .font(.system(size: 32, weight: .semibold, design: .rounded))
-                Text(Loc.topupOneTime)
+                    .contentTransition(.numericText())
+                Text(interval.wrappedValue == .year ? Loc.proPerYear : Loc.proPerMonth)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-
-            Text(Loc.topupCardDescription)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            primaryButton(title: Loc.topupCTA) {
-                await startTopup()
+            if interval.wrappedValue == .year {
+                Text(Loc.yearlyPlanMonthlyEquiv(ProTier.pro.annualPricePerMonthEUR))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
-        )
+    }
+
+    // MARK: - Top-up (Pro out-of-credits) flow
+
+    /// 3-pack ladder. Cards stagger in (60ms between each) for the first
+    /// paint; reduced-motion users get the final state instantly.
+    private var topupSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(CreditPack.displayOrder.enumerated()), id: \.element) { index, pack in
+                topupPackCard(pack: pack)
+                    .opacity(packsMounted ? 1 : 0)
+                    .offset(y: packsMounted ? 0 : 6)
+                    .animation(
+                        reduceMotion
+                            ? nil
+                            : .spring(response: 0.36, dampingFraction: 0.82)
+                                .delay(Double(index) * 0.06),
+                        value: packsMounted
+                    )
+            }
+            // Single buy button below the cards. Buys whichever pack is
+            // currently selected, so the user can preview prices before
+            // committing.
+            primaryButton(title: buyButtonTitle) {
+                await startTopup()
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private var buyButtonTitle: String {
+        // Concrete number on the CTA so the user sees what they're
+        // about to charge. ("Buy 200 credits" / "Koop 200 credits".)
+        Loc.buyCreditsCTA(selectedPack.credits)
+    }
+
+    private func topupPackCard(pack: CreditPack) -> some View {
+        let isSelected = pack == selectedPack
+        return Button {
+            selectedPack = pack
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(packLabel(pack))
+                            .font(.system(size: 14, weight: .semibold))
+                        if pack.isBestValue {
+                            Text(Loc.packBestValueBadge)
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(0.3)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(brandColor))
+                        }
+                    }
+                    Text(Loc.packCreditsDescriptor(
+                        credits: pack.credits,
+                        perCredit: formatPerCredit(pack)
+                    ))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Text(pack.priceEUR)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                // Selection indicator. Filled circle when selected, ring
+                // otherwise — same affordance as the macOS "radio" pattern.
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(isSelected ? brandColor : Color.secondary.opacity(0.4))
+                    .animation(.easeOut(duration: 0.16), value: isSelected)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? brandColor.opacity(0.08) : Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? brandColor.opacity(0.55) : Color.primary.opacity(0.06),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(PressableButtonStyle(pressedScale: 0.985))
+    }
+
+    private func packLabel(_ pack: CreditPack) -> String {
+        switch pack {
+        case .credits50: return Loc.packStarterLabel
+        case .credits200: return Loc.packStandardLabel
+        case .credits750: return Loc.packBestValueLabel
+        }
+    }
+
+    /// Formats centsPerCredit as "€0,040" / "€0.040" for display in the
+    /// per-credit descriptor under each pack. Tracks the in-app
+    /// language preference via `Loc.currencyLocale`.
+    private func formatPerCredit(_ pack: CreditPack) -> String {
+        let euros = pack.centsPerCredit / 100.0
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 3
+        formatter.maximumFractionDigits = 3
+        formatter.locale = Loc.currencyLocale
+        let value = formatter.string(from: NSNumber(value: euros)) ?? "0,000"
+        return "€\(value)"
+    }
+
+    // MARK: - Shared sub-elements
+
+    private var brandColor: Color {
+        Color(red: 0x9A / 255.0, green: 0xB7 / 255.0, blue: 1.0)
     }
 
     @ViewBuilder
@@ -241,8 +437,6 @@ struct ProUpgradeSheet: View {
         .disabled(busy)
     }
 
-    // MARK: Footer
-
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(Loc.proUpgradeFinePrint)
@@ -263,17 +457,12 @@ struct ProUpgradeSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let result = try await appState.backend.subscribe()
-            // Subscribe succeeded — clear any prior sign-in morph state so
-            // the card returns to its normal CTA on the next open.
+            let result = try await appState.backend.subscribe(
+                interval: appState.selectedSubscriptionInterval
+            )
             awaitingSignIn = false
             try openCheckout(result)
-            // Sheet stays open — URL-scheme callback refreshes ProEntitlement
-            // and dismisses via NotificationCenter when checkout completes.
         } catch BackendError.notSignedIn {
-            // Inline morph instead of the cross-window Settings prompt:
-            // the user already expressed intent here, keep them on the
-            // paywall and offer Google sign-in directly.
             awaitingSignIn = true
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -285,23 +474,15 @@ struct ProUpgradeSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let result = try await appState.backend.topup(pack: .credits200)
+            let result = try await appState.backend.topup(pack: selectedPack)
             try openCheckout(result)
         } catch BackendError.notSignedIn {
-            // Top-up only fires for active Pro users, so a missing session
-            // here usually means the keychain entry expired. Show the
-            // inline error chip — no global alert needed since the sheet
-            // is already in focus.
             errorMessage = Loc.proUpgradeSignInFirst
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
-    /// Branches on the `CheckoutResult` union from the backend. DMG-build
-    /// only handles `.web`; `.storeKit` is a backend bug here and we surface
-    /// it as a decode error. Real StoreKit purchase support arrives with
-    /// the App Store-build (deferred).
     private func openCheckout(_ result: CheckoutResult) throws {
         switch result {
         case .web(let url):
@@ -311,4 +492,3 @@ struct ProUpgradeSheet: View {
         }
     }
 }
-

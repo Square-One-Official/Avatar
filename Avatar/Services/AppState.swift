@@ -25,12 +25,28 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// Bottom-of-window toast variants. `showsUpgrade` flips the Upgrade pill
-/// on/off so we can reuse the same chip for free-tier upsells and Pro-only
-/// hard-limit notices.
+/// Bottom-of-window toast variants. `kind` decides which CTA layout the
+/// view renders so we can reuse the same chip for several distinct
+/// moments without each call site fiddling with flags.
+///
+/// - `.info` → Pro-only hard limit, no CTA, just dismiss.
+/// - `.upgrade` → Free-tier soft gate, single Upgrade pill.
+/// - `.aiTrialExhausted` → After 3rd AI generation. Two CTAs side-by-
+///   side: Upgrade (primary) and "Continue with basic" (ghost / dismiss),
+///   so the user is never forced into the paywall.
+enum ProToastKind: Equatable, Sendable {
+    case info
+    case upgrade
+    case aiTrialExhausted
+}
+
 struct ProToast: Equatable {
     let message: String
-    let showsUpgrade: Bool
+    let kind: ProToastKind
+
+    /// Back-compat helper for callers that still think in boolean terms.
+    /// `aiTrialExhausted` shows an Upgrade CTA too, so it counts.
+    var showsUpgrade: Bool { kind != .info }
 }
 
 /// Soft error / warning shown via `StatusChip` at the bottom of the main
@@ -184,6 +200,11 @@ final class AppState {
     /// `showProUpgradeSheetInSettings` instead — otherwise main window steals
     /// focus and macOS auto-dismisses the preferences pane.
     var showProUpgradeSheet: Bool = false
+    /// Currently-selected billing cadence inside `ProUpgradeSheet`. Defaults
+    /// to `.year` so the better-value option is anchored on first paint
+    /// (Emil: anchor highest-value path; user actively toggles down to
+    /// monthly if they want).
+    var selectedSubscriptionInterval: SubscriptionInterval = .year
     /// Controls the paywall sheet on the **Settings preferences window**.
     /// Set this from any button inside `SettingsView` so the sheet appears
     /// over Settings and the preferences pane stays open.
@@ -212,13 +233,24 @@ final class AppState {
     /// Free-user gate hit: show the toast with an Upgrade CTA so they can
     /// jump straight to the paywall.
     func showProUpsell(_ message: String, seconds: TimeInterval = 5) {
-        present(ProToast(message: message, showsUpgrade: true), seconds: seconds)
+        present(ProToast(message: message, kind: .upgrade), seconds: seconds)
     }
 
     /// Pro-user technical limit hit (e.g. batch hard cap): show the same
     /// chip without the Upgrade CTA, since they're already paying.
     func showProInfo(_ message: String, seconds: TimeInterval = 5) {
-        present(ProToast(message: message, showsUpgrade: false), seconds: seconds)
+        present(ProToast(message: message, kind: .info), seconds: seconds)
+    }
+
+    /// Reverse-trial moment: the user just finished their 3rd AI
+    /// generation. Show a non-blocking dual-CTA toast so they can
+    /// upgrade OR keep going with the basic mode. Stays a beat longer
+    /// than other toasts because the choice deserves consideration.
+    func showAITrialExhausted(seconds: TimeInterval = 8) {
+        present(
+            ProToast(message: Loc.aiTrialExhaustedBody, kind: .aiTrialExhausted),
+            seconds: seconds
+        )
     }
 
     private func present(_ toast: ProToast, seconds: TimeInterval) {

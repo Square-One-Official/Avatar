@@ -675,6 +675,32 @@ enum ImportFlow {
                 if !ent.isPro && ent.credits == 0 && ent.freeCutoutsRemaining > 0 {
                     ent.freeCutoutsUsed += 1
                     ent.freeCutoutsRemaining -= 1
+
+                    // Reverse-trial messaging on the way down. The
+                    // 3-2-1-0 cadence aims to make the upgrade voelbaar
+                    // BEFORE the user hits a hard wall: a soft "1 left"
+                    // chip after the 2nd cutout, a dual-CTA toast after
+                    // the 3rd. We never block; basic mode keeps working
+                    // for the remaining 3 imports.
+                    switch ent.freeCutoutsRemaining {
+                    case 1:
+                        // Subtle, non-blocking nudge. No CTA — they
+                        // still have one premium use ahead of them.
+                        appState.showProInfo(Loc.aiTrialOneLeft, seconds: 4)
+                    case 0:
+                        // Trial is done. Dual-CTA toast lets the user
+                        // upgrade OR explicitly continue with basic.
+                        appState.showAITrialExhausted()
+                        // Auto-disable the Magic Cutout pref so the
+                        // toggle UI stops lying about what will happen
+                        // on the next import (gate already returns
+                        // false, but the toggle would still read "on").
+                        if appState.magicCutoutPrefs.enabled {
+                            appState.magicCutoutPrefs.enabled = false
+                        }
+                    default:
+                        break
+                    }
                 }
             }
             return CutoutResult(subject: result.subject, usedMagic: true)

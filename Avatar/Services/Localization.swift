@@ -377,6 +377,20 @@ enum Loc {
     static var proPerMonth: String {
         en ? "/month" : "/maand"
     }
+    static var proPerYear: String {
+        en ? "/year" : "/jaar"
+    }
+    /// "Buy 200 credits" / "Koop 200 credits" — concrete amount on the
+    /// CTA so the user sees what they're committing to.
+    static func buyCreditsCTA(_ count: Int) -> String {
+        en ? "Buy \(count) credits" : "Koop \(count) credits"
+    }
+    /// Decimal locale for currency formatting (per-credit display in
+    /// the top-up paywall). Tracks the in-app language preference so
+    /// "€0,040" renders correctly for NL and "€0.040" for EN.
+    static var currencyLocale: Locale {
+        en ? Locale(identifier: "en_US") : Locale(identifier: "nl_NL")
+    }
     static var proSubscribeCTA: String {
         en ? "Subscribe" : "Abonneer"
     }
@@ -413,12 +427,12 @@ enum Loc {
 
     // MARK: Top-up
     static var topupCardTitle: String {
-        en ? "Buy 200 credits" : "Koop 200 credits"
+        en ? "Buy more credits" : "Koop extra credits"
     }
     static var topupCardPrice: String { "€4,99" }
     static var topupCardDescription: String {
-        en ? "200 extra credits, on top of your monthly grant. They never expire."
-           : "200 extra credits, bovenop je maandelijkse tegoed. Vervallen nooit."
+        en ? "Extra credits on top of your monthly grant. They never expire."
+           : "Extra credits bovenop je maandelijkse tegoed. Vervallen nooit."
     }
     static var topupCTA: String {
         en ? "Buy credits" : "Koop credits"
@@ -756,16 +770,91 @@ enum Loc {
         return en ? "\(remaining) of \(total) left"
                   : "\(remaining) van \(total) over"
     }
+    /// Row label for the AI (Magic Cutout) portion of the free trial.
+    /// Plural-aware ("1 AI generation" vs "N AI generations").
+    static func proQuotaAIRow(remaining: Int, total: Int) -> String {
+        en ? "\(remaining) of \(total) AI generations left"
+           : "Nog \(remaining) van \(total) AI-generaties"
+    }
+    /// Row label for the basic (Subject Lift) portion of the free trial.
+    static func proQuotaBasicRow(remaining: Int, total: Int) -> String {
+        en ? "\(remaining) of \(total) basic generations left"
+           : "Nog \(remaining) van \(total) basis-generaties"
+    }
     static var proQuotaSubtitle: String {
         en ? "Upgrade to Pro to unlock more"
            : "Upgrade naar Pro om meer te ontgrendelen"
     }
     static var proQuotaTooltip: String {
-        en ? "Free accounts can keep up to \(FreeTier.maxPortraits) portraits. Upgrade to Pro for unlimited."
-           : "Gratis accounts kunnen tot \(FreeTier.maxPortraits) portretten bewaren. Upgrade naar Pro voor onbeperkt."
+        en ? "Free accounts get \(FreeTier.freeMagicCutoutAllowance) AI generations + \(FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) basic generations. Upgrade to Pro for unlimited."
+           : "Gratis accounts krijgen \(FreeTier.freeMagicCutoutAllowance) AI-generaties + \(FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) basis-generaties. Upgrade naar Pro voor onbeperkt."
     }
     static var proQuotaUpgradeCTA: String {
         en ? "Upgrade" : "Upgrade"
+    }
+
+    // MARK: AI-trial reverse-trial messaging (3+3 pattern)
+    /// Subtle inline hint shown on the result card after the 2nd AI
+    /// generation. Soft, non-blocking — not a paywall.
+    static var aiTrialOneLeft: String {
+        en ? "1 AI generation left" : "Nog 1 AI-generatie over"
+    }
+    static var aiTrialExhaustedTitle: String {
+        en ? "Your AI trial is done" : "Je AI-trial is op"
+    }
+    static var aiTrialExhaustedBody: String {
+        en ? "Upgrade for unlimited — or continue with the basic mode."
+           : "Upgrade voor onbeperkt — of ga door met de basis-modus."
+    }
+    static var aiTrialContinueBasicCTA: String {
+        en ? "Continue with basic" : "Doorgaan met basis"
+    }
+    /// Toast shown when Magic Cutout was auto-disabled because the user
+    /// hit the AI trial cap mid-session.
+    static var magicCutoutAutoDisabled: String {
+        en ? "Magic Cutout is a Pro feature after your trial. We'll use the basic cutout instead."
+           : "Magic Cutout is een Pro-functie na je trial. We gebruiken nu de basis-cutout."
+    }
+
+    // MARK: Yearly plan
+    static var yearlyPlanTitle: String {
+        en ? "Pro Annual" : "Pro Jaarlijks"
+    }
+    static var yearlyPlanSavings: String {
+        // Concrete months > abstract %  (Emil: users feel concrete numbers)
+        en ? "2 months free" : "2 maanden gratis"
+    }
+    static func yearlyPlanMonthlyEquiv(_ perMonth: String) -> String {
+        en ? "\(perMonth)/mo billed annually"
+           : "\(perMonth)/maand bij jaarlijks"
+    }
+    static var monthlyPlanTitle: String {
+        en ? "Pro Monthly" : "Pro Maandelijks"
+    }
+    static var billingIntervalMonth: String {
+        en ? "Monthly" : "Maandelijks"
+    }
+    static var billingIntervalYear: String {
+        en ? "Yearly" : "Jaarlijks"
+    }
+
+    // MARK: Credit pack ladder
+    static var packBestValueBadge: String {
+        en ? "Best value" : "Beste waarde"
+    }
+    static var packStarterLabel: String {
+        en ? "Starter" : "Starter"
+    }
+    static var packStandardLabel: String {
+        en ? "Standard" : "Standaard"
+    }
+    static var packBestValueLabel: String {
+        en ? "Best value" : "Voordelig"
+    }
+    /// Per-pack descriptor under the price (e.g. "50 credits · €0,040 each").
+    static func packCreditsDescriptor(credits: Int, perCredit: String) -> String {
+        en ? "\(credits) credits · \(perCredit) each"
+           : "\(credits) credits · \(perCredit) per stuk"
     }
     static func proUpsellBatchLimit(_ max: Int) -> String {
         en ? "Importing more than \(max) at once is a Pro feature."
