@@ -26,11 +26,7 @@ struct SidebarProQuotaCard: View {
     private var atLimit: Bool { aiRemaining == 0 && basicRemaining == 0 }
     private var aiExhausted: Bool { aiRemaining == 0 }
 
-    /// Same brand periwinkle the import drop zone uses, so the upsell reads
-    /// as a continuation of the import surface rather than a new motif.
-    private var brand: Color {
-        Color(red: 0x9A / 255.0, green: 0xB7 / 255.0, blue: 1.0)
-    }
+    private var brand: Color { .appBrand }
 
     var body: some View {
         Button {

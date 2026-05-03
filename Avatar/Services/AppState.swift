@@ -81,6 +81,7 @@ struct BatchConfirmRequest {
 enum ProcessingKind {
     case cutout
     case fillBody
+    case colorize
 }
 
 @MainActor
@@ -183,6 +184,13 @@ final class AppState {
             // surface for. `proRequired` is rare (gate should have caught
             // it earlier) but we still want a clear message if it slips.
             fail(error.errorDescription ?? Loc.somethingWentWrong)
+            return true
+        case .payloadTooLarge:
+            // Outside the Magic Cutout flow this should never fire (only
+            // `BackendClient.cutout` does the size pre-check). If it does,
+            // surface the same too-large copy so the user gets a clear
+            // explanation rather than a generic "server error".
+            warn(error.errorDescription ?? Loc.somethingWentWrong)
             return true
         }
     }

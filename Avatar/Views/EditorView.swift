@@ -70,12 +70,6 @@ struct EditorView: View {
     @State private var isDropping = false
     @State private var showInspector = true
 
-    // "More magic edits" — hover reveals card chrome; click reveals a
-    // floating dropdown 8pt below the trigger (overlay, not inline — must
-    // not push siblings down).
-    @State private var isMoreOpen = false
-    @State private var isMoreHovering = false
-    @State private var isFillBodyHovering = false
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
     #endif
@@ -190,34 +184,6 @@ struct EditorView: View {
             .animation(.easeOut(duration: 0.15), value: isDropping)
             .animation(.easeOut(duration: 0.15), value: appState.isProcessing)
             .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
-            // Floating "More" dropdown rendered at root so its dismiss-catcher
-            // can cover the entire window. The catcher (Color.clear behind the
-            // panel) closes the menu on any outside click; clicks on the
-            // dropdown's button reach the button because it sits in front of
-            // the catcher in the ZStack.
-            .overlayPreferenceValue(MoreTriggerAnchorKey.self) { anchor in
-                GeometryReader { proxy in
-                    if isMoreOpen, let anchor {
-                        let rect = proxy[anchor]
-                        ZStack(alignment: .topLeading) {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
-                                }
-                            fillBodyDropdown
-                                .frame(width: rect.width)
-                                .offset(x: rect.minX, y: rect.maxY + 8)
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .opacity.combined(with: .offset(y: -6)),
-                                        removal: .opacity
-                                    )
-                                )
-                        }
-                    }
-                }
-            }
     }
 
     // MARK: - Canvas
@@ -589,137 +555,36 @@ struct EditorView: View {
                 }
             }
 
-            // "More" — extensible dropdown for Pro AI edits, always pinned
-            // to the bottom of the section. Currently houses Fill in Body;
-            // future additions (Colorise, background swap, etc.) slot in
-            // alongside without restructuring the inspector. Rendered as a
-            // Menu using the same chrome as the regular enhance cards so
-            // the section reads as one column of equally-weighted actions.
-            moreMagicEditsSection
-        }
-    }
-
-    /// "More" trigger only — the dropdown itself is rendered at the body
-    /// level via `overlayPreferenceValue` (see `body`). Local overlay is
-    /// avoided so we can place a transparent dismiss-catcher *behind* the
-    /// dropdown that closes the menu on any outside click without blocking
-    /// clicks on the menu items themselves.
-    @ViewBuilder private var moreMagicEditsSection: some View {
-        moreMagicEditsTrigger
-            .anchorPreference(key: MoreTriggerAnchorKey.self, value: .bounds) { $0 }
-    }
-
-    /// Default state: text-only "✨ More". Hover/open state: same content in
-    /// the same position, with the card fill + border faded in. Position never
-    /// shifts — only the surrounding chrome appears.
-    @ViewBuilder private var moreMagicEditsTrigger: some View {
-        let disabled = portrait.cutoutPNG == nil || appState.isProcessing
-        let showChrome = isMoreHovering || isMoreOpen
-        Button {
-            withAnimation(.easeOut(duration: 0.18)) { isMoreOpen.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .regular))
-                Text(Loc.moreMagicEdits)
-                    .fontWeight(.medium)
+            enhanceCard(
+                title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
+                systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "bandage.fill",
+                disabled: portrait.cutoutPNG == nil || appState.isProcessing,
+                help: Loc.fillBodyHelp,
+                active: portrait.isFillBodyApplied,
+                showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
+            ) {
+                if portrait.isFillBodyApplied {
+                    ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                } else {
+                    ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                }
             }
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(showChrome ? 0.04 : 0))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(showChrome ? 0.08 : 0), lineWidth: 1)
-                    )
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) { isMoreHovering = hovering }
-        }
-        .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
-        .help(Loc.moreMagicEditsHelp)
-    }
 
-    /// Floating menu panel. Distinct dark surface (separate from the inspector
-    /// background) so items read clearly; subtle border + shadow give it lift.
-    /// Item rows are flat (no per-row card chrome) — the panel is the surface,
-    /// hover provides per-row affordance.
-    @ViewBuilder private var fillBodyDropdown: some View {
-        VStack(spacing: 0) {
-            fillBodyDropdownItem
-        }
-        .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.black.opacity(0.55))
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.regularMaterial)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 8)
-        )
-    }
-
-    @ViewBuilder private var fillBodyDropdownItem: some View {
-        let title = portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody
-        let icon = portrait.isFillBodyApplied ? "arrow.uturn.backward" : "rectangle.expand.vertical"
-        let active = portrait.isFillBodyApplied
-        let showProBadge = !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
-        // Mirror the trigger's `isProcessing` guard. Without this, once the
-        // dropdown is open the inner button stays live during a running
-        // Fill in Body, and every extra tap spawns a parallel backend
-        // request — that's what was tripping the server-side rate limiter
-        // into "Too many requests" toasts.
-        let busy = appState.isProcessing
-        Button {
-            withAnimation(.easeOut(duration: 0.18)) { isMoreOpen = false }
-            if portrait.isFillBodyApplied {
-                ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-            } else {
-                ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            enhanceCard(
+                title: portrait.isColorized ? Loc.colorizeUndo : Loc.colorize,
+                systemImage: portrait.isColorized ? "arrow.uturn.backward" : "paintpalette",
+                disabled: portrait.cutoutPNG == nil || appState.isProcessing,
+                help: portrait.isColorized ? Loc.colorizeUndoHelp : Loc.colorizeHelp,
+                active: portrait.isColorized,
+                showProBadge: !appState.proEntitlement.isPro && !portrait.isColorized
+            ) {
+                if portrait.isColorized {
+                    ImportFlow.undoColorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                } else {
+                    ImportFlow.colorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                }
             }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(active ? Color.accentColor : Color.primary)
-                    .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(active ? Color.accentColor.opacity(0.15) : Color.white.opacity(0.08))
-                    )
-                Text(title)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.primary)
-                Spacer(minLength: 0)
-                if showProBadge { ProBadge() }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(isFillBodyHovering ? 0.08 : 0))
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(PressableButtonStyle())
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.10)) { isFillBodyHovering = hovering }
-        }
-        .disabled(busy)
-        .opacity(busy ? 0.45 : 1)
     }
 
     @ViewBuilder
@@ -729,10 +594,16 @@ struct EditorView: View {
         disabled: Bool,
         help: String,
         active: Bool = false,
+        showProBadge: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            enhanceCardLabel(title: title, systemImage: systemImage, active: active)
+            enhanceCardLabel(
+                title: title,
+                systemImage: systemImage,
+                active: active,
+                showProBadge: showProBadge
+            )
         }
         .buttonStyle(PressableButtonStyle())
         .disabled(disabled)
@@ -990,13 +861,6 @@ struct EditorView: View {
             undoManager: undoManager
         )
         if result.skipped > 0 { bulkSkippedCount = result.skipped }
-    }
-}
-
-private struct MoreTriggerAnchorKey: PreferenceKey {
-    static let defaultValue: Anchor<CGRect>? = nil
-    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = nextValue() ?? value
     }
 }
 
@@ -1578,6 +1442,13 @@ struct BackgroundChip: View {
                         }
                 )
                 .contextMenu { menuContents }
+                .popover(isPresented: $isRenaming, arrowEdge: .top) {
+                    RenameBackgroundPopover(
+                        name: $editName,
+                        onSave: finishRename,
+                        onCancel: { isRenaming = false }
+                    )
+                }
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
@@ -1606,17 +1477,9 @@ struct BackgroundChip: View {
             }
             .onHover { isHovering = $0 }
 
-            if isRenaming {
-                TextField(Loc.name, text: $editName, onCommit: finishRename)
-                    .textFieldStyle(.plain)
-                    .multilineTextAlignment(.center)
-                    .font(.caption2)
-                    .frame(width: 76)
-            } else {
-                Text(preset.name)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
+            Text(preset.name)
+                .font(.caption2)
+                .lineLimit(1)
         }
         .frame(width: 80)
     }
@@ -1642,6 +1505,51 @@ struct BackgroundChip: View {
             try? context.save()
         }
         isRenaming = false
+    }
+}
+
+// MARK: - Rename popover
+
+private struct RenameBackgroundPopover: View {
+    @Binding var name: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    @FocusState private var isFocused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSave: Bool { !trimmed.isEmpty }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(Loc.renameBackground)
+                .font(.subheadline.weight(.semibold))
+
+            TextField(Loc.name, text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($isFocused)
+                .onSubmit { if canSave { onSave() } }
+
+            HStack(spacing: 8) {
+                Spacer()
+                Button(Loc.cancel, role: .cancel, action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button(Loc.save) { if canSave { onSave() } }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSave)
+            }
+        }
+        .padding(16)
+        .frame(width: 240)
+        .onAppear {
+            isFocused = true
+            #if os(macOS)
+            DispatchQueue.main.async {
+                NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+            }
+            #endif
+        }
     }
 }
 

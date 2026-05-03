@@ -3,9 +3,7 @@ import SwiftData
 import UniformTypeIdentifiers
 import AppKit
 
-/// Brand periwinkle blue used throughout the import drop zone — cards, link,
-/// banner title, and the dashed border dots.
-private let dropZoneBlue = Color(red: 0x9A / 255.0, green: 0xB7 / 255.0, blue: 1.0)
+private let dropZoneBlue = Color.appBrand
 
 struct ImportDropZone: View {
     @Environment(\.modelContext) private var context

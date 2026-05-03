@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
+import { sendCheckoutError } from "../../../lib/checkout-errors.js";
 import { activeSubscription, ensureUser, supabase } from "../../../lib/supabase.js";
 import { isCreditPack, priceIdForPack, stripe, type CreditPack } from "../../../lib/stripe.js";
 
@@ -98,8 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ url: session.url });
   } catch (err) {
-    console.error("/v1/checkout/topup error", err);
-    res.status(500).json({ error: "checkout_failed" });
+    sendCheckoutError(req, res, "/v1/checkout/topup", err);
   }
 }
 

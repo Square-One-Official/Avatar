@@ -96,6 +96,42 @@ export async function outpaintPortrait(input: {
 }
 
 /**
+ * Colorize — runs DeOldify on a B&W (or low-saturation) photo and returns
+ * a colorized RGB version. The caller is responsible for compositing the
+ * input cutout over an opaque background BEFORE sending (DeOldify operates
+ * on RGB only and will silently flatten any alpha) and for re-attaching
+ * the alpha channel afterwards. Same dimensions in/out.
+ *
+ * Model: `arielreplicate/deoldify_image` — DeOldify, the long-running
+ * standard for B&W photo colorization. Warm photo-realistic palette,
+ * ~$0.001 per call. `model_name: "Artistic"` lifts saturation slightly
+ * for portraits (the alternative "Stable" is tuned for landscapes and
+ * leaves portraits looking washed-out). `render_factor` is a quality knob:
+ * 35 is the documented sweet spot — higher sharpens detail at the cost
+ * of speed/$ but rarely changes the colour decisions on a portrait.
+ *
+ * Version is pinned because the unversioned slug 404s for this community
+ * model (same fallback we use for BiRefNet). To upgrade, pick a new hash
+ * from https://replicate.com/arielreplicate/deoldify_image/versions.
+ */
+const DEOLDIFY_VERSION =
+  "arielreplicate/deoldify_image:0da600fab0c45a66211339f1c16b71345d22f26ef5fea3dca1bb90bb5711e950";
+
+export async function colorize(input: {
+  imageDataUrl: string;
+}): Promise<string> {
+  const output = (await replicate.run(DEOLDIFY_VERSION, {
+    input: {
+      input_image: input.imageDataUrl,
+      model_name: "Artistic",
+      render_factor: 35,
+    },
+  })) as unknown;
+
+  return extractUrl(output, "colorize");
+}
+
+/**
  * Replicate's SDK output is one of: a string URL, an array of URLs, or a
  * File-like object with a `.url()` method, depending on model + SDK
  * version. Normalise to a single URL string.

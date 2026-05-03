@@ -52,6 +52,7 @@ struct LibraryView: View {
                 }
             }
             .padding([.horizontal, .top], 12)
+            .padding(.bottom, 8)
             .animation(.easeOut(duration: 0.15), value: selectedSet.count >= 2)
 
             if filtered.isEmpty {
@@ -103,6 +104,13 @@ struct LibraryView: View {
                 SidebarProQuotaCard()
                     .transition(.opacity)
                     .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
+            } else if appState.proEntitlement.needsAccountLink {
+                // Pre-auth checkout grant: this Mac is Pro but no Supabase
+                // session is signed in. Banner offers to email a magic link
+                // so Pro syncs to other Macs.
+                SyncAcrossDevicesBanner()
+                    .transition(.opacity)
+                    .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.needsAccountLink)
             }
         }
         .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.isPro)

@@ -631,6 +631,126 @@ enum ImportFlow {
         )
     }
 
+    // MARK: - Colorise (Pro B&W → colour)
+
+    /// Calls `/v1/colorize`. The server flattens the cutout over neutral
+    /// grey, runs DeOldify on the RGB, and re-attaches the original alpha
+    /// so the silhouette round-trips identically. No face/body redetect or
+    /// re-align is needed (dimensions and geometry are preserved). Costs
+    /// 1 credit on success; failures don't deduct.
+    static func colorize(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
+        guard !appState.isProcessing else { return }
+        guard appState.proEntitlement.isPro else {
+            appState.showProUpgradeSheet = true
+            return
+        }
+        guard !portrait.isColorized else {
+            appState.note(Loc.colorizeAlready)
+            return
+        }
+        guard let cutoutData = portrait.cutoutPNG else {
+            appState.note(Loc.noCutoutAvailable)
+            return
+        }
+
+        appState.processingKind = .colorize
+        appState.isProcessing = true
+        appState.dismissBanner()
+        dlog("[Colorize] start id=\(portrait.id) bytes=\(cutoutData.count)")
+
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
+        let portraitID = portrait.id
+        let backend = appState.backend
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let (newCutoutPNG, creditsRemaining) = try await backend.colorize(
+                    imagePNG: cutoutData
+                )
+
+                await MainActor.run {
+                    let descriptor = FetchDescriptor<Portrait>(
+                        predicate: #Predicate { $0.id == portraitID }
+                    )
+                    guard let fresh = try? context.fetch(descriptor).first else {
+                        appState.isProcessing = false
+                        appState.warn(Loc.portraitNotFound)
+                        return
+                    }
+                    fresh.preColorizePNG = fresh.cutoutPNG
+                    fresh.cutoutPNG = newCutoutPNG
+                    fresh.isColorized = true
+                    fresh.updatedAt = Date()
+                    try? context.save()
+
+                    PortraitUndoManager.registerFromSnapshots(
+                        before: undoBefore,
+                        after: PortraitUndoManager.snapshot(of: fresh),
+                        context: context,
+                        undoManager: undoManager,
+                        appState: appState,
+                        actionName: Loc.colorize
+                    )
+
+                    appState.proEntitlement.credits = creditsRemaining
+                    appState.invalidateCutout(for: fresh)
+                    appState.isProcessing = false
+                    dlog("[Colorize] DONE id=\(fresh.id) credits=\(creditsRemaining)")
+                }
+            } catch let err as BackendError {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    switch err {
+                    case .noCredits:
+                        appState.showProUpgradeSheet = true
+                    case .server, .decode:
+                        appState.warn(Loc.colorizeFailed)
+                    default:
+                        if !appState.report(err) {
+                            appState.warn(Loc.colorizeFailed)
+                        }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    appState.isProcessing = false
+                    appState.warn(Loc.colorizeFailed)
+                }
+            }
+        }
+    }
+
+    /// Reverts Colorise by restoring the snapshotted B&W cutout. One-shot:
+    /// credits are not refunded (the Replicate call already happened).
+    static func undoColorize(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
+        guard portrait.isColorized, let original = portrait.preColorizePNG else { return }
+        let undoBefore = PortraitUndoManager.snapshot(of: portrait)
+        portrait.cutoutPNG = original
+        portrait.preColorizePNG = nil
+        portrait.isColorized = false
+        portrait.updatedAt = Date()
+        try? context.save()
+        appState.invalidateCutout(for: portrait)
+        PortraitUndoManager.registerFromSnapshots(
+            before: undoBefore,
+            after: PortraitUndoManager.snapshot(of: portrait),
+            context: context,
+            undoManager: undoManager,
+            appState: appState,
+            actionName: Loc.colorizeUndo
+        )
+    }
+
     // MARK: - Import Pipeline
 
     /// Returns true when the user is allowed to run Magic Cutout *and* has
@@ -727,6 +847,11 @@ enum ImportFlow {
                     // Log the raw status/detail for devs; show friendly copy.
                     dlog("[Magic Cutout] server error \(code) \(message ?? "")")
                     appState.fail(Loc.magicCutoutServerError(code, message))
+                case .payloadTooLarge(let bytes, let limit):
+                    // Pre-flight reject — known transport ceiling, not a
+                    // server fault. `.warn` keeps the toast amber, not red.
+                    dlog("[Magic Cutout] image too large bytes=\(bytes) limit=\(limit)")
+                    appState.warn(Loc.magicCutoutImageTooLarge(limit / (1024 * 1024)))
                 case .decode:
                     appState.fail(Loc.magicCutoutDecodeError)
                 case .proRequired:

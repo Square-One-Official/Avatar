@@ -91,6 +91,16 @@ final class Portrait {
     var preFillOffsetY: Double = 0
     var preFillScale: Double = 1
 
+    // MARK: - Colorise (Pro B&W → colour via Replicate DeOldify)
+    /// True when the current `cutoutPNG` has been colorized. Drives the
+    /// button label (Colorise ↔ Undo) and prevents double-application.
+    var isColorized: Bool = false
+    /// Snapshot of the cutout BEFORE Colorise so undo restores the exact
+    /// original bytes (lossless). Geometry is unchanged by colorization
+    /// so no separate face/eye/transform snapshot is needed — unlike
+    /// Fill in Body, the dimensions and silhouette round-trip identically.
+    @Attribute(.externalStorage) var preColorizePNG: Data?
+
     init(
         id: UUID = UUID(),
         name: String = "",

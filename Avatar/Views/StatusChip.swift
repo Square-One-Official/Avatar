@@ -54,6 +54,15 @@ enum StatusChipStyle {
 /// Reusable inline status chip. One component for every soft-error / info /
 /// success surface in the app, so all of them share padding, weight, radius,
 /// and icon set.
+/// Inline action embedded in a chip. The button reads as a quiet sibling to
+/// the message — same ink color, slightly stronger weight, capsule
+/// underlay so the affordance is unmistakable but the chip itself stays
+/// compact.
+struct StatusChipAction {
+    let label: String
+    let run: () -> Void
+}
+
 struct StatusChip: View {
     let severity: StatusSeverity
     let message: String
@@ -61,6 +70,10 @@ struct StatusChip: View {
     /// Optional dismiss control. When provided, an `xmark` button appears at
     /// the trailing edge.
     var onDismiss: (() -> Void)?
+    /// Optional inline CTA (e.g. "Try again") rendered before the dismiss
+    /// button. Use sparingly — only when the chip describes a state the
+    /// user can act on right there.
+    var action: StatusChipAction?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -73,6 +86,21 @@ struct StatusChip: View {
                 .foregroundStyle(severity.ink)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let action {
+                Button(action: action.run) {
+                    Text(action.label)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(severity.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(severity.ink.opacity(0.16))
+                        )
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PressableButtonStyle(pressedScale: 0.97))
+            }
 
             if let onDismiss {
                 Button(action: onDismiss) {

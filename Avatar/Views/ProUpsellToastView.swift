@@ -14,9 +14,7 @@ struct ProUpsellToastView: View {
 
     @State private var hovering = false
 
-    private var brand: Color {
-        Color(red: 0x9A / 255.0, green: 0xB7 / 255.0, blue: 1.0)
-    }
+    private var brand: Color { .appBrand }
 
     var body: some View {
         // The dual-CTA layout is wide enough that we stack vertically:

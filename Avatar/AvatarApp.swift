@@ -14,6 +14,10 @@ extension Color {
     /// Slightly elevated surface for cards, search bars, preset tiles.
     static let appSurface = Color(nsColor: .appSurface)
 
+    /// Brand periwinkle blue. Primary action color — CTAs, links, drop-zone
+    /// accents, Pro upsell surfaces. Same value in light and dark mode.
+    static let appBrand = Color(red: 0x5E / 255.0, green: 0x99 / 255.0, blue: 1.0)
+
     // MARK: Status palette
     //
     // Four severity levels, each with a soft fill + matching ink (text / icon

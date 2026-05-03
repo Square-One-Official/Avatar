@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireUser } from "../../lib/auth.js";
+import { optionalUser } from "../../lib/auth.js";
 import {
   activeSubscription,
   currentCredits,
@@ -8,6 +8,7 @@ import {
   freeImportsUsedForUser,
   FREE_CUTOUTS_ALLOWANCE,
   FREE_IMPORTS_ALLOWANCE,
+  supabase,
 } from "../../lib/supabase.js";
 import { creditsForTier, type Tier } from "../../lib/stripe.js";
 
@@ -36,60 +37,152 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
-  const user = await requireUser(req, res);
-  if (!user) return;
+
+  // Three states this endpoint serves:
+  //   1. Signed-in user (Bearer token valid)         → full account payload.
+  //   2. Signed-out + device has a paid checkout grant
+  //      (`device_grants` row matches X-Device-Fingerprint) →
+  //      Pro payload + needs_account_link=true so the UI shows the
+  //      "sign in to sync across Macs" banner.
+  //   3. Signed-out + no device grant                 → free-tier payload.
+  //
+  // Anonymous mode replaces the previous 401 hard-fail; pre-auth checkout
+  // makes it possible to be Pro without a Supabase session yet.
+  const userResult = await optionalUser(req, res);
+  if (userResult === "rejected") return; // optionalUser already wrote 401
 
   try {
-    await ensureUser(user.id);
+    if (userResult) {
+      const user = userResult;
+      await ensureUser(user.id);
 
-    // Dev-allowlisted users impersonate Pro state without an actual Stripe
-    // subscription. Mirrors the bypass in /v1/cutout so
-    // the client unlocks every Pro-gated UI path. Quota uses a high sentinel
-    // so the UI doesn't surface a paywall on the first cutout call.
-    if (isDevUnlimitedUser(user.email)) {
+      // Dev-allowlisted users impersonate Pro state without an actual Stripe
+      // subscription. Mirrors the bypass in /v1/cutout so
+      // the client unlocks every Pro-gated UI path. Quota uses a high sentinel
+      // so the UI doesn't surface a paywall on the first cutout call.
+      if (isDevUnlimitedUser(user.email)) {
+        res.status(200).json({
+          tier: "pro",
+          credits_remaining: 999_999,
+          monthly_quota: 999_999,
+          monthly_reset_at: null,
+          subscription_status: "active",
+          subscription_renews_at: null,
+          free_cutouts_used: 0,
+          free_cutouts_remaining: FREE_CUTOUTS_ALLOWANCE,
+          free_imports_used: 0,
+          free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
+          needs_account_link: false,
+        });
+        return;
+      }
+
+      const [sub, credits, freeCutouts, freeImports] = await Promise.all([
+        activeSubscription(user.id),
+        currentCredits(user.id),
+        freeCutoutsUsed(user.id),
+        freeImportsUsedForUser(user.id),
+      ]);
+
+      const tier = mapTierForClient(sub?.tier);
+      const monthlyQuota = sub ? quotaForRawTier(sub.tier) : 0;
+      const subscriptionStatus = mapSubscriptionStatus(sub?.status);
+      const periodEnd = sub?.current_period_end ?? null;
+
       res.status(200).json({
-        tier: "pro",
-        credits_remaining: 999_999,
-        monthly_quota: 999_999,
-        monthly_reset_at: null,
-        subscription_status: "active",
-        subscription_renews_at: null,
-        free_cutouts_used: 0,
-        free_cutouts_remaining: FREE_CUTOUTS_ALLOWANCE,
-        free_imports_used: 0,
-        free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
+        tier,
+        credits_remaining: credits,
+        monthly_quota: monthlyQuota,
+        monthly_reset_at: periodEnd,
+        subscription_status: subscriptionStatus,
+        subscription_renews_at: periodEnd,
+        free_cutouts_used: freeCutouts,
+        free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
+        free_imports_used: freeImports,
+        free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+        needs_account_link: false,
       });
       return;
     }
 
-    const [sub, credits, freeCutouts, freeImports] = await Promise.all([
-      activeSubscription(user.id),
-      currentCredits(user.id),
-      freeCutoutsUsed(user.id),
-      freeImportsUsedForUser(user.id),
-    ]);
+    // Anonymous path. Look up device_grants by fingerprint; if present, the
+    // device has a paid Pro grant from a pre-auth checkout. Resolve the
+    // account that owns the grant and serve a Pro payload tagged
+    // `needs_account_link: true`.
+    const fingerprint = req.headers["x-device-fingerprint"];
+    if (typeof fingerprint === "string" && fingerprint) {
+      const { data: grant } = await supabase
+        .from("device_grants")
+        .select("user_id")
+        .eq("device_fingerprint", fingerprint)
+        .maybeSingle();
 
-    const tier = mapTierForClient(sub?.tier);
-    const monthlyQuota = sub ? quotaForRawTier(sub.tier) : 0;
-    const subscriptionStatus = mapSubscriptionStatus(sub?.status);
-    const periodEnd = sub?.current_period_end ?? null;
+      const grantedUserId = (grant?.user_id as string | undefined) ?? null;
+      if (grantedUserId) {
+        const [sub, credits, freeCutouts, freeImports] = await Promise.all([
+          activeSubscription(grantedUserId),
+          currentCredits(grantedUserId),
+          freeCutoutsUsed(grantedUserId),
+          freeImportsUsedForUser(grantedUserId),
+        ]);
 
+        const grantedEmail = await emailForUser(grantedUserId);
+        const tier = mapTierForClient(sub?.tier);
+        const monthlyQuota = sub ? quotaForRawTier(sub.tier) : 0;
+        const subscriptionStatus = mapSubscriptionStatus(sub?.status);
+        const periodEnd = sub?.current_period_end ?? null;
+
+        res.status(200).json({
+          tier,
+          credits_remaining: credits,
+          monthly_quota: monthlyQuota,
+          monthly_reset_at: periodEnd,
+          subscription_status: subscriptionStatus,
+          subscription_renews_at: periodEnd,
+          free_cutouts_used: freeCutouts,
+          free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
+          free_imports_used: freeImports,
+          free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+          needs_account_link: true,
+          link_email: grantedEmail,
+        });
+        return;
+      }
+    }
+
+    // Pure anonymous: no signed-in user and no device grant. Free tier.
     res.status(200).json({
-      tier,
-      credits_remaining: credits,
-      monthly_quota: monthlyQuota,
-      monthly_reset_at: periodEnd,
-      subscription_status: subscriptionStatus,
-      subscription_renews_at: periodEnd,
-      free_cutouts_used: freeCutouts,
-      free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
-      free_imports_used: freeImports,
-      free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+      tier: null,
+      credits_remaining: 0,
+      monthly_quota: 0,
+      monthly_reset_at: null,
+      subscription_status: "none",
+      subscription_renews_at: null,
+      free_cutouts_used: 0,
+      free_cutouts_remaining: FREE_CUTOUTS_ALLOWANCE,
+      free_imports_used: 0,
+      free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
+      needs_account_link: false,
     });
   } catch (err) {
     console.error("/v1/account error", err);
     res.status(500).json({ error: "Internal error" });
   }
+}
+
+/** Look up email of an auth.users row by id. Service role can read auth schema. */
+async function emailForUser(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .schema("auth")
+    .from("users")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) {
+    console.warn("emailForUser failed", error);
+    return null;
+  }
+  return (data?.email as string | undefined) ?? null;
 }
 
 /**

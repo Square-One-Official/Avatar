@@ -41,6 +41,7 @@ enum Loc {
         return en ? "\(count) portraits selected" : "\(count) portretten geselecteerd"
     }
     static var ok: String              { "OK" }
+    static var save: String            { en ? "Save" : "Opslaan" }
     static var name: String            { en ? "Name" : "Naam" }
     static var add: String             { en ? "Add" : "Toevoegen" }
     static var close: String           { en ? "Close" : "Sluiten" }
@@ -102,14 +103,7 @@ enum Loc {
            : "Herstel de originele uitknip zonder Magic Retouch."
     }
 
-    // MARK: Editor – More magic edits (dropdown of Replicate-backed Pro tools)
-    static var moreMagicEdits: String {
-        en ? "More" : "Meer"
-    }
-    static var moreMagicEditsHelp: String {
-        en ? "Pro AI edits — fill in body and more."
-           : "Pro AI-bewerkingen — vul lichaam aan en meer."
-    }
+    // MARK: Editor – Pro AI edits (Replicate-backed)
     static var fillBody: String {
         en ? "Fill in body" : "Vul lichaam aan"
     }
@@ -131,6 +125,29 @@ enum Loc {
     static var fillBodyAlreadyComplete: String {
         en ? "This portrait already looks complete \u{2014} no fill needed."
            : "Dit portret ziet er al compleet uit \u{2014} geen aanvulling nodig."
+    }
+
+    static var colorize: String {
+        en ? "Colorise" : "Inkleuren"
+    }
+    static var colorizeUndo: String {
+        en ? "Undo colorise" : "Inkleuren ongedaan maken"
+    }
+    static var colorizeHelp: String {
+        en ? "Turn a black-and-white photo into colour with one click."
+           : "Maak met één klik kleur van een zwart-witfoto."
+    }
+    static var colorizeUndoHelp: String {
+        en ? "Revert to the original black-and-white cutout."
+           : "Herstel de originele zwart-witversie."
+    }
+    static var colorizeAlready: String {
+        en ? "This portrait is already colorised."
+           : "Dit portret is al ingekleurd."
+    }
+    static var colorizeFailed: String {
+        en ? "Couldn't colorise the photo. Please try again."
+           : "Kon de foto niet inkleuren. Probeer het opnieuw."
     }
 
     // MARK: Settings – Library back-up (export / import)
@@ -252,10 +269,6 @@ enum Loc {
            : "Meld je eerst aan om je abonnement te beheren."
     }
 
-    static var proUpgradeSignInToContinue: String {
-        en ? "Sign in to start your subscription."
-           : "Meld je aan om je abonnement te starten."
-    }
     /// Shown as a chip after a Magic Cutout call falls back to the basic
     /// cutout because the user's session expired or was never set up.
     /// Non-blocking — the basic cutout already produced a result.
@@ -359,6 +372,14 @@ enum Loc {
         en ? "Magic Cutout sent something we couldn't read. Using the basic cutout. No credits charged."
            : "Magic Cutout stuurde iets wat we niet konden lezen. We gebruiken nu de basisuitsnijder. Geen credits afgeschreven."
     }
+    /// Shown when the input PNG exceeds the Magic Cutout size cap. The cap
+    /// is a real transport limit (Supabase Storage), so the copy is
+    /// matter-of-fact rather than apologetic — the basic-cutout fallback
+    /// reads as intentional, not as a fault.
+    static func magicCutoutImageTooLarge(_ mb: Int) -> String {
+        en ? "Image is over \(mb) MB. Magic Cutout can't process this size. Using the basic cutout. No credits charged."
+           : "De afbeelding is groter dan \(mb) MB. Magic Cutout kan dit formaat niet verwerken. We gebruiken nu de basisuitsnijder. Geen credits afgeschreven."
+    }
 
     // MARK: Pro paywall
     static var proUpgradeTitle: String {
@@ -423,6 +444,76 @@ enum Loc {
     static var proUpgradeFinePrint: String {
         en ? "Cancel anytime. Credits reset at the start of each billing period. Top-up credits never expire."
            : "Op elk moment opzegbaar. Credits resetten aan het begin van elke factuurperiode. Bijgekochte credits vervallen nooit."
+    }
+
+    // MARK: Checkout error copy
+    /// Generic "tap to retry" CTA used inside the StatusChip after a
+    /// checkout failure. Kept short so the chip stays compact.
+    static var tryAgain: String {
+        en ? "Try again" : "Opnieuw"
+    }
+    /// Stripe responded with an error (network, tax config, etc.) —
+    /// implies a retry might just work.
+    static var checkoutStripeUnavailable: String {
+        en ? "Stripe is temporarily unreachable. Please try again."
+           : "Stripe is even niet bereikbaar. Probeer het zo nog eens."
+    }
+    /// Generic backend error initialising checkout — Supabase upsert
+    /// failure or unhandled exception. Same recovery path as Stripe
+    /// errors (retry).
+    static var checkoutInitFailed: String {
+        en ? "Couldn't start checkout. Please try again."
+           : "We konden de checkout niet starten. Probeer het opnieuw."
+    }
+    /// Pricing env var missing on the backend — only us can fix this.
+    /// Don't promise a retry will work; ask the user to contact support.
+    static var checkoutPricingMisconfigured: String {
+        en ? "Pricing is temporarily unavailable. Please contact support."
+           : "Prijzen zijn tijdelijk niet beschikbaar. Neem contact op met support."
+    }
+    /// 429 from the rate limiter. Retry will work after a short wait.
+    static var checkoutRateLimited: String {
+        en ? "Too many attempts. Please wait a moment and try again."
+           : "Te veel pogingen. Wacht even en probeer het opnieuw."
+    }
+    /// Transport / URLSession error — phone is offline, DNS failed, etc.
+    static var checkoutOffline: String {
+        en ? "No internet. Connect to a network and try again."
+           : "Geen internet. Maak verbinding en probeer het opnieuw."
+    }
+    /// Catch-all when none of the above mapped. Stays generic instead of
+    /// leaking a raw error code into the chip.
+    static var checkoutGenericError: String {
+        en ? "Something went wrong. Please try again."
+           : "Er ging iets mis. Probeer het opnieuw."
+    }
+
+    // MARK: Cross-device sync banner (post pre-auth checkout)
+    /// Title shown on the sync banner. Past-tense affirmative — "you ARE
+    /// Pro on this Mac" — before pivoting to the call-to-action.
+    static var syncBannerTitle: String {
+        en ? "Pro is active on this Mac"
+           : "Pro is actief op deze Mac"
+    }
+    /// Body explaining how to extend Pro to other Macs. Includes the
+    /// captured email so the user knows which inbox to check.
+    static func syncBannerBody(email: String) -> String {
+        en ? "Want Pro on your other Macs too? Sign in with \(email) to sync."
+           : "Wil je Pro ook op je andere Macs? Meld je aan met \(email) om te synchroniseren."
+    }
+    /// CTA on the banner. Triggers /v1/account/resend-magic-link.
+    static var syncBannerSendLink: String {
+        en ? "Email me a sign-in link" : "Stuur me een aanmeldlink"
+    }
+    /// Brief confirmation toast after the email is sent.
+    static func syncBannerLinkSent(email: String) -> String {
+        en ? "Sign-in link sent to \(email). Check your inbox."
+           : "Aanmeldlink verstuurd naar \(email). Check je inbox."
+    }
+    /// Error if the resend call fails.
+    static var syncBannerSendFailed: String {
+        en ? "Couldn't send the sign-in link. Try again."
+           : "Aanmeldlink kon niet verstuurd worden. Probeer het opnieuw."
     }
 
     // MARK: Top-up
@@ -595,16 +686,46 @@ enum Loc {
         ]
     }
 
+    /// Status messages shown during Colorise. Same length as
+    /// `processingStatuses` so dwell times line up.
+    static var colorizeProcessingStatuses: [String] {
+        en ? [
+            "Mixing the paint…",
+            "Picking a palette…",
+            "Warming up the skin tones…",
+            "Choosing a shirt colour…",
+            "Adding a touch of saturation…",
+            "Bringing the eyes to life…",
+            "Balancing the highlights…",
+            "Letting the colours settle…",
+            "Polishing the result…",
+            "Almost there, promise…",
+        ] : [
+            "De verf mengen…",
+            "Een palet kiezen…",
+            "Huidtinten opwarmen…",
+            "Een kleur voor het shirt kiezen…",
+            "Een vleugje verzadiging toevoegen…",
+            "De ogen tot leven wekken…",
+            "De hooglichten in balans brengen…",
+            "Kleuren laten bezinken…",
+            "Het resultaat polijsten…",
+            "Bijna klaar, echt waar…",
+        ]
+    }
+
     /// Returns the message rotation that fits the current processing kind.
     static func processingStatuses(for kind: ProcessingKind) -> [String] {
         switch kind {
         case .cutout:   return processingStatuses
         case .fillBody: return fillBodyProcessingStatuses
+        case .colorize: return colorizeProcessingStatuses
         }
     }
 
     // MARK: Editor – Background picker context menu
     static var rename: String          { en ? "Rename…" : "Hernoem…" }
+    static var renameBackground: String { en ? "Rename background" : "Achtergrond hernoemen" }
     static var setDefault: String      { en ? "Set as default" : "Maak standaard" }
     static var defaultCheck: String    { en ? "Default ✓" : "Standaard ✓" }
 

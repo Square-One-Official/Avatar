@@ -120,6 +120,8 @@
 		F75326EE95AD345F1B6AB7E3 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B1818524625F66274E218 /* GoogleSignInButton.swift */; };
 		FA2169F93286D9C1CFAA2E9E /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
+		AABBCCDDEEFF000000111101 /* SyncAcrossDevicesBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF000000111100 /* SyncAcrossDevicesBanner.swift */; };
+		AABBCCDDEEFF000000111102 /* SyncAcrossDevicesBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF000000111100 /* SyncAcrossDevicesBanner.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -128,6 +130,7 @@
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
 		2DA344343F0EF03C724D5743 /* LibraryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryArchive.swift; sourceTree = "<group>"; };
 		2F137F8D4D25DCECC222EE48 /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusChip.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF000000111100 /* SyncAcrossDevicesBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncAcrossDevicesBanner.swift; sourceTree = "<group>"; };
 		3181E7327476F43F448EA102 /* LibraryImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryImportSheet.swift; sourceTree = "<group>"; };
 		33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarUpdateCard.swift; sourceTree = "<group>"; };
 		347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLSchemeHandler.swift; sourceTree = "<group>"; };
@@ -309,6 +312,7 @@
 				63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */,
 				33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */,
 				2F137F8D4D25DCECC222EE48 /* StatusChip.swift */,
+				AABBCCDDEEFF000000111100 /* SyncAcrossDevicesBanner.swift */,
 				5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */,
 			);
 			path = Views;
@@ -484,6 +488,7 @@
 				88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */,
 				2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */,
 				20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */,
+				AABBCCDDEEFF000000111101 /* SyncAcrossDevicesBanner.swift in Sources */,
 				4942970960D076A70A892023 /* SupabaseConfig.swift in Sources */,
 				0A40457E36804B648A1F8E54 /* URLSchemeHandler.swift in Sources */,
 				1958745818A9BA0756947D05 /* UpdateManager.swift in Sources */,
@@ -535,6 +540,7 @@
 				9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */,
 				EDCEBBF69658512E9483D13B /* SidebarUpdateCard.swift in Sources */,
 				86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */,
+				AABBCCDDEEFF000000111102 /* SyncAcrossDevicesBanner.swift in Sources */,
 				E591BE03D14322F93DF5CBB5 /* SupabaseConfig.swift in Sources */,
 				C863651EF551A89CF19F884A /* URLSchemeHandler.swift in Sources */,
 				EAA5F4DF5638ED9457ED418F /* UpdateManager.swift in Sources */,

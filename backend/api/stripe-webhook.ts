@@ -9,7 +9,7 @@ import {
   packFromPriceId,
   type Tier,
 } from "../lib/stripe.js";
-import { supabase } from "../lib/supabase.js";
+import { findOrCreateUserByEmail, supabase } from "../lib/supabase.js";
 
 // Stripe webhook signature verification requires the raw request body.
 export const config = {
@@ -33,6 +33,44 @@ async function findUserByCustomerId(customerId: string): Promise<string | null> 
     .eq("stripe_customer_id", customerId)
     .maybeSingle();
   return (data?.id as string | undefined) ?? null;
+}
+
+/**
+ * Resolve the Supabase user that owns `customerId`, even if no link exists
+ * in `public.users` yet. Used by subscription / invoice handlers because in
+ * the pre-auth checkout flow Stripe can deliver `customer.subscription.*`
+ * and `invoice.paid` BEFORE `checkout.session.completed` — so the
+ * `users.stripe_customer_id` link from the session handler may not be in
+ * place yet.
+ *
+ * Lookup order:
+ *   1. `users.stripe_customer_id` match (fast path, the link exists).
+ *   2. Stripe customer's email → `findOrCreateUserByEmail` (the link will
+ *      be written by the session handler when it arrives, but we already
+ *      have what we need).
+ *
+ * Returns null only if the customer has no email at all (shouldn't happen
+ * for our flows — Stripe Checkout always collects one).
+ */
+async function resolveUserForCustomer(customerId: string): Promise<string | null> {
+  const direct = await findUserByCustomerId(customerId);
+  if (direct) return direct;
+
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (customer.deleted) return null;
+    const email = customer.email;
+    if (!email) return null;
+    const userId = await findOrCreateUserByEmail(email);
+    // Stamp the link so subsequent events take the fast path.
+    await supabase
+      .from("users")
+      .upsert({ id: userId, stripe_customer_id: customerId }, { onConflict: "id" });
+    return userId;
+  } catch (err) {
+    console.error("resolveUserForCustomer failed", { customerId, err });
+    return null;
+  }
 }
 
 async function upsertSubscription(sub: Stripe.Subscription, userId: string) {
@@ -124,12 +162,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.metadata?.supabase_user_id;
         const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+
+        // Resolve which Supabase user owns this checkout. Two paths:
+        //   1. Authed flow ("subscribe.ts" / "topup.ts"): metadata carries
+        //      supabase_user_id from session creation.
+        //   2. Anonymous flow ("subscribe-anonymous.ts"): no
+        //      supabase_user_id; we have customer_details.email collected by
+        //      Stripe and a device_fingerprint in metadata. Look up / create
+        //      the auth user by email and remember the device→user grant so
+        //      the macOS app can recognise this Mac as Pro on subsequent
+        //      /v1/account requests without forcing sign-in.
+        let userId = session.metadata?.supabase_user_id as string | undefined;
+        const deviceFingerprint = session.metadata?.device_fingerprint as string | undefined;
+        if (!userId && session.metadata?.flow === "subscribe_anonymous") {
+          const email = session.customer_details?.email;
+          if (!email) {
+            console.error("subscribe_anonymous session has no customer_details.email", { sessionId: session.id });
+            break;
+          }
+          userId = await findOrCreateUserByEmail(email);
+        }
+
         if (userId && customerId) {
           await supabase
             .from("users")
             .upsert({ id: userId, stripe_customer_id: customerId }, { onConflict: "id" });
+        }
+        if (userId && deviceFingerprint) {
+          // Idempotent: upsert on the fingerprint PK lets a re-delivered
+          // event re-stamp the same row without erroring.
+          const { error: grantErr } = await supabase
+            .from("device_grants")
+            .upsert(
+              {
+                device_fingerprint: deviceFingerprint,
+                user_id: userId,
+                source: "stripe_checkout",
+              },
+              { onConflict: "device_fingerprint" },
+            );
+          if (grantErr) console.error("device_grants upsert failed", grantErr);
         }
 
         // One-time top-up packs (mode: "payment", flow: "topup") grant credits
@@ -165,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
         const userId =
           (sub.metadata?.supabase_user_id as string | undefined) ??
-          (await findUserByCustomerId(customerId));
+          (await resolveUserForCustomer(customerId));
         if (!userId) {
           console.warn("No user found for subscription", sub.id);
           break;
@@ -178,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
         if (!customerId) break;
-        const userId = await findUserByCustomerId(customerId);
+        const userId = await resolveUserForCustomer(customerId);
         if (!userId) break;
 
         const priceId = invoice.lines.data[0]?.price?.id;

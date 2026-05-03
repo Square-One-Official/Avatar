@@ -1,0 +1,141 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { checkRateLimit, requireUser } from "../../lib/auth.js";
+import {
+  currentCredits,
+  ensureUser,
+  logCredit,
+} from "../../lib/supabase.js";
+import { flattenOnGrey, reapplyAlpha } from "../../lib/image.js";
+import { colorize } from "../../lib/replicate.js";
+
+export const config = {
+  api: {
+    bodyParser: { sizeLimit: "15mb" },
+  },
+};
+
+/**
+ * POST /v1/colorize
+ *
+ * Body:    { image: <base64 PNG with alpha — the current cutout> }
+ * Returns: 200 success
+ *            { cutout: <base64 PNG>, credits_remaining: int }
+ *          402 insufficient_credits
+ *          401 unauthorized
+ *          429 rate_limited
+ *
+ * Pipeline:
+ *   1. Flatten cutout RGBA over neutral grey so DeOldify (RGB-only) gets
+ *      a normal photo to colorize. Alpha is preserved separately for the
+ *      re-attach step.
+ *   2. Check credits (402 if empty).
+ *   3. Run DeOldify on the flattened RGB.
+ *   4. Re-attach the original alpha channel onto the colorized RGB so the
+ *      client receives a transparent cutout consistent with /v1/cutout.
+ *   5. Log 1 credit, return the new cutout.
+ *
+ * Errors before the credit-deducting Replicate call don't charge.
+ *
+ * Geometry is preserved end-to-end (same dimensions in/out, same
+ * silhouette), so unlike /v1/fill-body the client doesn't need to
+ * re-detect face/body or re-align the canvas.
+ */
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "method_not_allowed" });
+    return;
+  }
+  const user = await requireUser(req, res);
+  if (!user) return;
+
+  if (!(await checkRateLimit(user.id))) {
+    res.status(429).json({ error: "rate_limited" });
+    return;
+  }
+
+  const base64 = (req.body?.image ?? "") as string;
+  if (!base64 || typeof base64 !== "string") {
+    res.status(400).json({ error: "missing_image" });
+    return;
+  }
+
+  const cleaned = base64.replace(/^data:image\/[a-z]+;base64,/i, "");
+  let inputBytes: Buffer;
+  try {
+    inputBytes = Buffer.from(cleaned, "base64");
+  } catch {
+    res.status(400).json({ error: "invalid_base64" });
+    return;
+  }
+  if (inputBytes.length === 0 || inputBytes.length > 12 * 1024 * 1024) {
+    res.status(400).json({ error: "image_size_out_of_range" });
+    return;
+  }
+
+  const devEmails = (process.env.DEV_UNLIMITED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const isDevUser = !!user.email && devEmails.includes(user.email.toLowerCase());
+
+  try {
+    await ensureUser(user.id);
+
+    // Step 1: flatten over grey so DeOldify gets RGB it can work with.
+    // Pure server-side image work — safe to do before the credit gate.
+    const flattened = await flattenOnGrey(inputBytes);
+    const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
+
+    // Step 2: credit gate. Only checked once we know we're going to do
+    // billable work.
+    if (!isDevUser) {
+      const credits = await currentCredits(user.id);
+      if (credits < 1) {
+        res.status(402).json({ error: "insufficient_credits", credits_remaining: 0 });
+        return;
+      }
+    }
+
+    // Step 3: DeOldify colorizes the RGB.
+    const colorizedUrl = await colorize({ imageDataUrl: flattenedDataUrl });
+    const colorizedDownload = await fetch(colorizedUrl);
+    if (!colorizedDownload.ok) {
+      throw new Error(`DeOldify result fetch failed: ${colorizedDownload.status}`);
+    }
+    const colorizedBytes = Buffer.from(await colorizedDownload.arrayBuffer());
+
+    // Step 4: re-attach the original alpha so the client gets a
+    // transparent cutout, not an RGB rectangle on grey.
+    const cutoutBytes = await reapplyAlpha(colorizedBytes, inputBytes);
+
+    if (!isDevUser) {
+      await logCredit({
+        userId: user.id,
+        delta: -1,
+        reason: "colorize",
+        ref: colorizedUrl,
+      });
+    }
+
+    const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
+    res.status(200).json({
+      cutout: cutoutBytes.toString("base64"),
+      credits_remaining: creditsRemaining,
+    });
+  } catch (err) {
+    console.error("/v1/colorize error", err);
+    // Replicate rate-limits (low balance, burst exceeded) bubble up as
+    // 429s. Propagate so the client surfaces the friendly throttle copy
+    // instead of "colorize_failed".
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("status 429") ||
+      msg.includes("Too Many Requests") ||
+      msg.toLowerCase().includes("throttled")
+    ) {
+      res.status(429).json({ error: "rate_limited" });
+      return;
+    }
+    res.status(500).json({ error: "colorize_failed" });
+  }
+}

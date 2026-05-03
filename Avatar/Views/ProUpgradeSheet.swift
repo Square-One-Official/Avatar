@@ -22,7 +22,6 @@ struct ProUpgradeSheet: View {
 
     @State private var busy: Bool = false
     @State private var errorMessage: String?
-    @State private var awaitingSignIn: Bool = false
     /// Which top-up pack the user has highlighted. Defaults to the
     /// best-value pack so a single-click "Buy" path picks the anchor.
     @State private var selectedPack: CreditPack = .credits750
@@ -54,8 +53,21 @@ struct ProUpgradeSheet: View {
                 headline
                 card
                 if let errorMessage {
-                    StatusChip(severity: .danger, message: errorMessage, style: .soft)
-                        .transition(.opacity)
+                    StatusChip(
+                        severity: .danger,
+                        message: errorMessage,
+                        style: .soft,
+                        action: StatusChipAction(label: Loc.tryAgain) {
+                            Task {
+                                if showsTopup {
+                                    await startTopup()
+                                } else {
+                                    await startSubscribe()
+                                }
+                            }
+                        }
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 footer
             }
@@ -83,12 +95,6 @@ struct ProUpgradeSheet: View {
                         packsMounted = true
                     }
                 }
-            }
-        }
-        .onChange(of: appState.auth.isSignedIn) { _, signedIn in
-            if signedIn && awaitingSignIn {
-                awaitingSignIn = false
-                Task { await startSubscribe() }
             }
         }
         .onDisappear {
@@ -241,26 +247,12 @@ struct ProUpgradeSheet: View {
                 featureRow(Loc.proPlanFeatureCredits)
             }
 
-            // CTA morphs between Subscribe and Sign-in (unchanged from before).
-            ZStack {
-                if awaitingSignIn {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(Loc.proUpgradeSignInToContinue)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        GoogleSignInButton(isLoading: appState.auth.isSigningIn) {
-                            appState.auth.startSignIn()
-                        }
-                    }
-                    .transition(.opacity)
-                } else {
-                    primaryButton(title: Loc.proSubscribeCTA) {
-                        await startSubscribe()
-                    }
-                    .transition(.opacity)
-                }
+            // Pre-auth checkout: tap Subscribe → straight to Stripe. Stripe
+            // collects email; the webhook links it to a Supabase account.
+            // No sign-in friction before paying.
+            primaryButton(title: Loc.proSubscribeCTA) {
+                await startSubscribe()
             }
-            .animation(.easeOut(duration: 0.22), value: awaitingSignIn)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -406,9 +398,7 @@ struct ProUpgradeSheet: View {
 
     // MARK: - Shared sub-elements
 
-    private var brandColor: Color {
-        Color(red: 0x9A / 255.0, green: 0xB7 / 255.0, blue: 1.0)
-    }
+    private var brandColor: Color { .appBrand }
 
     @ViewBuilder
     private func featureRow(_ text: String) -> some View {
@@ -462,15 +452,14 @@ struct ProUpgradeSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let result = try await appState.backend.subscribe(
+            let result = try await appState.backend.subscribeAnonymous(
                 interval: appState.selectedSubscriptionInterval
             )
-            awaitingSignIn = false
             try openCheckout(result)
-        } catch BackendError.notSignedIn {
-            awaitingSignIn = true
+        } catch let error as BackendError {
+            errorMessage = userFacingMessage(for: error)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = Loc.checkoutGenericError
         }
     }
 
@@ -483,8 +472,24 @@ struct ProUpgradeSheet: View {
             try openCheckout(result)
         } catch BackendError.notSignedIn {
             errorMessage = Loc.proUpgradeSignInFirst
+        } catch let error as BackendError {
+            errorMessage = userFacingMessage(for: error)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = Loc.checkoutGenericError
+        }
+    }
+
+    /// Map server / transport errors to short, friendly copy. Never lets a
+    /// raw error code (like `checkout_failed`) leak to the chip — those are
+    /// for the request log, not for users.
+    private func userFacingMessage(for error: BackendError) -> String {
+        switch error {
+        case .server(_, "stripe_unavailable"):    return Loc.checkoutStripeUnavailable
+        case .server(_, "checkout_init_failed"):  return Loc.checkoutInitFailed
+        case .server(_, "pricing_misconfigured"): return Loc.checkoutPricingMisconfigured
+        case .rateLimited:                         return Loc.checkoutRateLimited
+        case .transport:                           return Loc.checkoutOffline
+        default:                                   return Loc.checkoutGenericError
         }
     }
 

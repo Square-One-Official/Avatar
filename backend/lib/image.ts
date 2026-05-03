@@ -18,6 +18,36 @@ export async function flattenOnGrey(cutoutPng: Buffer): Promise<Buffer> {
 }
 
 /**
+ * Re-attach the alpha channel from `originalRgba` onto `colorizedRgb`,
+ * resizing the alpha to match if dimensions disagree (DeOldify and other
+ * RGB models occasionally return a slightly different size due to internal
+ * resampling). Output is a PNG with the original silhouette preserved
+ * exactly. Used by /v1/colorize so the cutout's transparent background
+ * survives the round-trip through an RGB-only colorization model.
+ */
+export async function reapplyAlpha(
+  colorizedRgb: Buffer,
+  originalRgba: Buffer,
+): Promise<Buffer> {
+  const colorMeta = await sharp(colorizedRgb).metadata();
+  const w = colorMeta.width;
+  const h = colorMeta.height;
+  if (!w || !h) {
+    throw new Error("reapplyAlpha: colorized image has no dimensions");
+  }
+  const alpha = await sharp(originalRgba)
+    .ensureAlpha()
+    .extractChannel("alpha")
+    .resize(w, h, { fit: "fill" })
+    .toBuffer();
+  return sharp(colorizedRgb)
+    .removeAlpha()
+    .joinChannel(alpha)
+    .png()
+    .toBuffer();
+}
+
+/**
  * Build outpainting inputs from a transparent-background cutout PNG.
  *
  * Returns a (padded, mask) pair sized identically:

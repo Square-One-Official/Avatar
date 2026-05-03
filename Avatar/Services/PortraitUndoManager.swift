@@ -61,6 +61,9 @@ enum PortraitUndoManager {
         let preFillOffsetX: Double
         let preFillOffsetY: Double
         let preFillScale: Double
+        // Colorise
+        let isColorized: Bool
+        let preColorizePNG: Data?
         // Metadata
         let name: String
         let tags: String
@@ -109,6 +112,8 @@ enum PortraitUndoManager {
             preFillOffsetX: p.preFillOffsetX,
             preFillOffsetY: p.preFillOffsetY,
             preFillScale: p.preFillScale,
+            isColorized: p.isColorized,
+            preColorizePNG: p.preColorizePNG,
             name: p.name,
             tags: p.tags,
             updatedAt: p.updatedAt
@@ -236,6 +241,8 @@ enum PortraitUndoManager {
         portrait.preFillOffsetX = snap.preFillOffsetX
         portrait.preFillOffsetY = snap.preFillOffsetY
         portrait.preFillScale = snap.preFillScale
+        portrait.isColorized = snap.isColorized
+        portrait.preColorizePNG = snap.preColorizePNG
         portrait.name = snap.name
         portrait.tags = snap.tags
         portrait.updatedAt = snap.updatedAt

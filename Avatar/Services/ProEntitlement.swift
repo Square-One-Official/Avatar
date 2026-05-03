@@ -186,6 +186,15 @@ final class ProEntitlement {
     /// minimum of the user-counter and device-counter remainings — the
     /// server returns whichever is more restrictive.
     var freeImportsRemaining: Int = FreeTier.maxPortraits
+    /// True when this Mac is Pro because of a pre-auth checkout (the
+    /// `device_grants` row matches), but the user is not signed in. Drives
+    /// the "Sync across Macs" banner in Settings + sidebar.
+    var needsAccountLink: Bool = false
+    /// Email captured by Stripe at checkout. Shown in the sync banner so
+    /// the user knows which inbox to check after tapping "Email me a
+    /// sign-in link". Nil for signed-in users (we already have their email
+    /// via AuthManager).
+    var linkEmail: String?
 
     var isPro: Bool { tier != nil }
     var hasCredits: Bool { credits > 0 }
@@ -225,6 +234,8 @@ final class ProEntitlement {
         freeCutoutsRemaining = 0
         freeImportsUsed = 0
         freeImportsRemaining = FreeTier.maxPortraits
+        needsAccountLink = false
+        linkEmail = nil
         lastError = nil
     }
 
@@ -240,6 +251,8 @@ final class ProEntitlement {
         freeCutoutsRemaining = payload.freeCutoutsRemaining ?? 0
         freeImportsUsed = payload.freeImportsUsed ?? 0
         freeImportsRemaining = payload.freeImportsRemaining ?? FreeTier.maxPortraits
+        needsAccountLink = payload.needsAccountLink ?? false
+        linkEmail = payload.linkEmail
         lastError = nil
     }
 }
@@ -261,4 +274,11 @@ struct AccountPayload: Codable, Sendable {
     let freeCutoutsRemaining: Int?
     let freeImportsUsed: Int?
     let freeImportsRemaining: Int?
+    /// True when this device is Pro via a pre-auth checkout grant
+    /// (`device_grants` row) but the caller has no Bearer token. The UI
+    /// surfaces a "Sync across Macs" banner in this state.
+    let needsAccountLink: Bool?
+    /// Email captured by Stripe at the pre-auth checkout. Used by the
+    /// banner so the user knows which inbox to check.
+    let linkEmail: String?
 }

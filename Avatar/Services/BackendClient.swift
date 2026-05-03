@@ -11,6 +11,10 @@ enum BackendError: LocalizedError {
     case server(Int, String?)
     case decode
     case transport(Error)
+    /// Pre-flight reject when the input PNG exceeds the Magic Cutout size
+    /// limit. Surfaces a dedicated "image too large" toast instead of the
+    /// generic server-error copy — the request never reaches the wire.
+    case payloadTooLarge(bytes: Int, limit: Int)
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +26,8 @@ enum BackendError: LocalizedError {
         case .server(let s, let m): return m ?? "Server error (\(s))."
         case .decode:        return "Unexpected server response."
         case .transport(let e): return e.localizedDescription
+        case .payloadTooLarge(_, let limit):
+            return "Image is over \(limit / (1024 * 1024)) MB."
         }
     }
 }
@@ -52,8 +58,12 @@ final class BackendClient {
 
     // MARK: GET /v1/account
     /// Current tier, credits, and subscription state. Drives `ProEntitlement`.
+    /// Anonymous-friendly: when no Bearer token is available the server
+    /// falls back to a `device_grants` lookup keyed on
+    /// `X-Device-Fingerprint`. Devices that paid via the pre-auth checkout
+    /// flow are reported as Pro with `needs_account_link: true`.
     func me() async throws -> AccountPayload {
-        try await request("/v1/account", method: "GET")
+        try await requestAllowingAnonymous("/v1/account", method: "GET")
     }
 
     // MARK: POST /v1/import-claim
@@ -75,22 +85,84 @@ final class BackendClient {
         try await requestAllowingAnonymous("/v1/import-claim", method: "POST")
     }
 
-    // MARK: POST /v1/cutout
-    /// Magic Cutout — proxies to fal.ai BiRefNet on the backend, deducts
-    /// 1 credit on success. Returns the cutout PNG (foreground over
-    /// transparent alpha) plus the user's updated credit balance.
-    /// On 402 (no credits) the caller surfaces the upgrade sheet; on
-    /// any other transport/server error the caller falls back to Apple
-    /// Subject Lift and shows the offline toast.
+    // MARK: POST /v1/cutout (+ /v1/cutout/upload-url)
+    /// Magic Cutout — runs BiRefNet on the backend, deducts 1 credit on
+    /// success. Returns the cutout PNG (foreground over transparent alpha)
+    /// plus the user's updated credit balance.
+    ///
+    /// The PNG is uploaded directly to Supabase Storage (private bucket,
+    /// short-lived signed PUT URL) so the request body to `/v1/cutout` is
+    /// just the resulting key — Vercel's 4.5 MB serverless body cap never
+    /// comes into play. Replicate fetches the input from a signed read URL
+    /// the backend mints; bytes never traverse Vercel.
+    ///
+    /// On 402 (no credits) the caller surfaces the upgrade sheet; transport
+    /// or server errors fall back to Apple Subject Lift via the offline /
+    /// "hiccup" toasts. Inputs larger than `Self.cutoutInputLimitBytes`
+    /// throw `BackendError.payloadTooLarge` before any network I/O.
+    static let cutoutInputLimitBytes: Int = 20 * 1024 * 1024
+
+    private struct CutoutUploadURLResponse: Decodable {
+        let url: String
+        let key: String
+    }
     private struct CutoutResponse: Decodable {
         let cutout: String                // base64 PNG
         let creditsRemaining: Int         // decoded from `credits_remaining`
     }
+
     func cutout(imagePNG: Data) async throws -> (Data, Int) {
-        struct Body: Encodable { let image: String }
-        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
-        let resp: CutoutResponse = try await request("/v1/cutout", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.cutout) else { throw BackendError.decode }
+        guard imagePNG.count <= Self.cutoutInputLimitBytes else {
+            throw BackendError.payloadTooLarge(
+                bytes: imagePNG.count,
+                limit: Self.cutoutInputLimitBytes
+            )
+        }
+
+        // 1. Mint a signed PUT URL into the cutout-uploads bucket.
+        let upload: CutoutUploadURLResponse = try await request(
+            "/v1/cutout/upload-url", method: "POST"
+        )
+        guard let putURL = URL(string: upload.url) else {
+            throw BackendError.decode
+        }
+
+        // 2. PUT the bytes directly to Supabase Storage. Use `upload(for:from:)`
+        // rather than `data(for:)` with `httpBody` so a 20 MB body streams
+        // instead of double-buffering through URLProtocol.
+        var putReq = URLRequest(url: putURL)
+        putReq.httpMethod = "PUT"
+        putReq.setValue("image/png", forHTTPHeaderField: "Content-Type")
+        // The signed URL embeds auth in the query string — no Authorization
+        // header needed (and including the wrong one trips Supabase's check).
+        putReq.timeoutInterval = 120
+        let (_, putResponse): (Data, URLResponse)
+        do {
+            (_, putResponse) = try await session.upload(for: putReq, from: imagePNG)
+        } catch {
+            throw BackendError.transport(error)
+        }
+        guard let putHTTP = putResponse as? HTTPURLResponse else {
+            throw BackendError.decode
+        }
+        guard (200...299).contains(putHTTP.statusCode) else {
+            throw BackendError.server(putHTTP.statusCode, "storage upload failed")
+        }
+
+        // 3. Tell the backend the bytes have landed; receive the cutout.
+        struct Body: Encodable {
+            let storageKey: String
+            // Matches the snake_case the backend reads — JSONEncoder doesn't
+            // apply a key-encoding strategy here so we map explicitly.
+            enum CodingKeys: String, CodingKey { case storageKey = "storage_key" }
+        }
+        let body = try JSONEncoder().encode(Body(storageKey: upload.key))
+        let resp: CutoutResponse = try await request(
+            "/v1/cutout", method: "POST", body: body
+        )
+        guard let data = Data(base64Encoded: resp.cutout) else {
+            throw BackendError.decode
+        }
         return (data, resp.creditsRemaining)
     }
 
@@ -133,19 +205,61 @@ final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
-    // MARK: POST /v1/checkout/subscribe
-    /// Start a subscription checkout. Server picks the tier from the user
-    /// account (single Pro tier currently); the caller picks the billing
-    /// cadence via `interval` (defaults to monthly so older call sites
-    /// keep working unchanged). Returns a Stripe URL or a StoreKit
-    /// product ID — caller branches on the `CheckoutResult`.
-    func subscribe(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
+    // MARK: POST /v1/colorize
+    /// Colorise — sends the cutout PNG to the backend, which flattens it
+    /// over neutral grey, runs DeOldify on the RGB, and re-attaches the
+    /// original alpha so the result is a transparent cutout in colour.
+    /// Same dimensions in/out, so the client doesn't re-detect geometry.
+    /// Returns the new cutout PNG and the user's updated credit balance.
+    ///
+    /// On 402 (no credits) the caller surfaces the upgrade sheet; other
+    /// errors propagate so the caller can show the failure toast.
+    private struct ColorizeResponse: Decodable {
+        let cutout: String
+        let creditsRemaining: Int
+    }
+    func colorize(imagePNG: Data) async throws -> (Data, Int) {
+        struct Body: Encodable { let image: String }
+        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+        let resp: ColorizeResponse = try await request("/v1/colorize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.cutout) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
+    // MARK: POST /v1/checkout/subscribe-anonymous
+    /// Start a subscription checkout WITHOUT requiring a signed-in user.
+    /// Stripe collects the email during checkout; the webhook links that
+    /// email to a Supabase auth user and writes a `device_grants` row so
+    /// `me()` recognises this Mac as Pro on subsequent calls. The macOS
+    /// app's primary subscribe path goes through here — sign-in only
+    /// happens later, optionally, via the "Sync across Macs" magic link.
+    func subscribeAnonymous(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
         struct Body: Encodable { let interval: String }
         let body = try JSONEncoder().encode(Body(interval: interval.rawValue))
-        let resp: CheckoutResponse = try await request(
-            "/v1/checkout/subscribe", method: "POST", body: body
+        let resp: CheckoutResponse = try await requestAllowingAnonymous(
+            "/v1/checkout/subscribe-anonymous", method: "POST", body: body
         )
         return try resp.toResult()
+    }
+
+    // MARK: POST /v1/account/resend-magic-link
+    /// Asks the backend to email a Supabase magic-link to the address on
+    /// file (the email Stripe captured during the pre-auth checkout). The
+    /// link deep-links back to `aaavatar://auth-callback` and signs the
+    /// user in on whichever Mac they click it from. Authenticated by
+    /// `X-Device-Fingerprint` matching a `device_grants` row.
+    private struct ResendMagicLinkResponse: Decodable {
+        let sent: Bool
+        let email: String?
+    }
+    @discardableResult
+    func resendMagicLink() async throws -> String? {
+        let resp: ResendMagicLinkResponse = try await requestAllowingAnonymous(
+            "/v1/account/resend-magic-link", method: "POST"
+        )
+        return resp.email
     }
 
     // MARK: POST /v1/checkout/topup

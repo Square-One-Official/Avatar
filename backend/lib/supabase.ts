@@ -73,6 +73,60 @@ export async function ensureUser(userId: string): Promise<void> {
 }
 
 /**
+ * Finds an `auth.users` row by email, or creates one with no password set.
+ * Used by the Stripe webhook when an anonymous checkout completes — Stripe
+ * captured the email, and we need a Supabase user to attach the
+ * subscription / credits / device_grants to. The user can later sign in
+ * with that email via Google OAuth or a magic link; Supabase deduplicates
+ * by email so the auth row created here becomes their account.
+ *
+ * `email_confirm: true` skips Supabase's confirmation email — the email is
+ * already trusted because Stripe verified it for billing.
+ */
+export async function findOrCreateUserByEmail(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+
+  // Direct lookup against auth.users (service role bypasses RLS, can read
+  // the auth schema). Avoids the supabase-js admin listUsers pagination dance.
+  const { data: existing, error: lookupErr } = await supabase
+    .schema("auth")
+    .from("users")
+    .select("id")
+    .eq("email", normalized)
+    .maybeSingle();
+  if (lookupErr) throw lookupErr;
+  if (existing?.id) return existing.id as string;
+
+  const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+    email: normalized,
+    email_confirm: true,
+  });
+  if (createErr) throw createErr;
+  if (!created.user?.id) throw new Error("createUser returned no user id");
+  return created.user.id;
+}
+
+/**
+ * Generates a Supabase magic-link for `email` and returns the action URL.
+ * Caller is responsible for delivering the link (we don't auto-send so we
+ * don't spam users — the link is surfaced via the in-app
+ * `/v1/account/resend-magic-link` endpoint which does email it through
+ * Supabase SMTP via signInWithOtp).
+ */
+export async function generateMagicLink(email: string): Promise<string> {
+  const redirectTo = `${process.env.APP_URL_SCHEME ?? "aaavatar"}://auth-callback`;
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: "magiclink",
+    email: email.trim().toLowerCase(),
+    options: { redirectTo },
+  });
+  if (error) throw error;
+  const link = data?.properties?.action_link;
+  if (!link) throw new Error("generateLink returned no action_link");
+  return link;
+}
+
+/**
  * Free-tier Magic Cutout trial allowance. Free accounts get this many
  * BiRefNet cutouts before they need to subscribe (or fall back to the
  * basic Subject Lift). Enforced server-side so reinstalling the app
