@@ -64,7 +64,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSHumanReadableCopyright: "Avatar"
+        NSHumanReadableCopyright: "Aaavatar"
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
@@ -115,7 +115,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        NSHumanReadableCopyright: "Avatar"
+        NSHumanReadableCopyright: "Aaavatar"
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false

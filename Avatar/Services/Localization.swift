@@ -164,16 +164,16 @@ enum Loc {
         en ? "Couldn't write the back-up file." : "Kon het back-upbestand niet schrijven."
     }
     static var libraryImportNotAnArchive: String {
-        en ? "That file isn't a readable Avatar back-up."
-           : "Dit bestand is geen leesbare Avatar back-up."
+        en ? "That file isn't a readable Aaavatar back-up."
+           : "Dit bestand is geen leesbare Aaavatar back-up."
     }
     static var libraryImportMissingManifest: String {
-        en ? "This zip doesn't contain an Avatar library."
-           : "Deze zip bevat geen Avatar-bibliotheek."
+        en ? "This zip doesn't contain an Aaavatar library."
+           : "Deze zip bevat geen Aaavatar-bibliotheek."
     }
     static func libraryImportSchemaTooNew(_ version: Int) -> String {
-        en ? "This back-up was made with a newer version of Avatar (schema v\(version)). Update the app to import it."
-           : "Deze back-up is gemaakt met een nieuwere versie van Avatar (schema v\(version)). Werk de app bij om hem te importeren."
+        en ? "This back-up was made with a newer version of Aaavatar (schema v\(version)). Update the app to import it."
+           : "Deze back-up is gemaakt met een nieuwere versie van Aaavatar (schema v\(version)). Werk de app bij om hem te importeren."
     }
     static func libraryImportFailed(_ message: String) -> String {
         en ? "Import failed: \(message)" : "Importeren mislukt: \(message)"
@@ -244,7 +244,7 @@ enum Loc {
         return (en ? "Imported: " : "Geïmporteerd: ") + parts.joined(separator: ", ") + "."
     }
     static var libraryExportFilenamePrefix: String {
-        en ? "Avatar library" : "Avatar-bibliotheek"
+        en ? "Aaavatar library" : "Aaavatar-bibliotheek"
     }
 
     static var proUpgradeSignInFirst: String {
@@ -266,7 +266,7 @@ enum Loc {
 
     // MARK: First-launch welcome sheet
     static var welcomeTitle: String {
-        en ? "Welcome to Avatar" : "Welkom bij Avatar"
+        en ? "Welcome to Aaavatar" : "Welkom bij Aaavatar"
     }
     static var welcomeBody: String {
         en ? "Sign in with Google to keep your Pro subscription and credits in sync across your Macs. Your photos stay on your device — we only store your email and credit balance."
@@ -628,8 +628,8 @@ enum Loc {
     static var settingsAccount: String { en ? "Account" : "Account" }
     static var appearance: String      { en ? "Appearance" : "Weergave" }
     static var appearanceDesc: String {
-        en ? "Choose how Avatar looks. Dark uses a deeper near-black palette."
-           : "Kies hoe Avatar eruitziet. Donker gebruikt een dieper bijna-zwart palet."
+        en ? "Choose how Aaavatar looks. Dark uses a deeper near-black palette."
+           : "Kies hoe Aaavatar eruitziet. Donker gebruikt een dieper bijna-zwart palet."
     }
 
     // MARK: Settings – Backgrounds tab

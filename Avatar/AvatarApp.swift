@@ -249,7 +249,7 @@ private func recoverModelContainer(
     initialError: Error
 ) -> ModelContainer {
     let alert = NSAlert()
-    alert.messageText = "Avatar's library couldn't be opened"
+    alert.messageText = "Aaavatar's library couldn't be opened"
     alert.informativeText = """
     The on-disk database is unreadable. Resetting clears your imported portraits but lets the app launch.
 

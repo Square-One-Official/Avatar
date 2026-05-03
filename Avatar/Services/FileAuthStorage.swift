@@ -34,7 +34,7 @@ struct FileAuthStorage: AuthLocalStorage {
             create: true
         )) ?? FileManager.default.temporaryDirectory
         directory = base
-            .appendingPathComponent("Avatar", isDirectory: true)
+            .appendingPathComponent("Aaavatar", isDirectory: true)
             .appendingPathComponent("auth", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: directory,
