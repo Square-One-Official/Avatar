@@ -1564,21 +1564,29 @@ struct AddBackgroundButton: View {
     @Binding var showPopover: Bool
     let onPick: (AddBackgroundKind) -> Void
 
-    // Small curated palette. Kept neutral/on-brand — users can always upload custom.
-    // Names are resolved at render time via Loc so they update on language change.
+    @State private var pane: PopoverPane = .main
+    @State private var customColor: Color = Color(.sRGB, red: 0.36, green: 0.75, blue: 0.43, opacity: 1)
+    @State private var hexInput: String = "5BBF6E"
+
+    private enum PopoverPane { case main, custom }
+
+    // Curated brand palette. Names resolved at render time via Loc so they
+    // update on language change. Order is the on-screen reading order
+    // (5 per row, two rows, plus a 10th "custom" tile rendered separately).
     private static let paletteColors: [(Double, Double, Double)] = [
-        (1.00, 1.00, 1.00),
-        (0.93, 0.95, 0.97),
-        (0.96, 0.94, 0.91),
-        (0.83, 0.89, 0.95),
-        (0.85, 0.92, 0.86),
-        (0.97, 0.89, 0.84),
-        (0.15, 0.25, 0.45),
-        (0.18, 0.19, 0.22),
+        (0.00, 0.00, 0.00),  // Black
+        (0.23, 0.51, 0.96),  // Blue
+        (0.36, 0.75, 0.43),  // Green
+        (0.95, 0.80, 0.29),  // Yellow
+        (0.91, 0.30, 0.24),  // Red
+        (0.65, 0.81, 0.91),  // Sky
+        (0.79, 0.62, 0.93),  // Lavender
+        (0.36, 0.36, 0.85),  // Indigo
+        (0.91, 0.31, 0.40),  // Coral
     ]
     private static var paletteNames: [String] {
-        [Loc.white, Loc.lightGray, Loc.warmWhite, Loc.softBlue,
-         Loc.softGreen, Loc.peach, Loc.deepBlue, Loc.anthracite]
+        [Loc.colorBlack, Loc.colorBlue, Loc.colorGreen, Loc.colorYellow, Loc.colorRed,
+         Loc.colorSky, Loc.colorLavender, Loc.colorIndigo, Loc.colorCoral]
     }
     private var palette: [(String, Double, Double, Double)] {
         zip(Self.paletteNames, Self.paletteColors).map { ($0, $1.0, $1.1, $1.2) }
@@ -1606,6 +1614,11 @@ struct AddBackgroundButton: View {
             .buttonStyle(PressableButtonStyle())
             .popover(isPresented: $showPopover, arrowEdge: .top) {
                 popoverContents
+                    .onChange(of: showPopover) { _, isOpen in
+                        // Reset to main pane every time the popover reopens so users
+                        // don't land mid-customization from a previous session.
+                        if isOpen { pane = .main }
+                    }
             }
 
             Text(Loc.add)
@@ -1616,7 +1629,15 @@ struct AddBackgroundButton: View {
         .frame(width: 80)
     }
 
+    @ViewBuilder
     private var popoverContents: some View {
+        switch pane {
+        case .main:   mainPane
+        case .custom: customPane
+        }
+    }
+
+    private var mainPane: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
                 showPopover = false
@@ -1634,27 +1655,176 @@ struct AddBackgroundButton: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 8), count: 4),
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(36), spacing: 8), count: 5),
                       spacing: 8) {
                 ForEach(palette, id: \.0) { item in
                     Button {
                         showPopover = false
                         onPick(.color(item.1, item.2, item.3))
                     } label: {
-                        Circle()
+                        swatchShape
                             .fill(Color(.sRGB, red: item.1, green: item.2, blue: item.3, opacity: 1))
-                            .frame(width: 30, height: 30)
-                            .overlay {
-                                Circle().strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-                            }
+                            .overlay { swatchStroke }
+                            .frame(width: 36, height: 36)
                     }
                     .buttonStyle(PressableButtonStyle())
                     .help(item.0)
                 }
+
+                // Custom-color tile — rainbow gradient with a small glyph,
+                // visually slotted as the 10th cell of the 5×2 grid.
+                Button {
+                    pane = .custom
+                } label: {
+                    swatchShape
+                        .fill(
+                            AngularGradient(
+                                colors: [.red, .yellow, .green, .blue, .purple, .red],
+                                center: .center
+                            )
+                        )
+                        .overlay {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
+                        }
+                        .overlay { swatchStroke }
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(PressableButtonStyle())
+                .help(Loc.customColorTile)
             }
         }
         .padding(14)
         .frame(width: 240)
+    }
+
+    private var customPane: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Button {
+                    pane = .main
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(Loc.cancel)
+
+                Text(Loc.customColor)
+                    .font(.headline)
+
+                Spacer(minLength: 0)
+            }
+
+            // Live preview swatch — same shape language as the grid.
+            swatchShape
+                .fill(customColor)
+                .overlay { swatchStroke }
+                .frame(height: 56)
+
+            HStack(spacing: 8) {
+                Text("#")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                TextField("RRGGBB", text: $hexInput)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+                    .onChange(of: hexInput) { _, new in
+                        // Strip leading # and whitespace silently. Only update
+                        // the live preview when the input is a valid 6-char
+                        // hex — flicker between valid/invalid feels broken.
+                        let cleaned = Self.normalizeHex(new)
+                        if cleaned != new { hexInput = cleaned }
+                        if let c = Self.color(fromHex: cleaned) {
+                            customColor = c
+                        }
+                    }
+                ColorPicker("", selection: $customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .onChange(of: customColor) { _, new in
+                        let h = Self.hex(from: new)
+                        if h != hexInput { hexInput = h }
+                    }
+            }
+
+            HStack(spacing: 8) {
+                Button(Loc.cancel) {
+                    pane = .main
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Spacer(minLength: 0)
+
+                Button(Loc.add) {
+                    let c = Self.components(from: customColor)
+                    showPopover = false
+                    onPick(.color(c.0, c.1, c.2))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .keyboardShortcut(.defaultAction)
+                .disabled(Self.color(fromHex: hexInput) == nil)
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+    }
+
+    // MARK: Shared swatch chrome
+
+    private var swatchShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+    }
+
+    private var swatchStroke: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .strokeBorder(Color.primary.opacity(0.18), lineWidth: 1)
+    }
+
+    // MARK: Hex ↔ Color helpers
+
+    private static func normalizeHex(_ raw: String) -> String {
+        var s = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if s.hasPrefix("#") { s.removeFirst() }
+        // Keep only hex digits, cap at 6 chars.
+        s = String(s.unicodeScalars.filter { CharacterSet(charactersIn: "0123456789ABCDEF").contains($0) })
+        if s.count > 6 { s = String(s.prefix(6)) }
+        return s
+    }
+
+    private static func color(fromHex hex: String) -> Color? {
+        let s = normalizeHex(hex)
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+        let r = Double((v >> 16) & 0xFF) / 255.0
+        let g = Double((v >> 8) & 0xFF) / 255.0
+        let b = Double(v & 0xFF) / 255.0
+        return Color(.sRGB, red: r, green: g, blue: b, opacity: 1.0)
+    }
+
+    private static func components(from color: Color) -> (Double, Double, Double) {
+        #if os(macOS)
+        let ns = NSColor(color).usingColorSpace(.sRGB) ?? NSColor.white
+        return (Double(ns.redComponent), Double(ns.greenComponent), Double(ns.blueComponent))
+        #else
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (Double(r), Double(g), Double(b))
+        #endif
+    }
+
+    private static func hex(from color: Color) -> String {
+        let c = components(from: color)
+        let r = Int((c.0 * 255).rounded())
+        let g = Int((c.1 * 255).rounded())
+        let b = Int((c.2 * 255).rounded())
+        return String(format: "%02X%02X%02X", r, g, b)
     }
 }
 

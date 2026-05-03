@@ -730,19 +730,24 @@ enum Loc {
     static var defaultCheck: String    { en ? "Default ✓" : "Standaard ✓" }
 
     // MARK: Editor – Color palette
-    static var white: String           { en ? "White" : "Wit" }
-    static var lightGray: String       { en ? "Light gray" : "Licht grijs" }
-    static var warmWhite: String       { en ? "Warm white" : "Warm wit" }
-    static var softBlue: String        { en ? "Soft blue" : "Zacht blauw" }
-    static var softGreen: String       { en ? "Soft green" : "Zacht groen" }
-    static var peach: String           { en ? "Peach" : "Perzik" }
-    static var deepBlue: String        { en ? "Deep blue" : "Diep blauw" }
-    static var anthracite: String      { en ? "Anthracite" : "Antraciet" }
+    static var colorBlack: String      { en ? "Black" : "Zwart" }
+    static var colorBlue: String       { en ? "Blue" : "Blauw" }
+    static var colorGreen: String      { en ? "Green" : "Groen" }
+    static var colorYellow: String     { en ? "Yellow" : "Geel" }
+    static var colorRed: String        { en ? "Red" : "Rood" }
+    static var colorSky: String        { en ? "Sky" : "Hemelblauw" }
+    static var colorLavender: String   { en ? "Lavender" : "Lavendel" }
+    static var colorIndigo: String     { en ? "Indigo" : "Indigo" }
+    static var colorCoral: String      { en ? "Coral" : "Koraal" }
 
     // MARK: Editor – Add background popover
     static var uploadImage: String     { en ? "Upload image…" : "Upload afbeelding…" }
     static var chooseColor: String     { en ? "Choose a color" : "Kies een kleur" }
     static var color: String           { en ? "Color" : "Kleur" }
+    static var customColor: String     { en ? "Custom color" : "Aangepaste kleur" }
+    static var customColorTile: String { en ? "Custom…" : "Aangepast…" }
+    static var hexLabel: String        { en ? "Hex" : "Hex" }
+    static var invalidHex: String      { en ? "Enter a 6-digit hex value" : "Voer een 6-cijferige hex-waarde in" }
 
     // MARK: Settings – Tabs
     static var settingsGeneral: String { en ? "General" : "Algemeen" }
