@@ -56,6 +56,7 @@
 		692D91420BD13F3A0409A12A /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
 		6B544FC0626AD4CC467ECC79 /* ImageAdjustments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8024D84C778A83045FEA287D /* ImageAdjustments.swift */; };
 		6C8929F949C422C5AC550163 /* logo.svg in Resources */ = {isa = PBXBuildFile; fileRef = DB0C0C9C43AFC1383D6C54E2 /* logo.svg */; };
+		6C9CE24C7807460ABEB8EBF9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
 		6F3610CB62B56FF6FF361E03 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		6F88BA1D977E666AE9CE8B16 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = F1CAAB87E8E174A425083C2F /* logo.png */; };
 		6F8B473ACB0AABDCB73F0EE6 /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
@@ -89,6 +90,7 @@
 		B7BE94756631FED1390881A5 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		B7EDC4EF58F5F0EDBAE8E873 /* ImportDropZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */; };
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
+		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
 		C426F97DB055D12226E5CC8F /* ImportDropZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */; };
 		C5F6F1CE52391908E654CDB6 /* ProUpsellToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80857857F8C364DD00524644 /* ProUpsellToastView.swift */; };
 		C863651EF551A89CF19F884A /* URLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */; };
@@ -139,6 +141,7 @@
 		68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7194822E14F9864C38869D98 /* PortraitUndoManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitUndoManager.swift; sourceTree = "<group>"; };
 		7457F57817461EFCE4333729 /* Mesh 01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 01.png"; sourceTree = "<group>"; };
+		75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		7A86EE5462E82319D323AF1C /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		8024D84C778A83045FEA287D /* ImageAdjustments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageAdjustments.swift; sourceTree = "<group>"; };
 		80857857F8C364DD00524644 /* ProUpsellToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProUpsellToastView.swift; sourceTree = "<group>"; };
@@ -233,6 +236,7 @@
 		71DFDB8CC0E43797D477452F /* Avatar */ = {
 			isa = PBXGroup;
 			children = (
+				75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */,
 				68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */,
 				C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */,
 				C891EAFDEB4CC92E895D9081 /* Models */,
@@ -403,6 +407,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */,
 				DCD584C8769017840D8AC9CB /* Assets.xcassets in Resources */,
 				61A3B5EC8D7F69DCD0D6DB6F /* Mesh 01.png in Resources */,
 				E20E4C1FAB7C8E7057EBF08F /* Mesh 02.png in Resources */,
@@ -419,6 +424,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6C9CE24C7807460ABEB8EBF9 /* AppIcon.icon in Resources */,
 				9E600F2BBB451CE9B583F601 /* Assets.xcassets in Resources */,
 				7D7CE1745B5155D4E4B97CA2 /* Mesh 01.png in Resources */,
 				3D000915F635A4D128130DB4 /* Mesh 02.png in Resources */,
