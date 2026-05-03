@@ -1560,6 +1560,19 @@ enum AddBackgroundKind {
     case color(Double, Double, Double)
 }
 
+/// Bridges NSColorPanel's target/action callbacks back into a SwiftUI
+/// closure so the custom-color preview swatch can drive the same panel
+/// SwiftUI's `ColorPicker` would otherwise hide behind its own well.
+@MainActor
+private final class ColorPanelBridge: NSObject {
+    var onChange: ((Color) -> Void)?
+
+    @objc func colorDidChange(_ panel: NSColorPanel) {
+        let ns = panel.color.usingColorSpace(.sRGB) ?? panel.color
+        onChange?(Color(nsColor: ns))
+    }
+}
+
 struct AddBackgroundButton: View {
     @Binding var showPopover: Bool
     let onPick: (AddBackgroundKind) -> Void
@@ -1567,6 +1580,7 @@ struct AddBackgroundButton: View {
     @State private var pane: PopoverPane = .main
     @State private var customColor: Color = Color(.sRGB, red: 0.36, green: 0.75, blue: 0.43, opacity: 1)
     @State private var hexInput: String = "5BBF6E"
+    @State private var colorPanelBridge = ColorPanelBridge()
 
     private enum PopoverPane { case main, custom }
 
@@ -1721,11 +1735,20 @@ struct AddBackgroundButton: View {
                 Spacer(minLength: 0)
             }
 
-            // Live preview swatch — same shape language as the grid.
-            swatchShape
-                .fill(customColor)
-                .overlay { swatchStroke }
-                .frame(height: 56)
+            // Live preview swatch doubles as the color-wheel trigger — tapping
+            // it opens NSColorPanel anchored next to the popover. Help text
+            // makes the affordance discoverable for hover users.
+            Button {
+                openColorPanelNearPopover()
+            } label: {
+                swatchShape
+                    .fill(customColor)
+                    .overlay { swatchStroke }
+                    .frame(height: 56)
+                    .contentShape(swatchShape)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .help(Loc.customColor)
 
             HStack(spacing: 8) {
                 Text("#")
@@ -1753,14 +1776,6 @@ struct AddBackgroundButton: View {
             }
 
             HStack(spacing: 8) {
-                Button(Loc.cancel) {
-                    pane = .main
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-
-                Spacer(minLength: 0)
-
                 Button(Loc.add) {
                     let c = Self.components(from: customColor)
                     showPopover = false
@@ -1770,10 +1785,63 @@ struct AddBackgroundButton: View {
                 .controlSize(.regular)
                 .keyboardShortcut(.defaultAction)
                 .disabled(Self.color(fromHex: hexInput) == nil)
+
+                Button(Loc.cancel) {
+                    pane = .main
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Spacer(minLength: 0)
             }
         }
         .padding(14)
         .frame(width: 240)
+    }
+
+    // MARK: NSColorPanel integration
+
+    /// Opens the shared NSColorPanel positioned next to the current popover
+    /// window so the wheel doesn't appear in some random last-known location
+    /// across the screen. Uses a bridge object to forward picker changes
+    /// back to `customColor` without going through SwiftUI's ColorPicker.
+    private func openColorPanelNearPopover() {
+        let panel = NSColorPanel.shared
+        panel.showsAlpha = false
+        panel.color = NSColor(customColor)
+        colorPanelBridge.onChange = { newColor in
+            customColor = newColor
+        }
+        panel.setTarget(colorPanelBridge)
+        panel.setAction(#selector(ColorPanelBridge.colorDidChange(_:)))
+
+        if let popWin = Self.findPopoverWindow() {
+            let popFrame = popWin.frame
+            var pf = panel.frame
+            // Prefer the right side of the popover; if it would clip the
+            // screen, fall back to the left side.
+            pf.origin.x = popFrame.maxX + 12
+            pf.origin.y = popFrame.maxY - pf.height
+            if let visible = popWin.screen?.visibleFrame {
+                if pf.maxX > visible.maxX - 8 {
+                    pf.origin.x = popFrame.minX - pf.width - 12
+                }
+                pf.origin.x = max(pf.origin.x, visible.minX + 8)
+                pf.origin.y = max(pf.origin.y, visible.minY + 8)
+                pf.origin.y = min(pf.origin.y, visible.maxY - pf.height - 8)
+            }
+            panel.setFrame(pf, display: false)
+        }
+
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// SwiftUI popovers are backed by a private NSPanel subclass whose name
+    /// contains "Popover". Walk the visible windows to find it.
+    private static func findPopoverWindow() -> NSWindow? {
+        NSApp.windows.first { win in
+            win.isVisible && String(describing: type(of: win)).contains("Popover")
+        }
     }
 
     // MARK: Shared swatch chrome
