@@ -143,6 +143,15 @@ struct WindowBackgroundPainter: NSViewRepresentable {
     final class Coordinator: NSObject {
         var observation: NSKeyValueObservation?
         var latestColorScheme: ColorScheme?
+        /// Last `colorScheme` actually pushed through `paint()`. Used to skip
+        /// no-op repaints — `updateNSView` fires on every parent body
+        /// re-evaluation, but `paint()` walks the entire NSView tree marking
+        /// `needsDisplay = true`, which forces AppKit to redraw materials and
+        /// other bridged views, which invalidates SwiftUI views, which
+        /// re-evaluates the parent and calls `updateNSView` again. The result
+        /// was a display-rate feedback loop that pinned CPU at ~90% on idle.
+        var hasAppliedScheme: Bool = false
+        var lastAppliedScheme: ColorScheme?
         deinit { observation?.invalidate() }
     }
 
@@ -151,6 +160,8 @@ struct WindowBackgroundPainter: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         context.coordinator.latestColorScheme = colorScheme
+        context.coordinator.hasAppliedScheme = true
+        context.coordinator.lastAppliedScheme = colorScheme
         DispatchQueue.main.async { [coordinator = context.coordinator] in
             paint(view, colorScheme: coordinator.latestColorScheme)
             if let window = view.window, coordinator.observation == nil {
@@ -165,8 +176,22 @@ struct WindowBackgroundPainter: NSViewRepresentable {
                     options: [.new]
                 ) { [weak view, weak coordinator] _, _ in
                     guard let view, let coordinator else { return }
+                    // Only repaint when the resolved scheme actually changed.
+                    // Without this guard, any external bump to
+                    // `effectiveAppearance` (NSVisualEffectView re-resolving,
+                    // an NSAppearance push from a popover, etc.) re-runs
+                    // `paint()`, which recursively dirties every NSView via
+                    // `invalidateAppearance` — feeding the next display cycle
+                    // a full repaint that pegs CPU even when nothing changed.
+                    let next = coordinator.latestColorScheme
+                    if coordinator.hasAppliedScheme,
+                       coordinator.lastAppliedScheme == next {
+                        return
+                    }
+                    coordinator.hasAppliedScheme = true
+                    coordinator.lastAppliedScheme = next
                     DispatchQueue.main.async {
-                        paint(view, colorScheme: coordinator.latestColorScheme)
+                        paint(view, colorScheme: next)
                     }
                 }
             }
@@ -176,6 +201,12 @@ struct WindowBackgroundPainter: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.latestColorScheme = colorScheme
+        if context.coordinator.hasAppliedScheme,
+           context.coordinator.lastAppliedScheme == colorScheme {
+            return
+        }
+        context.coordinator.hasAppliedScheme = true
+        context.coordinator.lastAppliedScheme = colorScheme
         let scheme = colorScheme
         DispatchQueue.main.async { paint(nsView, colorScheme: scheme) }
     }
