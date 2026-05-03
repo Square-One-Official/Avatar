@@ -110,12 +110,12 @@ create-dmg \
   --background "$DMG_BACKGROUND" \
   --window-size 660 420 \
   --icon-size 128 \
-  --icon "Avatar.app" 165 215 \
+  --icon "Aaavatar.app" 165 215 \
   --app-drop-link 495 215 \
-  --hide-extension "Avatar.app" \
+  --hide-extension "Aaavatar.app" \
   --no-internet-enable \
   "$DMG_PATH" \
-  "$EXPORT_DIR/Avatar.app"
+  "$EXPORT_DIR/Aaavatar.app"
 
 # 6. Notarize (DMG)
 echo "→ Notarizing..."

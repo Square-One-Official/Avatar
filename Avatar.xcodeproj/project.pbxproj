@@ -618,7 +618,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.app;
-				PRODUCT_NAME = Avatar;
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -638,7 +638,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.app;
-				PRODUCT_NAME = Avatar;
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APP_STORE;
 			};
@@ -660,7 +660,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.app;
-				PRODUCT_NAME = Avatar;
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = APP_STORE;
 			};
@@ -681,7 +681,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.app;
-				PRODUCT_NAME = Avatar;
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 			};
 			name = Debug;
