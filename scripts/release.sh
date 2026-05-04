@@ -185,11 +185,17 @@ PY
 #     bumping the public version), upload the new DMG over the old asset
 #     instead of failing.
 echo "→ Creating GitHub Release..."
+# Stable-named copy so https://github.com/thierrzz/Avatar/releases/latest/download/Aaavatar.dmg
+# always resolves to the newest release. The website (Framer) links to that URL,
+# so it never has to be updated per release.
+STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"
+cp "$DMG_PATH" "$STABLE_DMG_PATH"
+
 if gh release view "v${VERSION}" >/dev/null 2>&1; then
-  echo "   release v${VERSION} already exists — clobbering DMG asset"
-  gh release upload "v${VERSION}" "$DMG_PATH" --clobber
+  echo "   release v${VERSION} already exists — clobbering DMG assets"
+  gh release upload "v${VERSION}" "$DMG_PATH" "$STABLE_DMG_PATH" --clobber
 else
-  gh release create "v${VERSION}" "$DMG_PATH" \
+  gh release create "v${VERSION}" "$DMG_PATH" "$STABLE_DMG_PATH" \
     --title "Aaavatar v${VERSION}" \
     --generate-notes
 fi

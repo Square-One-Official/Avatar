@@ -293,11 +293,13 @@ final class AppState {
     /// Awaitable variant of `refreshEntitlement`. Used by `URLSchemeHandler`
     /// after a Stripe return so it can apply intent-driven side effects (e.g.
     /// flipping the Magic Cutout toggle on) once Pro is confirmed.
+    ///
+    /// Always hits `/v1/account` — the endpoint is anonymous-safe and falls
+    /// back to a `device_grants` lookup keyed on `X-Device-Fingerprint` so a
+    /// signed-out Mac that paid via the pre-auth checkout flow is still
+    /// reported as Pro. Short-circuiting on `!auth.isSignedIn` would mask
+    /// that grant and leave a paid user stuck on free.
     func refreshEntitlementAsync() async {
-        guard auth.isSignedIn else {
-            proEntitlement.clear()
-            return
-        }
         proEntitlement.isRefreshing = true
         do {
             let me = try await backend.me()

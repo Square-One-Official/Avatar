@@ -3,6 +3,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.*.tmp
 *.log
 .DS_Store
 .vercel

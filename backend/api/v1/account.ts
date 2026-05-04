@@ -170,19 +170,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-/** Look up email of an auth.users row by id. Service role can read auth schema. */
+/**
+ * Look up email of an auth.users row by id via the GoTrue admin API.
+ * Direct `supabase.schema("auth").from("users")` queries are blocked by
+ * PostgREST (PGRST106 — auth is not in the exposed-schemas list); service
+ * role bypasses RLS but not the schema gate.
+ */
 async function emailForUser(userId: string): Promise<string | null> {
-  const { data, error } = await supabase
-    .schema("auth")
-    .from("users")
-    .select("email")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
   if (error) {
     console.warn("emailForUser failed", error);
     return null;
   }
-  return (data?.email as string | undefined) ?? null;
+  return data.user?.email ?? null;
 }
 
 /**

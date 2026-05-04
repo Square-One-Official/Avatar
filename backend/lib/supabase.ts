@@ -82,20 +82,30 @@ export async function ensureUser(userId: string): Promise<void> {
  *
  * `email_confirm: true` skips Supabase's confirmation email — the email is
  * already trusted because Stripe verified it for billing.
+ *
+ * The lookup goes through the GoTrue admin API rather than a direct
+ * `supabase.schema("auth").from("users")` query. PostgREST blocks the
+ * `auth` schema unless it's explicitly added to the project's exposed
+ * schemas list; service-role bypasses RLS but NOT the schema gate
+ * (PGRST106). The admin API is the supported, schema-exposure-independent
+ * path.
  */
+export async function findUserIdByEmail(email: string): Promise<string | null> {
+  const target = email.trim().toLowerCase();
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw error;
+    const hit = data.users.find((u) => u.email?.toLowerCase() === target);
+    if (hit) return hit.id;
+    if (data.users.length < 200) return null;
+  }
+}
+
 export async function findOrCreateUserByEmail(email: string): Promise<string> {
   const normalized = email.trim().toLowerCase();
 
-  // Direct lookup against auth.users (service role bypasses RLS, can read
-  // the auth schema). Avoids the supabase-js admin listUsers pagination dance.
-  const { data: existing, error: lookupErr } = await supabase
-    .schema("auth")
-    .from("users")
-    .select("id")
-    .eq("email", normalized)
-    .maybeSingle();
-  if (lookupErr) throw lookupErr;
-  if (existing?.id) return existing.id as string;
+  const existingId = await findUserIdByEmail(normalized);
+  if (existingId) return existingId;
 
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
     email: normalized,

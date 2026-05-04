@@ -38,7 +38,17 @@ enum URLSchemeHandler {
             appState.showProUpgradeSheet = false
             appState.showProUpgradeSheetInSettings = false
             Task {
-                await appState.refreshEntitlementAsync()
+                // Stripe webhook usually lands in <1s, but can lag a few
+                // seconds. Retry until Pro shows up or we give up — without
+                // this, a slow webhook leaves the just-paid user on free
+                // until the next manual refresh.
+                for attempt in 0..<6 {
+                    await appState.refreshEntitlementAsync()
+                    if appState.proEntitlement.isPro { break }
+                    if attempt < 5 {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    }
+                }
                 if appState.pendingMagicCutoutEnable && appState.proEntitlement.isPro {
                     appState.magicCutoutPrefs.enabled = true
                 }
