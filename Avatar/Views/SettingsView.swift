@@ -658,10 +658,13 @@ struct AccountSettings: View {
     }
 }
 
-/// Settings-tab variant of `SyncAcrossDevicesBanner`. Same backend call,
-/// styled to sit alongside the other Account cards (GroupBox + larger
-/// type) so users who dismiss the sidebar banner can still trigger the
-/// magic-link send.
+/// "Pro is active on this Mac" card — surfaced in Account settings when
+/// the user paid via the pre-auth (anonymous) checkout flow but hasn't
+/// signed in yet. Tapping the CTA emails a Supabase magic-link to the
+/// address Stripe captured at checkout, which deep-links back into the
+/// app and binds Pro to a Supabase account so it survives reinstall and
+/// can sync to additional Macs. Sole entry point — the older sidebar
+/// banner was removed as permanent visual noise.
 private struct LinkDeviceCard: View {
     @Environment(AppState.self) private var appState
     @State private var sending: Bool = false

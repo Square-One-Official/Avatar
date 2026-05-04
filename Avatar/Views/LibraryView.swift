@@ -104,14 +104,11 @@ struct LibraryView: View {
                 SidebarProQuotaCard()
                     .transition(.opacity)
                     .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.freeImportsUsed)
-            } else if appState.proEntitlement.needsAccountLink {
-                // Pre-auth checkout grant: this Mac is Pro but no Supabase
-                // session is signed in. Banner offers to email a magic link
-                // so Pro syncs to other Macs.
-                SyncAcrossDevicesBanner()
-                    .transition(.opacity)
-                    .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.needsAccountLink)
             }
+            // Pre-auth checkout grant lives in Settings → Account
+            // (LinkDeviceCard) — surfacing it in the sidebar took up
+            // permanent real estate from a paying user for a benefit
+            // (multi-Mac sync) most users don't need day-to-day.
         }
         .animation(.easeOut(duration: 0.2), value: appState.proEntitlement.isPro)
         .background(Color.appCanvas)
