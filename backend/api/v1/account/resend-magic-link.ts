@@ -48,14 +48,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const { data: userRow, error: userErr } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("email")
-      .eq("id", userId)
-      .maybeSingle();
+    // GoTrue admin API — direct `supabase.schema("auth").from("users")`
+    // queries are blocked by PostgREST (PGRST106); service role bypasses
+    // RLS but not the schema gate.
+    const { data: userData, error: userErr } = await supabase.auth.admin.getUserById(userId);
     if (userErr) throw userErr;
-    const email = (userRow?.email as string | undefined) ?? null;
+    const email = userData.user?.email ?? null;
     if (!email) {
       res.status(404).json({ error: "no_grant_for_device" });
       return;
