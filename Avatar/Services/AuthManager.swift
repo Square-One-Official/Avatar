@@ -38,11 +38,21 @@ final class AuthManager {
     private var authStateTask: Task<Void, Never>?
 
     init() {
+        // flowType: .implicit — Supabase magic-links generated server-side
+        // by `signInWithOtp` produce `#access_token=...` callback URLs.
+        // PKCE (the SDK default) requires a client-generated verifier, which
+        // a server-initiated email link can't carry, so `session(from:)`
+        // would reject the fragment with "Not a valid PKCE flow URL". OAuth
+        // works under either flow; switching the whole client to implicit
+        // keeps both code paths on the same parser.
         self.supabase = SupabaseClient(
             supabaseURL: SupabaseConfig.url,
             supabaseKey: SupabaseConfig.publishableKey,
             options: SupabaseClientOptions(
-                auth: SupabaseClientOptions.AuthOptions(storage: FileAuthStorage())
+                auth: SupabaseClientOptions.AuthOptions(
+                    storage: FileAuthStorage(),
+                    flowType: .implicit
+                )
             )
         )
         observeAuthState()

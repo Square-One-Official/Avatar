@@ -1,0 +1,93 @@
+<!--
+  Aaavatar — Supabase Auth: Magic Link template
+
+  Where this lives: Supabase Dashboard → Authentication → Email Templates
+                    → Magic Link (subject + body)
+
+  Subject:  Sign in to Aaavatar
+
+  Template variables (provided by GoTrue at send time):
+    {{ .ConfirmationURL }} — deep-link back to aaavatar://auth-callback
+    {{ .Email }}           — recipient address (optional, used in fallback line)
+
+  Logo: served from https://aaavatar.nl/email-icon.png
+  Upload a 256×256 PNG of the rendered app icon to the marketing site at
+  that path before publishing the template. (Framer → Assets → upload.)
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in to Aaavatar</title>
+  </head>
+  <body style="margin:0;padding:0;background:#0E0F12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#E6E8EE;-webkit-font-smoothing:antialiased;">
+    <!-- Preheader (hidden, shown in inbox preview) -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Tap the button to sign in to Aaavatar on this Mac. The link expires in 1 hour.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0E0F12;">
+      <tr>
+        <td align="center" style="padding:48px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background:#16181D;border:1px solid #23262E;border-radius:16px;">
+            <tr>
+              <td align="center" style="padding:40px 32px 8px 32px;">
+                <img src="https://aaavatar.nl/email-icon.png"
+                     width="72" height="72" alt="Aaavatar"
+                     style="display:block;border:0;outline:none;text-decoration:none;border-radius:16px;" />
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:16px 32px 8px 32px;">
+                <h1 style="margin:0;font-size:22px;line-height:1.3;font-weight:600;color:#FFFFFF;">
+                  Sign in to Aaavatar
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:8px 32px 24px 32px;">
+                <p style="margin:0;font-size:14px;line-height:1.55;color:#9BA1AD;">
+                  Tap the button below to sign in on this Mac. The link expires in 1 hour and can only be used once.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:8px 32px 32px 32px;">
+                <a href="{{ .ConfirmationURL }}"
+                   style="display:inline-block;padding:14px 28px;background:#5E99FF;color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;border-radius:12px;">
+                  Sign in to Aaavatar
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 32px 32px;">
+                <div style="height:1px;background:#23262E;line-height:1px;font-size:1px;">&nbsp;</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 16px 32px;">
+                <p style="margin:0 0 8px 0;font-size:12px;line-height:1.55;color:#7A808B;">
+                  Trouble with the button? Copy and paste this URL into your browser on the Mac you want to sign in on:
+                </p>
+                <p style="margin:0;font-size:12px;line-height:1.55;color:#5E99FF;word-break:break-all;">
+                  {{ .ConfirmationURL }}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 32px 32px;">
+                <p style="margin:0;font-size:12px;line-height:1.55;color:#5C616B;">
+                  Didn't request this? You can safely ignore this email — your account stays signed out.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:24px 0 0 0;font-size:11px;color:#5C616B;">
+            Sent by Aaavatar · <a href="https://aaavatar.nl" style="color:#7A808B;text-decoration:none;">aaavatar.nl</a>
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

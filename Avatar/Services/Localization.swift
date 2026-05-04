@@ -886,11 +886,18 @@ enum Loc {
         en ? "\(remaining) of \(total) basic generations left"
            : "Nog \(remaining) van \(total) basis-generaties"
     }
-    /// Single-line description of the 6-dot strip — splits the remaining
-    /// count between the AI tier and the basic fallback tier.
-    static func proQuotaCombinedRow(aiRemaining: Int, basicRemaining: Int) -> String {
-        en ? "\(aiRemaining) AI · \(basicRemaining) basic generations left"
-           : "\(aiRemaining) AI · \(basicRemaining) basis-generaties over"
+    /// Headline number for the sidebar quota card — collapses both tiers
+    /// into a single total so the user doesn't have to add AI + basic.
+    /// Sits above `proQuotaTierBreakdown`, which supplies the split.
+    static func proQuotaTotalRemaining(remaining: Int, total: Int) -> String {
+        en ? "\(remaining) of \(total) generations left"
+           : "Nog \(remaining) van \(total) generaties"
+    }
+    /// Sub-line under `proQuotaTotalRemaining` — splits the remaining count
+    /// between the AI tier and the basic fallback tier as supporting detail.
+    static func proQuotaTierBreakdown(ai: Int, basic: Int) -> String {
+        en ? "\(ai) AI · \(basic) basic"
+           : "\(ai) AI · \(basic) basis"
     }
     /// Copy that wraps the inline `Pro` badge in the upsell line.
     static var proQuotaUpgradeBeforeBadge: String {

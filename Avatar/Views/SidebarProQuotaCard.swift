@@ -1,17 +1,19 @@
 import SwiftUI
 
 /// Subtle bottom-of-sidebar nudge for free users: a single 6-dot strip
-/// split into an AI tier (brand-blue) and a basic tier (muted), with a
-/// description line and a green `Pro` badge in the upsell CTA. Reads
-/// from `proEntitlement` (server-tracked, survives delete-then-reimport)
-/// and routes a tap to the paywall. Hidden once the user is Pro.
-/// Sits below `SidebarUpdateCard` so a pending update relaunch always
-/// reads as the higher-priority CTA.
+/// (AI cluster on the left, basic cluster on the right, separated by a
+/// gap), a "X of Y left" headline with the tier breakdown beneath, and a
+/// green `Pro` badge in the upsell CTA. Reads from `proEntitlement`
+/// (server-tracked, survives delete-then-reimport) and routes a tap to
+/// the paywall. Hidden once the user is Pro. Sits below `SidebarUpdateCard`
+/// so a pending update relaunch always reads as the higher-priority CTA.
 ///
-/// **Why one row.** The previous two-row layout doubled the chrome for
-/// what users perceive as one resource — "6 generations, two flavors."
-/// One strip with a colour drop between clusters keeps the tier
-/// distinction without the visual weight of two stacked progress bars.
+/// **Why one row of dots.** The previous two-row layout doubled the chrome
+/// for what users perceive as one resource — "6 generations, two flavors."
+/// **Why uniform fill across tiers.** An earlier version used brand-blue
+/// for AI and a muted neutral for basic; the saturation gap made a fresh
+/// strip read as "3 used, 3 left" even when nothing had been consumed.
+/// Same hue everywhere, with a 10pt gap signalling the cluster split.
 struct SidebarProQuotaCard: View {
     @Environment(AppState.self) private var appState
     @State private var hovering = false
@@ -22,7 +24,8 @@ struct SidebarProQuotaCard: View {
     private var basicCapacity: Int { max(0, FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) }
     private var basicRemaining: Int { max(0, min(basicCapacity, appState.proEntitlement.freeBasicImportsRemaining)) }
 
-    private var aiExhausted: Bool { aiRemaining == 0 }
+    private var totalCapacity: Int { aiCapacity + basicCapacity }
+    private var totalRemaining: Int { aiRemaining + basicRemaining }
 
     private var brand: Color { .appBrand }
 
@@ -31,32 +34,25 @@ struct SidebarProQuotaCard: View {
             appState.showProUpgradeSheet = true
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                // Single 6-dot strip — AI cluster on the left (brand blue),
-                // basic cluster on the right (muted neutral). A small gap
-                // between clusters reads as "premium, then fallback" without
-                // needing a second row.
+                // Single 6-dot strip. Both clusters use the same hue at full
+                // strength so a fresh user reads "6 available," not "3 used,
+                // 3 still here." A 10pt gap (vs. 5pt internal spacing) is
+                // the only tier signal — the breakdown line below names them.
                 HStack(spacing: 10) {
-                    QuotaDots(
-                        remaining: aiRemaining,
-                        capacity: aiCapacity,
-                        fillColor: brand,
-                        emptyOpacity: aiExhausted ? 0.35 : 0.20
-                    )
-                    QuotaDots(
-                        remaining: basicRemaining,
-                        capacity: basicCapacity,
-                        fillColor: Color.primary.opacity(0.55),
-                        emptyOpacity: 0.14
-                    )
+                    QuotaDots(remaining: aiRemaining, capacity: aiCapacity, fillColor: brand)
+                    QuotaDots(remaining: basicRemaining, capacity: basicCapacity, fillColor: brand)
                 }
 
-                Text(Loc.proQuotaCombinedRow(
-                    aiRemaining: aiRemaining,
-                    basicRemaining: basicRemaining
-                ))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.primary.opacity(0.85))
-                .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Loc.proQuotaTotalRemaining(remaining: totalRemaining, total: totalCapacity))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                    Text(Loc.proQuotaTierBreakdown(ai: aiRemaining, basic: basicRemaining))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.secondary)
+                        .lineLimit(1)
+                }
 
                 HStack(spacing: 4) {
                     Text(Loc.proQuotaUpgradeBeforeBadge)
@@ -94,7 +90,8 @@ struct SidebarProQuotaCard: View {
         .padding(.bottom, 10)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.15), value: hovering)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: aiExhausted)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: aiRemaining)
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: basicRemaining)
         .help(Loc.proQuotaTooltip)
     }
 }
@@ -116,21 +113,27 @@ private struct InlineProBadge: View {
     }
 }
 
-/// Horizontal dot strip filled left-to-right by `remaining`. Filled =
-/// generations available, dim = consumed — matches the "X left" verbal
-/// cue users see in the description line.
+/// Horizontal dot strip filled left-to-right by `remaining`. Solid fill =
+/// available, hollow ring = consumed. Splitting state across two visual
+/// variables (shape + presence-of-fill) instead of one (opacity) keeps a
+/// fresh user from misreading the strip as half-used.
 private struct QuotaDots: View {
     let remaining: Int
     let capacity: Int
     let fillColor: Color
-    let emptyOpacity: Double
 
     var body: some View {
         HStack(spacing: 5) {
             ForEach(0..<capacity, id: \.self) { idx in
-                Circle()
-                    .fill(idx < remaining ? fillColor : fillColor.opacity(emptyOpacity))
-                    .frame(width: 6, height: 6)
+                if idx < remaining {
+                    Circle()
+                        .fill(fillColor)
+                        .frame(width: 6, height: 6)
+                } else {
+                    Circle()
+                        .strokeBorder(fillColor.opacity(0.30), lineWidth: 1)
+                        .frame(width: 6, height: 6)
+                }
             }
         }
     }
