@@ -16,12 +16,6 @@ enum FreeTier {
     /// Mirrors `FREE_IMPORTS_ALLOWANCE` in `backend/lib/supabase.ts`.
     static let maxPortraits = 6
 
-    /// Maximum number of images a free user can drop / pick in a single
-    /// import. Two is enough to feel useful (couple shot, before/after) but
-    /// low enough that "import a folder of 30 headshots" reads as a Pro perk.
-    /// Pro users are still subject to `BatchConfirmRequest.threshold`.
-    static let maxBatchImport = 2
-
     /// Free Magic Cutout trial allowance — number of cloud cutouts a free
     /// user may run before the toggle is gated. Mirrors the backend constant
     /// `FREE_CUTOUTS_ALLOWANCE` in `lib/supabase.ts`. Used only for copy /

@@ -13,42 +13,32 @@ enum PortraitDropHandler {
     /// `BatchConfirmRequest.threshold` images at once get a confirm dialog
     /// (each Magic Cutout call costs 1 credit), so a stray drop of a 500-
     /// photo folder doesn't burn a month of credits in one go. Free users
-    /// process locally for free but are gated by `FreeTier.maxBatchImport`
-    /// (toast → upsell) and `FreeTier.maxPortraits` (paywall sheet).
-    /// `existingPortraitCount` is the current library size — pass
-    /// `allPortraits.count` from the calling view's @Query.
+    /// drop into a partial-allowance gate: any overflow past
+    /// `freeImportsRemaining` is dropped from the batch and a single
+    /// upsell toast is surfaced — the rest still process.
     static func handle(providers: [NSItemProvider],
-                       existingPortraitCount: Int,
                        context: ModelContext,
                        appState: AppState) -> Bool {
         guard !providers.isEmpty else { return false }
 
-        // Free-tier gates run first — Pro users skip these entirely.
-        // We always return `true` so the drop is consumed (not bounced back
-        // by the system) even when the upsell short-circuits the import.
-        guard FreeTierGate.allowImport(incoming: providers.count,
-                                       existingPortraitCount: existingPortraitCount,
-                                       appState: appState) else {
-            return true
-        }
-
-        // Pro hard cap on batch size — memory safety. Surfaces an info toast
-        // (no Upgrade CTA) since the user is already paying.
-        if appState.proEntitlement.isPro
-            && providers.count > ProLimits.maxBatchImport {
-            appState.showProInfo(Loc.proBatchCapExceeded(ProLimits.maxBatchImport))
-            return true
-        }
+        // Clamp the batch to what the user is actually allowed to import.
+        // Surfaces the appropriate toast/paywall as a side effect. We always
+        // return `true` so the drop is consumed (not bounced back by the
+        // system) even when the upsell short-circuits the entire import.
+        let allowed = FreeTierGate.allowedImportCount(requested: providers.count,
+                                                      appState: appState)
+        guard allowed > 0 else { return true }
+        let clipped = Array(providers.prefix(allowed))
 
         // Decide whether to confirm before processing the batch.
         let useCloud = ImportFlow.shouldUseMagicCutout(appState: appState)
-        if useCloud && providers.count > BatchConfirmRequest.threshold {
+        if useCloud && clipped.count > BatchConfirmRequest.threshold {
             appState.batchConfirm = BatchConfirmRequest(
-                count: providers.count,
-                credits: providers.count, // 1 credit per image
+                count: clipped.count,
+                credits: clipped.count, // 1 credit per image
                 onConfirm: {
                     appState.batchConfirm = nil
-                    processAll(providers: providers, context: context,
+                    processAll(providers: clipped, context: context,
                                appState: appState)
                 },
                 onCancel: {
@@ -58,7 +48,7 @@ enum PortraitDropHandler {
             return true
         }
 
-        processAll(providers: providers, context: context,
+        processAll(providers: clipped, context: context,
                    appState: appState)
         return true
     }
@@ -117,52 +107,49 @@ enum PortraitDropHandler {
 }
 
 /// Free-tier import gating used by all import entry points (drop, file
-/// picker, raw `importFile` from MainWindow). Returns `true` when the
-/// caller should proceed; returns `false` after surfacing the appropriate
-/// upsell (toast or paywall sheet) so the caller skips the import.
+/// picker, raw `importFile` from MainWindow). Returns the number of
+/// incoming items the caller should actually process. A return of 0
+/// means the caller should skip the import entirely; the gate has
+/// already surfaced the relevant paywall/toast.
 @MainActor
 enum FreeTierGate {
-    /// Gate a request to import `incoming` new portraits. Pro users always
-    /// pass. Free users at the lifetime cap trigger the paywall; over-batch
-    /// triggers a soft upsell toast.
+    /// Decide how many of the `requested` portraits the caller may
+    /// process right now. Pro users are clamped to the technical batch
+    /// cap. Free users are clamped to `freeImportsRemaining` so a drop
+    /// of N images with M slots left processes M and surfaces a single
+    /// upsell toast for the dropped overflow — instead of refusing the
+    /// entire batch.
     ///
-    /// `existingPortraitCount` is intentionally ignored — the cap is
-    /// "5 imports ever", not "5 portraits in the library". Library count
-    /// was the cheat hole: delete a portrait → free a slot. The real cap
-    /// lives server-side in `users.free_imports_used` /
-    /// `device_imports.free_imports_used`; this client check is a fast
-    /// pre-flight using `proEntitlement.freeImportsRemaining` so we don't
-    /// fire a network call when we already know the request will fail.
-    /// `ImportFlow.claimImportSlot` is the authoritative gate.
-    static func allowImport(incoming: Int,
-                            existingPortraitCount: Int,
-                            appState: AppState) -> Bool {
-        _ = existingPortraitCount  // retained for ABI; no longer authoritative
+    /// The library size is intentionally ignored — the cap is "lifetime
+    /// imports", not "portraits visible in the library". Real authority
+    /// lives server-side (`users.free_imports_used` /
+    /// `device_imports.free_imports_used`); this client check is just a
+    /// fast pre-flight on `proEntitlement.freeImportsRemaining`.
+    /// `ImportFlow.claimImportSlot` is the actual gate per image.
+    static func allowedImportCount(requested: Int,
+                                   appState: AppState) -> Int {
         if appState.proEntitlement.isPro {
-            // Pro users only hit the technical batch cap.
-            if incoming > ProLimits.maxBatchImport {
+            if requested > ProLimits.maxBatchImport {
                 appState.showProInfo(Loc.proBatchCapExceeded(ProLimits.maxBatchImport))
-                return false
+                return 0
             }
-            return true
+            return requested
         }
 
         let remaining = appState.proEntitlement.freeImportsRemaining
         if remaining <= 0 {
             appState.showProUpgradeSheet = true
-            return false
+            return 0
         }
-        if incoming > FreeTier.maxBatchImport {
-            appState.showProUpsell(Loc.proUpsellBatchLimit(FreeTier.maxBatchImport))
-            return false
+        if requested > remaining {
+            // Process what's left and nudge the user — this is the
+            // moment the free tier ran out, so a soft upsell toast
+            // beats blocking the whole drop.
+            appState.showProUpsell(Loc.proUpsellPartialBatch(processed: remaining,
+                                                              requested: requested))
+            return remaining
         }
-        if incoming > remaining {
-            // User can still import some, but not all of this batch — same
-            // "Upgrade to keep going" UX as a hard exhaustion.
-            appState.showProUpgradeSheet = true
-            return false
-        }
-        return true
+        return requested
     }
 }
 

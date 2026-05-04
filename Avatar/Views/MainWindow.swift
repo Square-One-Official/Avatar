@@ -153,9 +153,8 @@ struct MainWindow: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url {
-            guard FreeTierGate.allowImport(incoming: 1,
-                                           existingPortraitCount: portraits.count,
-                                           appState: appState) else { return }
+            guard FreeTierGate.allowedImportCount(requested: 1,
+                                                  appState: appState) > 0 else { return }
             ImportFlow.importFile(url: url, context: context, appState: appState)
         }
         #endif

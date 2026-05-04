@@ -860,27 +860,6 @@ enum Loc {
     static var orBrowseFiles: String {
         en ? "or browse files" : "of blader bestanden"
     }
-    static var dropZoneProTitle: String {
-        en ? "Magic Cutout" : "Magic Cutout"
-    }
-    /// Subtitle shown while the free user still has trial cutouts left.
-    /// `n` = remaining free calls, normally 1 or 2. The "first 2 are on us"
-    /// framing is what makes the toggle land — switch off → save your trial,
-    /// switch on → use Pro now.
-    static func dropZoneProFreeRemaining(_ n: Int) -> String {
-        en ? "First \(FreeTier.freeMagicCutoutAllowance) are on us · \(n) left"
-           : "De eerste \(FreeTier.freeMagicCutoutAllowance) zijn van ons · nog \(n)"
-    }
-    /// Subtitle once the free trial is exhausted — banner flips back to the
-    /// classic Upgrade pill.
-    static var dropZoneProExhausted: String {
-        en ? "Free trial used — Upgrade to keep using"
-           : "Gratis proef opgebruikt — upgrade om door te gaan"
-    }
-    static var dropZoneProUpgrade: String {
-        en ? "Upgrade" : "Upgrade"
-    }
-
     // MARK: Sidebar update card
     static func updatedTo(_ version: String) -> String {
         en ? "Updated to \(version)" : "Bijgewerkt naar \(version)"
@@ -906,6 +885,19 @@ enum Loc {
     static func proQuotaBasicRow(remaining: Int, total: Int) -> String {
         en ? "\(remaining) of \(total) basic generations left"
            : "Nog \(remaining) van \(total) basis-generaties"
+    }
+    /// Single-line description of the 6-dot strip — splits the remaining
+    /// count between the AI tier and the basic fallback tier.
+    static func proQuotaCombinedRow(aiRemaining: Int, basicRemaining: Int) -> String {
+        en ? "\(aiRemaining) AI · \(basicRemaining) basic generations left"
+           : "\(aiRemaining) AI · \(basicRemaining) basis-generaties over"
+    }
+    /// Copy that wraps the inline `Pro` badge in the upsell line.
+    static var proQuotaUpgradeBeforeBadge: String {
+        en ? "Upgrade to" : "Upgrade naar"
+    }
+    static var proQuotaUpgradeAfterBadge: String {
+        en ? "to unlock more" : "om meer te ontgrendelen"
     }
     static var proQuotaSubtitle: String {
         en ? "Upgrade to Pro to unlock more"
@@ -982,9 +974,14 @@ enum Loc {
         en ? "\(credits) credits · \(perCredit) each"
            : "\(credits) credits · \(perCredit) per stuk"
     }
-    static func proUpsellBatchLimit(_ max: Int) -> String {
-        en ? "Importing more than \(max) at once is a Pro feature."
-           : "Meer dan \(max) tegelijk importeren is een Pro-functie."
+    /// Soft upsell shown when a free user drops more images than they
+    /// have free imports left — the batch is partially processed (the
+    /// first `processed` items run) and this nudges them to upgrade for
+    /// the rest. Single-message form: we don't want a toast per dropped
+    /// item, just one summary that names the cap they just hit.
+    static func proUpsellPartialBatch(processed: Int, requested: Int) -> String {
+        en ? "Imported \(processed) of \(requested). Upgrade to Pro for unlimited imports."
+           : "\(processed) van \(requested) geïmporteerd. Upgrade naar Pro voor onbeperkt."
     }
     static func proBatchCapExceeded(_ max: Int) -> String {
         en ? "Imports are capped at \(max) at a time to keep things smooth. Try again with fewer."

@@ -153,7 +153,6 @@ struct EditorView: View {
             }
             .onDrop(of: [.fileURL, .image], isTargeted: $isDropping) { providers in
                 PortraitDropHandler.handle(providers: providers,
-                                           existingPortraitCount: allPortraits.count,
                                            context: context,
                                            appState: appState)
             }

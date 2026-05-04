@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import UniformTypeIdentifiers
 import AppKit
 
@@ -8,7 +7,6 @@ private let dropZoneBlue = Color.appBrand
 struct ImportDropZone: View {
     @Environment(\.modelContext) private var context
     @Environment(AppState.self) private var appState
-    @Query private var portraits: [Portrait]
     @State private var hovering = false
 
     var body: some View {
@@ -56,17 +54,8 @@ struct ImportDropZone: View {
         )
         .onDrop(of: [.fileURL, .image], isTargeted: $hovering) { providers in
             PortraitDropHandler.handle(providers: providers,
-                                       existingPortraitCount: portraits.count,
                                        context: context,
                                        appState: appState)
-        }
-        .overlay(alignment: .bottom) {
-            if showsProUpsell {
-                ProUpsellBanner()
-                    .padding(.bottom, 72)
-                    .padding(.horizontal, 56)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
         }
         .overlay {
             if appState.isProcessing {
@@ -83,14 +72,7 @@ struct ImportDropZone: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.18), value: showsProUpsell)
         .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
-    }
-
-    private var showsProUpsell: Bool {
-        !appState.proEntitlement.isPro
-            && !appState.isProcessing
-            && appState.errorBanner == nil
     }
 
     private func pickFiles() {
@@ -99,10 +81,10 @@ struct ImportDropZone: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK else { return }
-        guard FreeTierGate.allowImport(incoming: panel.urls.count,
-                                       existingPortraitCount: portraits.count,
-                                       appState: appState) else { return }
-        for url in panel.urls {
+        let allowed = FreeTierGate.allowedImportCount(requested: panel.urls.count,
+                                                      appState: appState)
+        guard allowed > 0 else { return }
+        for url in panel.urls.prefix(allowed) {
             ImportFlow.importFile(url: url, context: context, appState: appState)
         }
     }
@@ -155,96 +137,3 @@ private struct PortraitCard: View {
     }
 }
 
-// MARK: - Pro upsell banner
-
-/// Shown at the bottom of the dropzone for free users. Two states:
-///   1. Trial available — Magic Cutout title + "First N are on us · M left"
-///      subtitle + a Toggle bound to `magicCutoutPrefs.enabled`. Lets the
-///      user decide between burning a free Pro cutout vs. saving it for
-///      later and using on-device Subject Lift.
-///   2. Trial exhausted — same title, "Free trial used — Upgrade…"
-///      subtitle, and the original green Upgrade pill that opens the
-///      paywall sheet.
-private struct ProUpsellBanner: View {
-    @Environment(AppState.self) private var appState
-    // Bound to the same UserDefaults key as `MagicCutoutPreferences.enabled`.
-    // The prefs object's computed property isn't @Observable-tracked, so a
-    // binding through it writes through but never re-renders the toggle.
-    @AppStorage("magicCutoutEnabled") private var magicCutoutEnabled: Bool = true
-    @State private var hovering = false
-
-    private var proGreen: Color {
-        Color(red: 0.20, green: 0.85, blue: 0.55)
-    }
-
-    private var trialRemaining: Int {
-        appState.proEntitlement.freeCutoutsRemaining
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Loc.dropZoneProTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(dropZoneBlue)
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 12)
-            trailingControl
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(hovering ? 0.14 : 0.08))
-        )
-        .frame(maxWidth: 420)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-    }
-
-    private var subtitle: String {
-        trialRemaining > 0
-            ? Loc.dropZoneProFreeRemaining(trialRemaining)
-            : Loc.dropZoneProExhausted
-    }
-
-    @ViewBuilder
-    private var trailingControl: some View {
-        if trialRemaining > 0 {
-            // @AppStorage writes the same UserDefaults key that
-            // `MagicCutoutPreferences.enabled` reads, so import-flow gating
-            // through `prefs.enabled` continues to see the right value.
-            Toggle("", isOn: $magicCutoutEnabled)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(proGreen)
-        } else {
-            Button {
-                appState.showProUpgradeSheet = true
-            } label: {
-                Text(Loc.dropZoneProUpgrade)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(proGreen)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule()
-                            .fill(proGreen.opacity(0.15))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(proGreen.opacity(0.30))
-                    )
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(PressableButtonStyle())
-        }
-    }
-}
