@@ -452,6 +452,9 @@ struct AccountSettings: View {
                     }
                 } else {
                     GroupBox { signedOutProfile }
+                    if appState.proEntitlement.needsAccountLink {
+                        LinkDeviceCard()
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -645,8 +648,6 @@ struct AccountSettings: View {
             case .web(let url):
                 NSWorkspace.shared.open(url)
             case .storeKit:
-                // DMG-build does not support StoreKit. Backend should not
-                // return a StoreKit product ID here; treat as decode error.
                 throw BackendError.decode
             }
         } catch let err as BackendError {
@@ -656,3 +657,90 @@ struct AccountSettings: View {
         }
     }
 }
+
+/// Settings-tab variant of `SyncAcrossDevicesBanner`. Same backend call,
+/// styled to sit alongside the other Account cards (GroupBox + larger
+/// type) so users who dismiss the sidebar banner can still trigger the
+/// magic-link send.
+private struct LinkDeviceCard: View {
+    @Environment(AppState.self) private var appState
+    @State private var sending: Bool = false
+    @State private var feedback: Feedback?
+
+    private enum Feedback: Equatable {
+        case success(email: String)
+        case failure
+    }
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.title2)
+                        .foregroundStyle(.tint)
+                        .frame(width: 32)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(Loc.syncBannerTitle)
+                            .font(.body.weight(.medium))
+                        if let email = appState.proEntitlement.linkEmail {
+                            Text(Loc.syncBannerBody(email: email))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                if let feedback {
+                    feedbackChip(feedback)
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        Task { await sendLink() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if sending { ProgressView().controlSize(.mini) }
+                            Text(Loc.syncBannerSendLink)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(sending)
+                }
+            }
+            .padding(8)
+        }
+        .animation(.easeOut(duration: 0.18), value: feedback)
+    }
+
+    @ViewBuilder
+    private func feedbackChip(_ feedback: Feedback) -> some View {
+        switch feedback {
+        case .success(let email):
+            StatusChip(severity: .success,
+                       message: Loc.syncBannerLinkSent(email: email),
+                       style: .soft)
+        case .failure:
+            StatusChip(severity: .danger,
+                       message: Loc.syncBannerSendFailed,
+                       style: .soft)
+        }
+    }
+
+    private func sendLink() async {
+        if sending { return }
+        sending = true
+        defer { sending = false }
+        do {
+            let email = try await appState.backend.resendMagicLink()
+            feedback = .success(email: email ?? appState.proEntitlement.linkEmail ?? "")
+        } catch {
+            feedback = .failure
+        }
+    }
+}
+
