@@ -360,10 +360,22 @@ enum ImageProcessor {
     }
 
     /// V2 hair zone: union of the radial-gradient `baseZone` (good for typical
-    /// short hair / beards) with a person-seg-derived zone clipped to the
-    /// upper portion of the image (catches long hair, side ponytails, afros,
-    /// braids — anything that falls outside the crown / beard ellipses).
+    /// short hair / beards) with a person-seg-derived zone (catches long
+    /// hair, side ponytails, afros, braids, flying strands — anything that
+    /// falls outside the crown / beard ellipses).
     ///
+    /// Earlier revisions clipped the person-seg zone to "above chin + face
+    /// height" out of an abundance of caution about the soft matte
+    /// touching shoulders. That cutoff dropped attenuation for any hair
+    /// flowing below it (long hair, the trailing tips of windswept hair
+    /// in landscape portraits) — exactly the cases the user still saw
+    /// background bleeding through. The cutoff is no longer needed because
+    /// (a) soft-matte selection already gates on `edgeBand × hairZone`, so
+    /// only silhouette pixels are touched, and (b) at the body interior
+    /// α=1 the colour-attenuation kernel is a mathematical no-op.
+    ///
+    /// Dilation widened from 0.6× to 1.0× face width so the zone reaches
+    /// the flying strand tips that sit a face-width past the silhouette.
     /// Falls back to `baseZone` when person-seg isn't available so non-
     /// portrait subjects behave the same as V1.
     private static func extendedHairZone(
@@ -374,41 +386,15 @@ enum ImageProcessor {
     ) -> CIImage {
         guard let personSeg, let faceRect else { return baseZone }
 
-        // Dilate person-seg by ~0.6× face width to capture flying strands
-        // that sit just outside the strict person silhouette.
-        let dilateR = max(8.0, faceRect.width * 0.6)
+        let dilateR = max(8.0, faceRect.width * 1.0)
         let dilatedPS = personSeg.applyingFilter("CIMorphologyMaximum", parameters: [
             kCIInputRadiusKey: dilateR
         ]).cropped(to: extent)
 
-        // Restrict to the upper portion: from the top of the image down to
-        // (chin-Y + face_height). Keeps the soft-matte treatment from
-        // bleeding onto shoulder/torso silhouette where the strict matte
-        // already does the right thing. Clip in CIImage bottom-left coords.
-        let chinY_TopLeft = faceRect.maxY
-        let upperCutoff_TopLeft = chinY_TopLeft + faceRect.height
-        let upperCutoff_BL = max(0, extent.height - upperCutoff_TopLeft)
-
-        // White rect from y=upperCutoff_BL to y=extent.height; black
-        // everywhere else. CIImage(color:) is infinite, so we crop to
-        // shape it. Then `composited(over: blackBG)` makes the rest black.
-        let upperRect = CGRect(x: 0, y: upperCutoff_BL,
-                                width: extent.width,
-                                height: extent.height - upperCutoff_BL)
-        let upperWhite = CIImage(color: CIColor(red: 1, green: 1, blue: 1, alpha: 1))
-            .cropped(to: upperRect)
-        let blackBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 1))
-            .cropped(to: extent)
-        let upperMask = upperWhite.composited(over: blackBG).cropped(to: extent)
-
-        let extendedZone = dilatedPS.applyingFilter("CIMultiplyCompositing", parameters: [
-            kCIInputBackgroundImageKey: upperMask
-        ]).cropped(to: extent)
-
-        // Lighten = max(baseZone, extendedZone) — pixel is "in hair zone" if
+        // Lighten = max(baseZone, dilatedPS) — pixel is "in hair zone" if
         // EITHER source says so.
         return baseZone.applyingFilter("CILightenBlendMode", parameters: [
-            kCIInputBackgroundImageKey: extendedZone
+            kCIInputBackgroundImageKey: dilatedPS
         ]).cropped(to: extent)
     }
 
