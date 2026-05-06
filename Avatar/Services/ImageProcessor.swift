@@ -273,7 +273,8 @@ enum ImageProcessor {
         let options = RefinementOptions(
             edgeBandRadius: 20.0 * scale,
             useExtendedHairZone: true,
-            softMatteGamma: 0.85
+            softMatteGamma: 0.85,
+            widerDecontamination: true
         )
         let refined = refineAlphaMatte(foreground: fgMask, personSeg: personMask,
                                         guide: originalCI, faceRect: faceRect,
@@ -456,6 +457,15 @@ enum ImageProcessor {
         /// matte before the edge-band blend. < 1 lifts wispy strands; only
         /// safe in linear-sRGB working space (V2). nil = no adjust.
         var softMatteGamma: Float? = nil
+        /// V2: drop the hair-zone gate on the decontamination region so the
+        /// blur-fusion RGB unmixing runs wherever alpha is non-trivially
+        /// partial — long hair past the shoulder, flyaways outside the
+        /// radial-gradient zone, glasses arms, anything wispy. Without this,
+        /// pixels at α=0.4 outside the hair zone keep their original
+        /// `α·F + (1−α)·B_old` RGB and ghost the source background through
+        /// the new backdrop. Safe at α≈1: blur-fusion math collapses to
+        /// `F = I` so body/face/shoulders are byte-for-byte unchanged.
+        var widerDecontamination: Bool = false
     }
 
     private static func refineAlphaMatte(
@@ -646,9 +656,19 @@ enum ImageProcessor {
             "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
         ]).cropped(to: extent)
-        let decontamRegion = hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
-            kCIInputBackgroundImageKey: alphaPresent
-        ]).cropped(to: extent)
+        // V1: scope decontamination to the radial-gradient hair zone so
+        // face/shoulder pixels can't possibly shift colour. Side effect:
+        // long hair past the shoulder, flyaways, glasses arms — anything
+        // outside the ellipses keeps `α·F + (1−α)·B_old` and ghosts the
+        // original background through any new backdrop.
+        // V2: drop that scope. Blur-fusion at α≈1 is mathematically a no-op
+        // (`F = F̂ + 1·(I − F̂) = I`), so body/face are still untouched, but
+        // every wispy pixel anywhere in the silhouette gets unmixed RGB.
+        let decontamRegion: CIImage = options.widerDecontamination
+            ? alphaPresent
+            : hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
+                kCIInputBackgroundImageKey: alphaPresent
+            ]).cropped(to: extent)
 
         return RefinedMatte(matte: blended, softAlpha: softMatte, decontamRegion: decontamRegion)
     }
