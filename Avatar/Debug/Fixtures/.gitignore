@@ -1,0 +1,7 @@
+# Fixture photos are private — never check them in.
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.heif
+!.gitignore

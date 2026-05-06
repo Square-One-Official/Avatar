@@ -120,6 +120,8 @@
 		F75326EE95AD345F1B6AB7E3 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B1818524625F66274E218 /* GoogleSignInButton.swift */; };
 		FA2169F93286D9C1CFAA2E9E /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
+		4676065BB62C08040FD18B1E /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */; };
+		D50BA5CB796BFF074EC925FE /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -179,6 +181,7 @@
 		F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDropZone.swift; sourceTree = "<group>"; };
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeBenchmark.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -239,12 +242,21 @@
 				75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */,
 				68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */,
 				C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */,
+				0D9B0CAA19B198A51ABD9230 /* Debug */,
 				C891EAFDEB4CC92E895D9081 /* Models */,
 				C73BD04D2D6AD13538A4D3E3 /* Resources */,
 				50DCF305A7684CEB872E8E63 /* Services */,
 				E2C4AFE19D88C3D78C93976E /* Views */,
 			);
 			path = Avatar;
+			sourceTree = "<group>";
+		};
+		0D9B0CAA19B198A51ABD9230 /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */,
+			);
+			path = Debug;
 			sourceTree = "<group>";
 		};
 		7BE0948B8680DB6BA122634A /* Products */ = {
@@ -454,6 +466,7 @@
 				DEE477EB98F989CA1467A0A1 /* Compositor.swift in Sources */,
 				9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */,
 				66FE6034F1F8531034560E88 /* DeviceFingerprint.swift in Sources */,
+				4676065BB62C08040FD18B1E /* EdgeBenchmark.swift in Sources */,
 				CAE42ED6303F5E98B46050A9 /* EditorView.swift in Sources */,
 				7DC1C04306F4A82722999943 /* ExportPreset.swift in Sources */,
 				82491CEFF1852DDF363A9E13 /* ExportService.swift in Sources */,
@@ -505,6 +518,7 @@
 				E8AF2A53C52B50C4453C65B2 /* Compositor.swift in Sources */,
 				F3AB75972232C58F0B721E8A /* DebugLog.swift in Sources */,
 				4AA77222958C62AEFFEB9FF1 /* DeviceFingerprint.swift in Sources */,
+				D50BA5CB796BFF074EC925FE /* EdgeBenchmark.swift in Sources */,
 				22F331DA021385FF381B6BEA /* EditorView.swift in Sources */,
 				F0D56262FE85216D1648099E /* ExportPreset.swift in Sources */,
 				9CDEBB9401C040885B7B35B8 /* ExportService.swift in Sources */,

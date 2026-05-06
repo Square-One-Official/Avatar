@@ -390,6 +390,26 @@ struct AvatarApp: App {
         .modelContainer(sharedModelContainer)
         .commands {
             CommandGroup(replacing: .newItem) { }
+            #if DEBUG
+            // Subject-Lift V1/V2 benchmark harness. Reads fixtures from
+            // Avatar/Debug/Fixtures/ (or $AVATAR_BENCH_FIXTURES) and writes
+            // side-by-side cutouts to ~/Desktop/edge-bench-<stamp>/ for
+            // perceptual A/B. Compiled out of Release builds.
+            CommandMenu("Debug") {
+                Button("Run Subject-Lift Benchmark…") {
+                    EdgeBenchmark.run()
+                }
+                Button("Open Latest Benchmark Folder") {
+                    EdgeBenchmark.revealLatest()
+                }
+                Divider()
+                Toggle("Use Subject-Lift V2",
+                       isOn: Binding(
+                        get: { UserDefaults.standard.bool(forKey: "subjectLiftV2") },
+                        set: { UserDefaults.standard.set($0, forKey: "subjectLiftV2") }
+                       ))
+            }
+            #endif
         }
         .handlesExternalEvents(matching: ["aaavatar"])
 
