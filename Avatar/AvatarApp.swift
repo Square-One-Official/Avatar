@@ -396,8 +396,15 @@ struct AvatarApp: App {
             // side-by-side cutouts to ~/Desktop/edge-bench-<stamp>/ for
             // perceptual A/B. Compiled out of Release builds.
             CommandMenu("Debug") {
-                Button("Run Subject-Lift Benchmark…") {
+                // Full pass — every fixture, ~1-3 min on M1 with ~25 photos.
+                // Use after V2 tweaks to confirm a candidate generalises.
+                Button("Run Subject-Lift Benchmark (Full)") {
                     EdgeBenchmark.run()
+                }
+                // Quick pass — 5 random fixtures, ~10-30s. Use while iterating
+                // on a single V2 parameter so the eyeball loop stays tight.
+                Button("Run Subject-Lift Benchmark (Quick — 5 Random)") {
+                    EdgeBenchmark.run(sampleSize: 5)
                 }
                 Button("Open Latest Benchmark Folder") {
                     EdgeBenchmark.revealLatest()

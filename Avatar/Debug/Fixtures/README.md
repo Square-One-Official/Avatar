@@ -1,44 +1,49 @@
 # Subject-Lift edge benchmark fixtures
 
-Drop curated portrait photos here (JPG / PNG / HEIC). The Debug → Run
-Subject-Lift Benchmark menu item picks them up, runs both V1 and V2 of
-`ImageProcessor.subjectLift`, and writes a side-by-side PNG plus timings
-to `~/Desktop/edge-bench-<timestamp>/`.
+Drop any portrait photos here (JPG / PNG / HEIC / AVIF / WebP). **Naming and
+curation are optional** — the harness picks up everything in this folder, sorts the output
+PNGs by source filename, and runs both V1 and V2 on each.
 
 The folder is intentionally **empty in git** — fixture portraits are private
 and would balloon the repo. Each developer maintains their own local set.
 A `.gitignore` keeps the photos out; only this README is tracked.
 
-## Suggested fixture set
+## Running the benchmark
 
-Aim for ~20 portraits that span the failure modes Subject-Lift actually has.
-Name files so the result PNGs sort the way you want to scan them:
+In a Debug build of the app:
 
-```
-01-blonde-on-white.jpg          # blonde hair vs white wall — fringe test
-02-blonde-on-busy.jpg
-03-dark-on-dark.jpg             # silhouette clipping
-04-dark-on-light.jpg
-05-curly-flyaways.jpg           # Vision usually clips wisps
-06-curly-busy-bg.jpg
-07-long-straight-down-shoulder.jpg
-08-side-ponytail.jpg            # hair zone radial gradient misses this
-09-afro.jpg                     # crown ellipse not wide enough
-10-braids.jpg
-11-glasses-with-flyaways.jpg
-12-bangs-over-eyebrows.jpg
-13-translucent-hair-low-light.jpg
-14-half-profile.jpg
-15-clean-studio.jpg             # control — must NOT regress
-16-clean-window-light.jpg       # control
-17-tiny-face-large-frame.jpg    # < 1500px input — adaptive resize check
-18-huge-4k-phone-portrait.jpg   # > 4K input — adaptive downsample check
-19-multiple-people.jpg          # instance mask multi-handling
-20-hat-with-hair-below.jpg
-```
+- **Debug → Run Subject-Lift Benchmark (Quick — 5 Random)** — 5 random
+  fixtures, ~10–30s. Use this while iterating on a V2 parameter.
+- **Debug → Run Subject-Lift Benchmark (Full)** — every fixture in the
+  folder, ~1–3 min for ~25 photos. Use to confirm a candidate generalises
+  before flipping `subjectLiftV2` on by default.
+- **Debug → Open Latest Benchmark Folder** — re-opens the most recent run.
+
+Output lands in `~/Desktop/edge-bench-<ISO8601>/`:
+- `00-summary.csv` — header, summary row (averages), then one row per fixture
+  with V1 ms, V2 ms, ratio, and ok flags.
+- `<source>-v1-cutout.png`, `<source>-v2-cutout.png` — raw cutouts.
+- `<source>-side-by-side.png` — six panels: V1 (top row) / V2 (bottom row)
+  composited over light grey, dark grey, and a busy backdrop. Hair-edge
+  defects only show against backdrops that contrast with the original photo.
+
+## Useful patterns to include
+
+You don't need all of these — even five varied portraits expose most of the
+edge-quality gaps. But if you want a representative set:
+
+- Blonde hair on light background (fringe test).
+- Dark hair on dark background (silhouette clipping).
+- Curly / textured hair with flyaways.
+- Long hair past the shoulders (V1's radial-gradient hair zone misses this).
+- Side ponytail / asymmetric hair (V1 ignores hair outside the crown ellipse).
+- Glasses with hair strands across them.
+- A clean studio shot — control, **must not regress**.
+- A small input (<1500 px long edge) and a large one (>4 K) to exercise the
+  V2 adaptive resize.
 
 ## Override location
 
-Setting the env var `AVATAR_BENCH_FIXTURES=/some/abs/path` makes the
-benchmark read from that folder instead. Useful when iterating on
-fixtures that live outside the repo.
+Setting `AVATAR_BENCH_FIXTURES=/some/abs/path` makes the benchmark read from
+that folder instead of this one. Useful when iterating on fixtures that live
+outside the repo.

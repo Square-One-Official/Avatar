@@ -22,19 +22,29 @@ import CoreImage.CIFilterBuiltins
 @MainActor
 enum EdgeBenchmark {
 
-    /// Discovers fixtures, runs V1 + V2, writes the comparison folder, and
-    /// reveals it in Finder. Returns the output folder URL on success.
+    /// Discovers fixtures, runs V1 + V2 on each, writes a comparison folder,
+    /// and reveals it in Finder. Returns the output folder URL on success.
+    ///
+    /// `sampleSize` caps the run to N random fixtures (used by the "Quick"
+    /// menu item — fast iteration while tuning V2). nil = run everything.
+    /// Either way the run order is shuffled so eyeballing the first few
+    /// PNGs is representative, even when the source folder is alphabetical.
     @discardableResult
-    static func run() -> URL? {
-        let fixtures = discoverFixtures()
-        guard !fixtures.isEmpty else {
+    static func run(sampleSize: Int? = nil) -> URL? {
+        let allFixtures = discoverFixtures()
+        guard !allFixtures.isEmpty else {
             showAlert(
                 title: "No fixtures found",
-                body: "Drop some portrait JPGs into Avatar/Debug/Fixtures/ "
-                    + "(or set AVATAR_BENCH_FIXTURES to a folder of portraits) "
-                    + "and try again."
+                body: noFixturesBody()
             )
             return nil
+        }
+
+        // Shuffle, then optionally cap. Shuffle first so a partial cap is a
+        // genuine random subset rather than the alphabetical first-N.
+        var fixtures = allFixtures.shuffled()
+        if let n = sampleSize, n > 0, n < fixtures.count {
+            fixtures = Array(fixtures.prefix(n))
         }
 
         let outDir = makeOutputDir()
@@ -45,11 +55,22 @@ enum EdgeBenchmark {
         }
 
         var rows: [String] = ["fixture,v1_ms,v2_ms,ratio,v1_ok,v2_ok"]
+        var v1Times: [Double] = []
+        var v2Times: [Double] = []
         for url in fixtures {
-            let row = process(fixture: url, outDir: outDir)
+            let (row, v1ms, v2ms) = process(fixture: url, outDir: outDir)
             rows.append(row)
+            if v1ms > 0 { v1Times.append(v1ms) }
+            if v2ms > 0 { v2Times.append(v2ms) }
             dlog("[EdgeBench] \(url.lastPathComponent) → \(row)")
         }
+
+        // Summary row at the top — easier to read in spreadsheet apps if it
+        // sits below the header. Keep header + summary + per-fixture rows.
+        let summary = makeSummaryRow(v1: v1Times, v2: v2Times,
+                                      total: allFixtures.count,
+                                      processed: fixtures.count)
+        rows.insert(summary, at: 1)
 
         let csvURL = outDir.appendingPathComponent("00-summary.csv")
         try? rows.joined(separator: "\n").write(to: csvURL, atomically: true, encoding: .utf8)
@@ -58,6 +79,38 @@ enum EdgeBenchmark {
         // PNGs without re-finding the folder.
         NSWorkspace.shared.activateFileViewerSelecting([csvURL])
         return outDir
+    }
+
+    private static func makeSummaryRow(v1: [Double], v2: [Double],
+                                        total: Int, processed: Int) -> String {
+        let avg: ([Double]) -> Double = { $0.isEmpty ? 0 : $0.reduce(0, +) / Double($0.count) }
+        let v1Avg = avg(v1), v2Avg = avg(v2)
+        let ratio = v1Avg > 0 ? String(format: "%.2f", v2Avg / v1Avg) : ""
+        let label = processed == total
+            ? "SUMMARY (\(processed) fixtures)"
+            : "SUMMARY (\(processed) of \(total) random)"
+        return "\(label),\(Int(v1Avg)),\(Int(v2Avg)),\(ratio),avg_v1_ms,avg_v2_ms"
+    }
+
+    /// Body for the "no fixtures found" alert. Lists every path the harness
+    /// looked at so a misconfigured env var is obvious instead of mysterious.
+    private static func noFixturesBody() -> String {
+        var lines = ["Looked here:"]
+        if let env = ProcessInfo.processInfo.environment["AVATAR_BENCH_FIXTURES"] {
+            lines.append("• AVATAR_BENCH_FIXTURES → \(env)")
+        }
+        if let bundled = Bundle.main.url(forResource: "Fixtures", withExtension: nil) {
+            lines.append("• Bundle: \(bundled.path)")
+        }
+        if let src = locateSourceTreeFixturesFolder() {
+            lines.append("• Source tree: \(src.path)")
+        } else {
+            lines.append("• Source tree: <not resolved>")
+        }
+        lines.append("")
+        lines.append("Drop any portrait JPG/PNG/HEIC files into one of those folders.")
+        lines.append("Naming doesn't matter — the harness picks them up automatically.")
+        return lines.joined(separator: "\n")
     }
 
     /// Opens the most recent `~/Desktop/edge-bench-*` folder in Finder, or
@@ -93,12 +146,13 @@ enum EdgeBenchmark {
     // MARK: - Per-fixture work
 
     /// Runs both pipelines and writes the V1, V2, and side-by-side PNGs.
-    /// Returns the CSV row for this fixture. Failures are reported in the row
+    /// Returns the CSV row plus the two wall-clock times so the caller can
+    /// roll them up into the summary row. Failures are reported in the row
     /// (`v1_ok` / `v2_ok` flags) rather than aborting the whole run.
-    private static func process(fixture url: URL, outDir: URL) -> String {
+    private static func process(fixture url: URL, outDir: URL) -> (row: String, v1ms: Double, v2ms: Double) {
         let name = url.deletingPathExtension().lastPathComponent
         guard let cg = ImageProcessor.cgImage(from: url) else {
-            return "\(name),,,,,LOAD_FAIL"
+            return ("\(name),,,,,LOAD_FAIL", 0, 0)
         }
 
         let (v1, v1ms) = timed { try? ImageProcessor.subjectLiftV1(image: cg) }
@@ -122,7 +176,8 @@ enum EdgeBenchmark {
             guard v1ms > 0 else { return "" }
             return String(format: "%.2f", v2ms / v1ms)
         }()
-        return "\(name),\(Int(v1ms)),\(Int(v2ms)),\(ratio),\(v1Ok ? 1 : 0),\(v2Ok ? 1 : 0)"
+        let row = "\(name),\(Int(v1ms)),\(Int(v2ms)),\(ratio),\(v1Ok ? 1 : 0),\(v2Ok ? 1 : 0)"
+        return (row, v1ms, v2ms)
     }
 
     /// Renders a vertical stack: V1 over three backdrops on top, V2 over the
@@ -218,7 +273,10 @@ enum EdgeBenchmark {
             roots.append(srcTree)
         }
 
-        let exts: Set<String> = ["jpg", "jpeg", "png", "heic", "heif"]
+        // ImageIO on macOS 14+ handles AVIF and WebP natively; CGImageSource
+        // (used by ImageProcessor.cgImage) accepts them via the same path as
+        // JPG/PNG/HEIC, so we don't need any extra decode setup.
+        let exts: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "avif", "webp"]
         var fixtures: [URL] = []
         var seen = Set<String>()
         for root in roots {
@@ -236,22 +294,21 @@ enum EdgeBenchmark {
         return fixtures.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Walks up from the running executable looking for `Avatar/Debug/Fixtures`.
-    /// Returns nil when the build is being run from a deployed location (App
-    /// Store, downloaded DMG) where the source tree isn't present.
+    /// Resolves the source-tree `Avatar/Debug/Fixtures` folder by anchoring
+    /// to *this file's* compile-time path. Walking up from `Bundle.main`
+    /// doesn't work for Debug builds — the .app sits in DerivedData,
+    /// nowhere near the worktree. `#filePath` always points to the source
+    /// file used at build time, so the Fixtures sibling is one step away.
+    /// Returns nil when the source tree has been moved or deleted since
+    /// build (rare; user fixes by rebuilding).
     private static func locateSourceTreeFixturesFolder() -> URL? {
-        var dir = Bundle.main.bundleURL.deletingLastPathComponent()
-        let fm = FileManager.default
-        for _ in 0..<10 {
-            let candidate = dir.appendingPathComponent("Avatar/Debug/Fixtures", isDirectory: true)
-            var isDir: ObjCBool = false
-            if fm.fileExists(atPath: candidate.path, isDirectory: &isDir), isDir.boolValue {
-                return candidate
-            }
-            dir.deleteLastPathComponent()
-            if dir.path == "/" { return nil }
-        }
-        return nil
+        let thisFile = URL(fileURLWithPath: #filePath)
+        let candidate = thisFile.deletingLastPathComponent()
+            .appendingPathComponent("Fixtures", isDirectory: true)
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir),
+              isDir.boolValue else { return nil }
+        return candidate
     }
 
     private static func makeOutputDir() -> URL? {
