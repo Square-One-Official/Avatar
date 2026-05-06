@@ -12,6 +12,11 @@ A `.gitignore` keeps the photos out; only this README is tracked.
 
 In a Debug build of the app:
 
+- **First run** triggers an OS file picker because the app is sandboxed —
+  point it at this folder (or any folder of portraits). macOS hands the
+  app a security-scoped bookmark so subsequent runs read the same folder
+  without re-prompting. Use **Debug → Choose Fixtures Folder…** to re-pick
+  later (e.g. after moving the worktree).
 - **Debug → Run Subject-Lift Benchmark (Quick — 5 Random)** — 5 random
   fixtures, ~10–30s. Use this while iterating on a V2 parameter.
 - **Debug → Run Subject-Lift Benchmark (Full)** — every fixture in the
@@ -19,7 +24,9 @@ In a Debug build of the app:
   before flipping `subjectLiftV2` on by default.
 - **Debug → Open Latest Benchmark Folder** — re-opens the most recent run.
 
-Output lands in `~/Desktop/edge-bench-<ISO8601>/`:
+Output lands inside the app's sandbox container at
+`~/Library/Containers/com.aaavatar.Avatar/Data/Library/Application Support/EdgeBench/edge-bench-<ISO8601>/`
+and Finder reveals it automatically when the run completes:
 - `00-summary.csv` — header, summary row (averages), then one row per fixture
   with V1 ms, V2 ms, ratio, and ok flags.
 - `<source>-v1-cutout.png`, `<source>-v2-cutout.png` — raw cutouts.

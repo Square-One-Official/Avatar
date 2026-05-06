@@ -7,10 +7,14 @@ import CoreImage.CIFilterBuiltins
 
 /// Debug-only side-by-side benchmark for the Subject-Lift pipeline.
 ///
-/// Runs every JPG/PNG/HEIC fixture under `Avatar/Debug/Fixtures/` (or the path
-/// set in the `AVATAR_BENCH_FIXTURES` env var) through both `subjectLiftV1`
-/// (current production) and `subjectLiftV2` (in-development) and writes the
-/// results to `~/Desktop/edge-bench-{ISO8601}/` for eyeball comparison.
+/// Runs every JPG/PNG/HEIC/AVIF/WebP fixture under the user-picked fixtures
+/// folder (chosen once via NSOpenPanel + persisted as a security-scoped
+/// bookmark — the app is sandboxed) through both `subjectLiftV1` (current
+/// production) and `subjectLiftV2` (in-development), and writes results
+/// inside the app's container at
+/// `~/Library/Containers/<bundle-id>/Data/Library/Application Support/EdgeBench/edge-bench-{ISO8601}/`
+/// for eyeball comparison. The output folder is revealed in Finder when
+/// the run completes; "Open Latest" jumps back to it later.
 ///
 /// The cutouts are composited over a *triptych* backdrop — light grey, dark
 /// grey, and a busy noise pattern — because hair-edge defects only become
@@ -22,6 +26,13 @@ import CoreImage.CIFilterBuiltins
 @MainActor
 enum EdgeBenchmark {
 
+    /// UserDefaults key for the security-scoped bookmark that points at the
+    /// fixtures folder. The app is sandboxed, so a user-picked URL plus a
+    /// scoped bookmark is the only way to read photos from outside the
+    /// container — including the source-tree `Avatar/Debug/Fixtures/` path
+    /// that lives inside `~/Documents/Dev Projects/`.
+    private static let fixturesBookmarkKey = "edgeBenchmarkFixturesBookmark"
+
     /// Discovers fixtures, runs V1 + V2 on each, writes a comparison folder,
     /// and reveals it in Finder. Returns the output folder URL on success.
     ///
@@ -31,12 +42,26 @@ enum EdgeBenchmark {
     /// PNGs is representative, even when the source folder is alphabetical.
     @discardableResult
     static func run(sampleSize: Int? = nil) -> URL? {
-        let allFixtures = discoverFixtures()
+        // Acquire security scope on the bookmarked fixtures folder for the
+        // entire run. Without this the FileManager enumeration silently
+        // returns nothing — sandbox blocks reads outside the container with
+        // no error and no permission prompt.
+        let scoped = resolveFixturesBookmark()
+        let didStartScope = scoped?.startAccessingSecurityScopedResource() ?? false
+        defer {
+            if didStartScope, let scoped { scoped.stopAccessingSecurityScopedResource() }
+        }
+
+        let allFixtures = discoverFixtures(scopedFolder: scoped)
         guard !allFixtures.isEmpty else {
-            showAlert(
-                title: "No fixtures found",
-                body: noFixturesBody()
-            )
+            // First-run path under sandbox: there's no folder picked yet,
+            // or the saved bookmark resolved to an empty / moved folder.
+            // Show the picker; on success, recurse so the new bookmark
+            // takes effect with its own freshly-acquired scope.
+            if pickFixturesFolder() != nil {
+                return run(sampleSize: sampleSize)
+            }
+            showAlert(title: "No fixtures found", body: noFixturesBody())
             return nil
         }
 
@@ -92,34 +117,97 @@ enum EdgeBenchmark {
         return "\(label),\(Int(v1Avg)),\(Int(v2Avg)),\(ratio),avg_v1_ms,avg_v2_ms"
     }
 
-    /// Body for the "no fixtures found" alert. Lists every path the harness
-    /// looked at so a misconfigured env var is obvious instead of mysterious.
+    /// Body for the "no fixtures found" alert. Reached only when the user
+    /// cancelled the picker — explains why the source-tree path won't work
+    /// without a bookmark and tells them how to retry.
     private static func noFixturesBody() -> String {
-        var lines = ["Looked here:"]
+        var lines = [
+            "The app is sandboxed, so the harness needs you to pick the",
+            "fixtures folder once via the OS file picker. macOS then grants",
+            "this app a long-lived security-scoped bookmark to that folder.",
+            "",
+            "Try again with:",
+            "  Debug → Choose Fixtures Folder…",
+            ""
+        ]
         if let env = ProcessInfo.processInfo.environment["AVATAR_BENCH_FIXTURES"] {
-            lines.append("• AVATAR_BENCH_FIXTURES → \(env)")
+            lines.append("AVATAR_BENCH_FIXTURES env var is set to: \(env)")
+            lines.append("(Only works for paths inside the sandbox container.)")
         }
-        if let bundled = Bundle.main.url(forResource: "Fixtures", withExtension: nil) {
-            lines.append("• Bundle: \(bundled.path)")
+        if resolveFixturesBookmark() != nil {
+            lines.append("Saved bookmark exists, but the folder has no recognised")
+            lines.append("portraits (.jpg/.jpeg/.png/.heic/.heif/.avif/.webp).")
         }
-        if let src = locateSourceTreeFixturesFolder() {
-            lines.append("• Source tree: \(src.path)")
-        } else {
-            lines.append("• Source tree: <not resolved>")
-        }
-        lines.append("")
-        lines.append("Drop any portrait JPG/PNG/HEIC files into one of those folders.")
-        lines.append("Naming doesn't matter — the harness picks them up automatically.")
         return lines.joined(separator: "\n")
     }
 
-    /// Opens the most recent `~/Desktop/edge-bench-*` folder in Finder, or
-    /// shows an alert when none exist.
+    // MARK: - Sandbox: user-picker + security-scoped bookmark
+
+    /// Show NSOpenPanel for the user to pick a fixtures folder. Returns the
+    /// picked URL on success (and saves a security-scoped bookmark for next
+    /// time); nil if the user cancelled.
+    @discardableResult
+    @MainActor
+    static func pickFixturesFolder() -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "Pick the Subject-Lift fixtures folder"
+        panel.message = "Drop your portrait fixtures here. The benchmark will run on every JPG, PNG, HEIC, AVIF, and WebP it finds."
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        // .claude/worktrees/ lives behind a dotfile component — show hidden
+        // so the user doesn't have to Cmd+Shift+. inside the panel.
+        panel.showsHiddenFiles = true
+        panel.prompt = "Choose"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        saveFixturesBookmark(for: url)
+        return url
+    }
+
+    /// Public action exposed via the Debug menu — re-prompt and replace the
+    /// saved bookmark. Useful when the user moves the worktree.
+    @MainActor
+    static func chooseFixturesFolder() {
+        _ = pickFixturesFolder()
+    }
+
+    private static func saveFixturesBookmark(for url: URL) {
+        do {
+            let data = try url.bookmarkData(options: .withSecurityScope,
+                                             includingResourceValuesForKeys: nil,
+                                             relativeTo: nil)
+            UserDefaults.standard.set(data, forKey: fixturesBookmarkKey)
+        } catch {
+            dlog("[EdgeBench] Failed to save bookmark: \(error)")
+        }
+    }
+
+    /// Resolves the saved bookmark to a URL. Returns nil if there's no
+    /// bookmark, or if the folder has been deleted entirely. Stale bookmarks
+    /// (folder moved but still exists) are transparently re-saved.
+    private static func resolveFixturesBookmark() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: fixturesBookmarkKey) else { return nil }
+        var stale = false
+        do {
+            let url = try URL(resolvingBookmarkData: data,
+                              options: .withSecurityScope,
+                              relativeTo: nil,
+                              bookmarkDataIsStale: &stale)
+            if stale { saveFixturesBookmark(for: url) }
+            return url
+        } catch {
+            dlog("[EdgeBench] Bookmark resolution failed: \(error)")
+            return nil
+        }
+    }
+
+    /// Opens the most recent `EdgeBench/edge-bench-*` folder under
+    /// Application Support in Finder, or shows an alert when none exist.
     static func revealLatest() {
-        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
-        guard let desktop,
+        guard let root = benchmarkRootDir(),
               let entries = try? FileManager.default.contentsOfDirectory(
-                at: desktop,
+                at: root,
                 includingPropertiesForKeys: [.contentModificationDateKey],
                 options: [.skipsHiddenFiles]
               )
@@ -252,25 +340,28 @@ enum EdgeBenchmark {
 
     // MARK: - Discovery + IO
 
-    private static func discoverFixtures() -> [URL] {
+    private static func discoverFixtures(scopedFolder: URL? = nil) -> [URL] {
         var roots: [URL] = []
 
-        // 1) Env var override — fastest iteration when the dev keeps fixtures
-        //    outside the repo.
+        // 1) Env var override — handy in non-sandboxed test runs. Under the
+        //    real sandbox this only resolves if the path is inside the
+        //    container, so the bookmark path (2) is the primary mechanism.
         if let envPath = ProcessInfo.processInfo.environment["AVATAR_BENCH_FIXTURES"],
            !envPath.isEmpty {
             roots.append(URL(fileURLWithPath: envPath, isDirectory: true))
         }
 
-        // 2) Bundled Fixtures folder (if it ships with the build).
+        // 2) User-picked folder via NSOpenPanel + security-scoped bookmark.
+        //    Caller has already started scope before invoking us; we just
+        //    enumerate. This is the path that lets the sandboxed app read
+        //    fixtures sitting in the worktree (or anywhere else outside
+        //    the container).
+        if let scopedFolder { roots.append(scopedFolder) }
+
+        // 3) Bundled Fixtures folder (if anyone ever copies them into
+        //    Resources for an end-to-end test build). Always sandbox-safe.
         if let bundleURL = Bundle.main.url(forResource: "Fixtures", withExtension: nil) {
             roots.append(bundleURL)
-        }
-
-        // 3) Source-tree fallback — works when running from Xcode out of the
-        //    worktree. Walks up from the executable until it finds the folder.
-        if let srcTree = locateSourceTreeFixturesFolder() {
-            roots.append(srcTree)
         }
 
         // ImageIO on macOS 14+ handles AVIF and WebP natively; CGImageSource
@@ -294,29 +385,26 @@ enum EdgeBenchmark {
         return fixtures.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Resolves the source-tree `Avatar/Debug/Fixtures` folder by anchoring
-    /// to *this file's* compile-time path. Walking up from `Bundle.main`
-    /// doesn't work for Debug builds — the .app sits in DerivedData,
-    /// nowhere near the worktree. `#filePath` always points to the source
-    /// file used at build time, so the Fixtures sibling is one step away.
-    /// Returns nil when the source tree has been moved or deleted since
-    /// build (rare; user fixes by rebuilding).
-    private static func locateSourceTreeFixturesFolder() -> URL? {
-        let thisFile = URL(fileURLWithPath: #filePath)
-        let candidate = thisFile.deletingLastPathComponent()
-            .appendingPathComponent("Fixtures", isDirectory: true)
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir),
-              isDir.boolValue else { return nil }
-        return candidate
+    /// Output folder lives inside the sandbox's Application Support
+    /// container — the only place a sandboxed app is guaranteed to be able
+    /// to write without requesting any further entitlements. The user
+    /// reaches it via Finder when the run completes (NSWorkspace reveal).
+    /// Concretely: `~/Library/Containers/<bundle-id>/Data/Library/Application Support/EdgeBench/edge-bench-<stamp>/`.
+    private static func benchmarkRootDir() -> URL? {
+        guard let appSupport = try? FileManager.default.url(for: .applicationSupportDirectory,
+                                                              in: .userDomainMask,
+                                                              appropriateFor: nil,
+                                                              create: true) else { return nil }
+        let dir = appSupport.appendingPathComponent("EdgeBench", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }
 
     private static func makeOutputDir() -> URL? {
-        guard let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
-        else { return nil }
+        guard let root = benchmarkRootDir() else { return nil }
         let stamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
-        let dir = desktop.appendingPathComponent("edge-bench-\(stamp)", isDirectory: true)
+        let dir = root.appendingPathComponent("edge-bench-\(stamp)", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             return dir

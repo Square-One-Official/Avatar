@@ -409,6 +409,13 @@ struct AvatarApp: App {
                 Button("Open Latest Benchmark Folder") {
                     EdgeBenchmark.revealLatest()
                 }
+                // The app is sandboxed, so reading photos from outside the
+                // container needs a security-scoped bookmark. The first
+                // benchmark run prompts automatically; this lets the dev
+                // re-pick the folder if they move the worktree.
+                Button("Choose Fixtures Folder…") {
+                    EdgeBenchmark.chooseFixturesFolder()
+                }
                 Divider()
                 Toggle("Use Subject-Lift V2",
                        isOn: Binding(
