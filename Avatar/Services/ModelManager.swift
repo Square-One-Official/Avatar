@@ -112,16 +112,16 @@ final class ModelManager {
         "models/matting-v1/matting-model.mlmodelc.zip"
     )!
 
-    /// Hex SHA-256 of the `matting-model.mlmodelc.zip` — paste from
-    /// `build/matting/matting-model.mlmodelc.zip.sha256` after running
-    /// `scripts/repackage_matting_model.py`. Verified after every
-    /// download; mismatch refuses to install.
+    /// Hex SHA-256 of the `matting-model.mlmodelc.zip` — emitted by
+    /// `scripts/convert_ormbg_to_coreml.py` and saved alongside the zip
+    /// at `build/matting/matting-model.mlmodelc.zip.sha256`. Verified
+    /// after every download; mismatch refuses to install (the CoreML
+    /// loader would crash on a tampered or partially-downloaded
+    /// payload, so the SHA gate is the only guard before the runtime).
     ///
-    /// **Placeholder until the first release is published.** The
-    /// verification path is exercised end-to-end either way (a real
-    /// download will fail with `verificationFailed` until this is
-    /// updated to the actual hash).
-    static let expectedSHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
+    /// Bump on every model swap. Always paste exactly what the script
+    /// prints — do not regenerate the hash from a hand-edited zip.
+    static let expectedSHA256 = "c3c48f25fab5915fbff44359d3a37d893a9abe8cfbff3b5ba592ae10a41f8f85"
 
     /// Bump on every model swap. `.model_version` sidecar in the install
     /// dir compares against this to decide whether to wipe older caches
