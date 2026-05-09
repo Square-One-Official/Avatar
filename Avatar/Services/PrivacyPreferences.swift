@@ -28,10 +28,17 @@ enum LocalCutoutEngine: String, CaseIterable, Codable, Sendable {
     case downloadedModel
 }
 
-/// Persisted user preferences for the local-first pivot. Mirrors the
-/// pattern in `MagicCutoutPreferences` — UserDefaults-backed, defaults
-/// registered at init time so the onboarding sheet sees a sane initial
-/// state. `@Observable` lets SwiftUI views bind to changes.
+/// Persisted user preferences for the local-first pivot. UserDefaults-
+/// backed via `didSet` rather than computed properties — `@Observable`'s
+/// macro instruments stored properties for change tracking but does NOT
+/// see through computed-over-UserDefaults accessors, which is why
+/// `MagicCutoutPreferences` had to fall back to `@AppStorage` in
+/// SettingsView. Stored-with-didSet keeps a single source of truth, lets
+/// SwiftUI re-render on every mutation, and still persists across launches.
+///
+/// Memory state and disk state can drift only if a foreign process edits
+/// the plist while the app is running — fine for our case (debug menu
+/// "Reset Onboarding" deletes keys then prompts for a quit-and-relaunch).
 @MainActor
 @Observable
 final class PrivacyPreferences {
@@ -41,45 +48,44 @@ final class PrivacyPreferences {
 
     /// Default for new users coming through onboarding is whatever they
     /// pick. Default for migrated existing users is `cloudAllowed`,
-    /// preserving today's behaviour. Default for *anyone* who somehow
-    /// reaches this without onboarding (e.g., a unit test) is also
-    /// `cloudAllowed` so we never silently block a feature without
-    /// explicit user consent to the privacy posture.
-    var mode: AIPrivacyMode {
-        get {
-            guard let raw = UserDefaults.standard.string(forKey: Self.modeKey),
-                  let m = AIPrivacyMode(rawValue: raw)
-            else { return .cloudAllowed }
-            return m
+    /// preserving today's behaviour. Default for anyone reaching this
+    /// without onboarding (e.g., a unit test) is also `cloudAllowed`
+    /// so we never silently block a feature without explicit user
+    /// consent to the privacy posture.
+    var mode: AIPrivacyMode = .cloudAllowed {
+        didSet {
+            UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
         }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: Self.modeKey) }
     }
 
     /// Local engine selection. Only consulted when `mode == .localOnly`.
     /// Default Apple Vision so the cutout pipeline always has something
     /// to fall back to even if the user picked "downloaded model" but
     /// never completed the download (e.g., quit during first-use download).
-    var engine: LocalCutoutEngine {
-        get {
-            guard let raw = UserDefaults.standard.string(forKey: Self.engineKey),
-                  let e = LocalCutoutEngine(rawValue: raw)
-            else { return .appleVision }
-            return e
+    var engine: LocalCutoutEngine = .appleVision {
+        didSet {
+            UserDefaults.standard.set(engine.rawValue, forKey: Self.engineKey)
         }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: Self.engineKey) }
     }
 
     /// Convenience for call sites that just want a yes/no on cloud AI.
-    /// Reads through `mode` so observers fire correctly.
     var cloudAllowed: Bool { mode == .cloudAllowed }
 
     init() {
-        // Register defaults once at construction. `register` doesn't
-        // overwrite values already set, so existing users who picked
-        // a mode through onboarding keep their choice.
-        UserDefaults.standard.register(defaults: [
-            Self.modeKey: AIPrivacyMode.cloudAllowed.rawValue,
-            Self.engineKey: LocalCutoutEngine.appleVision.rawValue,
-        ])
+        // Read persisted values, if any. `string(forKey:)` returns nil
+        // for unset keys (defaults registration is intentionally not
+        // used here — we want the actual disk state, not a synthetic
+        // fallback that would mask a missing key on first launch).
+        // Setting the stored property triggers didSet which writes back
+        // to UserDefaults — redundant on the first run, idempotent
+        // afterwards. Hop through helpers so init stays linear.
+        if let raw = UserDefaults.standard.string(forKey: Self.modeKey),
+           let m = AIPrivacyMode(rawValue: raw) {
+            self.mode = m
+        }
+        if let raw = UserDefaults.standard.string(forKey: Self.engineKey),
+           let e = LocalCutoutEngine(rawValue: raw) {
+            self.engine = e
+        }
     }
 }
