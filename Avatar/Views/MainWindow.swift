@@ -100,6 +100,13 @@ struct MainWindow: View {
             OnboardingSheet()
                 .environment(appState)
                 .environment(appState.privacyPrefs)
+                // Engine step's inline download progress reads
+                // `manager.state`, so the sheet has to carry the same
+                // ModelManager instance the rest of the app sees.
+                // Without this, the env lookup fails at runtime and
+                // SwiftUI silently shows a blank space where the
+                // progress bar should go.
+                .environment(appState.modelManager)
         }
         .alert(
             Loc.magicCutoutTitle,

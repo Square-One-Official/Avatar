@@ -349,6 +349,13 @@ enum Loc {
     static var onboardingContinue: String { en ? "Continue" : "Doorgaan" }
     static var onboardingDone: String { en ? "Done" : "Klaar" }
     static var onboardingSkip: String { en ? "Skip" : "Overslaan" }
+    /// Used in the engine step when the model download fails — clicking
+    /// Done falls back to Apple Vision rather than leaving the user
+    /// stuck on a broken-download state.
+    static var onboardingDoneWithoutEnhanced: String {
+        en ? "Continue without enhanced model"
+           : "Doorgaan zonder verbeterd model"
+    }
 
     // MARK: Settings — Privacy & AI section
     static var privacyAndAITitle: String {
