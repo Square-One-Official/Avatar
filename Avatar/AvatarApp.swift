@@ -426,6 +426,32 @@ struct AvatarApp: App {
                         get: { (UserDefaults.standard.object(forKey: "subjectLiftV2") as? Bool) ?? true },
                         set: { UserDefaults.standard.set($0, forKey: "subjectLiftV2") }
                        ))
+                Divider()
+                // Wipe just the onboarding-related defaults so the next
+                // launch hits the first-launch path. Library, portraits,
+                // auth session, Magic Cutout toggle, and V2 preference
+                // stay intact — this is for *flow* testing, not "reset
+                // the whole app". Asks the user to quit so the running
+                // process's UserDefaults cache doesn't reinstate the
+                // values via the migration shim before we observe the
+                // change.
+                Button("Reset Onboarding…") {
+                    let keys = [
+                        "hasSeenOnboarding",
+                        "hasSeenWelcomeSignIn",
+                        "hasRunOnboardingMigration",
+                        "aiPrivacyMode",
+                        "localCutoutEngine",
+                    ]
+                    for key in keys {
+                        UserDefaults.standard.removeObject(forKey: key)
+                    }
+                    let alert = NSAlert()
+                    alert.messageText = "Onboarding state cleared"
+                    alert.informativeText = "Quit Aaavatar (⌘Q) and relaunch to see the first-launch flow. Library, auth, and other preferences are unchanged."
+                    alert.alertStyle = .informational
+                    alert.runModal()
+                }
             }
             #endif
         }
