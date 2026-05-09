@@ -213,15 +213,16 @@ def convert_to_mlpackage(out: Path) -> None:
         inputs=[ct.ImageType(
             name="input",
             shape=(1, 3, INPUT_SIZE, INPUT_SIZE),
-            # ImageNet normalization. Bake into scale/bias so the Swift
-            # caller can pass a plain RGB CVPixelBuffer (0-255) without
-            # any pre-processing. scale = 1/(255*std), bias = -mean/std.
-            scale=1.0 / (0.229 * 255.0),
-            bias=[
-                -0.485 / 0.229,
-                -0.456 / 0.224,
-                -0.406 / 0.225,
-            ],
+            # ORMBG's preprocessing (per ormbg/inference.py and
+            # data_loader_cache.py) is a plain `x / 255.0` — NO ImageNet
+            # mean/std subtraction. Earlier conversions baked ImageNet
+            # normalisation in by mistake; the model then received data
+            # in a distribution it was never trained on and produced a
+            # smudgy ghost-like matte. `scale = 1/255, bias = [0, 0, 0]`
+            # matches what ORMBG actually expects and lets the Swift
+            # caller hand over a plain 0-255 RGB pixel buffer.
+            scale=1.0 / 255.0,
+            bias=[0.0, 0.0, 0.0],
             color_layout=ct.colorlayout.RGB,
         )],
         outputs=[ct.TensorType(name="alpha")],
