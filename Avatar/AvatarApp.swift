@@ -372,6 +372,11 @@ struct AvatarApp: App {
                 .environment(updater)
                 #endif
                 .environment(appState.magicCutoutPrefs)
+                // Make the announcement service reachable from any view —
+                // the `.newBadge(...)` modifier reads it via the
+                // environment so feature affordances anywhere in the
+                // window can opt into the NEW pill without prop-drilling.
+                .environment(appState.announcements)
                 // Minimum ensures the library sidebar (~200), canvas (~280)
                 // and inspector (~320) all have enough room to display
                 // their content without truncation.
@@ -400,6 +405,7 @@ struct AvatarApp: App {
                 .environment(updater)
                 #endif
                 .environment(appState.magicCutoutPrefs)
+                .environment(appState.announcements)
                 .modelContainer(sharedModelContainer)
                 .preferredColorScheme(colorScheme)
                 .id(appState.language)

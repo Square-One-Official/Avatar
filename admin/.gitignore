@@ -1,0 +1,8 @@
+node_modules
+.next
+.vercel
+.env
+.env.local
+.env.*.local
+payload-types.ts
+next-env.d.ts

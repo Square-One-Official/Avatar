@@ -48,6 +48,12 @@ enum CheckoutResult {
 final class BackendClient {
     let baseURL: URL = URL(string: "https://api.aaavatar.nl")!
 
+    /// Marketing version pulled from the app bundle, e.g. "1.1.4". Sent as
+    /// `X-App-Version` on every request so the backend can gate
+    /// version-targeted features (announcements with `minAppVersion`).
+    static let appVersion: String? =
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+
     private unowned let auth: AuthManager
     private let session: URLSession
 
@@ -297,6 +303,39 @@ final class BackendClient {
         return url
     }
 
+    // MARK: GET /v1/announcements/pending
+    /// Next unseen feature announcement for the signed-in user. Authored
+    /// in the Payload CMS at admin.aaavatar.nl and surfaced as a sheet on
+    /// sign-in. Returns nil when the user is fully caught up.
+    private struct PendingResponse: Decodable {
+        let announcement: Announcement?
+    }
+    func fetchPendingAnnouncement() async throws -> Announcement? {
+        let resp: PendingResponse = try await request("/v1/announcements/pending", method: "GET")
+        return resp.announcement
+    }
+
+    // MARK: POST /v1/announcements/seen
+    /// Marks an announcement as seen. Idempotent on (user, slug) — safe to
+    /// call from both the dismiss tap and `.onDisappear`.
+    func markAnnouncementSeen(slug: String, action: String) async throws {
+        struct Body: Encodable { let slug: String; let action: String }
+        let body = try JSONEncoder().encode(Body(slug: slug, action: action))
+        struct Empty: Decodable { let ok: Bool }
+        let _: Empty = try await request("/v1/announcements/seen", method: "POST", body: body)
+    }
+
+    // MARK: GET /v1/badges
+    /// Active "NEW" badges keyed by componentId. Server filters out badges
+    /// whose tied announcement the user has already dismissed.
+    private struct BadgesResponse: Decodable {
+        let badges: [AnnouncementBadge]
+    }
+    func fetchBadges() async throws -> [AnnouncementBadge] {
+        let resp: BadgesResponse = try await requestAllowingAnonymous("/v1/badges", method: "GET")
+        return resp.badges
+    }
+
     // MARK: - Generic request
     private func request<R: Decodable>(
         _ path: String,
@@ -338,6 +377,13 @@ final class BackendClient {
         // Sent on every request so the backend can cross-reference the
         // device against the user's account if one is signed in.
         req.setValue(DeviceFingerprint.current, forHTTPHeaderField: "X-Device-Fingerprint")
+        // Marketing version (e.g. "1.1.4"). Used by the announcements
+        // feed to enforce minAppVersion gates so a "what's new in 1.2"
+        // pop-up doesn't fire on a 1.1 client where the feature isn't
+        // present yet.
+        if let version = Self.appVersion {
+            req.setValue(version, forHTTPHeaderField: "X-App-Version")
+        }
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.httpBody = body

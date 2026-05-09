@@ -89,6 +89,18 @@ struct MainWindow: View {
             WelcomeSignInSheet()
                 .environment(appState)
         }
+        .sheet(item: Binding(
+            get: { appState.announcements.current },
+            set: { newValue in
+                // Externally-cleared (announcement service set current to
+                // nil) → no-op. Sheet's own dismiss-side cleanup is owned
+                // by AnnouncementService.dismiss().
+                if newValue == nil { appState.announcements.current = nil }
+            }
+        )) { announcement in
+            AnnouncementSheet(announcement: announcement)
+                .environment(appState.announcements)
+        }
         .alert(
             Loc.magicCutoutTitle,
             isPresented: Binding(
@@ -132,9 +144,29 @@ struct MainWindow: View {
             } else if !hasSeenWelcomeSignIn {
                 hasSeenWelcomeSignIn = true
             }
+
+            // Announcements + NEW badges. Badges fetch anonymously so a
+            // signed-out user still sees the pill; the pending-pop-up
+            // path only runs once we have a session, since the seen-
+            // state filter requires a user id.
+            await appState.announcements.refreshBadges()
+            if appState.auth.isSignedIn {
+                await appState.announcements.fetchPending()
+            }
         }
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in
-            if signedIn { appState.refreshEntitlement() }
+            if signedIn {
+                appState.refreshEntitlement()
+                Task {
+                    // Brief stagger lets the WelcomeSignInSheet finish its
+                    // dismiss animation before the announcement sheet
+                    // tries to present — macOS won't show two sheets at
+                    // once and would silently swallow the second.
+                    try? await Task.sleep(for: .milliseconds(450))
+                    await appState.announcements.refreshBadges()
+                    await appState.announcements.fetchPending()
+                }
+            }
         }
     }
 

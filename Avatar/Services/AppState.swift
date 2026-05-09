@@ -282,6 +282,17 @@ final class AppState {
     @ObservationIgnored
     private(set) lazy var backend: BackendClient = BackendClient(auth: auth)
 
+    /// Feature-announcement + NEW-badge pipeline. Owns the in-memory
+    /// model of "what announcement should the modal show" and "which
+    /// components have an active NEW badge". Populated from
+    /// `/v1/announcements/pending` and `/v1/badges` after sign-in and
+    /// on launch. `@ObservationIgnored` because the service is itself
+    /// `@Observable` and sub-properties drive view updates — wrapping
+    /// it again here would re-trigger every view that touches
+    /// `appState` whenever the badge map changes.
+    @ObservationIgnored
+    private(set) lazy var announcements: AnnouncementService = AnnouncementService(backend: backend)
+
     init() {}
 
     /// Fetches the latest entitlement from the backend. Silent on network
