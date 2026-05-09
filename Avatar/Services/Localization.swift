@@ -365,8 +365,37 @@ enum Loc {
            : "Uitgeschakeld in modus Alleen lokaal."
     }
     static var privacyEngineDownloadComingSoon: String {
+        // Retained for legacy callers. The new flow surfaces explicit
+        // download controls instead of a "coming soon" hint, so this
+        // string is unused in current code paths but kept around so a
+        // pinned older build referencing it still links.
         en ? "Enhanced model coming soon — Apple Vision is used for now."
            : "Verbeterd model komt binnenkort — momenteel wordt Apple Vision gebruikt."
+    }
+
+    // MARK: Downloadable matting model (BiRefNet)
+    static var modelDownloadButton: String {
+        en ? "Download model" : "Model downloaden"
+    }
+    static var modelDownloadSizeHint: String {
+        en ? "About 90 MB. Stored in this app's container."
+           : "Ongeveer 90 MB. Bewaard in de map van deze app."
+    }
+    static func modelDownloadingLabel(percent: Int) -> String {
+        en ? "Downloading… \(percent)%" : "Downloaden… \(percent)%"
+    }
+    static var modelDownloadedReady: String {
+        en ? "Enhanced model ready" : "Verbeterd model klaar"
+    }
+    static var modelRemoveButton: String {
+        en ? "Remove" : "Verwijderen"
+    }
+    static var modelDownloadRetryButton: String {
+        en ? "Try again" : "Opnieuw proberen"
+    }
+    static var modelMissingFallbackToast: String {
+        en ? "Enhanced model isn't downloaded yet. Used Apple Vision for this import. Download in Settings → Privacy & AI."
+           : "Het verbeterde model is nog niet gedownload. Apple Vision werd gebruikt voor deze import. Downloaden in Instellingen → Privacy & AI."
     }
 
     // MARK: Cloud-feature gating toasts (local-only)

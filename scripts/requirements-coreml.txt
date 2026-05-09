@@ -1,0 +1,8 @@
+# Python deps for `convert_birefnet_to_coreml.py`. Pinned loosely — bump if
+# a newer coremltools fixes a Swin attention conversion issue.
+coremltools>=8.0
+torch>=2.2
+transformers>=4.40
+einops>=0.7
+huggingface_hub>=0.21
+numpy>=1.26

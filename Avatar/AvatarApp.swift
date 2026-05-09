@@ -373,6 +373,7 @@ struct AvatarApp: App {
                 #endif
                 .environment(appState.magicCutoutPrefs)
                 .environment(appState.privacyPrefs)
+                .environment(appState.modelManager)
                 // Minimum ensures the library sidebar (~200), canvas (~280)
                 // and inspector (~320) all have enough room to display
                 // their content without truncation.
@@ -465,6 +466,7 @@ struct AvatarApp: App {
                 #endif
                 .environment(appState.magicCutoutPrefs)
                 .environment(appState.privacyPrefs)
+                .environment(appState.modelManager)
                 .modelContainer(sharedModelContainer)
                 .preferredColorScheme(colorScheme)
                 .id(appState.language)

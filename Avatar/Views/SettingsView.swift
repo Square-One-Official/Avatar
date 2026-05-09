@@ -106,13 +106,7 @@ private struct PrivacyAndAISection: View {
                 .labelsHidden()
             }
 
-            // Engine picker, only visible in local-only mode. The
-            // downloaded-model option is intentionally not greyed out
-            // here even though the actual download isn't wired yet —
-            // the choice is persisted so the BiRefNet session can pick
-            // it up. The caption surfaces the current fallback so the
-            // user understands why their cutouts still look like Apple
-            // Vision output.
+            // Engine picker, only visible in local-only mode.
             if prefs.mode == .localOnly {
                 HStack(alignment: .center, spacing: 12) {
                     Text(Loc.privacyEnginePickerLabel)
@@ -129,7 +123,73 @@ private struct PrivacyAndAISection: View {
                 }
 
                 if prefs.engine == .downloadedModel {
-                    Text(Loc.privacyEngineDownloadComingSoon)
+                    DownloadedModelStatusView()
+                }
+            }
+        }
+    }
+}
+
+/// Status / action row for the downloadable BiRefNet matting model.
+/// Renders the right affordance for each `LocalModelState`:
+///
+///  - `.notDownloaded` → "Download" button + size estimate.
+///  - `.downloading`   → progress bar + cancel.
+///  - `.ready`         → "Downloaded" badge + Remove button.
+///  - `.failed`        → error message + Try Again button.
+///
+/// Lives inside `PrivacyAndAISection` so it inherits the same disabled-
+/// when-locked semantics; here it's only shown when mode == .localOnly,
+/// so no extra locking is needed.
+private struct DownloadedModelStatusView: View {
+    @Environment(ModelManager.self) private var manager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch manager.state {
+            case .notDownloaded:
+                HStack(spacing: 10) {
+                    Button {
+                        manager.download()
+                    } label: {
+                        Label(Loc.modelDownloadButton, systemImage: "arrow.down.circle")
+                    }
+                    .controlSize(.regular)
+                    Text(Loc.modelDownloadSizeHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+            case .downloading(let progress):
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                    HStack {
+                        Text(Loc.modelDownloadingLabel(percent: Int(progress * 100)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(Loc.cancel) {
+                            manager.removeDownloaded()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
+            case .ready:
+                HStack(spacing: 10) {
+                    Label(Loc.modelDownloadedReady, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.appSuccessInk)
+                    Spacer()
+                    Button(Loc.modelRemoveButton) {
+                        manager.removeDownloaded()
+                    }
+                    .controlSize(.small)
+                }
+
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundStyle(Color.appWarningInk)
                         .padding(.horizontal, 10)
@@ -139,6 +199,13 @@ private struct PrivacyAndAISection: View {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color.appWarning.opacity(0.30))
                         )
+                    HStack {
+                        Spacer()
+                        Button(Loc.modelDownloadRetryButton) {
+                            manager.download(force: true)
+                        }
+                        .controlSize(.small)
+                    }
                 }
             }
         }

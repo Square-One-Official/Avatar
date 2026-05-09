@@ -364,6 +364,149 @@ enum ImageProcessor {
         return (resized, scale)
     }
 
+    /// Subject lift via the optional downloadable BiRefNet_lite-matting
+    /// CoreML model. Produces a real continuous-α matte that handles wispy
+    /// hair edges Apple Vision can't (Vision is a segmentation network with
+    /// near-binary alpha; BiRefNet is a matting network trained for the
+    /// kind of flowing-hair / curly-flyaway edges V2 still bleeds on).
+    ///
+    /// Caller is responsible for gating on `ModelManager.cachedModelURL()
+    /// != nil` — this function will throw if the model file is missing or
+    /// malformed. ImportFlow handles the fallback to V2 when the model
+    /// isn't present.
+    ///
+    /// Performance: ~1-2s on M1 at 1024x1024 (fp16, ANE/GPU dispatch via
+    /// `computeUnits = .all`). MLModel loading is amortized via
+    /// `cachedDownloadedModel` — first call after a fresh launch pays
+    /// ~200ms cold-start, subsequent calls are inference-only. Cache is
+    /// invalidated when the URL changes (e.g. user re-downloads after a
+    /// `modelVersion` bump).
+    static func subjectLiftDownloaded(image: CGImage, modelURL: URL) throws -> CGImage {
+        let originalCI = CIImage(cgImage: image)
+        let extent = originalCI.extent
+
+        // 1. Load (or reuse cached) MLModel.
+        let model = try loadOrReuseDownloadedModel(at: modelURL)
+
+        // 2. Resize source to 1024×1024 — BiRefNet was trained at this
+        //    fixed resolution. The conversion script bakes ImageNet
+        //    normalization into the model's preprocessing, so the buffer
+        //    we hand over carries plain RGB 0-255.
+        let inputSize: CGFloat = 1024
+        let scaleX = inputSize / extent.width
+        let scaleY = inputSize / extent.height
+        let resized = originalCI
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(x: 0, y: 0, width: inputSize, height: inputSize))
+        guard let inputBuffer = createPixelBuffer(from: resized,
+                                                    size: CGSize(width: inputSize, height: inputSize)) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+
+        // 3. Inference.
+        let input = try MLDictionaryFeatureProvider(dictionary: [
+            "input": MLFeatureValue(pixelBuffer: inputBuffer)
+        ])
+        let prediction = try model.prediction(from: input)
+
+        // 4. Extract the alpha matte. Conversion script names the output
+        //    "alpha"; older / re-converted models may use a different
+        //    name, so fall through to known aliases and finally the
+        //    MultiArray scan as a safety net.
+        let candidateNames = ["alpha", "output", "sigmoid_output", "out"]
+        var maskCI: CIImage?
+        for name in candidateNames {
+            if let feature = prediction.featureValue(for: name),
+               let buffer = feature.imageBufferValue {
+                maskCI = CIImage(cvPixelBuffer: buffer)
+                break
+            }
+        }
+        if maskCI == nil {
+            maskCI = extractMaskFromMultiArray(prediction: prediction)
+        }
+        guard let rawMask = maskCI else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+
+        // 5. Scale mask back to source extent. BiRefNet's output is the
+        //    same continuous-α we want — no need for the multi-mask
+        //    union / hair zone gating dance V2 needs to coax a soft matte
+        //    out of Vision's near-binary mask.
+        let mask = scaleMaskToExtent(rawMask, extent: extent)
+
+        // 6. Light guided-filter refinement to snap the matte onto real
+        //    luminance edges. Loose epsilon — BiRefNet's output is
+        //    already edge-aware, we're just cleaning up sub-pixel
+        //    scaling artifacts from step 5.
+        let guided = mask.applyingFilter("CIGuidedFilter", parameters: [
+            "inputGuideImage": originalCI,
+            kCIInputRadiusKey: 2.0,
+            "inputEpsilon": 0.01
+        ]).cropped(to: extent)
+
+        // 7. Blur-fusion RGB decontamination (V2 win, same algorithm).
+        //    Recovers unmixed foreground colour at semi-transparent
+        //    pixels so wispy strands don't carry the original
+        //    background through to the new backdrop.
+        let refinedFG = refineForeground(source: originalCI, alpha: guided,
+                                          extent: extent,
+                                          pass1Radius: 90, pass2Radius: 6)
+
+        // 8. Composite refined RGB + alpha.
+        let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
+            .cropped(to: extent)
+        let alphaMatte = guided.applyingFilter("CIMaskToAlpha")
+        let composed = refinedFG.applyingFilter("CIBlendWithMask", parameters: [
+            "inputBackgroundImage": clearBG,
+            "inputMaskImage": alphaMatte
+        ]).cropped(to: extent)
+
+        // 9. Render through the linear-sRGB context so all the filter
+        //    math above runs in physical light — same correctness win
+        //    V2 applies, applied here too.
+        let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let cg = liftContext.createCGImage(composed, from: extent,
+                                                  format: .RGBA8,
+                                                  colorSpace: outputCS) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        return cg
+    }
+
+    // MARK: - MLModel cache (downloaded engine)
+
+    /// `MLModel` itself is thread-safe to *use* once loaded; only the
+    /// cache lookup needs a lock. Loading is the expensive part (~200ms),
+    /// so the cache is critical for the multi-cutout case (re-imports,
+    /// reprocess, etc.). Keyed by URL so a `modelVersion` bump that
+    /// changes the install path invalidates the cache automatically.
+    private static let downloadedModelCacheLock = NSLock()
+    nonisolated(unsafe) private static var cachedDownloadedModel: (url: URL, model: MLModel)?
+
+    private static func loadOrReuseDownloadedModel(at url: URL) throws -> MLModel {
+        downloadedModelCacheLock.lock()
+        if let cached = cachedDownloadedModel, cached.url == url {
+            let m = cached.model
+            downloadedModelCacheLock.unlock()
+            return m
+        }
+        downloadedModelCacheLock.unlock()
+
+        // Load outside the lock — model compilation / load can be slow
+        // and we don't want to serialize callers that arrive while a
+        // cold-start is in flight on a different URL (rare, but cheap
+        // to handle correctly).
+        let config = MLModelConfiguration()
+        config.computeUnits = .all
+        let loaded = try MLModel(contentsOf: url, configuration: config)
+
+        downloadedModelCacheLock.lock()
+        cachedDownloadedModel = (url, loaded)
+        downloadedModelCacheLock.unlock()
+        return loaded
+    }
+
     /// V2 hair zone: union of the radial-gradient `baseZone` (good for typical
     /// short hair / beards) with a person-seg-derived zone (catches long
     /// hair, side ponytails, afros, braids, flying strands — anything that
@@ -1302,13 +1445,24 @@ enum ImageProcessor {
     // MARK: - Process pipeline
 
     /// Convenience: lift subject, detect face + eyes, and measure body extent.
-    /// When a BiRefNet model is provided, uses the advanced pipeline for better
-    /// hair quality; otherwise falls back to the Apple Vision pipeline.
-    static func process(image: CGImage, birefnetModel: MLModel? = nil) throws -> ProcessedSubject {
+    /// When `downloadedModelURL` is provided AND the file at that URL loads
+    /// cleanly, runs the BiRefNet matting pipeline for crisper hair edges.
+    /// Falls back to Apple Vision (V2 by default) when the URL is nil OR
+    /// when the model load / inference fails — failure mode is "the user
+    /// gets a result anyway" rather than a hard import error.
+    static func process(image: CGImage, downloadedModelURL: URL? = nil) throws -> ProcessedSubject {
         let cutout: CGImage
-        if let model = birefnetModel {
-            cutout = try birefnetLift(image: image, model: model)
-            dlog("[Process] Used BiRefNet pipeline")
+        if let modelURL = downloadedModelURL {
+            do {
+                cutout = try subjectLiftDownloaded(image: image, modelURL: modelURL)
+                dlog("[Process] Used downloaded BiRefNet pipeline")
+            } catch {
+                // Soft fallback so a corrupt cache or transient inference
+                // failure doesn't block the whole import. The user sees
+                // a slightly worse cutout instead of an error chip.
+                dlog("[Process] Downloaded model failed (\(error)); falling back to Apple Vision")
+                cutout = try subjectLift(image: image)
+            }
         } else {
             cutout = try subjectLift(image: image)
             dlog("[Process] Used Apple Vision pipeline")
