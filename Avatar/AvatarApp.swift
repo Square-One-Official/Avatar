@@ -417,9 +417,12 @@ struct AvatarApp: App {
                     EdgeBenchmark.chooseFixturesFolder()
                 }
                 Divider()
+                // V2 is now default-on. Toggle reflects the actual default
+                // (true) when the key is unset; flipping off is the explicit
+                // V1 opt-out for debugging real-world regressions.
                 Toggle("Use Subject-Lift V2",
                        isOn: Binding(
-                        get: { UserDefaults.standard.bool(forKey: "subjectLiftV2") },
+                        get: { (UserDefaults.standard.object(forKey: "subjectLiftV2") as? Bool) ?? true },
                         set: { UserDefaults.standard.set($0, forKey: "subjectLiftV2") }
                        ))
             }

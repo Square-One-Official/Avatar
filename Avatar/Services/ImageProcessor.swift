@@ -63,15 +63,20 @@ enum ImageProcessor {
     }()
 
     /// Removes the background using Vision's foreground instance mask. Public
-    /// entry point used by the import pipeline. Branches to `subjectLiftV2`
+    /// entry point used by the import pipeline. Defaults to `subjectLiftV2`
     /// (linear-sRGB context, pinned Vision revisions, adaptive resolution,
-    /// extended hair zone, alpha gamma) when the debug `subjectLiftV2`
-    /// preference is set; otherwise runs the original `subjectLiftV1` path
-    /// untouched. The toggle lets the V1/V2 split land safely — once the
-    /// EdgeBenchmark harness validates V2 across the fixture set the default
-    /// flips on, then V1 is removed in a follow-up.
+    /// extended hair zone, alpha gamma, full-silhouette colour
+    /// decontamination) — accepted after a fixture-set A/B against V1.
+    /// V1 stays available behind an explicit `subjectLiftV2 = false` opt-out
+    /// so we can revert instantly if a real-world regression surfaces. V1
+    /// gets removed in a follow-up once V2 has been default-on for a
+    /// release cycle without bug reports.
     static func subjectLift(image: CGImage) throws -> CGImage {
-        if UserDefaults.standard.bool(forKey: "subjectLiftV2") {
+        // `object(forKey:) as? Bool` distinguishes "not set" (→ true, V2
+        // default) from "set to false" (→ V1 opt-out). `bool(forKey:)`
+        // would conflate the two.
+        let useV2 = (UserDefaults.standard.object(forKey: "subjectLiftV2") as? Bool) ?? true
+        if useV2 {
             return try subjectLiftV2(image: image)
         }
         return try subjectLiftV1(image: image)
