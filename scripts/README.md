@@ -2,82 +2,110 @@
 
 One-shot dev tooling that doesn't ship in the app bundle.
 
-## `convert_birefnet_to_coreml.py`
-
-Converts the open-source `ZhengPeng7/BiRefNet_lite-matting` PyTorch model
-to a fp16 CoreML `.mlmodelc` and zips it for distribution as a GitHub
-release asset. Run on **Apple Silicon Mac with Xcode installed** — the
-script invokes `xcrun coremlcompiler` for the final compile step.
-
-### Why we ship this
-
-Apple Vision (V2) does most portraits well. It can't fully clean up
-hair-edge bleed on hard cases — long flowing hair, curly flyaways
-against contrasting backgrounds — because Vision is a *segmentation*
-network producing near-binary alpha. BiRefNet_lite-matting is a *matting*
-network: continuous α at hair edges, designed for the cases Vision
-struggles with. ~90 MB fp16, MIT licensed, the alternatives (RMBG, MODNet
-PPM weights, RVM) are all non-commercial and disqualified for a paid app.
-
-### One-time setup
+## TL;DR — get the downloadable matting model live
 
 ```bash
-cd Avatar    # repo root
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r scripts/requirements-coreml.txt
+# 1. Manual download (one-time, ~176 MB)
+#    https://github.com/john-rocky/CoreML-Models#is-net
+#    Click "IS-Net" or "IS-Net-General-Use", save the .mlmodel locally.
+
+# 2. Repackage into our distribution format
+python3 scripts/repackage_matting_model.py \
+  --input ~/Downloads/IS-Net-General-Use.mlmodel
+
+# 3. Publish (the script prints the exact command at the end)
+gh release create models/matting-v1 \
+  build/matting/matting-model.mlmodelc.zip \
+  --title "Matting model v1 (IS-Net)" \
+  --notes "IS-Net DIS, CoreML, 1024x1024, Apache 2.0" \
+  --repo thierrzz/Avatar
+
+# 4. Tell me the SHA-256 (printed by the script + saved in
+#    build/matting/matting-model.mlmodelc.zip.sha256), and I'll plumb it
+#    into ModelManager.expectedSHA256.
 ```
 
-### Run
+## Why IS-Net and not BiRefNet
+
+The original plan picked **BiRefNet_lite-matting** (~90 MB fp16, MIT) as
+the primary model, with **IS-Net (DIS)** flagged as a runner-up "if
+BiRefNet conversion hits a wall." The wall is real:
+
+- BiRefNet's ASPP decoder uses **deformable convolutions**
+  (`torchvision::deform_conv2d`).
+- coremltools 9.0 has no built-in converter for that op.
+- Writing a custom converter would mean expressing deform-conv as
+  gather + bilinear-sample + conv in MIL — non-trivial, would need
+  per-coremltools-version maintenance, and may not dispatch cleanly to
+  ANE.
+
+IS-Net's trade-off vs BiRefNet, honestly stated:
+
+| | IS-Net (DIS) | BiRefNet_lite-matting |
+|---|---|---|
+| Size | ~176 MB | ~90 MB |
+| License | Apache 2.0 | MIT |
+| CoreML ready | Yes (john-rocky) | Needs unblocking |
+| vs Apple Vision V2 | Clearly better | Clearly better |
+| vs each other on flyaways | — | Slightly better than IS-Net |
+
+For the user's pain (long flowing hair, curly flyaways still bleed
+under V2), IS-Net should bring most of the win. Crispness on the
+hardest cases will be a touch behind a hypothetical BiRefNet build.
+The plan called this out as the right pivot, so we're taking it.
+
+## `repackage_matting_model.py`
+
+Compiles an existing `.mlmodel` / `.mlpackage` to `.mlmodelc`, zips it,
+and prints the SHA-256 + a ready-to-paste `gh release create` command.
+No PyTorch deps required — the model is already CoreML.
+
+Run from the repo root on an Apple Silicon Mac with Xcode installed
+(needed for `xcrun coremlcompiler`). The Python deps are stdlib only —
+no `requirements-coreml.txt` install needed for this path.
 
 ```bash
-python3 scripts/convert_birefnet_to_coreml.py
+python3 scripts/repackage_matting_model.py \
+  --input ~/Downloads/IS-Net-General-Use.mlmodel
 ```
 
-Output (in `build/birefnet/`):
-- `birefnet-lite-matting.mlpackage` — CoreML 7 package (intermediate).
-- `birefnet-lite-matting.mlmodelc/` — compiled, runtime-ready model.
-- `birefnet-lite-matting.mlmodelc.zip` — upload this to the GitHub
-  release.
-- `birefnet-lite-matting.mlmodelc.zip.sha256` — paste this into
-  `ModelManager.expectedSHA256` in Swift.
+Output (in `build/matting/`):
+- `matting-model.mlmodelc/` — compiled, runtime-ready.
+- `matting-model.mlmodelc.zip` — upload this to the GitHub release.
+- `matting-model.mlmodelc.zip.sha256` — paste hex into Swift.
 
-Approximate timing: 5–15 minutes on M1, mostly model download + tracing.
+The on-disk name is **engine-agnostic** (`matting-model.mlmodelc`), so
+swapping IS-Net for a future better model only requires re-running this
+script with the new input — no Swift constants change.
 
-### Publish
+## `convert_birefnet_to_coreml.py` (deprecated)
+
+Kept for reference. Aborts with an error pointing at
+`repackage_matting_model.py`. If a future coremltools release adds
+`torchvision::deform_conv2d`, delete the abort block at the top of
+`main()` and the rest of the script should still trace + convert. The
+`requirements-coreml.txt` deps are still pinned in case we revisit.
+
+## Publishing the release
+
+After `repackage_matting_model.py` finishes, publish:
 
 ```bash
-gh release create models/birefnet-lite-v1 \
-  build/birefnet/birefnet-lite-matting.mlmodelc.zip \
-  --title "BiRefNet lite-matting v1" \
-  --notes "CoreML fp16, 1024x1024, MIT licensed" \
+gh release create models/matting-v1 \
+  build/matting/matting-model.mlmodelc.zip \
+  --title "Matting model v1 (IS-Net)" \
+  --notes "IS-Net DIS, CoreML, 1024x1024, Apache 2.0" \
   --repo thierrzz/Avatar
 ```
 
-Then in `Avatar/Services/ModelManager.swift`:
-- Update `modelURL` to the new release asset URL.
-- Update `expectedSHA256` to the value from the `.zip.sha256` file.
-- Bump `modelVersion` so cached older copies get invalidated.
+Tags follow `models/matting-vN` and act as permanent version pins —
+**never reuse a tag.** Bump (`-v2`, `-v3`, …) on every model swap so
+`ModelManager`'s sidecar version check invalidates older caches
+correctly.
 
-The release tag (`models/birefnet-lite-v1`) is part of the URL and acts as
-a permanent version pin — never reuse a tag, always bump (`-v2`, etc.)
-when retraining or reconverting.
+## Updating the Swift side
 
-### Troubleshooting
-
-**"AttributeError on `out[0][-1]`" during tracing.**
-BiRefNet's forward signature varies across releases. Open the script,
-find the `AlphaOnly` wrapper, and `print(out)` inside `forward` to see
-the actual shape. Adjust the indexing accordingly.
-
-**"Op not supported on ANE" warnings during convert.**
-Swin attention occasionally falls off the Apple Neural Engine in some
-coremltools versions. The model still runs (CPU + GPU dispatch), it's
-just slower. If unacceptable, fall back to **IS-Net (DIS)** from
-[`john-rocky/CoreML-Models`](https://github.com/john-rocky/CoreML-Models)
-— prebuilt `.mlmodel`, Apache-2.0, ~176 MB, drop-in replacement
-(matching the SHA-256/URL constants in `ModelManager`).
-
-**`xcrun coremlcompiler` not found.**
-Install Xcode (full app, not just Command Line Tools). Confirm with
-`xcrun --find coremlcompiler`.
+In `Avatar/Services/ModelManager.swift`:
+- `modelURL` — point at the new release asset URL.
+- `expectedSHA256` — paste from `…/matting-model.mlmodelc.zip.sha256`.
+- `modelVersion` — bump so cached older copies invalidate at launch.

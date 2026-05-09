@@ -94,34 +94,45 @@ final class ModelManager {
 
     // MARK: - Manifest (update after each release)
 
-    /// GitHub Releases URL of the .mlmodelc.zip. Tag is part of the path
-    /// and acts as a permanent version pin — never reuse a tag, always
-    /// bump (`-v2`, `-v3`) when retraining or reconverting. The release
-    /// asset stays alive even after the tag is deleted, but pinning to
-    /// the tag makes accidental cache invalidation impossible.
+    /// GitHub Releases URL of the matting model `.mlmodelc.zip`. Tag is
+    /// part of the path and acts as a permanent version pin — never
+    /// reuse a tag, always bump (`-v2`, `-v3`) when swapping models or
+    /// reconverting. The release asset stays alive even after the tag
+    /// is deleted, but pinning to the tag makes accidental cache
+    /// invalidation impossible.
+    ///
+    /// History: planned to ship BiRefNet_lite-matting, but coremltools
+    /// can't convert `torchvision::deform_conv2d`. Pivoted to IS-Net
+    /// (DIS) per the documented runner-up — Apache 2.0, prebuilt
+    /// CoreML from `john-rocky/CoreML-Models`. The on-disk model name
+    /// stays generic (`matting-model.mlmodelc`) so future swaps don't
+    /// touch this constant.
     static let modelURL = URL(string:
         "https://github.com/thierrzz/Avatar/releases/download/" +
-        "models/birefnet-lite-v1/birefnet-lite-matting.mlmodelc.zip"
+        "models/matting-v1/matting-model.mlmodelc.zip"
     )!
 
-    /// Hex SHA-256 of the .mlmodelc.zip — paste from
-    /// `build/birefnet/birefnet-lite-matting.mlmodelc.zip.sha256` after
-    /// running `scripts/convert_birefnet_to_coreml.py`. Verified after
-    /// every download; mismatch refuses to install.
+    /// Hex SHA-256 of the `matting-model.mlmodelc.zip` — paste from
+    /// `build/matting/matting-model.mlmodelc.zip.sha256` after running
+    /// `scripts/repackage_matting_model.py`. Verified after every
+    /// download; mismatch refuses to install.
     ///
-    /// **Placeholder until the first release is published.** Until then
-    /// `download()` will succeed unless this is set; intentionally kept
-    /// non-empty so the verification path is exercised end-to-end.
+    /// **Placeholder until the first release is published.** The
+    /// verification path is exercised end-to-end either way (a real
+    /// download will fail with `verificationFailed` until this is
+    /// updated to the actual hash).
     static let expectedSHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
 
-    /// Bump on every retrain / reconversion. `.model_version` sidecar in
-    /// the install dir compares against this to decide whether to wipe
-    /// older caches at launch.
+    /// Bump on every model swap. `.model_version` sidecar in the install
+    /// dir compares against this to decide whether to wipe older caches
+    /// at launch.
     static let modelVersion = "1"
 
     /// On-disk name of the compiled model directory. Must match the zip's
-    /// inner directory name produced by the conversion script.
-    static let modelDirName = "birefnet-lite-matting.mlmodelc"
+    /// inner directory name produced by the repackaging script. Kept
+    /// engine-agnostic so swapping IS-Net for a future better model
+    /// doesn't require any Swift changes — only a new release upload.
+    static let modelDirName = "matting-model.mlmodelc"
 
     // MARK: - Observable state
 

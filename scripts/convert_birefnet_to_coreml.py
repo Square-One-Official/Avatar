@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 """
+DEPRECATED — kept as a reference for if/when coremltools learns to handle
+`torchvision::deform_conv2d`. The script gets ~80% through MIL conversion
+and then fails on the deform-conv op inside BiRefNet's ASPP decoder
+(`squeeze_module/0/dec_att/aspp1/atrous_conv`). coremltools has no built-
+in converter for that op and writing a custom one is non-trivial (would
+need to express deform-conv as gather + bilinear-sample + conv in MIL).
+
+Use `repackage_matting_model.py` instead — it pivots to IS-Net (DIS),
+the documented runner-up: Apache 2.0, prebuilt CoreML on
+`john-rocky/CoreML-Models`, hair quality clearly above Apple Vision but
+visibly behind BiRefNet on the hardest flyaways.
+
+If a future coremltools release adds deform_conv2d, the rest of this
+script should still work — re-enable by deleting the abort-early block
+at the top of `main()`.
+
+────────────────────────── original docstring ──────────────────────────
+
 Convert BiRefNet_lite-matting (ZhengPeng7/BiRefNet_lite-matting) to a fp16
 CoreML .mlpackage at 1024x1024 fixed input, then compile to .mlmodelc and
 zip for distribution as a GitHub release asset.
@@ -66,6 +84,25 @@ INPUT_SIZE = 1024  # square; BiRefNet trained at 1024x1024
 
 
 def main() -> None:
+    sys.stderr.write(
+        "\n"
+        "── This script is deprecated ──────────────────────────────────\n"
+        "  BiRefNet conversion fails on torchvision::deform_conv2d which\n"
+        "  coremltools has no converter for. Use the runner-up instead:\n"
+        "\n"
+        "    1. Download IS-Net from john-rocky/CoreML-Models:\n"
+        "       https://github.com/john-rocky/CoreML-Models#is-net\n"
+        "    2. Repackage:\n"
+        "       python3 scripts/repackage_matting_model.py \\\n"
+        "         --input ~/Downloads/IS-Net-General-Use.mlmodel\n"
+        "\n"
+        "  See scripts/README.md for the full pivot rationale.\n"
+        "───────────────────────────────────────────────────────────────\n"
+        "\n"
+    )
+    sys.exit(2)
+    # Unreachable but kept so the rest of this file remains a working
+    # reference for if/when a deform_conv2d converter lands upstream.
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
     mlpackage_path = BUILD_DIR / f"{MODEL_NAME}.mlpackage"
 

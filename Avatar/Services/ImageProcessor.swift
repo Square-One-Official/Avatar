@@ -409,25 +409,43 @@ enum ImageProcessor {
         ])
         let prediction = try model.prediction(from: input)
 
-        // 4. Extract the alpha matte. Conversion script names the output
-        //    "alpha"; older / re-converted models may use a different
-        //    name, so fall through to known aliases and finally the
-        //    MultiArray scan as a safety net.
+        // 4. Extract the alpha matte. Output naming varies: a custom
+        //    converter can name it cleanly ("alpha"), but a prebuilt
+        //    torch→CoreML model (e.g. john-rocky's IS-Net) often emits
+        //    opaque tensor names like `var_4090`. Try known aliases
+        //    first, then scan every output for the first image-typed
+        //    feature, then fall through to the MultiArray scan. Logged
+        //    with the resolved name so misnamed outputs are visible
+        //    in the log without changing code.
         let candidateNames = ["alpha", "output", "sigmoid_output", "out"]
         var maskCI: CIImage?
+        var resolvedName: String?
         for name in candidateNames {
             if let feature = prediction.featureValue(for: name),
                let buffer = feature.imageBufferValue {
                 maskCI = CIImage(cvPixelBuffer: buffer)
+                resolvedName = name
                 break
             }
         }
         if maskCI == nil {
+            for name in prediction.featureNames {
+                if let feature = prediction.featureValue(for: name),
+                   let buffer = feature.imageBufferValue {
+                    maskCI = CIImage(cvPixelBuffer: buffer)
+                    resolvedName = "\(name) (scan)"
+                    break
+                }
+            }
+        }
+        if maskCI == nil {
             maskCI = extractMaskFromMultiArray(prediction: prediction)
+            resolvedName = "MultiArray"
         }
         guard let rawMask = maskCI else {
             throw ImageProcessorError.maskGenerationFailed
         }
+        dlog("[Downloaded] Got mask via '\(resolvedName ?? "?")'")
 
         // 5. Scale mask back to source extent. BiRefNet's output is the
         //    same continuous-α we want — no need for the multi-mask
