@@ -121,7 +121,7 @@ final class ModelManager {
     ///
     /// Bump on every model swap. Always paste exactly what the script
     /// prints — do not regenerate the hash from a hand-edited zip.
-    static let expectedSHA256 = "c3c48f25fab5915fbff44359d3a37d893a9abe8cfbff3b5ba592ae10a41f8f85"
+    static let expectedSHA256 = "75e4b22bf842ee86b9d1cbeeb29d74e4eff8bcb350d331a8d445d40f12c61378"
 
     /// Bump on every model swap. `.model_version` sidecar in the install
     /// dir compares against this to decide whether to wipe older caches
