@@ -1,8 +1,18 @@
 # Python deps for `convert_birefnet_to_coreml.py`. Pinned loosely — bump if
 # a newer coremltools fixes a Swin attention conversion issue.
 coremltools>=8.0
-torch>=2.2
+# Pin torch to 2.7 — coremltools 9.0 prints a "not tested" warning with
+# torch 2.8 and the trace can hit shape-inference oddities. 2.7 is the
+# most-recently-blessed version per coremltools' compatibility matrix.
+torch>=2.6,<2.8
 transformers>=4.40
 einops>=0.7
 huggingface_hub>=0.21
 numpy>=1.26
+# BiRefNet's `modeling_birefnet.py` (loaded via `trust_remote_code=True`)
+# imports kornia + timm + torchvision at module top-level. Without these
+# `transformers.AutoModelForImageSegmentation.from_pretrained` raises
+# ImportError before the model graph is even constructed.
+kornia>=0.7
+timm>=1.0
+torchvision>=0.17
