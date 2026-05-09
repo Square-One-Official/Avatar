@@ -5,19 +5,18 @@ One-shot dev tooling that doesn't ship in the app bundle.
 ## TL;DR — get the downloadable matting model live
 
 ```bash
-# 1. Manual download (one-time, ~176 MB)
-#    https://github.com/john-rocky/CoreML-Models#is-net
-#    Click "IS-Net" or "IS-Net-General-Use", save the .mlmodel locally.
+# 1. Activate venv (re-use the one you set up earlier)
+source ../.venv/bin/activate
+pip install -r scripts/requirements-coreml.txt
 
-# 2. Repackage into our distribution format
-python3 scripts/repackage_matting_model.py \
-  --input ~/Downloads/IS-Net-General-Use.mlmodel
+# 2. Convert ORMBG from PyTorch to CoreML fp16 (5-15 min, mostly download)
+python3 scripts/convert_ormbg_to_coreml.py
 
-# 3. Publish (the script prints the exact command at the end)
+# 3. Publish — the script prints the exact command at the end
 gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
-  --title "Matting model v1 (IS-Net)" \
-  --notes "IS-Net DIS, CoreML, 1024x1024, Apache 2.0" \
+  --title "Matting model v1 (ORMBG)" \
+  --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
   --repo thierrzz/Avatar
 
 # 4. Tell me the SHA-256 (printed by the script + saved in
@@ -25,76 +24,84 @@ gh release create models/matting-v1 \
 #    into ModelManager.expectedSHA256.
 ```
 
-## Why IS-Net and not BiRefNet
+## Why ORMBG (and not BiRefNet, IS-Net, RMBG, MODNet, withoutBG, ZIM)
 
-The original plan picked **BiRefNet_lite-matting** (~90 MB fp16, MIT) as
-the primary model, with **IS-Net (DIS)** flagged as a runner-up "if
-BiRefNet conversion hits a wall." The wall is real:
+We went through every realistic candidate. The ones that survive the
+"open + commercial-clean + CoreML-ready + better than Apple Vision V2"
+filter are vanishingly few:
 
-- BiRefNet's ASPP decoder uses **deformable convolutions**
-  (`torchvision::deform_conv2d`).
-- coremltools 9.0 has no built-in converter for that op.
-- Writing a custom converter would mean expressing deform-conv as
-  gather + bilinear-sample + conv in MIL — non-trivial, would need
-  per-coremltools-version maintenance, and may not dispatch cleanly to
-  ANE.
+| Model | Year | License | CoreML | Verdict |
+|---|---|---|---|---|
+| **ORMBG** | **2024** | **Apache 2.0** | Convert from PyTorch (clean) | ✅ **Picked** |
+| IS-Net (DIS) | 2022 | Apache 2.0 | Prebuilt | ⚠️ Older + general-purpose |
+| BiRefNet | 2024 | MIT | ❌ `deform_conv2d` | Blocked |
+| BiRefNet-HR | 2025 | MIT | ❌ same op | Blocked |
+| RMBG-1.4/2.0 | 2024 | **CC-BY-NC** | Prebuilt | ❌ Non-commercial |
+| MODNet (PPM) | 2022 | **CC-BY-NC-SA** | Conversion script | ❌ Non-commercial |
+| Robust Video Matting | 2021 | **CC-BY-NC** | Prebuilt | ❌ Non-commercial |
+| BackgroundMattingV2 | 2021 | MIT | Manual | ❌ Needs background frame |
+| BEN2 | 2024 | base open / **paid commercial** | ❌ | ❌ Paid for commercial |
+| withoutBG | 2025 | Apache 2.0 | None — multi-stage pipeline | ⚠️ ~141 MB, complex |
+| ZIM | 2025 | **CC-BY-NC 4.0** | Convertible | ❌ Non-commercial |
 
-IS-Net's trade-off vs BiRefNet, honestly stated:
+**ORMBG specifically wins because:**
 
-| | IS-Net (DIS) | BiRefNet_lite-matting |
-|---|---|---|
-| Size | ~176 MB | ~90 MB |
-| License | Apache 2.0 | MIT |
-| CoreML ready | Yes (john-rocky) | Needs unblocking |
-| vs Apple Vision V2 | Clearly better | Clearly better |
-| vs each other on flyaways | — | Slightly better than IS-Net |
+1. **Apache 2.0** for both code and weights — no license carve-outs, no
+   commercial restrictions. (RMBG-1.4 is what ORMBG deliberately re-
+   implements as an open clone.)
+2. **DIS-family architecture**, no `deform_conv2d` — the op that
+   blocked BiRefNet conversion. ORMBG uses only standard convolutions.
+3. **Portrait-specialized**: trained on P3M-10K + AIM-500 + PPM-100 +
+   10k synthetic portraits. IS-Net-General-Use is general-purpose;
+   ORMBG's training distribution matches our production input
+   (people importing portraits).
+4. **2 years newer than IS-Net** with significantly better matting data.
+5. **~88 MB at fp16** — half the size of IS-Net's prebuilt CoreML.
+6. **F1 = 0.9932, MAE = 0.008** on the author's eval (July 2024).
 
-For the user's pain (long flowing hair, curly flyaways still bleed
-under V2), IS-Net should bring most of the win. Crispness on the
-hardest cases will be a touch behind a hypothetical BiRefNet build.
-The plan called this out as the right pivot, so we're taking it.
+## `convert_ormbg_to_coreml.py`
+
+Snapshots `schirrmacher/ormbg` from Hugging Face (just the weights +
+architecture code, ~100 MB skipping training/dataset folders), loads
+the PyTorch checkpoint, traces at 1024×1024, converts to fp16 CoreML
+targeting macOS 14, compiles to `.mlmodelc`, zips, prints the SHA.
+
+Bakes ImageNet normalization into the model's preprocessing so the
+Swift caller can pass a plain RGB `CVPixelBuffer` without preprocessing.
+
+```bash
+python3 scripts/convert_ormbg_to_coreml.py
+```
+
+The architecture import is defensive — if upstream renames the module
+again, edit `KNOWN_MODEL_IMPORTS` at the top of the script and re-run.
 
 ## `repackage_matting_model.py`
 
-Compiles an existing `.mlmodel` / `.mlpackage` to `.mlmodelc`, zips it,
-and prints the SHA-256 + a ready-to-paste `gh release create` command.
-No PyTorch deps required — the model is already CoreML.
-
-Run from the repo root on an Apple Silicon Mac with Xcode installed
-(needed for `xcrun coremlcompiler`). The Python deps are stdlib only —
-no `requirements-coreml.txt` install needed for this path.
+Generic alternative path for any prebuilt `.mlmodel` / `.mlpackage`.
+Compiles + zips + hashes whatever you hand it. Stdlib-only, no PyTorch
+deps. Use this if a future model ships as prebuilt CoreML and we want
+to repackage without going through PyTorch:
 
 ```bash
 python3 scripts/repackage_matting_model.py \
-  --input ~/Downloads/IS-Net-General-Use.mlmodel
+  --input ~/Downloads/some-other-matting-model.mlmodel
 ```
-
-Output (in `build/matting/`):
-- `matting-model.mlmodelc/` — compiled, runtime-ready.
-- `matting-model.mlmodelc.zip` — upload this to the GitHub release.
-- `matting-model.mlmodelc.zip.sha256` — paste hex into Swift.
-
-The on-disk name is **engine-agnostic** (`matting-model.mlmodelc`), so
-swapping IS-Net for a future better model only requires re-running this
-script with the new input — no Swift constants change.
 
 ## `convert_birefnet_to_coreml.py` (deprecated)
 
-Kept for reference. Aborts with an error pointing at
-`repackage_matting_model.py`. If a future coremltools release adds
-`torchvision::deform_conv2d`, delete the abort block at the top of
-`main()` and the rest of the script should still trace + convert. The
-`requirements-coreml.txt` deps are still pinned in case we revisit.
+Aborts with an error pointing at the ORMBG script. Kept as a working
+reference for if/when coremltools adds `torchvision::deform_conv2d`
+support — at that point delete the abort block at the top of `main()`
+and BiRefNet becomes available again.
 
-## Publishing the release
-
-After `repackage_matting_model.py` finishes, publish:
+## Publishing
 
 ```bash
 gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
-  --title "Matting model v1 (IS-Net)" \
-  --notes "IS-Net DIS, CoreML, 1024x1024, Apache 2.0" \
+  --title "Matting model v1 (ORMBG)" \
+  --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
   --repo thierrzz/Avatar
 ```
 
@@ -103,9 +110,14 @@ Tags follow `models/matting-vN` and act as permanent version pins —
 `ModelManager`'s sidecar version check invalidates older caches
 correctly.
 
-## Updating the Swift side
+## Updating Swift
 
 In `Avatar/Services/ModelManager.swift`:
-- `modelURL` — point at the new release asset URL.
-- `expectedSHA256` — paste from `…/matting-model.mlmodelc.zip.sha256`.
-- `modelVersion` — bump so cached older copies invalidate at launch.
+- `modelURL` — point at the new release asset URL (already targets
+  `models/matting-v1` from the previous pivot).
+- `expectedSHA256` — paste from `build/matting/matting-model.mlmodelc.zip.sha256`.
+- `modelVersion` — bump if cached older copies need invalidating.
+
+The on-disk model directory name (`matting-model.mlmodelc`) is engine-
+agnostic — no Swift change needed when swapping models, only a new
+release upload + SHA constant update.
