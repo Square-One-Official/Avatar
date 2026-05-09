@@ -55,6 +55,8 @@ struct GeneralSettings: View {
                 Divider()
                 LanguageSection()
                 Divider()
+                PrivacyAndAISection()
+                Divider()
                 MagicCutoutSection()
                 Divider()
                 LibrarySection()
@@ -65,6 +67,80 @@ struct GeneralSettings: View {
                 Spacer(minLength: 0)
             }
             .padding(.vertical, 4)
+        }
+    }
+}
+
+// MARK: - Privacy & AI
+
+/// Mirrors the onboarding choice and lets the user revisit it without
+/// re-running the sheet. Mode toggles between `localOnly` (no photo
+/// bytes leave the Mac, cloud features hidden) and `cloudAllowed`
+/// (today's behaviour). When `localOnly`, exposes the engine picker
+/// (Apple Vision vs downloaded model) — the downloaded-model option is
+/// recorded but the cutout pipeline still falls back to Apple Vision
+/// until the BiRefNet session lands; a banner makes that visible.
+private struct PrivacyAndAISection: View {
+    @Environment(PrivacyPreferences.self) private var prefs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(Loc.privacyAndAITitle).font(.headline)
+            Text(Loc.privacyAndAIDesc)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Mode picker — segmented for fast switching.
+            HStack(alignment: .center, spacing: 12) {
+                Text(Loc.privacyModePickerLabel)
+                    .frame(width: 70, alignment: .leading)
+                Picker(Loc.privacyModePickerLabel, selection: Binding(
+                    get: { prefs.mode },
+                    set: { prefs.mode = $0 }
+                )) {
+                    Text(Loc.onboardingPrivacyLocalTitle).tag(AIPrivacyMode.localOnly)
+                    Text(Loc.onboardingPrivacyCloudTitle).tag(AIPrivacyMode.cloudAllowed)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
+            // Engine picker, only visible in local-only mode. The
+            // downloaded-model option is intentionally not greyed out
+            // here even though the actual download isn't wired yet —
+            // the choice is persisted so the BiRefNet session can pick
+            // it up. The caption surfaces the current fallback so the
+            // user understands why their cutouts still look like Apple
+            // Vision output.
+            if prefs.mode == .localOnly {
+                HStack(alignment: .center, spacing: 12) {
+                    Text(Loc.privacyEnginePickerLabel)
+                        .frame(width: 70, alignment: .leading)
+                    Picker(Loc.privacyEnginePickerLabel, selection: Binding(
+                        get: { prefs.engine },
+                        set: { prefs.engine = $0 }
+                    )) {
+                        Text(Loc.onboardingEngineAppleVisionTitle).tag(LocalCutoutEngine.appleVision)
+                        Text(Loc.onboardingEngineDownloadedTitle).tag(LocalCutoutEngine.downloadedModel)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                if prefs.engine == .downloadedModel {
+                    Text(Loc.privacyEngineDownloadComingSoon)
+                        .font(.caption)
+                        .foregroundStyle(Color.appWarningInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color.appWarning.opacity(0.30))
+                        )
+                }
+            }
         }
     }
 }
@@ -205,6 +281,13 @@ private struct MagicCutoutSection: View {
     // same key directly, which is what makes the switch follow clicks.
     @AppStorage("magicCutoutEnabled") private var enabled: Bool = true
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyPreferences.self) private var privacyPrefs
+
+    /// Local-only privacy posture greys this section out and pins the
+    /// switch off. The user has already chosen "no photos leave the
+    /// Mac" upstream; toggling Magic Cutout on inside that mode would
+    /// be incoherent. Caption explains why.
+    private var lockedByPrivacy: Bool { !privacyPrefs.cloudAllowed }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -233,8 +316,9 @@ private struct MagicCutoutSection: View {
                 Spacer(minLength: 0)
 
                 Toggle("", isOn: Binding(
-                    get: { appState.proEntitlement.isPro && enabled },
+                    get: { !lockedByPrivacy && appState.proEntitlement.isPro && enabled },
                     set: { newValue in
+                        guard !lockedByPrivacy else { return }
                         if appState.proEntitlement.isPro {
                             enabled = newValue
                         } else if newValue {
@@ -245,8 +329,16 @@ private struct MagicCutoutSection: View {
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
+                .disabled(lockedByPrivacy)
+            }
+
+            if lockedByPrivacy {
+                Text(Loc.privacyDisabledInLocalOnly)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
+        .opacity(lockedByPrivacy ? 0.55 : 1)
     }
 }
 

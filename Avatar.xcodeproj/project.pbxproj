@@ -122,6 +122,18 @@
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
 		4676065BB62C08040FD18B1E /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */; };
 		D50BA5CB796BFF074EC925FE /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */; };
+		2563AF23F713148492510DE3 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6105DAD5A3E960083E5BD473 /* PrivacyPreferences.swift */; };
+		DAF0C72593FB81B0213C3460 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6105DAD5A3E960083E5BD473 /* PrivacyPreferences.swift */; };
+		0C2B41F26A699A4A9CCF2A73 /* OnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6AA8B162DE87C02711A376A /* OnboardingSheet.swift */; };
+		CA4A13C7FFBDB0AFA9A7C333 /* OnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6AA8B162DE87C02711A376A /* OnboardingSheet.swift */; };
+		1C869DCFDBDC9D501BF4D9B0 /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8059DF6BCCDFE2264D65F26 /* OnboardingStepAuth.swift */; };
+		19E4CA6814856CC25318903A /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8059DF6BCCDFE2264D65F26 /* OnboardingStepAuth.swift */; };
+		2B854EBE17D5300BC21BB9CB /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D791796A8809A43BC94834DE /* OnboardingStepPrivacy.swift */; };
+		98D3957F90C7DF2731A7B499 /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D791796A8809A43BC94834DE /* OnboardingStepPrivacy.swift */; };
+		78554D9C35408211FEDA86C4 /* OnboardingStepEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B68D0A77EA6E1F142043EE /* OnboardingStepEngine.swift */; };
+		37700103419BE9C5389E9F22 /* OnboardingStepEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B68D0A77EA6E1F142043EE /* OnboardingStepEngine.swift */; };
+		D2BAB841E05C0A9FD85B18EB /* OnboardingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 982F9AE2323DE1A79EC2253B /* OnboardingProgress.swift */; };
+		798900C040C8DA24EFA148E5 /* OnboardingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 982F9AE2323DE1A79EC2253B /* OnboardingProgress.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -182,6 +194,12 @@
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8000DFDE0879DC2600606651 /* EdgeBenchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeBenchmark.swift; sourceTree = "<group>"; };
+		6105DAD5A3E960083E5BD473 /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
+		D6AA8B162DE87C02711A376A /* OnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSheet.swift; sourceTree = "<group>"; };
+		F8059DF6BCCDFE2264D65F26 /* OnboardingStepAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepAuth.swift; sourceTree = "<group>"; };
+		D791796A8809A43BC94834DE /* OnboardingStepPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepPrivacy.swift; sourceTree = "<group>"; };
+		43B68D0A77EA6E1F142043EE /* OnboardingStepEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepEngine.swift; sourceTree = "<group>"; };
+		982F9AE2323DE1A79EC2253B /* OnboardingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingProgress.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -227,6 +245,7 @@
 				349CA2BF8E0D0316D4C6EC9F /* Localization.swift */,
 				355D09CA2450C106801EAD77 /* ModelManager.swift */,
 				7194822E14F9864C38869D98 /* PortraitUndoManager.swift */,
+				6105DAD5A3E960083E5BD473 /* PrivacyPreferences.swift */,
 				81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */,
 				FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */,
 				29693AE9839C2E40136C758E /* SupabaseConfig.swift */,
@@ -312,6 +331,7 @@
 				3181E7327476F43F448EA102 /* LibraryImportSheet.swift */,
 				48EF633AE84A1D2EF9412998 /* LibraryView.swift */,
 				877D5A42F98746FCC7A61452 /* MainWindow.swift */,
+				DC7AA1837D35C269CC86EBC0 /* Onboarding */,
 				84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */,
 				DED2448B10A7B5504F841578 /* ProBadge.swift */,
 				B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */,
@@ -324,6 +344,18 @@
 				5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		DC7AA1837D35C269CC86EBC0 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				D6AA8B162DE87C02711A376A /* OnboardingSheet.swift */,
+				F8059DF6BCCDFE2264D65F26 /* OnboardingStepAuth.swift */,
+				D791796A8809A43BC94834DE /* OnboardingStepPrivacy.swift */,
+				43B68D0A77EA6E1F142043EE /* OnboardingStepEngine.swift */,
+				982F9AE2323DE1A79EC2253B /* OnboardingProgress.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -487,6 +519,12 @@
 				2AE09B3845EA1E0F90A53B18 /* PillSegmentedControl.swift in Sources */,
 				42D5EECAFCB644F316022C85 /* Portrait.swift in Sources */,
 				B77A1F8EE216E673B1250E57 /* PortraitUndoManager.swift in Sources */,
+				2563AF23F713148492510DE3 /* PrivacyPreferences.swift in Sources */,
+				0C2B41F26A699A4A9CCF2A73 /* OnboardingSheet.swift in Sources */,
+				1C869DCFDBDC9D501BF4D9B0 /* OnboardingStepAuth.swift in Sources */,
+				2B854EBE17D5300BC21BB9CB /* OnboardingStepPrivacy.swift in Sources */,
+				78554D9C35408211FEDA86C4 /* OnboardingStepEngine.swift in Sources */,
+				D2BAB841E05C0A9FD85B18EB /* OnboardingProgress.swift in Sources */,
 				89AA16048F395B4CF00BA39D /* ProBadge.swift in Sources */,
 				B6E6633C3A2A74AF59456F58 /* ProEntitlement.swift in Sources */,
 				06AA209FBD19063A78F21083 /* ProUpgradeSheet.swift in Sources */,
@@ -539,6 +577,12 @@
 				524B6A85C7C4B12BA53B9ED0 /* PillSegmentedControl.swift in Sources */,
 				93DE69BFD660664855889F69 /* Portrait.swift in Sources */,
 				EBE90C07C35BAA7F586C5E6D /* PortraitUndoManager.swift in Sources */,
+				DAF0C72593FB81B0213C3460 /* PrivacyPreferences.swift in Sources */,
+				CA4A13C7FFBDB0AFA9A7C333 /* OnboardingSheet.swift in Sources */,
+				19E4CA6814856CC25318903A /* OnboardingStepAuth.swift in Sources */,
+				98D3957F90C7DF2731A7B499 /* OnboardingStepPrivacy.swift in Sources */,
+				37700103419BE9C5389E9F22 /* OnboardingStepEngine.swift in Sources */,
+				798900C040C8DA24EFA148E5 /* OnboardingProgress.swift in Sources */,
 				430A107B1D3198CE9ECDBA44 /* ProBadge.swift in Sources */,
 				598E5AA5D1B64C6A66AE5249 /* ProEntitlement.swift in Sources */,
 				280A11648DAEFCF19F5E82C9 /* ProUpgradeSheet.swift in Sources */,

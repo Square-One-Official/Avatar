@@ -225,6 +225,14 @@ final class AppState {
     /// Toggle persistence for Magic Cutout. Owned here so the URL scheme
     /// handler can flip it on after checkout-return.
     let magicCutoutPrefs: MagicCutoutPreferences = MagicCutoutPreferences()
+    /// Local-first AI privacy posture (`localOnly` | `cloudAllowed`) and
+    /// the local cutout engine selection (`appleVision` | `downloadedModel`).
+    /// Set during first-launch onboarding, editable in Settings → General
+    /// → Privacy & AI. Cloud features (Magic Cutout, Fill in Body, Colorize)
+    /// gate on `privacyPrefs.cloudAllowed`; the Subject-Lift engine branch
+    /// in `ImageProcessor` reads `privacyPrefs.engine` (downloaded-model
+    /// path is a placeholder until the BiRefNet session lands).
+    let privacyPrefs: PrivacyPreferences = PrivacyPreferences()
     /// Pending batch-import confirmation. Non-nil → MainWindow shows a
     /// confirm dialog before any of the queued items run through Magic
     /// Cutout (which would each cost 1 credit). Set by `PortraitDropHandler`

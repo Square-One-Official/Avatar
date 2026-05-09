@@ -7,19 +7,30 @@ struct MainWindow: View {
     @Query(sort: \Portrait.updatedAt, order: .reverse) private var portraits: [Portrait]
     @Query private var backgrounds: [BackgroundPreset]
 
-    /// First-launch flag. Controls whether `WelcomeSignInSheet` should be
-    /// presented over the main window. The sheet itself flips this true on
-    /// either sign-in or "Maybe later" so the surface never reappears.
+    /// Legacy flag from the single-step welcome sheet. Read here only for
+    /// the one-shot migration: existing users who already saw the old
+    /// flow are mapped to `hasSeenOnboarding = true + cloudAllowed +
+    /// appleVision` so behaviour is preserved and the new sheet never
+    /// appears for them.
     @AppStorage("hasSeenWelcomeSignIn") private var hasSeenWelcomeSignIn = false
+    /// New first-launch flag for the three-step onboarding. The sheet
+    /// flips this on completion (Done) or by skipping the auth step + a
+    /// privacy choice. Sticky across launches.
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     /// One-shot guard for the file-storage migration (build 6+). Without
     /// this, every signed-out launch would re-show the welcome sheet for
     /// users who chose to stay signed-out. Sticky across launches.
     @AppStorage("hasRunFileAuthMigration") private var hasRunFileAuthMigration = false
-    /// Drives the `.sheet(isPresented:)` binding. Decoupled from
-    /// `hasSeenWelcomeSignIn` so flipping the AppStorage during dismissal
-    /// (e.g. on successful sign-in) doesn't fight the sheet's own dismiss
+    /// One-shot migration: legacy `hasSeenWelcomeSignIn` users get auto-
+    /// promoted to `hasSeenOnboarding = true` with the today-equivalent
+    /// privacy posture. Runs at most once per install regardless of
+    /// subsequent state changes.
+    @AppStorage("hasRunOnboardingMigration") private var hasRunOnboardingMigration = false
+    /// Drives the `.sheet(isPresented:)` binding for the onboarding flow.
+    /// Decoupled from `hasSeenOnboarding` so flipping the AppStorage at
+    /// the end of the flow doesn't fight the sheet's own dismiss
     /// transition.
-    @State private var showWelcomeSheet = false
+    @State private var showOnboardingSheet = false
 
     var body: some View {
         @Bindable var state = appState
@@ -85,9 +96,10 @@ struct MainWindow: View {
             ProUpgradeSheet()
                 .environment(appState)
         }
-        .sheet(isPresented: $showWelcomeSheet) {
-            WelcomeSignInSheet()
+        .sheet(isPresented: $showOnboardingSheet) {
+            OnboardingSheet()
                 .environment(appState)
+                .environment(appState.privacyPrefs)
         }
         .alert(
             Loc.magicCutoutTitle,
@@ -114,9 +126,9 @@ struct MainWindow: View {
 
             // Storage migration (build 6+): a returning user whose previous
             // session lived in the Keychain has nothing in the new file
-            // storage. Re-arm the welcome sheet so they get a clear sign-in
-            // prompt instead of a silent signed-out state. Runs at most
-            // once, regardless of subsequent sign-out behaviour.
+            // storage. Re-arm the legacy welcome flag so the migration
+            // step below routes them through the new onboarding. Runs at
+            // most once, regardless of subsequent sign-out behaviour.
             if !hasRunFileAuthMigration {
                 hasRunFileAuthMigration = true
                 if hasSeenWelcomeSignIn && !FileAuthStorage().hasAnySession() {
@@ -124,13 +136,27 @@ struct MainWindow: View {
                 }
             }
 
-            // First-launch welcome. Sheet only presents if the user has
-            // never seen it AND isn't already signed in (a returning user
-            // whose session restored shouldn't be asked to sign in again).
-            if !hasSeenWelcomeSignIn && !appState.auth.isSignedIn {
-                showWelcomeSheet = true
-            } else if !hasSeenWelcomeSignIn {
-                hasSeenWelcomeSignIn = true
+            // Onboarding migration (this build): map any user who already
+            // saw the legacy single-step welcome sheet to the new flag
+            // with `cloudAllowed + appleVision` defaults. That preserves
+            // exactly today's behaviour (Magic Cutout still works, photos
+            // still upload, etc.) without re-onboarding them. The
+            // `PrivacyPreferences` defaults registration already provides
+            // those values, so we only need to flip `hasSeenOnboarding`.
+            if !hasRunOnboardingMigration {
+                hasRunOnboardingMigration = true
+                if hasSeenWelcomeSignIn {
+                    hasSeenOnboarding = true
+                }
+            }
+
+            // First-launch onboarding. Present when the user hasn't
+            // completed it AND isn't already signed in (a returning user
+            // whose session restored shouldn't be asked to sign in again,
+            // but we still want to capture the privacy posture — for
+            // those, jump them straight to the privacy step instead).
+            if !hasSeenOnboarding {
+                showOnboardingSheet = true
             }
         }
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in

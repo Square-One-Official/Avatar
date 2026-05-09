@@ -292,6 +292,89 @@ enum Loc {
         en ? "Sign in with Google" : "Aanmelden met Google"
     }
 
+    // MARK: Onboarding — Privacy mode step
+    static var onboardingPrivacyTitle: String {
+        en ? "How should AI work?" : "Hoe mag AI werken?"
+    }
+    static var onboardingPrivacyBody: String {
+        en ? "You can keep everything on this Mac, or let Aaavatar use cloud AI for higher-quality cutouts and extras. You can change this any time in Settings."
+           : "Je kunt alles op deze Mac houden, of Aaavatar cloud-AI laten gebruiken voor scherpere uitsneden en extra's. Je kunt dit altijd wijzigen in Instellingen."
+    }
+    static var onboardingPrivacyLocalTitle: String {
+        en ? "Local only" : "Alleen lokaal"
+    }
+    static var onboardingPrivacyLocalRecommended: String {
+        en ? "Recommended for privacy" : "Aanbevolen voor privacy"
+    }
+    static var onboardingPrivacyLocalBody: String {
+        en ? "Your photos never leave this Mac. Background removal runs entirely on-device. Magic Cutout, Fill in Body, and Colorize are turned off."
+           : "Je foto's verlaten deze Mac nooit. Achtergrond verwijderen gebeurt volledig op je apparaat. Magic Cutout, Fill in Body en Colorize staan uit."
+    }
+    static var onboardingPrivacyCloudTitle: String {
+        en ? "Allow cloud AI" : "Cloud-AI toestaan"
+    }
+    static var onboardingPrivacyCloudBody: String {
+        en ? "Use Magic Cutout, Fill in Body, and Colorize. Photos are uploaded over HTTPS, processed, and discarded server-side. No sign-in required for the free trial."
+           : "Gebruik Magic Cutout, Fill in Body en Colorize. Foto's worden via HTTPS geüpload, verwerkt en server-side verwijderd. Aanmelden niet nodig voor de gratis proefperiode."
+    }
+
+    // MARK: Onboarding — Local engine step
+    static var onboardingEngineTitle: String {
+        en ? "Pick a local engine" : "Kies een lokale engine"
+    }
+    static var onboardingEngineBody: String {
+        en ? "How should background removal run on this Mac?"
+           : "Hoe moet achtergrond verwijderen op deze Mac werken?"
+    }
+    static var onboardingEngineAppleVisionTitle: String {
+        en ? "Apple Vision" : "Apple Vision"
+    }
+    static var onboardingEngineAppleVisionDefault: String {
+        en ? "Default" : "Standaard"
+    }
+    static var onboardingEngineAppleVisionBody: String {
+        en ? "Built into macOS. Instant. Hair edges and fine strands can look chunky on hard cases."
+           : "Ingebouwd in macOS. Onmiddellijk. Haarranden en fijne plukken kunnen er bij moeilijke foto's blokkerig uitzien."
+    }
+    static var onboardingEngineDownloadedTitle: String {
+        en ? "Download enhanced model" : "Verbeterd model downloaden"
+    }
+    static var onboardingEngineDownloadedBody: String {
+        en ? "About 90 MB. Crisper hair and edges. Runs entirely on this Mac. Downloaded the first time you import a photo."
+           : "Ongeveer 90 MB. Strakkere haren en randen. Draait volledig op deze Mac. Wordt gedownload zodra je voor het eerst een foto importeert."
+    }
+
+    // MARK: Onboarding — Generic
+    static var onboardingBack: String { en ? "Back" : "Terug" }
+    static var onboardingContinue: String { en ? "Continue" : "Doorgaan" }
+    static var onboardingDone: String { en ? "Done" : "Klaar" }
+    static var onboardingSkip: String { en ? "Skip" : "Overslaan" }
+
+    // MARK: Settings — Privacy & AI section
+    static var privacyAndAITitle: String {
+        en ? "Privacy & AI" : "Privacy & AI"
+    }
+    static var privacyAndAIDesc: String {
+        en ? "Choose whether AI features run locally on this Mac or in the cloud. Local-only disables Magic Cutout, Fill in Body, and Colorize."
+           : "Kies of AI-functies lokaal op deze Mac draaien of in de cloud. Alleen-lokaal schakelt Magic Cutout, Fill in Body en Colorize uit."
+    }
+    static var privacyModePickerLabel: String { en ? "Mode" : "Modus" }
+    static var privacyEnginePickerLabel: String { en ? "Engine" : "Engine" }
+    static var privacyDisabledInLocalOnly: String {
+        en ? "Disabled in Local-only mode."
+           : "Uitgeschakeld in modus Alleen lokaal."
+    }
+    static var privacyEngineDownloadComingSoon: String {
+        en ? "Enhanced model coming soon — Apple Vision is used for now."
+           : "Verbeterd model komt binnenkort — momenteel wordt Apple Vision gebruikt."
+    }
+
+    // MARK: Cloud-feature gating toasts (local-only)
+    static var reprocessRequiresCloudAI: String {
+        en ? "Re-cutout uses cloud AI. Switch to Allow cloud AI in Settings → Privacy & AI."
+           : "Opnieuw uitsnijden gebruikt cloud-AI. Kies Cloud-AI toestaan in Instellingen → Privacy & AI."
+    }
+
     // MARK: Account / Pro settings section
     static var accountSectionTitle: String  { en ? "Account" : "Account" }
     static var accountNotSignedIn: String   { en ? "Not signed in" : "Niet aangemeld" }
