@@ -532,17 +532,28 @@ enum ImageProcessor {
         // the composite step below.
         let guided = attenuated
 
-        // 7. Blur-fusion RGB decontamination (V2 win, same algorithm).
-        //    Recovers unmixed foreground colour at semi-transparent
-        //    pixels so wispy strands don't carry the original
-        //    background through to the new backdrop. Matches V2's
-        //    portrait-tuned radii (180/8) — the earlier 90/6 wasn't
-        //    sampling far enough into solid hair pixels for the F̂
-        //    estimate, leaving warm-tinted halos around curly hair
-        //    edges when the original background was light/warm. 180px
-        //    first pass reaches reliably-α=1 pixels for typical head
-        //    sizes; 8px second pass cleans up local detail.
-        let refinedFG = refineForeground(source: originalCI, alpha: guided,
+        // 7. Blur-fusion RGB decontamination, but with a critical twist:
+        //    use `solidInterior` (the matte eroded by ~33px) as the
+        //    alpha rather than `guided`. This forces F̂ to be sampled
+        //    *only* from deep-interior pixels we trust — pixels far
+        //    from the warm rim-light contamination, so F̂ is itself
+        //    untainted dark-hair colour.
+        //
+        //    Why this matters: passing the full `guided` matte as
+        //    alpha lets blur-fusion's weighted-average sample some of
+        //    the warm-tinted edge pixels (their α is partial but
+        //    non-zero, so they contribute to F̂). The recovered F
+        //    inherits a faint warm cast — the user-reported "halo".
+        //    Restricting to solidInterior excludes those pixels from
+        //    the F-estimation entirely.
+        //
+        //    The math holds: at solidInterior=0 (every edge / wispy /
+        //    contaminated pixel), the blur-fusion kernel collapses to
+        //    F = F̂, which is exactly what we want — replace the
+        //    contaminated RGB with the clean local-hair reference.
+        //    The actual compositing alpha (step 8) is still `guided`,
+        //    so the silhouette and hair structure are preserved.
+        let refinedFG = refineForeground(source: originalCI, alpha: solidInterior,
                                           extent: extent,
                                           pass1Radius: 180, pass2Radius: 8)
 
