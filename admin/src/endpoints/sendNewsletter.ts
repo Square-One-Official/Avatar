@@ -2,9 +2,9 @@ import type { Endpoint, PayloadHandler } from "payload";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as React from "react";
-import AnnouncementEmail from "../emails/AnnouncementEmail.js";
-import { lexicalToHtml } from "../lib/lexical.js";
-import { resolveRecipients } from "../lib/recipients.js";
+import AnnouncementEmail from "../emails/AnnouncementEmail";
+import { lexicalToHtml } from "../lib/lexical";
+import { resolveRecipients } from "../lib/recipients";
 
 /**
  * POST /api/send-newsletter
