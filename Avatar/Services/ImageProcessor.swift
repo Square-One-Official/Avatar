@@ -466,10 +466,16 @@ enum ImageProcessor {
         // 7. Blur-fusion RGB decontamination (V2 win, same algorithm).
         //    Recovers unmixed foreground colour at semi-transparent
         //    pixels so wispy strands don't carry the original
-        //    background through to the new backdrop.
+        //    background through to the new backdrop. Matches V2's
+        //    portrait-tuned radii (180/8) — the earlier 90/6 wasn't
+        //    sampling far enough into solid hair pixels for the F̂
+        //    estimate, leaving warm-tinted halos around curly hair
+        //    edges when the original background was light/warm. 180px
+        //    first pass reaches reliably-α=1 pixels for typical head
+        //    sizes; 8px second pass cleans up local detail.
         let refinedFG = refineForeground(source: originalCI, alpha: guided,
                                           extent: extent,
-                                          pass1Radius: 90, pass2Radius: 6)
+                                          pass1Radius: 180, pass2Radius: 8)
 
         // 8. Composite refined RGB + alpha.
         let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
