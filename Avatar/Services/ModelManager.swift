@@ -235,31 +235,18 @@ final class ModelManager {
     }
 
     private func downloadToTemp(progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let session = URLSession(configuration: .ephemeral)
-        let (location, response) = try await session.download(
-            for: URLRequest(url: Self.modelURL),
-            delegate: ProgressDelegate(progress: progress)
-        )
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw ModelManagerError.downloadFailed("HTTP \(code)")
-        }
-        // URLSession writes to a temp location that disappears once we
-        // return — copy to a stable temp path we control before verify
-        // and unzip. Using `.itemReplacementDirectory` keeps the file on
-        // the same volume so `FileManager.replaceItem` can be atomic.
-        let tmpDir = try FileManager.default.url(
-            for: .itemReplacementDirectory,
-            in: .userDomainMask,
-            appropriateFor: Self.modelInstallDirectory(),
-            create: true
-        )
-        let stable = tmpDir.appendingPathComponent("birefnet-download.zip")
-        if FileManager.default.fileExists(atPath: stable.path) {
-            try? FileManager.default.removeItem(at: stable)
-        }
-        try FileManager.default.moveItem(at: location, to: stable)
-        return stable
+        // Why not `URLSession.download(for:delegate:)` async API:
+        // that variant routes delegate callbacks via the calling
+        // thread, which is suspended in `await`, so
+        // `urlSession(_:downloadTask:didWriteData:totalBytesWritten:totalBytesExpectedToWrite:)`
+        // never fires until the download is already complete — the
+        // user sees 0% then a jump to ready, no progress in between.
+        // A delegate-bound session running on its own queue avoids
+        // that suspension. Side benefit: we can also drive a synthetic
+        // progress timer for fast downloads where the real delegate
+        // would fire only once or twice.
+        let coordinator = DownloadCoordinator(progress: progress)
+        return try await coordinator.download(from: Self.modelURL)
     }
 
     private func verifyAndInstall(zipURL: URL) async throws {
@@ -444,18 +431,74 @@ final class ModelManager {
     }
 }
 
-// MARK: - URLSession progress delegate
+// MARK: - Download coordinator
 
-/// Bridges `URLSessionDownloadDelegate` progress callbacks into a plain
-/// closure so `ModelManager` can stay agnostic of the delegate dance.
-/// Lives on the URLSession's delegate queue; the closure should hop to
-/// MainActor before mutating UI state.
-private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+/// Self-contained URLSessionDownloadDelegate that owns its session,
+/// runs the download via a `URLSessionDownloadTask`, and resumes a
+/// continuation when the file lands or the request fails. Designed
+/// for one shot: instantiate, call `download(from:)`, throw away.
+///
+/// Two callbacks of interest fire here:
+///   • `didWriteData` updates `progress` from real bytes received.
+///   • A synthetic timer ticks ~10× per second while the download is
+///     in flight, smoothly easing toward an estimated 90% based on
+///     elapsed time vs an ~12 s budget. The timer never reports a
+///     value lower than the real progress, so it acts as a *floor*
+///     when GitHub's CDN streams the whole file in two big chunks
+///     (which would otherwise show 0% → jump → 100%).
+///
+/// Lifecycle: the URLSession holds the delegate strongly, the delegate
+/// holds the session inside `download(from:)` until completion. Both
+/// drop their references via `session.invalidateAndCancel()` after
+/// the continuation resumes so neither leaks.
+private final class DownloadCoordinator: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let progress: @Sendable (Double) -> Void
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<URL, Error>?
+    private var session: URLSession?
+    private var startedAt: Date?
+    private var lastReported: Double = 0
+    private var syntheticTimer: Task<Void, Never>?
+
+    /// Synthetic-progress budget. Picked so the bar reaches ~90%
+    /// after about ten seconds even on a connection that delivers
+    /// the whole file in one chunk. Real progress always wins when
+    /// it's higher; the synthetic curve only fills the silence.
+    private static let syntheticBudgetSeconds: TimeInterval = 12.0
+    private static let syntheticCeiling: Double = 0.90
 
     init(progress: @escaping @Sendable (Double) -> Void) {
         self.progress = progress
     }
+
+    func download(from url: URL) async throws -> URL {
+        try await withCheckedThrowingContinuation { cont in
+            lock.lock()
+            self.continuation = cont
+            self.startedAt = Date()
+            lock.unlock()
+
+            // Per-download session — owns this delegate, gets
+            // invalidated in `finish(...)`. `delegateQueue: nil`
+            // gives URLSession its own serial OperationQueue, so
+            // delegate callbacks never collide with our calling
+            // thread (which is the actual reason the async
+            // `download(for:delegate:)` fails to deliver progress
+            // — its delegate runs on the suspended awaiter).
+            let config = URLSessionConfiguration.ephemeral
+            let s = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+            lock.lock()
+            self.session = s
+            lock.unlock()
+
+            startSyntheticTimer()
+
+            let task = s.downloadTask(with: URLRequest(url: url))
+            task.resume()
+        }
+    }
+
+    // MARK: Real progress (URLSessionDownloadDelegate)
 
     func urlSession(_ session: URLSession,
                     downloadTask: URLSessionDownloadTask,
@@ -464,14 +507,131 @@ private final class ProgressDelegate: NSObject, URLSessionDownloadDelegate, @unc
                     totalBytesExpectedToWrite: Int64) {
         guard totalBytesExpectedToWrite > 0 else { return }
         let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        progress(p)
+        report(p)
     }
 
     func urlSession(_ session: URLSession,
                     downloadTask: URLSessionDownloadTask,
                     didFinishDownloadingTo location: URL) {
-        // The async/await `download(for:delegate:)` API consumes the
-        // URL — nothing to do here. Required by the protocol.
+        // The temp file at `location` is auto-deleted as soon as this
+        // method returns, so we MUST move it inside this scope — the
+        // continuation can't be resumed asynchronously with the
+        // original URL or it'll point at a missing file.
+        do {
+            let stable = try moveToStablePath(location)
+            report(1.0)
+            finish(.success(stable))
+        } catch {
+            finish(.failure(error))
+        }
+    }
+
+    func urlSession(_ session: URLSession,
+                    task: URLSessionTask,
+                    didCompleteWithError error: Error?) {
+        // `didFinishDownloadingTo` already resumed the continuation
+        // on success. This handler exists only for the failure path
+        // (server error, cancelled, network drop). Check for HTTP
+        // non-2xx too — URLSession reports those via the response
+        // not the error, so a 404 would otherwise look successful
+        // until SHA verify catches it.
+        if let error {
+            finish(.failure(ModelManagerError.downloadFailed(error.localizedDescription)))
+            return
+        }
+        if let http = task.response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            finish(.failure(ModelManagerError.downloadFailed("HTTP \(http.statusCode)")))
+        }
+    }
+
+    // MARK: Synthetic-progress timer
+
+    /// Drives a slow ease toward `syntheticCeiling` over
+    /// `syntheticBudgetSeconds`, reporting 10× per second. Clamped so
+    /// it never overrides a higher real-progress value. Cancels itself
+    /// on completion via `finish(...)`.
+    private func startSyntheticTimer() {
+        let task = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.reportSynthetic()
+                try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 s
+            }
+        }
+        lock.lock()
+        self.syntheticTimer = task
+        lock.unlock()
+    }
+
+    private func reportSynthetic() {
+        lock.lock()
+        let start = startedAt
+        let last = lastReported
+        lock.unlock()
+        guard let start else { return }
+
+        // Logistic-ish ease so we don't crawl too slowly at the start
+        // or jump too fast near the ceiling. Linear-with-cap is fine
+        // for our needs; the visual is much closer to real progress
+        // than instant 0→100, which is what the user sees today.
+        let elapsed = Date().timeIntervalSince(start)
+        let raw = elapsed / Self.syntheticBudgetSeconds
+        let synthetic = min(Self.syntheticCeiling, max(0, raw))
+
+        // Don't go backward: only report if the synthetic floor is
+        // strictly above the last real-or-synthetic value. This is
+        // the "floor" behaviour — real progress (often higher than
+        // the timer) always wins.
+        if synthetic > last {
+            report(synthetic)
+        }
+    }
+
+    private func report(_ value: Double) {
+        lock.lock()
+        guard value > lastReported else { lock.unlock(); return }
+        lastReported = value
+        lock.unlock()
+        progress(value)
+    }
+
+    // MARK: Cleanup
+
+    private func finish(_ result: Result<URL, Error>) {
+        lock.lock()
+        let cont = self.continuation
+        let s = self.session
+        let timer = self.syntheticTimer
+        self.continuation = nil
+        self.session = nil
+        self.syntheticTimer = nil
+        lock.unlock()
+
+        timer?.cancel()
+        // `invalidateAndCancel` releases the URLSession→delegate
+        // strong ref so the coordinator (and the closures it holds)
+        // can deinit. Without this the session sits around until
+        // the URLSession's own bookkeeping reaps it.
+        s?.invalidateAndCancel()
+
+        switch result {
+        case .success(let url): cont?.resume(returning: url)
+        case .failure(let err): cont?.resume(throwing: err)
+        }
+    }
+
+    private func moveToStablePath(_ location: URL) throws -> URL {
+        // System temp directory is fine — the caller (ModelManager)
+        // verifies SHA + extracts immediately and cleans up the zip.
+        // No need for `.itemReplacementDirectory` since we never call
+        // `FileManager.replaceItem` on it.
+        let stable = FileManager.default.temporaryDirectory
+            .appendingPathComponent("matting-download-\(UUID().uuidString).zip")
+        if FileManager.default.fileExists(atPath: stable.path) {
+            try? FileManager.default.removeItem(at: stable)
+        }
+        try FileManager.default.moveItem(at: location, to: stable)
+        return stable
     }
 }
 
