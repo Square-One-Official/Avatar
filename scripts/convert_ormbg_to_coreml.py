@@ -184,9 +184,15 @@ def convert_to_mlpackage(out: Path) -> None:
     print(f"[1/3] Tracing with example input 1x3x{INPUT_SIZE}x{INPUT_SIZE}…")
     example = torch.rand(1, 3, INPUT_SIZE, INPUT_SIZE)
 
-    # DIS-family models often return a tuple of side outputs at multiple
-    # resolutions during training and a single tensor at inference. Wrap
-    # so the traced graph exposes a single sigmoid'd alpha matte.
+    # DIS-family models return logits (BCEWithLogitsLoss training), not
+    # sigmoid'd probabilities. ORMBG's official `inference.py` takes
+    # `result[0][0]` and applies *min-max normalisation* to map it into
+    # [0, 1] — sigmoid alone is wrong here because the logit range is
+    # narrow enough that sigmoid compresses everything towards 0.5,
+    # producing the "ghost / half-transparent everywhere" matte we hit
+    # on the previous build. Mirror the official postprocess inside the
+    # traced graph so CoreML's output is already in [0, 1] and Swift
+    # doesn't need to know about it.
     class AlphaOnly(torch.nn.Module):
         def __init__(self, m):
             super().__init__()
@@ -194,14 +200,29 @@ def convert_to_mlpackage(out: Path) -> None:
 
         def forward(self, x):
             out = self.m(x)
+            # Drill down to the highest-resolution matte tensor.
+            # ORMBG returns `(side_outputs, intermediate_features)` where
+            # `side_outputs[0]` is the full-res matte (per `inference.py`).
             if isinstance(out, (tuple, list)):
-                # DIS-style: out[0] is the list of side outputs at
-                # different resolutions; out[0][0] is the highest-res.
                 inner = out[0]
                 if isinstance(inner, (tuple, list)):
-                    return torch.sigmoid(inner[0])
-                return torch.sigmoid(inner)
-            return torch.sigmoid(out)
+                    m = inner[0]
+                else:
+                    m = inner
+            else:
+                m = out
+
+            # Per-image min-max normalisation. `m.shape == [B, 1, H, W]`
+            # for ORMBG; flatten to [B, H*W] so the reduce ops cover the
+            # whole spatial extent at once, then broadcast back.
+            b = m.shape[0]
+            flat = m.reshape(b, -1)
+            mi = flat.min(dim=1, keepdim=True).values.reshape(b, 1, 1, 1)
+            ma = flat.max(dim=1, keepdim=True).values.reshape(b, 1, 1, 1)
+            # `+ 1e-6` guards against the (theoretical) flat-output case
+            # where every pixel has the same value — without it the
+            # divide would produce NaN and the CoreML loader would fail.
+            return (m - mi) / (ma - mi + 1e-6)
 
     wrapped = AlphaOnly(model).eval()
     with torch.no_grad():
