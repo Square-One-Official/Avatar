@@ -1,26 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import config from "@payload-config";
 import { RootLayout } from "@payloadcms/next/layouts";
-import { handleServerFunctions } from "@payloadcms/next/utilities";
-import type { ServerFunctionClient } from "payload";
 import { importMap } from "./admin/importMap.js";
 import "@payloadcms/next/css";
 
 /**
- * Payload v3 server function. The admin UI calls this to invoke
- * server-only logic (login, document mutations, etc.). Passes through
- * to handleServerFunctions which routes by name based on the request.
+ * Payload v3 admin shell. The component form (`<RootLayout>...`)
+ * lets Payload set up its own server-function client internally
+ * — bypassing the need to wire `handleServerFunctions` ourselves
+ * and avoiding the import-not-exported breakage on this Payload
+ * version.
  */
-const serverFunction: ServerFunctionClient = async function (args) {
-  "use server";
-  return handleServerFunctions({
-    ...args,
-    config,
-    importMap,
-  });
-};
-
-const Layout = ({ children }: { children: React.ReactNode }) =>
-  RootLayout({ children, config, importMap, serverFunction });
+const Layout = ({ children }: { children: React.ReactNode }) => (
+  <RootLayout config={config} importMap={importMap}>
+    {children}
+  </RootLayout>
+);
 
 export default Layout;
