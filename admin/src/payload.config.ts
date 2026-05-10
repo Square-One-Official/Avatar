@@ -57,6 +57,12 @@ export default buildConfig({
           "",
       ),
     },
+    // Auto-create / sync tables on startup. Safe here because Payload
+    // owns the `payload` schema exclusively — no other consumer's
+    // tables can be clobbered. Without this, the very first request
+    // fails with "Failed query: select users.id..." because Payload
+    // never gets a chance to materialise its schema.
+    push: true,
   }),
   plugins: [
     // Supabase Storage exposes an S3-compatible endpoint; the same
