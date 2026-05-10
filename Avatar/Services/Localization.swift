@@ -333,15 +333,15 @@ enum Loc {
         en ? "Default" : "Standaard"
     }
     static var onboardingEngineAppleVisionBody: String {
-        en ? "Built into macOS. Instant. Hair edges and fine strands can look chunky on hard cases."
-           : "Ingebouwd in macOS. Onmiddellijk. Haarranden en fijne plukken kunnen er bij moeilijke foto's blokkerig uitzien."
+        en ? "Built into macOS. Instant. Hair edges can look chunky on long or curly hair against contrasting backgrounds."
+           : "Ingebouwd in macOS. Onmiddellijk. Haarranden kunnen er blokkerig uitzien bij lang of krullend haar tegen een contrasterende achtergrond."
     }
     static var onboardingEngineDownloadedTitle: String {
         en ? "Download enhanced model" : "Verbeterd model downloaden"
     }
     static var onboardingEngineDownloadedBody: String {
-        en ? "About 90 MB. Crisper hair and edges. Runs entirely on this Mac. Downloaded the first time you import a photo."
-           : "Ongeveer 90 MB. Strakkere haren en randen. Draait volledig op deze Mac. Wordt gedownload zodra je voor het eerst een foto importeert."
+        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Download from Settings when you're ready."
+           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Downloaden via Instellingen wanneer je er klaar voor bent."
     }
 
     // MARK: Onboarding — Generic
@@ -371,22 +371,13 @@ enum Loc {
         en ? "Disabled in Local-only mode."
            : "Uitgeschakeld in modus Alleen lokaal."
     }
-    static var privacyEngineDownloadComingSoon: String {
-        // Retained for legacy callers. The new flow surfaces explicit
-        // download controls instead of a "coming soon" hint, so this
-        // string is unused in current code paths but kept around so a
-        // pinned older build referencing it still links.
-        en ? "Enhanced model coming soon — Apple Vision is used for now."
-           : "Verbeterd model komt binnenkort — momenteel wordt Apple Vision gebruikt."
-    }
-
-    // MARK: Downloadable matting model (BiRefNet)
+    // MARK: Downloadable matting model (ORMBG)
     static var modelDownloadButton: String {
         en ? "Download model" : "Model downloaden"
     }
     static var modelDownloadSizeHint: String {
-        en ? "About 90 MB. Stored in this app's container."
-           : "Ongeveer 90 MB. Bewaard in de map van deze app."
+        en ? "78 MB · stored in this app's container"
+           : "78 MB · bewaard in de map van deze app"
     }
     static func modelDownloadingLabel(percent: Int) -> String {
         en ? "Downloading… \(percent)%" : "Downloaden… \(percent)%"
