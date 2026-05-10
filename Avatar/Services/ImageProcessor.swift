@@ -454,14 +454,37 @@ enum ImageProcessor {
         let mask = scaleMaskToExtent(rawMask, extent: extent)
 
         // 6. Light guided-filter refinement to snap the matte onto real
-        //    luminance edges. Loose epsilon — BiRefNet's output is
-        //    already edge-aware, we're just cleaning up sub-pixel
+        //    luminance edges. Loose epsilon — the matting model's output
+        //    is already edge-aware, we're just cleaning up sub-pixel
         //    scaling artifacts from step 5.
-        let guided = mask.applyingFilter("CIGuidedFilter", parameters: [
+        let guidedRaw = mask.applyingFilter("CIGuidedFilter", parameters: [
             "inputGuideImage": originalCI,
             kCIInputRadiusKey: 2.0,
             "inputEpsilon": 0.01
         ]).cropped(to: extent)
+
+        // 6b. Tighten the silhouette by ~3px to clip the warm-halo ring.
+        //     ORMBG's matte tends to include the outermost pixels of
+        //     the silhouette at α=1 even when they're really
+        //     background-edge pixels with light bounced off the
+        //     subject — those carry a tint of the original
+        //     background, which composited over a new backdrop reads
+        //     as a coloured glow. The pixels are at α=1 so blur-fusion
+        //     can't fix them; the only correct move is to clip them
+        //     out of the cutout entirely. Small Gaussian blur after
+        //     the morphology gives the new edge a sub-pixel feather
+        //     so the cutout doesn't look hard-cut. Cost: hair
+        //     flyaways thinner than ~3px get lost — acceptable for
+        //     ORMBG's portrait-trained domain (the model already
+        //     coalesces wisps into the main hair mass).
+        let guided = guidedRaw
+            .applyingFilter("CIMorphologyMinimum", parameters: [
+                kCIInputRadiusKey: 3.0
+            ])
+            .applyingFilter("CIGaussianBlur", parameters: [
+                kCIInputRadiusKey: 1.0
+            ])
+            .cropped(to: extent)
 
         // 7. Blur-fusion RGB decontamination (V2 win, same algorithm).
         //    Recovers unmixed foreground colour at semi-transparent
