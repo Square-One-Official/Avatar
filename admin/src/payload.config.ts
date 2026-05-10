@@ -5,11 +5,11 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { s3Storage } from "@payloadcms/storage-s3";
 
-import { Users } from "./collections/Users";
-import { Media } from "./collections/Media";
-import { Announcements } from "./collections/Announcements";
-import { BadgeComponents } from "./collections/BadgeComponents";
-import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
+import { Users } from "./collections/Users.js";
+import { Media } from "./collections/Media.js";
+import { Announcements } from "./collections/Announcements.js";
+import { BadgeComponents } from "./collections/BadgeComponents.js";
+import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
