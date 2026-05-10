@@ -457,111 +457,40 @@ enum ImageProcessor {
         //    luminance edges. Loose epsilon — the matting model's output
         //    is already edge-aware, we're just cleaning up sub-pixel
         //    scaling artifacts from step 5.
-        let guidedRaw = mask.applyingFilter("CIGuidedFilter", parameters: [
+        let guided = mask.applyingFilter("CIGuidedFilter", parameters: [
             "inputGuideImage": originalCI,
             kCIInputRadiusKey: 2.0,
             "inputEpsilon": 0.01
         ]).cropped(to: extent)
 
-        // 6b. Tighten the body silhouette by ~3px to clip the
-        //     contaminated outer ring at α=1. The hair-edge problem
-        //     (partial-α pixels carrying warm-tinted RGB) is handled
-        //     separately in step 6c below.
-        let guidedTight = guidedRaw
-            .applyingFilter("CIMorphologyMinimum", parameters: [
-                kCIInputRadiusKey: 3.0
-            ])
-            .applyingFilter("CIGaussianBlur", parameters: [
-                kCIInputRadiusKey: 1.0
-            ])
-            .cropped(to: extent)
-
-        // 6c. Colour attenuation for hair-edge halos. The erosion above
-        //     fixes contamination at α=1 (binary-edge pixels carrying
-        //     bg colour). It cannot touch the warm-tinted glow at hair
-        //     flyaways where α=0.3-0.7 — those pixels are correctly
-        //     partial-α according to ORMBG, but their RGB carries
-        //     bounce light from the original scene. Composited over a
-        //     new backdrop the bounce light reads as an out-of-place
-        //     coloured glow.
+        // 7. Composite original RGB with the matte as alpha — minimal
+        //    pipeline matching ORMBG's own inference.py post-process
+        //    (`Image.paste(orig, mask=matte)`). We deliberately do NOT
+        //    blur-fuse / colour-attenuate / erode the matte here.
         //
-        //     Same approach V2 uses: sample local foreground colour
-        //     from deep-interior pixels (where we trust the matte),
-        //     then attenuate α for any partial-α pixel whose RGB
-        //     sits too far from that local colour. Pixels matching
-        //     "real hair colour" pass through; pixels matching
-        //     "warm rim light" get pushed toward α=0.
-        //
-        //     The hair zone here is the *eroded* matte — anywhere
-        //     the model called solid foreground after we trimmed
-        //     3px. That gives us a generous-but-trusted region to
-        //     sample colour from without needing face detection.
-        let solidInterior = guidedTight.applyingFilter("CIMorphologyMinimum", parameters: [
-            kCIInputRadiusKey: 30.0
-        ]).cropped(to: extent)
-        let interiorOnlyRGB = originalCI.applyingFilter("CIMultiplyCompositing", parameters: [
-            kCIInputBackgroundImageKey: solidInterior
-        ]).cropped(to: extent)
-        // 80px Gaussian gathers a meaningful local colour reference
-        // even for pixels at the silhouette edge. Smaller radii leave
-        // localHair undefined (maskBlur ≈ 0) at the rim, which the
-        // kernel handles by skipping attenuation — defeating the
-        // purpose for our case.
-        let interiorBlur = interiorOnlyRGB.applyingFilter("CIGaussianBlur", parameters: [
-            kCIInputRadiusKey: 80.0
-        ]).cropped(to: extent)
-        let interiorMaskBlur = solidInterior.applyingFilter("CIGaussianBlur", parameters: [
-            kCIInputRadiusKey: 80.0
-        ]).cropped(to: extent)
-
-        // Use the tight matte as both the soft-α input AND the zone
-        // gate — every foreground pixel is a candidate for attenuation,
-        // but the kernel's `partialGate` (smoothstep on α) means only
-        // partial-α pixels get touched in practice. Solid interior
-        // (α=1) is mathematically a no-op via the gate. If the kernel
-        // fails to compile (shouldn't in practice; same shader compiled
-        // for V2), fall back to the un-attenuated tight matte.
-        let attenuated = colorAttenuationKernel?.apply(
-            extent: extent,
-            arguments: [originalCI, interiorBlur, interiorMaskBlur,
-                        guidedTight, guidedTight]
-        )?.cropped(to: extent) ?? guidedTight
-
-        // Final alpha = the colour-attenuated tight matte. Replaces
-        // the previous `guided` for both blur-fusion's α input and
-        // the composite step below.
-        let guided = attenuated
-
-        // 7. Blur-fusion RGB decontamination, but with a critical twist:
-        //    use `solidInterior` (the matte eroded by ~33px) as the
-        //    alpha rather than `guided`. This forces F̂ to be sampled
-        //    *only* from deep-interior pixels we trust — pixels far
-        //    from the warm rim-light contamination, so F̂ is itself
-        //    untainted dark-hair colour.
-        //
-        //    Why this matters: passing the full `guided` matte as
-        //    alpha lets blur-fusion's weighted-average sample some of
-        //    the warm-tinted edge pixels (their α is partial but
-        //    non-zero, so they contribute to F̂). The recovered F
-        //    inherits a faint warm cast — the user-reported "halo".
-        //    Restricting to solidInterior excludes those pixels from
-        //    the F-estimation entirely.
-        //
-        //    The math holds: at solidInterior=0 (every edge / wispy /
-        //    contaminated pixel), the blur-fusion kernel collapses to
-        //    F = F̂, which is exactly what we want — replace the
-        //    contaminated RGB with the clean local-hair reference.
-        //    The actual compositing alpha (step 8) is still `guided`,
-        //    so the silhouette and hair structure are preserved.
-        let refinedFG = refineForeground(source: originalCI, alpha: solidInterior,
-                                          extent: extent,
-                                          pass1Radius: 180, pass2Radius: 8)
-
-        // 8. Composite refined RGB + alpha.
+        //    History: earlier builds layered V2's defence-in-depth
+        //    refinement on top of ORMBG's output and produced
+        //    increasingly bad halos. V2's stages assume Vision's
+        //    chunky binary mask + a face-locatable hair zone — neither
+        //    holds for ORMBG, which already returns continuous α from
+        //    a portrait-trained matting head. Each refinement layer
+        //    was either a no-op (e.g. colour-attenuation kernel
+        //    falling back via maskBlur < 0.01 safety) or actively
+        //    damaging (blur-fusion sampling F̂ from interior pixels
+        //    that themselves carry rim-light tint, then painting that
+        //    tint over the entire silhouette). The honest baseline is
+        //    the model's raw matte against the original RGB; any
+        //    residual halo here is a property of the photo + model
+        //    ceiling, not of our pipeline. See plan file
+        //    /Users/thierry/.claude/plans/make-a-plan-for-crispy-hamster.md
+        //    for the full diagnosis. If a future test shows the halo
+        //    is bad enough on common photos to warrant decontamination,
+        //    Step 3 of that plan describes a simpler matte-keyed
+        //    approach to add.
         let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
             .cropped(to: extent)
         let alphaMatte = guided.applyingFilter("CIMaskToAlpha")
-        let composed = refinedFG.applyingFilter("CIBlendWithMask", parameters: [
+        let composed = originalCI.applyingFilter("CIBlendWithMask", parameters: [
             "inputBackgroundImage": clearBG,
             "inputMaskImage": alphaMatte
         ]).cropped(to: extent)
