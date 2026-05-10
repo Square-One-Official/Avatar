@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
+    "vercel-build": "payload migrate:create --forceAcceptWarning --name auto || true; payload migrate || true; next build",
     "start": "next start",
     "generate:types": "payload generate:types",
     "payload": "payload"
