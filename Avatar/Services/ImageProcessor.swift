@@ -463,21 +463,11 @@ enum ImageProcessor {
             "inputEpsilon": 0.01
         ]).cropped(to: extent)
 
-        // 6b. Tighten the silhouette by ~3px to clip the warm-halo ring.
-        //     ORMBG's matte tends to include the outermost pixels of
-        //     the silhouette at α=1 even when they're really
-        //     background-edge pixels with light bounced off the
-        //     subject — those carry a tint of the original
-        //     background, which composited over a new backdrop reads
-        //     as a coloured glow. The pixels are at α=1 so blur-fusion
-        //     can't fix them; the only correct move is to clip them
-        //     out of the cutout entirely. Small Gaussian blur after
-        //     the morphology gives the new edge a sub-pixel feather
-        //     so the cutout doesn't look hard-cut. Cost: hair
-        //     flyaways thinner than ~3px get lost — acceptable for
-        //     ORMBG's portrait-trained domain (the model already
-        //     coalesces wisps into the main hair mass).
-        let guided = guidedRaw
+        // 6b. Tighten the body silhouette by ~3px to clip the
+        //     contaminated outer ring at α=1. The hair-edge problem
+        //     (partial-α pixels carrying warm-tinted RGB) is handled
+        //     separately in step 6c below.
+        let guidedTight = guidedRaw
             .applyingFilter("CIMorphologyMinimum", parameters: [
                 kCIInputRadiusKey: 3.0
             ])
@@ -485,6 +475,62 @@ enum ImageProcessor {
                 kCIInputRadiusKey: 1.0
             ])
             .cropped(to: extent)
+
+        // 6c. Colour attenuation for hair-edge halos. The erosion above
+        //     fixes contamination at α=1 (binary-edge pixels carrying
+        //     bg colour). It cannot touch the warm-tinted glow at hair
+        //     flyaways where α=0.3-0.7 — those pixels are correctly
+        //     partial-α according to ORMBG, but their RGB carries
+        //     bounce light from the original scene. Composited over a
+        //     new backdrop the bounce light reads as an out-of-place
+        //     coloured glow.
+        //
+        //     Same approach V2 uses: sample local foreground colour
+        //     from deep-interior pixels (where we trust the matte),
+        //     then attenuate α for any partial-α pixel whose RGB
+        //     sits too far from that local colour. Pixels matching
+        //     "real hair colour" pass through; pixels matching
+        //     "warm rim light" get pushed toward α=0.
+        //
+        //     The hair zone here is the *eroded* matte — anywhere
+        //     the model called solid foreground after we trimmed
+        //     3px. That gives us a generous-but-trusted region to
+        //     sample colour from without needing face detection.
+        let solidInterior = guidedTight.applyingFilter("CIMorphologyMinimum", parameters: [
+            kCIInputRadiusKey: 30.0
+        ]).cropped(to: extent)
+        let interiorOnlyRGB = originalCI.applyingFilter("CIMultiplyCompositing", parameters: [
+            kCIInputBackgroundImageKey: solidInterior
+        ]).cropped(to: extent)
+        // 80px Gaussian gathers a meaningful local colour reference
+        // even for pixels at the silhouette edge. Smaller radii leave
+        // localHair undefined (maskBlur ≈ 0) at the rim, which the
+        // kernel handles by skipping attenuation — defeating the
+        // purpose for our case.
+        let interiorBlur = interiorOnlyRGB.applyingFilter("CIGaussianBlur", parameters: [
+            kCIInputRadiusKey: 80.0
+        ]).cropped(to: extent)
+        let interiorMaskBlur = solidInterior.applyingFilter("CIGaussianBlur", parameters: [
+            kCIInputRadiusKey: 80.0
+        ]).cropped(to: extent)
+
+        // Use the tight matte as both the soft-α input AND the zone
+        // gate — every foreground pixel is a candidate for attenuation,
+        // but the kernel's `partialGate` (smoothstep on α) means only
+        // partial-α pixels get touched in practice. Solid interior
+        // (α=1) is mathematically a no-op via the gate. If the kernel
+        // fails to compile (shouldn't in practice; same shader compiled
+        // for V2), fall back to the un-attenuated tight matte.
+        let attenuated = colorAttenuationKernel?.apply(
+            extent: extent,
+            arguments: [originalCI, interiorBlur, interiorMaskBlur,
+                        guidedTight, guidedTight]
+        )?.cropped(to: extent) ?? guidedTight
+
+        // Final alpha = the colour-attenuated tight matte. Replaces
+        // the previous `guided` for both blur-fusion's α input and
+        // the composite step below.
+        let guided = attenuated
 
         // 7. Blur-fusion RGB decontamination (V2 win, same algorithm).
         //    Recovers unmixed foreground colour at semi-transparent
