@@ -16,10 +16,16 @@ export const Users: CollectionConfig = {
     tokenExpiration: 60 * 60 * 8,
   },
   access: {
-    // Lock the admin to authenticated users only — there is no
-    // public-self-signup. Add a new admin by creating a user via the
-    // Payload local API or directly in the DB.
-    create: ({ req }) => Boolean(req.user),
+    // Bootstrap: allow create when the users table is empty so the
+    // first-user flow at /admin/create-first-user can succeed. After
+    // that, only signed-in users can create more admins. Payload's
+    // built-in /admin/create-first-user route also enforces this from
+    // the UI side.
+    create: async ({ req }) => {
+      if (req.user) return true;
+      const { totalDocs } = await req.payload.count({ collection: "users" });
+      return totalDocs === 0;
+    },
     read: ({ req }) => Boolean(req.user),
     update: ({ req }) => Boolean(req.user),
     delete: ({ req }) => Boolean(req.user),
