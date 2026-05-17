@@ -292,6 +292,116 @@ enum Loc {
         en ? "Sign in with Google" : "Aanmelden met Google"
     }
 
+    // MARK: Onboarding — Privacy mode step
+    static var onboardingPrivacyTitle: String {
+        en ? "How should AI work?" : "Hoe mag AI werken?"
+    }
+    static var onboardingPrivacyBody: String {
+        en ? "You can keep everything on this Mac, or let Aaavatar use cloud AI for higher-quality cutouts and extras. You can change this any time in Settings."
+           : "Je kunt alles op deze Mac houden, of Aaavatar cloud-AI laten gebruiken voor scherpere uitsneden en extra's. Je kunt dit altijd wijzigen in Instellingen."
+    }
+    static var onboardingPrivacyLocalTitle: String {
+        en ? "Local only" : "Alleen lokaal"
+    }
+    static var onboardingPrivacyLocalRecommended: String {
+        en ? "Recommended for privacy" : "Aanbevolen voor privacy"
+    }
+    static var onboardingPrivacyLocalBody: String {
+        en ? "Your photos never leave this Mac. Background removal runs entirely on-device. Magic Cutout, Fill in Body, and Colorize are turned off."
+           : "Je foto's verlaten deze Mac nooit. Achtergrond verwijderen gebeurt volledig op je apparaat. Magic Cutout, Fill in Body en Colorize staan uit."
+    }
+    static var onboardingPrivacyCloudTitle: String {
+        en ? "Allow cloud AI" : "Cloud-AI toestaan"
+    }
+    static var onboardingPrivacyCloudBody: String {
+        en ? "Use Magic Cutout, Fill in Body, and Colorize. Photos are uploaded over HTTPS, processed, and discarded server-side. No sign-in required for the free trial."
+           : "Gebruik Magic Cutout, Fill in Body en Colorize. Foto's worden via HTTPS geüpload, verwerkt en server-side verwijderd. Aanmelden niet nodig voor de gratis proefperiode."
+    }
+
+    // MARK: Onboarding — Local engine step
+    static var onboardingEngineTitle: String {
+        en ? "Pick a local engine" : "Kies een lokale engine"
+    }
+    static var onboardingEngineBody: String {
+        en ? "How should background removal run on this Mac?"
+           : "Hoe moet achtergrond verwijderen op deze Mac werken?"
+    }
+    static var onboardingEngineAppleVisionTitle: String {
+        en ? "Apple Vision" : "Apple Vision"
+    }
+    static var onboardingEngineAppleVisionDefault: String {
+        en ? "Default" : "Standaard"
+    }
+    static var onboardingEngineAppleVisionBody: String {
+        en ? "Built into macOS. Instant. Hair edges can look chunky on long or curly hair against contrasting backgrounds."
+           : "Ingebouwd in macOS. Onmiddellijk. Haarranden kunnen er blokkerig uitzien bij lang of krullend haar tegen een contrasterende achtergrond."
+    }
+    static var onboardingEngineDownloadedTitle: String {
+        en ? "Download enhanced model" : "Verbeterd model downloaden"
+    }
+    static var onboardingEngineDownloadedBody: String {
+        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Download from Settings when you're ready."
+           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Downloaden via Instellingen wanneer je er klaar voor bent."
+    }
+
+    // MARK: Onboarding — Generic
+    static var onboardingBack: String { en ? "Back" : "Terug" }
+    static var onboardingContinue: String { en ? "Continue" : "Doorgaan" }
+    static var onboardingDone: String { en ? "Done" : "Klaar" }
+    static var onboardingSkip: String { en ? "Skip" : "Overslaan" }
+    /// Used in the engine step when the model download fails — clicking
+    /// Done falls back to Apple Vision rather than leaving the user
+    /// stuck on a broken-download state.
+    static var onboardingDoneWithoutEnhanced: String {
+        en ? "Continue without enhanced model"
+           : "Doorgaan zonder verbeterd model"
+    }
+
+    // MARK: Settings — Privacy & AI section
+    static var privacyAndAITitle: String {
+        en ? "Privacy & AI" : "Privacy & AI"
+    }
+    static var privacyAndAIDesc: String {
+        en ? "Choose whether AI features run locally on this Mac or in the cloud. Local-only disables Magic Cutout, Fill in Body, and Colorize."
+           : "Kies of AI-functies lokaal op deze Mac draaien of in de cloud. Alleen-lokaal schakelt Magic Cutout, Fill in Body en Colorize uit."
+    }
+    static var privacyModePickerLabel: String { en ? "Mode" : "Modus" }
+    static var privacyEnginePickerLabel: String { en ? "Engine" : "Engine" }
+    static var privacyDisabledInLocalOnly: String {
+        en ? "Disabled in Local-only mode."
+           : "Uitgeschakeld in modus Alleen lokaal."
+    }
+    // MARK: Downloadable matting model (ORMBG)
+    static var modelDownloadButton: String {
+        en ? "Download model" : "Model downloaden"
+    }
+    static var modelDownloadSizeHint: String {
+        en ? "78 MB · stored in this app's container"
+           : "78 MB · bewaard in de map van deze app"
+    }
+    static func modelDownloadingLabel(percent: Int) -> String {
+        en ? "Downloading… \(percent)%" : "Downloaden… \(percent)%"
+    }
+    static var modelDownloadedReady: String {
+        en ? "Enhanced model ready" : "Verbeterd model klaar"
+    }
+    static var modelRemoveButton: String {
+        en ? "Remove" : "Verwijderen"
+    }
+    static var modelDownloadRetryButton: String {
+        en ? "Try again" : "Opnieuw proberen"
+    }
+    static var modelMissingFallbackToast: String {
+        en ? "Enhanced model isn't downloaded yet. Used Apple Vision for this import. Download in Settings → Privacy & AI."
+           : "Het verbeterde model is nog niet gedownload. Apple Vision werd gebruikt voor deze import. Downloaden in Instellingen → Privacy & AI."
+    }
+
+    // MARK: Cloud-feature gating toasts (local-only)
+    static var reprocessRequiresCloudAI: String {
+        en ? "Re-cutout uses cloud AI. Switch to Allow cloud AI in Settings → Privacy & AI."
+           : "Opnieuw uitsnijden gebruikt cloud-AI. Kies Cloud-AI toestaan in Instellingen → Privacy & AI."
+    }
+
     // MARK: Account / Pro settings section
     static var accountSectionTitle: String  { en ? "Account" : "Account" }
     static var accountNotSignedIn: String   { en ? "Not signed in" : "Niet aangemeld" }
@@ -774,25 +884,13 @@ enum Loc {
     static var square: String          { en ? "Square" : "Vierkant" }
     static var circle: String          { en ? "Circle" : "Cirkel" }
 
-    // MARK: Settings – AI Model tab
-    static var aiHairQuality: String   { en ? "AI Hair Quality" : "AI Haarkwaliteit" }
-    static var advancedCutoutModel: String { en ? "Advanced cutout model" : "Geavanceerd uitknipmodel" }
-    static var advancedModelDesc: String {
-        en ? "Uses a specialized AI model (BiRefNet) for better hair quality when removing backgrounds. Especially visible with fine hair, curls, and hair against a busy background."
-           : "Gebruikt een gespecialiseerd AI-model (BiRefNet) voor betere haarkwaliteit bij het vrijstaand maken. Vooral zichtbaar bij fijn haar, krullen en haar tegen een drukke achtergrond."
-    }
-    static var modelNotInstalled: String { en ? "Model not installed" : "Model niet geinstalleerd" }
-    static var downloadModelPrompt: String {
-        en ? "Download the BiRefNet model (~250 MB) for better hair quality when removing backgrounds."
-           : "Download het BiRefNet model (~250 MB) voor betere haarkwaliteit bij het vrijstaand maken."
-    }
-    static var installModel: String    { en ? "Install model" : "Installeer model" }
-    static var downloading: String     { en ? "Downloading…" : "Downloaden..." }
-    static var modelAvailable: String  { en ? "Model available" : "Model beschikbaar" }
-    static var useAdvancedModel: String {
-        en ? "Use advanced model for cutout"
-           : "Gebruik geavanceerd model bij uitknippen"
-    }
+    // (Legacy "Settings – AI Model tab" strings removed. They referenced
+    // the bundled 250 MB BiRefNet model that was deleted in build 6
+    // and the Settings tab that surfaced it, which the local-first
+    // pivot replaced with the Privacy & AI section + the optional
+    // downloadable ORMBG engine. The strings had no remaining call
+    // sites at the time of removal — confirmed via grep before
+    // dropping them.)
     static var advancedModelToggleHelp: String {
         en ? "When enabled, new and re-cut portraits are processed with the advanced model. Existing portraits are not automatically reprocessed. Use 'Re-cutout' in the editor."
            : "Wanneer ingeschakeld worden nieuwe en opnieuw uitgeknipte portretten verwerkt met het geavanceerde model. Bestaande portretten worden niet automatisch opnieuw verwerkt. Gebruik 'Opnieuw uitknippen' in de editor."

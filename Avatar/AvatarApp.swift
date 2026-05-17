@@ -377,6 +377,8 @@ struct AvatarApp: App {
                 // environment so feature affordances anywhere in the
                 // window can opt into the NEW pill without prop-drilling.
                 .environment(appState.announcements)
+                .environment(appState.privacyPrefs)
+                .environment(appState.modelManager)
                 // Minimum ensures the library sidebar (~200), canvas (~280)
                 // and inspector (~320) all have enough room to display
                 // their content without truncation.
@@ -395,6 +397,69 @@ struct AvatarApp: App {
         .modelContainer(sharedModelContainer)
         .commands {
             CommandGroup(replacing: .newItem) { }
+            #if DEBUG
+            // Subject-Lift V1/V2 benchmark harness. Reads fixtures from
+            // Avatar/Debug/Fixtures/ (or $AVATAR_BENCH_FIXTURES) and writes
+            // side-by-side cutouts to ~/Desktop/edge-bench-<stamp>/ for
+            // perceptual A/B. Compiled out of Release builds.
+            CommandMenu("Debug") {
+                // Full pass — every fixture, ~1-3 min on M1 with ~25 photos.
+                // Use after V2 tweaks to confirm a candidate generalises.
+                Button("Run Subject-Lift Benchmark (Full)") {
+                    EdgeBenchmark.run()
+                }
+                // Quick pass — 5 random fixtures, ~10-30s. Use while iterating
+                // on a single V2 parameter so the eyeball loop stays tight.
+                Button("Run Subject-Lift Benchmark (Quick — 5 Random)") {
+                    EdgeBenchmark.run(sampleSize: 5)
+                }
+                Button("Open Latest Benchmark Folder") {
+                    EdgeBenchmark.revealLatest()
+                }
+                // The app is sandboxed, so reading photos from outside the
+                // container needs a security-scoped bookmark. The first
+                // benchmark run prompts automatically; this lets the dev
+                // re-pick the folder if they move the worktree.
+                Button("Choose Fixtures Folder…") {
+                    EdgeBenchmark.chooseFixturesFolder()
+                }
+                Divider()
+                // V2 is now default-on. Toggle reflects the actual default
+                // (true) when the key is unset; flipping off is the explicit
+                // V1 opt-out for debugging real-world regressions.
+                Toggle("Use Subject-Lift V2",
+                       isOn: Binding(
+                        get: { (UserDefaults.standard.object(forKey: "subjectLiftV2") as? Bool) ?? true },
+                        set: { UserDefaults.standard.set($0, forKey: "subjectLiftV2") }
+                       ))
+                Divider()
+                // Wipe just the onboarding-related defaults so the next
+                // launch hits the first-launch path. Library, portraits,
+                // auth session, Magic Cutout toggle, and V2 preference
+                // stay intact — this is for *flow* testing, not "reset
+                // the whole app". Asks the user to quit so the running
+                // process's UserDefaults cache doesn't reinstate the
+                // values via the migration shim before we observe the
+                // change.
+                Button("Reset Onboarding…") {
+                    let keys = [
+                        "hasSeenOnboarding",
+                        "hasSeenWelcomeSignIn",
+                        "hasRunOnboardingMigration",
+                        "aiPrivacyMode",
+                        "localCutoutEngine",
+                    ]
+                    for key in keys {
+                        UserDefaults.standard.removeObject(forKey: key)
+                    }
+                    let alert = NSAlert()
+                    alert.messageText = "Onboarding state cleared"
+                    alert.informativeText = "Quit Aaavatar (⌘Q) and relaunch to see the first-launch flow. Library, auth, and other preferences are unchanged."
+                    alert.alertStyle = .informational
+                    alert.runModal()
+                }
+            }
+            #endif
         }
         .handlesExternalEvents(matching: ["aaavatar"])
 
@@ -406,6 +471,8 @@ struct AvatarApp: App {
                 #endif
                 .environment(appState.magicCutoutPrefs)
                 .environment(appState.announcements)
+                .environment(appState.privacyPrefs)
+                .environment(appState.modelManager)
                 .modelContainer(sharedModelContainer)
                 .preferredColorScheme(colorScheme)
                 .id(appState.language)

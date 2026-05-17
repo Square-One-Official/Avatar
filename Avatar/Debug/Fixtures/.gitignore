@@ -1,0 +1,10 @@
+# Fixture photos are private — never check them in. Match every format the
+# harness recognises so a stray drag-drop doesn't get auto-staged.
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.heif
+*.avif
+*.webp
+!.gitignore

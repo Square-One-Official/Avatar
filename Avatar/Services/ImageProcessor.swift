@@ -39,12 +39,60 @@ struct FaceDetectionResult {
 enum ImageProcessor {
     static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
 
-    /// Removes the background using Vision's foreground instance mask
-    /// (the same "Subject Lift" model the Photos app uses, macOS 14+) and
-    /// refines the matte with `VNGeneratePersonSegmentationRequest(.accurate)`
-    /// for smoother hair edges. Falls back to the raw foreground mask when
-    /// person segmentation has nothing useful (e.g. non-person subjects).
+    /// Linear-sRGB working-space context used **only** by `subjectLiftV2`.
+    /// All matte arithmetic — guided filter, gaussian blur, multiply
+    /// composites, the custom blur-fusion / colour-attenuation kernels — is
+    /// mathematically correct only in linear light. Rendering through this
+    /// context applies the sRGB→linear transform on input, runs every filter
+    /// in linear, then applies linear→sRGB on output, so a 50/50 blend at a
+    /// hair edge is the *physical* 50/50 instead of the perceptually-darker
+    /// gamma-encoded one. 16-bit half-float intermediate avoids 8-bit banding
+    /// in the soft alpha around wispy strands.
+    /// `subjectLiftV1`, `birefnetLift` (legacy), `magicRetouch`, and the orientation /
+    /// PNG helpers stay on the default-sRGB `ciContext` so we don't perturb
+    /// downstream features that were tuned against it.
+    private static let liftContext: CIContext = {
+        let linear = CGColorSpace(name: CGColorSpace.linearSRGB)!
+        let srgb   = CGColorSpace(name: CGColorSpace.sRGB)!
+        return CIContext(options: [
+            .useSoftwareRenderer: false,
+            .workingColorSpace: linear,
+            .outputColorSpace: srgb,
+            .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
+        ])
+    }()
+
+    /// Removes the background using Vision's foreground instance mask. Public
+    /// entry point used by the import pipeline. Defaults to `subjectLiftV2`
+    /// (linear-sRGB context, pinned Vision revisions, adaptive resolution,
+    /// extended hair zone, alpha gamma, full-silhouette colour
+    /// decontamination) — accepted after a fixture-set A/B against V1.
+    /// V1 stays available behind an explicit `subjectLiftV2 = false` opt-out
+    /// so we can revert instantly if a real-world regression surfaces. V1
+    /// gets removed in a follow-up once V2 has been default-on for a
+    /// release cycle without bug reports.
     static func subjectLift(image: CGImage) throws -> CGImage {
+        // `object(forKey:) as? Bool` distinguishes "not set" (→ true, V2
+        // default) from "set to false" (→ V1 opt-out). `bool(forKey:)`
+        // would conflate the two.
+        let useV2 = (UserDefaults.standard.object(forKey: "subjectLiftV2") as? Bool) ?? true
+        if useV2 {
+            return try subjectLiftV2(image: image)
+        }
+        return try subjectLiftV1(image: image)
+    }
+
+    /// V1 — original Apple Vision pipeline, **bit-for-bit identical** to the
+    /// pre-split implementation. Kept around behind the `subjectLiftV2` flag
+    /// so the EdgeBenchmark harness can A/B against V2, and so we can revert
+    /// instantly if V2 regresses on real-world imports.
+    ///
+    /// Uses `VNGenerateForegroundInstanceMaskRequest` (the same "Subject
+    /// Lift" model the Photos app uses, macOS 14+) and refines the matte
+    /// with `VNGeneratePersonSegmentationRequest(.accurate)` for smoother
+    /// hair edges. Falls back to the raw foreground mask when person
+    /// segmentation has nothing useful (e.g. non-person subjects).
+    static func subjectLiftV1(image: CGImage) throws -> CGImage {
         let foreground = VNGenerateForegroundInstanceMaskRequest()
         let personSeg = VNGeneratePersonSegmentationRequest()
         personSeg.qualityLevel = .accurate
@@ -148,6 +196,394 @@ enum ImageProcessor {
         return cg
     }
 
+    /// V2 — same algorithmic skeleton as V1 with four targeted upgrades:
+    ///
+    /// 1. **Linear-sRGB working colour space** via `liftContext`. Every CI
+    ///    filter (guided filter, gaussian blur, multiply composites, the
+    ///    blur-fusion + colour-attenuation kernels) does its arithmetic in
+    ///    physically linear light. Without this, a hair-edge 50/50 blend
+    ///    reads darker than the physical 50/50 because sRGB is gamma-encoded.
+    /// 2. **Pinned Vision request revisions** so future macOS doesn't silently
+    ///    re-tune behaviour. 16-bit half person-seg buffer for smoother soft
+    ///    alpha at the edge band.
+    /// 3. **Adaptive Vision input resolution** — tiny inputs (<1500 px) get
+    ///    upscaled before Vision sees them so the mask isn't chunky;
+    ///    monstrous inputs (>4096 px) get downsampled because Vision's mask
+    ///    network has fixed feature size and the extra cost buys nothing.
+    /// 4. **Extended hair zone** (via person-seg) and **soft-matte gamma lift**
+    ///    inside `refineAlphaMatte`, so long hair / ponytails / afros that
+    ///    fall outside the radial-gradient ellipses still get the soft-matte
+    ///    treatment, and wispy strands get pulled above the perceptual floor.
+    ///
+    /// Compositing happens against the *original* image regardless of what
+    /// resolution Vision saw — Vision only ever sees the resized version, the
+    /// final alpha is up-/down-sampled back to the source extent, and colour
+    /// fidelity comes from the unmodified source pixels.
+    static func subjectLiftV2(image: CGImage) throws -> CGImage {
+        let originalCI = CIImage(cgImage: image)
+        let extent = originalCI.extent
+
+        // 1. Adaptive Vision input — see `visionInput` for the policy.
+        let (visionImage, _) = visionInput(from: image)
+
+        // 2. Vision requests with pinned revisions + 16-bit half person-seg.
+        let foreground = VNGenerateForegroundInstanceMaskRequest()
+        foreground.revision = VNGenerateForegroundInstanceMaskRequestRevision1
+
+        let personSeg = VNGeneratePersonSegmentationRequest()
+        personSeg.revision = VNGeneratePersonSegmentationRequestRevision1
+        personSeg.qualityLevel = .accurate
+        // 16-bit half retains soft-edge precision the 8-bit V1 buffer
+        // discards. Negligible memory cost vs the perceptual win on the
+        // edge-band where continuous α actually matters.
+        personSeg.outputPixelFormat = kCVPixelFormatType_OneComponent16Half
+
+        let faceReq = VNDetectFaceRectanglesRequest()
+        faceReq.revision = VNDetectFaceRectanglesRequestRevision3
+
+        let handler = VNImageRequestHandler(cgImage: visionImage, options: [:])
+        try handler.perform([foreground, personSeg, faceReq])
+
+        guard let fgObservation = foreground.results?.first else {
+            throw ImageProcessorError.noSubjectFound
+        }
+
+        // 3. Foreground instance mask → CIImage at original extent.
+        let fgMaskPB = try fgObservation.generateScaledMaskForImage(
+            forInstances: fgObservation.allInstances,
+            from: handler
+        )
+        let fgMaskRaw = CIImage(cvPixelBuffer: fgMaskPB)
+        let fgMask = scaleMaskToExtent(fgMaskRaw, extent: extent)
+
+        // 4. Optional person-seg refinement matte at original extent.
+        let personMask: CIImage? = {
+            guard let buffer = (personSeg.results?.first)?.pixelBuffer else { return nil }
+            return scaleMaskToExtent(CIImage(cvPixelBuffer: buffer), extent: extent)
+        }()
+
+        // 5. Largest face rect in original-image pixels (top-left origin).
+        //    Vision face boundingBox is normalized [0,1] so the resize doesn't
+        //    perturb the result.
+        let faceRect = largestFaceRect(observations: faceReq.results,
+                                       imageSize: extent.size)
+
+        // 6. Refinement options scaled to source size. The 2048 pivot keeps
+        //    the band visually consistent — a 4032×3024 phone photo gets
+        //    ~40px, a 1024×1024 preview keeps ~20px, a 6048×4032 export
+        //    pegs at ~60px which is wide enough to encompass long hair
+        //    strands without bleeding into clean shoulder lines.
+        let longSide = max(extent.width, extent.height)
+        let scale = max(1.0, longSide / 2048.0)
+        let options = RefinementOptions(
+            edgeBandRadius: 20.0 * scale,
+            useExtendedHairZone: true,
+            softMatteGamma: 0.85,
+            widerDecontamination: true
+        )
+        let refined = refineAlphaMatte(foreground: fgMask, personSeg: personMask,
+                                        guide: originalCI, faceRect: faceRect,
+                                        extent: extent, options: options)
+
+        // 7. Foreground RGB. Same blur-fusion decontamination as V1 — the
+        //    math works regardless of which mask the soft alpha came from.
+        let foregroundRGB: CIImage = {
+            guard let softAlpha = refined.softAlpha,
+                  let region = refined.decontamRegion else {
+                return originalCI
+            }
+            let unmixed = refineForeground(source: originalCI, alpha: softAlpha,
+                                            extent: extent,
+                                            pass1Radius: 180, pass2Radius: 8)
+            return unmixed.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: originalCI,
+                "inputMaskImage": region
+            ]).cropped(to: extent)
+        }()
+
+        // 8. Composite refined RGB + new alpha.
+        let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
+            .cropped(to: extent)
+        let alphaMatte = refined.matte.applyingFilter("CIMaskToAlpha")
+        let composed = foregroundRGB.applyingFilter("CIBlendWithMask", parameters: [
+            "inputBackgroundImage": clearBG,
+            "inputMaskImage": alphaMatte
+        ]).cropped(to: extent)
+
+        // Render through the linear-sRGB context so every filter above ran
+        // in linear light.
+        let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let cg = liftContext.createCGImage(composed, from: extent,
+                                                  format: .RGBA8,
+                                                  colorSpace: outputCS) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        return cg
+    }
+
+    /// Returns the image Vision should see, plus the scale that was applied
+    /// (for record-keeping; the mask scaling at the end always targets the
+    /// **original** extent so callers don't need to compose anything against
+    /// this scale themselves).
+    ///
+    /// Policy: Vision's instance-mask network has a fixed internal feature
+    /// resolution. Inputs much smaller than that produce a chunky upscaled
+    /// mask; inputs much larger waste wall-time without recovering detail.
+    /// 1500–4096 px on the long edge is the sweet spot we've observed.
+    private static func visionInput(from cg: CGImage) -> (image: CGImage, scale: CGFloat) {
+        let longEdge = max(cg.width, cg.height)
+        let target: Int
+        switch longEdge {
+        case ..<1500:  target = 2048
+        case ..<4097:  target = longEdge   // pass through
+        default:       target = 4096
+        }
+        if target == longEdge { return (cg, 1.0) }
+
+        let scale = CGFloat(target) / CGFloat(longEdge)
+        let newW = Int(round(CGFloat(cg.width) * scale))
+        let newH = Int(round(CGFloat(cg.height) * scale))
+        let outRect = CGRect(x: 0, y: 0, width: newW, height: newH)
+
+        // CILanczosScaleTransform is the standard high-quality up/down
+        // sampler in Core Image — better than CIAffineTransform for both
+        // upscale (sharper) and downscale (less aliasing).
+        let ci = CIImage(cgImage: cg).applyingFilter("CILanczosScaleTransform", parameters: [
+            kCIInputScaleKey: scale,
+            kCIInputAspectRatioKey: 1.0
+        ])
+        let cs = cg.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        // Render through the linear-sRGB context so the resample is
+        // colour-correct. Falling back to the original on render failure
+        // keeps Vision running rather than aborting the whole import.
+        guard let resized = liftContext.createCGImage(ci, from: outRect,
+                                                       format: .RGBA8,
+                                                       colorSpace: cs) else {
+            return (cg, 1.0)
+        }
+        return (resized, scale)
+    }
+
+    /// Subject lift via the optional downloadable matting model
+    /// (currently ORMBG — Apache 2.0, DIS-family, portrait-trained;
+    /// see `ModelManager` and the conversion script for the pivot
+    /// history away from BiRefNet). Produces a real continuous-α
+    /// matte that handles wispy hair edges Apple Vision can't (Vision
+    /// is a segmentation network with near-binary alpha; ORMBG is a
+    /// matting network trained for the kind of flowing-hair /
+    /// curly-flyaway edges V2 still bleeds on).
+    ///
+    /// Caller is responsible for gating on `ModelManager.cachedModelURL()
+    /// != nil` — this function will throw if the model file is missing or
+    /// malformed. ImportFlow handles the fallback to V2 when the model
+    /// isn't present.
+    ///
+    /// Performance: ~1-2s on M1 at 1024x1024 (fp16, ANE/GPU dispatch via
+    /// `computeUnits = .all`). MLModel loading is amortized via
+    /// `cachedDownloadedModel` — first call after a fresh launch pays
+    /// ~200ms cold-start, subsequent calls are inference-only. Cache is
+    /// invalidated when the URL changes (e.g. user re-downloads after a
+    /// `modelVersion` bump).
+    static func subjectLiftDownloaded(image: CGImage, modelURL: URL) throws -> CGImage {
+        let originalCI = CIImage(cgImage: image)
+        let extent = originalCI.extent
+
+        // 1. Load (or reuse cached) MLModel.
+        let model = try loadOrReuseDownloadedModel(at: modelURL)
+
+        // 2. Resize source to 1024×1024 — ORMBG (and most DIS-family
+        //    matting heads) trained at this fixed resolution. The
+        //    conversion script bakes a plain `x/255` preprocessing
+        //    into the model (verified by reading ORMBG's own
+        //    `inference.py`), so the buffer we hand over carries
+        //    plain RGB 0-255 with no further normalisation.
+        let inputSize: CGFloat = 1024
+        let scaleX = inputSize / extent.width
+        let scaleY = inputSize / extent.height
+        let resized = originalCI
+            .transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+            .cropped(to: CGRect(x: 0, y: 0, width: inputSize, height: inputSize))
+        guard let inputBuffer = createPixelBuffer(from: resized,
+                                                    size: CGSize(width: inputSize, height: inputSize)) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+
+        // 3. Inference.
+        let input = try MLDictionaryFeatureProvider(dictionary: [
+            "input": MLFeatureValue(pixelBuffer: inputBuffer)
+        ])
+        let prediction = try model.prediction(from: input)
+
+        // 4. Extract the alpha matte. Output naming varies: a custom
+        //    converter can name it cleanly ("alpha"), but a prebuilt
+        //    torch→CoreML model (e.g. john-rocky's IS-Net) often emits
+        //    opaque tensor names like `var_4090`. Try known aliases
+        //    first, then scan every output for the first image-typed
+        //    feature, then fall through to the MultiArray scan. Logged
+        //    with the resolved name so misnamed outputs are visible
+        //    in the log without changing code.
+        let candidateNames = ["alpha", "output", "sigmoid_output", "out"]
+        var maskCI: CIImage?
+        var resolvedName: String?
+        for name in candidateNames {
+            if let feature = prediction.featureValue(for: name),
+               let buffer = feature.imageBufferValue {
+                maskCI = CIImage(cvPixelBuffer: buffer)
+                resolvedName = name
+                break
+            }
+        }
+        if maskCI == nil {
+            for name in prediction.featureNames {
+                if let feature = prediction.featureValue(for: name),
+                   let buffer = feature.imageBufferValue {
+                    maskCI = CIImage(cvPixelBuffer: buffer)
+                    resolvedName = "\(name) (scan)"
+                    break
+                }
+            }
+        }
+        if maskCI == nil {
+            maskCI = extractMaskFromMultiArray(prediction: prediction)
+            resolvedName = "MultiArray"
+        }
+        guard let rawMask = maskCI else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        dlog("[Downloaded] Got mask via '\(resolvedName ?? "?")'")
+
+        // 5. Scale mask back to source extent. ORMBG's output is the
+        //    same continuous-α we want — no need for the multi-mask
+        //    union / hair zone gating dance V2 needs to coax a soft matte
+        //    out of Vision's near-binary mask.
+        let mask = scaleMaskToExtent(rawMask, extent: extent)
+
+        // 6. Light guided-filter refinement to snap the matte onto real
+        //    luminance edges. Loose epsilon — the matting model's output
+        //    is already edge-aware, we're just cleaning up sub-pixel
+        //    scaling artifacts from step 5.
+        let guided = mask.applyingFilter("CIGuidedFilter", parameters: [
+            "inputGuideImage": originalCI,
+            kCIInputRadiusKey: 2.0,
+            "inputEpsilon": 0.01
+        ]).cropped(to: extent)
+
+        // 7. Composite original RGB with the matte as alpha — minimal
+        //    pipeline matching ORMBG's own inference.py post-process
+        //    (`Image.paste(orig, mask=matte)`). We deliberately do NOT
+        //    blur-fuse / colour-attenuate / erode the matte here.
+        //
+        //    History: earlier builds layered V2's defence-in-depth
+        //    refinement on top of ORMBG's output and produced
+        //    increasingly bad halos. V2's stages assume Vision's
+        //    chunky binary mask + a face-locatable hair zone — neither
+        //    holds for ORMBG, which already returns continuous α from
+        //    a portrait-trained matting head. Each refinement layer
+        //    was either a no-op (e.g. colour-attenuation kernel
+        //    falling back via maskBlur < 0.01 safety) or actively
+        //    damaging (blur-fusion sampling F̂ from interior pixels
+        //    that themselves carry rim-light tint, then painting that
+        //    tint over the entire silhouette). The honest baseline is
+        //    the model's raw matte against the original RGB; any
+        //    residual halo here is a property of the photo + model
+        //    ceiling, not of our pipeline. See plan file
+        //    /Users/thierry/.claude/plans/make-a-plan-for-crispy-hamster.md
+        //    for the full diagnosis. If a future test shows the halo
+        //    is bad enough on common photos to warrant decontamination,
+        //    Step 3 of that plan describes a simpler matte-keyed
+        //    approach to add.
+        let clearBG = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
+            .cropped(to: extent)
+        let alphaMatte = guided.applyingFilter("CIMaskToAlpha")
+        let composed = originalCI.applyingFilter("CIBlendWithMask", parameters: [
+            "inputBackgroundImage": clearBG,
+            "inputMaskImage": alphaMatte
+        ]).cropped(to: extent)
+
+        // 9. Render through the linear-sRGB context so all the filter
+        //    math above runs in physical light — same correctness win
+        //    V2 applies, applied here too.
+        let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let cg = liftContext.createCGImage(composed, from: extent,
+                                                  format: .RGBA8,
+                                                  colorSpace: outputCS) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        return cg
+    }
+
+    // MARK: - MLModel cache (downloaded engine)
+
+    /// `MLModel` itself is thread-safe to *use* once loaded; only the
+    /// cache lookup needs a lock. Loading is the expensive part (~200ms),
+    /// so the cache is critical for the multi-cutout case (re-imports,
+    /// reprocess, etc.). Keyed by URL so a `modelVersion` bump that
+    /// changes the install path invalidates the cache automatically.
+    private static let downloadedModelCacheLock = NSLock()
+    nonisolated(unsafe) private static var cachedDownloadedModel: (url: URL, model: MLModel)?
+
+    private static func loadOrReuseDownloadedModel(at url: URL) throws -> MLModel {
+        downloadedModelCacheLock.lock()
+        if let cached = cachedDownloadedModel, cached.url == url {
+            let m = cached.model
+            downloadedModelCacheLock.unlock()
+            return m
+        }
+        downloadedModelCacheLock.unlock()
+
+        // Load outside the lock — model compilation / load can be slow
+        // and we don't want to serialize callers that arrive while a
+        // cold-start is in flight on a different URL (rare, but cheap
+        // to handle correctly).
+        let config = MLModelConfiguration()
+        config.computeUnits = .all
+        let loaded = try MLModel(contentsOf: url, configuration: config)
+
+        downloadedModelCacheLock.lock()
+        cachedDownloadedModel = (url, loaded)
+        downloadedModelCacheLock.unlock()
+        return loaded
+    }
+
+    /// V2 hair zone: union of the radial-gradient `baseZone` (good for typical
+    /// short hair / beards) with a person-seg-derived zone (catches long
+    /// hair, side ponytails, afros, braids, flying strands — anything that
+    /// falls outside the crown / beard ellipses).
+    ///
+    /// Earlier revisions clipped the person-seg zone to "above chin + face
+    /// height" out of an abundance of caution about the soft matte
+    /// touching shoulders. That cutoff dropped attenuation for any hair
+    /// flowing below it (long hair, the trailing tips of windswept hair
+    /// in landscape portraits) — exactly the cases the user still saw
+    /// background bleeding through. The cutoff is no longer needed because
+    /// (a) soft-matte selection already gates on `edgeBand × hairZone`, so
+    /// only silhouette pixels are touched, and (b) at the body interior
+    /// α=1 the colour-attenuation kernel is a mathematical no-op.
+    ///
+    /// Dilation widened from 0.6× to 1.0× face width so the zone reaches
+    /// the flying strand tips that sit a face-width past the silhouette.
+    /// Falls back to `baseZone` when person-seg isn't available so non-
+    /// portrait subjects behave the same as V1.
+    private static func extendedHairZone(
+        baseZone: CIImage,
+        personSeg: CIImage?,
+        faceRect: CGRect?,
+        extent: CGRect
+    ) -> CIImage {
+        guard let personSeg, let faceRect else { return baseZone }
+
+        let dilateR = max(8.0, faceRect.width * 1.0)
+        let dilatedPS = personSeg.applyingFilter("CIMorphologyMaximum", parameters: [
+            kCIInputRadiusKey: dilateR
+        ]).cropped(to: extent)
+
+        // Lighten = max(baseZone, dilatedPS) — pixel is "in hair zone" if
+        // EITHER source says so.
+        return baseZone.applyingFilter("CILightenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: dilatedPS
+        ]).cropped(to: extent)
+    }
+
     /// Combines the foreground instance mask with the (optional) person-segmentation
     /// matte and polishes the alpha channel so hair and soft edges survive while
     /// background-colour fringing is knocked back.
@@ -173,12 +609,44 @@ enum ImageProcessor {
         let decontamRegion: CIImage?
     }
 
+    /// Knobs for the V2 refinement path. Defaulting these to the V1 numerics
+    /// keeps `subjectLiftV1` bit-for-bit identical when it calls the shared
+    /// `refineAlphaMatte` — V2 passes overrides for the three things it
+    /// changes (edge-band radius scales with source size; the hair zone is
+    /// extended via person-seg to cover long hair / ponytails / afros; the
+    /// soft matte gets a small gamma lift to recover wispy strands above the
+    /// perceptual floor in linear-sRGB).
+    struct RefinementOptions {
+        /// Morphology radius for the edge band (dilate − erode of `combined`).
+        /// V1 hard-codes 20.0; V2 scales by `max(longEdge / 2048.0, 1.0)` so a
+        /// 4K phone photo gets a wider band than a 1024-px preview.
+        var edgeBandRadius: CGFloat = 20.0
+        /// When true, union the radial-gradient hair zone with a person-seg-
+        /// derived zone (dilated, clipped to above the chin) so the soft-
+        /// matte treatment reaches hair the radial gradients miss.
+        var useExtendedHairZone: Bool = false
+        /// Optional `inputPower` for a `CIGammaAdjust` applied to the soft
+        /// matte before the edge-band blend. < 1 lifts wispy strands; only
+        /// safe in linear-sRGB working space (V2). nil = no adjust.
+        var softMatteGamma: Float? = nil
+        /// V2: drop the hair-zone gate on the decontamination region so the
+        /// blur-fusion RGB unmixing runs wherever alpha is non-trivially
+        /// partial — long hair past the shoulder, flyaways outside the
+        /// radial-gradient zone, glasses arms, anything wispy. Without this,
+        /// pixels at α=0.4 outside the hair zone keep their original
+        /// `α·F + (1−α)·B_old` RGB and ghost the source background through
+        /// the new backdrop. Safe at α≈1: blur-fusion math collapses to
+        /// `F = I` so body/face/shoulders are byte-for-byte unchanged.
+        var widerDecontamination: Bool = false
+    }
+
     private static func refineAlphaMatte(
         foreground: CIImage,
         personSeg: CIImage?,
         guide: CIImage,
         faceRect: CGRect?,
-        extent: CGRect
+        extent: CGRect,
+        options: RefinementOptions = RefinementOptions()
     ) -> RefinedMatte {
         // Union with person segmentation (max) — hair strands the foreground
         // mask chops off usually survive in the person matte. We gate the
@@ -265,7 +733,13 @@ enum ImageProcessor {
         // attenuate alpha for pixels whose RGB doesn't match. Solid skin
         // / body are protected by gating on softMatte<0.95 inside the
         // kernel.
-        let hairZone = buildHairZoneMask(faceRect: faceRect, extent: extent)
+        let baseHairZone = buildHairZoneMask(faceRect: faceRect, extent: extent)
+        let hairZone = options.useExtendedHairZone
+            ? extendedHairZone(baseZone: baseHairZone,
+                               personSeg: personSeg,
+                               faceRect: faceRect,
+                               extent: extent)
+            : baseHairZone
         let solidHairAmplified = combined.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 20, y: 0, z: 0, w: 0),
             "inputGVector": CIVector(x: 0, y: 20, z: 0, w: 0),
@@ -288,22 +762,34 @@ enum ImageProcessor {
         let maskBlur = hairOnlyMask.applyingFilter("CIGaussianBlur", parameters: [
             kCIInputRadiusKey: 80.0
         ]).cropped(to: extent)
-        let softMatte = colorAttenuationKernel?.apply(
+        let softMatteAttenuated = colorAttenuationKernel?.apply(
             extent: extent,
             arguments: [guide, hairBlur, maskBlur, softMatteRaw, hairZone]
         )?.cropped(to: extent) ?? softMatteRaw
 
+        // Optional gamma lift on the soft matte. Only safe in linear-sRGB
+        // working space — V1 leaves this nil so behaviour is unchanged. V2
+        // passes ~0.85 so wisps that fall in the 0.05–0.30 alpha range get
+        // pulled above the perceptual floor before the edge-band blend.
+        let softMatte: CIImage = options.softMatteGamma.map { gamma in
+            softMatteAttenuated.applyingFilter("CIGammaAdjust", parameters: [
+                "inputPower": NSNumber(value: gamma)
+            ]).cropped(to: extent)
+        } ?? softMatteAttenuated
+
         // ── Silhouette edge band × the hair zone built above ─────────────
         // Multiplying by the silhouette edge band (dilate − erode of
-        // `combined`, 20px) restricts the soft-matte treatment to actual
-        // cutout boundary pixels in that zone — body interior and any
-        // non-edge pixel inside the hair zone bounding box are unaffected,
-        // so face skin and shoulders never shift.
+        // `combined`, default 20px) restricts the soft-matte treatment to
+        // actual cutout boundary pixels in that zone — body interior and
+        // any non-edge pixel inside the hair zone bounding box are
+        // unaffected, so face skin and shoulders never shift. V2 scales
+        // the radius by source long-edge so a 4K phone photo gets a wider
+        // band than a 1024-px preview.
         let edgeOuter = combined.applyingFilter("CIMorphologyMaximum", parameters: [
-            kCIInputRadiusKey: 20.0
+            kCIInputRadiusKey: options.edgeBandRadius
         ]).cropped(to: extent)
         let edgeInner = combined.applyingFilter("CIMorphologyMinimum", parameters: [
-            kCIInputRadiusKey: 20.0
+            kCIInputRadiusKey: options.edgeBandRadius
         ]).cropped(to: extent)
         let edgeBand = edgeOuter.applyingFilter("CISubtractBlendMode", parameters: [
             kCIInputBackgroundImageKey: edgeInner
@@ -342,9 +828,19 @@ enum ImageProcessor {
             "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1)
         ]).cropped(to: extent)
-        let decontamRegion = hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
-            kCIInputBackgroundImageKey: alphaPresent
-        ]).cropped(to: extent)
+        // V1: scope decontamination to the radial-gradient hair zone so
+        // face/shoulder pixels can't possibly shift colour. Side effect:
+        // long hair past the shoulder, flyaways, glasses arms — anything
+        // outside the ellipses keeps `α·F + (1−α)·B_old` and ghosts the
+        // original background through any new backdrop.
+        // V2: drop that scope. Blur-fusion at α≈1 is mathematically a no-op
+        // (`F = F̂ + 1·(I − F̂) = I`), so body/face are still untouched, but
+        // every wispy pixel anywhere in the silhouette gets unmixed RGB.
+        let decontamRegion: CIImage = options.widerDecontamination
+            ? alphaPresent
+            : hairZone.applyingFilter("CIMultiplyCompositing", parameters: [
+                kCIInputBackgroundImageKey: alphaPresent
+            ]).cropped(to: extent)
 
         return RefinedMatte(matte: blended, softAlpha: softMatte, decontamRegion: decontamRegion)
     }
@@ -987,13 +1483,24 @@ enum ImageProcessor {
     // MARK: - Process pipeline
 
     /// Convenience: lift subject, detect face + eyes, and measure body extent.
-    /// When a BiRefNet model is provided, uses the advanced pipeline for better
-    /// hair quality; otherwise falls back to the Apple Vision pipeline.
-    static func process(image: CGImage, birefnetModel: MLModel? = nil) throws -> ProcessedSubject {
+    /// When `downloadedModelURL` is provided AND the file at that URL loads
+    /// cleanly, runs the BiRefNet matting pipeline for crisper hair edges.
+    /// Falls back to Apple Vision (V2 by default) when the URL is nil OR
+    /// when the model load / inference fails — failure mode is "the user
+    /// gets a result anyway" rather than a hard import error.
+    static func process(image: CGImage, downloadedModelURL: URL? = nil) throws -> ProcessedSubject {
         let cutout: CGImage
-        if let model = birefnetModel {
-            cutout = try birefnetLift(image: image, model: model)
-            dlog("[Process] Used BiRefNet pipeline")
+        if let modelURL = downloadedModelURL {
+            do {
+                cutout = try subjectLiftDownloaded(image: image, modelURL: modelURL)
+                dlog("[Process] Used downloaded BiRefNet pipeline")
+            } catch {
+                // Soft fallback so a corrupt cache or transient inference
+                // failure doesn't block the whole import. The user sees
+                // a slightly worse cutout instead of an error chip.
+                dlog("[Process] Downloaded model failed (\(error)); falling back to Apple Vision")
+                cutout = try subjectLift(image: image)
+            }
         } else {
             cutout = try subjectLift(image: image)
             dlog("[Process] Used Apple Vision pipeline")

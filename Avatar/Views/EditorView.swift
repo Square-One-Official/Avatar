@@ -543,7 +543,13 @@ struct EditorView: View {
             // user is now Pro with Magic Cutout enabled. In that case we
             // surface a one-shot "redo with Magic Cutout" affordance, which
             // disappears again once the upgraded cutout lands.
-            if showMagicCutoutUpgradeCard {
+            //
+            // Local-only mode hides this card entirely: redo IS a cloud
+            // call, and the privacy promise is that no cloud call leaves
+            // the Mac. Showing a disabled-with-upsell button would be
+            // dishonest about the posture; better to make the affordance
+            // simply disappear and surface the choice in Settings instead.
+            if showMagicCutoutUpgradeCard && appState.privacyPrefs.cloudAllowed {
                 enhanceCard(
                     title: Loc.redoWithMagicCutout,
                     systemImage: "wand.and.stars",
@@ -554,33 +560,40 @@ struct EditorView: View {
                 }
             }
 
-            enhanceCard(
-                title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
-                systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "bandage.fill",
-                disabled: portrait.cutoutPNG == nil || appState.isProcessing,
-                help: Loc.fillBodyHelp,
-                active: portrait.isFillBodyApplied,
-                showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
-            ) {
-                if portrait.isFillBodyApplied {
-                    ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                } else {
-                    ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+            // Fill in Body and Colorize are cloud-only features. Hide
+            // (don't grey-out) when local-only so the user isn't teased
+            // with paywall theatre for something that's a deliberate
+            // privacy opt-out, not a paywall gate. The settings panel is
+            // where they switch posture if they change their mind.
+            if appState.privacyPrefs.cloudAllowed {
+                enhanceCard(
+                    title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
+                    systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "bandage.fill",
+                    disabled: portrait.cutoutPNG == nil || appState.isProcessing,
+                    help: Loc.fillBodyHelp,
+                    active: portrait.isFillBodyApplied,
+                    showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
+                ) {
+                    if portrait.isFillBodyApplied {
+                        ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                    } else {
+                        ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                    }
                 }
-            }
 
-            enhanceCard(
-                title: portrait.isColorized ? Loc.colorizeUndo : Loc.colorize,
-                systemImage: portrait.isColorized ? "arrow.uturn.backward" : "paintpalette",
-                disabled: portrait.cutoutPNG == nil || appState.isProcessing,
-                help: portrait.isColorized ? Loc.colorizeUndoHelp : Loc.colorizeHelp,
-                active: portrait.isColorized,
-                showProBadge: !appState.proEntitlement.isPro && !portrait.isColorized
-            ) {
-                if portrait.isColorized {
-                    ImportFlow.undoColorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                } else {
-                    ImportFlow.colorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                enhanceCard(
+                    title: portrait.isColorized ? Loc.colorizeUndo : Loc.colorize,
+                    systemImage: portrait.isColorized ? "arrow.uturn.backward" : "paintpalette",
+                    disabled: portrait.cutoutPNG == nil || appState.isProcessing,
+                    help: portrait.isColorized ? Loc.colorizeUndoHelp : Loc.colorizeHelp,
+                    active: portrait.isColorized,
+                    showProBadge: !appState.proEntitlement.isPro && !portrait.isColorized
+                ) {
+                    if portrait.isColorized {
+                        ImportFlow.undoColorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                    } else {
+                        ImportFlow.colorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
+                    }
                 }
             }
         }

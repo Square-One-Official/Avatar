@@ -30,7 +30,11 @@ enum PortraitDropHandler {
         guard allowed > 0 else { return true }
         let clipped = Array(providers.prefix(allowed))
 
-        // Decide whether to confirm before processing the batch.
+        // Decide whether to confirm before processing the batch. Cloud
+        // mode requires Magic Cutout entitlement, the per-feature toggle,
+        // **and** the global privacy posture being `cloudAllowed`. In
+        // localOnly mode this is always false, so the entire batch routes
+        // to local Subject Lift and no signed PUT URL is ever requested.
         let useCloud = ImportFlow.shouldUseMagicCutout(appState: appState)
         if useCloud && clipped.count > BatchConfirmRequest.threshold {
             appState.batchConfirm = BatchConfirmRequest(
@@ -283,6 +287,15 @@ enum ImportFlow {
     /// opt-in. Gated on entitlement (`canUseProCutout`): non-entitled users
     /// see the paywall instead of running the call.
     static func reprocess(portrait: Portrait, context: ModelContext, appState: AppState) {
+        // Local-only short-circuit: redo IS a cloud call by definition
+        // (it's the upgrade-from-Subject-Lift path). Surface a soft note
+        // instead of silently falling through to a no-op or — worse — a
+        // signed PUT URL request that the privacy mode is supposed to
+        // block. The CTA points at the only place to flip the switch.
+        guard appState.privacyPrefs.cloudAllowed else {
+            appState.note(Loc.reprocessRequiresCloudAI)
+            return
+        }
         guard appState.proEntitlement.canUseProCutout else {
             appState.showProUpgradeSheet = true
             return
@@ -498,7 +511,12 @@ enum ImportFlow {
                 guard let newCutoutCG = ImageProcessor.cgImage(from: newCutoutPNG) else {
                     throw BackendError.decode
                 }
-                let detected = try ImageProcessor.process(image: newCutoutCG, birefnetModel: nil)
+                // Re-detect on an already-cut-out image: no hair-edge
+                // work needed (the matte is the original cutout's), so
+                // skip the downloaded engine even when the user has it
+                // selected — saves an MLModel round-trip we'd just throw
+                // away.
+                let detected = try ImageProcessor.process(image: newCutoutCG, downloadedModelURL: nil)
                 let newCutoutSize = CGSize(width: newCutoutCG.width, height: newCutoutCG.height)
                 dlog("[FillBody] new cutout \(newCutoutCG.width)×\(newCutoutCG.height) " +
                      "eye=\(detected.eyeCenter.map { "\($0.x),\($0.y)" } ?? "nil") " +
@@ -746,9 +764,34 @@ enum ImportFlow {
     /// branch: cloud Magic Cutout (Replicate) versus Apple Subject Lift.
     /// Cloud errors fall back to Subject Lift via `runCloudWithFallback`;
     /// failed calls never spend a credit nor a free-trial slot.
+    ///
+    /// Local-first gate: even with entitlement and the per-feature toggle
+    /// on, returns false when the global privacy posture is `localOnly`.
+    /// That keeps the cloud branch unreachable — no signed PUT URL is ever
+    /// requested, no photo bytes leave the Mac. Settings → Privacy & AI is
+    /// the single switch that controls this; the per-feature Magic Cutout
+    /// toggle keeps its existing semantics within `cloudAllowed`.
     @MainActor
     static func shouldUseMagicCutout(appState: AppState) -> Bool {
-        appState.proEntitlement.canUseProCutout && appState.magicCutoutPrefs.enabled
+        appState.privacyPrefs.cloudAllowed
+            && appState.proEntitlement.canUseProCutout
+            && appState.magicCutoutPrefs.enabled
+    }
+
+    /// Resolves the URL of the on-disk downloaded matting model — but only
+    /// when the user has actually picked the downloaded engine. Returns
+    /// nil when the engine is `.appleVision`, when the model isn't
+    /// downloaded yet, or when the user is on the cloud path (where the
+    /// engine choice is moot).
+    ///
+    /// Hopping to MainActor reads the live `privacyPrefs.engine` and
+    /// `modelManager.state` — both `@Observable` and main-actor-bound —
+    /// so the import pipeline (which runs on a detached task) gets a
+    /// consistent snapshot.
+    @MainActor
+    static func resolveDownloadedModelURL(appState: AppState) -> URL? {
+        guard appState.privacyPrefs.engine == .downloadedModel else { return nil }
+        return appState.modelManager.cachedModelURL()
     }
 
     /// Runs Magic Cutout against the backend, hopping to MainActor for
@@ -848,12 +891,18 @@ enum ImportFlow {
                     appState.fail(err.errorDescription ?? Loc.somethingWentWrong)
                 }
             }
-            // Fallback runs sync off main. Apple Subject Lift never charges.
-            let subject = try ImageProcessor.process(image: cg, birefnetModel: nil)
+            // Fallback runs sync off main. Apple Subject Lift / downloaded
+            // BiRefNet never charges. Resolve the engine choice on the
+            // MainActor so the snapshot is consistent with what Settings
+            // shows; the URL is nil when the user is on Apple Vision or
+            // hasn't downloaded yet.
+            let modelURL = await resolveDownloadedModelURL(appState: appState)
+            let subject = try ImageProcessor.process(image: cg, downloadedModelURL: modelURL)
             return CutoutResult(subject: subject, usedMagic: false)
         } catch {
             await MainActor.run { appState.warn(Loc.magicCutoutOfflineToast) }
-            let subject = try ImageProcessor.process(image: cg, birefnetModel: nil)
+            let modelURL = await resolveDownloadedModelURL(appState: appState)
+            let subject = try ImageProcessor.process(image: cg, downloadedModelURL: modelURL)
             return CutoutResult(subject: subject, usedMagic: false)
         }
     }
@@ -872,7 +921,12 @@ enum ImportFlow {
                 processed = result.subject
                 usedMagic = result.usedMagic
             } else {
-                processed = try ImageProcessor.process(image: cg, birefnetModel: nil)
+                // Local path. Engine is picked up here — when the user
+                // is on Apple Vision (or hasn't downloaded the enhanced
+                // model yet) `modelURL` is nil and `process` runs V2
+                // exactly as before.
+                let modelURL = await resolveDownloadedModelURL(appState: appState)
+                processed = try ImageProcessor.process(image: cg, downloadedModelURL: modelURL)
                 usedMagic = false
             }
             let cutoutSize = CGSize(width: processed.cutout.width, height: processed.cutout.height)
