@@ -27,12 +27,12 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
 }
 
 const HTML = `<!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Ingelogd — Avatar</title>
+<title>Signed in — Avatar</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -117,10 +117,10 @@ const HTML = `<!doctype html>
         <polyline points="20 6 9 17 4 12"></polyline>
       </svg>
     </div>
-    <h1>Je bent ingelogd</h1>
-    <p>Avatar opent automatisch. Je kunt dit tabblad sluiten.</p>
+    <h1>You're signed in</h1>
+    <p>Avatar will open automatically. You can close this tab.</p>
     <p id="fallback" hidden>
-      Niets gebeurd? <a class="retry" id="retry" href="#">Open Avatar opnieuw</a>
+      Nothing happened? <a class="retry" id="retry" href="#">Open Avatar again</a>
     </p>
   </main>
 <script>
