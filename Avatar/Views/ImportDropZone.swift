@@ -31,26 +31,13 @@ struct ImportDropZone: View {
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            ZStack {
-                // Outer aura — softly bleeds past the dashed border so the
-                // whole zone reads as "lit up" the moment a drag enters.
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(dropZoneBlue)
-                    .blur(radius: 38)
-                    .opacity(hovering ? 0.42 : 0)
-
-                // Inner glaze — a barely-there blue wash inside the dashed
-                // frame, gives the surface itself a hint of color.
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(dropZoneBlue.opacity(hovering ? 0.07 : 0))
-
-                // Dashed border — brightens to full opacity on target.
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                    .foregroundStyle(dropZoneBlue.opacity(hovering ? 1.0 : 0.55))
-            }
-            .padding(40)
-            .animation(.easeOut(duration: 0.28), value: hovering)
+            // Flat brand-blue tint that appears only while a drag is over the
+            // zone. Opacity over the dark background reads as a lighter,
+            // dark-mode-friendly shade without any glow or border chrome.
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(dropZoneBlue.opacity(hovering ? 0.18 : 0))
+                .padding(40)
+                .animation(.easeOut(duration: 0.18), value: hovering)
         )
         .onDrop(of: [.fileURL, .image], isTargeted: $hovering) { providers in
             PortraitDropHandler.handle(providers: providers,
