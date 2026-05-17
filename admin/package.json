@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "description": "Payload v3 CMS for Aaavatar — drives in-app announcements, NEW badges, and email newsletters.",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
+    "vercel-build": "payload migrate:create --forceAcceptWarning --name auto || true; payload migrate || true; next build",
     "start": "next start",
     "generate:types": "payload generate:types",
     "payload": "payload"
@@ -29,6 +31,7 @@
     "sharp": "^0.33.0"
   },
   "devDependencies": {
+    "@swc-node/register": "^1.11.1",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
