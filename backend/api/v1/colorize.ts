@@ -5,8 +5,8 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { flattenOnGrey, reapplyAlpha } from "../../lib/image.js";
-import { colorize } from "../../lib/replicate.js";
+import { flattenOnGrey, MAX_DECODED_IMAGE_BYTES, reapplyAlpha } from "../../lib/image.js";
+import { colorize, ReplicateTimeoutError } from "../../lib/replicate.js";
 
 export const config = {
   api: {
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "invalid_base64" });
     return;
   }
-  if (inputBytes.length === 0 || inputBytes.length > 12 * 1024 * 1024) {
+  if (inputBytes.length === 0 || inputBytes.length > MAX_DECODED_IMAGE_BYTES) {
     res.status(400).json({ error: "image_size_out_of_range" });
     return;
   }
@@ -124,6 +124,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("/v1/colorize error", err);
+    if (err instanceof ReplicateTimeoutError) {
+      res.status(504).json({ error: "model_timeout" });
+      return;
+    }
     // Replicate rate-limits (low balance, burst exceeded) bubble up as
     // 429s. Propagate so the client surfaces the friendly throttle copy
     // instead of "colorize_failed".

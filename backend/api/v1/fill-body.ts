@@ -5,8 +5,8 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { padForOutpaint } from "../../lib/image.js";
-import { magicCutout, outpaintPortrait } from "../../lib/replicate.js";
+import { MAX_DECODED_IMAGE_BYTES, padForOutpaint } from "../../lib/image.js";
+import { magicCutout, outpaintPortrait, ReplicateTimeoutError } from "../../lib/replicate.js";
 
 export const config = {
   api: {
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "invalid_base64" });
     return;
   }
-  if (inputBytes.length === 0 || inputBytes.length > 12 * 1024 * 1024) {
+  if (inputBytes.length === 0 || inputBytes.length > MAX_DECODED_IMAGE_BYTES) {
     res.status(400).json({ error: "image_size_out_of_range" });
     return;
   }
@@ -154,6 +154,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("/v1/fill-body error", err);
+    if (err instanceof ReplicateTimeoutError) {
+      res.status(504).json({ error: "model_timeout" });
+      return;
+    }
     // Replicate rate-limits (low balance, burst exceeded, etc.) bubble up
     // as 429s. Propagate them so the client's existing rateLimited handler
     // surfaces "Too many requests. Please wait a moment." instead of the

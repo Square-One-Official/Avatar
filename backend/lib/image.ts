@@ -1,6 +1,19 @@
 import sharp from "sharp";
 
 /**
+ * Post-decode payload cap for `/v1/colorize` and `/v1/fill-body`. The
+ * Vercel `bodyParser.sizeLimit` on those endpoints is 15 MB, which is
+ * the *base64-encoded* request size. After decoding, the raw image
+ * Buffer is ~75% of that — so this 12 MB cap on the decoded bytes is
+ * always reached first.
+ *
+ * Audit MEDIUM #16: shared here so the two endpoints can't drift apart
+ * and a future endpoint reuses the same limit. Bumping the underlying
+ * `bodyParser.sizeLimit` is meaningless unless this constant moves too.
+ */
+export const MAX_DECODED_IMAGE_BYTES = 12 * 1024 * 1024;
+
+/**
  * Flatten a transparent-background cutout PNG onto a neutral grey
  * background so identity-preserving instruction editors (Nano Banana,
  * Flux Kontext, etc.) get a normal RGB photo to work with.

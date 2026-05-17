@@ -3,6 +3,39 @@ import Replicate from "replicate";
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 
 /**
+ * Hard timeout for any single `replicate.run()` call (audit MEDIUM #17).
+ * The SDK has no built-in client-side timeout; a hung Replicate prediction
+ * would otherwise let the Vercel function run to its 60s `maxDuration`,
+ * costing the user a full timeout instead of a clean 504.
+ *
+ * 50s leaves ~10s of headroom under Vercel's default function ceiling so
+ * the handler can still finalise (free-trial counter, response write)
+ * after we surface the timeout.
+ */
+const REPLICATE_TIMEOUT_MS = 50_000;
+
+export class ReplicateTimeoutError extends Error {
+  constructor(public readonly model: string) {
+    super(`replicate.run(${model}) timed out after ${REPLICATE_TIMEOUT_MS}ms`);
+    this.name = "ReplicateTimeoutError";
+  }
+}
+
+async function runWithTimeout<T>(model: string, p: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new ReplicateTimeoutError(model)), REPLICATE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * Magic Cutout — runs a background-removal model on the input portrait.
  * Returns the URL of the resulting transparent-PNG. The caller downloads it
  * and re-encodes for the client.
@@ -24,16 +57,19 @@ const MODEL_VERSION =
 export async function magicCutout(input: {
   imageDataUrl: string;
 }): Promise<string> {
-  const output = (await replicate.run(MODEL_VERSION, {
-    input: {
-      image: input.imageDataUrl,
-      // 2048x2048 is the practical upper bound — BiRefNet runs at this on a
-      // T4 in <10s. Larger inputs are bilinear-upscaled internally and don't
-      // sharpen the matte further. The client already caps long-edge at the
-      // canvas-friendly 2048 before sending.
-      resolution: "2048x2048",
-    },
-  })) as unknown;
+  const output = (await runWithTimeout(
+    "magicCutout",
+    replicate.run(MODEL_VERSION, {
+      input: {
+        image: input.imageDataUrl,
+        // 2048x2048 is the practical upper bound — BiRefNet runs at this on a
+        // T4 in <10s. Larger inputs are bilinear-upscaled internally and don't
+        // sharpen the matte further. The client already caps long-edge at the
+        // canvas-friendly 2048 before sending.
+        resolution: "2048x2048",
+      },
+    }),
+  )) as unknown;
 
   return extractUrl(output, "magicCutout");
 }
@@ -80,17 +116,20 @@ export async function outpaintPortrait(input: {
     "do not invent, redraw, or extend facial features. " +
     "Photographic, soft natural lighting, single subject.";
 
-  const output = (await replicate.run("black-forest-labs/flux-fill-pro", {
-    input: {
-      image: input.imageDataUrl,
-      mask: input.maskDataUrl,
-      prompt,
-      output_format: "png",
-      // Max permitted with an input image. Lower values may refuse on
-      // perfectly innocuous portraits.
-      safety_tolerance: 2,
-    },
-  })) as unknown;
+  const output = (await runWithTimeout(
+    "outpaintPortrait",
+    replicate.run("black-forest-labs/flux-fill-pro", {
+      input: {
+        image: input.imageDataUrl,
+        mask: input.maskDataUrl,
+        prompt,
+        output_format: "png",
+        // Max permitted with an input image. Lower values may refuse on
+        // perfectly innocuous portraits.
+        safety_tolerance: 2,
+      },
+    }),
+  )) as unknown;
 
   return extractUrl(output, "outpaintPortrait");
 }
@@ -120,13 +159,16 @@ const DEOLDIFY_VERSION =
 export async function colorize(input: {
   imageDataUrl: string;
 }): Promise<string> {
-  const output = (await replicate.run(DEOLDIFY_VERSION, {
-    input: {
-      input_image: input.imageDataUrl,
-      model_name: "Artistic",
-      render_factor: 35,
-    },
-  })) as unknown;
+  const output = (await runWithTimeout(
+    "colorize",
+    replicate.run(DEOLDIFY_VERSION, {
+      input: {
+        input_image: input.imageDataUrl,
+        model_name: "Artistic",
+        render_factor: 35,
+      },
+    }),
+  )) as unknown;
 
   return extractUrl(output, "colorize");
 }

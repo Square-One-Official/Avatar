@@ -9,7 +9,7 @@ import {
   FREE_CUTOUTS_ALLOWANCE,
 } from "../../lib/supabase.js";
 import { supabase } from "../../lib/supabase.js";
-import { magicCutout } from "../../lib/replicate.js";
+import { magicCutout, ReplicateTimeoutError } from "../../lib/replicate.js";
 
 /**
  * POST /v1/cutout
@@ -97,7 +97,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 5-minute TTL is more than enough for Replicate to fetch the input
     // before BiRefNet runs (cold-start + warm-up rarely exceeds 60s).
-    console.log("[/v1/cutout] step=sign storageKey=", storageKey);
+    //
+    // Audit MEDIUM #21: don't log the full signed URLs (they grant 5-min
+    // read access to the bytes) or the raw storage key (contains the
+    // userId). Diagnostics only need the step + a short tag.
+    console.log("[/v1/cutout] step=sign storageKey=", redactKey(storageKey));
     const { data: signed, error: signErr } = await supabase.storage
       .from("cutout-uploads")
       .createSignedUrl(storageKey, 300);
@@ -106,17 +110,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(500).json({ error: "cutout_failed", step: "sign" });
       return;
     }
-    console.log("[/v1/cutout] step=replicate url=", signed.signedUrl);
+    console.log("[/v1/cutout] step=replicate url=<redacted>");
 
     let resultUrl: string;
     try {
       resultUrl = await magicCutout({ imageDataUrl: signed.signedUrl });
     } catch (e) {
       console.error("[/v1/cutout] replicate error", e);
+      // Audit MEDIUM #17: distinguish a timeout from a model error so the
+      // client can show a friendlier "model is taking longer than usual"
+      // banner instead of "cutout failed".
+      if (e instanceof ReplicateTimeoutError) {
+        res.status(504).json({ error: "model_timeout", step: "replicate" });
+        return;
+      }
       res.status(500).json({ error: "cutout_failed", step: "replicate" });
       return;
     }
-    console.log("[/v1/cutout] step=download resultUrl=", resultUrl);
+    console.log("[/v1/cutout] step=download resultUrl=<redacted>");
 
     const download = await fetch(resultUrl);
     if (!download.ok) {
@@ -124,6 +135,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const cutoutBytes = Buffer.from(await download.arrayBuffer());
     console.log("[/v1/cutout] step=deduct mode=", mode, "bytes=", cutoutBytes.length);
+    // No `resultUrl` in the log — it's a Replicate-signed download URL.
+    // For incident traceability we still keep the prediction reference
+    // in the credit_ledger row below, which is operator-only.
 
     // Deduct only after we have the bytes in hand.
     if (mode === "credit") {
@@ -157,4 +171,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("/v1/cutout error", err);
     res.status(500).json({ error: "cutout_failed" });
   }
+}
+
+/**
+ * Truncate a storage key to a short, non-identifying tag for logs. The
+ * raw key is `<userId>/<uuid>.png` — logging the full path leaks the
+ * userId to whoever has Vercel-logs read access. Keep only the last 8
+ * chars of the UUID so a developer can still correlate a failure to the
+ * upload object if they need to.
+ */
+function redactKey(key: string): string {
+  const dot = key.lastIndexOf(".");
+  const stem = dot > 0 ? key.slice(0, dot) : key;
+  const tail = stem.slice(-8);
+  return `…/${tail}`;
 }
