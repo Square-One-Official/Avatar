@@ -340,6 +340,7 @@ struct AvatarApp: App {
     #if !APP_STORE
     @State private var updater = UpdateManager()
     #endif
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("appearanceMode") private var appearanceRaw: String = AppearanceMode.dark.rawValue
     private var colorScheme: ColorScheme {
         let mode = AppearanceMode(rawValue: appearanceRaw) ?? .dark
@@ -392,6 +393,23 @@ struct AvatarApp: App {
                     #if !APP_STORE
                     updater.checkForUpdatesInBackground()
                     #endif
+                }
+                // Flush decoded image caches when the window is fully
+                // hidden (audit HIGH #8). NSCache also evicts under system
+                // memory pressure on its own, but a backgrounded window
+                // sitting idle for hours shouldn't keep hundreds of MB of
+                // CoreImage buffers resident "just in case". Repopulation
+                // on next foreground is cheap — the source PNGs live in
+                // SwiftData external storage.
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .background {
+                        appState.flushImageCaches()
+                        // Audit MEDIUM #28: cancel any in-flight import
+                        // pipelines so a backgrounded window doesn't keep
+                        // burning CPU + holding refs to large UIImages
+                        // for an import the user is no longer watching.
+                        appState.cancelInFlightImports()
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)

@@ -10,6 +10,7 @@
 		01F567F761E6F3C8934AC4C0 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1191A20AC32839CBA5B4807 /* AuthManager.swift */; };
 		021E0E31E2907C54E028C0CE /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1191A20AC32839CBA5B4807 /* AuthManager.swift */; };
 		06AA209FBD19063A78F21083 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
+		09FAAF08E924B069E4DC3906 /* AuthEncryption.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */; };
 		0A40457E36804B648A1F8E54 /* URLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */; };
 		0C6211741743F6872B88D183 /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */; };
 		0C7F01C3A11F8D65DF29050A /* ProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */; };
@@ -23,6 +24,7 @@
 		1B091FC5D688FFD174F50657 /* Mesh 03.png in Resources */ = {isa = PBXBuildFile; fileRef = 947924202C732493D553BD14 /* Mesh 03.png */; };
 		1B6646132381C29B4FE739BB /* ImageAdjustments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8024D84C778A83045FEA287D /* ImageAdjustments.swift */; };
 		1E2B5F5EB2EECFD9C067FBDD /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3181E7327476F43F448EA102 /* LibraryImportSheet.swift */; };
+		1F48C6FC8BC48ADBAEB6A950 /* TLSPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5D63248862E832DE73D422 /* TLSPinning.swift */; };
 		20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		22F331DA021385FF381B6BEA /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
 		280A11648DAEFCF19F5E82C9 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
@@ -102,6 +104,7 @@
 		AD908A7C36FFE3AF72270EA4 /* OnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CED461FBDBF56344685D3D /* OnboardingSheet.swift */; };
 		AEB460C0337997C6FA65993A /* BulkAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C29944A4F31F74C9CD6F54 /* BulkAligner.swift */; };
 		B03C58275150A57C7CAE9B41 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5127F7FAC6DD92487E178E76 /* AppState.swift */; };
+		B37743511EACC41E15BEDE84 /* AuthEncryption.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */; };
 		B3B24CB78F4451A09882A78E /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
 		B6E6633C3A2A74AF59456F58 /* ProEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */; };
 		B77A1F8EE216E673B1250E57 /* PortraitUndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7194822E14F9864C38869D98 /* PortraitUndoManager.swift */; };
@@ -131,6 +134,7 @@
 		DFD79485661CC8C6BA3005B2 /* AnnouncementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */; };
 		E04984253BD9437942C1DE92 /* FileAuthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96955F87205367E1A31005B8 /* FileAuthStorage.swift */; };
 		E0F821475D2B3ADDEC22840B /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF5D10603D8C4CBCEBF63691 /* ExportSheet.swift */; };
+		E1BF2C75CA25401C784761BA /* TLSPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5D63248862E832DE73D422 /* TLSPinning.swift */; };
 		E20E4C1FAB7C8E7057EBF08F /* Mesh 02.png in Resources */ = {isa = PBXBuildFile; fileRef = E21A227552D65C64EBB609A5 /* Mesh 02.png */; };
 		E591BE03D14322F93DF5CBB5 /* SupabaseConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29693AE9839C2E40136C758E /* SupabaseConfig.swift */; };
 		E8AF2A53C52B50C4453C65B2 /* Compositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFBA66AF626E08F10F1333C /* Compositor.swift */; };
@@ -200,8 +204,10 @@
 		CBFBA66AF626E08F10F1333C /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
 		D7D7267E27D224F2446B9E76 /* DeviceFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceFingerprint.swift; sourceTree = "<group>"; };
 		DB0C0C9C43AFC1383D6C54E2 /* logo.svg */ = {isa = PBXFileReference; path = logo.svg; sourceTree = "<group>"; };
+		DB5D63248862E832DE73D422 /* TLSPinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TLSPinning.swift; sourceTree = "<group>"; };
 		DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementSheet.swift; sourceTree = "<group>"; };
 		DD21EBC5B96234F7E98D39FF /* Avatar-MAS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Avatar-MAS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthEncryption.swift; sourceTree = "<group>"; };
 		DE931792D085D73E20E9D67F /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		DE999750B624A66B1CAC75E3 /* BackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClient.swift; sourceTree = "<group>"; };
 		DED2448B10A7B5504F841578 /* ProBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProBadge.swift; sourceTree = "<group>"; };
@@ -246,6 +252,7 @@
 			children = (
 				F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */,
 				5127F7FAC6DD92487E178E76 /* AppState.swift */,
+				DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */,
 				C1191A20AC32839CBA5B4807 /* AuthManager.swift */,
 				EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */,
 				DE999750B624A66B1CAC75E3 /* BackendClient.swift */,
@@ -266,6 +273,7 @@
 				81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */,
 				FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */,
 				29693AE9839C2E40136C758E /* SupabaseConfig.swift */,
+				DB5D63248862E832DE73D422 /* TLSPinning.swift */,
 				EA293E7F1CF952594B0EB25E /* UpdateManager.swift */,
 				347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */,
 			);
@@ -524,6 +532,7 @@
 				0C6211741743F6872B88D183 /* AnnouncementService.swift in Sources */,
 				DFD79485661CC8C6BA3005B2 /* AnnouncementSheet.swift in Sources */,
 				5ED90F39E1CD5FCAF05C6AE8 /* AppState.swift in Sources */,
+				B37743511EACC41E15BEDE84 /* AuthEncryption.swift in Sources */,
 				01F567F761E6F3C8934AC4C0 /* AuthManager.swift in Sources */,
 				867313BD6DC51163C952CA94 /* AutoAligner.swift in Sources */,
 				4A0E9AD4D1A4AEE4070AFC9B /* AvatarApp.swift in Sources */,
@@ -572,6 +581,7 @@
 				2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */,
 				20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */,
 				4942970960D076A70A892023 /* SupabaseConfig.swift in Sources */,
+				E1BF2C75CA25401C784761BA /* TLSPinning.swift in Sources */,
 				0A40457E36804B648A1F8E54 /* URLSchemeHandler.swift in Sources */,
 				1958745818A9BA0756947D05 /* UpdateManager.swift in Sources */,
 				850254B0FC758B3438E67CCD /* WelcomeSignInSheet.swift in Sources */,
@@ -586,6 +596,7 @@
 				32BA05BD3FE62DB19FF6512F /* AnnouncementService.swift in Sources */,
 				2BF00FB85FDB9DB07C4F8B93 /* AnnouncementSheet.swift in Sources */,
 				B03C58275150A57C7CAE9B41 /* AppState.swift in Sources */,
+				09FAAF08E924B069E4DC3906 /* AuthEncryption.swift in Sources */,
 				021E0E31E2907C54E028C0CE /* AuthManager.swift in Sources */,
 				B7BE94756631FED1390881A5 /* AutoAligner.swift in Sources */,
 				CCDA297FDC7DB266C5C99205 /* AvatarApp.swift in Sources */,
@@ -634,6 +645,7 @@
 				EDCEBBF69658512E9483D13B /* SidebarUpdateCard.swift in Sources */,
 				86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */,
 				E591BE03D14322F93DF5CBB5 /* SupabaseConfig.swift in Sources */,
+				1F48C6FC8BC48ADBAEB6A950 /* TLSPinning.swift in Sources */,
 				C863651EF551A89CF19F884A /* URLSchemeHandler.swift in Sources */,
 				EAA5F4DF5638ED9457ED418F /* UpdateManager.swift in Sources */,
 				5C51099955E0873ED21B68DF /* WelcomeSignInSheet.swift in Sources */,
@@ -703,6 +715,7 @@
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.10;
 			};
 			name = Release;
@@ -852,6 +865,7 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.10;
 			};
 			name = Debug;

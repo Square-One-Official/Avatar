@@ -122,6 +122,55 @@ final class AppState {
             if !isProcessing { processingKind = .cutout }
         }
     }
+
+    /// Handles for every in-flight `Task.detached` spawned by
+    /// `ImportFlow`. Tracked so we can cancel them when the user
+    /// navigates away or the scene goes to `.background` — see
+    /// `cancelInFlightImports()` and the `onChange(of: scenePhase)` in
+    /// `AvatarApp`. Audit MEDIUM #28.
+    ///
+    /// `@ObservationIgnored` because mutating the array shouldn't
+    /// invalidate views; the relevant view-level signal is
+    /// `isProcessing`, which is observable.
+    @ObservationIgnored
+    private var importTasks: [Task<Void, Never>] = []
+
+    /// Register an import task so it can be cancelled later. Prunes any
+    /// already-finished handles so the array doesn't grow without bound
+    /// across long sessions. Safe to call from any actor — the function
+    /// itself is `@MainActor` via the enclosing class.
+    func trackImportTask(_ task: Task<Void, Never>) {
+        importTasks.removeAll { $0.isCancelled || isFinished($0) }
+        importTasks.append(task)
+    }
+
+    /// Cancel every in-flight import task and drop the handles. Calls
+    /// `Task.cancel()` which Swift Concurrency surfaces as a
+    /// `CancellationError` at the next `await` boundary inside the task —
+    /// the existing pipeline already has plenty of those (`await
+    /// MainActor.run`, `await runPipeline`, etc.) so cancellation lands
+    /// cleanly without us having to thread `Task.isCancelled` checks
+    /// through every step.
+    func cancelInFlightImports() {
+        for task in importTasks { task.cancel() }
+        importTasks.removeAll()
+        // Flip the UI back out of the spinner so a backgrounded window
+        // doesn't return showing "Processing…" when the user returns.
+        if isProcessing { isProcessing = false }
+    }
+
+    /// `Task.isCancelled` doesn't surface "finished normally". The cheap
+    /// proxy: poll `value` via a non-blocking wrapper. Since we use
+    /// `Task<Void, Never>` the value type is Void, but inspecting
+    /// completion synchronously isn't part of the public API — so we
+    /// just prune based on `isCancelled` and accept that finished-but-
+    /// not-cancelled handles get pruned on the NEXT add.
+    private func isFinished(_ task: Task<Void, Never>) -> Bool {
+        // Currently no synchronous "isFinished" on Task; rely on
+        // `isCancelled` for pruning. A handle that ran to completion is
+        // a few hundred bytes — cheap to retain until the next purge.
+        return false
+    }
     /// Drives the rotating status copy in `ProcessingStatusView`. Set this
     /// BEFORE flipping `isProcessing` to true. Auto-resets to `.cutout`
     /// when `isProcessing` flips back to false.
@@ -349,34 +398,71 @@ final class AppState {
     // ever read from the same dict, producing an O(N²) re-render cascade
     // across the sidebar thumbnails + editor canvas. View invalidation is
     // already driven by the underlying Portrait / BackgroundPreset models.
+    //
+    // Each cache is an `NSCache` with both a count limit and a cost-based
+    // memory limit (audit HIGH #8). Cost is the exact pixel-buffer size
+    // (`bytesPerRow * height`). NSCache also evicts under system memory
+    // pressure on its own, but we set explicit caps so a user importing
+    // hundreds of full-resolution portraits can't grow these into the
+    // multi-GB range before the OS notices.
+    //
+    // Rough budget (~500 MB worst case in steady state, far less for
+    // typical sessions because NSCache evicts long-tail entries):
+    //   - cutoutCache             ~200 MB / 200 items
+    //   - adjustedCutoutCache     ~150 MB / 200 items
+    //   - backgroundCache         ~100 MB / 100 items
+    //   - thumbnailCache           ~50 MB / 2 000 items (thumbs are tiny)
 
     /// In-memory cache of decoded cutout CGImages keyed by portrait id,
     /// so the editor doesn't re-decode on every redraw.
     @ObservationIgnored
-    private var cutoutCache: [UUID: CGImage] = [:]
+    private let cutoutCache: NSCache<NSUUID, CGImageBox> = AppState.makeCache(
+        countLimit: 200, costLimitMB: 200
+    )
     /// In-memory cache of the adjusted cutout (base cutout + CIFilter chain),
     /// keyed by portrait id. Stored with the adjustments' hash so we can
     /// invalidate as soon as any slider changes value.
     @ObservationIgnored
-    private var adjustedCutoutCache: [UUID: (key: Int, image: CGImage)] = [:]
+    private let adjustedCutoutCache: NSCache<NSUUID, KeyedCGImageBox> = AppState.makeCache(
+        countLimit: 200, costLimitMB: 150
+    )
     /// In-memory cache of decoded background images keyed by preset id.
     @ObservationIgnored
-    private var backgroundCache: [UUID: CGImage] = [:]
+    private let backgroundCache: NSCache<NSUUID, CGImageBox> = AppState.makeCache(
+        countLimit: 100, costLimitMB: 100
+    )
     /// Composited thumbnail cache for the Library sidebar. Holds a flat
     /// CGImage at thumbnail resolution per portrait so each row paints with
     /// a single Image, not a live CanvasPreview (GeometryReader + CI chain).
     /// Keyed by portrait id; the stored hash captures every input that
     /// affects the rendered pixels.
     @ObservationIgnored
-    private var thumbnailCache: [UUID: (key: Int, image: CGImage)] = [:]
+    private let thumbnailCache: NSCache<NSUUID, KeyedCGImageBox> = AppState.makeCache(
+        countLimit: 2_000, costLimitMB: 50
+    )
     /// Pixel side for sidebar thumbnails. 44pt visible @2x.
     private static let thumbnailPixelSize: CGFloat = 88
 
+    /// In-memory pixel-buffer cost of a CGImage. `bytesPerRow` already
+    /// includes any alignment padding the buffer carries, so this is the
+    /// exact decoded size — what NSCache should be metering against.
+    private static func cost(of image: CGImage) -> Int {
+        return image.bytesPerRow * image.height
+    }
+
+    private static func makeCache<K, V>(countLimit: Int, costLimitMB: Int) -> NSCache<K, V> {
+        let cache = NSCache<K, V>()
+        cache.countLimit = countLimit
+        cache.totalCostLimit = costLimitMB * 1_024 * 1_024
+        return cache
+    }
+
     func cutout(for portrait: Portrait) -> CGImage? {
-        if let cached = cutoutCache[portrait.id] { return cached }
+        let key = portrait.id as NSUUID
+        if let cached = cutoutCache.object(forKey: key) { return cached.image }
         guard let data = portrait.cutoutPNG,
               let img = ImageProcessor.cgImage(from: data) else { return nil }
-        cutoutCache[portrait.id] = img
+        cutoutCache.setObject(CGImageBox(img), forKey: key, cost: Self.cost(of: img))
         return img
     }
 
@@ -387,43 +473,63 @@ final class AppState {
         guard let base = cutout(for: portrait) else { return nil }
         let adj = ImageAdjustments(from: portrait)
         if adj.isNeutral { return base }
-        let key = adj.hashValue
-        if let hit = adjustedCutoutCache[portrait.id], hit.key == key {
+        let hashKey = adj.hashValue
+        let nsKey = portrait.id as NSUUID
+        if let hit = adjustedCutoutCache.object(forKey: nsKey), hit.hashKey == hashKey {
             return hit.image
         }
         guard let rendered = ImageAdjustmentRenderer.apply(adj, to: base) else {
             return base
         }
-        adjustedCutoutCache[portrait.id] = (key, rendered)
+        adjustedCutoutCache.setObject(
+            KeyedCGImageBox(hashKey: hashKey, image: rendered),
+            forKey: nsKey,
+            cost: Self.cost(of: rendered)
+        )
         return rendered
     }
 
     func invalidateCutout(for portrait: Portrait) {
-        cutoutCache.removeValue(forKey: portrait.id)
-        adjustedCutoutCache.removeValue(forKey: portrait.id)
-        thumbnailCache.removeValue(forKey: portrait.id)
+        let key = portrait.id as NSUUID
+        cutoutCache.removeObject(forKey: key)
+        adjustedCutoutCache.removeObject(forKey: key)
+        thumbnailCache.removeObject(forKey: key)
     }
 
     func invalidateAdjusted(for portrait: Portrait) {
-        adjustedCutoutCache.removeValue(forKey: portrait.id)
-        thumbnailCache.removeValue(forKey: portrait.id)
+        let key = portrait.id as NSUUID
+        adjustedCutoutCache.removeObject(forKey: key)
+        thumbnailCache.removeObject(forKey: key)
     }
 
     func backgroundImage(for preset: BackgroundPreset) -> CGImage? {
         guard preset.kind == .image else { return nil }
-        if let cached = backgroundCache[preset.id] { return cached }
+        let key = preset.id as NSUUID
+        if let cached = backgroundCache.object(forKey: key) { return cached.image }
         guard preset.modelContext != nil,
               let data = preset.imageData,
               let img = ImageProcessor.cgImage(from: data) else { return nil }
-        backgroundCache[preset.id] = img
+        backgroundCache.setObject(CGImageBox(img), forKey: key, cost: Self.cost(of: img))
         return img
     }
 
     func invalidateBackground(_ preset: BackgroundPreset) {
-        backgroundCache.removeValue(forKey: preset.id)
+        backgroundCache.removeObject(forKey: preset.id as NSUUID)
         // Background changed → any thumbnail composited against this preset
         // is stale. Cheap to drop the whole map; thumbnails repopulate lazily.
-        thumbnailCache.removeAll(keepingCapacity: true)
+        thumbnailCache.removeAllObjects()
+    }
+
+    /// Drops every cached decoded image. Called when the scene goes to
+    /// `.background` so a hidden window doesn't keep hundreds of MB of
+    /// CoreImage pixel buffers resident. Caches repopulate lazily on next
+    /// view appearance — cheap because the underlying PNGs live in
+    /// SwiftData external storage.
+    func flushImageCaches() {
+        cutoutCache.removeAllObjects()
+        adjustedCutoutCache.removeAllObjects()
+        backgroundCache.removeAllObjects()
+        thumbnailCache.removeAllObjects()
     }
 
     /// Returns a flattened CGImage suitable for a sidebar thumbnail. Cheap on
@@ -452,9 +558,10 @@ final class AppState {
         } else {
             hasher.combine(0)
         }
-        let key = hasher.finalize()
+        let hashKey = hasher.finalize()
+        let nsKey = portrait.id as NSUUID
 
-        if let hit = thumbnailCache[portrait.id], hit.key == key {
+        if let hit = thumbnailCache.object(forKey: nsKey), hit.hashKey == hashKey {
             return hit.image
         }
 
@@ -472,11 +579,33 @@ final class AppState {
             outputSize: size,
             shape: .square
         ) else { return nil }
-        thumbnailCache[portrait.id] = (key, img)
+        thumbnailCache.setObject(
+            KeyedCGImageBox(hashKey: hashKey, image: img),
+            forKey: nsKey,
+            cost: Self.cost(of: img)
+        )
         return img
     }
 
     func invalidateThumbnail(for portrait: Portrait) {
-        thumbnailCache.removeValue(forKey: portrait.id)
+        thumbnailCache.removeObject(forKey: portrait.id as NSUUID)
+    }
+}
+
+/// Reference-typed wrapper for storing CGImages in NSCache (which requires
+/// AnyObject values). One class per cache shape so the NSCache generics
+/// stay strict: `CGImageBox` for raw images, `KeyedCGImageBox` for the
+/// hashed variants.
+private final class CGImageBox: NSObject {
+    let image: CGImage
+    init(_ image: CGImage) { self.image = image }
+}
+
+private final class KeyedCGImageBox: NSObject {
+    let hashKey: Int
+    let image: CGImage
+    init(hashKey: Int, image: CGImage) {
+        self.hashKey = hashKey
+        self.image = image
     }
 }

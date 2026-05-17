@@ -1,28 +1,35 @@
 import Foundation
 import Auth
 
-/// `AuthLocalStorage` implementation backed by a sandboxed file instead of the
-/// Keychain.
+/// `AuthLocalStorage` implementation backed by a sandboxed file, with
+/// AES-GCM envelope encryption for the JWT / refresh-token blobs at rest
+/// (audit HIGH #7). The encryption key lives in the macOS Keychain; the
+/// auth payload itself stays on disk under the per-app Container.
 ///
-/// Why not Keychain: the macOS Keychain ACL is bound to the binary's code
-/// signature, so every signed release rebuilds the ACL and the user is
-/// re-prompted for "Always Allow" — multiple times per launch (Supabase
-/// reads the session, refreshes the token, then writes it back). On a
-/// shipping app that releases regularly, the prompts pile up and the
-/// auth flow feels broken. DeviceFingerprint moved to UserDefaults for
-/// the same reason; this is the same trade-off applied to the auth
-/// session.
+/// History: this storage initially landed *unencrypted* because the macOS
+/// Keychain ACL is bound to the binary's code signature, so every signed
+/// release rebuilt the ACL and the user was re-prompted for "Always Allow"
+/// — multiple times per launch (Supabase reads the session, refreshes the
+/// token, then writes it back). The new design keeps a fixed-shape
+/// Keychain item (a 32-byte symmetric key, no custom ACL) which the
+/// owning app reads without UI; on the rare signing-identity change the
+/// old key becomes unreachable, the encrypted file fails to decrypt, and
+/// the user is asked to sign in once — same UX as a fresh install.
 ///
-/// Threat model: the app is sandboxed (`com.apple.security.app-sandbox`),
-/// so the storage directory lives inside the per-app Container at
+/// Threat model the encryption now closes (vs. the old plaintext shape):
+///   - Local privilege escalation / disk theft / Time Machine restore
+///     where the Container files are reachable but the Keychain remains
+///     bound to this Mac + user. Without the key, the file is opaque.
+///
+/// Threat model the encryption deliberately does *not* close:
+///   - A live, unlocked user session with the Avatar app running — at
+///     that point CryptoKit holds the unwrapped key in memory.
+///
+/// Sandbox + filesystem hardening from the original design carries over:
+/// the storage directory lives at
 /// `~/Library/Containers/com.thierry.Avatar/Data/Library/Application
-/// Support/Avatar/auth/`. Other apps cannot read that directory without
-/// TCC permission. Files are written with mode `0600` (owner read/write
-/// only). Practical security is comparable to Keychain for the threats
-/// that matter here ("other apps trying to steal my session"); we lose
-/// the theoretical benefit of Keychain's encrypted storage at rest, but
-/// macOS Keychain on a logged-in account is effectively decrypted in
-/// memory anyway.
+/// Support/Avatar/auth/`, files are written with mode `0600`, and the
+/// directory is `0700`.
 struct FileAuthStorage: AuthLocalStorage {
     private let directory: URL
 
@@ -45,7 +52,8 @@ struct FileAuthStorage: AuthLocalStorage {
 
     func store(key: String, value: Data) throws {
         let url = fileURL(for: key)
-        try value.write(to: url, options: [.atomic, .completeFileProtection])
+        let payload = try AuthEncryption.encrypt(value)
+        try payload.write(to: url, options: [.atomic, .completeFileProtection])
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600],
             ofItemAtPath: url.path
@@ -55,7 +63,30 @@ struct FileAuthStorage: AuthLocalStorage {
     func retrieve(key: String) throws -> Data? {
         let url = fileURL(for: key)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        return try Data(contentsOf: url)
+        let onDisk = try Data(contentsOf: url)
+
+        // Fast path — encrypted v1 blob.
+        if let first = onDisk.first, first == AuthEncryption.magic {
+            do {
+                return try AuthEncryption.decrypt(onDisk)
+            } catch {
+                // Stale key (signing-identity change, Keychain reset, etc.):
+                // surface "no session" so the caller asks the user to sign
+                // in again. Removing the file keeps subsequent reads cheap.
+                try? FileManager.default.removeItem(at: url)
+                return nil
+            }
+        }
+
+        // Legacy plaintext payload from before the encryption rollover. If
+        // it parses as a Supabase session blob, re-encrypt in place so the
+        // user keeps their session; otherwise treat as missing.
+        if AuthEncryption.looksLikePlaintextSession(onDisk) {
+            try? store(key: key, value: onDisk)
+            return onDisk
+        }
+        try? FileManager.default.removeItem(at: url)
+        return nil
     }
 
     func remove(key: String) throws {
