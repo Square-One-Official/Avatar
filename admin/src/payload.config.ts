@@ -13,18 +13,6 @@ import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * Append `schema=payload` to a Postgres connection string if it's not
- * already there. Idempotent — calling on an already-qualified URL is a
- * no-op. Empty string in → empty string out so a missing env doesn't
- * produce a malformed URL that obscures the underlying config issue.
- */
-function ensureSchema(url: string): string {
-  if (!url) return url;
-  if (/[?&]schema=/.test(url)) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}schema=payload`;
-}
-
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -51,17 +39,17 @@ export default buildConfig({
   // a few extra ms; the admin app is low-traffic so the simplicity wins.
   db: postgresAdapter({
     pool: {
-      connectionString: ensureSchema(
+      connectionString:
         process.env.DATABASE_URL ??
-          process.env.POSTGRES_URL_NON_POOLING ??
-          "",
-      ),
+        process.env.POSTGRES_URL_NON_POOLING ??
+        "",
     },
-    // Auto-create / sync tables on startup. Safe here because Payload
-    // owns the `payload` schema exclusively — no other consumer's
-    // tables can be clobbered. Without this, the very first request
-    // fails with "Failed query: select users.id..." because Payload
-    // never gets a chance to materialise its schema.
+    // Confine Payload's tables to a dedicated `payload` schema so they
+    // never collide with the existing `public.users`, `public.subscriptions`
+    // etc. that the avatars-api backend owns. `?schema=payload` in the
+    // connection string is ignored by node-postgres; this option is
+    // honoured by the adapter and prefixes every DDL/query.
+    schemaName: "payload",
     push: true,
   }),
   plugins: [
