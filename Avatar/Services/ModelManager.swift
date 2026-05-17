@@ -27,7 +27,7 @@ final class MagicCutoutPreferences {
     }
 }
 
-// MARK: - Downloadable matting model (BiRefNet_lite-matting)
+// MARK: - Downloadable matting model (ORMBG)
 
 /// State of the optional downloadable matting model. Drives the Settings
 /// engine row's UI and the import-time fallback decision.
@@ -70,24 +70,32 @@ enum ModelManagerError: Error {
     case installFailed(String)
 }
 
-/// Manages the optional downloadable BiRefNet_lite-matting model. Single
-/// instance owned by `AppState`. UI surfaces (Settings → Privacy & AI
-/// engine row) read `state` and call `download(force:)` /
-/// `removeDownloaded()`. The cutout pipeline reads `cachedModelURL()` to
-/// decide whether to use the downloaded engine or fall back to Apple
-/// Vision V2.
+/// Manages the optional downloadable matting model (currently ORMBG,
+/// Apache-2.0, DIS-family). Single instance owned by `AppState`. UI
+/// surfaces (Settings → Privacy & AI engine row + onboarding step 3)
+/// read `state` and call `download(force:)` / `removeDownloaded()`.
+/// The cutout pipeline reads `cachedModelURL()` to decide whether to
+/// use the downloaded engine or fall back to Apple Vision V2.
+///
+/// "Matting model" is the engine-agnostic name in code paths and on
+/// disk; the specific model in use is recorded only in the release
+/// metadata and this top-of-file comment. Swapping ORMBG for a future
+/// model (e.g. once coremltools supports `deform_conv2d` and BiRefNet
+/// is back on the table) only requires re-running the conversion
+/// script + updating `modelURL` / `expectedSHA256` / bumping
+/// `modelVersion` — no Swift renames.
 ///
 /// Persistence layout (sandbox container):
 /// ```
 /// ~/Library/Containers/<bundle>/Data/Library/Application Support/Avatar/Models/
-///   ├── birefnet-lite-matting.mlmodelc/   ← compiled, runtime-ready
-///   └── .model_version                     ← "1\n" (matches `modelVersion`)
+///   ├── matting-model.mlmodelc/   ← compiled, runtime-ready
+///   └── .model_version             ← "1\n" (matches `modelVersion`)
 /// ```
 ///
 /// Bumping `modelVersion` invalidates older cached copies on next launch.
-/// The legacy V4 BiRefNet model (250 MB, removed in build 6) is also
-/// cleaned up via `removeLegacyLocalModel()` for users updating from a
-/// pre-pivot build.
+/// The legacy V4 BiRefNet model (`BiRefNet.mlmodelc`, ~250 MB, bundled
+/// pre-pivot, removed in build 6) is also cleaned up via
+/// `removeLegacyLocalModel()` for users updating from a pre-pivot build.
 @MainActor
 @Observable
 final class ModelManager {
@@ -102,11 +110,12 @@ final class ModelManager {
     /// invalidation impossible.
     ///
     /// History: planned to ship BiRefNet_lite-matting, but coremltools
-    /// can't convert `torchvision::deform_conv2d`. Pivoted to IS-Net
-    /// (DIS) per the documented runner-up — Apache 2.0, prebuilt
-    /// CoreML from `john-rocky/CoreML-Models`. The on-disk model name
-    /// stays generic (`matting-model.mlmodelc`) so future swaps don't
-    /// touch this constant.
+    /// can't convert `torchvision::deform_conv2d`. After a brief
+    /// IS-Net intermezzo we landed on ORMBG (Apache-2.0, DIS-family,
+    /// portrait-trained, 2024) — same restrictions but the only
+    /// architecture in scope that converts cleanly. The on-disk
+    /// model name stays generic (`matting-model.mlmodelc`) so future
+    /// swaps don't touch this constant.
     static let modelURL = URL(string:
         "https://github.com/thierrzz/Avatar/releases/download/" +
         "models/matting-v1/matting-model.mlmodelc.zip"
@@ -278,7 +287,7 @@ final class ModelManager {
         // is interrupted (sandbox crash, machine sleep) — next launch
         // would otherwise see a corrupt directory and try to load it.
         let tmpExtract = installDir.deletingLastPathComponent()
-            .appendingPathComponent(".birefnet-extract-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent(".matting-extract-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmpExtract, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmpExtract) }
 
@@ -361,10 +370,12 @@ final class ModelManager {
         }
     }
 
-    /// Cleans up the legacy V4 BiRefNet model (`BiRefNet.mlmodelc`) shipped
-    /// in builds prior to the local-first pivot. Called from
-    /// `MagicCutoutPreferences.init` and `ModelManager.init` so any code
-    /// path that touches the prefs subsystem clears it.
+    /// Cleans up the legacy V4 BiRefNet model (`BiRefNet.mlmodelc`,
+    /// ~250 MB) shipped in builds prior to the local-first pivot.
+    /// Called from `MagicCutoutPreferences.init` and `ModelManager.init`
+    /// so any code path that touches the prefs subsystem clears it.
+    /// The current downloadable engine lives at `matting-model.mlmodelc`
+    /// (engine-agnostic name, currently ORMBG).
     static func removeLegacyLocalModel() {
         let modelsDir = modelsBaseDirectory()
         let legacy = modelsDir.appendingPathComponent("BiRefNet.mlmodelc")

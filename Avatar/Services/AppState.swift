@@ -231,14 +231,15 @@ final class AppState {
     /// → Privacy & AI. Cloud features (Magic Cutout, Fill in Body, Colorize)
     /// gate on `privacyPrefs.cloudAllowed`; the Subject-Lift engine branch
     /// in `ImageProcessor` reads `privacyPrefs.engine` to decide between
-    /// Apple Vision V2 and the downloaded BiRefNet path.
+    /// Apple Vision V2 and the downloaded matting-model path.
     let privacyPrefs: PrivacyPreferences = PrivacyPreferences()
     /// Lifecycle + state for the optional downloadable matting model
-    /// (BiRefNet_lite-matting). Settings → Privacy & AI engine row owns
-    /// the user-facing controls; `ImportFlow` reads `cachedModelURL()`
-    /// at pipeline time to decide whether to use the downloaded engine
-    /// or fall back to Apple Vision. Always present even when the user
-    /// hasn't downloaded — `state` defaults to `.notDownloaded`.
+    /// (currently ORMBG, see `ModelManager` for the why). Settings →
+    /// Privacy & AI engine row owns the user-facing controls;
+    /// `ImportFlow` reads `cachedModelURL()` at pipeline time to decide
+    /// whether to use the downloaded engine or fall back to Apple
+    /// Vision. Always present even when the user hasn't downloaded —
+    /// `state` defaults to `.notDownloaded`.
     let modelManager: ModelManager = ModelManager()
     /// Pending batch-import confirmation. Non-nil → MainWindow shows a
     /// confirm dialog before any of the queued items run through Magic

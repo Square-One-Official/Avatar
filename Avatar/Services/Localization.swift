@@ -884,25 +884,13 @@ enum Loc {
     static var square: String          { en ? "Square" : "Vierkant" }
     static var circle: String          { en ? "Circle" : "Cirkel" }
 
-    // MARK: Settings – AI Model tab
-    static var aiHairQuality: String   { en ? "AI Hair Quality" : "AI Haarkwaliteit" }
-    static var advancedCutoutModel: String { en ? "Advanced cutout model" : "Geavanceerd uitknipmodel" }
-    static var advancedModelDesc: String {
-        en ? "Uses a specialized AI model (BiRefNet) for better hair quality when removing backgrounds. Especially visible with fine hair, curls, and hair against a busy background."
-           : "Gebruikt een gespecialiseerd AI-model (BiRefNet) voor betere haarkwaliteit bij het vrijstaand maken. Vooral zichtbaar bij fijn haar, krullen en haar tegen een drukke achtergrond."
-    }
-    static var modelNotInstalled: String { en ? "Model not installed" : "Model niet geinstalleerd" }
-    static var downloadModelPrompt: String {
-        en ? "Download the BiRefNet model (~250 MB) for better hair quality when removing backgrounds."
-           : "Download het BiRefNet model (~250 MB) voor betere haarkwaliteit bij het vrijstaand maken."
-    }
-    static var installModel: String    { en ? "Install model" : "Installeer model" }
-    static var downloading: String     { en ? "Downloading…" : "Downloaden..." }
-    static var modelAvailable: String  { en ? "Model available" : "Model beschikbaar" }
-    static var useAdvancedModel: String {
-        en ? "Use advanced model for cutout"
-           : "Gebruik geavanceerd model bij uitknippen"
-    }
+    // (Legacy "Settings – AI Model tab" strings removed. They referenced
+    // the bundled 250 MB BiRefNet model that was deleted in build 6
+    // and the Settings tab that surfaced it, which the local-first
+    // pivot replaced with the Privacy & AI section + the optional
+    // downloadable ORMBG engine. The strings had no remaining call
+    // sites at the time of removal — confirmed via grep before
+    // dropping them.)
     static var advancedModelToggleHelp: String {
         en ? "When enabled, new and re-cut portraits are processed with the advanced model. Existing portraits are not automatically reprocessed. Use 'Re-cutout' in the editor."
            : "Wanneer ingeschakeld worden nieuwe en opnieuw uitgeknipte portretten verwerkt met het geavanceerde model. Bestaande portretten worden niet automatisch opnieuw verwerkt. Gebruik 'Opnieuw uitknippen' in de editor."

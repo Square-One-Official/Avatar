@@ -48,7 +48,7 @@ enum ImageProcessor {
     /// hair edge is the *physical* 50/50 instead of the perceptually-darker
     /// gamma-encoded one. 16-bit half-float intermediate avoids 8-bit banding
     /// in the soft alpha around wispy strands.
-    /// `subjectLiftV1`, `birefnetLift`, `magicRetouch`, and the orientation /
+    /// `subjectLiftV1`, `birefnetLift` (legacy), `magicRetouch`, and the orientation /
     /// PNG helpers stay on the default-sRGB `ciContext` so we don't perturb
     /// downstream features that were tuned against it.
     private static let liftContext: CIContext = {
@@ -364,11 +364,14 @@ enum ImageProcessor {
         return (resized, scale)
     }
 
-    /// Subject lift via the optional downloadable BiRefNet_lite-matting
-    /// CoreML model. Produces a real continuous-α matte that handles wispy
-    /// hair edges Apple Vision can't (Vision is a segmentation network with
-    /// near-binary alpha; BiRefNet is a matting network trained for the
-    /// kind of flowing-hair / curly-flyaway edges V2 still bleeds on).
+    /// Subject lift via the optional downloadable matting model
+    /// (currently ORMBG — Apache 2.0, DIS-family, portrait-trained;
+    /// see `ModelManager` and the conversion script for the pivot
+    /// history away from BiRefNet). Produces a real continuous-α
+    /// matte that handles wispy hair edges Apple Vision can't (Vision
+    /// is a segmentation network with near-binary alpha; ORMBG is a
+    /// matting network trained for the kind of flowing-hair /
+    /// curly-flyaway edges V2 still bleeds on).
     ///
     /// Caller is responsible for gating on `ModelManager.cachedModelURL()
     /// != nil` — this function will throw if the model file is missing or
@@ -388,10 +391,12 @@ enum ImageProcessor {
         // 1. Load (or reuse cached) MLModel.
         let model = try loadOrReuseDownloadedModel(at: modelURL)
 
-        // 2. Resize source to 1024×1024 — BiRefNet was trained at this
-        //    fixed resolution. The conversion script bakes ImageNet
-        //    normalization into the model's preprocessing, so the buffer
-        //    we hand over carries plain RGB 0-255.
+        // 2. Resize source to 1024×1024 — ORMBG (and most DIS-family
+        //    matting heads) trained at this fixed resolution. The
+        //    conversion script bakes a plain `x/255` preprocessing
+        //    into the model (verified by reading ORMBG's own
+        //    `inference.py`), so the buffer we hand over carries
+        //    plain RGB 0-255 with no further normalisation.
         let inputSize: CGFloat = 1024
         let scaleX = inputSize / extent.width
         let scaleY = inputSize / extent.height
@@ -447,7 +452,7 @@ enum ImageProcessor {
         }
         dlog("[Downloaded] Got mask via '\(resolvedName ?? "?")'")
 
-        // 5. Scale mask back to source extent. BiRefNet's output is the
+        // 5. Scale mask back to source extent. ORMBG's output is the
         //    same continuous-α we want — no need for the multi-mask
         //    union / hair zone gating dance V2 needs to coax a soft matte
         //    out of Vision's near-binary mask.

@@ -77,9 +77,9 @@ struct GeneralSettings: View {
 /// re-running the sheet. Mode toggles between `localOnly` (no photo
 /// bytes leave the Mac, cloud features hidden) and `cloudAllowed`
 /// (today's behaviour). When `localOnly`, exposes the engine picker
-/// (Apple Vision vs downloaded model) — the downloaded-model option is
-/// recorded but the cutout pipeline still falls back to Apple Vision
-/// until the BiRefNet session lands; a banner makes that visible.
+/// (Apple Vision vs downloaded model) plus the `DownloadedModelStatusView`
+/// below it, which surfaces the download/remove/progress controls for
+/// the matting model when the user picks that engine.
 private struct PrivacyAndAISection: View {
     @Environment(PrivacyPreferences.self) private var prefs
 
@@ -130,7 +130,8 @@ private struct PrivacyAndAISection: View {
     }
 }
 
-/// Status / action row for the downloadable BiRefNet matting model.
+/// Status / action row for the downloadable matting model (currently
+/// ORMBG; see `ModelManager` for the model history).
 /// Renders the right affordance for each `LocalModelState`:
 ///
 ///  - `.notDownloaded` → "Download" button + size estimate.

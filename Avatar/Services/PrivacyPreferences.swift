@@ -19,10 +19,12 @@ enum AIPrivacyMode: String, CaseIterable, Codable, Sendable {
 /// Which engine the local-only path uses for background removal.
 /// `appleVision` is the always-available Subject Lift pipeline (free,
 /// instant, decent — visible hair-edge limits documented in the V2
-/// commit history). `downloadedModel` is the optional ~90 MB BiRefNet_lite-
-/// matting CoreML model the user can opt into for crisper hair (download
-/// triggered first time the user imports under that engine — wired in a
-/// later session).
+/// commit history). `downloadedModel` is the optional ~78 MB matting
+/// CoreML model the user can opt into for crisper hair edges
+/// (currently ORMBG — Apache 2.0, DIS-family, portrait-trained; see
+/// `ModelManager` and the conversion script for the pivot history).
+/// Download is user-driven from Settings → Privacy & AI, not auto-
+/// triggered on import.
 enum LocalCutoutEngine: String, CaseIterable, Codable, Sendable {
     case appleVision
     case downloadedModel
