@@ -4,9 +4,7 @@ import {
   stripe,
   creditsForTier,
   creditsForPack,
-  intervalFromPriceId,
-  tierFromPriceId,
-  packFromPriceId,
+  resolvePriceLive,
   type Tier,
 } from "../lib/stripe.js";
 import { findOrCreateUserByEmail, supabase } from "../lib/supabase.js";
@@ -75,9 +73,10 @@ async function resolveUserForCustomer(customerId: string): Promise<string | null
 
 async function upsertSubscription(sub: Stripe.Subscription, userId: string) {
   const priceId = sub.items.data[0]?.price.id;
-  const tier: Tier | null = tierFromPriceId(priceId);
+  const resolved = await resolvePriceLive(priceId);
+  const tier: Tier | null = resolved?.tier ?? null;
   if (!tier) {
-    console.warn("Unknown price ID on subscription", priceId);
+    console.warn("Unknown / unresolvable price ID on subscription", priceId);
     return;
   }
   await supabase.from("subscriptions").upsert(
@@ -214,7 +213,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // create time but we set it ourselves, so this is mostly defence.)
           const lines = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
           const priceId = lines.data[0]?.price?.id;
-          const validatedPack = packFromPriceId(priceId);
+          const resolved = await resolvePriceLive(priceId);
+          const validatedPack = resolved?.pack ?? null;
           if (validatedPack && validatedPack === pack) {
             await grantTopupCredits({
               userId,
@@ -255,7 +255,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!userId) break;
 
         const priceId = invoice.lines.data[0]?.price?.id;
-        const tier = tierFromPriceId(priceId);
+        const resolved = await resolvePriceLive(priceId);
+        const tier = resolved?.tier ?? null;
         if (!tier) break;
 
         // For YEARLY subs we still only grant ONE month of credits up front.
@@ -265,8 +266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // burns through everything and immediately churns.
         // The ref includes ":0" so the cron can use ":1"…":11" without
         // colliding with the up-front grant.
-        const interval = intervalFromPriceId(priceId);
-        const ref = interval === "year" ? `${invoice.id}:0` : invoice.id;
+        const ref = resolved?.interval === "year" ? `${invoice.id}:0` : invoice.id;
 
         await grantPeriodCredits({
           userId,

@@ -122,3 +122,87 @@ export function isCreditPack(value: unknown): value is CreditPack {
 export function isSubscriptionInterval(value: unknown): value is SubscriptionInterval {
   return value === "month" || value === "year";
 }
+
+/**
+ * Live-validated lookup of an incoming Stripe price ID (audit HIGH #6).
+ *
+ * The synchronous helpers above (`tierFromPriceId`, `packFromPriceId`,
+ * `intervalFromPriceId`) trust the local env-var map. That's fine for
+ * building outbound checkout sessions where we already know our own IDs,
+ * but the webhook handler and the yearly-credits cron both *receive* a
+ * price ID from outside and dispatch credit grants based on it. If env
+ * has drifted — stale test price, dropped product, copy-paste mix-up
+ * between live and test mode — the env-only path either grants credits
+ * for a price we didn't intend or silently no-ops on one we did. Both
+ * leak revenue or trust.
+ *
+ * `resolvePriceLive` adds two guards on top of the env lookup:
+ *   1. The price must be known to our env (so an attacker who could
+ *      inject an arbitrary price ID can't trick us into grantng credits
+ *      for an unrelated product).
+ *   2. The price must exist in Stripe AND be `active`. Catches local
+ *      env drift, stale price IDs, and the live/test-mode mix-up.
+ *
+ * Results are cached in-memory keyed by price ID. Fluid Compute reuses
+ * function instances across invocations, so warm functions amortise the
+ * `prices.retrieve` cost over many webhook deliveries.
+ */
+export interface ResolvedPrice {
+  tier: Tier | null;
+  pack: CreditPack | null;
+  interval: SubscriptionInterval | null;
+  active: boolean;
+  productId: string;
+}
+
+const priceCache = new Map<string, ResolvedPrice | null>();
+
+export async function resolvePriceLive(
+  priceId: string | undefined | null,
+): Promise<ResolvedPrice | null> {
+  if (!priceId) return null;
+
+  // Negative caching included: an unknown price stays unknown for the
+  // lifetime of this function instance so we don't beat on Stripe with a
+  // bad ID on every webhook retry.
+  if (priceCache.has(priceId)) {
+    return priceCache.get(priceId) ?? null;
+  }
+
+  // Local map gate first — keeps us from leaking signal about which
+  // price IDs are interesting to attackers via Stripe rate-limit
+  // patterns. (`stripe.prices.retrieve` is cheap, but no reason to
+  // call it for IDs we don't recognise.)
+  const tier = tierFromPriceId(priceId);
+  const pack = packFromPriceId(priceId);
+  if (!tier && !pack) {
+    console.warn("resolvePriceLive: price not in local map", priceId);
+    priceCache.set(priceId, null);
+    return null;
+  }
+
+  try {
+    const price = await stripe.prices.retrieve(priceId);
+    if (!price.active) {
+      console.warn("resolvePriceLive: price exists but is inactive", priceId);
+      priceCache.set(priceId, null);
+      return null;
+    }
+    const productId = typeof price.product === "string" ? price.product : price.product.id;
+    const resolved: ResolvedPrice = {
+      tier,
+      pack,
+      interval: intervalFromPriceId(priceId),
+      active: price.active,
+      productId,
+    };
+    priceCache.set(priceId, resolved);
+    return resolved;
+  } catch (err) {
+    // Stripe round-trip failed — do NOT cache so a transient outage
+    // doesn't poison the lookup. Caller treats null as "skip / no-op",
+    // which preserves idempotency: the webhook will be redelivered.
+    console.error("resolvePriceLive: stripe.prices.retrieve failed", { priceId, err });
+    return null;
+  }
+}

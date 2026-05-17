@@ -1,9 +1,9 @@
+import { timingSafeEqual } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   creditsForTier,
-  intervalFromPriceId,
+  resolvePriceLive,
   stripe,
-  tierFromPriceId,
 } from "../../lib/stripe.js";
 import { supabase } from "../../lib/supabase.js";
 
@@ -33,8 +33,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({ error: "cron_misconfigured" });
     return;
   }
-  const auth = req.headers.authorization ?? "";
-  if (auth !== `Bearer ${expected}`) {
+  const authHeader = req.headers.authorization;
+  const auth = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+  if (!isAuthorized(auth, expected)) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
@@ -59,15 +60,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const sub = await stripe.subscriptions.retrieve(row.id);
         const priceId = sub.items.data[0]?.price.id;
-        if (intervalFromPriceId(priceId) !== "year") {
+        const resolved = await resolvePriceLive(priceId);
+        if (!resolved || resolved.interval !== "year" || !resolved.tier) {
           skipped++;
           continue;
         }
-        const tier = tierFromPriceId(priceId);
-        if (!tier) {
-          skipped++;
-          continue;
-        }
+        const tier = resolved.tier;
 
         // Find the most recent paid invoice for this subscription — its
         // ID is the ledger ref base used by the webhook.
@@ -117,6 +115,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("/api/cron/grant-yearly-credits error", err);
     res.status(500).json({ error: "cron_failed", message: (err as Error).message });
   }
+}
+
+/**
+ * Constant-time bearer-token check (audit HIGH #5). The previous
+ * implementation used `auth !== `Bearer ${expected}`` which short-circuits
+ * at the first mismatched byte and is a textbook side-channel for
+ * brute-forcing a long secret a byte at a time. `timingSafeEqual` requires
+ * equal-length buffers, so we length-check first; the length of the
+ * expected secret is not itself a secret (it's a Vercel-config artifact).
+ */
+function isAuthorized(received: string | undefined, expected: string): boolean {
+  if (typeof received !== "string") return false;
+  const expectedHeader = `Bearer ${expected}`;
+  if (received.length !== expectedHeader.length) return false;
+  const a = Buffer.from(received);
+  const b = Buffer.from(expectedHeader);
+  return timingSafeEqual(a, b);
 }
 
 /** Whole-month difference between two dates (calendar months, not 30-day blocks). */
