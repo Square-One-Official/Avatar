@@ -9,6 +9,8 @@ import { Users } from "./collections/Users";
 import { Media } from "./collections/Media";
 import { Announcements } from "./collections/Announcements";
 import { BadgeComponents } from "./collections/BadgeComponents";
+import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
+import { AuditLog } from "./collections/AuditLog";
 import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,7 +24,7 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, BadgeComponents],
+  collections: [Users, Media, Announcements, BadgeComponents, NewsletterUnsubscribes, AuditLog],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {
@@ -32,15 +34,24 @@ export default buildConfig({
   // Payload's tables to a dedicated schema so they never collide with
   // the existing public.* tables (users, subscriptions, etc.).
   //
-  // Source preference: prefer the explicit DATABASE_URL, fall back to
-  // POSTGRES_URL_NON_POOLING (auto-injected by Vercel's Supabase
-  // integration). The non-pooled connection is used because Payload
+  // Source preference (audit CRITICAL #1 — scope Payload off the shared
+  // service-role connection):
+  //   1. PAYLOAD_DATABASE_URL — scoped `payload_app` role, owns only the
+  //      `payload` schema. See backend/sql/008_payload_scoped_role.sql.
+  //   2. DATABASE_URL — legacy fallback, typically the Supabase service /
+  //      postgres role. Acceptable during the rollover but should be
+  //      removed once PAYLOAD_DATABASE_URL is set on every environment.
+  //   3. POSTGRES_URL_NON_POOLING — auto-injected by Vercel's Supabase
+  //      integration; last-resort so local `vercel link` still works
+  //      against a fresh project.
+  // The non-pooled (port 5432) connection is used because Payload
   // migrations don't tolerate pgbouncer's transaction-mode pooling
   // (LISTEN/NOTIFY, prepared statements). For serverless runtime that's
   // a few extra ms; the admin app is low-traffic so the simplicity wins.
   db: postgresAdapter({
     pool: {
       connectionString:
+        process.env.PAYLOAD_DATABASE_URL ??
         process.env.DATABASE_URL ??
         process.env.POSTGRES_URL_NON_POOLING ??
         "",
