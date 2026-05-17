@@ -57,7 +57,7 @@ final class BackendClient {
     private unowned let auth: AuthManager
     private let session: URLSession
 
-    init(auth: AuthManager, session: URLSession = .shared) {
+    init(auth: AuthManager, session: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
         self.session = session
     }

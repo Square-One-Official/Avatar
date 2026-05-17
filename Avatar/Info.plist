@@ -37,6 +37,23 @@
 	<string>public.app-category.photography</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsArbitraryLoadsForMedia</key>
+		<false/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<false/>
+		<key>NSAllowsLocalNetworking</key>
+		<false/>
+	</dict>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Aaavatar needs access to your Desktop to read portrait files you drag in and to save exports you choose to write there.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Aaavatar needs access to Documents to read portrait files you import and to save exports and library archives you choose to write there.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Aaavatar needs access to Downloads to read portrait files you import and to save exports you choose to write there.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Aaavatar</string>
 	<key>NSPrincipalClass</key>
@@ -50,7 +67,7 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml</string>
+	<string>https://api.aaavatar.nl/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU=</string>
 	<key>SUScheduledCheckInterval</key>
