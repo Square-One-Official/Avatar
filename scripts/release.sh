@@ -179,6 +179,12 @@ with open(path, "w") as f:
     f.write(text)
 PY
 
+# Mirror the appcast into the backend deploy so api.aaavatar.nl/appcast.xml
+# stays in sync (audit HIGH #10 — self-hosted Sparkle feed). Old builds
+# pinned to the GitHub URL keep using the file under repo root; new
+# builds use the backend-served copy and benefit from TLS pinning.
+cp "$PROJECT_DIR/appcast.xml" "$PROJECT_DIR/backend/api/_appcast.xml"
+
 # 10. GitHub Release
 #     Idempotent: if the tag already exists (re-running for a higher BUILD
 #     under the same MARKETING_VERSION, e.g. shipping a hotfix without
@@ -204,4 +210,5 @@ echo ""
 echo "✅ Release v${VERSION} published!"
 echo ""
 echo "Don't forget:"
-echo "  1. Verify appcast.xml and commit + push"
+echo "  1. Verify appcast.xml + backend/api/_appcast.xml (both updated)"
+echo "     and commit + push"

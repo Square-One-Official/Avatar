@@ -1,0 +1,191 @@
+<?xml version="1.0" standalone="yes"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <item>
+      <title>Version 1.2.0</title>
+      <pubDate>Sun, 17 May 2026 18:07:33 +0200</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.2.0/Aaavatar-1.2.0.dmg"
+        length="21278156"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="qq4IzS1xnfIXx4E2WeidKKW/ZTmAzrHkJMIebMoyIcK/95CGfj0WtwY+jjgYGSWk4ljUpdC8HygmBV4rNuBnAw==" />
+    </item>
+    <item>
+      <title>Version 1.1.4</title>
+      <pubDate>Mon, 04 May 2026 12:41:11 +0200</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>1.1.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.1.4/Aaavatar-1.1.4.dmg"
+        length="21067890"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="sN6oZAchywhTDw1vLt/QcjU/DQfd0wixeRLynZReSXs9eyNnamRLqnhvhvWO0Sk1EC95+v8QKz91wIFYF0yBBw==" />
+    </item>
+    <item>
+      <title>Version 1.1.3</title>
+      <pubDate>Mon, 04 May 2026 12:30:00 +0200</pubDate>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>1.1.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.1.3/Aaavatar-1.1.3.dmg"
+        length="21065618"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="Su4AbhAtdwea24GG2bT8pdoAv1dnSF8UJvbckebijzWwrjkepYEe5dDLt3BjPvbx3whGXDTKizBncx/GgROwAA==" />
+    </item>
+    <item>
+      <title>Version 1.1.2</title>
+      <pubDate>Mon, 04 May 2026 10:31:11 +0200</pubDate>
+      <sparkle:version>14</sparkle:version>
+      <sparkle:shortVersionString>1.1.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.1.2/Aaavatar-1.1.2.dmg"
+        length="21058156"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="yd1dJuA9XgeOycbrsIw6HkQ3jwJ9otuNacaDdddEjlYvrGEXPinYjtRvae72ejMXFSzGOuYNt4jOoZ5V9Ki9AQ==" />
+    </item>
+    <item>
+      <title>Version 1.1.1</title>
+      <pubDate>Mon, 04 May 2026 01:23:38 +0200</pubDate>
+      <sparkle:version>13</sparkle:version>
+      <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.1.1/Aaavatar-1.1.1.dmg"
+        length="21068471"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="p6N3s2cRPvivNPDEoVYLr4hQ8VOLoWuZdEeZDUuCG7koysr4PxZWbKc7kp5c6BkmHvRWMbtGicYzpkOxl3rYCQ==" />
+    </item>
+    <item>
+      <title>Version 1.1.0</title>
+      <pubDate>Mon, 04 May 2026 00:51:44 +0200</pubDate>
+      <sparkle:version>12</sparkle:version>
+      <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.1.0/Aaavatar-1.1.0.dmg"
+        length="21091453"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="zno3AHgHFLHd9mDydCmEBjXciHnsosvNRMBRtZp2H9uhaZiJgH2u5fbko6rG4vmb+IWNeO1uYB39uvVHW0ARDA==" />
+    </item>
+    <item>
+      <title>Version 1.0.3</title>
+      <pubDate>Sun, 03 May 2026 21:53:17 +0200</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.3/Aaavatar-1.0.3.dmg"
+        length="21020996"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="BWwU0AfppFRjjS6T3WxLARfq5qZo29+VzBHYG2r51XorE6r6kDwyb7OUdFNaxlgLOMewI4byeR7SjJS+os6uAw==" />
+    </item>
+    <item>
+      <title>Version 1.0.2</title>
+      <pubDate>Sun, 03 May 2026 21:01:29 +0200</pubDate>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.2/Aaavatar-1.0.2.dmg"
+        length="19037931"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="y9g3gPVPqNdW2iihR2ZyfnDWSA4DwY4rGxf8nMqCwjirFKsFkF5n5eu4Ix3YwQ4CDrxCsEInYauaUwh0gdUqBg==" />
+    </item>
+    <item>
+      <title>Version 1.0.1</title>
+      <pubDate>Sun, 03 May 2026 20:01:01 +0200</pubDate>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.1/Aaavatar-1.0.1.dmg"
+        length="19827705"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="LmJgUuJMSGF0ko1qPrVezYG0maaU+MiiNUrolnXplkHZN2Ekchg3s9iTxZ1UCub13CAPGYpsIf6j0Jj3Vs4bDA==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Sun, 03 May 2026 15:47:26 +0200</pubDate>
+      <sparkle:version>8</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19482831"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="SXecTiI0ZUzc2J0HaiqMRZQEW1PMl61C4y35Ln2dF2kXuaZQ0w60zSngYth5nAb2phSpEprHLvqO8WcMSXdSCw==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Sat, 02 May 2026 09:44:49 +0200</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19425132"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="TgxiKoS7AiGB3CY4QydA+yhQLL+OLVOJivqhDdW899mh28e1i6U7S8zzpzWovC6UNVQ7nMjjuK3v0cYewXrVDg==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 15:28:19 +0200</pubDate>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19423893"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="IpkmuifoaswZxaece/pc8WTS+jEowBqUBmjfVMj9StwruCgGpfcnUUcMUYfM3YGO//0efVBeUHMtuwWk+u0bAQ==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 14:59:02 +0200</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19418997"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="Wpns98L1/aixV/XvMl9Dtthd1dEhom/ceytDgo/xwQ2JPTT2Ro8pIwnKFAX10THlkNGmaJTtOhAxkkGKYySDCg==" />
+    </item>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 14:30:30 +0200</pubDate>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19420480"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="N3b8b6A2y4CHNKGSDBule/j47MmQeRdP3fZSaUWuZBrw8fXI41f278z7Kzi6bWhIamLuP6UNX7dyo84LqT25DA==" />
+    </item>
+    <title>Avatar Updates</title>
+    <!--
+      Voeg een nieuw <item> toe per release.
+      Meest recente bovenaan.
+      edSignature genereer je met: ./sign_update Avatar-X.X.zip
+    -->
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Fri, 01 May 2026 13:47:58 +0200</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.0.0/Aaavatar-1.0.0.dmg"
+        length="19420456"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="hef5fa2LMIh/aNvB7Y6pKJkMG7sNJxzW4kzaEZhJj1C3Ncot9XKZ1fh3r/LbxFh1Wakndgu//+TBxWoURFUEBw==" />
+    </item>
+  </channel>
+</rss>

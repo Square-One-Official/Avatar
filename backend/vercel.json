@@ -18,6 +18,9 @@
     },
     "api/cron/grant-yearly-credits.ts": {
       "maxDuration": 60
+    },
+    "api/appcast.ts": {
+      "includeFiles": "api/_appcast.xml"
     }
   },
   "crons": [
@@ -28,6 +31,7 @@
   ],
   "rewrites": [
     { "source": "/v1/(.*)", "destination": "/api/v1/$1" },
-    { "source": "/auth-callback", "destination": "/api/auth-callback" }
+    { "source": "/auth-callback", "destination": "/api/auth-callback" },
+    { "source": "/appcast.xml", "destination": "/api/appcast" }
   ]
 }
