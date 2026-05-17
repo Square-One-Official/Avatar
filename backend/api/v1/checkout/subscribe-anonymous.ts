@@ -1,4 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import {
+  checkAnonCheckoutRateLimit,
+  clientIp,
+  requireDeviceFingerprint,
+} from "../../../lib/auth.js";
 import { sendCheckoutError } from "../../../lib/checkout-errors.js";
 import { isSubscriptionInterval, priceIdForTier, stripe } from "../../../lib/stripe.js";
 
@@ -26,6 +31,7 @@ const APP_SCHEME = process.env.APP_URL_SCHEME ?? "aaavatar";
  *   200 { url: string }                      — hosted Stripe Checkout URL
  *   400 { error: "invalid_interval" }         — bad body
  *   400 { error: "missing_device_fingerprint" }
+ *   429 { error: "rate_limited" }             — too many anonymous checkouts from this IP
  *   500 { error: "pricing_misconfigured" }    — env vars
  *   502 { error: "stripe_unavailable" | "checkout_init_failed", requestId }
  */
@@ -35,9 +41,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const fingerprint = req.headers["x-device-fingerprint"];
-  if (typeof fingerprint !== "string" || !fingerprint) {
-    res.status(400).json({ error: "missing_device_fingerprint" });
+  const fingerprint = requireDeviceFingerprint(req, res);
+  if (!fingerprint) return; // 400 already written
+
+  // Per-IP cap on Stripe Session creation. Even abandoned sessions consume
+  // Stripe API quota and pollute the dashboard; without this, an attacker
+  // can spray fingerprints and burn through our rate budget. 5/hour is
+  // well above any honest retry pattern.
+  const allowed = await checkAnonCheckoutRateLimit(clientIp(req));
+  if (!allowed) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 

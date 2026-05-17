@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { optionalUser } from "../../lib/auth.js";
+import {
+  checkAnonAccountRateLimit,
+  clientIp,
+  maskEmail,
+  optionalUser,
+  readDeviceFingerprint,
+} from "../../lib/auth.js";
 import {
   activeSubscription,
   currentCredits,
@@ -109,8 +115,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // device has a paid Pro grant from a pre-auth checkout. Resolve the
     // account that owns the grant and serve a Pro payload tagged
     // `needs_account_link: true`.
-    const fingerprint = req.headers["x-device-fingerprint"];
-    if (typeof fingerprint === "string" && fingerprint) {
+    //
+    // Two anti-enumeration measures (both required — neither is sufficient
+    // alone):
+    //   1. Strict UUID validation so the fingerprint search space is at
+    //      least the full v4 UUID space, not arbitrary attacker-chosen
+    //      strings.
+    //   2. Per-IP rate limit on this anonymous lookup so an attacker can't
+    //      iterate UUIDs from a single host. The limit (60/min) is well
+    //      above what a single client needs on launch + scenePhase events.
+    //
+    // We also only return a *masked* email — the device-fingerprint header
+    // is a low-entropy secret (UserDefaults plist, recoverable by anyone
+    // with disk access), so the response must not turn into a fingerprint
+    // → email oracle.
+    const fingerprint = readDeviceFingerprint(req);
+    if (fingerprint) {
+      const ipAllowed = await checkAnonAccountRateLimit(clientIp(req));
+      if (!ipAllowed) {
+        res.status(429).json({ error: "rate_limited" });
+        return;
+      }
+
       const { data: grant } = await supabase
         .from("device_grants")
         .select("user_id")
@@ -144,7 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           free_imports_used: freeImports,
           free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
           needs_account_link: true,
-          link_email: grantedEmail,
+          link_email: maskEmail(grantedEmail),
         });
         return;
       }

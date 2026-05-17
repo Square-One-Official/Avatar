@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { optionalUser } from "../../lib/auth.js";
+import { optionalUser, requireDeviceFingerprint } from "../../lib/auth.js";
 import {
   activeSubscription,
   ensureUser,
@@ -15,7 +15,7 @@ import {
  * Body:    (empty)
  * Returns: 200 { allowed: true,  imports_used: int, imports_remaining: int }
  *          402 { allowed: false, imports_used: int, imports_remaining: 0 }
- *          400 { error: "missing_fingerprint" }
+ *          400 { error: "missing_device_fingerprint" }
  *          401 { error: "..." }   // only when an explicit, invalid token is sent
  *
  * Atomically reserves one lifetime free-import slot before the client
@@ -36,12 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const fingerprint = req.headers["x-device-fingerprint"];
-  const fp = Array.isArray(fingerprint) ? fingerprint[0] : fingerprint;
-  if (!fp || typeof fp !== "string" || fp.length < 8 || fp.length > 128) {
-    res.status(400).json({ error: "missing_fingerprint" });
-    return;
-  }
+  const fp = requireDeviceFingerprint(req, res);
+  if (!fp) return; // 400 already written
 
   const user = await optionalUser(req, res);
   if (user === "rejected") return; // 401 already written

@@ -1,4 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import {
+  checkMagicLinkRateLimit,
+  maskEmail,
+  requireDeviceFingerprint,
+} from "../../../lib/auth.js";
 import { supabase } from "../../../lib/supabase.js";
 
 const APP_SCHEME = process.env.APP_URL_SCHEME ?? "aaavatar";
@@ -22,6 +27,7 @@ const APP_SCHEME = process.env.APP_URL_SCHEME ?? "aaavatar";
  *   200 { sent: true }
  *   400 { error: "missing_device_fingerprint" }
  *   404 { error: "no_grant_for_device" }      — caller is not a paid device
+ *   429 { error: "rate_limited" }              — too many sends for this device
  *   500 { error: "send_failed" }
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -30,9 +36,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const fingerprint = req.headers["x-device-fingerprint"];
-  if (typeof fingerprint !== "string" || !fingerprint) {
-    res.status(400).json({ error: "missing_device_fingerprint" });
+  const fingerprint = requireDeviceFingerprint(req, res);
+  if (!fingerprint) return; // 400 already written
+
+  // Rate-limit before the DB lookup. An attacker iterating UUIDs would
+  // otherwise burn Supabase reads even on 404s; gating up front keeps the
+  // cost of probing flat.
+  const allowed = await checkMagicLinkRateLimit(fingerprint);
+  if (!allowed) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 
@@ -71,7 +83,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     if (sendErr) throw sendErr;
 
-    res.status(200).json({ sent: true, email });
+    // Return a masked email so the UI can show "sent to t****y@e***.com"
+    // without turning this endpoint into a fingerprint→email oracle for
+    // anyone able to guess (or brute-force) the device fingerprint.
+    res.status(200).json({ sent: true, email: maskEmail(email) });
   } catch (err) {
     console.error("/v1/account/resend-magic-link error", err);
     res.status(500).json({ error: "send_failed" });
