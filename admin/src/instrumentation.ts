@@ -18,9 +18,15 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   try {
+    // `webpackIgnore: true` tells webpack to leave these as native Node
+    // dynamic imports. Without it, the presence of `src/middleware.ts`
+    // makes Next.js also compile this file for the Edge runtime, and the
+    // Edge build then chokes on Payload's transitive Node-only deps
+    // (`payload` → `pg` → `net`, etc.). The runtime guard above keeps
+    // these imports unreachable from Edge anyway.
     const [{ getPayload }, configModule] = await Promise.all([
-      import("payload"),
-      import("./payload.config"),
+      import(/* webpackIgnore: true */ "payload"),
+      import(/* webpackIgnore: true */ "./payload.config.js"),
     ]);
     await getPayload({ config: configModule.default });
     console.log("[instrumentation] Payload initialised — schema synced");
