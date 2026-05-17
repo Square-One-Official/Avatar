@@ -37,3 +37,9 @@ Carthage/Build
 RobustVideoMatting/
 .vercel
 build_release.log
+
+# Signed Data-Processing Agreement PDFs (audit HIGH #15)
+docs/legal/dpa/
+
+# Incremental TS build state (per-project, machine-local)
+*.tsbuildinfo

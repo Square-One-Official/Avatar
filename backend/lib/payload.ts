@@ -236,6 +236,48 @@ function headingLevel(tag: string | undefined): number {
 }
 
 /**
+ * Records a newsletter unsubscribe in Payload's `newsletter-unsubscribes`
+ * collection (audit HIGH #15). Idempotent — the collection has a unique
+ * index on `email`, so re-clicking a stale link is a no-op. Returns true
+ * when the row was created OR already existed (i.e. the user is now
+ * opted-out); false on configuration / transport failure.
+ */
+export async function recordNewsletterUnsubscribe(
+  email: string,
+  source: "one_click" | "list_unsubscribe_post" | "manual" = "one_click",
+): Promise<boolean> {
+  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — unsubscribe NOT recorded");
+    return false;
+  }
+
+  const url = `${PAYLOAD_API_URL.replace(/\/$/, "")}/newsletter-unsubscribes`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `users API-Key ${PAYLOAD_API_KEY}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ email: email.trim().toLowerCase(), source }),
+  });
+
+  if (res.ok) return true;
+
+  // The unique index makes a second click return 400 with a Postgres
+  // duplicate-key error wrapped in Payload's error envelope. Treat it as
+  // success — the user is opted out either way.
+  if (res.status === 400) {
+    const text = await res.text().catch(() => "");
+    if (/duplicate|unique/i.test(text)) return true;
+    console.warn("unsubscribe POST 400 (not duplicate)", text);
+    return false;
+  }
+  console.error("unsubscribe POST failed", res.status, await res.text().catch(() => ""));
+  return false;
+}
+
+/**
  * Best-effort semver compare — returns true if `version >= min`. Falls
  * back to "true" on anything unparseable so a typo in `minAppVersion`
  * never blocks an announcement entirely.

@@ -1,10 +1,11 @@
-import type { Endpoint, PayloadHandler } from "payload";
+import type { Endpoint, Payload, PayloadHandler } from "payload";
 import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as React from "react";
 import AnnouncementEmail from "../emails/AnnouncementEmail";
 import { lexicalToHtml } from "../lib/lexical";
 import { resolveRecipients } from "../lib/recipients";
+import { unsubscribeUrlFor } from "../lib/unsubscribe-token";
 
 /**
  * POST /api/send-newsletter
@@ -73,15 +74,21 @@ const handler: PayloadHandler = async (req) => {
   const bodySource = newsletter?.customBody ?? (ann as { body?: unknown }).body;
   const bodyHtml = lexicalToHtml(bodySource);
 
-  const html = await render(
-    React.createElement(AnnouncementEmail, {
-      title,
-      bodyHtml,
-      imageUrl,
-      cta,
-      unsubscribeUrl: undefined, // Wire up before any non-test bulk send.
-    }),
-  );
+  // Helper: render the email body with this recipient's unsubscribe URL
+  // baked in. Doing it per-recipient is the only way to keep the link
+  // bound to the specific address — Resend's `batch.send` accepts an
+  // array of distinct messages, so the per-recipient cost is just an HMAC
+  // + a `render()` call (both cheap; the JSX tree is tiny).
+  const renderForRecipient = async (recipient: string): Promise<string> =>
+    render(
+      React.createElement(AnnouncementEmail, {
+        title,
+        bodyHtml,
+        imageUrl,
+        cta,
+        unsubscribeUrl: unsubscribeUrlFor(recipient),
+      }),
+    );
 
   const subject = newsletter?.subject?.trim() || title;
   const fromName = newsletter?.fromName?.trim() || process.env.RESEND_FROM_NAME || "Aaavatar";
@@ -91,11 +98,14 @@ const handler: PayloadHandler = async (req) => {
   const resend = new Resend(apiKey);
 
   if (testMode) {
+    const testHtml = await renderForRecipient(testEmail);
+    const testUnsubscribeUrl = unsubscribeUrlFor(testEmail);
     const { data, error } = await resend.emails.send({
       from,
       to: testEmail,
       subject: `[TEST] ${subject}`,
-      html,
+      html: testHtml,
+      headers: listUnsubscribeHeaders(testUnsubscribeUrl),
     });
     if (error) {
       return Response.json({ error: error.message }, { status: 500 });
@@ -113,18 +123,51 @@ const handler: PayloadHandler = async (req) => {
     const arr = (ann as { audienceEmails?: { email?: string }[] }).audienceEmails ?? [];
     return arr.map((e) => e.email ?? "").filter(Boolean);
   })();
-  const recipients = await resolveRecipients(audience, audienceEmails);
+  const cohort = await resolveRecipients(audience, audienceEmails);
+
+  // GDPR Art. 21 / CAN-SPAM: anyone who clicked unsubscribe in a previous
+  // newsletter must be filtered out of every audience before send. The
+  // Payload `newsletter-unsubscribes` collection is the source of truth;
+  // we pull every row (it's small — at most "every user who's ever
+  // opted out") and exclude their emails from the cohort.
+  const optOut = await fetchUnsubscribedEmails(req.payload);
+  const recipients = cohort.filter((e) => !optOut.has(e.toLowerCase()));
+  const skippedOptOut = cohort.length - recipients.length;
   if (recipients.length === 0) {
-    return Response.json({ error: "No recipients matched" }, { status: 400 });
+    return Response.json(
+      {
+        error: skippedOptOut > 0
+          ? "All matched users have unsubscribed from the newsletter"
+          : "No recipients matched",
+      },
+      { status: 400 },
+    );
   }
 
   // Batch through Resend's bulk-send API. Each call accepts up to 100
   // emails; we use 50 to leave headroom for retries.
   const BATCH = 50;
-  const batches: { from: string; to: string; subject: string; html: string }[][] = [];
+  type Message = {
+    from: string;
+    to: string;
+    subject: string;
+    html: string;
+    headers: Record<string, string>;
+  };
+  const batches: Message[][] = [];
   for (let i = 0; i < recipients.length; i += BATCH) {
     const slice = recipients.slice(i, i + BATCH);
-    batches.push(slice.map((to) => ({ from, to, subject, html })));
+    const rendered = await Promise.all(slice.map(async (to) => {
+      const url = unsubscribeUrlFor(to);
+      return {
+        from,
+        to,
+        subject,
+        html: await renderForRecipient(to),
+        headers: listUnsubscribeHeaders(url),
+      };
+    }));
+    batches.push(rendered);
   }
 
   let sent = 0;
@@ -156,8 +199,49 @@ const handler: PayloadHandler = async (req) => {
     },
   });
 
-  return Response.json({ ok: true, sent, batches: batches.length });
+  return Response.json({ ok: true, sent, batches: batches.length, skippedOptOut });
 };
+
+/**
+ * RFC 8058 + RFC 2369: the `List-Unsubscribe` header is the
+ * URL-and-mailto form; `List-Unsubscribe-Post` opts the message into
+ * Gmail / Outlook's one-click button by promising the URL accepts a
+ * bodyless POST. Our /v1/unsubscribe endpoint handles both GET (link
+ * click) and POST (one-click) shapes.
+ */
+function listUnsubscribeHeaders(url: string): Record<string, string> {
+  return {
+    "List-Unsubscribe": `<${url}>, <mailto:news@aaavatar.nl?subject=unsubscribe>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
+/**
+ * Pull every recorded unsubscribe via Payload's local API and return a
+ * lowercased Set for O(1) cohort filtering. The collection is bounded
+ * (one row per opted-out address ever), so paginating once with a large
+ * limit is fine for the foreseeable future.
+ */
+async function fetchUnsubscribedEmails(payload: Payload): Promise<Set<string>> {
+  const set = new Set<string>();
+  try {
+    const result = await payload.find({
+      collection: "newsletter-unsubscribes",
+      limit: 10_000,
+      pagination: false,
+      depth: 0,
+    });
+    for (const doc of result.docs ?? []) {
+      const email = (doc as { email?: unknown }).email;
+      if (typeof email === "string") set.add(email.trim().toLowerCase());
+    }
+  } catch (err) {
+    // Fail-closed would block all sends on a flake. Fail-open is the
+    // honest trade-off: we log loudly so the operator catches it.
+    console.error("fetchUnsubscribedEmails failed — filter skipped", err);
+  }
+  return set;
+}
 
 export const sendNewsletterEndpoint: Endpoint = {
   path: "/send-newsletter",
