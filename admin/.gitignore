@@ -6,3 +6,4 @@ node_modules
 .env.*.local
 payload-types.ts
 next-env.d.ts
+.env*.local
