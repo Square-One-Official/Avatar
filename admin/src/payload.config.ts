@@ -14,6 +14,7 @@ import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default buildConfig({
+  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL ?? "http://localhost:3001",
   admin: {
     user: Users.slug,
     meta: {
