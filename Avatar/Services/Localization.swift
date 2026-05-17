@@ -371,6 +371,18 @@ enum Loc {
         en ? "Disabled in Local-only mode."
            : "Uitgeschakeld in modus Alleen lokaal."
     }
+    // Audit MEDIUM #27. Toggle copy is intentionally honest: today the
+    // app sends no telemetry beyond what Supabase Auth always logs, so
+    // the description names the forward-looking contract rather than
+    // pretending current behaviour changes.
+    static var privacyDiagnosticsTitle: String {
+        en ? "Share anonymous diagnostics"
+           : "Anonieme diagnostiek delen"
+    }
+    static var privacyDiagnosticsDesc: String {
+        en ? "Aaavatar currently sends no usage analytics. If we add optional telemetry (app version, macOS version, feature usage), this switch governs it. Sign-in events go through Supabase regardless — see Privacy Policy."
+           : "Aaavatar verstuurt op dit moment geen gebruiksanalyses. Als we straks optionele telemetrie toevoegen (appversie, macOS-versie, functie­gebruik), bepaalt deze schakelaar of die meegaat. Aanmeldgebeurtenissen lopen sowieso via Supabase — zie het privacybeleid."
+    }
     // MARK: Downloadable matting model (ORMBG)
     static var modelDownloadButton: String {
         en ? "Download model" : "Model downloaden"

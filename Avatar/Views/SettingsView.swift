@@ -126,6 +126,26 @@ private struct PrivacyAndAISection: View {
                     DownloadedModelStatusView()
                 }
             }
+
+            Divider().padding(.vertical, 4)
+
+            // Audit MEDIUM #27. Forward-looking opt-out: today nothing
+            // beyond what Supabase Auth always logs leaves the app, but
+            // any future telemetry surface (Sparkle system profile,
+            // crash reporting, usage events) must read this flag.
+            Toggle(isOn: Binding(
+                get: { prefs.shareAnonymousDiagnostics },
+                set: { prefs.shareAnonymousDiagnostics = $0 }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Loc.privacyDiagnosticsTitle)
+                    Text(Loc.privacyDiagnosticsDesc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .toggleStyle(.switch)
         }
     }
 }

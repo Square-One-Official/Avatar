@@ -23,8 +23,21 @@ import Foundation
 enum DeviceFingerprint {
     private static let key = "nl.aaavatar.Avatar.DeviceFingerprint.id"
 
+    /// Process-local ephemeral fingerprint. Generated lazily on first
+    /// access via `useEphemeralForThisLaunch`, regenerated on next launch
+    /// (it's in-memory only). Audit MEDIUM #26.
+    nonisolated(unsafe) private static var ephemeral: String?
+
     /// Returns the stored UUID, generating one on first access. Idempotent.
+    ///
+    /// When `useEphemeralForThisLaunch` has been called (currently from
+    /// `PrivacyPreferences` whenever `mode == .localOnly`), this returns
+    /// a fresh UUID generated once per process and held only in memory.
+    /// Trade-off: per-device free-trial counters reset on every launch in
+    /// that mode, which is acceptable because localOnly users opt out of
+    /// the cloud features the counter primarily protects.
     static var current: String {
+        if let eph = ephemeral { return eph }
         let defaults = UserDefaults.standard
         if let existing = defaults.string(forKey: key), !existing.isEmpty {
             return existing
@@ -32,5 +45,23 @@ enum DeviceFingerprint {
         let new = UUID().uuidString
         defaults.set(new, forKey: key)
         return new
+    }
+
+    /// Switch this process into ephemeral mode — `current` returns a
+    /// fresh UUID generated lazily on next access, held only in memory.
+    /// The persisted UserDefaults UUID is intentionally left alone so
+    /// flipping the privacy mode back to `cloudAllowed` (mid-launch or
+    /// next launch) returns the stable identity.
+    static func useEphemeralForThisLaunch() {
+        guard ephemeral == nil else { return }
+        ephemeral = UUID().uuidString
+    }
+
+    /// Drop ephemeral mode for the rest of the process — `current` goes
+    /// back to reading the UserDefaults UUID. Called when the user
+    /// switches OUT of localOnly so a cloud sign-in attempt in the same
+    /// session picks up the stable identity the backend already knows.
+    static func dropEphemeral() {
+        ephemeral = nil
     }
 }

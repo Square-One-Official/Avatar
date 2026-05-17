@@ -45,8 +45,9 @@ enum LocalCutoutEngine: String, CaseIterable, Codable, Sendable {
 @Observable
 final class PrivacyPreferences {
 
-    static let modeKey   = "aiPrivacyMode"
-    static let engineKey = "localCutoutEngine"
+    static let modeKey               = "aiPrivacyMode"
+    static let engineKey             = "localCutoutEngine"
+    static let shareDiagnosticsKey   = "shareAnonymousDiagnostics"
 
     /// Default for new users coming through onboarding is whatever they
     /// pick. Default for migrated existing users is `cloudAllowed`,
@@ -57,6 +58,25 @@ final class PrivacyPreferences {
     var mode: AIPrivacyMode = .cloudAllowed {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
+            // Audit MEDIUM #26: localOnly users get an ephemeral device
+            // fingerprint regenerated on every launch, so this Mac isn't
+            // tracked across sessions by the backend's anti-cheat counter.
+            // Flipping back to cloudAllowed restores the persisted UUID
+            // so existing subscription / device_grants rows still match.
+            applyFingerprintPolicy(for: mode)
+        }
+    }
+
+    /// Centralised translation of `mode` → device-fingerprint strategy.
+    /// Called from `didSet` and from `init` so a fresh launch in
+    /// `localOnly` immediately goes ephemeral instead of waiting for the
+    /// next mutation.
+    private func applyFingerprintPolicy(for mode: AIPrivacyMode) {
+        switch mode {
+        case .localOnly:
+            DeviceFingerprint.useEphemeralForThisLaunch()
+        case .cloudAllowed:
+            DeviceFingerprint.dropEphemeral()
         }
     }
 
@@ -67,6 +87,23 @@ final class PrivacyPreferences {
     var engine: LocalCutoutEngine = .appleVision {
         didSet {
             UserDefaults.standard.set(engine.rawValue, forKey: Self.engineKey)
+        }
+    }
+
+    /// User-facing consent for anonymous diagnostics (audit MEDIUM #27).
+    /// Today the app sends NO product analytics — but Sparkle's update
+    /// channel can optionally include `SUEnableSystemProfiling` (macOS
+    /// version, hardware model, locale; default off) and Supabase Auth
+    /// internally records sign-in events. This flag is the contract we
+    /// honour: while it is `false`, the app must not enable any
+    /// optional telemetry and must prefer the most privacy-preserving
+    /// path through any vendor SDK. Default `true` mirrors what the app
+    /// does today (no telemetry beyond what Supabase Auth always logs);
+    /// the toggle is forward-looking so a future Sparkle profile flip
+    /// doesn't ship without an opt-out.
+    var shareAnonymousDiagnostics: Bool = true {
+        didSet {
+            UserDefaults.standard.set(shareAnonymousDiagnostics, forKey: Self.shareDiagnosticsKey)
         }
     }
 
@@ -89,5 +126,14 @@ final class PrivacyPreferences {
            let e = LocalCutoutEngine(rawValue: raw) {
             self.engine = e
         }
+        // `bool(forKey:)` returns false for unset keys — guard with
+        // `object(forKey:)` so a missing key keeps the default (true)
+        // instead of silently opting the user out.
+        if UserDefaults.standard.object(forKey: Self.shareDiagnosticsKey) != nil {
+            self.shareAnonymousDiagnostics = UserDefaults.standard.bool(forKey: Self.shareDiagnosticsKey)
+        }
+        // didSet on `mode` doesn't run during property initialisation, so
+        // apply the fingerprint policy explicitly on first launch.
+        applyFingerprintPolicy(for: mode)
     }
 }
