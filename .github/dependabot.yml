@@ -1,0 +1,66 @@
+# Dependency-update automation (audit HIGH #13).
+#
+# Two ecosystems, two cadences:
+#   - admin/    npm — Next.js + Payload; weekly so security advisories
+#                land within a sprint of disclosure.
+#   - backend/  npm — small surface; same weekly cadence.
+#
+# Major upgrades are NOT auto-merged: Payload v4 in particular needs a
+# manual schema-migration review (the Drizzle adapter still rewrites
+# tables on `push: true`). Patch + minor PRs are grouped to keep the
+# review noise down.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "admin"
+    groups:
+      patch-and-minor:
+        update-types:
+          - "patch"
+          - "minor"
+        # Keep Payload + Next.js out of the auto-group; their upgrades
+        # benefit from individual review.
+        exclude-patterns:
+          - "payload"
+          - "@payloadcms/*"
+          - "next"
+          - "react"
+          - "react-dom"
+    ignore:
+      # @react-email/components 1.0+ is a semver-major rewrite that
+      # changes the public API. Hold until a dedicated upgrade PR.
+      - dependency-name: "@react-email/components"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      patch-and-minor:
+        update-types:
+          - "patch"
+          - "minor"
+
+  # Lightweight check that GitHub Actions themselves (if any get added
+  # later) don't sit on stale SHAs.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"

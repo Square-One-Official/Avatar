@@ -1,0 +1,99 @@
+name: CI
+
+# Cheap pre-merge sanity. Both Vercel projects do their own typecheck +
+# build at deploy time; this workflow catches regressions BEFORE the
+# branch is merged, so a broken type doesn't reach `main`. Also lints
+# `appcast.xml` because that file is hand-edited on every release and
+# Sparkle's parser is unforgiving (audit MEDIUM #31).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-typecheck:
+    name: Backend (avatars-api) typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm run typecheck
+        working-directory: backend
+      - name: npm audit (production deps, high+ severity)
+        run: npm audit --production --audit-level=high
+        working-directory: backend
+
+  admin-typecheck:
+    name: Admin (avatar-admin) typecheck + build
+    runs-on: ubuntu-latest
+    env:
+      # Build-time env so payload.config.ts evaluates without crashing.
+      # All values are placeholders — the build doesn't connect anywhere.
+      PAYLOAD_SECRET: ci-placeholder
+      ADMIN_TOTP_SECRET: ci-placeholder
+      ADMIN_MFA_SIGNING_SECRET: ci-placeholder
+      UNSUBSCRIBE_SIGNING_SECRET: ci-placeholder
+      SUPABASE_URL: https://placeholder.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: admin/package-lock.json
+      - run: npm ci
+        working-directory: admin
+      - run: npx tsc --noEmit
+        working-directory: admin
+      - run: npx next build
+        working-directory: admin
+      - name: npm audit (production deps, high+ severity)
+        run: npm audit --production --audit-level=high
+        working-directory: admin
+
+  appcast-lint:
+    name: Sparkle appcast.xml lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: xmllint well-formedness check
+        run: xmllint --noout appcast.xml
+      - name: Sanity-check Sparkle fields
+        # Each `<item>` must carry an `<enclosure>` with both a URL and
+        # an `sparkle:edSignature` so Sparkle won't refuse the update on
+        # the user's Mac. Catches a forgotten signature paste during
+        # release prep.
+        run: |
+          python3 <<'PY'
+          import xml.etree.ElementTree as ET, sys
+          ns = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
+          root = ET.parse("appcast.xml").getroot()
+          missing = []
+          for item in root.iter("item"):
+              title = (item.findtext("title") or "?").strip()
+              enc = item.find("enclosure")
+              if enc is None:
+                  missing.append((title, "no <enclosure>")); continue
+              if not enc.attrib.get("url"):
+                  missing.append((title, "enclosure missing url"))
+              if not enc.attrib.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature"):
+                  missing.append((title, "enclosure missing sparkle:edSignature"))
+          if missing:
+              for t, why in missing:
+                  print(f"::error file=appcast.xml::{t}: {why}")
+              sys.exit(1)
+          print(f"appcast.xml ok — {sum(1 for _ in root.iter('item'))} item(s) validated")
+          PY
