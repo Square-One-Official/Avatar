@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { auditHooks } from "../lib/audit-hooks";
 
 /**
  * Admin operators. Just one user (you) at first. API-key auth is enabled
@@ -27,4 +28,14 @@ export const Users: CollectionConfig = {
     delete: ({ req }) => Boolean(req.user),
   },
   fields: [],
+  hooks: (() => {
+    const a = auditHooks<{ email?: string }>(
+      "users",
+      (doc) => doc.email ?? "(unknown email)",
+    );
+    return {
+      afterChange: [a.afterChange],
+      afterDelete: [a.afterDelete],
+    };
+  })(),
 };

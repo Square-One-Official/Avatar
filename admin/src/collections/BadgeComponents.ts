@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { auditHooks } from "../lib/audit-hooks";
 
 /**
  * Registry of components in the macOS app that can wear a "NEW" badge.
@@ -30,4 +31,14 @@ export const BadgeComponents: CollectionConfig = {
     { name: "componentId", type: "text", required: true, unique: true },
     { name: "label", type: "text", required: true, admin: { description: "Human-readable name shown in the dropdown." } },
   ],
+  hooks: (() => {
+    const a = auditHooks<{ label?: string; componentId?: string }>(
+      "badge-components",
+      (doc) => doc.label ?? doc.componentId ?? "(unnamed)",
+    );
+    return {
+      afterChange: [a.afterChange],
+      afterDelete: [a.afterDelete],
+    };
+  })(),
 };

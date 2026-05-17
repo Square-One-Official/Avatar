@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { auditHooks } from "../lib/audit-hooks";
 
 /**
  * The core CMS document. One Announcement drives:
@@ -206,4 +207,14 @@ export const Announcements: CollectionConfig = {
       ],
     },
   ],
+  hooks: (() => {
+    const a = auditHooks<{ title?: string; slug?: string }>(
+      "announcements",
+      (doc) => doc.title ?? doc.slug ?? "(untitled)",
+    );
+    return {
+      afterChange: [a.afterChange],
+      afterDelete: [a.afterDelete],
+    };
+  })(),
 };
