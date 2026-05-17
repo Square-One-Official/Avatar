@@ -3,6 +3,37 @@ import SwiftData
 import AppKit
 import UniformTypeIdentifiers
 
+// MARK: - Concurrency model (audit HIGH #9)
+//
+// `ImportFlow` reaches off the main actor for the slow stuff (file I/O,
+// CGImage decode, Subject Lift V2 inference, BiRefNet / Flux model
+// calls) while keeping SwiftData mutations on `@MainActor`. The discipline
+// is enforced by a single rule with three concrete sub-rules.
+//
+// Rule: never let a non-Sendable type cross a `Task.detached` boundary.
+//
+//   1. **`ModelContext` stays on the main actor.** It is *not* Sendable.
+//      Capture the `ModelContainer` (which is) before the detached
+//      block, then re-derive `container.mainContext` inside an
+//      `await MainActor.run { … }` whenever we need to write.
+//   2. **`Portrait` (SwiftData @Model) stays on the main actor too.**
+//      Cross the boundary with the portrait's `UUID` only; fetch by
+//      `#Predicate { $0.id == portraitID }` on the main actor at the
+//      mutation site.
+//   3. **`AppState` is `@MainActor`-bound and Sendable by isolation.**
+//      Reads / writes from inside a detached block MUST go through
+//      `await MainActor.run { appState.foo = … }`. The compiler
+//      enforces this under `SWIFT_STRICT_CONCURRENCY=targeted`
+//      (set in `project.yml`), so a future refactor that forgets the
+//      `MainActor.run` wrap will fail to build instead of crashing at
+//      runtime.
+//
+// The cancellation contract (audit MEDIUM #28) is layered on top: each
+// detached task handle is registered with `appState.trackImportTask(_:)`
+// so a backgrounded window / sheet dismissal can call
+// `appState.cancelInFlightImports()` and the next `await` boundary
+// inside each task throws CancellationError cleanly.
+
 /// Centralised drop-handler used by every view that should accept a portrait
 /// drag-and-drop (the empty-state import zone AND the editor surface, so users
 /// can drop a fresh photo at any time without going back to an empty state).
@@ -208,7 +239,7 @@ enum ImportFlow {
         // Capture Sendable container; runPipeline derives the main context.
         let container = context.container
 
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             // Reserve the server-side slot first so the cheat path
             // (delete-then-reimport) is closed before we even decode.
             let allowed = await claimImportSlot(appState: appState)
@@ -246,6 +277,9 @@ enum ImportFlow {
                               container: container, appState: appState,
                               useCloud: useCloud)
         }
+        // Audit MEDIUM #28: register so a window-background or sheet-
+        // dismissal cancels the in-flight pipeline cleanly.
+        appState.trackImportTask(task)
     }
 
     /// Variant for when raw image bytes are already in memory (e.g. dragged from
@@ -259,7 +293,7 @@ enum ImportFlow {
         let useCloud = shouldUseMagicCutout(appState: appState)
         let container = context.container
 
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             // Same anti-cheat gate as importFile — see claimImportSlot.
             let allowed = await claimImportSlot(appState: appState)
             guard allowed else { return }
@@ -276,6 +310,7 @@ enum ImportFlow {
                               container: container, appState: appState,
                               useCloud: useCloud)
         }
+        appState.trackImportTask(task)
     }
 
     /// Re-runs the cutout pipeline on an existing portrait via cloud Magic
@@ -314,7 +349,7 @@ enum ImportFlow {
         dlog("[Reprocess] start id=\(portrait.id) \(cg.width)x\(cg.height)")
 
         let portraitID = portrait.id
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             do {
                 let result = try await runCloudWithFallback(cg: cg, appState: appState)
                 let processed = result.subject
@@ -356,6 +391,7 @@ enum ImportFlow {
                 }
             }
         }
+        appState.trackImportTask(task)
     }
 
     // MARK: - Magic Retouch
@@ -380,7 +416,7 @@ enum ImportFlow {
         dlog("[MagicRetouch] start id=\(portrait.id) \(cutoutCG.width)×\(cutoutCG.height)")
 
         let portraitID = portrait.id
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             guard let enhanced = ImageProcessor.magicRetouch(image: cutoutCG) else {
                 await MainActor.run {
                     appState.warn(Loc.magicRetouchFailed)
@@ -410,6 +446,7 @@ enum ImportFlow {
                 dlog("[MagicRetouch] DONE id=\(fresh.id)")
             }
         }
+        appState.trackImportTask(task)
     }
 
     /// Reverts Magic Retouch by restoring the pre-retouch cutout.
@@ -480,7 +517,7 @@ enum ImportFlow {
         let portraitID = portrait.id
         let backend = appState.backend
 
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             do {
                 // Detect the face on the pre-fill cutout so the backend can
                 // lock that region as never-paint in the outpaint mask. The
@@ -597,6 +634,7 @@ enum ImportFlow {
                 }
             }
         }
+        appState.trackImportTask(task)
     }
 
     /// Reverts Fill in Body by restoring the snapshotted cutout and geometry.
@@ -672,7 +710,7 @@ enum ImportFlow {
         let portraitID = portrait.id
         let backend = appState.backend
 
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             do {
                 let (newCutoutPNG, creditsRemaining) = try await backend.colorize(
                     imagePNG: cutoutData
@@ -728,6 +766,7 @@ enum ImportFlow {
                 }
             }
         }
+        appState.trackImportTask(task)
     }
 
     /// Reverts Colorise by restoring the snapshotted B&W cutout. One-shot:

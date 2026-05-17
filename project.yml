@@ -17,6 +17,13 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.10"
+    # Audit HIGH #9: turn on Swift 6 strict-concurrency diagnostics in
+    # "targeted" mode — flags Sendable + actor-isolation violations as
+    # warnings without forcing a full Swift 6 language-mode migration.
+    # `ImportFlow.swift` is the highest-risk surface; its existing pattern
+    # (pass `ModelContainer`, re-derive `ModelContext` on `@MainActor`,
+    # touch `AppState` only via `MainActor.run`) is already compatible.
+    SWIFT_STRICT_CONCURRENCY: "targeted"
     MARKETING_VERSION: "1.2.0"
     CURRENT_PROJECT_VERSION: "17"
     DEVELOPMENT_TEAM: "5J92MMGKTX"
@@ -68,7 +75,30 @@ targets:
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
-        SUFeedURL: "https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml"
+        # Privacy usage strings — audit CRITICAL #4. Aaavatar accesses
+        # files exclusively through NSOpenPanel/NSSavePanel under the
+        # `files.user-selected.read-write` sandbox entitlement, but macOS
+        # 14+ surfaces TCC prompts for protected folders even on
+        # user-selected paths. The strings below show as the prompt
+        # rationale so the user sees a meaningful explanation rather than
+        # a generic "wants to access your Desktop folder".
+        NSDesktopFolderUsageDescription: "Aaavatar needs access to your Desktop to read portrait files you drag in and to save exports you choose to write there."
+        NSDocumentsFolderUsageDescription: "Aaavatar needs access to Documents to read portrait files you import and to save exports and library archives you choose to write there."
+        NSDownloadsFolderUsageDescription: "Aaavatar needs access to Downloads to read portrait files you import and to save exports you choose to write there."
+        # Lock ATS down explicitly — defense-in-depth alongside the TLS
+        # pinning in `TLSPinning.swift`. Defaults are already strict; this
+        # makes the intent visible and forbids any future code path from
+        # adding a hostname exception.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsArbitraryLoadsForMedia: false
+          NSAllowsArbitraryLoadsInWebContent: false
+          NSAllowsLocalNetworking: false
+        # Self-hosted Sparkle feed (audit HIGH #10). Old builds still
+        # point at https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml,
+        # which release.sh keeps in lockstep, so existing installs keep
+        # updating during the transition window.
+        SUFeedURL: "https://api.aaavatar.nl/appcast.xml"
         SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
@@ -119,6 +149,16 @@ targets:
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
+        # Privacy usage strings — match the Developer ID target (see above
+        # for rationale).
+        NSDesktopFolderUsageDescription: "Aaavatar needs access to your Desktop to read portrait files you drag in and to save exports you choose to write there."
+        NSDocumentsFolderUsageDescription: "Aaavatar needs access to Documents to read portrait files you import and to save exports and library archives you choose to write there."
+        NSDownloadsFolderUsageDescription: "Aaavatar needs access to Downloads to read portrait files you import and to save exports you choose to write there."
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsArbitraryLoadsForMedia: false
+          NSAllowsArbitraryLoadsInWebContent: false
+          NSAllowsLocalNetworking: false
         CFBundleURLTypes:
           - CFBundleURLName: nl.avatar.app.scheme
             CFBundleURLSchemes:
