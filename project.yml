@@ -24,8 +24,8 @@ settings:
     # (pass `ModelContainer`, re-derive `ModelContext` on `@MainActor`,
     # touch `AppState` only via `MainActor.run`) is already compatible.
     SWIFT_STRICT_CONCURRENCY: "targeted"
-    MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "17"
+    MARKETING_VERSION: "1.2.1"
+    CURRENT_PROJECT_VERSION: "18"
     DEVELOPMENT_TEAM: "5J92MMGKTX"
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
