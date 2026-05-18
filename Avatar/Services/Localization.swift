@@ -987,27 +987,11 @@ enum Loc {
     }
     /// Row label for the AI (Magic Cutout) portion of the free trial.
     /// Plural-aware ("1 AI generation" vs "N AI generations").
-    static func proQuotaAIRow(remaining: Int, total: Int) -> String {
-        en ? "\(remaining) of \(total) AI generations left"
-           : "Nog \(remaining) van \(total) AI-generaties"
-    }
-    /// Row label for the basic (Subject Lift) portion of the free trial.
-    static func proQuotaBasicRow(remaining: Int, total: Int) -> String {
-        en ? "\(remaining) of \(total) basic generations left"
-           : "Nog \(remaining) van \(total) basis-generaties"
-    }
-    /// Headline number for the sidebar quota card — collapses both tiers
-    /// into a single total so the user doesn't have to add AI + basic.
-    /// Sits above `proQuotaTierBreakdown`, which supplies the split.
+    /// Headline number for the sidebar quota card. Single unified counter:
+    /// AI and basic generations both spend the same slot.
     static func proQuotaTotalRemaining(remaining: Int, total: Int) -> String {
-        en ? "\(remaining) of \(total) generations left"
-           : "Nog \(remaining) van \(total) generaties"
-    }
-    /// Sub-line under `proQuotaTotalRemaining` — splits the remaining count
-    /// between the AI tier and the basic fallback tier as supporting detail.
-    static func proQuotaTierBreakdown(ai: Int, basic: Int) -> String {
-        en ? "\(ai) AI · \(basic) basic"
-           : "\(ai) AI · \(basic) basis"
+        en ? "\(remaining) of \(total) portraits left"
+           : "Nog \(remaining) van \(total) portretten"
     }
     /// Copy that wraps the inline `Pro` badge in the upsell line.
     static var proQuotaUpgradeBeforeBadge: String {
@@ -1021,34 +1005,11 @@ enum Loc {
            : "Upgrade naar Pro om meer te ontgrendelen"
     }
     static var proQuotaTooltip: String {
-        en ? "Free accounts get \(FreeTier.freeMagicCutoutAllowance) AI generations + \(FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) basic generations. Upgrade to Pro for unlimited."
-           : "Gratis accounts krijgen \(FreeTier.freeMagicCutoutAllowance) AI-generaties + \(FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance) basis-generaties. Upgrade naar Pro voor onbeperkt."
+        en ? "Free accounts get \(FreeTier.maxPortraits) portraits. Upgrade to Pro for unlimited."
+           : "Gratis accounts krijgen \(FreeTier.maxPortraits) portretten. Upgrade naar Pro voor onbeperkt."
     }
     static var proQuotaUpgradeCTA: String {
         en ? "Upgrade" : "Upgrade"
-    }
-
-    // MARK: AI-trial reverse-trial messaging (3+3 pattern)
-    /// Subtle inline hint shown on the result card after the 2nd AI
-    /// generation. Soft, non-blocking — not a paywall.
-    static var aiTrialOneLeft: String {
-        en ? "1 AI generation left" : "Nog 1 AI-generatie over"
-    }
-    static var aiTrialExhaustedTitle: String {
-        en ? "Your AI trial is done" : "Je AI-trial is op"
-    }
-    static var aiTrialExhaustedBody: String {
-        en ? "Upgrade for unlimited — or continue with the basic mode."
-           : "Upgrade voor onbeperkt — of ga door met de basis-modus."
-    }
-    static var aiTrialContinueBasicCTA: String {
-        en ? "Continue with basic" : "Doorgaan met basis"
-    }
-    /// Toast shown when Magic Cutout was auto-disabled because the user
-    /// hit the AI trial cap mid-session.
-    static var magicCutoutAutoDisabled: String {
-        en ? "Magic Cutout is a Pro feature after your trial. We'll use the basic cutout instead."
-           : "Magic Cutout is een Pro-functie na je trial. We gebruiken nu de basis-cutout."
     }
 
     // MARK: Yearly plan

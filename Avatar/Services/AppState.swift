@@ -31,22 +31,16 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 ///
 /// - `.info` → Pro-only hard limit, no CTA, just dismiss.
 /// - `.upgrade` → Free-tier soft gate, single Upgrade pill.
-/// - `.aiTrialExhausted` → After 3rd AI generation. Two CTAs side-by-
-///   side: Upgrade (primary) and "Continue with basic" (ghost / dismiss),
-///   so the user is never forced into the paywall.
 enum ProToastKind: Equatable, Sendable {
     case info
     case upgrade
-    case aiTrialExhausted
 }
 
 struct ProToast: Equatable {
     let message: String
     let kind: ProToastKind
 
-    /// Back-compat helper for callers that still think in boolean terms.
-    /// `aiTrialExhausted` shows an Upgrade CTA too, so it counts.
-    var showsUpgrade: Bool { kind != .info }
+    var showsUpgrade: Bool { kind == .upgrade }
 }
 
 /// Soft error / warning shown via `StatusChip` at the bottom of the main
@@ -313,17 +307,6 @@ final class AppState {
     /// chip without the Upgrade CTA, since they're already paying.
     func showProInfo(_ message: String, seconds: TimeInterval = 5) {
         present(ProToast(message: message, kind: .info), seconds: seconds)
-    }
-
-    /// Reverse-trial moment: the user just finished their 3rd AI
-    /// generation. Show a non-blocking dual-CTA toast so they can
-    /// upgrade OR keep going with the basic mode. Stays a beat longer
-    /// than other toasts because the choice deserves consideration.
-    func showAITrialExhausted(seconds: TimeInterval = 8) {
-        present(
-            ProToast(message: Loc.aiTrialExhaustedBody, kind: .aiTrialExhausted),
-            seconds: seconds
-        )
     }
 
     private func present(_ toast: ProToast, seconds: TimeInterval) {

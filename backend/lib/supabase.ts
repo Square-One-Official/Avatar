@@ -172,13 +172,12 @@ export async function tryConsumeFreeCutout(userId: string): Promise<number | nul
 }
 
 /**
- * Lifetime free-tier import allowance. The 6-portrait library cap is
- * enforced as "6 imports ever", not "6 portraits at a time" — deleting a
- * portrait no longer frees a slot. Splits into 3 AI (Magic Cutout trial)
- * + 3 basic (Subject Lift) imports. Mirrored client-side in
- * `FreeTier.maxPortraits`.
+ * Lifetime free-tier import allowance. Enforced as "3 imports ever", not
+ * "3 portraits at a time" — deleting a portrait does not free a slot.
+ * Source-agnostic: a free import can be Subject Lift OR Magic Cutout,
+ * both count the same. Mirrored client-side in `FreeTier.maxPortraits`.
  */
-export const FREE_IMPORTS_ALLOWANCE = 6;
+export const FREE_IMPORTS_ALLOWANCE = 3;
 
 export type ImportClaimResult = {
   allowed: boolean;

@@ -71,7 +71,10 @@ struct ImportDropZone: View {
         let allowed = FreeTierGate.allowedImportCount(requested: panel.urls.count,
                                                       appState: appState)
         guard allowed > 0 else { return }
-        for url in panel.urls.prefix(allowed) {
+        // Random subset when the picker selection exceeds the remaining
+        // free allowance — mirrors the drag-drop batch behaviour in
+        // `PortraitDropHandler.handle`.
+        for url in panel.urls.shuffled().prefix(allowed) {
             ImportFlow.importFile(url: url, context: context, appState: appState)
         }
     }

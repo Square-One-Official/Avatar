@@ -5,24 +5,14 @@ import Foundation
 /// sheet for the library ceiling. Pro users have no enforced limits beyond
 /// the batch-confirm threshold in `BatchConfirmRequest.threshold`.
 enum FreeTier {
-    /// Lifetime free imports a free account may run. Splits into 3 AI
-    /// (Magic Cutout trial) + 3 basic (Subject Lift) imports — see
-    /// `freeMagicCutoutAllowance` for the AI portion. Enforced
-    /// server-side via `users.free_imports_used` AND
-    /// `device_imports.free_imports_used` (Keychain UUID). Deleting a
-    /// portrait does NOT free a slot — otherwise the cap is trivially
-    /// defeated by import-then-delete. Bump this only after
-    /// re-evaluating the trial economics.
+    /// Lifetime free imports a free account may run. Source-agnostic — a
+    /// slot is spent whether the user runs Magic Cutout (cloud) or Subject
+    /// Lift (local). Enforced server-side via `users.free_imports_used`
+    /// AND `device_imports.free_imports_used` (Keychain UUID, anchors to
+    /// first launch). Deleting a portrait does NOT free a slot —
+    /// otherwise the cap is trivially defeated by import-then-delete.
     /// Mirrors `FREE_IMPORTS_ALLOWANCE` in `backend/lib/supabase.ts`.
-    static let maxPortraits = 6
-
-    /// Free Magic Cutout trial allowance — number of cloud cutouts a free
-    /// user may run before the toggle is gated. Mirrors the backend constant
-    /// `FREE_CUTOUTS_ALLOWANCE` in `lib/supabase.ts`. Used only for copy /
-    /// progress UI; server is the actual gate. Reverse-trial pattern:
-    /// experience the premium model first, then drop to the basic
-    /// (Subject Lift) for the remaining 3 imports.
-    static let freeMagicCutoutAllowance = 3
+    static let maxPortraits = 3
 }
 
 /// Hard ceilings that apply to Pro users. These are technical/safety
@@ -166,13 +156,9 @@ final class ProEntitlement {
     var isRefreshing: Bool = false
     /// Last error message from a refresh attempt.
     var lastError: String?
-    /// Magic Cutout free-trial calls the user has spent. Server is source
-    /// of truth — see `users.free_cutouts_used`. Survives reinstall.
-    var freeCutoutsUsed: Int = 0
-    /// Free-trial calls still available (server-clamped to 0…allowance).
-    var freeCutoutsRemaining: Int = 0
-    /// Lifetime imports the user has run (Subject Lift OR Magic Cutout).
-    /// Server-tracked across `users.free_imports_used` AND
+    /// Lifetime imports the user has run (Subject Lift OR Magic Cutout —
+    /// both count the same against the unified `FreeTier.maxPortraits`
+    /// cap). Server-tracked across `users.free_imports_used` AND
     /// `device_imports.free_imports_used`. Used for the sidebar quota card
     /// and the empty-state import gate.
     var freeImportsUsed: Int = 0
@@ -193,28 +179,16 @@ final class ProEntitlement {
     var isPro: Bool { tier != nil }
     var hasCredits: Bool { credits > 0 }
     /// True when the user can run a Magic Cutout: either they're Pro, or
-    /// they still have free-trial calls left. Drives the dropzone toggle
-    /// state and `ImportFlow.shouldUseMagicCutout`.
-    var canUseProCutout: Bool { isPro || freeCutoutsRemaining > 0 }
+    /// they still have free import slots left (any of the 3 free portraits
+    /// may be spent on cloud AI). Drives the dropzone toggle state and
+    /// `ImportFlow.shouldUseMagicCutout`.
+    var canUseProCutout: Bool { isPro || freeImportsRemaining > 0 }
     /// True when a free user has at least one import slot left — Pro users
     /// are unlimited. UI gates against this instead of the library count.
     var canImport: Bool { isPro || freeImportsRemaining > 0 }
 
-    /// Free imports the user has remaining of the BASIC (Subject Lift)
-    /// portion of the trial. Computed from total remaining minus AI
-    /// remaining, clamped to [0, 3]. Drives the second dot-row in
-    /// `SidebarProQuotaCard` so users see the two phases of free.
-    var freeBasicImportsRemaining: Int {
-        let basicAllowance = max(0, FreeTier.maxPortraits - FreeTier.freeMagicCutoutAllowance)
-        let aiRemaining = freeCutoutsRemaining
-        // Total free imports left = the import-counter remaining; basic
-        // = total - AI (clamped to the basic allowance).
-        let basicLeft = freeImportsRemaining - aiRemaining
-        return min(basicAllowance, max(0, basicLeft))
-    }
-
-    /// Resets all state (e.g. on sign-out). Free-trial counters reset to
-    /// the full allowance — but they're rehydrated from /v1/account the
+    /// Resets all state (e.g. on sign-out). `freeImportsRemaining` resets
+    /// to the full allowance — but it's rehydrated from /v1/account the
     /// moment the next import-claim or sign-in happens, so the device
     /// counter still gates a logged-out cheat attempt.
     func clear() {
@@ -224,8 +198,6 @@ final class ProEntitlement {
         monthlyResetAt = nil
         subscriptionStatus = .none
         subscriptionRenewsAt = nil
-        freeCutoutsUsed = 0
-        freeCutoutsRemaining = 0
         freeImportsUsed = 0
         freeImportsRemaining = FreeTier.maxPortraits
         needsAccountLink = false
@@ -241,8 +213,6 @@ final class ProEntitlement {
         monthlyResetAt = payload.monthlyResetAt
         subscriptionStatus = payload.subscriptionStatus
         subscriptionRenewsAt = payload.subscriptionRenewsAt
-        freeCutoutsUsed = payload.freeCutoutsUsed ?? 0
-        freeCutoutsRemaining = payload.freeCutoutsRemaining ?? 0
         freeImportsUsed = payload.freeImportsUsed ?? 0
         freeImportsRemaining = payload.freeImportsRemaining ?? FreeTier.maxPortraits
         needsAccountLink = payload.needsAccountLink ?? false
@@ -255,8 +225,9 @@ final class ProEntitlement {
 /// `BackendClient` decoder applies `.convertFromSnakeCase`, so e.g.
 /// `credits_remaining` → `creditsRemaining`.
 ///
-/// `freeCutoutsUsed` / `freeCutoutsRemaining` are optional so older
-/// backends (pre-migration 003) keep decoding cleanly.
+/// `freeCutoutsUsed` / `freeCutoutsRemaining` are still emitted by the
+/// backend for protocol stability but no longer surfaced — the unified
+/// free counter is `freeImportsRemaining`.
 struct AccountPayload: Codable, Sendable {
     let tier: ProTier?
     let creditsRemaining: Int

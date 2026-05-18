@@ -59,7 +59,11 @@ enum PortraitDropHandler {
         let allowed = FreeTierGate.allowedImportCount(requested: providers.count,
                                                       appState: appState)
         guard allowed > 0 else { return true }
-        let clipped = Array(providers.prefix(allowed))
+        // Shuffle before clipping: when a free user drops more images than
+        // their remaining allowance, take a random subset instead of always
+        // the leading N. Pro users always have `allowed == providers.count`
+        // so the shuffle is observable only when the gate trims the batch.
+        let clipped = Array(providers.shuffled().prefix(allowed))
 
         // Decide whether to confirm before processing the batch. Cloud
         // mode requires Magic Cutout entitlement, the per-feature toggle,
@@ -855,42 +859,10 @@ enum ImportFlow {
         do {
             let result = try await ImageProcessor.processCloud(image: cg, backend: backend)
             await MainActor.run {
-                let ent = appState.proEntitlement
-                ent.credits = result.creditsRemaining
-                // If the user had no credits, the server consumed a
-                // free-trial slot. Mirror it locally so the dropzone
-                // counter ticks immediately; the next /v1/account
-                // refresh reconciles with server truth.
-                if !ent.isPro && ent.credits == 0 && ent.freeCutoutsRemaining > 0 {
-                    ent.freeCutoutsUsed += 1
-                    ent.freeCutoutsRemaining -= 1
-
-                    // Reverse-trial messaging on the way down. The
-                    // 3-2-1-0 cadence aims to make the upgrade voelbaar
-                    // BEFORE the user hits a hard wall: a soft "1 left"
-                    // chip after the 2nd cutout, a dual-CTA toast after
-                    // the 3rd. We never block; basic mode keeps working
-                    // for the remaining 3 imports.
-                    switch ent.freeCutoutsRemaining {
-                    case 1:
-                        // Subtle, non-blocking nudge. No CTA — they
-                        // still have one premium use ahead of them.
-                        appState.showProInfo(Loc.aiTrialOneLeft, seconds: 4)
-                    case 0:
-                        // Trial is done. Dual-CTA toast lets the user
-                        // upgrade OR explicitly continue with basic.
-                        appState.showAITrialExhausted()
-                        // Auto-disable the Magic Cutout pref so the
-                        // toggle UI stops lying about what will happen
-                        // on the next import (gate already returns
-                        // false, but the toggle would still read "on").
-                        if appState.magicCutoutPrefs.enabled {
-                            appState.magicCutoutPrefs.enabled = false
-                        }
-                    default:
-                        break
-                    }
-                }
+                appState.proEntitlement.credits = result.creditsRemaining
+                // The unified `freeImportsRemaining` is the single source of
+                // truth and is updated by `claimImportSlot` before this call
+                // runs; the import-exhaustion paywall fires from there.
             }
             return CutoutResult(subject: result.subject, usedMagic: true)
         } catch let err as BackendError {
