@@ -2,6 +2,18 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <item>
+      <title>Version 1.2.1</title>
+      <pubDate>Mon, 18 May 2026 21:29:24 +0200</pubDate>
+      <sparkle:version>18</sparkle:version>
+      <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/thierrzz/Avatar/releases/download/v1.2.1/Aaavatar-1.2.1.dmg"
+        length="21310262"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="Y60Fri3RO+mZnN7YZfDkVbBqePeuCVCjV2XhMr15/nLNeKEpKfcq1SxtE23mTLCmkS4XtuXgwcRo7TKnVSH1CA==" />
+    </item>
+    <item>
       <title>Version 1.2.0</title>
       <pubDate>Sun, 17 May 2026 18:07:33 +0200</pubDate>
       <sparkle:version>17</sparkle:version>
