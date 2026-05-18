@@ -20,7 +20,7 @@ jobs:
     name: Backend (avatars-api) typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -48,7 +48,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
       DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -68,7 +68,7 @@ jobs:
     name: Sparkle appcast.xml lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate appcast structure + Sparkle fields
         # Python's `ElementTree.parse()` raises on malformed XML so we
         # get the well-formedness check for free (no `xmllint` needed —
