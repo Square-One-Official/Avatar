@@ -69,11 +69,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: xmllint well-formedness check
-        run: xmllint --noout appcast.xml
-      - name: Sanity-check Sparkle fields
-        # Each `<item>` must carry an `<enclosure>` with both a URL and
-        # an `sparkle:edSignature` so Sparkle won't refuse the update on
+      - name: Validate appcast structure + Sparkle fields
+        # Python's `ElementTree.parse()` raises on malformed XML so we
+        # get the well-formedness check for free (no `xmllint` needed —
+        # libxml2-utils isn't on the ubuntu-24.04 runner image). Each
+        # `<item>` must also carry an `<enclosure>` with a URL and an
+        # `sparkle:edSignature` so Sparkle won't refuse the update on
         # the user's Mac. Catches a forgotten signature paste during
         # release prep.
         run: |
