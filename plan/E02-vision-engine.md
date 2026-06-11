@@ -23,24 +23,41 @@ Unit-test op fixtures.
 **Result:** `VisionCutoutEngine` (struct, `CutoutEngine`-conform) in `AvatarKit/Sources/AvatarKit/Engines/VisionCutoutEngine.swift` — adaptieve input (1500–4096) → gepinde fg-mask + 16-bit person-seg gated union (r=8) → CIGuidedFilter (r=8, ε=1e-4) → clamp → MaskToAlpha/BlendWithMask, linear-sRGB/RGBAh, ~180 regels, geen stages 5–11; fouten via `VisionCutoutEngine.Failure` (.noSubjectFound/.renderFailed); `AvatarKitTests`-testtarget toegevoegd (5 tests op synthetische fixtures, groen); Avatar + Avatar2 bouwen Debug groen.
 
 ## 2.2 — EdgeBenchmark 5e arm + beslisrun
-- status: backlog
+- status: ready
 - owner: —
-- blockedBy: 2.1
+- blockedBy: E01.8
 - DoD: beide targets bouwen, tests groen
 
 Nieuwe engine als arm 'v2.0-minimal' aan EdgeBenchmark; run op fixtures incl. moeilijke gevallen;
 vastleggen welke oude stages (5–11) terugplaatsing verdienen. Alleen met bewijs.
 
+Notities (AI, bij oplevering 2.1):
+- Blocker 2.1 is done; nieuwe blocker E01.8 (Avatar-target moet AvatarKit linken om de engine
+  als arm aan te kunnen roepen — project.yml is INFRA-grens).
+- De 4-arms-harness uit pipeline-audit-2.0.md (raw/ORMBG-armen + `subjectLiftRaw`) bestaat
+  alleen als **niet-gecommitte wijzigingen** in de hoofd-checkout op de v1-branch
+  (`fix/newsletter-cohorts-revoke-public`): EdgeBenchmark.swift +40, ImageProcessor.swift +30.
+  Bij deze story porten/committen, anders benchmark je tegen de 2-arms-versie.
+- De beslisrun vereist privé fixture-foto's (Avatar/Debug/Fixtures is leeg in git én op deze
+  machine) — run + beoordeling samen met Thierry inplannen.
+
 **Result:** _(invullen bij done)_
 
 ## 2.3 — OrmbgEngine
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: AI
 - blockedBy: 2.1
 - DoD: beide targets bouwen, tests groen
 
 Bestaand 3-staps ORMBG-pad overnemen achter CutoutEngine-protocol; downloadlogica versimpeld uit
 ModelManager.
+
+**Plan:**
+1. `OrmbgEngine` (struct, `CutoutEngine`-conform) + `OrmbgModelStore` (actor) in `AvatarKit/Sources/AvatarKit/Engines/`. Het 3-staps inferentiepad 1-op-1 uit `subjectLiftDownloaded`: 1024² input (×/255 zit in het model) → matte → guided filter (r=2, ε=0.01) → composite, linear-sRGB; bewust géén V2-refinement erop (gedocumenteerd schadelijk: halo's).
+2. Downloadlogica versimpeld: zelfde manifest (GitHub release-zip, SHA-256-gate), maar versie in de installatiemap-naam (`ormbg/v1/`) i.p.v. sidecar-bestand, en een enkele async `download()` i.p.v. de Observation-state-machine — UI-state is een zorg van de 2.0-settings-story, niet van de engine.
+3. Gedeelde linear-sRGB CIContext naar `EngineRendering.swift` (intern, Engines/); VisionCutoutEngine gebruikt hem ook.
+4. ZIPFoundation als AvatarKit-dependency (zelfde versie als project.yml, 0.9.20) voor de zip-extractie — genoteerd voor INFRA-review.
+5. Tests zonder model/netwerk: matte-extractie uit synthetische MLMultiArray (float32 + float16-decode), isAvailable=false zonder installatie, SHA-256-helper op tempbestand; build via scripts/build-v2.sh.
 
 **Result:** _(invullen bij done)_
 
