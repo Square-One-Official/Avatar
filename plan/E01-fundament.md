@@ -47,8 +47,8 @@ draait.
 **Result:** XCTest-targets voor beide packages (5 router-tests + smoke-test) en scripts/build-v2.sh (xcodegen + beide targets + beide testsuites); alles groen.
 
 ## 1.5 — SHARED: BackendClient naar AvatarKit
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
 
