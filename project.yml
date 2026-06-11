@@ -176,3 +176,41 @@ targets:
       configs:
         Release:
           CODE_SIGN_IDENTITY: "Apple Distribution"
+
+  Avatar2:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Avatar2
+        excludes:
+          - "Avatar2.entitlements"
+    resources:
+      - path: Avatar2/Assets.xcassets
+    info:
+      path: Avatar2/Info.plist
+      properties:
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: Aaavatar 2
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Aaavatar"
+        NSPrincipalClass: NSApplication
+        LSApplicationCategoryType: public.app-category.photography
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsArbitraryLoadsForMedia: false
+          NSAllowsArbitraryLoadsInWebContent: false
+          NSAllowsLocalNetworking: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2
+        PRODUCT_NAME: Aaavatar 2
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        COMBINE_HIDPI_IMAGES: YES
+        CODE_SIGN_ENTITLEMENTS: Avatar2/Avatar2.entitlements

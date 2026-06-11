@@ -5,7 +5,7 @@ Team: **INFRA**
 Lege Aaavatar 2.0-app die naast de oude draait.
 
 ## 1.1 — Scaffold Avatar2-target
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen
@@ -13,10 +13,10 @@ Lege Aaavatar 2.0-app die naast de oude draait.
 Nieuw app-target `Avatar2` in het bestaande Xcode-project (bundle-id nl.squareone.aaavatar2, eigen
 icon-placeholder). Oude target onaangeroerd. DoD: beide apps bouwen en starten.
 
-**Result:** _(invullen bij done)_
+**Result:** Avatar2-target (nl.squareone.aaavatar2, eigen icon-placeholder) toegevoegd via project.yml + xcodegen; beide targets bouwen Debug groen; Aaavatar 2.app start en toont placeholder.
 
 ## 1.2 — AvatarKit package
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
@@ -26,7 +26,7 @@ Swift package met skelet: `CutoutEngine`-protocol + `PipelineRouter`-stub. Avata
 **Result:** _(invullen bij done)_
 
 ## 1.3 — AvatarUI package
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
