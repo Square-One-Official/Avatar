@@ -23,7 +23,7 @@ icon-placeholder). Oude target onaangeroerd. DoD: beide apps bouwen en starten.
 
 Swift package met skelet: `CutoutEngine`-protocol + `PipelineRouter`-stub. Avatar2 linkt ertegen.
 
-**Result:** _(invullen bij done)_
+**Result:** AvatarKit lokale SwiftPM-package (CutoutEngine-protocol, CutoutEngineKind, PipelineRouter-stub in Sources/AvatarKit/Engines/); Avatar2 linkt en gebruikt het; package + beide targets bouwen groen.
 
 ## 1.3 — AvatarUI package
 - status: ready
