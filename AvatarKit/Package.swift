@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "AvatarKit", targets: ["AvatarKit"])
     ],
     targets: [
-        .target(name: "AvatarKit")
+        .target(name: "AvatarKit"),
+        .testTarget(name: "AvatarKitTests", dependencies: ["AvatarKit"])
     ]
 )
