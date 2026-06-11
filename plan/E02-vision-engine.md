@@ -5,7 +5,7 @@ Team: **AI**
 De 2.0-cutout van ~200 regels (zie pipeline-audit-2.0.md).
 
 ## 2.1 — VisionCutoutEngine
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E01.2
 - DoD: beide targets bouwen, tests groen

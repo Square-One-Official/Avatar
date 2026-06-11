@@ -16,7 +16,7 @@ icon-placeholder). Oude target onaangeroerd. DoD: beide apps bouwen en starten.
 **Result:** Avatar2-target (nl.squareone.aaavatar2, eigen icon-placeholder) toegevoegd via project.yml + xcodegen; beide targets bouwen Debug groen; Aaavatar 2.app start en toont placeholder.
 
 ## 1.2 — AvatarKit package
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
@@ -47,7 +47,7 @@ draait.
 **Result:** _(invullen bij done)_
 
 ## 1.5 — SHARED: BackendClient naar AvatarKit
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
@@ -58,7 +58,7 @@ vandaaruit. Enige story die Avatar/ mag raken.
 **Result:** _(invullen bij done)_
 
 ## 1.6 — Auth 2.0: e-mail + code
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen

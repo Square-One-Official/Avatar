@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 
 @main
@@ -22,6 +23,9 @@ struct ContentPlaceholderView: View {
             Text("Scaffold — E01.1")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            Text("Engines: \(CutoutEngineKind.allCases.map(\.rawValue).joined(separator: " · "))")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

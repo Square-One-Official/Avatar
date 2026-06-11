@@ -28,6 +28,7 @@
 		1F48C6FC8BC48ADBAEB6A950 /* TLSPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB5D63248862E832DE73D422 /* TLSPinning.swift */; };
 		20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		22F331DA021385FF381B6BEA /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
+		248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3A383A9104F04C87490DC691 /* AvatarKit */; };
 		280A11648DAEFCF19F5E82C9 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
 		2910C9E84F1A95DDE6EAF669 /* BulkAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C29944A4F31F74C9CD6F54 /* BulkAligner.swift */; };
 		2AE09B3845EA1E0F90A53B18 /* PillSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */; };
@@ -195,6 +196,7 @@
 		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
 		A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessor.swift; sourceTree = "<group>"; };
+		A398E717302397E2504B24FB /* AvatarKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarKit; path = AvatarKit; sourceTree = SOURCE_ROOT; };
 		A67F34619015B892E51F8BA0 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
 		A781DB69220F07CD4C7450BC /* Portrait.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Portrait.swift; sourceTree = "<group>"; };
 		B313E53EBD6AC732524D4690 /* ImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
@@ -250,9 +252,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BB917933EEC7CA91FB01A0F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		27AC0FD0827B2FAA960526B3 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				A398E717302397E2504B24FB /* AvatarKit */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
 		50DCF305A7684CEB872E8E63 /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -328,6 +346,7 @@
 			children = (
 				71DFDB8CC0E43797D477452F /* Avatar */,
 				CB7BDE2BF513118028522B32 /* Avatar2 */,
+				27AC0FD0827B2FAA960526B3 /* Packages */,
 				7BE0948B8680DB6BA122634A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -466,6 +485,7 @@
 			buildPhases = (
 				524ED26EE9BA88338A3B3D60 /* Sources */,
 				26F07A91C58853C486522B51 /* Resources */,
+				BB917933EEC7CA91FB01A0F6 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -473,6 +493,7 @@
 			);
 			name = Avatar2;
 			packageProductDependencies = (
+				3A383A9104F04C87490DC691 /* AvatarKit */,
 			);
 			productName = Avatar2;
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
@@ -511,6 +532,7 @@
 				C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				FAD8C4AE8E294733D9421134 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				2B464EABE673F993AD8E5962 /* XCLocalSwiftPackageReference "AvatarKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7BE0948B8680DB6BA122634A /* Products */;
@@ -1007,6 +1029,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		2B464EABE673F993AD8E5962 /* XCLocalSwiftPackageReference "AvatarKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = AvatarKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1049,6 +1078,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		3A383A9104F04C87490DC691 /* AvatarKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AvatarKit;
 		};
 		D94FA301098580AC25AAEE33 /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;

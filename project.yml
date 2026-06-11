@@ -14,6 +14,8 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation
     from: "0.9.20"
+  AvatarKit:
+    path: AvatarKit
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -185,6 +187,8 @@ targets:
       - path: Avatar2
         excludes:
           - "Avatar2.entitlements"
+    dependencies:
+      - package: AvatarKit
     resources:
       - path: Avatar2/Assets.xcassets
     info:
