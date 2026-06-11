@@ -5,7 +5,7 @@ Team: **AI**
 De 2.0-cutout van ~200 regels (zie pipeline-audit-2.0.md).
 
 ## 2.1 — VisionCutoutEngine
-- status: in_progress
+- status: done
 - owner: AI
 - blockedBy: E01.2
 - DoD: beide targets bouwen, tests groen
@@ -20,7 +20,7 @@ Unit-test op fixtures.
 4. `AvatarKitTests`-testtarget toegevoegd aan Package.swift omdat de DoD tests eist; E01.4 (INFRA) kan hierop voortbouwen voor het buildscript.
 5. Beide targets bouwen (xcodegen + xcodebuild), tests groen, merge naar v2-main.
 
-**Result:** _(invullen bij done)_
+**Result:** `VisionCutoutEngine` (struct, `CutoutEngine`-conform) in `AvatarKit/Sources/AvatarKit/Engines/VisionCutoutEngine.swift` — adaptieve input (1500–4096) → gepinde fg-mask + 16-bit person-seg gated union (r=8) → CIGuidedFilter (r=8, ε=1e-4) → clamp → MaskToAlpha/BlendWithMask, linear-sRGB/RGBAh, ~180 regels, geen stages 5–11; fouten via `VisionCutoutEngine.Failure` (.noSubjectFound/.renderFailed); `AvatarKitTests`-testtarget toegevoegd (5 tests op synthetische fixtures, groen); Avatar + Avatar2 bouwen Debug groen.
 
 ## 2.2 — EdgeBenchmark 5e arm + beslisrun
 - status: backlog
