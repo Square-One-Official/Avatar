@@ -26,8 +26,8 @@ Swift package met skelet: `CutoutEngine`-protocol + `PipelineRouter`-stub. Avata
 **Result:** AvatarKit lokale SwiftPM-package (CutoutEngine-protocol, CutoutEngineKind, PipelineRouter-stub in Sources/AvatarKit/Engines/); Avatar2 linkt en gebruikt het; package + beide targets bouwen groen.
 
 ## 1.3 — AvatarUI package
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
 
