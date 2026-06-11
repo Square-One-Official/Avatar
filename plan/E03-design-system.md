@@ -5,8 +5,8 @@ Team: **DS**
 Tokens en componenten 1-op-1 uit Figma (pagina Components). Dark-only.
 
 ## 3.1 — Tokens
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: E01.3
 - DoD: beide targets bouwen, tests groen
 
