@@ -36,8 +36,8 @@ Leeg Swift package-skelet voor het design system. Avatar2 linkt ertegen.
 **Result:** AvatarUI lokale SwiftPM-package (leeg skelet met versie-anker); Avatar2 linkt ertegen; package + beide targets bouwen groen.
 
 ## 1.4 — Testtargets + buildscript
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.2, 1.3
 - DoD: beide targets bouwen, tests groen
 
