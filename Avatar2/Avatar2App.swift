@@ -1,4 +1,5 @@
 import AvatarKit
+import AvatarUI
 import SwiftUI
 
 @main

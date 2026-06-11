@@ -26,17 +26,17 @@ Swift package met skelet: `CutoutEngine`-protocol + `PipelineRouter`-stub. Avata
 **Result:** AvatarKit lokale SwiftPM-package (CutoutEngine-protocol, CutoutEngineKind, PipelineRouter-stub in Sources/AvatarKit/Engines/); Avatar2 linkt en gebruikt het; package + beide targets bouwen groen.
 
 ## 1.3 — AvatarUI package
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
 
 Leeg Swift package-skelet voor het design system. Avatar2 linkt ertegen.
 
-**Result:** _(invullen bij done)_
+**Result:** AvatarUI lokale SwiftPM-package (leeg skelet met versie-anker); Avatar2 linkt ertegen; package + beide targets bouwen groen.
 
 ## 1.4 — Testtargets + buildscript
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.2, 1.3
 - DoD: beide targets bouwen, tests groen

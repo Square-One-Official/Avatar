@@ -122,6 +122,7 @@
 		C944B1F772FD3DFE3305D6C8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */; };
 		CAE42ED6303F5E98B46050A9 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
 		CCDA297FDC7DB266C5C99205 /* AvatarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */; };
+		CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */ = {isa = PBXBuildFile; productRef = 7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */; };
 		D3902C8E716FB212480A16B3 /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */; };
 		D43723746F3532F825382CAB /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
 		D481897535E17F0376EA1C21 /* ProUpsellToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80857857F8C364DD00524644 /* ProUpsellToastView.swift */; };
@@ -173,6 +174,7 @@
 		5127F7FAC6DD92487E178E76 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSignInSheet.swift; sourceTree = "<group>"; };
 		5DE64240C8D2B68EB34AA721 /* Mesh 05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 05.png"; sourceTree = "<group>"; };
+		5EF100DCFD517EBCFF88035A /* AvatarUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarUI; path = AvatarUI; sourceTree = SOURCE_ROOT; };
 		5FEC338C38035806F6E59DFF /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarProQuotaCard.swift; sourceTree = "<group>"; };
 		68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -257,6 +259,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */,
+				CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +270,7 @@
 			isa = PBXGroup;
 			children = (
 				A398E717302397E2504B24FB /* AvatarKit */,
+				5EF100DCFD517EBCFF88035A /* AvatarUI */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -494,6 +498,7 @@
 			name = Avatar2;
 			packageProductDependencies = (
 				3A383A9104F04C87490DC691 /* AvatarKit */,
+				7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */,
 			);
 			productName = Avatar2;
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
@@ -533,6 +538,7 @@
 				4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				FAD8C4AE8E294733D9421134 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				2B464EABE673F993AD8E5962 /* XCLocalSwiftPackageReference "AvatarKit" */,
+				E9EF5D457223351F07D558F6 /* XCLocalSwiftPackageReference "AvatarUI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7BE0948B8680DB6BA122634A /* Products */;
@@ -1034,6 +1040,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = AvatarKit;
 		};
+		E9EF5D457223351F07D558F6 /* XCLocalSwiftPackageReference "AvatarUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = AvatarUI;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1082,6 +1092,10 @@
 		3A383A9104F04C87490DC691 /* AvatarKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AvatarKit;
+		};
+		7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AvatarUI;
 		};
 		D94FA301098580AC25AAEE33 /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;

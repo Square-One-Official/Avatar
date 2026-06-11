@@ -16,6 +16,8 @@ packages:
     from: "0.9.20"
   AvatarKit:
     path: AvatarKit
+  AvatarUI:
+    path: AvatarUI
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -189,6 +191,7 @@ targets:
           - "Avatar2.entitlements"
     dependencies:
       - package: AvatarKit
+      - package: AvatarUI
     resources:
       - path: Avatar2/Assets.xcassets
     info:
