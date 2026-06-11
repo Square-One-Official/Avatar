@@ -36,15 +36,15 @@ Leeg Swift package-skelet voor het design system. Avatar2 linkt ertegen.
 **Result:** AvatarUI lokale SwiftPM-package (leeg skelet met versie-anker); Avatar2 linkt ertegen; package + beide targets bouwen groen.
 
 ## 1.4 — Testtargets + buildscript
-- status: ready
-- owner: —
+- status: done
+- owner: INFRA
 - blockedBy: 1.2, 1.3
 - DoD: beide targets bouwen, tests groen
 
 Testtargets voor AvatarKit en AvatarUI, één smoke-test, xcodebuild-script dat beide apps + tests
 draait.
 
-**Result:** _(invullen bij done)_
+**Result:** XCTest-targets voor beide packages (5 router-tests + smoke-test) en scripts/build-v2.sh (xcodegen + beide targets + beide testsuites); alles groen.
 
 ## 1.5 — SHARED: BackendClient naar AvatarKit
 - status: ready

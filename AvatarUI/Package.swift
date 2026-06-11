@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "AvatarUI", targets: ["AvatarUI"])
     ],
     targets: [
-        .target(name: "AvatarUI")
+        .target(name: "AvatarUI"),
+        .testTarget(name: "AvatarUITests", dependencies: ["AvatarUI"])
     ]
 )
