@@ -14,7 +14,11 @@ Kernregels (samenvatting, details in BOARD.md):
 ## Vaste kennis
 
 - Cutout-stack: 3 paden — Vision (default), gedownload ORMBG-model, Replicate cloud (`men1scus/birefnet`). Het oude `birefnetLift()` is dood. Comments in deze codebase liegen soms: vertrouw call sites, niet headers.
-- Design-bron: Figma "Aaavatar", pagina's "Stories" (flows) en "Components" (tokens/componenten). Lokale Figma MCP-server staat in `.mcp.json` (vereist draaiende Figma desktop-app).
+- Design-bron: Figma-bestand "Aaavatar" (key NtX3dQvGU29gwYQKEcOkSy) — **moet open staan in de Figma desktop-app** voor de lokale MCP. Gebruik node-id's, niet de zichtbare pagina:
+  - Stories (flows/schermen): node `151:1409` — https://www.figma.com/design/NtX3dQvGU29gwYQKEcOkSy/Aaavatar?node-id=151-1409
+  - Components (tokens/componenten): node `11:180` — https://www.figma.com/design/NtX3dQvGU29gwYQKEcOkSy/Aaavatar?node-id=11-180
+  - Settings-voorbeelden: node `4017:10181` · Pro-modal: node `4019:953`
+  Check bij twijfel eerst met get_metadata of je het juiste bestand te pakken hebt (verwacht pagina's Stories/Components); zo niet: meld het aan Thierry i.p.v. op een ander bestand door te bouwen.
 - Plandocumenten: `~/Documents/Claude/Projects/Aaavatar/` (redesign-audit-en-plan.md, aaavatar-2.0-bouwplan.md, pipeline-audit-2.0.md, figma-design-review.md).
 - Auth 2.0 = e-mail + OTP, geen Google-UI (Google-infra bewaren). Stripe hangt aan Supabase user-id + e-mail; zie E01.7 voor de identiteitstest.
 - Builds: `xcodegen` voor projectgeneratie waar een project.yml ligt; test op beide targets.
