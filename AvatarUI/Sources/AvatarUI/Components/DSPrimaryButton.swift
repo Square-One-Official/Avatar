@@ -19,12 +19,20 @@ public struct DSPrimaryButton: View {
     private let title: String
     private let icon: Image?
     private let size: Size
+    private let fullWidth: Bool
     private let action: () -> Void
 
-    public init(_ title: String, icon: Image? = nil, size: Size = .default, action: @escaping () -> Void) {
+    public init(
+        _ title: String,
+        icon: Image? = nil,
+        size: Size = .default,
+        fullWidth: Bool = false,
+        action: @escaping () -> Void
+    ) {
         self.title = title
         self.icon = icon
         self.size = size
+        self.fullWidth = fullWidth
         self.action = action
     }
 
@@ -42,6 +50,7 @@ public struct DSPrimaryButton: View {
                     .lineLimit(1)
             }
             .foregroundStyle(DSColor.Action.onAction)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.horizontal, size.horizontalPadding)
             .padding(.vertical, size.verticalPadding)
             .background(DSColor.Background.action, in: Capsule())

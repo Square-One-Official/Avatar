@@ -2,7 +2,9 @@
 
 Team: **FEAT**
 
-Figma: Onboarding / Splash, Email, OTP, Permissions. Downloadstap is geschrapt (Apple-first). Copy-fixes zijn in Figma verwerkt.
+Figma: Onboarding / Splash, Email, OTP, Permissions. Downloadstap was geschrapt (Apple-first);
+besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening): optionele model-download komt terug
+als skipbare stap — zie E04.6. Copy-fixes zijn in Figma verwerkt.
 
 ## 4.1 — Splash + Email-stap
 - status: done
@@ -66,15 +68,17 @@ Notities (FEAT, vóór de bouw):
 
 **Result:** _(invullen bij done)_
 
-## 4.4 — High-fidelity edges naar Settings
-- status: backlog
+## 4.4 — High-fidelity edges naar Settings [VERVALLEN — opgegaan in E15.2]
+- status: done
 - owner: —
 - blockedBy: E08.1
 - DoD: beide targets bouwen, tests groen
 
 Downloadkaart in barebones Settings (E08.1) — onboarding bevat hem niet meer.
+Vervallen: E08.1 is vervangen door E15 en de downloadkaart staat expliciet in E15.2;
+de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
-**Result:** _(invullen bij done)_
+**Result:** Vervallen zonder implementatie — opgegaan in E15.2 (downloadkaart in AI & Models).
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
@@ -95,5 +99,21 @@ Hierheen verplaatst (losse 'visuele pass'-vermeldingen):
 - Uit E08.3-notities: paywall-barebones is zonder Figma-frame opgebouwd uit DS-componenten,
   "visuele pass later" — het Pro-modal-frame bestaat inmiddels (4019:953); de paywall-pass
   loopt via E14.1 (pixel-volgen), niet via deze story.
+
+**Result:** _(invullen bij done)_
+
+## 4.6 — Onboarding-stappen "Download now" + "Downloading"
+- status: ready
+- owner: —
+- blockedBy: E03.2 (done) — Figma-frames staan inmiddels op de Stories-pagina: 'Onboarding / Download now' (4030:1131) en 'Onboarding / Downloading' (4030:1149); op ready gezet conform het besluit
+- DoD: beide targets bouwen, tests groen
+- Context: besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening). Copy-basis: figma-design-review.md §"Onboarding / Download now" + §"Onboarding / Downloading", aangevuld met het bewijs-argument "beter op krullend/fijn haar" (besluit Thierry). NB (AI): de E02.2-beslisrun zag op de huidige 7 fixtures geen ORMBG-meerwaarde boven v2.0-minimal — bij de bouw de copy-claim staven met eigen voorbeelden (bijv. de E05.6-nudge-cases) of de claim zachter formuleren.
+
+Twee skipbare onboarding-stappen conform de nieuwe Stories-frames. **Hiërarchie is een hard
+besluit:** primaire knop = "Continue with built-in engine", download is de secundaire actie.
+De download draait door in de achtergrond (voortgang zichtbaar in Settings > AI & Models,
+E15.2) — zelfde OrmbgModelStore (E02.3) als de Settings-kaart: één download-state, twee
+vensters erop. Modelgrootte in de copy = de echte ORMBG-grootte (±175 MB, niet de 1,2 GB
+uit het oude frame).
 
 **Result:** _(invullen bij done)_

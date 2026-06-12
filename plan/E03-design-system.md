@@ -98,3 +98,16 @@ DSColor/DSTypography/DSLayout leggen, afwijkingen corrigeren. Volledige mapping
 expliciet markeren.
 
 **Result:** _(invullen bij done)_
+
+## 3.9 — Button-aanvullingen: full-width + ghost-tekstknop
+- status: done
+- owner: DS
+- blockedBy: 3.2
+- DoD: beide targets bouwen, tests groen
+- Context: E04.5 legt de gebouwde flows naast de Stories-frames: Onboarding/Email en /OTP tonen Button-instances gestretcht op kolombreedte (360/332) en een ghost-neutral-tekstknop (Resend code, Figma Components Button Type=Ghost Color=Neutral 13:305). DSPrimaryButton/DSNeutralButton huggen alleen; een ghost-tekstknop ontbreekt. (Story toegevoegd door FEAT bij E04.5 — AvatarUI is DS-grens.)
+
+`fullWidth`-parameter op DSPrimaryButton en DSNeutralButton (capsule strekt mee) en DSGhostButton
+(tekstknop, states 1-op-1 met het ghostNeutral-gedrag van DSIconButton: default muted zonder bg,
+hover bg neutral-stronger + primary, pressed bg neutral-strongest).
+
+**Result:** `fullWidth: Bool = false` op DSPrimaryButton én DSNeutralButton (label-HStack strekt vóór de padding, capsule strekt mee — bestaande call sites ongewijzigd) en DSGhostButton (zelfde maten/parameters als DSPrimaryButton; states 1-op-1 het ghostNeutral-gedrag van DSIconButton: muted → hover bg neutral-stronger + primary → pressed bg neutral-strongest, disabled opacityschaal .25). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).

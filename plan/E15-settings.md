@@ -27,6 +27,12 @@ Notifications-secties zoals ontworpen.
 RAM-eis • grootte, Active-state, download/delete via icon-button). Hier landt de High-fidelity
 edges-download (was E04.4/E08.1).
 
+Bevestigd (besluit Thierry 2026-06-12, vervolg op de ORMBG-herziening): de downloadkaart +
+voortgangsweergave **blijft**, gevoed door dezelfde `OrmbgModelStore` (E02.3) als de
+onboarding-downloadstap (E04.6) — één download-state, twee vensters erop. Een download die
+in onboarding gestart is loopt hier zichtbaar door (achtergrond-download). E05.6 (nudge na
+rafelig haarresultaat) hangt hier ook op.
+
 **Result:** _(invullen bij done)_
 
 ## 15.3 — Account-pagina (zelf invullen)
