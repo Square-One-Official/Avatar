@@ -7,8 +7,11 @@ Bewust minimaal; volledige flows volgen als Figma af is.
 ## 8.1 — Settings barebones
 - status: ready
 - owner: —
-- blockedBy: E03.2
+- blockedBy: E03.2, E03.6
 - DoD: beide targets bouwen, tests groen
+
+Notitie (FEAT): E03.6 (toggle-component) toegevoegd als blocker — de privacy/engine-sectie
+heeft dezelfde online-modellen-toggle nodig als E04.3.
 
 Privacy/engine (incl. High-fidelity edges-downloadkaart uit onboarding), account, versie. Eén
 venster, drie secties.
