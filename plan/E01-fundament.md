@@ -81,8 +81,8 @@ Google-infra NIET slopen.
 **Result:** _(invullen bij done)_
 
 ## 1.8 — SHARED: Avatar (v1) target linkt AvatarKit
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
 
