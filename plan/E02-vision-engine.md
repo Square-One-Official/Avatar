@@ -23,10 +23,14 @@ Unit-test op fixtures.
 **Result:** `VisionCutoutEngine` (struct, `CutoutEngine`-conform) in `AvatarKit/Sources/AvatarKit/Engines/VisionCutoutEngine.swift` — adaptieve input (1500–4096) → gepinde fg-mask + 16-bit person-seg gated union (r=8) → CIGuidedFilter (r=8, ε=1e-4) → clamp → MaskToAlpha/BlendWithMask, linear-sRGB/RGBAh, ~180 regels, geen stages 5–11; fouten via `VisionCutoutEngine.Failure` (.noSubjectFound/.renderFailed); `AvatarKitTests`-testtarget toegevoegd (5 tests op synthetische fixtures, groen); Avatar + Avatar2 bouwen Debug groen.
 
 ## 2.2 — EdgeBenchmark 5e arm + beslisrun
-- status: ready
-- owner: —
+- status: in_progress
+- owner: AI
 - blockedBy: E01.8
 - DoD: beide targets bouwen, tests groen
+
+Notitie (AI, claim): opgepakt naast E09.1 op instructie Thierry — E09.1 is extern
+geblokkeerd (Replicate-saldo op, wacht op top-up); fixtures staan inmiddels in
+Avatar/Debug/Fixtures (hoofd-checkout), harness-uitbreidingen op bench/2.0-bakeoff-arms.
 
 Nieuwe engine als arm 'v2.0-minimal' aan EdgeBenchmark; run op fixtures incl. moeilijke gevallen;
 vastleggen welke oude stages (5–11) terugplaatsing verdienen. Alleen met bewijs.

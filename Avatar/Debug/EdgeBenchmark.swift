@@ -2,6 +2,7 @@
 
 import Foundation
 import AppKit
+import AvatarKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
@@ -83,7 +84,7 @@ enum EdgeBenchmark {
         // model installed. Resolved once for the whole run.
         let downloadedModelURL = ModelManager().cachedModelURL()
 
-        var rows: [String] = ["fixture,v1_ms,v2_ms,ratio,v1_ok,v2_ok,raw_ms,raw_ok,dl_ms,dl_ok"]
+        var rows: [String] = ["fixture,v1_ms,v2_ms,ratio,v1_ok,v2_ok,raw_ms,raw_ok,dl_ms,dl_ok,v2min_ms,v2min_ok"]
         var v1Times: [Double] = []
         var v2Times: [Double] = []
         for url in fixtures {
@@ -261,6 +262,10 @@ enum EdgeBenchmark {
             return timed { try? ImageProcessor.subjectLiftDownloaded(image: cg, modelURL: modelURL) }
         }()
 
+        // Vijfde arm (E02.2): de 2.0-minimal pipeline zelf — VisionCutoutEngine
+        // uit AvatarKit, exact wat Avatar2 gaat shippen.
+        let (v2min, v2minMs) = timed { runV2Minimal(image: cg) }
+
         let v1Ok = (v1 != nil)
         let v2Ok = (v2 != nil)
 
@@ -268,6 +273,7 @@ enum EdgeBenchmark {
         if let v2 { writePNG(v2, to: outDir.appendingPathComponent("\(name)-v2-cutout.png")) }
         if let raw { writePNG(raw, to: outDir.appendingPathComponent("\(name)-raw-cutout.png")) }
         if let dl { writePNG(dl, to: outDir.appendingPathComponent("\(name)-ormbg-cutout.png")) }
+        if let v2min { writePNG(v2min, to: outDir.appendingPathComponent("\(name)-v2min-cutout.png")) }
 
         // Extra triptychs so raw and ORMBG can be eyeballed against V2 on
         // the same contrast backdrops as the existing V1/V2 comparison.
@@ -278,6 +284,10 @@ enum EdgeBenchmark {
         if let dl, let v2 {
             let strip = makeSideBySide(v1: dl, v2: v2)
             writePNG(strip, to: outDir.appendingPathComponent("\(name)-ormbg-vs-v2.png"))
+        }
+        if let v2min, let v2 {
+            let strip = makeSideBySide(v1: v2min, v2: v2)
+            writePNG(strip, to: outDir.appendingPathComponent("\(name)-v2min-vs-v2.png"))
         }
 
         // Side-by-side over the triptych backdrop. We composite the cutout
@@ -294,8 +304,24 @@ enum EdgeBenchmark {
         }()
         let row = "\(name),\(Int(v1ms)),\(Int(v2ms)),\(ratio),\(v1Ok ? 1 : 0),\(v2Ok ? 1 : 0),"
             + "\(Int(rawMs)),\(raw != nil ? 1 : 0),"
-            + "\(downloadedModelURL == nil ? "" : String(Int(dlMs))),\(dl != nil ? 1 : 0)"
+            + "\(downloadedModelURL == nil ? "" : String(Int(dlMs))),\(dl != nil ? 1 : 0),"
+            + "\(Int(v2minMs)),\(v2min != nil ? 1 : 0)"
         return (row, v1ms, v2ms)
+    }
+
+    /// Sync bridge naar de async VisionCutoutEngine. De engine doet puur
+    /// Vision/CoreImage-werk zonder MainActor-afhankelijkheid, dus een
+    /// detached task + semaphore vanaf de (MainActor-)harness is veilig —
+    /// debug-harness-pragmatiek, geen productie-patroon.
+    private static func runV2Minimal(image: CGImage) -> CGImage? {
+        let sem = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var result: CGImage?
+        Task.detached(priority: .userInitiated) {
+            result = try? await VisionCutoutEngine().cutout(image)
+            sem.signal()
+        }
+        sem.wait()
+        return result
     }
 
     /// Renders a vertical stack: V1 over three backdrops on top, V2 over the
