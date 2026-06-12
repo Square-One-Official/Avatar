@@ -82,9 +82,9 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: done
+- status: in_progress
 - owner: FEAT
-- Heropend en afgerond (2026-06-12): visuele-pass-bevindingen 1–9 van Thierry verwerkt; DS-leveringen E03.10–3.13.
+- Heropend en afgerond (2026-06-12): bevindingen 1–9 verwerkt (DS: E03.10–3.13); 10–12 → E03.14, 16–17 → E03.15; heropend voor bevinding 18 (venstermaat + schalende first-use-ring).
 - Tweede heropening, afgerond (2026-06-12, AI): punten 13–15 van Thierry verwerkt — zie Result-blok punten 13–15 onderaan.
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
