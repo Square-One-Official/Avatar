@@ -22,13 +22,17 @@ export class ReplicateTimeoutError extends Error {
   }
 }
 
-async function runWithTimeout<T>(model: string, p: Promise<T>): Promise<T> {
+async function runWithTimeout<T>(
+  model: string,
+  p: Promise<T>,
+  timeoutMs: number = REPLICATE_TIMEOUT_MS,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       p,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new ReplicateTimeoutError(model)), REPLICATE_TIMEOUT_MS);
+        timer = setTimeout(() => reject(new ReplicateTimeoutError(model)), timeoutMs);
       }),
     ]);
   } finally {
@@ -169,16 +173,116 @@ export async function colorize(input: {
 }
 
 /**
+ * Stylize — instruction-edit on a flattened RGB portrait (stijlen én
+ * retouch-edits). In tegenstelling tot outpaintPortrait is er geen mask:
+ * het model herschrijft het hele beeld op basis van de prompt, dus
+ * identity-behoud is hier een modeleigenschap, niet een pixelgarantie —
+ * precies wat de E09.1-bakeoff meet.
+ *
+ * De drie geregistreerde armen (MODEL_REGISTRY.stylize) accepteren NIET
+ * dezelfde payload; stylizeInputFor vertaalt per model-familie. Een nieuw
+ * alternatief registreren = eerst hier een tak toevoegen (zie de NOTE in
+ * lib/models.ts).
+ *
+ * Ruimere timeout dan de 50s-default: gpt-image op hoge kwaliteit zit
+ * geregeld boven de 50s. De endpoint-maxDuration (90s, vercel.json) houdt
+ * 10s marge voor afronden van de response.
+ */
+const STYLIZE_TIMEOUT_MS = 80_000;
+
+export async function stylizeEdit(input: {
+  imageDataUrl: string;
+  prompt: string;
+  /** Breedte/hoogte van de input, voor armen zonder match_input_image. */
+  width: number;
+  height: number;
+  model?: string | null;
+}): Promise<string> {
+  const ref = input.model ?? defaultModelRef("stylize");
+  const payload = stylizeInputFor(ref, input);
+  const output = (await runWithTimeout(
+    "stylizeEdit",
+    replicate.run(ref as `${string}/${string}`, { input: payload }),
+    STYLIZE_TIMEOUT_MS,
+  )) as unknown;
+
+  return extractUrl(output, "stylizeEdit");
+}
+
+function stylizeInputFor(
+  ref: string,
+  input: { imageDataUrl: string; prompt: string; width: number; height: number },
+): Record<string, unknown> {
+  if (ref.startsWith("google/nano-banana")) {
+    return {
+      prompt: input.prompt,
+      image_input: [input.imageDataUrl],
+      aspect_ratio: "match_input_image",
+      output_format: "png",
+    };
+  }
+  if (ref.startsWith("black-forest-labs/flux-2")) {
+    return {
+      prompt: input.prompt,
+      input_images: [input.imageDataUrl],
+      resolution: "match_input_image",
+      aspect_ratio: "match_input_image",
+      output_format: "png",
+      // Zelfde reden als outpaintPortrait: lager weigert op onschuldige
+      // portretten.
+      safety_tolerance: 2,
+    };
+  }
+  if (ref.startsWith("openai/gpt-image")) {
+    return {
+      prompt: input.prompt,
+      input_images: [input.imageDataUrl],
+      // Identity-behoud staat of valt met input_fidelity=high; quality=high
+      // is de eerlijke vergelijking met de andere pro-armen (en de reden
+      // voor STYLIZE_TIMEOUT_MS).
+      input_fidelity: "high",
+      quality: "high",
+      output_format: "png",
+      moderation: "low",
+      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde
+      // van de drie ondersteunde ratio's.
+      aspect_ratio: nearestGptAspect(input.width, input.height),
+    };
+  }
+  throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
+}
+
+function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" {
+  if (width <= 0 || height <= 0) return "1:1";
+  const ratio = width / height;
+  const options: Array<["1:1" | "3:2" | "2:3", number]> = [
+    ["1:1", 1],
+    ["3:2", 1.5],
+    ["2:3", 2 / 3],
+  ];
+  options.sort((a, b) => Math.abs(a[1] - ratio) - Math.abs(b[1] - ratio));
+  return options[0][0];
+}
+
+/**
  * Replicate's SDK output is one of: a string URL, an array of URLs, or a
  * File-like object with a `.url()` method, depending on model + SDK
  * version. Normalise to a single URL string.
  */
 function extractUrl(output: unknown, source: string): string {
   if (typeof output === "string") return output;
-  if (Array.isArray(output) && typeof output[0] === "string") return output[0];
+  if (Array.isArray(output)) {
+    // gpt-image-1.5 levert een ARRAY van FileOutput-objecten (multi-image
+    // models doen dat allemaal); pak het eerste element en val door naar
+    // de object-tak hieronder.
+    if (typeof output[0] === "string") return output[0];
+    return extractUrl(output[0], source);
+  }
   if (output && typeof output === "object" && "url" in output) {
-    const fn = (output as { url: () => string }).url;
-    if (typeof fn === "function") return fn();
+    const fn = (output as { url: () => unknown }).url;
+    // .url() geeft in nieuwere SDK-versies een URL-object terug — altijd
+    // naar string dwingen.
+    if (typeof fn === "function") return String(fn.call(output));
   }
   throw new Error(`Unexpected Replicate output shape from ${source}`);
 }
