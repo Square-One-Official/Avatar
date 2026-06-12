@@ -4,10 +4,25 @@ import SwiftUI
 
 @main
 struct Avatar2App: App {
+    @State private var auth: AuthService
+    @State private var onboarding: OnboardingModel
+
+    init() {
+        let auth = AuthService()
+        _auth = State(initialValue: auth)
+        _onboarding = State(initialValue: OnboardingModel(auth: auth))
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentPlaceholderView()
-                .frame(minWidth: 480, minHeight: 320)
+            Group {
+                if onboarding.isActive {
+                    OnboardingFlow(model: onboarding)
+                } else {
+                    ContentPlaceholderView()
+                }
+            }
+            .frame(minWidth: 480, minHeight: 320)
         }
     }
 }

@@ -118,3 +118,17 @@ oplevering E02.1 — project.yml is INFRA-grens.)
 
 **Result:** Al vervuld door E01.5: project.yml had de AvatarKit-package-dependency al op de targets Avatar én Avatar-MAS (naast Avatar2). Geverifieerd op v2-main: xcodegen + Avatar, Avatar-MAS en Avatar2 bouwen Debug groen, alle package-tests groen; geen v1-codewijzigingen. E02.2 (AI) is hiermee gedeblokkeerd.
 
+
+## 1.9 — Avatar2 unit-test-target
+- status: ready
+- owner: —
+- blockedBy: 1.1
+- DoD: beide targets bouwen, tests groen
+
+App-target-logica (bv. OnboardingModel uit E04.1: e-mailvalidatie, stap-state, skip/finish — en
+straks de auto-verify-logica van E04.2) is nu alleen build-gedekt: er is geen unit-test-target
+voor Avatar2. Toevoegen via project.yml (Avatar2Tests, XCTest, host Avatar2) + opnemen in
+scripts/build-v2.sh. (Story toegevoegd door FEAT bij oplevering E04.1 — project.yml is
+INFRA-grens.)
+
+**Result:** _(invullen bij done)_
