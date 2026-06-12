@@ -271,10 +271,18 @@ function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" 
  */
 function extractUrl(output: unknown, source: string): string {
   if (typeof output === "string") return output;
-  if (Array.isArray(output) && typeof output[0] === "string") return output[0];
+  if (Array.isArray(output)) {
+    // gpt-image-1.5 levert een ARRAY van FileOutput-objecten (multi-image
+    // models doen dat allemaal); pak het eerste element en val door naar
+    // de object-tak hieronder.
+    if (typeof output[0] === "string") return output[0];
+    return extractUrl(output[0], source);
+  }
   if (output && typeof output === "object" && "url" in output) {
-    const fn = (output as { url: () => string }).url;
-    if (typeof fn === "function") return fn();
+    const fn = (output as { url: () => unknown }).url;
+    // .url() geeft in nieuwere SDK-versies een URL-object terug — altijd
+    // naar string dwingen.
+    if (typeof fn === "function") return String(fn.call(output));
   }
   throw new Error(`Unexpected Replicate output shape from ${source}`);
 }
