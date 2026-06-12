@@ -134,7 +134,7 @@ INFRA-grens.)
 **Result:** Avatar2Tests-target (bundle.unit-test, gehost in Aaavatar 2.app) via project.yml, incl. expliciete PRODUCT_MODULE_NAME=Avatar2 (PRODUCT_NAME bevat een spatie) en scheme-testTargets op Avatar2; 9 OnboardingModel-unit-tests (stap-overgangen, e-mailgate, code-gate, completion-persistentie — Supabase-paden bewust buiten bereik); teststap opgenomen in scripts/build-v2.sh; beide targets bouwen groen, alle suites groen (Avatar2Tests 9/9, AvatarKit 31, AvatarUI 1).
 
 ## 1.10 — Model-override-parameter + MODEL_REGISTRY [backend]
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen
@@ -146,4 +146,4 @@ een whitelist per endpoint (geen vrije slugs — alleen geregistreerde alternati
 en gepinde versies verhuizen uit de losse constanten naar één `MODEL_REGISTRY` in `backend/lib`,
 zodat override-whitelist, credit-tarief (E14.3) en `requiresCloud` per feature op één plek leven.
 
-**Result:** _(invullen bij done)_
+**Result:** MODEL_REGISTRY in backend/lib/models.ts (default + override-whitelist, credits en requiresCloud per feature; BiRefNet/DeOldify/FLUX-Fill-refs verhuisd uit replicate.ts); optionele `model_override`-bodyparameter op /v1/cutout, /v1/colorize en /v1/fill-body — alleen gehonoreerd voor isDevUnlimitedUser (gate gecentraliseerd in lib/auth.ts; onbekende key → 400 unknown_model_override, niet-dev → stil genegeerd); credit-aftrek leest het tarief uit het registry (gedrag ongewijzigd, alle tarieven 1 — E14.3 hoeft alleen registry-getallen te wijzigen); tsc-typecheck + tsx-smoke-driver (backend/scripts/models-smoke.ts) groen, beide app-targets + alle testsuites groen. Let op: productie-deploy vereist port naar `main` (Vercel deployt v1-main, niet v2-main) — zelfde situatie als het recovery-endpoint uit E01.7.
