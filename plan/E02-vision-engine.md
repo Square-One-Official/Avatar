@@ -73,8 +73,6 @@ heroverwegen — alleen terugbrengen met bewijs op failure-cases die Vision aant
 raw als ondergrens is verrassend sterk maar verliest strand-zachtheid; stages 1–4+12–13
 verdienen hun plek (klein, zichtbaar effect).
 
-**Result:** _(invullen bij done)_
-
 ## 2.3 — OrmbgEngine
 - status: done
 - owner: AI
