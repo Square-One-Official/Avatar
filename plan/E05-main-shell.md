@@ -69,8 +69,8 @@ Notities (FEAT, bij oplevering):
 **Result:** IsolatingCanvas + IsolatingStatusPill in Avatar2/Features/Shell/ en ShellModel-state .revealing(original:cutout:): processing toont origineel + "Removing background...", cutout klaar → 0,8s zwartfade van de achtergrond onder de cutout-overlay + "Cutting out hair...", daarna .result → editor; status-pill = Figma "Recording" (capsule bg Card, 32-container met spinner, Labels/Small subtle, rechtsonder gap-4). Beide targets bouwen groen, alle tests groen (2 nieuwe Avatar2-tests: ShellModelTests).
 
 ## 5.4 — Sidebar (set)
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E03.5
 - DoD: beide targets bouwen, tests groen
 
