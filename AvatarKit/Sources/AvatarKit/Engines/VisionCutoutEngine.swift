@@ -29,18 +29,7 @@ public struct VisionCutoutEngine: CutoutEngine {
 
     public init() {}
 
-    /// Matte-wiskunde (guided filter, blends, mask-composite) klopt alleen
-    /// in linear licht; RGBAh voorkomt 8-bit banding in de zachte alpha.
-    /// Input krijgt sRGB→linear, output linear→sRGB.
-    private static let context: CIContext = {
-        let linear = CGColorSpace(name: CGColorSpace.linearSRGB)!
-        return CIContext(options: [
-            .useSoftwareRenderer: false,
-            .workingColorSpace: linear,
-            .outputColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-            .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
-        ])
-    }()
+    private static var context: CIContext { EngineRendering.linearContext }
 
     public func cutout(_ image: CGImage) async throws -> CGImage {
         let original = CIImage(cgImage: image)
@@ -166,10 +155,6 @@ public struct VisionCutoutEngine: CutoutEngine {
     }
 
     private static func scaled(_ mask: CIImage, to extent: CGRect) -> CIImage {
-        let sx = extent.width / mask.extent.width
-        let sy = extent.height / mask.extent.height
-        return mask
-            .transformed(by: CGAffineTransform(scaleX: sx, y: sy))
-            .cropped(to: extent)
+        EngineRendering.scaled(mask, to: extent)
     }
 }

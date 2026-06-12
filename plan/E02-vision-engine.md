@@ -44,7 +44,7 @@ Notities (AI, bij oplevering 2.1):
 **Result:** _(invullen bij done)_
 
 ## 2.3 — OrmbgEngine
-- status: in_progress
+- status: done
 - owner: AI
 - blockedBy: 2.1
 - DoD: beide targets bouwen, tests groen
@@ -59,7 +59,7 @@ ModelManager.
 4. ZIPFoundation als AvatarKit-dependency (zelfde versie als project.yml, 0.9.20) voor de zip-extractie — genoteerd voor INFRA-review.
 5. Tests zonder model/netwerk: matte-extractie uit synthetische MLMultiArray (float32 + float16-decode), isAvailable=false zonder installatie, SHA-256-helper op tempbestand; build via scripts/build-v2.sh.
 
-**Result:** _(invullen bij done)_
+**Result:** `OrmbgEngine` + `OrmbgModelStore` (actor: installedModelURL/download/removeInstalled/model-cache, SHA-256-gate, versie-in-mapnaam onder Application Support/AvatarKit/Models/ormbg/) in `AvatarKit/Engines/`; 3-staps pad 1-op-1 uit `subjectLiftDownloaded` (1024² → matte → guided r=2 ε=0.01 → composite, linear-sRGB); gedeelde contexten naar `EngineRendering.swift` (VisionCutoutEngine gerefactord); ZIPFoundation 0.9.20 als AvatarKit-dependency (INFRA-review gevraagd); 8 nieuwe tests, totaal 18 groen; beide targets bouwen Debug groen via build-v2.sh.
 
 ## 2.4 — CloudCutoutEngine
 - status: backlog
