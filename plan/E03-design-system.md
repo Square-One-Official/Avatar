@@ -58,8 +58,8 @@ Figma).
 
 
 ## 3.6 — Toggle/switch-component
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 
