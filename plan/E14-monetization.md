@@ -13,9 +13,8 @@ Pro-model: Starter Free (3 afbeeldingen totaal, lokale features, watermark) vs P
 
 Plan-kiezer met Starter/Pro-cards, Monthly/Yearly-toggle, Upgrade to pro-CTA. Bestaat als
 design — pixel-volgen, maar met de werkelijke prijzen: **€4,99/mnd, €49,90/jr en 200 credits/mnd**
-(besluit Thierry 2026-06-12). Let op: de "Save 20%"-toggle-label uit Figma klopt niet bij €49,90
-(dat is −17% / "2 maanden gratis") — toon de werkelijke korting, geen designtekst overnemen die
-feitelijk onjuist is.
+(besluit Thierry 2026-06-12). Jaarlabel: **"2 months free"** (klopt exact: €49,90 = 10 × €4,99) —
+vervangt de "Save 20%"-tekst; Thierry past Figma hierop aan.
 
 **Result:** _(invullen bij done)_
 
@@ -42,7 +41,7 @@ CreditMeter in AvatarKit: elke cloud-actie meldt z'n kosten in credits vóór ui
 trekt af via bestaande backend, toont op=op-state → top-up. On-device-acties tonen geen credits.
 CreditMeter exposeert per actie ook **`requiresCloud`** (voer voor de cloud/AI-glyph uit E03.7).
 
-**Credit-tarieven (besluit Thierry 2026-06-12: kosten-proportioneel, AI-kostenbescherming):**
+**Credit-tarieven (besluit Thierry 2026-06-12, netto-correctie 2e iteratie: kosten-proportioneel, AI-kostenbescherming):**
 
 | Actie | Model (huidig/bakeoff) | Kosten/call | Credits |
 |---|---|---|---|
@@ -50,17 +49,22 @@ CreditMeter exposeert per actie ook **`requiresCloud`** (voer voor de cloud/AI-g
 | Colorize | DeOldify (Replicate) | ~$0,001 | **1** |
 | Fill body | FLUX Fill pro (Replicate) | ~$0,05 | **2** |
 | Generatieve stijl/kleding/haar — standaardmodel | Nano Banana 2 ($0,067) / GPT Image 2 medium ($0,053) / FLUX.2 edit (vanaf $0,045/MP) | ~$0,05–0,07 | **4** |
-| Generatieve stijl/kleding/haar — premiummodel (alleen als E09.1-bakeoff het rechtvaardigt) | Nano Banana Pro | $0,134 (1K/2K) | **5** |
+| Generatieve stijl/kleding/haar — premiummodel (alleen als E09.1-bakeoff het rechtvaardigt) | Nano Banana Pro | $0,134 (1K/2K) | **7** |
 
-Rekensom (peildatum 12 jun 2026, koers ~€0,93/$): 1 credit kost de gebruiker €4,99/200 =
-**€0,025**. Worst case is 200 credits volledig aan 5-credit-acties: 40 × $0,134 = $5,36 ≈ €4,98 —
-nét binnen de €4,99-grens (break-even, geen retry-marge: premiummodel dus alléén inzetten waar de
-bakeoff het hard maakt). Standaard-generatief: 50 × $0,067 = $3,35 ≈ €3,12. Fill: 100 × $0,05 ≈
-€4,65. Lichte calls: 200 × $0,002 ≈ €0,37. Realistische mix zit ruim onder de grens; bij
-modelwissel of koersdaling de tabel herijken (secundaire check: het 750-top-up-pack verkoopt
-credits voor €0,020/stuk — duurste actie mag ook dáár niet structureel boven uitkomen, vandaar
-geen 5-credit-actie als standaardroute). GPT Image 2 op kwaliteit high ($0,211) past in geen
-enkel tarief — niet inzetten.
+Rekensom op **netto-omzet** (besluit Thierry: €4,99 incl. 21% BTW en Stripe-fees → ≈ **€3,80
+netto**/mnd; peildatum 12 jun 2026, koers ~€0,92/$): 1 credit levert netto €3,80/200 = **€0,019**
+op. Worst cases bij 200 credits op één actiesoort:
+- Premium-generatief (7 cr): ~28 × $0,134 = $3,75 ≈ **€3,45** ✓ (vandaar 7 i.p.v. 5 — bij 5 was
+  het $5,36 ≈ €4,93, ruim boven netto).
+- Standaard-generatief (4 cr): 50 × $0,067 = $3,35 ≈ **€3,08** ✓.
+- Lichte calls (1 cr): 200 × $0,002 ≈ **€0,37** ✓.
+- Fill body (2 cr): 100 × $0,05 = $5,00 ≈ **€4,60** — boven de €3,80 netto (wel onder bruto).
+  All-fill is geen realistisch patroon (fill ≈ 1× per portret), dus tarief blijft 2 conform
+  besluit; ALS dit knelt is 3 credits de fix — **open punt voor Thierry**.
+
+Bij modelwissel of koersdaling de tabel herijken. Secundaire check: het 750-top-up-pack verkoopt
+credits voor €0,020 bruto/stuk — duurste actie mag ook dáár niet structureel boven uitkomen.
+GPT Image 2 op kwaliteit high ($0,211) past in geen enkel tarief — niet inzetten.
 
 **Result:** _(invullen bij done)_
 

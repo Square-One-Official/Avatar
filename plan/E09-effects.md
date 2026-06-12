@@ -5,9 +5,9 @@ Team: **FEAT+AI**
 
 
 ## 9.1 — [AI] Stijl-route bepalen
-- status: backlog
+- status: ready
 - owner: —
-- blockedBy: E01.5
+- blockedBy: E01.5 (done — gepromoveerd naar ready op besluit Thierry 2026-06-12)
 - DoD: beide targets bouwen, tests groen
 
 Drie-armige bakeoff (besluit Thierry 2026-06-12): **Nano Banana (Replicate/fal) vs FLUX.2 vs
@@ -17,8 +17,11 @@ Testset: de 4 stijlen (Clay/Wood/3D/Scribble) **plus edit-cases**: tanden bleken
 verminderen, belichting fixen, haar en kleding. **Hard criterium: identity-behoud** — FLUX Fill
 (de bestaande fill-body-route) als referentie; een arm die identiteit verliest valt af ongeacht
 stijlkwaliteit. De uitkomst mag **per feature een ander model** zijn (stijl ≠ kleding ≠ haar) —
-dat bepaalt ook het standaard- vs premiumtarief in E14.3 (4 vs 5 credits). Testmechanisme:
-de dev-only model-picker uit E15.5 (op zijn beurt geblokkeerd op E01.10).
+dat bepaalt ook het standaard- vs premiumtarief in E14.3 (4 vs 7 credits). Testmechanisme:
+de dev-only model-picker uit E15.5; zolang die er niet is kan de bakeoff direct via de
+`model_override`-parameter (E01.10). Let op deploy (E13.0): backend-wijzigingen op v2-main staan
+nog niet op productie — test in-app tegen een **Vercel-preview-deploy** van de branch totdat de
+E13.0-port naar main gedraaid is.
 
 **Result:** _(invullen bij done)_
 
