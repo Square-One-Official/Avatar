@@ -103,9 +103,9 @@ Hierheen verplaatst (losse 'visuele pass'-vermeldingen):
 **Result:** _(invullen bij done)_
 
 ## 4.6 — Onboarding-stappen "Download now" + "Downloading"
-- status: blocked
+- status: ready
 - owner: —
-- blockedBy: Figma-frames (Thierry voegt ze toe aan de Stories-pagina; zet op ready zodra ze er staan), E03.2
+- blockedBy: E03.2 (done) — Figma-frames staan inmiddels op de Stories-pagina: 'Onboarding / Download now' (4030:1131) en 'Onboarding / Downloading' (4030:1149); op ready gezet conform het besluit
 - DoD: beide targets bouwen, tests groen
 - Context: besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening). Copy-basis: figma-design-review.md §"Onboarding / Download now" + §"Onboarding / Downloading", aangevuld met het bewijs-argument "beter op krullend/fijn haar" (besluit Thierry). NB (AI): de E02.2-beslisrun zag op de huidige 7 fixtures geen ORMBG-meerwaarde boven v2.0-minimal — bij de bouw de copy-claim staven met eigen voorbeelden (bijv. de E05.6-nudge-cases) of de claim zachter formuleren.
 
