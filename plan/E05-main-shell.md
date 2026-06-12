@@ -50,8 +50,8 @@ Notities (FEAT, bij oplevering):
 **Result:** Import in Avatar2/Features/Shell/ (ShellModel + uitgebreide ShellView): drag-drop over het hele venster (fileURL- én image-providers, dashed rand-glow) en NSOpenPanel-bestandskiezer → PipelineRouter(Vision) → canvasstates empty/processing/result/failed; eerste cutout flipt de quota-gating; beide targets bouwen groen, packagetests groen, smoke-run OK.
 
 ## 5.3 — Isolating-animatie
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: 5.2
 - DoD: beide targets bouwen, tests groen
 
