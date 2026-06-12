@@ -160,3 +160,12 @@ Eén component, twee varianten (heading/subtitle): rust = pure tekst; hover = ba
 Enter/blur bevestigt, Esc annuleert.
 
 **Result:** DSInlineEditLabel in AvatarUI/Components. Contract: `DSInlineEditLabel(_ placeholder: String, text: Binding<String>, variant: .heading|.subtitle)`; drie staten — rust: pure tekst (heading Body/Medium primary, subtitle Body/Small subtle; leeg = placeholder muted); hover: bg neutral, padding gap-2/gap-0.5, r-md continuous, pointer-cursor (NSCursor push/pop); edit: TextField op dezelfde plek met identieke typografie, breedte volgt inhoud via verborgen maattekst + overlay, hover-bg + focus-rand b-thin muted — padding in alle staten gelijk, dus geen layoutshift. Enter/blur committen (getrimd), Esc annuleert (onExitCommand); blur-commit gegate op isEditing zodat Esc niet alsnog commit. Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
+
+## 3.14 — Review-fixes: glass-materiaal, canvas-ratio, inline-edit-breedte
+- status: in_progress
+- owner: DS
+- blockedBy: 3.11, 3.12, 3.13
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-bevindingen 10–12 van Thierry (12 jun, verse build): (10) DSToolButton oogt vlak — materiaal in lagen met doorschemerende blur; (11) DSCanvasCard hoort vast 1:1 (exportformaat), foto aspect-fill; (12) DSInlineEditLabel-veld kapt tekst af — intrinsieke breedte, meegroeien, nooit clippen.
+
+**Result:** _(invullen bij done)_
