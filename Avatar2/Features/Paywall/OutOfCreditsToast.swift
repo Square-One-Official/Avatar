@@ -32,27 +32,3 @@ struct OutOfCreditsToastView: View {
         }
     }
 }
-
-/// Tijdelijke opstap tot de main-shell (E05) en het editor-framework (E06)
-/// echte gating-callsites leveren: toont de entitlementstate (DSQuotaBadge)
-/// en opent de paywall via dezelfde requestUpgrade()-route als DSGated.
-struct EntitlementStatusStrip: View {
-    let model: EntitlementModel
-
-    var body: some View {
-        HStack(spacing: DSSpacing.gap2) {
-            // Quota pas ná de eerste cutout (E05.1): geen druk vóór waarde.
-            if model.hasCompletedFirstCutout {
-                if model.isProActive {
-                    DSQuotaBadge("\(model.creditsRemaining) credits")
-                } else if let free = model.freeImportsRemaining {
-                    DSQuotaBadge("\(free) of \(FreeTier.maxPortraits) free imports left")
-                }
-            }
-            DSNeutralButton("Upgrade to Pro", size: .small) {
-                model.requestUpgrade()
-            }
-        }
-        .task { await model.refresh() }
-    }
-}

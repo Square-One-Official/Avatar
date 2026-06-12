@@ -82,7 +82,7 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
@@ -100,7 +100,18 @@ Hierheen verplaatst (losse 'visuele pass'-vermeldingen):
   "visuele pass later" — het Pro-modal-frame bestaat inmiddels (4019:953); de paywall-pass
   loopt via E14.1 (pixel-volgen), niet via deze story.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- Buiten de frames maar functioneel behouden, in de geest van het design: foutmeldingen,
+  RecoverPro-hint, continue-without-account (Email), dynamisch e-mailadres + 'Wrong email? Go
+  back' (OTP). De quota-zichtbaarheidsregel uit E05.1 (pas ná eerste cutout) blijft het
+  gedragsbesluit; de vórm is nu 1-op-1 de Figma-topbar.
+- Gear-knop stuurt de standaard Settings-selector; functioneel zodra E15.1 de Settings-scene
+  levert.
+- get_design_context van de lokale Figma-MCP hing op alle frames; geometrie komt uit
+  get_metadata (exact) + variabelen uit get_variable_defs + screenshot-pixelmeting (splash).
+- E03.9 (full-width-knoppen + DSGhostButton) is hiervoor als DS-story toegevoegd en gedaan.
+
+**Result:** Onboarding en shell 1-op-1 getrokken op de Stories-frames: Splash licht conform frame (H1 primary-static-black, Continue onder, fluid-gradient als geregistreerde placeholder — ASSETS.md #1); Email-kolom 360 gecentreerd (H1-kop uit het frame, veld "Work email address" + envelop, full-width "Continue with email", footer Body/Small muted op gap-12 met Terms/Privacy-links in lime, v1-URL's); OTP-kolom 332 ("Check your email" H1, sub Body/Medium subtle, gaps 48, full-width Verify + DSGhostButton "Resend code"); First use met memoji-ring 469×524 (6 placeholder-avatars 112 op exacte Figma-posities, projects-palet — ASSETS.md #2), lime plus (fillBrand 40) + "Drop a portrait / or choose a file"-link; ShellTopBar (quota Labels/Small + Upgrade-brand-chip links op x76, gear 48-cirkel rechts) vervangt EntitlementStatusStrip; dropzone = Figma-vierkant 465×456 r-4xl dashed lime b-medium met "Drop it" H3 (vervangt randglow); PortraitHeader gecentreerd boven canvas in Body/Medium + Body/Small subtle. Beide targets bouwen groen, alle tests groen.
 
 ## 4.6 — Onboarding-stappen "Download now" + "Downloading"
 - status: ready

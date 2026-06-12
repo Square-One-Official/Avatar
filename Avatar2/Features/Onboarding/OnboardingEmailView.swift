@@ -1,9 +1,11 @@
-// Onboarding 2.0 — e-mailstap (Figma: Onboarding / Email, dark). Copy volgt
-// de verwerkte review-fixes: subtitle legt uit waaróm e-mail nodig is,
-// footer in portret-termen, expliciet continue-without-account-pad en de
-// RecoverPro-hint voor Pro-gebruikers (bouwplan §Auth & betalingen, punt 4).
-// Geen Google-knop in 2.0; foutmeldingen in neutrale tinten — het dark
-// design system kent bewust geen signaalkleuren (E03.1).
+// Onboarding 2.0 — e-mailstap (Figma: Onboarding / Email, 2611:39442).
+// E04.5: 1-op-1 met het frame — contentkolom 360 exact gecentreerd: kop H1,
+// gap-8, input (placeholder "Work email address", mail-icoon, géén label),
+// gap-2, full-width "Continue with email"; footer Body/Small muted op
+// gap-12 van de onderrand met Terms/Privacy-links in lime (zelfde URL's
+// als v1 ProUpgradeSheet). Buiten het frame maar functioneel vereist
+// (bouwplan §Auth, in de geest van het design): foutmelding + RecoverPro-
+// hint onder het veld, continue-without-account boven de footer.
 
 import AvatarUI
 import SwiftUI
@@ -15,42 +17,38 @@ struct OnboardingEmailView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: DSSpacing.gap2) {
-                Text("No strings attached. No servers either.")
-                    .dsTextStyle(.h4)
+            VStack(spacing: 0) {
+                Text("Your email unlocks your license, your photos never leave your Mac.")
+                    .dsTextStyle(.h1)
                     .foregroundStyle(DSColor.Foreground.primary)
-                Text("Your email unlocks your license — your photos never leave your Mac.")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.subtle)
-            }
-            .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.center)
 
-            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                DSTextField(
-                    label: "Email",
-                    placeholder: "you@company.com",
-                    text: $model.emailInput
-                )
-                .onSubmit {
-                    Task { await model.submitEmail() }
-                }
-                if let error = model.auth.lastError {
-                    Text(error)
+                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                    DSTextField(
+                        placeholder: "Work email address",
+                        icon: Image(systemName: "envelope"),
+                        text: $model.emailInput
+                    )
+                    .onSubmit {
+                        Task { await model.submitEmail() }
+                    }
+                    DSPrimaryButton("Continue with email", fullWidth: true) {
+                        Task { await model.submitEmail() }
+                    }
+                    .disabled(!model.canSubmitEmail)
+
+                    if let error = model.auth.lastError {
+                        Text(error)
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+                    Text("Upgraded to Pro before? Sign in with that same email to keep it.")
                         .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .foregroundStyle(DSColor.Foreground.muted)
                 }
-                Text("Upgraded to Pro before? Sign in with that same email to keep it.")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                .padding(.top, DSSpacing.gap8)
             }
-            .frame(width: 320)
-            .padding(.top, DSSpacing.gap8)
-
-            DSPrimaryButton("Continue") {
-                Task { await model.submitEmail() }
-            }
-            .disabled(!model.canSubmitEmail)
-            .padding(.top, DSSpacing.gap6)
+            .frame(width: 360)
 
             Spacer()
 
@@ -63,11 +61,33 @@ struct OnboardingEmailView: View {
                 .foregroundStyle(DSColor.Foreground.subtle)
                 .underline()
 
-                Text("One look for every team portrait. Made on your Mac, not in the cloud.")
+                footerText
                     .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 360)
             }
+            .padding(.bottom, DSSpacing.gap12)
         }
-        .padding(DSSpacing.gap8)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Footer uit het frame; links in lime zoals het design (AttributedString
+    /// zodat de regel als één lopende tekst wikkelt).
+    private var footerText: Text {
+        var plain = AttributedString(
+            "One look for every team portrait. Made on your Mac, not in the cloud. By clicking continue, you agree to our "
+        )
+        plain.foregroundColor = DSColor.Foreground.muted
+        var terms = AttributedString("Terms of Service")
+        terms.foregroundColor = DSColor.Action.primary
+        terms.link = URL(string: "https://aaavatar.nl/terms-of-service")
+        var middle = AttributedString(" and ")
+        middle.foregroundColor = DSColor.Foreground.muted
+        var privacy = AttributedString("Privacy Policy")
+        privacy.foregroundColor = DSColor.Action.primary
+        privacy.link = URL(string: "https://aaavatar.nl/privacy-policy")
+        var dot = AttributedString(".")
+        dot.foregroundColor = DSColor.Foreground.muted
+        return Text(plain + terms + middle + privacy + dot)
     }
 }

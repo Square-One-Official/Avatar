@@ -7,5 +7,5 @@ batch — een placeholder stilletjes als definitief behandelen mag niet.
 
 | # | Wat | Figma-frame | Formaat | Status placeholder |
 |---|-----|-------------|---------|--------------------|
-| 1 | Splash-achtergrondafbeelding | Onboarding / Splash (Stories, node 151:1409) | _opmeten bij E04.5_ | nog te bouwen |
-| 2 | Memoji-cirkel | App / First use (Stories, node 151:1409) | _opmeten bij E04.5_ | nog te bouwen |
+| 1 | Splash-achtergrondafbeelding (fluid blauwe gradient) | Onboarding / Splash (2611:39453) | full-bleed, frame 1240×800 | placeholder gebouwd (E04.5, OnboardingSplashView) |
+| 2 | Memoji-avatars (6 figuren; cirkels = projects-palet) | App / First use (4008:7050, Frame 28 4016:552) | 6× 112×112 in ring 469×524 | placeholder gebouwd (E04.5, FirstUseEmptyState) |
