@@ -80,3 +80,16 @@ Google-infra NIET slopen.
 
 **Result:** _(invullen bij done)_
 
+## 1.8 — SHARED: Avatar (v1) target linkt AvatarKit
+- status: ready
+- owner: —
+- blockedBy: 1.2
+- DoD: beide targets bouwen, tests groen
+
+Nodig voor E02.2 (AI): EdgeBenchmark leeft in `Avatar/Debug/` en moet `VisionCutoutEngine` uit
+AvatarKit als 5e arm kunnen aanroepen. Alleen project.yml: package-dependency `AvatarKit` op de
+targets `Avatar` en `Avatar-MAS`; geen v1-codewijzigingen. (Story toegevoegd door AI bij
+oplevering E02.1 — project.yml is INFRA-grens.)
+
+**Result:** _(invullen bij done)_
+
