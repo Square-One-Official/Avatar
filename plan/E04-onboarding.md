@@ -82,9 +82,9 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: in_progress
+- status: done
 - owner: FEAT
-- Heropend (2026-06-12): visuele-pass-bevindingen 1–9 van Thierry (app vs frames) verwerken; DS-leveringen E03.10–3.13 zijn er al.
+- Heropend en afgerond (2026-06-12): visuele-pass-bevindingen 1–9 van Thierry verwerkt; DS-leveringen E03.10–3.13.
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
 - Context: Stories-pagina node 151:1409; werkregel Figma-1-op-1 + placeholder-regel (CLAUDE.md → Vaste kennis, besluit Thierry 2026-06-12).
@@ -111,6 +111,18 @@ Notities (FEAT, bij oplevering):
 - get_design_context van de lokale Figma-MCP hing op alle frames; geometrie komt uit
   get_metadata (exact) + variabelen uit get_variable_defs + screenshot-pixelmeting (splash).
 - E03.9 (full-width-knoppen + DSGhostButton) is hiervoor als DS-story toegevoegd en gedaan.
+
+**Result review-fix (bevindingen 1–9, per punt):**
+1. Vensterbalk: `.windowStyle(.hiddenTitleBar)` op de WindowGroup — één zwart vlak, traffic lights inline, geen venstertitel; de topbar reserveert zelf de ruimte ernaast (x76 uit het frame).
+2. Dropzone-staat: tijdens een drag verdwijnt de first-use-inhoud volledig (canvas toont alleen bg) en blijft alleen het Figma-dropvierkant over, met 0,15s fade; het hele venster blijft droptarget (review-besluit) — het vlak is puur visueel.
+3. Status-pill: verplaatst van foto-overlay naar vensterniveau. NB: de frames zetten hem rechtsonder (Isolating 4017:1862 op x816–988, inzet ±16; Image added 4017:1849), niet gecentreerd — conform "check het frame" rechtsonder met gap-4 aangehouden.
+4. Glass-effect: DS-story E03.11 — DSToolButton met DSGlassCircle (ultraThinMaterial + neutral + rim-highlight), DSBottomToolbar erop; de gear gebruikt nu dezelfde DSToolButton i.p.v. een eigen cirkel.
+5. Layoutshift: sidebar-toggle muteert in één `withAnimation(.spring(0.35))`-transactie (toolSelection-binding) zodat kaart, toolbar en sidebar samen veren; de HStack-animatie blijft als vangnet voor externe toggles.
+6. Canvas-kaart: DS-story E03.12 — DSCanvasCard (bg Card, r-4xl); editor én isolating-fases tonen de foto gevuld in de kaart op frameformaat (465×456, aspect-fit met max), de Name/Role-header staat nu in de layoutflow bóven de kaart (padding-top gap-8, Figma y=32/kaart 108) — geen overlap meer mogelijk.
+7. Dot-grid: DSDotGrid programmatisch (Canvas, geen asset): Ø3-stippen op 17pt-grid in neutral-strongest op Card — 1:1 gemeten uit de render van de canvas-"Image"-nodes (bv. 4017:1811; het genoemde node-id 4031:1876 bestaat niet in het document). Editor rendert de cutout op `showsDotGrid: true`; E07 zet hem uit zodra een achtergrond actief is.
+8. Sidebar als kaart: bg Card met r-4xl continuous + marge gap-1 rondom (frame-inzet 4); zoekveld = DSSearchField (E03.10: capsule h48, ruimere padding); selectie-highlight was al de afgeronde Inset-card (E03.5); thumbnails 48 met continuous corners (DSSidebarRow-tweak in E03.10).
+9. Inline edit: DSInlineEditLabel (E03.13) vervangt de losse TextFields in PortraitHeader — rust = tekst, hover = neutral-badge met pointer-cursor, klik = echt veld op dezelfde plek (breedte volgt inhoud, focus-rand), Enter/blur bevestigt, Esc annuleert; Name = heading-variant, Role = subtitle. Drie staten vastgelegd in het E03.13-contract; sidebar-rename kan hem later hergebruiken.
+Beide targets bouwen groen, alle tests groen.
 
 **Result:** Onboarding en shell 1-op-1 getrokken op de Stories-frames: Splash licht conform frame (H1 primary-static-black, Continue onder, fluid-gradient als geregistreerde placeholder — ASSETS.md #1); Email-kolom 360 gecentreerd (H1-kop uit het frame, veld "Work email address" + envelop, full-width "Continue with email", footer Body/Small muted op gap-12 met Terms/Privacy-links in lime, v1-URL's); OTP-kolom 332 ("Check your email" H1, sub Body/Medium subtle, gaps 48, full-width Verify + DSGhostButton "Resend code"); First use met memoji-ring 469×524 (6 placeholder-avatars 112 op exacte Figma-posities, projects-palet — ASSETS.md #2), lime plus (fillBrand 40) + "Drop a portrait / or choose a file"-link; ShellTopBar (quota Labels/Small + Upgrade-brand-chip links op x76, gear 48-cirkel rechts) vervangt EntitlementStatusStrip; dropzone = Figma-vierkant 465×456 r-4xl dashed lime b-medium met "Drop it" H3 (vervangt randglow); PortraitHeader gecentreerd boven canvas in Body/Medium + Body/Small subtle. Beide targets bouwen groen, alle tests groen.
 

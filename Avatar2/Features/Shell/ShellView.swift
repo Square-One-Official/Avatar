@@ -1,7 +1,10 @@
 // Main shell-wortel (E05). 5.1 = first-use-empty-state, 5.2 = import
-// (drag-drop over het hele venster + bestandskiezer → PipelineRouter,
-// review-fix: geen omlijnd dropvierkant maar een vensterrand-glow).
-// Isolating-animatie (5.3), sidebar (5.4) en header (5.5) haken hier in.
+// (drag-drop over het hele venster + bestandskiezer → PipelineRouter).
+// E04.5-fix (bevindingen 2/3/6): tijdens een drag vervangt de Figma-
+// dropzone de first-use-inhoud (gedrag: heel venster blijft droptarget);
+// de status-pill hangt op vensterniveau rechtsonder (positie uit de
+// frames); de Name/Role-header staat in de flow bóven de canvas-kaart —
+// nooit over de foto.
 
 import AvatarUI
 import SwiftUI
@@ -29,6 +32,9 @@ struct ShellView: View {
                     onSelect: { model.select($0) },
                     onAdd: { model.presentOpenPanel() }
                 )
+                // Losstaande kaart met marge rondom (bevinding 8; frame-
+                // inzet 4 t.o.v. venster).
+                .padding(DSSpacing.gap1)
                 .transition(.move(edge: .trailing))
             }
         }
@@ -39,54 +45,76 @@ struct ShellView: View {
     }
 
     private var mainArea: some View {
-        canvas
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Heel het venster is droptarget (Fitts); de Figma-dropzone
-            // (App / Dropzone, 4017:1622) verschijnt zolang er iets boven
-            // hangt: 465×456, r-4xl, dashed lime b-medium, "Drop it" H3.
-            .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
-                handleDrop(providers)
+        VStack(spacing: 0) {
+            // Header in de flow, los bóven de kaart (bevinding 6) —
+            // Figma Frame 2: y=32, kaart begint op 108.
+            if showsPortraitHeader {
+                PortraitHeader(model: model)
+                    .padding(.top, DSSpacing.gap8)
             }
-            .overlay {
-                if model.isDropTargeted {
-                    DropzoneOverlay()
-                        .allowsHitTesting(false)
-                }
+            canvas
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Heel het venster is droptarget (Fitts, review-besluit); de
+        // Figma-dropzone (App / Dropzone, 4017:1622) is puur visueel.
+        .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
+            handleDrop(providers)
+        }
+        .overlay {
+            if model.isDropTargeted {
+                DropzoneOverlay()
+                    .allowsHitTesting(false)
             }
-            // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
-            // de "top"-strook uit de App-frames.
-            .overlay(alignment: .top) {
-                ShellTopBar(model: entitlement)
+        }
+        // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
+        // de "top"-strook uit de App-frames.
+        .overlay(alignment: .top) {
+            ShellTopBar(model: entitlement)
+        }
+        // Status-pill op vensterniveau (bevinding 3): de frames zetten
+        // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
+        // Image added 4017:1849), niet aan de foto geplakt.
+        .overlay(alignment: .bottomTrailing) {
+            if let label = isolatingStatusLabel {
+                IsolatingStatusPill(label: label)
+                    .padding(DSSpacing.gap4)
             }
-            // Name/Role-header (E05.5) zodra er een portret op canvas
-            // staat — gecentreerd boven het canvas (Figma Frame 2, y=32).
-            .overlay(alignment: .top) {
-                if case .result = model.canvas {
-                    PortraitHeader(model: model)
-                        .padding(.top, DSSpacing.gap8)
-                }
-            }
+        }
+        .animation(.easeOut(duration: 0.15), value: model.isDropTargeted)
+    }
+
+    private var showsPortraitHeader: Bool {
+        switch model.canvas {
+        case .processing, .revealing, .result: true
+        case .empty, .failed: false
+        }
+    }
+
+    private var isolatingStatusLabel: String? {
+        switch model.canvas {
+        case .processing: "Removing background..."
+        case .revealing: "Cutting out hair..."
+        default: nil
+        }
     }
 
     @ViewBuilder
     private var canvas: some View {
         switch model.canvas {
         case .empty:
-            FirstUseEmptyState {
-                model.presentOpenPanel()
+            // Tijdens een drag verdwijnt de first-use-inhoud en blijft
+            // alleen de dropzone over (bevinding 2).
+            if model.isDropTargeted {
+                DSColor.Background.app
+            } else {
+                FirstUseEmptyState {
+                    model.presentOpenPanel()
+                }
             }
         case .processing(let original):
             IsolatingCanvas(original: original, cutout: nil)
-                .overlay(alignment: .bottomTrailing) {
-                    IsolatingStatusPill(label: "Removing background...")
-                        .padding(DSSpacing.gap4)
-                }
         case .revealing(let original, let cutout):
             IsolatingCanvas(original: original, cutout: cutout)
-                .overlay(alignment: .bottomTrailing) {
-                    IsolatingStatusPill(label: "Cutting out hair...")
-                        .padding(DSSpacing.gap4)
-                }
         case .result(let cutout):
             // Editor-framework (E06.1): toolbar + panel-systeem rond het
             // resultaat; foto-verkleining regelt de DS-container centraal.

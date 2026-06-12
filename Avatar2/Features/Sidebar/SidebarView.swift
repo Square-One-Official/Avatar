@@ -1,9 +1,10 @@
-// Sidebar/set (E05.4, Figma: App / Sidebar images 4011:4986, paneel "Siri
-// AI" 248 breed). Search bovenin (DSTextField h40 als stand-in voor de
-// Figma "Search input"-component h48 — DS-story E03.10), daaronder
-// DSSidebarRow-slots (thumb 48 uit de cutout, naam/rol, selectie = bg
-// Inset) en de DSAddButton (sidebar-add-besluit 10 jun). Thumbnails in
-// Figma zijn placeholderfoto's; wij renderen de echte cutouts.
+// Sidebar/set (E05.4 + E04.5-fix bevinding 8, Figma: App / Sidebar images
+// 4011:4986, paneel "Siri AI" 248 breed). Losstaande afgeronde kaart
+// (bg Card, r-4xl continuous — zelfde kaarttaal als DSEditPanel; ShellView
+// geeft de marge rondom) met DSSearchField (capsule h48, E03.10) bovenin,
+// DSSidebarRow-slots (thumb 48, continuous corners; selectie = afgeronde
+// Inset-highlight) en de DSAddButton (sidebar-add-besluit 10 jun).
+// Thumbnails in Figma zijn placeholderfoto's; wij renderen de cutouts.
 
 import AvatarUI
 import SwiftData
@@ -28,12 +29,8 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            DSTextField(
-                placeholder: "Search",
-                icon: Image(systemName: "magnifyingglass"),
-                text: $searchText
-            )
-            .padding(DSSpacing.gap3)
+            DSSearchField(text: $searchText)
+                .padding(DSSpacing.gap3)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -58,7 +55,10 @@ struct SidebarView: View {
         }
         .frame(width: 248)
         .frame(maxHeight: .infinity)
-        .background(DSColor.Background.card)
+        .background(
+            DSColor.Background.card,
+            in: .rect(cornerRadius: DSRadius.xl4, style: .continuous)
+        )
     }
 
     @ViewBuilder
