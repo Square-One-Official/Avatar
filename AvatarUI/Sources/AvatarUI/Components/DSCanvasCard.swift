@@ -26,6 +26,10 @@ public struct DSCanvasCard<Content: View>: View {
             }
             content
         }
+        // Vast vierkant (E03.14, bevinding 11): het canvas is het
+        // exportformaat (1:1); de inhoud vult de kaart (aspect-fill door
+        // de caller) en wordt door de kaart geclipt.
+        .aspectRatio(1, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
     }
 }

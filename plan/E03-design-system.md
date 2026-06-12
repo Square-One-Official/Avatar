@@ -160,3 +160,12 @@ Eén component, twee varianten (heading/subtitle): rust = pure tekst; hover = ba
 Enter/blur bevestigt, Esc annuleert.
 
 **Result:** DSInlineEditLabel in AvatarUI/Components. Contract: `DSInlineEditLabel(_ placeholder: String, text: Binding<String>, variant: .heading|.subtitle)`; drie staten — rust: pure tekst (heading Body/Medium primary, subtitle Body/Small subtle; leeg = placeholder muted); hover: bg neutral, padding gap-2/gap-0.5, r-md continuous, pointer-cursor (NSCursor push/pop); edit: TextField op dezelfde plek met identieke typografie, breedte volgt inhoud via verborgen maattekst + overlay, hover-bg + focus-rand b-thin muted — padding in alle staten gelijk, dus geen layoutshift. Enter/blur committen (getrimd), Esc annuleert (onExitCommand); blur-commit gegate op isEditing zodat Esc niet alsnog commit. Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
+
+## 3.14 — Review-fixes: glass-materiaal, canvas-ratio, inline-edit-breedte
+- status: done
+- owner: DS
+- blockedBy: 3.11, 3.12, 3.13
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-bevindingen 10–12 van Thierry (12 jun, verse build): (10) DSToolButton oogt vlak — materiaal in lagen met doorschemerende blur; (11) DSCanvasCard hoort vast 1:1 (exportformaat), foto aspect-fill; (12) DSInlineEditLabel-veld kapt tekst af — intrinsieke breedte, meegroeien, nooit clippen.
+
+**Result:** Per punt: (10) DSGlassCircle in lagen — NSVisualEffectView (.hudWindow, blendingMode .withinWindow) als blur-basis zodat content in hetzelfde venster doorschemert (SwiftUI's .ultraThinMaterial blendt op macOS achter het venster en oogde daardoor vlak), daarbovenop neutral-tint, inner-highlight bovenin (primary .10 → clear, top→center) en gradient-rim licht-boven/donker-onder (primary .25 → zwart .35, b-thin); (11) DSCanvasCard dwingt zelf 1:1 af (aspectRatio in de component, exportformaat) — caller levert aspect-fill-inhoud, dot-grid blijft zichtbaar door transparante cutout-delen; integratie: de 465:456-modifiers op de twee Avatar2-call-sites (EditorView, IsolatingCanvas) vervangen door maxWidth/Height 456; (12) DSInlineEditLabel-editveld = ZStack van verborgen maattekst (+ gap-1 caret-marge, bepaalt minimum) en TextField met .fixedSize(horizontal:) (intrinsieke breedte, groeit mee tijdens typen) — gecentreerd, clipt nooit. Beide targets bouwen groen, alle tests groen.
