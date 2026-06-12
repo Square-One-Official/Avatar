@@ -62,8 +62,8 @@ Versie, updatekanaal, check-for-updates (Sparkle), links (privacy, site). Zelfde
 "Advanced"-sectie in Settings > AI & Models, alleen zichtbaar voor dev-accounts
 (isDevUnlimitedUser): model-picker per cloud-feature (whitelist uit E01.10) en engine-keuze per
 lokale feature. Keuzes persistent, duidelijk gemarkeerd als dev-only. Geen zichtbaarheid of
-gedrag voor reguliere gebruikers. Let op deploy (E13.0): zolang de backend-port naar main niet
-gedraaid is, staan MODEL_REGISTRY/model_override alleen op v2-main — in-app testen tegen een
-**Vercel-preview-deploy** van de branch.
+gedrag voor reguliere gebruikers. Deploy: MODEL_REGISTRY/model_override staan sinds de E13.0-port
+van 2026-06-12 op productie; backend-werk dat daarna op v2-main landt in-app testen tegen een
+**Vercel-preview-deploy** tot de volgende port.
 
 **Result:** _(invullen bij done)_
