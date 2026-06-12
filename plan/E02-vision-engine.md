@@ -45,7 +45,7 @@ ModelManager.
 **Result:** _(invullen bij done)_
 
 ## 2.4 — CloudCutoutEngine
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E01.5
 - DoD: beide targets bouwen, tests groen

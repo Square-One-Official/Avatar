@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 
 /// Compact "NEW" pill rendered next to recently-launched feature

@@ -47,7 +47,7 @@ draait.
 **Result:** XCTest-targets voor beide packages (5 router-tests + smoke-test) en scripts/build-v2.sh (xcodegen + beide targets + beide testsuites); alles groen.
 
 ## 1.5 — SHARED: BackendClient naar AvatarKit
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
@@ -55,7 +55,7 @@ draait.
 BackendClient (auth/entitlement/cloud-calls) verplaatsen naar AvatarKit; oude app consumeert hem
 vandaaruit. Enige story die Avatar/ mag raken.
 
-**Result:** _(invullen bij done)_
+**Result:** BackendClient + TLSPinning + DeviceFingerprint + entitlement-wire-types + Announcement-modellen naar AvatarKit/Backend/ (public API, AuthManager gekoppeld via nieuw AccessTokenProviding-protocol); Avatar, Avatar-MAS en Avatar2 bouwen groen, tests groen, v1 start-smoke OK.
 
 ## 1.6 — Auth 2.0: e-mail + code
 - status: ready

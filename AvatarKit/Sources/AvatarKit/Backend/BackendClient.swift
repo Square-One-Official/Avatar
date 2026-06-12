@@ -2,7 +2,7 @@ import Foundation
 
 /// Typed errors the backend can return. `noCredits` (HTTP 402) triggers the
 /// upgrade paywall; `unauthorized` (401) triggers sign-in.
-enum BackendError: LocalizedError {
+public enum BackendError: LocalizedError {
     case notSignedIn
     case unauthorized
     case noCredits
@@ -16,7 +16,7 @@ enum BackendError: LocalizedError {
     /// generic server-error copy — the request never reaches the wire.
     case payloadTooLarge(bytes: Int, limit: Int)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .notSignedIn:   return "Please sign in to continue."
         case .unauthorized:  return "Session expired. Please sign in again."
@@ -36,28 +36,29 @@ enum BackendError: LocalizedError {
 /// URL (DMG-build path: open in browser, listen for `aaavatar://auth-callback`
 /// to refresh entitlement) or a StoreKit product ID (App Store-build path:
 /// invoke `Product.purchase()`). Exactly one is non-nil.
-enum CheckoutResult {
+public enum CheckoutResult {
     case web(URL)
     case storeKit(productId: String)
 }
 
 /// REST client for the Avatar backend (Vercel + Supabase).
 /// Production base URL: `https://api.aaavatar.nl`.
-/// All requests authenticate via the bearer token from `AuthManager`.
+/// All requests authenticate via the bearer token from the injected
+/// `AccessTokenProviding` (v1: `AuthManager`; 2.0: `AuthService`).
 @MainActor
-final class BackendClient {
-    let baseURL: URL = URL(string: "https://api.aaavatar.nl")!
+public final class BackendClient {
+    public let baseURL: URL = URL(string: "https://api.aaavatar.nl")!
 
     /// Marketing version pulled from the app bundle, e.g. "1.1.4". Sent as
     /// `X-App-Version` on every request so the backend can gate
     /// version-targeted features (announcements with `minAppVersion`).
-    static let appVersion: String? =
+    public static let appVersion: String? =
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
 
-    private unowned let auth: AuthManager
+    private unowned let auth: any AccessTokenProviding
     private let session: URLSession
 
-    init(auth: AuthManager, session: URLSession = TLSPinning.pinnedShared) {
+    public init(auth: any AccessTokenProviding, session: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
         self.session = session
     }
@@ -68,7 +69,7 @@ final class BackendClient {
     /// falls back to a `device_grants` lookup keyed on
     /// `X-Device-Fingerprint`. Devices that paid via the pre-auth checkout
     /// flow are reported as Pro with `needs_account_link: true`.
-    func me() async throws -> AccountPayload {
+    public func me() async throws -> AccountPayload {
         try await requestAllowingAnonymous("/v1/account", method: "GET")
     }
 
@@ -81,13 +82,13 @@ final class BackendClient {
     /// Pro users get a short-circuit `allowed: true` without consuming any
     /// counter. Works without a signed-in session (anonymous mode hits
     /// only the device counter).
-    struct ClaimResponse: Decodable {
-        let allowed: Bool
-        let importsUsed: Int
-        let importsRemaining: Int
-        let pro: Bool?
+    public struct ClaimResponse: Decodable, Sendable {
+        public let allowed: Bool
+        public let importsUsed: Int
+        public let importsRemaining: Int
+        public let pro: Bool?
     }
-    func claimImport() async throws -> ClaimResponse {
+    public func claimImport() async throws -> ClaimResponse {
         try await requestAllowingAnonymous("/v1/import-claim", method: "POST")
     }
 
@@ -106,7 +107,7 @@ final class BackendClient {
     /// or server errors fall back to Apple Subject Lift via the offline /
     /// "hiccup" toasts. Inputs larger than `Self.cutoutInputLimitBytes`
     /// throw `BackendError.payloadTooLarge` before any network I/O.
-    static let cutoutInputLimitBytes: Int = 20 * 1024 * 1024
+    public static let cutoutInputLimitBytes: Int = 20 * 1024 * 1024
 
     private struct CutoutUploadURLResponse: Decodable {
         let url: String
@@ -117,7 +118,7 @@ final class BackendClient {
         let creditsRemaining: Int         // decoded from `credits_remaining`
     }
 
-    func cutout(imagePNG: Data) async throws -> (Data, Int) {
+    public func cutout(imagePNG: Data) async throws -> (Data, Int) {
         guard imagePNG.count <= Self.cutoutInputLimitBytes else {
             throw BackendError.payloadTooLarge(
                 bytes: imagePNG.count,
@@ -190,13 +191,20 @@ final class BackendClient {
     /// even when alpha gaps suggest missing parts. When the client cannot
     /// detect a face the field is omitted and the backend falls back to a
     /// top-of-bbox heuristic.
-    struct FaceBox: Encodable {
-        let x: Double
-        let y: Double
-        let width: Double
-        let height: Double
+    public struct FaceBox: Encodable, Sendable {
+        public let x: Double
+        public let y: Double
+        public let width: Double
+        public let height: Double
+
+        public init(x: Double, y: Double, width: Double, height: Double) {
+            self.x = x
+            self.y = y
+            self.width = width
+            self.height = height
+        }
     }
-    func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+    public func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
         struct Body: Encodable {
             let image: String
             let face: FaceBox?
@@ -224,7 +232,7 @@ final class BackendClient {
         let cutout: String
         let creditsRemaining: Int
     }
-    func colorize(imagePNG: Data) async throws -> (Data, Int) {
+    public func colorize(imagePNG: Data) async throws -> (Data, Int) {
         struct Body: Encodable { let image: String }
         let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
         let resp: ColorizeResponse = try await request("/v1/colorize", method: "POST", body: body)
@@ -241,7 +249,7 @@ final class BackendClient {
     /// `me()` recognises this Mac as Pro on subsequent calls. The macOS
     /// app's primary subscribe path goes through here — sign-in only
     /// happens later, optionally, via the "Sync across Macs" magic link.
-    func subscribeAnonymous(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
+    public func subscribeAnonymous(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
         struct Body: Encodable { let interval: String }
         let body = try JSONEncoder().encode(Body(interval: interval.rawValue))
         let resp: CheckoutResponse = try await requestAllowingAnonymous(
@@ -261,7 +269,7 @@ final class BackendClient {
         let email: String?
     }
     @discardableResult
-    func resendMagicLink() async throws -> String? {
+    public func resendMagicLink() async throws -> String? {
         let resp: ResendMagicLinkResponse = try await requestAllowingAnonymous(
             "/v1/account/resend-magic-link", method: "POST"
         )
@@ -271,7 +279,7 @@ final class BackendClient {
     // MARK: POST /v1/checkout/topup
     /// Buy a one-time credit pack. Topped-up credits stack with the monthly
     /// grant and never expire. Same union response shape as `subscribe()`.
-    func topup(pack: CreditPack) async throws -> CheckoutResult {
+    public func topup(pack: CreditPack) async throws -> CheckoutResult {
         struct Body: Encodable { let pack: String }
         let body = try JSONEncoder().encode(Body(pack: pack.rawValue))
         let resp: CheckoutResponse = try await request("/v1/checkout/topup", method: "POST", body: body)
@@ -297,7 +305,7 @@ final class BackendClient {
     /// update payment method, view invoices, and cancel their subscription.
     /// Wired to the "Manage Subscription" button in Settings.
     private struct PortalResponse: Decodable { let url: String }
-    func openPortal() async throws -> URL {
+    public func openPortal() async throws -> URL {
         let resp: PortalResponse = try await request("/v1/portal", method: "POST")
         guard let url = URL(string: resp.url) else { throw BackendError.decode }
         return url
@@ -310,7 +318,7 @@ final class BackendClient {
     private struct PendingResponse: Decodable {
         let announcement: Announcement?
     }
-    func fetchPendingAnnouncement() async throws -> Announcement? {
+    public func fetchPendingAnnouncement() async throws -> Announcement? {
         let resp: PendingResponse = try await request("/v1/announcements/pending", method: "GET")
         return resp.announcement
     }
@@ -318,7 +326,7 @@ final class BackendClient {
     // MARK: POST /v1/announcements/seen
     /// Marks an announcement as seen. Idempotent on (user, slug) — safe to
     /// call from both the dismiss tap and `.onDisappear`.
-    func markAnnouncementSeen(slug: String, action: String) async throws {
+    public func markAnnouncementSeen(slug: String, action: String) async throws {
         struct Body: Encodable { let slug: String; let action: String }
         let body = try JSONEncoder().encode(Body(slug: slug, action: action))
         struct Empty: Decodable { let ok: Bool }
@@ -331,7 +339,7 @@ final class BackendClient {
     private struct BadgesResponse: Decodable {
         let badges: [AnnouncementBadge]
     }
-    func fetchBadges() async throws -> [AnnouncementBadge] {
+    public func fetchBadges() async throws -> [AnnouncementBadge] {
         let resp: BadgesResponse = try await requestAllowingAnonymous("/v1/badges", method: "GET")
         return resp.badges
     }
@@ -344,7 +352,7 @@ final class BackendClient {
     ) async throws -> R {
         guard let token = auth.accessToken else { throw BackendError.notSignedIn }
         return try await send(
-            path: path, method: method, body: body, token: token,
+            path: path, method: method, body: body, token: token
         )
     }
 
@@ -358,7 +366,7 @@ final class BackendClient {
         body: Data? = nil
     ) async throws -> R {
         try await send(
-            path: path, method: method, body: body, token: auth.accessToken,
+            path: path, method: method, body: body, token: auth.accessToken
         )
     }
 

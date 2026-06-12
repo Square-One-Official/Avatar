@@ -1,3 +1,4 @@
+import AvatarKit
 import Foundation
 
 /// User-facing AI privacy posture. Set during first-launch onboarding,

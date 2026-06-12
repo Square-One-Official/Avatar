@@ -20,7 +20,7 @@ import Foundation
 /// for an orphaned item from a previous install. The threat model here is
 /// "create a fresh Google account on the same Mac to reset the trial",
 /// which a plain UserDefaults UUID defeats just as effectively.
-enum DeviceFingerprint {
+public enum DeviceFingerprint {
     private static let key = "nl.aaavatar.Avatar.DeviceFingerprint.id"
 
     /// Process-local ephemeral fingerprint. Generated lazily on first
@@ -36,7 +36,7 @@ enum DeviceFingerprint {
     /// Trade-off: per-device free-trial counters reset on every launch in
     /// that mode, which is acceptable because localOnly users opt out of
     /// the cloud features the counter primarily protects.
-    static var current: String {
+    public static var current: String {
         if let eph = ephemeral { return eph }
         let defaults = UserDefaults.standard
         if let existing = defaults.string(forKey: key), !existing.isEmpty {
@@ -52,7 +52,7 @@ enum DeviceFingerprint {
     /// The persisted UserDefaults UUID is intentionally left alone so
     /// flipping the privacy mode back to `cloudAllowed` (mid-launch or
     /// next launch) returns the stable identity.
-    static func useEphemeralForThisLaunch() {
+    public static func useEphemeralForThisLaunch() {
         guard ephemeral == nil else { return }
         ephemeral = UUID().uuidString
     }
@@ -61,7 +61,7 @@ enum DeviceFingerprint {
     /// back to reading the UserDefaults UUID. Called when the user
     /// switches OUT of localOnly so a cloud sign-in attempt in the same
     /// session picks up the stable identity the backend already knows.
-    static func dropEphemeral() {
+    public static func dropEphemeral() {
         ephemeral = nil
     }
 }

@@ -1,3 +1,4 @@
+import AvatarKit
 import Foundation
 import AppKit
 import Supabase
@@ -125,3 +126,4 @@ final class AuthManager {
         }
     }
 }
+extension AuthManager: AccessTokenProviding {}

@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 
 /// Modal surface that announces a new feature. Shown over the main

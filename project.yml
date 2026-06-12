@@ -63,6 +63,7 @@ targets:
       - package: Sparkle
       - package: Supabase
       - package: ZIPFoundation
+      - package: AvatarKit
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
@@ -137,6 +138,7 @@ targets:
     dependencies:
       - package: Supabase
       - package: ZIPFoundation
+      - package: AvatarKit
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources

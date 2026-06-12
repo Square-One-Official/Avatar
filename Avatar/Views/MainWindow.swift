@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 import SwiftData
 

@@ -8,20 +8,20 @@ import Foundation
 /// the server — it must remain stable over the lifetime of an announcement
 /// or users will be re-shown content they already dismissed. To "re-show"
 /// a campaign, publish a new document with a new slug.
-struct Announcement: Decodable, Identifiable, Equatable {
-    let slug: String
-    let title: String
+public struct Announcement: Decodable, Identifiable, Equatable, Sendable {
+    public let slug: String
+    public let title: String
     /// Markdown. Render with `AttributedString(markdown:)` so links and
     /// emphasis flow inline without each call site re-parsing.
-    let body: String
-    let imageUrl: URL?
-    let cta: CTA?
+    public let body: String
+    public let imageUrl: URL?
+    public let cta: CTA?
 
-    var id: String { slug }
+    public var id: String { slug }
 
-    struct CTA: Decodable, Equatable {
-        let label: String
-        let url: URL
+    public struct CTA: Decodable, Equatable, Sendable {
+        public let label: String
+        public let url: URL
     }
 
     /// Custom decoder so the `image_url` snake-case from the backend
@@ -32,7 +32,7 @@ struct Announcement: Decodable, Identifiable, Equatable {
         case imageUrl
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         slug = try c.decode(String.self, forKey: .slug)
         title = try c.decode(String.self, forKey: .title)
@@ -50,7 +50,7 @@ struct Announcement: Decodable, Identifiable, Equatable {
 /// Active "NEW" badge keyed on a stable component identifier. Component
 /// IDs are coordinated with Payload's `badge-component-registry` — see
 /// `BadgeComponent` in `AnnouncementService` for the canonical list.
-struct AnnouncementBadge: Decodable, Equatable {
-    let componentId: String
-    let expiresAt: Date
+public struct AnnouncementBadge: Decodable, Equatable, Sendable {
+    public let componentId: String
+    public let expiresAt: Date
 }

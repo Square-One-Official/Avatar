@@ -37,14 +37,14 @@ import Security
 ///
 /// and add the new hash to `pinnedCertHashesBase64` BEFORE the old one is
 /// retired. Users on older builds keep working until they update.
-enum TLSPinning {
+public enum TLSPinning {
     /// Hosts that get the pin check. Anything else uses the OS trust
     /// store (ATS still applies — hostname + chain validity are still
     /// enforced).
-    static let pinnedHosts: Set<String> = ["api.aaavatar.nl"]
+    public static let pinnedHosts: Set<String> = ["api.aaavatar.nl"]
 
     /// SHA256(cert-DER), base64. ANY match in the chain accepts.
-    static let pinnedCertHashesBase64: [String] = [
+    public static let pinnedCertHashesBase64: [String] = [
         // Let's Encrypt R13 — intermediate, signed by ISRG Root X1.
         // Valid until 2027-03-12. Currently issuing api.aaavatar.nl.
         "07EoIWqEP47xMhUB9d9Spd9Sk57iwZKXcSzT3k1Bk1Q=",
@@ -58,7 +58,7 @@ enum TLSPinning {
     /// process; reused by `BackendClient` for every request. URLSession
     /// keeps a strong reference to its delegate, so the delegate lives as
     /// long as the session does.
-    static let pinnedShared: URLSession = {
+    public static let pinnedShared: URLSession = {
         let config = URLSessionConfiguration.default
         config.tlsMinimumSupportedProtocolVersion = .TLSv12
         let delegate = TLSPinningDelegate()
@@ -66,11 +66,11 @@ enum TLSPinning {
     }()
 }
 
-final class TLSPinningDelegate: NSObject, URLSessionDelegate {
+public final class TLSPinningDelegate: NSObject, URLSessionDelegate {
     private let pinnedHosts: Set<String>
     private let pins: Set<Data>
 
-    init(
+    public init(
         pinnedHosts: Set<String> = TLSPinning.pinnedHosts,
         pinsBase64: [String] = TLSPinning.pinnedCertHashesBase64
     ) {
@@ -78,7 +78,7 @@ final class TLSPinningDelegate: NSObject, URLSessionDelegate {
         self.pins = Set(pinsBase64.compactMap { Data(base64Encoded: $0) })
     }
 
-    func urlSession(
+    public func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void

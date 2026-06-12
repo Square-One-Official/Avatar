@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 
 /// Subtle bottom-of-sidebar nudge for free users: a single 3-dot strip,
