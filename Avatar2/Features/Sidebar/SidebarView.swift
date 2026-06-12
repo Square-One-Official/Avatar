@@ -11,7 +11,8 @@ import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
-    @Query(sort: \Portrait2.createdAt) private var portraits: [Portrait2]
+    // Laatst bewerkt bovenaan, zoals v1 (punt 13).
+    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @State private var searchText = ""
 
     let selectedID: PersistentIdentifier?

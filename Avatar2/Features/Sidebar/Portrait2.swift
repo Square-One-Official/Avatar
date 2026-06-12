@@ -11,12 +11,25 @@ final class Portrait2 {
     var name: String
     var role: String
     var createdAt: Date
+    /// Laatst bewerkt (visuele pass punt 13) — bijgewerkt bij elke mutatie
+    /// (naam/rol/cutout; achtergrond zodra dat veld bestaat). Sidebar
+    /// sorteert hierop (jongste bovenaan) en launch selecteert de jongste.
+    /// Migratie: lichtgewicht via de default `.distantPast`; ShellModel
+    /// zet bestaande rijen eenmalig op `createdAt` (de bedoelde default —
+    /// SwiftData kan niet naar een ander veld defaulten).
+    var updatedAt: Date = Date.distantPast
     @Attribute(.externalStorage) var cutoutData: Data
 
     init(name: String = "", role: String = "", createdAt: Date = .now, cutoutData: Data) {
         self.name = name
         self.role = role
         self.createdAt = createdAt
+        self.updatedAt = createdAt
         self.cutoutData = cutoutData
+    }
+
+    /// Markeer als zojuist bewerkt.
+    func touch() {
+        updatedAt = .now
     }
 }

@@ -41,18 +41,37 @@ struct ShellView: View {
         .animation(.spring(duration: 0.35), value: model.isSidebarVisible)
         .background(DSColor.Background.app)
         .preferredColorScheme(.dark)
-        .task { model.modelContext = modelContext }
+        .task {
+            model.modelContext = modelContext
+            // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
+            // portret direct op canvas; first-use alleen bij écht leeg.
+            model.restoreSelectionAtLaunch()
+        }
     }
 
     private var mainArea: some View {
         VStack(spacing: 0) {
-            // Header in de flow, los bóven de kaart (bevinding 6) —
-            // Figma Frame 2: y=32, kaart begint op 108.
-            if showsPortraitHeader {
-                PortraitHeader(model: model)
-                    .padding(.top, DSSpacing.gap8)
+            if model.isShowingSettings {
+                // Punt 14: Settings vervangt de canvas-weergave binnen het
+                // hoofdvenster; topbar (quota + gear) blijft als overlay
+                // staan. Esc sluit (verborgen cancel-knop, werkt
+                // venster-breed); de gear toggelt.
+                SettingsRootView()
+                    .background(
+                        Button("") { model.isShowingSettings = false }
+                            .keyboardShortcut(.cancelAction)
+                            .opacity(0)
+                            .accessibilityHidden(true)
+                    )
+            } else {
+                // Header in de flow, los bóven de kaart (bevinding 6) —
+                // Figma Frame 2: y=32, kaart begint op 108.
+                if showsPortraitHeader {
+                    PortraitHeader(model: model)
+                        .padding(.top, DSSpacing.gap8)
+                }
+                canvas
             }
-            canvas
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Heel het venster is droptarget (Fitts, review-besluit); de
@@ -61,15 +80,22 @@ struct ShellView: View {
             handleDrop(providers)
         }
         .overlay {
-            if model.isDropTargeted {
+            // Geen dropzone bovenop Settings (punt 14): de drop zelf wordt
+            // in handleDrop genegeerd zolang Settings open staat.
+            if model.isDropTargeted && !model.isShowingSettings {
                 DropzoneOverlay()
                     .allowsHitTesting(false)
             }
         }
         // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
-        // de "top"-strook uit de App-frames.
+        // de "top"-strook uit de App-frames. De gear toggelt de in-window
+        // Settings (punt 14) en toont de active-state zolang die open is.
         .overlay(alignment: .top) {
-            ShellTopBar(model: entitlement)
+            ShellTopBar(
+                model: entitlement,
+                isSettingsActive: model.isShowingSettings,
+                onToggleSettings: { model.isShowingSettings.toggle() }
+            )
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
@@ -163,6 +189,9 @@ struct ShellView: View {
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        // Punt 14: tijdens Settings geen imports — de canvas-weergave is
+        // niet zichtbaar, een stille import zou verwarren.
+        guard !model.isShowingSettings else { return false }
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
                 let url: URL?
