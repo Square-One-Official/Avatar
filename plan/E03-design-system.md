@@ -46,13 +46,13 @@ Eén gating-patroon voor alle features (les uit v1: niet versnipperen).
 **Result:** DSProChip + DSGated in AvatarUI/Components. Figma kent géén los gating-component (review rode draad 3); de chip hergebruikt 1-op-1 de brand-Badge uit 3.2 — de "Upgrade"-taal van topbar en Upgrade Modal (4019:953). Contract: `DSProChip(_ label: String = "Pro")` (lime badge; eigen label voor credit-kosten zoals "2 credits") en `DSGated(isLocked: Bool, chipLabel: String = "Pro", onUpgradeRequested: () -> Void) { content }` — vergrendeld: chip top-trailing (inzet gap-1), eigen interactie van de inhoud uit, élke tik → onUpgradeRequested met de Figma-hover/pressed-opacitystates; ontgrendeld: inhoud onaangeroerd. Credit-tegoed tonen blijft DSQuotaBadge (3.2). Beide targets bouwen groen, AvatarUI-tests groen (2 nieuwe smoke-tests).
 
 ## 3.5 — Formulier- en lijstcomponenten
-- status: backlog
-- owner: —
+- status: done
+- owner: DS
 - blockedBy: 3.2
 - DoD: beide targets bouwen, tests groen
 
 OTP-veld, tekstveld, panel-headers, sidebar-rij (avatar+naam+rol), add-knop (button-component uit
 Figma).
 
-**Result:** _(invullen bij done)_
+**Result:** Vijf componenten 1-op-1 uit Figma in AvatarUI/Components: DSTextField (Input 59:621 — optioneel muted label, capsuleveld h40 bg neutral, rand b-thin divider→muted bij focus, Body/Small, 20pt leading icon), DSOTPField (OTP 60:798 — 6 cellen px gap-3.5/py gap-5 r-lg met middenstreepje 8×2, placeholdercijfer muted/ingevoerd primary, actieve cel muted rand; invoer via verborgen veld met cijferfilter, `DSOTPField(code: Binding<String>, length: Int = 6)`), DSPanelHeader (Onboarding-Copy-blok — H1 primary + Body/Medium subtle, gap-2, alignment-parameter), DSSidebarRow (Slot 4011:5010 — avatar 48 r-2xl + naam/rol UI/Labels/Base primary/muted, selectie = bg Inset op r-2xl, `DSSidebarRow(name:role:isSelected:action:avatar:)`), DSNeutralButton (Button Fill-Neutral 12:216, zelfde maten als DSPrimaryButton) met DSAddButton (= neutral button + plus-icoon, het sidebar-add-besluit van 10 jun). Beide targets bouwen groen, AvatarUI-tests groen (5 nieuwe smoke-tests).
 
