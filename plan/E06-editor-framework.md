@@ -5,8 +5,8 @@ Team: **FEAT**
 Figma: App / Edit. Raamwerk waar alle feature-panelen in hangen.
 
 ## 6.1 — Toolbar + panel-systeem
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E03.3
 - DoD: beide targets bouwen, tests groen
 
