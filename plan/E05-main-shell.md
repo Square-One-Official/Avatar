@@ -5,14 +5,24 @@ Team: **FEAT**
 Figma: App / First use, Dropzone, Image added, Isolating animation, Sidebar images.
 
 ## 5.1 — First use-empty-state
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
 
 Memoji-cirkel, gefixte copy, quota pas tonen ná eerste cutout.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- Memoji-cirkel is een gedocumenteerde placeholder (cirkel + glyph): het echte memoji-beeld
+  is een Figma-asset; exporteren zodra het "Aaavatar"-bestand in de Figma desktop-app open
+  staat (MCP had nu een ander bestand voor zich).
+- Quota-gating: EntitlementModel.hasCompletedFirstCutout (UserDefaults shell.firstCutoutDone);
+  de status-strip verbergt de quota-badge tot markFirstCutoutCompleted() — aanroepen vanuit
+  de import-flow (E05.2/5.3).
+- Choose file… is een bewuste no-op tot E05.2 (import → PipelineRouter); INFRA-placeholder
+  ContentPlaceholderView is vervangen door ShellView (waar 5.2–5.5 in haken).
+
+**Result:** First-use-empty-state in Avatar2/Features/Shell/ (FirstUseEmptyState + ShellView-wortel): memoji-cirkel-placeholder, review-copy ("Drop a portrait — yours or a colleague's — or choose a file"), Choose file…-knop (no-op tot E05.2), quota-badge pas ná eerste cutout via EntitlementModel; beide targets bouwen groen, packagetests groen, smoke-run OK.
 
 ## 5.2 — Import
 - status: backlog

@@ -27,6 +27,18 @@ final class EntitlementModel {
     private(set) var isCheckoutBusy = false
     private(set) var checkoutError: String?
 
+    /// Designbesluit (E05.1): geen quota-druk vóór waarde — de quota-badge
+    /// verschijnt pas ná de eerste geslaagde cutout. De import-flow (E05.2+)
+    /// roept markFirstCutoutCompleted() aan.
+    private static let firstCutoutKey = "shell.firstCutoutDone"
+    private(set) var hasCompletedFirstCutout =
+        UserDefaults.standard.bool(forKey: firstCutoutKey)
+
+    func markFirstCutoutCompleted() {
+        hasCompletedFirstCutout = true
+        UserDefaults.standard.set(true, forKey: Self.firstCutoutKey)
+    }
+
     let backend: BackendClient
 
     /// BackendClient houdt `auth` unowned vast; dit model borgt de levensduur.

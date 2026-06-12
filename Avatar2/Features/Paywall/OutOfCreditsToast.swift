@@ -41,10 +41,13 @@ struct EntitlementStatusStrip: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.gap2) {
-            if model.isProActive {
-                DSQuotaBadge("\(model.creditsRemaining) credits")
-            } else if let free = model.freeImportsRemaining {
-                DSQuotaBadge("\(free) of \(FreeTier.maxPortraits) free imports left")
+            // Quota pas ná de eerste cutout (E05.1): geen druk vóór waarde.
+            if model.hasCompletedFirstCutout {
+                if model.isProActive {
+                    DSQuotaBadge("\(model.creditsRemaining) credits")
+                } else if let free = model.freeImportsRemaining {
+                    DSQuotaBadge("\(free) of \(FreeTier.maxPortraits) free imports left")
+                }
             }
             DSNeutralButton("Upgrade to Pro", size: .small) {
                 model.requestUpgrade()
