@@ -1,12 +1,9 @@
-// Isolating-animatie (E05.3, Figma: App / Image added 4017:1817 + App /
-// Isolating animation "Background fading dark loop" 4017:1762). Fase 1:
-// volle foto (r-2xl) met status-pill "Removing background...". Fase 2
-// (cutout klaar): de achtergrond fadet naar donker — app-achtergrondlaag
-// animeert over het origineel terwijl de cutout (alleen persoon-pixels)
-// erbovenop ligt; status "Cutting out hair...". De pill (Figma
-// "Recording": h48, 32-container + label, rechtsonder) toont een kleine
-// activity-indicator in de logo-container; het frame exposeert daar geen
-// eigen asset voor.
+// Isolating-animatie (E05.3 + E04.5-fix, Figma: App / Image added
+// 4017:1817 + App / Isolating animation 4017:1762). De foto leeft in de
+// canvas-kaart (DSCanvasCard, bevinding 6) op het frameformaat 465×456;
+// fase 1 toont het origineel gevuld, fase 2 fadet een app-achtergrondlaag
+// over het origineel terwijl de cutout erbovenop ligt. De status-pill
+// (Figma "Recording") hangt op vensterniveau in ShellView (bevinding 3).
 
 import AvatarUI
 import SwiftUI
@@ -19,28 +16,35 @@ struct IsolatingCanvas: View {
     @State private var backgroundFaded = false
 
     var body: some View {
-        Image(nsImage: original)
+        DSCanvasCard {
+            portraitLayer(original)
+                .overlay {
+                    DSColor.Background.app
+                        .opacity(backgroundFaded ? 1 : 0)
+                }
+                .overlay {
+                    if let cutout {
+                        portraitLayer(cutout)
+                    }
+                }
+        }
+        .aspectRatio(465.0 / 456.0, contentMode: .fit)
+        .frame(maxWidth: 465, maxHeight: 456)
+        .padding(.vertical, DSSpacing.gap8)
+        .onChange(of: cutout != nil, initial: true) { _, hasCutout in
+            guard hasCutout else { return }
+            withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
+                backgroundFaded = true
+            }
+        }
+    }
+
+    private func portraitLayer(_ image: NSImage) -> some View {
+        Image(nsImage: image)
             .resizable()
-            .scaledToFit()
-            .overlay {
-                DSColor.Background.app
-                    .opacity(backgroundFaded ? 1 : 0)
-            }
-            .overlay {
-                if let cutout {
-                    Image(nsImage: cutout)
-                        .resizable()
-                        .scaledToFit()
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-            .padding(DSSpacing.gap8)
-            .onChange(of: cutout != nil, initial: true) { _, hasCutout in
-                guard hasCutout else { return }
-                withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
-                    backgroundFaded = true
-                }
-            }
+            .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
     }
 }
 

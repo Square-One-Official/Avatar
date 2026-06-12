@@ -46,27 +46,13 @@ struct ShellTopBar: View {
     }
 }
 
-/// Gear rechtsboven (Figma Frame 27: 48-cirkel, neutral bg, 18pt-icoon —
-/// zelfde maatvoering als de bottom-toolbar-tools).
+/// Gear rechtsboven (Figma Frame 27) — DSToolButton (E03.11): zelfde
+/// glass-cirkel als de bottom-toolbar-tools. De actie stuurt de standaard
+/// Settings-selector; functioneel zodra E15.1 de Settings-scene levert.
 private struct GearButton: View {
-    @State private var isHovering = false
-
     var body: some View {
-        Button {
+        DSToolButton(Image(systemName: "gearshape.fill"), label: "Settings") {
             NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(isHovering ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
-                .frame(width: 48, height: 48)
-                .background(
-                    isHovering ? DSColor.Background.neutralStronger : DSColor.Background.neutral,
-                    in: Circle()
-                )
         }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: isHovering)
-        .accessibilityLabel(Text("Settings"))
     }
 }

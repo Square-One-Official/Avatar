@@ -43,6 +43,11 @@ struct Avatar2App: App {
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         .modelContainer(for: Portrait2.self)
+        // Bevinding 1 (E04.5): Figma kent geen aparte titelbalk — één zwart
+        // vlak, traffic lights inline, geen venstertitel. hiddenTitleBar
+        // geeft full-size content; de topbar reserveert zelf ruimte naast
+        // de window-controls.
+        .windowStyle(.hiddenTitleBar)
     }
 }
 

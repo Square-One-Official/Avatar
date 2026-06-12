@@ -64,21 +64,24 @@ struct EditorView: View {
         EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten
-    /// de sidebar en openen hun paneel.
+    /// de sidebar en openen hun paneel. Eén withAnimation-transactie zodat
+    /// kaart, toolbar en sidebar samen veren — geen sprong (bevinding 5).
     private var toolSelection: Binding<EditorTool?> {
         Binding(
             get: { isSidebarVisible ? .images : activeTool },
             set: { newValue in
-                switch newValue {
-                case .images:
-                    isSidebarVisible = true
-                    activeTool = nil
-                case nil:
-                    isSidebarVisible = false
-                    activeTool = nil
-                default:
-                    isSidebarVisible = false
-                    activeTool = newValue
+                withAnimation(.spring(duration: 0.35)) {
+                    switch newValue {
+                    case .images:
+                        isSidebarVisible = true
+                        activeTool = nil
+                    case nil:
+                        isSidebarVisible = false
+                        activeTool = nil
+                    default:
+                        isSidebarVisible = false
+                        activeTool = newValue
+                    }
                 }
             }
         )
@@ -86,11 +89,20 @@ struct EditorView: View {
 
     var body: some View {
         DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
-            Image(nsImage: portrait)
-                .resizable()
-                .scaledToFit()
-                .padding(.horizontal, DSSpacing.gap8)
-                .padding(.top, DSSpacing.gap8)
+            // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
+            // dot-grid eronder zolang er geen achtergrond is ingesteld
+            // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
+            // transparante delen tonen het raster: achtergrond verwijderd.
+            DSCanvasCard(showsDotGrid: true) {
+                Image(nsImage: portrait)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            }
+            .aspectRatio(465.0 / 456.0, contentMode: .fit)
+            .frame(maxWidth: 465, maxHeight: 456)
+            .padding(.top, DSSpacing.gap8)
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
