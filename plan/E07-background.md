@@ -5,7 +5,7 @@ Team: **FEAT**
 
 
 ## 7.1 — Background-paneel
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E06.1
 - DoD: beide targets bouwen, tests groen

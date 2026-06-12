@@ -20,7 +20,7 @@ Person-seg minus gezicht/haar (macOS 26-pad); tap-to-segment volgt bij macOS 27.
 **Result:** `ClothesMaskGenerator` in `AvatarKit/Engines/` — `mask(for:) async throws -> CGImage` (wit = kleding, bron-resolutie, linear-sRGB); person-seg (rev1/accurate/16-bit) × (1 − crown∪beard∪gezicht-zone uit grootste face rect); fouten `.noPersonFound` (ook bij lege matte, drempel 1/255 gemiddelde) / `.noFaceFound` / `.renderFailed`; 7 nieuwe tests (zone-dekking, compositie, luminantie, e2e-foutpad), totaal 25 groen; beide targets bouwen via build-v2.sh. Contract voor E10.2: dilate/feather richting FLUX Fill is aan de consument.
 
 ## 10.2 — Clothes-paneel
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 10.1, E06.1
 - DoD: beide targets bouwen, tests groen

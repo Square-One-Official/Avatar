@@ -24,7 +24,7 @@ Notities (FEAT, bij oplevering):
 **Result:** EditorView in Avatar2/Features/Editor/ op DSEditPanelContainer (E03.3): zes tools uit App / Edit als DSToolbarItem-enum (EditorTool) met lime active-ring, tik-op-actief deselecteert, foto verkleint centraal via de container-spring; per tool een lege DSEditPanel-chrome met stub-regel die naar de leverende story wijst (6.3/E07.1/E09.2/E10.2/E11.2/E05.4); gemount in ShellView op canvas .result. Beide targets bouwen groen, alle tests groen (1 nieuwe Avatar2-test: EditorToolTests).
 
 ## 6.2 — Undo/redo + hold-to-compare
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 6.1
 - DoD: beide targets bouwen, tests groen
@@ -34,7 +34,7 @@ Beide staan in het design (10 jun); bouwen conform Figma, op canvas-niveau.
 **Result:** _(invullen bij done)_
 
 ## 6.3 — Edit-paneel
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 6.1, E03.4
 - DoD: beide targets bouwen, tests groen
