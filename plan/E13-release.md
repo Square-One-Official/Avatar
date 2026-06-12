@@ -5,8 +5,8 @@ Team: **INFRA**
 Laatste epic (13.0 uitgezonderd: doorlopende deploy-port, kan eerder).
 
 ## 13.0 — Backend-port v2-main → main (productie-deploy)
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: —
 - DoD: backend-typecheck groen op main; v2-main-kant ongewijzigd
 - Context: Vercel (avatars-api, rootDirectory=backend) deployt `main`, niet v2-main. (Story toegevoegd op besluit Thierry 2026-06-12.)
