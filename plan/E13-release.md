@@ -33,5 +33,13 @@ v1-library → Portrait2-store (read-only import).
 Bakeoff-besluiten verwerkt, beide apps groen, onboarding+main flow compleet, Stripe-identiteitstest
 (E01.7) geslaagd.
 
+Checklist-items uit E01.7 (INFRA, 2026-06-12):
+- [ ] Supabase custom SMTP terugzetten: nieuwe Resend API-key (dashboard Thierry) →
+      smtp.resend.com:465, user "resend", afzender noreply@aaavatar.nl. Auth-mail draait nu op de
+      ingebouwde Supabase-mailer (rate-cap ~2/uur, afzender mail.app.supabase.io) — niet
+      release-waardig.
+- [ ] /v1/auth/send-recovery-email deployen (staat als niet-gecommit v1-werk) en E2E mismatch-pad
+      testen.
+
 **Result:** _(invullen bij done)_
 
