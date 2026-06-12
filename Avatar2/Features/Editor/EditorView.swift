@@ -100,8 +100,7 @@ struct EditorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             }
-            .aspectRatio(465.0 / 456.0, contentMode: .fit)
-            .frame(maxWidth: 465, maxHeight: 456)
+            .frame(maxWidth: 456, maxHeight: 456)
             .padding(.top, DSSpacing.gap8)
         } panel: { tool in
             if tool == .images {

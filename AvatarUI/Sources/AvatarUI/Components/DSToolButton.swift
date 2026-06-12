@@ -46,18 +46,30 @@ public struct DSToolButton: View {
     }
 }
 
-/// De glass-surface van de toolcirkels: donkere material, neutral-tint en
-/// een rim die bovenaan subtiel oplicht.
+/// De glass-surface van de toolcirkels (E03.14, bevinding 10) — in lagen
+/// zoals Figma: (a) NSVisualEffectView met withinWindow-blending zodat
+/// onderliggende content (de foto) met blur doorschemert — SwiftUI's
+/// Material bleek op zwart vlak te renderen; (b) neutral-tint; (c)
+/// gradient-rim: licht bovenaan, donker onderaan; (d) inner-highlight
+/// bovenin de cirkel.
 struct DSGlassCircle: View {
     var body: some View {
         ZStack {
-            Circle().fill(.ultraThinMaterial)
+            WithinWindowBlur()
+                .clipShape(Circle())
             Circle().fill(DSColor.Background.neutral)
+            Circle().fill(
+                LinearGradient(
+                    colors: [DSColor.Foreground.primary.opacity(0.10), .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
+            )
             Circle().strokeBorder(
                 LinearGradient(
                     colors: [
-                        DSColor.Foreground.primary.opacity(0.18),
-                        DSColor.Foreground.primary.opacity(0.04)
+                        DSColor.Foreground.primary.opacity(0.25),
+                        Color.black.opacity(0.35)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -66,4 +78,19 @@ struct DSGlassCircle: View {
             )
         }
     }
+}
+
+/// In-window-blur: NSVisualEffectView die de content erónder in hetzelfde
+/// venster vervaagt (SwiftUI's .ultraThinMaterial blendt op macOS achter
+/// het venster en oogt vlak op een zwart vlak).
+private struct WithinWindowBlur: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .withinWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

@@ -40,26 +40,31 @@ public struct DSInlineEditLabel: View {
     public var body: some View {
         Group {
             if isEditing {
-                // Verborgen maattekst houdt het veld zo smal als de inhoud.
-                Text(draft.isEmpty ? placeholder : draft)
-                    .dsTextStyle(variant.textStyle)
-                    .opacity(DSOpacity.hidden)
-                    .lineLimit(1)
-                    .overlay {
-                        TextField(
-                            "",
-                            text: $draft,
-                            prompt: Text(placeholder)
-                                .foregroundStyle(DSColor.Foreground.muted)
-                        )
-                        .textFieldStyle(.plain)
+                // Breedte = max(maattekst + caret-marge, intrinsieke
+                // veldbreedte): minimum op de huidige tekst, groeit mee
+                // tijdens het typen, blijft gecentreerd, clipt nooit
+                // (E03.14, bevinding 12).
+                ZStack {
+                    Text(draft.isEmpty ? placeholder : draft)
                         .dsTextStyle(variant.textStyle)
-                        .foregroundStyle(variant.color)
-                        .multilineTextAlignment(.center)
-                        .focused($fieldFocused)
-                        .onSubmit { commit() }
-                        .onExitCommand { cancel() }
-                    }
+                        .opacity(DSOpacity.hidden)
+                        .lineLimit(1)
+                        .padding(.horizontal, DSSpacing.gap1)
+                    TextField(
+                        "",
+                        text: $draft,
+                        prompt: Text(placeholder)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    )
+                    .textFieldStyle(.plain)
+                    .dsTextStyle(variant.textStyle)
+                    .foregroundStyle(variant.color)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .focused($fieldFocused)
+                    .onSubmit { commit() }
+                    .onExitCommand { cancel() }
+                }
             } else {
                 Text(text.isEmpty ? placeholder : text)
                     .dsTextStyle(variant.textStyle)
