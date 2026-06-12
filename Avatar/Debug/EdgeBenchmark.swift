@@ -79,11 +79,16 @@ enum EdgeBenchmark {
             return nil
         }
 
-        var rows: [String] = ["fixture,v1_ms,v2_ms,ratio,v1_ok,v2_ok"]
+        // Optional downloaded-model arm (ORMBG): only when the user has the
+        // model installed. Resolved once for the whole run.
+        let downloadedModelURL = ModelManager().cachedModelURL()
+
+        var rows: [String] = ["fixture,v1_ms,v2_ms,ratio,v1_ok,v2_ok,raw_ms,raw_ok,dl_ms,dl_ok"]
         var v1Times: [Double] = []
         var v2Times: [Double] = []
         for url in fixtures {
-            let (row, v1ms, v2ms) = process(fixture: url, outDir: outDir)
+            let (row, v1ms, v2ms) = process(fixture: url, outDir: outDir,
+                                            downloadedModelURL: downloadedModelURL)
             rows.append(row)
             if v1ms > 0 { v1Times.append(v1ms) }
             if v2ms > 0 { v2Times.append(v2ms) }
@@ -237,20 +242,43 @@ enum EdgeBenchmark {
     /// Returns the CSV row plus the two wall-clock times so the caller can
     /// roll them up into the summary row. Failures are reported in the row
     /// (`v1_ok` / `v2_ok` flags) rather than aborting the whole run.
-    private static func process(fixture url: URL, outDir: URL) -> (row: String, v1ms: Double, v2ms: Double) {
+    private static func process(fixture url: URL, outDir: URL,
+                                downloadedModelURL: URL? = nil) -> (row: String, v1ms: Double, v2ms: Double) {
         let name = url.deletingPathExtension().lastPathComponent
         guard let cg = ImageProcessor.cgImage(from: url) else {
-            return ("\(name),,,,,LOAD_FAIL", 0, 0)
+            return ("\(name),,,,,LOAD_FAIL,,,,", 0, 0)
         }
 
         let (v1, v1ms) = timed { try? ImageProcessor.subjectLiftV1(image: cg) }
         let (v2, v2ms) = timed { try? ImageProcessor.subjectLiftV2(image: cg) }
+
+        // 2.0 bakeoff arms: the unrefined Vision baseline (every refinement
+        // stage must beat this to earn its place in 2.0), and the optional
+        // downloaded matting model (decides whether ModelManager survives).
+        let (raw, rawMs) = timed { try? ImageProcessor.subjectLiftRaw(image: cg) }
+        let (dl, dlMs): (CGImage?, Double) = {
+            guard let modelURL = downloadedModelURL else { return (nil, 0) }
+            return timed { try? ImageProcessor.subjectLiftDownloaded(image: cg, modelURL: modelURL) }
+        }()
 
         let v1Ok = (v1 != nil)
         let v2Ok = (v2 != nil)
 
         if let v1 { writePNG(v1, to: outDir.appendingPathComponent("\(name)-v1-cutout.png")) }
         if let v2 { writePNG(v2, to: outDir.appendingPathComponent("\(name)-v2-cutout.png")) }
+        if let raw { writePNG(raw, to: outDir.appendingPathComponent("\(name)-raw-cutout.png")) }
+        if let dl { writePNG(dl, to: outDir.appendingPathComponent("\(name)-ormbg-cutout.png")) }
+
+        // Extra triptychs so raw and ORMBG can be eyeballed against V2 on
+        // the same contrast backdrops as the existing V1/V2 comparison.
+        if let raw, let v2 {
+            let strip = makeSideBySide(v1: raw, v2: v2)
+            writePNG(strip, to: outDir.appendingPathComponent("\(name)-raw-vs-v2.png"))
+        }
+        if let dl, let v2 {
+            let strip = makeSideBySide(v1: dl, v2: v2)
+            writePNG(strip, to: outDir.appendingPathComponent("\(name)-ormbg-vs-v2.png"))
+        }
 
         // Side-by-side over the triptych backdrop. We composite the cutout
         // onto each of three test backgrounds (light grey, dark grey, busy
@@ -264,7 +292,9 @@ enum EdgeBenchmark {
             guard v1ms > 0 else { return "" }
             return String(format: "%.2f", v2ms / v1ms)
         }()
-        let row = "\(name),\(Int(v1ms)),\(Int(v2ms)),\(ratio),\(v1Ok ? 1 : 0),\(v2Ok ? 1 : 0)"
+        let row = "\(name),\(Int(v1ms)),\(Int(v2ms)),\(ratio),\(v1Ok ? 1 : 0),\(v2Ok ? 1 : 0),"
+            + "\(Int(rawMs)),\(raw != nil ? 1 : 0),"
+            + "\(downloadedModelURL == nil ? "" : String(Int(dlMs))),\(dl != nil ? 1 : 0)"
         return (row, v1ms, v2ms)
     }
 

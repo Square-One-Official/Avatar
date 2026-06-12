@@ -83,6 +83,36 @@ enum ImageProcessor {
         return try subjectLiftV1(image: image)
     }
 
+    /// RAW baseline — what Apple gives you for free, zero refinement.
+    /// `VNGenerateForegroundInstanceMaskRequest` → `generateMaskedImage`,
+    /// nothing else: no person-seg union, no guided filter, no hair zone,
+    /// no decontamination, default colour management.
+    ///
+    /// Exists for the 2.0 bakeoff (EdgeBenchmark): every refinement stage in
+    /// V1/V2 must justify itself against THIS output. If raw looks close
+    /// enough on real fixtures, the 2.0 pipeline can shrink accordingly.
+    static func subjectLiftRaw(image: CGImage) throws -> CGImage {
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        try handler.perform([request])
+        guard let observation = request.results?.first else {
+            throw ImageProcessorError.noSubjectFound
+        }
+        let buffer = try observation.generateMaskedImage(
+            ofInstances: observation.allInstances,
+            from: handler,
+            croppedToInstancesExtent: false
+        )
+        let ci = CIImage(cvPixelBuffer: buffer)
+        let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let cg = ciContext.createCGImage(ci, from: ci.extent,
+                                               format: .RGBA8,
+                                               colorSpace: outputCS) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        return cg
+    }
+
     /// V1 — original Apple Vision pipeline, **bit-for-bit identical** to the
     /// pre-split implementation. Kept around behind the `subjectLiftV2` flag
     /// so the EdgeBenchmark harness can A/B against V2, and so we can revert
