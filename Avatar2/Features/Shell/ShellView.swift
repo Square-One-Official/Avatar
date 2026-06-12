@@ -74,7 +74,11 @@ struct ShellView: View {
                 canvas
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Punt 19: top-uitlijning — de VStack centreerde verticaal,
+        // waardoor de kaart bij lage vensters onder de quota-rij kroop;
+        // header hoort vast bovenaan (Figma y=32), de foto is het enige
+        // flexibele element.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Heel het venster is droptarget (Fitts, review-besluit); de
         // Figma-dropzone (App / Dropzone, 4017:1622) is puur visueel.
         .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
