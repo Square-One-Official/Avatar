@@ -120,3 +120,16 @@ hover bg neutral-stronger + primary, pressed bg neutral-strongest).
 - Context: Figma Components "Search input" (4016:14176, 6 states); gebruikt in de sidebar (App / Sidebar images, instance 224×48). E05.4 gebruikt tijdelijk DSTextField (h40) als stand-in — vervangen zodra deze component er is. (Story toegevoegd door FEAT bij E05.4 — AvatarUI is DS-grens.)
 
 **Result:** _(invullen bij done)_
+
+## 3.11 — Glass-effect op icon-/toolknoppen
+- status: in_progress
+- owner: DS
+- blockedBy: 3.3
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-bevinding 4 van Thierry (12 jun, app vs frames): de 48-cirkel-toolknoppen zijn vlak; in Figma (Components → Icon-Only Button, App / Edit) hebben ze een glazige donkere material met subtiele rand/highlight. Figma exposeert het effect niet als variabele — benadering met material + divider-rim + top-highlight, te ijken op de frames.
+
+Publieke DSToolButton (48-cirkel, glass-surface, optionele lime active-ring, 18pt-icoon) en
+DSBottomToolbar intern erop; FEAT-callsites (gear) kunnen dan dezelfde component gebruiken
+i.p.v. het idioom na te bouwen.
+
+**Result:** _(invullen bij done)_
