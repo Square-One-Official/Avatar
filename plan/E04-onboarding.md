@@ -27,8 +27,8 @@ Notities (FEAT, bij oplevering):
 **Result:** Onboarding-flow (Splash → Email → code-verstuurd-landing) in Avatar2/Features/Onboarding/ op AuthService.requestCode + DSTextField/DSPrimaryButton; incl. continue-without-account (persistent via onboarding2.completed), RecoverPro-hint en review-copy; gemount in Avatar2App achter onboarding.isActive; beide targets bouwen groen, alle packagetests groen, smoke-run 0% idle-CPU.
 
 ## 4.2 — OTP-stap
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: 4.1
 - DoD: beide targets bouwen, tests groen
 
