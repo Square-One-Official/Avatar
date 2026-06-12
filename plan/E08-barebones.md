@@ -4,19 +4,24 @@ Team: **FEAT**
 
 Bewust minimaal; volledige flows volgen als Figma af is.
 
-## 8.1 — Settings barebones
-- status: ready
+## 8.1 — Settings barebones [VERVANGEN door E15 — niet oppakken]
+- status: done
 - owner: —
 - blockedBy: E03.2, E03.6
 - DoD: beide targets bouwen, tests groen
 
+**Vervangen door [E15 — Settings volledig](E15-settings.md)** (besluit Thierry 2026-06-12):
+Figma heeft nu volledige Settings-frames, dus de barebones-variant vervalt. De inhoud van deze
+story is opgegaan in E15.1 (shell + Preferences), E15.2 (AI & Models incl. High-fidelity
+edges-download en online-modellen-toggle), E15.3 (Account) en E15.4 (About/Updates).
+
 Notitie (FEAT): E03.6 (toggle-component) toegevoegd als blocker — de privacy/engine-sectie
-heeft dezelfde online-modellen-toggle nodig als E04.3.
+heeft dezelfde online-modellen-toggle nodig als E04.3. (Geldt nu voor E15.2.)
 
 Privacy/engine (incl. High-fidelity edges-downloadkaart uit onboarding), account, versie. Eén
 venster, drie secties.
 
-**Result:** _(invullen bij done)_
+**Result:** Vervallen zonder implementatie — vervangen door E15 (Settings volledig); zie E15.1–E15.4.
 
 ## 8.2 — Export barebones
 - status: backlog
