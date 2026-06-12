@@ -1,5 +1,5 @@
-// Smoke-tests voor E03.4: body-evaluatie van DSProChip en DSGated in
-// beide gate-standen.
+// Smoke-tests voor E03.4/E03.7: body-evaluatie van DSProChip, DSGated en
+// de per-feature-indicatoren.
 
 import SwiftUI
 import XCTest
@@ -17,6 +17,29 @@ final class DSProChipTests: XCTestCase {
     func testGatedRendertVergrendeldEnOntgrendeld() {
         for locked in [true, false] {
             let view = DSGated(isLocked: locked, onUpgradeRequested: {}) {
+                DSPrimaryButton("Whiten teeth") {}
+            }
+            XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+        }
+    }
+
+    @MainActor
+    func testFeatureIndicatorenRenderen() {
+        XCTAssertNotNil(ImageRenderer(content: DSFeatureIndicator(.pro) {}).cgImage)
+        XCTAssertNotNil(ImageRenderer(content: DSFeatureIndicator(.cloudOff) {}).cgImage)
+    }
+
+    @MainActor
+    func testGatedRendertCloudGlyphAlleenAlsOnlineVereistEnUit() {
+        for (locked, requiresOnline, online) in
+            [(true, true, false), (false, true, false), (false, true, true)] {
+            let view = DSGated(
+                isLocked: locked,
+                requiresOnline: requiresOnline,
+                isOnlineEnabled: online,
+                onUpgradeRequested: {},
+                onOpenAISettings: {}
+            ) {
                 DSPrimaryButton("Whiten teeth") {}
             }
             XCTAssertNotNil(ImageRenderer(content: view).cgImage)

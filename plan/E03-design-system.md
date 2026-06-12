@@ -71,7 +71,7 @@ DS-grens.)
 **Result:** DSToggle 1-op-1 uit Figma Toggle (61:944) in AvatarUI/Components: track 48×24 r-full — uit neutral→neutral-stronger (hover)→neutral-strongest (pressed), aan background/action (lime, alle staten); thumb 22 met gap-px-inzet — foreground/default/thumb (uit) resp. on-action (aan), hover schuift thumb 2pt naar binnen, pressed toont thumb alvast aan de doelzijde (zo staan de Figma-pressed-frames erin); Figma kent géén disabled-variant → opacityschaal .25 zoals DSTextField; a11y via accessibilityRepresentation als echte Toggle. Contract: `DSToggle(isOn: Binding<Bool>)`. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
 
 ## 3.7 — Per-feature-indicatoren: Pro-badge + cloud/AI-glyph
-- status: in_progress
+- status: done
 - owner: DS
 - blockedBy: 3.4
 - DoD: beide targets bouwen, tests groen
@@ -83,4 +83,4 @@ die voor free-gebruikers vergrendeld zijn; (2) een cloud/AI-glyph wanneer de fea
 Settings > AI & Models (cloud-glyph). Géén modals of blokkades — de indicatoren informeren, het
 bestaande DSGated-gedrag blijft het enige gate-mechanisme.
 
-**Result:** _(invullen bij done)_
+**Result:** DSFeatureIndicator (.pro = brand-chip, .cloudOff = cloud-glyph in neutral cirkel à la Icon-Only Button Small) in AvatarUI/Components: tik → popover (geen modal) met één regel uitleg + route-knop in lime (Upgrade resp. "Open AI & Models settings"). DSGated uitgebreid (source-compatible): `DSGated(isLocked:chipLabel:requiresOnline:isOnlineEnabled:onUpgradeRequested:onOpenAISettings:content:)` — cloud-glyph verschijnt alleen bij requiresOnline && !isOnlineEnabled (vlag uit CreditMeter E14.3 geeft de aanroeper door), naast de Pro-chip top-trailing (inzet gap-1); indicatoren staan buiten de gate-knop zodat ze zelf tikbaar zijn, élke tik op vergrendelde inhoud blijft → onUpgradeRequested. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
