@@ -50,17 +50,9 @@ struct Avatar2App: App {
         // geeft full-size content; de topbar reserveert zelf ruimte naast
         // de window-controls.
         .windowStyle(.hiddenTitleBar)
-
-        // E15.1: Settings-venster — de gear in de shell-topbar stuurt al de
-        // standaard Settings-selector (showSettingsWindow:), dus deze scene
-        // is de hele koppeling. Zelfde hiddenTitleBar-patroon; de sub-nav
-        // reserveert zelf de ruimte voor de traffic lights (y76, frame
-        // 4019:497).
-        Settings {
-            SettingsRootView()
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1000, height: 700)
+        // E15.1 + punt 14: Settings leeft BINNEN het hoofdvenster (view-
+        // state in ShellView, gear toggelt) — geen aparte Settings-scene;
+        // de frames vullen het hele app-venster.
     }
 }
 

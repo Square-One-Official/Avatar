@@ -1,11 +1,10 @@
-// Settings-venster (E15.1) — 1-op-1 Figma 'App / Settings / Preferences'
-// (4019:497): sub-nav links (320, "SETTINGS"-kop + 4 Navigation Buttons,
-// alles op y76 vanaf de venstertop zodat de traffic lights inline vallen,
-// zelfde maat als de shell-topbar), content rechts (header + Settings-
-// secties). De credits/Upgrade-strip en de gear uit het frame horen bij
-// het hóófdvenster-patroon dat elk App-frame draagt; de story scopet dit
-// venster op "sub-nav + content-area" — bewust weggelaten (gedocumenteerd
-// in de story).
+// Settings (E15.1 + visuele pass punt 14) — 1-op-1 Figma 'App / Settings /
+// Preferences' (4019:497). Leeft BINNEN het hoofdvenster: vervangt de
+// canvas-weergave als view-state in ShellView (gear toggelt, Esc sluit);
+// de shell-topbar (quota + gear) blijft erboven staan — precies zoals de
+// frames het hele app-venster vullen. Sub-nav links (320, "SETTINGS"-kop +
+// 4 Navigation Buttons, op y76 vanaf de venstertop), content rechts
+// (header + Settings-secties).
 //
 // Pagina's 15.2–15.4 zijn hier bewust nog placeholders; elke story vult
 // zijn eigen pagina in.
@@ -23,9 +22,7 @@ struct SettingsRootView: View {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(minWidth: 1000, minHeight: 700)
-        .background(DSColor.Background.app)
-        .appliedAppearancePreference()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: sub-nav (Figma "sub-nav" 4019:753: navigation op x24,
@@ -116,7 +113,9 @@ struct SettingsSectionCard<Rows: View>: View {
                 .padding(.top, DSSpacing.gap6)
         }
         .padding(DSSpacing.gap6)
-        .frame(width: 608, alignment: .leading)
+        // 608 in het 1000-frame; krimpt mee met kleinere vensters zodat
+        // de dropdown/toggle rechts nooit buiten beeld valt.
+        .frame(maxWidth: 608, alignment: .leading)
         .background(DSColor.Background.card)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
     }
@@ -154,7 +153,7 @@ struct SettingsRow<Control: View>: View {
             Spacer(minLength: DSSpacing.gap4)
             control
         }
-        .frame(width: 560, alignment: .leading)
+        .frame(maxWidth: 560, alignment: .leading)
     }
 }
 

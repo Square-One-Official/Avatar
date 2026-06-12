@@ -28,10 +28,12 @@ Notities (AI, bij oplevering):
   later puur tokenwerk.
 - Navigation Button/Setting Row/sectiekaart zijn lokale views in Features/Settings/ — niet
   in AvatarUI (DS-grens); DS kan ze desgewenst liften via een eigen story.
-- Visuele smoke-run kon niet betrouwbaar: er draaide een tweede debug-instantie (Xcode) naast
-  een actieve gebruikerssessie; gear→Settings loopt via de standaard selector + Settings-scene
-  (zelfde koppeling als E04.5 voorzag). Visuele check meenemen bij de eerstvolgende vrije
-  smoke-run (punt-13-oplevering).
+- Visuele smoke-run kon bij oplevering niet betrouwbaar (tweede debug-instantie naast actieve
+  gebruikerssessie); alsnog gedaan bij visuele-pass punt 14.
+- Herzien door visuele-pass punt 14 (zelfde dag): de aparte Settings-scene is vervangen door
+  een in-window view-state in ShellView (gear toggelt met active-state, Esc sluit, topbar
+  blijft staan) — conform de frames die het hele app-venster vullen. Screenshots geverifieerd
+  tegen 4019:497, incl. pill-dropdown en meekrimpende sectiekaarten.
 
 **Result:** Settings-venster (SwiftUI Settings-scene, hiddenTitleBar, 1000×700) in Avatar2/Features/Settings/ — SettingsRootView (sub-nav 320 met SETTINGS-kop + 4 Navigation Buttons incl. action-balkje/hover, content 656), SettingsPreferencesPage (H1-header, Appearance-sectie met System/Light/Dark-dropdown op DS-tokens, Notifications-sectie met icoonrij + DSToggle), sectie/rij als herbruikbare lokale views; gear werkt nu via showSettingsWindow:; beide targets bouwen groen, packagetests groen.
 

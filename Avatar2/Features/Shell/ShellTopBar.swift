@@ -1,10 +1,10 @@
-// Shell-topbar (E04.5, Figma: App-frames node "top" 4017:1921 + gear
-// "Frame 27"). Links naast de window-controls: quota-label (Labels/Small,
-// "x/3 left" free · "x credits" Pro) + Upgrade-chip (brand). Rechts: gear
-// in 48-cirkel (zelfde idioom als de toolbar-tools); de actie stuurt de
-// standaard Settings-selector — functioneel zodra E15.1 de Settings-scene
-// levert. Zichtbaarheid quota/Upgrade volgt het E05.1-besluit (pas ná de
-// eerste cutout); de vorm is 1-op-1 Figma. Vervangt EntitlementStatusStrip.
+// Shell-topbar (E04.5 + visuele pass punt 15, Figma: App-frames node "top"
+// 4017:1921 + gear "Frame 27"). De quota-regel begint exact op x76 — vlak
+// naast de window-controls (x16–68) — en zit verticaal gecentreerd op
+// dezelfde regel (strook h52, middellijn y26): tekst y18/h16, chip y14/h24.
+// De gear (48-cirkel) hangt op y12 met trailing 16. Zichtbaarheid
+// quota/Upgrade volgt het E05.1-besluit (pas ná de eerste cutout).
+// Punt 14: de gear toggelt de in-window Settings en toont de active-state.
 
 import AvatarKit
 import AvatarUI
@@ -12,9 +12,11 @@ import SwiftUI
 
 struct ShellTopBar: View {
     let model: EntitlementModel
+    let isSettingsActive: Bool
+    let onToggleSettings: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             if model.hasCompletedFirstCutout {
                 HStack(spacing: DSSpacing.gap2) {
                     Text(quotaLabel)
@@ -24,14 +26,23 @@ struct ShellTopBar: View {
                         model.requestUpgrade()
                     }
                 }
-                // Figma "top": quota op x76 (na de window-controls), bar h52.
-                .padding(.leading, 76 - DSSpacing.gap4)
+                // Figma "top": kwota-regel gecentreerd in de 52-strook…
+                .frame(height: 52)
+                // …en exact op x76, direct na de window-controls.
+                .padding(.leading, 76)
             }
             Spacer()
-            GearButton()
+            DSToolButton(
+                Image(systemName: "gearshape.fill"),
+                label: "Settings",
+                isActive: isSettingsActive
+            ) {
+                onToggleSettings()
+            }
+            // Figma "Frame 27": gear op y12, 16 uit de rechterrand.
+            .padding(.top, DSSpacing.gap3)
+            .padding(.trailing, DSSpacing.gap4)
         }
-        .padding(.horizontal, DSSpacing.gap4)
-        .padding(.top, DSSpacing.gap3)
         .task { await model.refresh() }
     }
 
@@ -43,16 +54,5 @@ struct ShellTopBar: View {
             return "\(free)/\(FreeTier.maxPortraits) left"
         }
         return ""
-    }
-}
-
-/// Gear rechtsboven (Figma Frame 27) — DSToolButton (E03.11): zelfde
-/// glass-cirkel als de bottom-toolbar-tools. De actie stuurt de standaard
-/// Settings-selector; functioneel zodra E15.1 de Settings-scene levert.
-private struct GearButton: View {
-    var body: some View {
-        DSToolButton(Image(systemName: "gearshape.fill"), label: "Settings") {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        }
     }
 }

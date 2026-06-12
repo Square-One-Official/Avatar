@@ -55,6 +55,7 @@ struct SettingsPreferencesPage: View {
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)
+        .padding(.trailing, DSSpacing.gap6)
     }
 
     // Figma-dropdown: pill (bg neutral, r-xl, 40 hoog) met label + chevron.
@@ -76,8 +77,13 @@ struct SettingsPreferencesPage: View {
             .frame(height: 40)
             .background(DSColor.Background.neutral)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))
+            .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
         }
-        .menuStyle(.borderlessButton)
+        // .button + .plain rendert het eigen label (pill + tekst + chevron
+        // rechts, zoals het frame); borderlessButton verving het door zijn
+        // eigen chevron-links-layout.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
     }

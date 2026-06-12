@@ -15,7 +15,8 @@ struct SidebarView: View {
     /// als padding, de kaartradius rekent er concentrisch mee.
     static let edgeInset: CGFloat = DSSpacing.gap1
 
-    @Query(sort: \Portrait2.createdAt) private var portraits: [Portrait2]
+    // Laatst bewerkt bovenaan, zoals v1 (punt 13).
+    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @State private var searchText = ""
 
     let selectedID: PersistentIdentifier?

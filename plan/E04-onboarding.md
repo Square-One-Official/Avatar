@@ -85,6 +85,7 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 - status: done
 - owner: FEAT
 - Heropend en afgerond (2026-06-12): visuele-pass-bevindingen 1–9 van Thierry verwerkt; DS-leveringen E03.10–3.13.
+- Tweede heropening, afgerond (2026-06-12, AI): punten 13–15 van Thierry verwerkt — zie Result-blok punten 13–15 onderaan.
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
 - Context: Stories-pagina node 151:1409; werkregel Figma-1-op-1 + placeholder-regel (CLAUDE.md → Vaste kennis, besluit Thierry 2026-06-12).
@@ -111,6 +112,11 @@ Notities (FEAT, bij oplevering):
 - get_design_context van de lokale Figma-MCP hing op alle frames; geometrie komt uit
   get_metadata (exact) + variabelen uit get_variable_defs + screenshot-pixelmeting (splash).
 - E03.9 (full-width-knoppen + DSGhostButton) is hiervoor als DS-story toegevoegd en gedaan.
+
+**Result punten 13–15 (2026-06-12, AI):**
+13. Launch-gedrag: `Portrait2.updatedAt` toegevoegd (touch bij naam/rol-mutatie; nieuw portret = createdAt; lichtgewicht migratie via sentinel `.distantPast` + eenmalige fixup naar createdAt bij launch), sidebar sorteert erop (jongste bovenaan, zoals v1); bij launch met niet-lege store wordt de laatst geselecteerde (persistentModelID in UserDefaults `shell.lastSelectedPortraitID`) hersteld, met het jongst-bewerkte portret als terugval — first-use-state alleen bij écht lege store. Smoke-run: herstart toont direct het laatst bewerkte portret.
+14. Settings in-window: aparte Settings-scene verwijderd; SettingsRootView vervangt de canvas-weergave als view-state in ShellView (topbar incl. quota-rij + gear blijft staan), gear toggelt met active-state, Esc sluit (venster-brede cancel-shortcut); drops worden tijdens Settings genegeerd. Terugweg-keuze conform hoofddesign: gear-toggle + Esc, geen extra terug-knop (de gear ís de plek waar de gebruiker klikt).
+15. Quota-rij op de frame-maten uit "top" (4017:1921): tekst exact op x76 direct naast de window-controls, verticaal gecentreerd op dezelfde regel (strook h52, middellijn y26); gear op y12/trailing 16. NB: get_design_context hangt nog steeds op dit bestand (bekende MCP-workaround) — maten uit get_metadata, visueel geverifieerd met screenshots van de draaiende app.
 
 **Result review-fix (bevindingen 1–9, per punt):**
 1. Vensterbalk: `.windowStyle(.hiddenTitleBar)` op de WindowGroup — één zwart vlak, traffic lights inline, geen venstertitel; de topbar reserveert zelf de ruimte ernaast (x76 uit het frame).
