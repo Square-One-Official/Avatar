@@ -69,8 +69,8 @@ auth. Backend auth.ts ongewijzigd. Google-infra blijft bestaan maar krijgt geen 
 **Result:** AuthService (@Observable, requestCode/verifyCode/signOut via Supabase signInWithOTP+verifyOTP, conformeert aan AccessTokenProviding) in AvatarKit/Auth/ met AES-GCM-versleutelde sessie-opslag (eigen Keychain-service nl.squareone.aaavatar2, zelfde ontwerp als v1 audit-fix HIGH #7); supabase-swift 2.x als package-dependency; beide targets bouwen groen, 31 AvatarKit-tests groen (6 nieuwe storage-tests).
 
 ## 1.7 — Stripe/identiteit-verificatie OTP-switch
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.6
 - DoD: beide targets bouwen, tests groen
 
