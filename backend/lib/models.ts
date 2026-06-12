@@ -20,7 +20,7 @@
  * adapter in lib/replicate.ts first and only then register it.
  */
 
-export type CloudFeature = "cutout" | "colorize" | "fill_body";
+export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize";
 
 export interface ModelEntry {
   /** Replicate ref: unversioned `owner/slug` or pinned `owner/slug:version`. */
@@ -86,6 +86,34 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
       },
     },
     credits: 1,
+    requiresCloud: true,
+  },
+  // Instruction-edit (stijlen + retouch). De drie entries zijn de E09.1
+  // bakeoff-armen; /v1/stylize is dev-only tot de bakeoff een definitief
+  // default per feature heeft aangewezen (E09.2 haalt de gate weg). Alle
+  // drie zijn officiële, unversioned slugs — geen pinning nodig. De
+  // payload-verschillen per arm leven in stylizeInputFor (lib/replicate.ts).
+  stylize: {
+    // Voorlopig; de bakeoff-uitkomst bepaalt het echte default (mag per
+    // feature verschillen — stijl ≠ kleding ≠ haar, zie E09.1).
+    defaultModel: "nano-banana",
+    models: {
+      "nano-banana": {
+        ref: "google/nano-banana",
+        label: "Nano Banana (Gemini 2.5 Flash Image)",
+      },
+      "flux-2-pro": {
+        ref: "black-forest-labs/flux-2-pro",
+        label: "FLUX.2 [pro]",
+      },
+      "gpt-image-1.5": {
+        ref: "openai/gpt-image-1.5",
+        label: "GPT Image 1.5",
+      },
+    },
+    // E14.3: generatief standaardtarief (4); premium-features (7) krijgen
+    // bij dat besluit hun eigen registratie.
+    credits: 4,
     requiresCloud: true,
   },
 };
