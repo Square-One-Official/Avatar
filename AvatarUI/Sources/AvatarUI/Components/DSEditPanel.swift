@@ -57,15 +57,22 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
 
     public var body: some View {
         VStack(spacing: DSSpacing.gap2) {
+            // Layoutgarantie (E03.16, bevinding 19): de foto is het ENIGE
+            // flexibele element — lagere layoutPriority zodat paneel en
+            // toolbar eerst hun volle hoogte krijgen en nooit afgekapt
+            // kunnen worden; de foto krimpt desnoods naar nul.
             photo
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(-1)
 
             if let tool = activeTool {
                 panel(tool)
+                    .fixedSize(horizontal: false, vertical: true)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             DSBottomToolbar(items: tools, selection: $activeTool)
+                .fixedSize()
         }
         .animation(.spring(duration: 0.35), value: activeTool)
     }
