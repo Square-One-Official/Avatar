@@ -4,8 +4,12 @@ Team: **AI**
 
 Design-onafhankelijk: alles capability-gated (macOS 27 + Apple Silicon vereist; app blijft op macOS 14 werken). Doel: de gepresenteerde features technisch werkend hebben vóór het definitieve design — daarna alleen verfijnen. Vereist Xcode 27 beta + macOS 27 beta op de dev-Mac (actie Thierry indien nog niet geïnstalleerd).
 
+**GEPARKEERD (2026-06-12):** dev-Mac draait macOS 26; de Apple Intelligence-API's (Image
+Playground / Foundation Models) vereisen macOS 27. Hele epic wacht op de macOS 27-beta op de
+dev-Mac — niet verwijderd, komt terug zodra de beta geïnstalleerd is.
+
 ## 16.1 — Capability-laag
-- status: ready
+- status: blocked — wacht op macOS 27-beta op dev-Mac
 - owner: —
 - blockedBy: E01.2
 - DoD: beide targets bouwen, tests groen
