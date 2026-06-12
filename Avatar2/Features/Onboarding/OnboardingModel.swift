@@ -17,8 +17,13 @@ final class OnboardingModel {
 
     private static let completedKey = "onboarding2.completed"
 
+    static let otpLength = 6
+
     private(set) var step: Step = .splash
     var emailInput = ""
+    var otpCode = ""
+    /// Bevestiging na een geslaagde resend; gewist bij elke nieuwe actie.
+    private(set) var didResendCode = false
     private(set) var hasCompleted: Bool
 
     let auth: AuthService
@@ -59,10 +64,50 @@ final class OnboardingModel {
         guard canSubmitEmail else { return }
         do {
             try await auth.requestCode(email: trimmedEmail)
+            otpCode = ""
+            didResendCode = false
             step = .otp
         } catch {
             // Boodschap staat in auth.lastError; de stap blijft staan.
         }
+    }
+
+    var canVerifyCode: Bool {
+        otpCode.count == Self.otpLength && !auth.isBusy
+    }
+
+    /// Verifieert de code; de view triggert dit ook automatisch zodra het
+    /// 6e cijfer binnen is (auto-verify). `canVerifyCode` maakt dubbele
+    /// triggers (onChange + knop) onschadelijk via de isBusy-gate.
+    func verifyCode() async {
+        guard canVerifyCode else { return }
+        didResendCode = false
+        do {
+            try await auth.verifyCode(email: trimmedEmail, code: otpCode)
+            markCompleted()
+        } catch {
+            // Boodschap staat in auth.lastError; code blijft staan zodat
+            // de gebruiker hem kan corrigeren.
+        }
+    }
+
+    func resendCode() async {
+        guard !auth.isBusy else { return }
+        didResendCode = false
+        do {
+            try await auth.requestCode(email: trimmedEmail)
+            otpCode = ""
+            didResendCode = true
+        } catch {
+            // Boodschap staat in auth.lastError.
+        }
+    }
+
+    /// 'Wrong email? Go back' — terug naar de e-mailstap met schone lei.
+    func goBackToEmail() {
+        otpCode = ""
+        didResendCode = false
+        step = .email
     }
 
     /// Continue-without-account: app in zonder sessie; inloggen kan later
