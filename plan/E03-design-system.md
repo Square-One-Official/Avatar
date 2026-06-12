@@ -36,14 +36,14 @@ centraal in de container geregeld, consistent voor ALLE panelen.
 **Result:** DSBottomToolbar + DSEditPanel(Container) 1-op-1 uit Figma Stories→App/Edit & App/Effects dark (Toolbar 4016:3746, dropdownMenu 4016:13604): toolbar = HStack gap-2/padding gap-2 zonder fill, tools 48×48 cirkel bg neutral met 18pt-medium-icoon, actief = lime ring b-medium + lime icoon, tik op actieve tool deselecteert; paneel = bg Card, r-4xl, kaartpadding gap-2 + sectiepadding gap-5, titel UI/Labels/Base primary, schaduw 0/12/24/-12 zwart 25%. Contract: `DSEditPanelContainer(tools: [DSToolbarItem<ID>], activeTool: Binding<ID?>, photo: () -> Photo, panel: (ID) -> Panel)` stapelt foto (flexibele hoogte) → actief paneel → toolbar met gap-2 en regelt het foto-verkleint-besluit (10 jun) centraal via één spring-animatie — feature-panelen leveren alleen titel+inhoud via `DSEditPanel(title:content:)` en hoeven zelf niets te animeren; undo/redo zijn géén toolbar-items maar losse DSIconButtons (E06); in Figma overlapt het paneel de foto statisch — bewust afgeweken conform bouwplan-designbesluit. Beide targets bouwen groen, AvatarUI-tests groen (3 nieuwe smoke-tests).
 
 ## 3.4 — ProChip / credit-gating-component
-- status: backlog
-- owner: —
+- status: done
+- owner: DS
 - blockedBy: 3.2
 - DoD: beide targets bouwen, tests groen
 
 Eén gating-patroon voor alle features (les uit v1: niet versnipperen).
 
-**Result:** _(invullen bij done)_
+**Result:** DSProChip + DSGated in AvatarUI/Components. Figma kent géén los gating-component (review rode draad 3); de chip hergebruikt 1-op-1 de brand-Badge uit 3.2 — de "Upgrade"-taal van topbar en Upgrade Modal (4019:953). Contract: `DSProChip(_ label: String = "Pro")` (lime badge; eigen label voor credit-kosten zoals "2 credits") en `DSGated(isLocked: Bool, chipLabel: String = "Pro", onUpgradeRequested: () -> Void) { content }` — vergrendeld: chip top-trailing (inzet gap-1), eigen interactie van de inhoud uit, élke tik → onUpgradeRequested met de Figma-hover/pressed-opacitystates; ontgrendeld: inhoud onaangeroerd. Credit-tegoed tonen blijft DSQuotaBadge (3.2). Beide targets bouwen groen, AvatarUI-tests groen (2 nieuwe smoke-tests).
 
 ## 3.5 — Formulier- en lijstcomponenten
 - status: backlog
