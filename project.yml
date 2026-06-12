@@ -214,6 +214,15 @@ targets:
           NSAllowsArbitraryLoadsForMedia: false
           NSAllowsArbitraryLoadsInWebContent: false
           NSAllowsLocalNetworking: false
+        # Stripe-checkout keert terug via aaavatar://stripe-return|stripe-cancel
+        # (hardcoded in backend/api/v1/checkout/*). Auth 2.0 gebruikt geen
+        # deep-links meer; dit scheme blijft puur voor de Stripe-roundtrip.
+        # Let op: v1 registreert hetzelfde scheme — met beide apps op één
+        # machine kiest LaunchServices er één (acceptabel tijdens de transitie).
+        CFBundleURLTypes:
+          - CFBundleURLName: nl.squareone.aaavatar2.scheme
+            CFBundleURLSchemes:
+              - aaavatar
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2
