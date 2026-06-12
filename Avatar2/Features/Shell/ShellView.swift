@@ -33,8 +33,9 @@ struct ShellView: View {
                     onAdd: { model.presentOpenPanel() }
                 )
                 // Losstaande kaart met marge rondom (bevinding 8; frame-
-                // inzet 4 t.o.v. venster).
-                .padding(DSSpacing.gap1)
+                // inzet 4) — zelfde inset waarmee de kaartradius
+                // concentrisch rekent (bevinding 17).
+                .padding(SidebarView.edgeInset)
                 .transition(.move(edge: .trailing))
             }
         }

@@ -32,14 +32,20 @@ public struct DSToolButton: View {
                 .foregroundStyle(isActive ? DSColor.Action.primary : DSColor.Foreground.primary)
                 .frame(width: 48, height: 48)
                 .background { DSGlassCircle() }
+                // Ring altijd onderdeel van de button-view en alleen via
+                // opacity geschakeld (E03.15, bevinding 16): een
+                // conditionele insert hertekent buiten de lopende
+                // layout-animatie om en doet de ring verspringen bij de
+                // canvas-verschuiving; zo animeert hij gewoon mee.
                 .overlay {
-                    if isActive {
-                        Circle().strokeBorder(
+                    Circle()
+                        .strokeBorder(
                             DSColor.Action.primary,
                             lineWidth: DSBorderWidth.medium
                         )
-                    }
+                        .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
                 }
+                .animation(.easeOut(duration: 0.15), value: isActive)
         }
         .buttonStyle(DSStateOpacityButtonStyle())
         .accessibilityLabel(Text(label))
