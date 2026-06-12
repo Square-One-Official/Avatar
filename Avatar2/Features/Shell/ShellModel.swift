@@ -13,9 +13,12 @@ import UniformTypeIdentifiers
 final class ShellModel {
     enum CanvasState {
         case empty
-        /// Origineel zichtbaar tijdens de cutout; E05.3 vervangt dit door
-        /// de echte fade-out + statuscopy.
+        /// Fase 1 (E05.3): origineel op canvas, cutout rekent —
+        /// "Removing background...".
         case processing(NSImage)
+        /// Fase 2 (E05.3): cutout klaar, achtergrond fadet naar donker —
+        /// "Cutting out hair...".
+        case revealing(original: NSImage, cutout: NSImage)
         case result(NSImage)
         case failed(String)
     }
@@ -65,10 +68,17 @@ final class ShellModel {
     }
 
     private func runCutout(on cgImage: CGImage) async {
-        canvas = .processing(nsImage(from: cgImage))
+        let original = nsImage(from: cgImage)
+        canvas = .processing(original)
         do {
-            let cutout = try await router.cutout(cgImage)
-            canvas = .result(nsImage(from: cutout))
+            let cutout = nsImage(from: try await router.cutout(cgImage))
+            // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
+            // animeert, het model wacht dezelfde duur en stapt dan door.
+            canvas = .revealing(original: original, cutout: cutout)
+            try? await Task.sleep(
+                for: .seconds(IsolatingTiming.backgroundFade + IsolatingTiming.settle)
+            )
+            canvas = .result(cutout)
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
         } catch {
