@@ -5,8 +5,8 @@ Team: **FEAT**
 Vervangt E08.1 (barebones). Figma heeft nu twee voorbeeld-frames: 'App / Settings / Preferences' en 'App / Settings / AI & Models' (sectie Settings, node 4017:10181). Patroon: sub-nav links (4 items) + content rechts met Settings-secties. **Besluit Thierry: de rest van de pagina's zelf invullen in dezelfde stijl.**
 
 ## 15.1 — Settings-shell + Preferences
-- status: ready
-- owner: —
+- status: done
+- owner: AI (op directe instructie Thierry 2026-06-12 — E15 in volgorde 15.1→15.4, ondanks FEAT-epic)
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
 - Context: Figma 'App / Settings / Preferences' (4019:497); componenten Navigation Button/Setting Row uit Components-pagina.
@@ -14,7 +14,26 @@ Vervangt E08.1 (barebones). Figma heeft nu twee voorbeeld-frames: 'App / Setting
 Venster met sub-nav (4 items) + content-area, conform Figma. Preferences-pagina: Appearance- en
 Notifications-secties zoals ontworpen.
 
-**Result:** _(invullen bij done)_
+Notities (AI, bij oplevering):
+- Sub-nav-items = de vier E15-pagina's (Preferences/AI & Models/Account/About); het frame
+  toont nog "Permissions" uit de template-app — gedocumenteerde afwijking conform het bord.
+- Credits/Upgrade-strip + gear uit het frame zijn hoofdvenster-patroon (elk App-frame draagt
+  ze); dit venster is gescoped op sub-nav + content zoals de story zegt. Traffic lights
+  inline (hiddenTitleBar), nav én header op y76 zoals de shell.
+- Notifications-rij: frame draagt transcribe-template-copy ("Recording reminder…"); vorm
+  1-op-1, copy in de geest van Aaavatar ("Update notifications", persistent
+  settings2.updateNotifications — 15.4/Sparkle consumeert hem).
+- Theme-voorkeur (System/Light/Dark) persistent (settings2.appearance) en toegepast op beide
+  scenes; tokens zijn dark-only dus het directe effect is systeemcontrols — licht thema is
+  later puur tokenwerk.
+- Navigation Button/Setting Row/sectiekaart zijn lokale views in Features/Settings/ — niet
+  in AvatarUI (DS-grens); DS kan ze desgewenst liften via een eigen story.
+- Visuele smoke-run kon niet betrouwbaar: er draaide een tweede debug-instantie (Xcode) naast
+  een actieve gebruikerssessie; gear→Settings loopt via de standaard selector + Settings-scene
+  (zelfde koppeling als E04.5 voorzag). Visuele check meenemen bij de eerstvolgende vrije
+  smoke-run (punt-13-oplevering).
+
+**Result:** Settings-venster (SwiftUI Settings-scene, hiddenTitleBar, 1000×700) in Avatar2/Features/Settings/ — SettingsRootView (sub-nav 320 met SETTINGS-kop + 4 Navigation Buttons incl. action-balkje/hover, content 656), SettingsPreferencesPage (H1-header, Appearance-sectie met System/Light/Dark-dropdown op DS-tokens, Notifications-sectie met icoonrij + DSToggle), sectie/rij als herbruikbare lokale views; gear werkt nu via showSettingsWindow:; beide targets bouwen groen, packagetests groen.
 
 ## 15.2 — AI & Models-pagina
 - status: backlog

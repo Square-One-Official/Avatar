@@ -40,6 +40,8 @@ struct Avatar2App: App {
                 }
             }
             .animation(.easeOut(duration: 0.18), value: entitlement.isShowingOutOfCreditsToast)
+            // E15.1: persistente Theme-voorkeur (Preferences > Appearance).
+            .appliedAppearancePreference()
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         .modelContainer(for: Portrait2.self)
@@ -48,6 +50,17 @@ struct Avatar2App: App {
         // geeft full-size content; de topbar reserveert zelf ruimte naast
         // de window-controls.
         .windowStyle(.hiddenTitleBar)
+
+        // E15.1: Settings-venster — de gear in de shell-topbar stuurt al de
+        // standaard Settings-selector (showSettingsWindow:), dus deze scene
+        // is de hele koppeling. Zelfde hiddenTitleBar-patroon; de sub-nav
+        // reserveert zelf de ruimte voor de traffic lights (y76, frame
+        // 4019:497).
+        Settings {
+            SettingsRootView()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1000, height: 700)
     }
 }
 
