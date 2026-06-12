@@ -113,13 +113,13 @@ hover bg neutral-stronger + primary, pressed bg neutral-strongest).
 **Result:** `fullWidth: Bool = false` op DSPrimaryButton én DSNeutralButton (label-HStack strekt vóór de padding, capsule strekt mee — bestaande call sites ongewijzigd) en DSGhostButton (zelfde maten/parameters als DSPrimaryButton; states 1-op-1 het ghostNeutral-gedrag van DSIconButton: muted → hover bg neutral-stronger + primary → pressed bg neutral-strongest, disabled opacityschaal .25). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
 
 ## 3.10 — Search input-component
-- status: ready
-- owner: —
+- status: done
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 - Context: Figma Components "Search input" (4016:14176, 6 states); gebruikt in de sidebar (App / Sidebar images, instance 224×48). E05.4 gebruikt tijdelijk DSTextField (h40) als stand-in — vervangen zodra deze component er is. (Story toegevoegd door FEAT bij E05.4 — AvatarUI is DS-grens.)
 
-**Result:** _(invullen bij done)_
+**Result:** DSSearchField in AvatarUI/Components (capsule h48, bg neutral, rand b-thin divider→muted bij focus, px gap-4, zoekicoon 20 muted + gap-2, tekst Body/Medium — placeholder muted/waarde primary; label/helper uit het component bewust buiten scope, geen dark-frame gebruikt ze). Meegelift (bevinding 8c): DSSidebarRow-thumbclip naar continuous corners. Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
 
 ## 3.11 — Glass-effect op icon-/toolknoppen
 - status: done
