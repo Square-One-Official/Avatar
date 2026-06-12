@@ -25,8 +25,8 @@ PrimaryButton (lime pill), Chip, IconButton (circulair), QuotaBadge, Toast.
 **Result:** DSPrimaryButton (lime pill, Default/Small), DSIconButton (circulair, fillBrand/ghostNeutral incl. active), DSBadge/DSChip/DSQuotaBadge (Figma "Badge" = chip; alleen fill, outline ongebruikt in dark frames) en DSToast (kaart + timer-track) in AvatarUI/Components; states 1-op-1 via Figma-opacityschaal (hover 75/pressed 50/disabled 25), ghostNeutral via bg-wissel (neutral-stronger dark geïnterpoleerd #ffffff1a, niet opvraagbaar via MCP); beide targets bouwen groen, testtargets nog niet aanwezig (E01.4 open).
 
 ## 3.3 — BottomToolbar + EditPanel-container
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.2
 - DoD: beide targets bouwen, tests groen
 
