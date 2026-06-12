@@ -26,8 +26,8 @@ Eén preset (vierkant PNG 1024) + share sheet; watermark voor free.
 **Result:** _(invullen bij done)_
 
 ## 8.3 — Paywall/credit-states barebones
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E01.5, E03.4
 - DoD: beide targets bouwen, tests groen
 
