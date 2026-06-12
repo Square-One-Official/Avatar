@@ -71,8 +71,8 @@ DS-grens.)
 **Result:** DSToggle 1-op-1 uit Figma Toggle (61:944) in AvatarUI/Components: track 48×24 r-full — uit neutral→neutral-stronger (hover)→neutral-strongest (pressed), aan background/action (lime, alle staten); thumb 22 met gap-px-inzet — foreground/default/thumb (uit) resp. on-action (aan), hover schuift thumb 2pt naar binnen, pressed toont thumb alvast aan de doelzijde (zo staan de Figma-pressed-frames erin); Figma kent géén disabled-variant → opacityschaal .25 zoals DSTextField; a11y via accessibilityRepresentation als echte Toggle. Contract: `DSToggle(isOn: Binding<Bool>)`. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
 
 ## 3.7 — Per-feature-indicatoren: Pro-badge + cloud/AI-glyph
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.4
 - DoD: beide targets bouwen, tests groen
 - Context: DSGated/DSProChip uit 3.4; de requiresCloud-vlag per actie komt uit CreditMeter (E14.3). (Story toegevoegd op besluit Thierry 2026-06-12.)
