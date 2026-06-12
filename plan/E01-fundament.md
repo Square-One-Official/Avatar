@@ -58,8 +58,8 @@ vandaaruit. Enige story die Avatar/ mag raken.
 **Result:** BackendClient + TLSPinning + DeviceFingerprint + entitlement-wire-types + Announcement-modellen naar AvatarKit/Backend/ (public API, AuthManager gekoppeld via nieuw AccessTokenProviding-protocol); Avatar, Avatar-MAS en Avatar2 bouwen groen, tests groen, v1 start-smoke OK.
 
 ## 1.6 — Auth 2.0: e-mail + code
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
 
