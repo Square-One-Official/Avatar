@@ -55,24 +55,53 @@ enum EditorTool: String, CaseIterable, Identifiable {
 
 struct EditorView: View {
     let portrait: NSImage
+    /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
+    /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
+    @Binding var isSidebarVisible: Bool
     @State private var activeTool: EditorTool?
 
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
         EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
+    /// Onderschept .images: ring aan = sidebar open; andere tools sluiten
+    /// de sidebar en openen hun paneel.
+    private var toolSelection: Binding<EditorTool?> {
+        Binding(
+            get: { isSidebarVisible ? .images : activeTool },
+            set: { newValue in
+                switch newValue {
+                case .images:
+                    isSidebarVisible = true
+                    activeTool = nil
+                case nil:
+                    isSidebarVisible = false
+                    activeTool = nil
+                default:
+                    isSidebarVisible = false
+                    activeTool = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
-        DSEditPanelContainer(tools: Self.toolbarItems, activeTool: $activeTool) {
+        DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
             Image(nsImage: portrait)
                 .resizable()
                 .scaledToFit()
                 .padding(.horizontal, DSSpacing.gap8)
                 .padding(.top, DSSpacing.gap8)
         } panel: { tool in
-            DSEditPanel(title: tool.label) {
-                Text("\(tool.label) tools land here (\(tool.pendingStory)).")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if tool == .images {
+                // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
+                EmptyView()
+            } else {
+                DSEditPanel(title: tool.label) {
+                    Text("\(tool.label) tools land here (\(tool.pendingStory)).")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .padding(.horizontal, DSSpacing.gap3)

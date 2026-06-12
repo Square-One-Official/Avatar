@@ -6,6 +6,7 @@
 import AppKit
 import AvatarKit
 import Observation
+import SwiftData
 import UniformTypeIdentifiers
 
 @MainActor
@@ -26,10 +27,23 @@ final class ShellModel {
     private(set) var canvas: CanvasState = .empty
     var isDropTargeted = false
 
-    /// Naam/rol van het huidige portret (E05.5). Verhuist naar het
-    /// SwiftData-model Portrait2 zodra E05.4 landt.
-    var portraitName = ""
-    var portraitRole = ""
+    /// Sidebar/set (E05.4): Images-tool of avatar-toggle opent het paneel.
+    var isSidebarVisible = false
+
+    /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
+    private(set) var selectedPortrait: Portrait2?
+    /// ModelContext komt uit de environment (ShellView .task) — SwiftData
+    /// is pas ná init beschikbaar.
+    @ObservationIgnored var modelContext: ModelContext?
+
+    /// Naam/rol van het huidige portret (E05.5) — sinds E05.4 doorgeschreven
+    /// naar het SwiftData-model Portrait2.
+    var portraitName = "" {
+        didSet { selectedPortrait?.name = portraitName }
+    }
+    var portraitRole = "" {
+        didSet { selectedPortrait?.role = portraitRole }
+    }
 
     private let entitlement: EntitlementModel
 
@@ -81,9 +95,41 @@ final class ShellModel {
             canvas = .result(cutout)
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
+            persist(cutout: cutout)
         } catch {
             canvas = .failed("Couldn't find a person in that photo. Try another portrait.")
         }
+    }
+
+    // MARK: - Set/sidebar (E05.4)
+
+    /// Geslaagde cutout → nieuw portret in de set; wordt meteen de selectie.
+    private func persist(cutout: NSImage) {
+        guard let modelContext, let png = pngData(from: cutout) else { return }
+        let portrait = Portrait2(cutoutData: png)
+        modelContext.insert(portrait)
+        select(portrait)
+    }
+
+    /// Selectie uit de sidebar: portret op canvas, naam/rol in de header.
+    func select(_ portrait: Portrait2) {
+        selectedPortrait = portrait
+        portraitName = portrait.name
+        portraitRole = portrait.role
+        if let image = NSImage(data: portrait.cutoutData) {
+            canvas = .result(image)
+        }
+    }
+
+    func toggleSidebar() {
+        isSidebarVisible.toggle()
+    }
+
+    private func pngData(from image: NSImage) -> Data? {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
     }
 
     private func nsImage(from cgImage: CGImage) -> NSImage {

@@ -16,11 +16,31 @@ struct ShellView: View {
         _model = State(initialValue: ShellModel(entitlement: entitlement))
     }
 
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
+        // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
+        // resterende ruimte (één spring, geen layoutshift).
+        HStack(spacing: 0) {
+            mainArea
+            if model.isSidebarVisible {
+                SidebarView(
+                    selectedID: model.selectedPortrait?.persistentModelID,
+                    onSelect: { model.select($0) },
+                    onAdd: { model.presentOpenPanel() }
+                )
+                .transition(.move(edge: .trailing))
+            }
+        }
+        .animation(.spring(duration: 0.35), value: model.isSidebarVisible)
+        .background(DSColor.Background.app)
+        .preferredColorScheme(.dark)
+        .task { model.modelContext = modelContext }
+    }
+
+    private var mainArea: some View {
         canvas
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(DSColor.Background.app)
-            .preferredColorScheme(.dark)
             // Heel het venster is droptarget (Fitts); de Figma-dropzone
             // (App / Dropzone, 4017:1622) verschijnt zolang er iets boven
             // hangt: 465×456, r-4xl, dashed lime b-medium, "Drop it" H3.
@@ -70,7 +90,8 @@ struct ShellView: View {
         case .result(let cutout):
             // Editor-framework (E06.1): toolbar + panel-systeem rond het
             // resultaat; foto-verkleining regelt de DS-container centraal.
-            EditorView(portrait: cutout)
+            // Images-tool toggelt de sidebar (E05.4).
+            EditorView(portrait: cutout, isSidebarVisible: $model.isSidebarVisible)
         case .failed(let message):
             VStack(spacing: DSSpacing.gap4) {
                 Text(message)
