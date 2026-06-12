@@ -6,11 +6,13 @@ import SwiftUI
 struct Avatar2App: App {
     @State private var auth: AuthService
     @State private var onboarding: OnboardingModel
+    @State private var entitlement: EntitlementModel
 
     init() {
         let auth = AuthService()
         _auth = State(initialValue: auth)
         _onboarding = State(initialValue: OnboardingModel(auth: auth))
+        _entitlement = State(initialValue: EntitlementModel(auth: auth))
     }
 
     var body: some Scene {
@@ -20,9 +22,29 @@ struct Avatar2App: App {
                     OnboardingFlow(model: onboarding)
                 } else {
                     ContentPlaceholderView()
+                        // Tijdelijke paywall-opstap tot E05/E06 echte
+                        // gating-callsites leveren.
+                        .overlay(alignment: .topTrailing) {
+                            EntitlementStatusStrip(model: entitlement)
+                                .padding(DSSpacing.gap4)
+                        }
                 }
             }
             .frame(minWidth: 480, minHeight: 320)
+            .sheet(isPresented: Binding(
+                get: { entitlement.isPaywallPresented },
+                set: { entitlement.isPaywallPresented = $0 }
+            )) {
+                PaywallSheet(model: entitlement)
+            }
+            .overlay(alignment: .bottom) {
+                if entitlement.isShowingOutOfCreditsToast {
+                    OutOfCreditsToastView(model: entitlement)
+                        .padding(.bottom, DSSpacing.gap6)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.18), value: entitlement.isShowingOutOfCreditsToast)
         }
     }
 }

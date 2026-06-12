@@ -26,12 +26,21 @@ Eén preset (vierkant PNG 1024) + share sheet; watermark voor free.
 **Result:** _(invullen bij done)_
 
 ## 8.3 — Paywall/credit-states barebones
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: E01.5, E03.4
 - DoD: beide targets bouwen, tests groen
 
 Hergebruik v1 ProUpgradeSheet-logica via AvatarKit; op=op-toast.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- EntitlementModel.requestUpgrade() is dé opstap voor alle gating (zelfde route als
+  DSGated.onUpgradeRequested); handleOutOfCredits() is het 402-pad (op=op-toast, tik = paywall).
+- Tijdelijke EntitlementStatusStrip (quota-badge + upgrade-knop) op de placeholder tot E05/E06
+  echte callsites leveren; verwijderen bij de main-shell.
+- StoreKit-tak van CheckoutResult bewust niet gebouwd (DMG-pad eerst, zoals v1) — hoort bij een
+  latere MAS-story. Geen Figma-paywall-frame; opgebouwd uit DS-componenten, visuele pass later.
+- Logica alleen build-gedekt tot E01.9 (Avatar2-testtarget, INFRA) landt.
+
+**Result:** Paywall barebones in Avatar2/Features/Paywall/ — EntitlementModel (me/subscribeAnonymous/topup via AvatarKit BackendClient, jaar- en best-value-ankers uit v1), state-aware PaywallSheet (subscribe ↔ top-up-ladder), op=op-DSToast met timer en tik-naar-paywall, EntitlementStatusStrip als tijdelijke opstap; beide targets bouwen groen, packagetests groen, smoke-run OK.
 
