@@ -25,8 +25,8 @@ Notities (FEAT, bij oplevering):
 **Result:** First-use-empty-state in Avatar2/Features/Shell/ (FirstUseEmptyState + ShellView-wortel): memoji-cirkel-placeholder, review-copy ("Drop a portrait — yours or a colleague's — or choose a file"), Choose file…-knop (no-op tot E05.2), quota-badge pas ná eerste cutout via EntitlementModel; beide targets bouwen groen, packagetests groen, smoke-run OK.
 
 ## 5.2 — Import
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E02.1, E03.3
 - DoD: beide targets bouwen, tests groen
 
