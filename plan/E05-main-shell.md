@@ -69,13 +69,23 @@ Notities (FEAT, bij oplevering):
 **Result:** IsolatingCanvas + IsolatingStatusPill in Avatar2/Features/Shell/ en ShellModel-state .revealing(original:cutout:): processing toont origineel + "Removing background...", cutout klaar → 0,8s zwartfade van de achtergrond onder de cutout-overlay + "Cutting out hair...", daarna .result → editor; status-pill = Figma "Recording" (capsule bg Card, 32-container met spinner, Labels/Small subtle, rechtsonder gap-4). Beide targets bouwen groen, alle tests groen (2 nieuwe Avatar2-tests: ShellModelTests).
 
 ## 5.4 — Sidebar (set)
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: E03.5
 - DoD: beide targets bouwen, tests groen
 
 Bewerkte thumbnails (Figma-foto's zijn placeholders), naam/rol, zoek, add-knop (button-component).
 Canvas-overgang zonder layoutshift. SwiftData-model Portrait2, los van v1-store.
+
+Notities (FEAT, bij oplevering):
+- Zoekveld is DSTextField (h40) als stand-in: de Figma "Search input"-component (h48, 6 states)
+  ontbreekt in AvatarUI — DS-story E03.10 toegevoegd; vervangen zodra die landt.
+- Images-tool in de toolbar = de sidebar-toggle (lime ring volgt de sidebar-staat, geen
+  bottom-paneel); de avatar-toggle rechtsboven uit App / Edit komt met de export/topbar-iteratie.
+- Naam/rol uit de header schrijven door naar het geselecteerde Portrait2 (didSet-proxy);
+  geslaagde cutout → nieuw portret, meteen geselecteerd.
+
+**Result:** Sidebar/set in Avatar2/Features/Sidebar/ (Portrait2 @Model met externalStorage-cutout + SidebarView 248 breed op bg Card: DSTextField-zoek, DSSidebarRow-slots met echte cutout-thumbs 48, DSAddButton onderaan) + ShellModel-uitbreiding (isSidebarVisible, select/persist, naam/rol-doorschrijf) en EditorView-interceptie van de Images-tool; sidebar schuift met één spring in (move-transition, canvas centreert mee — geen layoutshift); eigen modelContainer in Avatar2App, los van de v1-store. Beide targets bouwen groen, alle tests groen (2 nieuwe Avatar2-tests: Portrait2Tests).
 
 **Result:** _(invullen bij done)_
 

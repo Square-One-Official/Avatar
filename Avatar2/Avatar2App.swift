@@ -1,5 +1,6 @@
 import AvatarKit
 import AvatarUI
+import SwiftData
 import SwiftUI
 
 @main
@@ -40,6 +41,8 @@ struct Avatar2App: App {
             }
             .animation(.easeOut(duration: 0.18), value: entitlement.isShowingOutOfCreditsToast)
         }
+        // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
+        .modelContainer(for: Portrait2.self)
     }
 }
 
