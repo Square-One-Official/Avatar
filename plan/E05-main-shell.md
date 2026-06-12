@@ -72,12 +72,18 @@ Canvas-overgang zonder layoutshift. SwiftData-model Portrait2, los van v1-store.
 **Result:** _(invullen bij done)_
 
 ## 5.5 — Name/Role-header
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
 
 Met inline edit.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- Inline edit = plain TextFields in DS-typografie (naam h6, rol bodySmall) met muted prompts;
+  header verschijnt alleen bij een portret op canvas (result-staat).
+- Naam/rol leven nu op ShellModel (in-memory); verhuizen naar SwiftData-model Portrait2
+  zodra E05.4 landt.
+
+**Result:** PortraitHeader (naam/rol, inline edit via plain DS-TextFields) in Avatar2/Features/Shell/, gemount top-leading op het canvas in de result-staat; state op ShellModel tot Portrait2 (E05.4); beide targets bouwen groen, packagetests groen, smoke-run OK.
 
