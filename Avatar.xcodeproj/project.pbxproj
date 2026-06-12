@@ -93,6 +93,7 @@
 		89AA16048F395B4CF00BA39D /* ProBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED2448B10A7B5504F841578 /* ProBadge.swift */; };
 		89C89D347949E200275051E3 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		8BA79F365F5F7B49329FF371 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
+		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
@@ -160,6 +161,16 @@
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		87662211E3812D30D3A1EC78 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AB54389917B9F2BD788AD1AD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F4373EF228FD59705373ED24;
+			remoteInfo = Avatar2;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		051B298A2948690FF14EB935 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
 		0F7453266932AB3B263A665E /* Mesh 06.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 06.png"; sourceTree = "<group>"; };
@@ -225,9 +236,11 @@
 		BFEB57BF9CE4292E9C2463D3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C1191A20AC32839CBA5B4807 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepPrivacy.swift; sourceTree = "<group>"; };
+		C447017F67D767535688965F /* Avatar2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Avatar2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
 		CBFBA66AF626E08F10F1333C /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
+		D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelTests.swift; sourceTree = "<group>"; };
 		DB0C0C9C43AFC1383D6C54E2 /* logo.svg */ = {isa = PBXFileReference; path = logo.svg; sourceTree = "<group>"; };
 		DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementSheet.swift; sourceTree = "<group>"; };
 		DD21EBC5B96234F7E98D39FF /* Avatar-MAS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Avatar-MAS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -374,6 +387,7 @@
 				DD21EBC5B96234F7E98D39FF /* Avatar-MAS.app */,
 				FB7ECB473A580210DC4D2672 /* Avatar.app */,
 				7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */,
+				C447017F67D767535688965F /* Avatar2Tests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -383,6 +397,7 @@
 			children = (
 				71DFDB8CC0E43797D477452F /* Avatar */,
 				CB7BDE2BF513118028522B32 /* Avatar2 */,
+				B76D45760515CACF423A8362 /* Avatar2Tests */,
 				27AC0FD0827B2FAA960526B3 /* Packages */,
 				7BE0948B8680DB6BA122634A /* Products */,
 			);
@@ -395,6 +410,14 @@
 				DFDAB22A212625A25637573E /* Fixtures */,
 			);
 			path = Debug;
+			sourceTree = "<group>";
+		};
+		B76D45760515CACF423A8362 /* Avatar2Tests */ = {
+			isa = PBXGroup;
+			children = (
+				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
+			);
+			path = Avatar2Tests;
 			sourceTree = "<group>";
 		};
 		C73BD04D2D6AD13538A4D3E3 /* Resources */ = {
@@ -562,6 +585,24 @@
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
 			productType = "com.apple.product-type.application";
 		};
+		FFE91095DA967F6B3DE265A4 /* Avatar2Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A793E85FCE9F79FD66E86909 /* Build configuration list for PBXNativeTarget "Avatar2Tests" */;
+			buildPhases = (
+				8C93ABB5025981C18F7CC8D2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6069A5FCAA5091ABA24AAF45 /* PBXTargetDependency */,
+			);
+			name = Avatar2Tests;
+			packageProductDependencies = (
+			);
+			productName = Avatar2Tests;
+			productReference = C447017F67D767535688965F /* Avatar2Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -578,6 +619,9 @@
 						DevelopmentTeam = 5J92MMGKTX;
 					};
 					F4373EF228FD59705373ED24 = {
+						DevelopmentTeam = 5J92MMGKTX;
+					};
+					FFE91095DA967F6B3DE265A4 = {
 						DevelopmentTeam = 5J92MMGKTX;
 					};
 				};
@@ -606,6 +650,7 @@
 				AFCA11CCEB86A285714926DA /* Avatar */,
 				847EA269D764E7F6F67D124E /* Avatar-MAS */,
 				F4373EF228FD59705373ED24 /* Avatar2 */,
+				FFE91095DA967F6B3DE265A4 /* Avatar2Tests */,
 			);
 		};
 /* End PBXProject section */
@@ -738,6 +783,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8C93ABB5025981C18F7CC8D2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C771512F8370F1DF2BE801D6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -800,6 +853,14 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		6069A5FCAA5091ABA24AAF45 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F4373EF228FD59705373ED24 /* Avatar2 */;
+			targetProxy = 87662211E3812D30D3A1EC78 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		1370C0C73946E015EE9AE47C /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -816,8 +877,27 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
+				PRODUCT_MODULE_NAME = Avatar2;
 				PRODUCT_NAME = "Aaavatar 2";
 				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		4B51C76ACB249844FA9BC481 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.Avatar2Tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2";
 			};
 			name = Release;
 		};
@@ -927,6 +1007,24 @@
 			};
 			name = Debug;
 		};
+		AF432B12853E96FD22B6994D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.Avatar2Tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2";
+			};
+			name = Debug;
+		};
 		B236868A01DF2C4FF1091E2A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -942,6 +1040,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
+				PRODUCT_MODULE_NAME = Avatar2;
 				PRODUCT_NAME = "Aaavatar 2";
 				SDKROOT = macosx;
 			};
@@ -1082,6 +1181,15 @@
 			buildConfigurations = (
 				B236868A01DF2C4FF1091E2A /* Debug */,
 				1370C0C73946E015EE9AE47C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A793E85FCE9F79FD66E86909 /* Build configuration list for PBXNativeTarget "Avatar2Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF432B12853E96FD22B6994D /* Debug */,
+				4B51C76ACB249844FA9BC481 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
