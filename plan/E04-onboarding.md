@@ -48,11 +48,21 @@ Notities (FEAT, bij oplevering):
 ## 4.3 — Privacy-stap
 - status: ready
 - owner: —
-- blockedBy: E03.2
+- blockedBy: E03.2, E03.6
 - DoD: beide targets bouwen, tests groen
 
 Online-modellen-toggle met inline consequentie-uitleg, één Continue-knop. Schrijft dezelfde
 PrivacyPreferences als v1.
+
+Notities (FEAT, vóór de bouw):
+- Geblokkeerd op nieuwe story E03.6: AvatarUI heeft nog geen toggle/switch-component.
+- "Dezelfde PrivacyPreferences als v1" = dezelfde UserDefaults-keys/rawValues (aiPrivacyMode,
+  localCutoutEngine, shareAnonymousDiagnostics) in het eigen defaults-domein van Avatar2 —
+  v1's klasse leeft in Avatar/Services/ (verboden terrein) en de bundle-id's verschillen,
+  dus de plist kan nooit letterlijk gedeeld zijn. Incl. fingerprint-beleid (localOnly →
+  ephemeral DeviceFingerprint, zit al in AvatarKit).
+- Flow-rewire bij de bouw: OTP-verify én skip-pad landen straks op de privacy-stap i.p.v.
+  direct afronden.
 
 **Result:** _(invullen bij done)_
 

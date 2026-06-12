@@ -56,3 +56,16 @@ Figma).
 
 **Result:** Vijf componenten 1-op-1 uit Figma in AvatarUI/Components: DSTextField (Input 59:621 — optioneel muted label, capsuleveld h40 bg neutral, rand b-thin divider→muted bij focus, Body/Small, 20pt leading icon), DSOTPField (OTP 60:798 — 6 cellen px gap-3.5/py gap-5 r-lg met middenstreepje 8×2, placeholdercijfer muted/ingevoerd primary, actieve cel muted rand; invoer via verborgen veld met cijferfilter, `DSOTPField(code: Binding<String>, length: Int = 6)`), DSPanelHeader (Onboarding-Copy-blok — H1 primary + Body/Medium subtle, gap-2, alignment-parameter), DSSidebarRow (Slot 4011:5010 — avatar 48 r-2xl + naam/rol UI/Labels/Base primary/muted, selectie = bg Inset op r-2xl, `DSSidebarRow(name:role:isSelected:action:avatar:)`), DSNeutralButton (Button Fill-Neutral 12:216, zelfde maten als DSPrimaryButton) met DSAddButton (= neutral button + plus-icoon, het sidebar-add-besluit van 10 jun). Beide targets bouwen groen, AvatarUI-tests groen (5 nieuwe smoke-tests).
 
+
+## 3.6 — Toggle/switch-component
+- status: ready
+- owner: —
+- blockedBy: 3.1
+- DoD: beide targets bouwen, tests groen
+
+Online-modellen-toggle uit Figma Onboarding / Permissions (en straks Settings E08.1): AvatarUI
+heeft nog geen toggle/switch. Component 1-op-1 uit Figma "Components" (incl. on/off- en
+disabled-staten, lime active-state). (Story toegevoegd door FEAT bij E04.3 — AvatarUI is
+DS-grens.)
+
+**Result:** _(invullen bij done)_
