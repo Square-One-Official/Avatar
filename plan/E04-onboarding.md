@@ -27,17 +27,26 @@ Notities (FEAT, bij oplevering):
 **Result:** Onboarding-flow (Splash → Email → code-verstuurd-landing) in Avatar2/Features/Onboarding/ op AuthService.requestCode + DSTextField/DSPrimaryButton; incl. continue-without-account (persistent via onboarding2.completed), RecoverPro-hint en review-copy; gemount in Avatar2App achter onboarding.isActive; beide targets bouwen groen, alle packagetests groen, smoke-run 0% idle-CPU.
 
 ## 4.2 — OTP-stap
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT
 - blockedBy: 4.1
 - DoD: beide targets bouwen, tests groen
 
 Auto-verify bij 6e cijfer, disabled-state, 'Wrong email? Go back'-link.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- Resend-link in foreground/subtle i.p.v. het lage contrast uit het oorspronkelijke frame
+  (review-fix); resend-bevestiging als inline tekstregel.
+- Auto-verify én Verify-knop: dubbele triggers onschadelijk via de isBusy-gate in
+  canVerifyCode. Bij een foute code blijft de invoer staan om te corrigeren.
+- Logica blijft alleen build-gedekt tot E01.9 (Avatar2-testtarget, INFRA) landt.
+- Live e-mail-verify niet in deze sessie getest; SMTP-pad is door INFRA al live geverifieerd
+  (E01.7-notities) — end-to-end-check kan bij de eerste handmatige run.
+
+**Result:** OTP-stap in Avatar2/Features/Onboarding/ (OnboardingOTPView op DSOTPField + AuthService.verifyCode): auto-verify bij het 6e cijfer, Verify-knop met disabled-state, Resend code met bevestiging, 'Wrong email? Go back'; geslaagde verify rondt onboarding af; stub-landing uit 4.1 verwijderd; beide targets bouwen groen, alle packagetests groen.
 
 ## 4.3 — Privacy-stap
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen

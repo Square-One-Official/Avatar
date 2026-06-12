@@ -19,7 +19,7 @@ struct OnboardingFlow: View {
                 OnboardingEmailView(model: model)
                     .transition(.opacity)
             case .otp:
-                OnboardingCodeSentView(model: model)
+                OnboardingOTPView(model: model)
                     .transition(.opacity)
             }
         }
