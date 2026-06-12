@@ -46,8 +46,8 @@ Eén gating-patroon voor alle features (les uit v1: niet versnipperen).
 **Result:** DSProChip + DSGated in AvatarUI/Components. Figma kent géén los gating-component (review rode draad 3); de chip hergebruikt 1-op-1 de brand-Badge uit 3.2 — de "Upgrade"-taal van topbar en Upgrade Modal (4019:953). Contract: `DSProChip(_ label: String = "Pro")` (lime badge; eigen label voor credit-kosten zoals "2 credits") en `DSGated(isLocked: Bool, chipLabel: String = "Pro", onUpgradeRequested: () -> Void) { content }` — vergrendeld: chip top-trailing (inzet gap-1), eigen interactie van de inhoud uit, élke tik → onUpgradeRequested met de Figma-hover/pressed-opacitystates; ontgrendeld: inhoud onaangeroerd. Credit-tegoed tonen blijft DSQuotaBadge (3.2). Beide targets bouwen groen, AvatarUI-tests groen (2 nieuwe smoke-tests).
 
 ## 3.5 — Formulier- en lijstcomponenten
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.2
 - DoD: beide targets bouwen, tests groen
 
