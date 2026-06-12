@@ -19,9 +19,9 @@ verminderen, belichting fixen, haar en kleding. **Hard criterium: identity-behou
 stijlkwaliteit. De uitkomst mag **per feature een ander model** zijn (stijl ≠ kleding ≠ haar) —
 dat bepaalt ook het standaard- vs premiumtarief in E14.3 (4 vs 7 credits). Testmechanisme:
 de dev-only model-picker uit E15.5; zolang die er niet is kan de bakeoff direct via de
-`model_override`-parameter (E01.10). Let op deploy (E13.0): backend-wijzigingen op v2-main staan
-nog niet op productie — test in-app tegen een **Vercel-preview-deploy** van de branch totdat de
-E13.0-port naar main gedraaid is.
+`model_override`-parameter (E01.10 — sinds de E13.0-port van 2026-06-12 op productie). Voor
+backend-werk dat ná die port op v2-main landt geldt: in-app testen tegen een
+**Vercel-preview-deploy** van de branch tot de volgende E13.0-port.
 
 **Result:** _(invullen bij done)_
 
