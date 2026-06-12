@@ -72,8 +72,8 @@ Canvas-overgang zonder layoutshift. SwiftData-model Portrait2, los van v1-store.
 **Result:** _(invullen bij done)_
 
 ## 5.5 — Name/Role-header
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
 
