@@ -87,3 +87,18 @@ Notities (FEAT, bij oplevering):
 
 **Result:** PortraitHeader (naam/rol, inline edit via plain DS-TextFields) in Avatar2/Features/Shell/, gemount top-leading op het canvas in de result-staat; state op ShellModel tot Portrait2 (E05.4); beide targets bouwen groen, packagetests groen, smoke-run OK.
 
+
+## 5.6 — Nudge: high-fidelity model na rafelig haarresultaat
+- status: backlog
+- owner: —
+- blockedBy: E15.2
+- DoD: beide targets bouwen, tests groen
+- Context: besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening); derde plek van de optionele model-download naast E04.6 (onboarding) en E15.2 (Settings > AI & Models). Zelfde OrmbgModelStore-state.
+
+Detecteer ná een Vision-cutout een waarschijnlijk rafelig haarresultaat en toon subtiel bij
+het resultaat een aanbod om het high-fidelity model te downloaden. Hard in de story:
+**eenmalig per gebruiker**, wegklikbaar, géén modal. Detectie-heuristiek (bv. alpha-rafel
+langs de bovenrand van het silhouet) is onderdeel van de story — afstemmen met AI-team
+over een bruikbaar signaal uit de engine.
+
+**Result:** _(invullen bij done)_

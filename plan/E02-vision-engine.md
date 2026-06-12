@@ -73,6 +73,12 @@ heroverwegen — alleen terugbrengen met bewijs op failure-cases die Vision aant
 raw als ondergrens is verrassend sterk maar verliest strand-zachtheid; stages 1–4+12–13
 verdienen hun plek (klein, zichtbaar effect).
 
+> Herziening Thierry 2026-06-12: de optionele model-download **blijft** — op drie plekken
+> (onboarding-stap E04.6, Settings-kaart E15.2, nudge E05.6), allemaal op dezelfde
+> OrmbgModelStore. Het infra-deel van bovenstaand oordeel is daarmee overruled; het
+> kwaliteitsbewijs (geen meerwaarde op deze 7 fixtures) blijft staan als context voor de
+> copy-claims en de E05.6-detectie.
+
 ## 2.3 — OrmbgEngine
 - status: done
 - owner: AI
