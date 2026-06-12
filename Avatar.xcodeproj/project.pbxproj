@@ -14,6 +14,7 @@
 		0A40457E36804B648A1F8E54 /* URLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */; };
 		0C6211741743F6872B88D183 /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */; };
 		0C7F01C3A11F8D65DF29050A /* ProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */; };
+		0EACA40A9B4E46F1CCEAE54B /* ShellModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2F90C51F873C306E8E73DF /* ShellModel.swift */; };
 		127B1D637DF29D44D413A879 /* NewBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */; };
 		14022758E747EEEE44C7592C /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F17C123521D20C3E207A5B /* EdgeBenchmark.swift */; };
 		14308767A851A30F3C0A54DF /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 50D8262C016C4A1E0312CC15 /* AvatarKit */; };
@@ -209,6 +210,7 @@
 		947924202C732493D553BD14 /* Mesh 03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 03.png"; sourceTree = "<group>"; };
 		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
+		9E2F90C51F873C306E8E73DF /* ShellModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellModel.swift; sourceTree = "<group>"; };
 		A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessor.swift; sourceTree = "<group>"; };
 		A398E717302397E2504B24FB /* AvatarKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarKit; path = AvatarKit; sourceTree = SOURCE_ROOT; };
 		A67F34619015B892E51F8BA0 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
@@ -433,6 +435,7 @@
 			isa = PBXGroup;
 			children = (
 				155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */,
+				9E2F90C51F873C306E8E73DF /* ShellModel.swift */,
 				390524875FAE18DD4A1A916F /* ShellView.swift */,
 			);
 			path = Shell;
@@ -726,6 +729,7 @@
 				C4DFDE3A0EA223126024DCF6 /* OnboardingSplashView.swift in Sources */,
 				D10DD1DAD674FDF2DFD2FD11 /* OutOfCreditsToast.swift in Sources */,
 				7344A7378B3152DF1E80D4DB /* PaywallSheet.swift in Sources */,
+				0EACA40A9B4E46F1CCEAE54B /* ShellModel.swift in Sources */,
 				5C11985FD936B0FECF929EB7 /* ShellView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
