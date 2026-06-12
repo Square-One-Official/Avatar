@@ -43,3 +43,17 @@ final class DSEditPanelTests: XCTestCase {
         }
     }
 }
+
+// E03.11 — glass-toolknop
+extension DSEditPanelTests {
+
+    @MainActor
+    func testToolButtonRendertActiefEnInactief() {
+        for active in [true, false] {
+            let view = DSToolButton(
+                Image(systemName: "sparkles"), label: "Effects", isActive: active
+            ) {}
+            XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+        }
+    }
+}
