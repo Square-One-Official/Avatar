@@ -40,6 +40,8 @@ Notities (AI, bij oplevering 2.1):
   Bij deze story porten/committen, anders benchmark je tegen de 2-arms-versie.
 - De beslisrun vereist privé fixture-foto's (Avatar/Debug/Fixtures is leeg in git én op deze
   machine) — run + beoordeling samen met Thierry inplannen.
+- INFRA, bij oplevering E01.8: blocker opgeheven — Avatar én Avatar-MAS linken AvatarKit op
+  v2-main (stond er al sinds E01.5; builds geverifieerd).
 
 **Result:** _(invullen bij done)_
 

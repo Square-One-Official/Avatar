@@ -81,7 +81,7 @@ Google-infra NIET slopen.
 **Result:** _(invullen bij done)_
 
 ## 1.8 — SHARED: Avatar (v1) target linkt AvatarKit
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
@@ -91,5 +91,5 @@ AvatarKit als 5e arm kunnen aanroepen. Alleen project.yml: package-dependency `A
 targets `Avatar` en `Avatar-MAS`; geen v1-codewijzigingen. (Story toegevoegd door AI bij
 oplevering E02.1 — project.yml is INFRA-grens.)
 
-**Result:** _(invullen bij done)_
+**Result:** Al vervuld door E01.5: project.yml had de AvatarKit-package-dependency al op de targets Avatar én Avatar-MAS (naast Avatar2). Geverifieerd op v2-main: xcodegen + Avatar, Avatar-MAS en Avatar2 bouwen Debug groen, alle package-tests groen; geen v1-codewijzigingen. E02.2 (AI) is hiermee gedeblokkeerd.
 
