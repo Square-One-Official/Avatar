@@ -5,8 +5,8 @@ Team: **FEAT+AI**
 
 
 ## 9.1 — [AI] Stijl-route bepalen
-- status: ready
-- owner: —
+- status: in_progress
+- owner: AI
 - blockedBy: E01.5 (done — gepromoveerd naar ready op besluit Thierry 2026-06-12)
 - DoD: beide targets bouwen, tests groen
 
