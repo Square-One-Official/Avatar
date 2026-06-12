@@ -47,13 +47,11 @@ timeouts). Sheets: `~/Documents/Claude/Projects/Aaavatar/e09-bakeoff/`.
 
 ## Status run
 
-102/140 calls voltooid op 2026-06-12. **Gepauzeerd: Replicate-saldo op** (402
-Insufficient credit; daarvóór al 6/min-throttle bij <$5). Compleet: 4 stijlen (60/60),
-edit-teeth (14/15), edit-wrinkles (15/15), referenties (5/5). Deels: edit-lighting (8/15).
-Open: edit-hair (0), edit-clothes (0). Naveegrun na top-up maakt de matrix af (driver
-slaat bestaande bestanden over).
+**Compleet: 140/140** (2026-06-12; halverwege gepauzeerd op leeg Replicate-saldo, naveegrun
+na top-up). Volledige outputs, contactsheets, inputs en driver gearchiveerd in
+`~/Documents/Claude/Projects/Aaavatar/e09-bakeoff/`.
 
-## Resultaten (voorlopig — stijlen + teeth/wrinkles compleet)
+## Resultaten
 
 Patroon is consistent over de vier stijlen:
 
@@ -70,30 +68,49 @@ Patroon is consistent over de vier stijlen:
   en herkadert/zoomt daardoor zichtbaar bij afwijkende inputverhoudingen; traagste arm
   (~45–60 s bij quality=high) en duurste.
 
-Edits (teeth compleet, wrinkles compleet, lighting 8/15):
+Edits (alle vijf compleet):
 
 - **edit-teeth**: opvallend — alle drie de armen "tonen" het resultaat door de mond te
   openen bij gesloten-mond-inputs; nano het minst (p3 bleef dicht), flux-2 het meest.
   Op p4 (zichtbare tanden) doen alle drie het netjes natuurlijk.
 - **edit-wrinkles**: nano het meest gehoorzaam (subtiel, leeftijd/karakter intact, kader
   exact); gpt goed maar herkadert; flux-2 oké met lichte gezichtsdrift.
+- **edit-lighting**: nano het best — ook het bewust donker belichte p2 netjes naar
+  gebalanceerd studiolicht met gezicht intact; flux-2 belicht goed maar verandert het gezicht
+  licht; gpt wisselvallig (soms nauwelijks lift, soms high-key uitgewassen) + herkadering.
+- **edit-hair**: nano duidelijke winnaar — kort kapsel in eigen kleur, gezicht/expressie/
+  kleding exact behouden op alle vijf; flux-2 maakt er geregeld zichtbaar een ander gezicht
+  van (p2, p3, p4); gpt degelijk met lichte herkadering.
+- **edit-clothes**: nano het best (pak + wit overhemd toegevoegd, gezicht/pose incl.
+  vinger-op-wang en headset intact); gpt goede tweede; flux-2 herkadert en drift. Opvallend:
+  als instructie-edit doet nano kledingwissel zónder mask beter dan de huidige
+  mask-gebaseerde fill-body-route props vermijdt (telefoon-hallucinatie p2).
 - **Referentie fill-body (productie)**: gezicht per definitie pixel-vast, maar de fill
   hallucineert op 2/5 portretten (telefoon in hand bij p2; donkere artefacten + pseudo-tekst
   bij p5) — de identiteits-lat zit dus op het gezicht, niet op de rest van het canvas.
 
-## Aanbeveling per feature (voorlopig, af te ronden na hair/clothes)
+## Aanbeveling per feature (definitief)
 
-- **Effects/stijlen (E09.2)**: nano-banana als default (identiteit is het harde criterium;
-  3d/scribble overtuigend, clay/wood acceptabel maar vlak). flux-2-pro valt af op
-  identity-drift ondanks de mooiste stijl. Overweging voor later: stijlsterkte van nano
-  per stijl bijsturen met promptversterking i.p.v. modelwissel.
-- **Retouch/edits (E12)**: nano-banana — beste "change nothing else"-gehoorzaamheid, geen
-  herkadering, snel (~10 s). gpt-image-1.5 is kwalitatief vergelijkbaar op het gezicht maar
-  herkadert en is 4–5× trager.
-- **Haar (E11) / Kleding (E10)**: nog open — wacht op resterende 30 calls na top-up.
-- **Tarief-implicatie (E14.3)**: als nano-banana overal default wordt, is het
-  standaardtarief (4 cr) dekkend; gpt-image-1.5 als eventuele premium-arm (7 cr) heeft
-  alleen zin als hair/clothes een kwaliteitssprong laat zien.
+| Feature | Aanbeveling | Onderbouwing |
+|---|---|---|
+| Effects/stijlen (E09.2) | **nano-banana** | identiteit (hard criterium) vrijwel altijd intact; 3d/scribble overtuigend, clay/wood acceptabel maar vlak — stijlsterkte bijsturen met promptversterking, niet met modelwissel. flux-2-pro valt af op identity-drift ondanks de mooiste stijl |
+| Retouch/edits (E12: tanden, rimpels, belichting) | **nano-banana** | beste "change nothing else"-gehoorzaamheid, kader exact, snelste (~10 s) en goedkoopste arm |
+| Haar (E11) | **nano-banana** | enige arm die op alle vijf portretten het gezicht exact hield bij kapselwissel; flux-2 maakt er geregeld een ander gezicht van |
+| Kleding (E10) | **nano-banana** voor kledingwissel; **flux-fill-pro blijft** voor outpaint/fill-body | instructie-edit wisselt kleding met gezicht/pose intact en zonder mask-plumbing; FLUX Fill behoudt zijn rol waar fysieke pixelgarantie op het gezicht vereist is (canvas-uitbreiding), wel met bekende prop-hallucinaties in het fill-gebied |
+| gpt-image-1.5 | reserve-arm, geen premium-tier | kwalitatief dichtbij nano op het gezicht, maar herkadert structureel (kent alleen 1:1/3:2/2:3), is 4–5× trager en duurder; biedt nergens de kwaliteitssprong die een 7-credits-tier zou rechtvaardigen |
+
+**Tarief-implicatie (E14.3):** nano-banana overal default → standaardtarief (4 cr) dekt ruim
+(~$0,04/call); op kwaliteitsgronden is er géén premium-arm — het 7-credits-tier moet uit
+featurewaarde komen (bv. meerdere varianten per call), niet uit een duurder model.
+
+**Aandachtspunten voor de bouw-stories:**
+- Teeth-whitening: armen "tonen" het resultaat door gesloten monden te openen → claus
+  "keep the mouth closed" toevoegen wanneer de input geen zichtbare tanden heeft, of de
+  edit alleen aanbieden bij zichtbare tanden.
+- De identieke identity-clausule in elke stijlprompt is dragend voor nano's identiteitsscore —
+  behouden in de server-side stijl→prompt-mapping (E09.2).
+- Replicate-saldo bewaken: onder $5 knijpt Replicate naar 6 predictions/min en bij $0 is
+  elke cloud-feature kapot (402) — saldo-alert instellen vóór E09.2 live gaat.
 
 ## Bijlage: prompts
 
