@@ -82,9 +82,9 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: in_progress
+- status: done
 - owner: FEAT
-- Heropend en afgerond (2026-06-12): bevindingen 1–9 verwerkt (DS: E03.10–3.13); 10–12 → E03.14, 16–17 → E03.15; heropend voor bevinding 18 (venstermaat + schalende first-use-ring).
+- Heropend en afgerond (2026-06-12): bevindingen 1–9 verwerkt (DS: E03.10–3.13); 10–12 → E03.14, 16–17 → E03.15, 19–21 → E03.16; 18–19 (FEAT) hieronder.
 - Tweede heropening, afgerond (2026-06-12, AI): punten 13–15 van Thierry verwerkt — zie Result-blok punten 13–15 onderaan.
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
@@ -117,6 +117,12 @@ Notities (FEAT, bij oplevering):
 13. Launch-gedrag: `Portrait2.updatedAt` toegevoegd (touch bij naam/rol-mutatie; nieuw portret = createdAt; lichtgewicht migratie via sentinel `.distantPast` + eenmalige fixup naar createdAt bij launch), sidebar sorteert erop (jongste bovenaan, zoals v1); bij launch met niet-lege store wordt de laatst geselecteerde (persistentModelID in UserDefaults `shell.lastSelectedPortraitID`) hersteld, met het jongst-bewerkte portret als terugval — first-use-state alleen bij écht lege store. Smoke-run: herstart toont direct het laatst bewerkte portret.
 14. Settings in-window: aparte Settings-scene verwijderd; SettingsRootView vervangt de canvas-weergave als view-state in ShellView (topbar incl. quota-rij + gear blijft staan), gear toggelt met active-state, Esc sluit (venster-brede cancel-shortcut); drops worden tijdens Settings genegeerd. Terugweg-keuze conform hoofddesign: gear-toggle + Esc, geen extra terug-knop (de gear ís de plek waar de gebruiker klikt).
 15. Quota-rij op de frame-maten uit "top" (4017:1921): tekst exact op x76 direct naast de window-controls, verticaal gecentreerd op dezelfde regel (strook h52, middellijn y26); gear op y12/trailing 16. NB: get_design_context hangt nog steeds op dit bestand (bekende MCP-workaround) — maten uit get_metadata, visueel geverifieerd met screenshots van de draaiende app.
+
+**Result review-fix (bevindingen 18–21, per punt):**
+18a. Venster: `.defaultSize(1100×760)` (ruim boven de 1000×700-ontwerpmaat), minimum 800×600 en frame-autosave via `setFrameAutosaveName` (WindowFrameAutosave-representable) — gebruikersmaat overleeft sessies, defaultSize geldt alleen zonder opgeslagen frame.
+18b. First-use-ring schaalt met de beschikbare ruimte: één schaalfactor (clamp 0,35–1, ademruimte 48/120 voor de topbar) op alle Figma-offsets én de avatardiameter (glyph schaalt mee); center-content blijft op ware grootte. Geen vaste offsets meer.
+19. FEAT-deel: mainArea top-uitgelijnd — de verticale centrering was wat de kaart bij lage vensters onder de quota-rij schoof; containergarantie + DoD-layouttest (800×600, paneel open) in E03.16 (DS): foto is het enige flexibele element, toolbar/paneel nooit afkapbaar.
+20–21. DSInlineEditLabel-conventies in E03.16 (DS): caret vóór de blijvende subtle-hint (leading veld in gecentreerde container), select-all bij focus (native), buitenklik committet via event-monitor die de klik doorgeeft (canvas/toolknop/sidebar voeren hun actie uit). Drieklik-test handmatig bij de eerstvolgende run.
 
 **Result review-fix (bevindingen 1–9, per punt):**
 1. Vensterbalk: `.windowStyle(.hiddenTitleBar)` op de WindowGroup — één zwart vlak, traffic lights inline, geen venstertitel; de topbar reserveert zelf de ruimte ernaast (x76 uit het frame).
