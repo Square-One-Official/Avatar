@@ -32,3 +32,6 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E11 Hair](E11-hair.md) | FEAT+AI | blocked |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | blocked |
 | [E13 Release-voorbereiding](E13-release.md) | INFRA | blocked |
+| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready |
+| [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
+| [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | ready — design-onafhankelijk |
