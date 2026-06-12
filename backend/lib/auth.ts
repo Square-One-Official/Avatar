@@ -245,6 +245,22 @@ export async function checkAnonCheckoutRateLimit(ip: string): Promise<boolean> {
 }
 
 /**
+ * True when the caller's e-mail is on the DEV_UNLIMITED_EMAILS allowlist
+ * (comma-separated env var). Dev-allowlisted users skip credit/trial gates
+ * and may use the `model_override` parameter (E01.10). Canonical home of
+ * the gate — /v1/account and /v1/checkout/topup still carry local copies
+ * from before E01.10; route new callers here.
+ */
+export function isDevUnlimitedUser(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.toLowerCase());
+}
+
+/**
  * Extract the originating client IP. Vercel terminates TLS at the edge and
  * forwards the real client address in `x-forwarded-for` (first hop). Falls
  * back to the socket address if the header is missing (e.g. local
