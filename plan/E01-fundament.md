@@ -88,10 +88,10 @@ Notities (INFRA, bij oplevering):
   Resend = 465) waardoor ALLE auth-mail (ook v1 magic-links) hing → GoTrue 504. Bij de fix-poging
   bleek de Management API een partial PATCH op smtp_* als groeps-reset te behandelen; de custom
   SMTP-config is gewist en de Resend-key is nergens lokaal/Vercel terug te vinden (admin- én
-  backend-envs hebben lege RESEND_API_KEY). Project draait nu op de ingebouwde Supabase-mailer:
-  mail werkt weer (geverifieerd: /otp 200 + bezorgd), maar afzender is mail.app.supabase.io en
-  rate-cap ~2/uur. ACTIE THIERRY vóór release: nieuwe Resend API-key aanmaken en custom SMTP
-  (smtp.resend.com:465, user "resend") terugzetten — ook genoteerd bij E13.3.
+  backend-envs hebben lege RESEND_API_KEY). Tussentijds draaide het project op de ingebouwde
+  Supabase-mailer. OPGELOST (Thierry, 2026-06-12): nieuwe Resend-key, custom SMTP terug op
+  smtp.resend.com:465, domein verified; live OTP-mail getest — aflevering én
+  {{ .Token }}-rendering werken.
 - Magic-link-mailtemplate had GEEN {{ .Token }} (alleen ConfirmationURL) — de e-mail+code-flow
   van E01.6 kon dus nooit werken. Template uitgebreid met code-blok ({{ .Token }}, eigen huisstijl)
   naast de bestaande knop, dus v1-link-flow blijft werken.
@@ -103,7 +103,7 @@ Notities (INFRA, bij oplevering):
   stuurt hardcoded aaavatar://stripe-return|stripe-cancel. Geverifieerd in gebouwde Info.plist.
   Let op: v1 en v2 registreren hetzelfde scheme — LaunchServices kiest er één per machine.
 
-**Result:** Identiteitstest geslaagd (OTP-login op beide bestaande Google-users → zelfde Supabase user-id, Pro behouden via /v1/account); aaavatar-URL-scheme op Avatar2 (project.yml, geverifieerd in Info.plist); recovery-handler lokaal groen (endpoint wacht op v1-deploy); productie-SMTP-bug (poort 462) gevonden — mail draait nu op de ingebouwde mailer, Resend-key moet opnieuw gezet (actie Thierry, zie notities); magic-link-template heeft nu {{ .Token }} voor de code-flow; beide targets + tests groen.
+**Result:** Identiteitstest geslaagd (OTP-login op beide bestaande Google-users → zelfde Supabase user-id, Pro behouden via /v1/account); aaavatar-URL-scheme op Avatar2 (project.yml, geverifieerd in Info.plist); recovery-handler lokaal groen (endpoint wacht op v1-deploy); productie-SMTP-bug (poort 462) gevonden en opgelost — custom SMTP hersteld op smtp.resend.com:465 met nieuwe Resend-key (domein verified), live OTP-mail getest incl. {{ .Token }}-codeblok in het magic-link-template; beide targets + tests groen.
 
 ## 1.8 — SHARED: Avatar (v1) target linkt AvatarKit
 - status: done
