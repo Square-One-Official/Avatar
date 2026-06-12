@@ -15,14 +15,14 @@ Kleuren (lime-accent, dark surfaces), typografie, spacing, radii uit Figma → A
 **Result:** Dark-mode tokens 1-op-1 uit Figma-variabelen (Stories→Dark-secties) in AvatarUI/Tokens: DSColor (surfaces #000/#1c1917/#292524, lime #d5f466, foregrounds, projects-palet), DSTextStyle/DSTypography (Labels/Body/H1-H6-subset), DSSpacing/DSRadius/DSBorderWidth/DSOpacity/DSShadow; signaalkleuren (error/warning/success/info) komen in geen enkel dark-frame voor en zijn bewust buiten scope; beide targets bouwen groen, testtargets bestaan nog niet (E01.4 open).
 
 ## 3.2 — Basiscomponenten
-- status: backlog
-- owner: —
+- status: done
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 
 PrimaryButton (lime pill), Chip, IconButton (circulair), QuotaBadge, Toast.
 
-**Result:** _(invullen bij done)_
+**Result:** DSPrimaryButton (lime pill, Default/Small), DSIconButton (circulair, fillBrand/ghostNeutral incl. active), DSBadge/DSChip/DSQuotaBadge (Figma "Badge" = chip; alleen fill, outline ongebruikt in dark frames) en DSToast (kaart + timer-track) in AvatarUI/Components; states 1-op-1 via Figma-opacityschaal (hover 75/pressed 50/disabled 25), ghostNeutral via bg-wissel (neutral-stronger dark geïnterpoleerd #ffffff1a, niet opvraagbaar via MCP); beide targets bouwen groen, testtargets nog niet aanwezig (E01.4 open).
 
 ## 3.3 — BottomToolbar + EditPanel-container
 - status: backlog
