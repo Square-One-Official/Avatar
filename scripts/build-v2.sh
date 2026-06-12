@@ -18,6 +18,10 @@ echo "==> build Avatar2"
 xcodebuild -project Avatar.xcodeproj -scheme Avatar2 \
   -configuration Debug -derivedDataPath "$DERIVED" build | tail -1
 
+echo "==> tests Avatar2 (unit, gehost in Aaavatar 2.app)"
+xcodebuild -project Avatar.xcodeproj -scheme Avatar2 \
+  -configuration Debug -derivedDataPath "$DERIVED" test | tail -1
+
 echo "==> tests AvatarKit"
 swift test --package-path AvatarKit
 

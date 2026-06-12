@@ -120,7 +120,7 @@ oplevering E02.1 — project.yml is INFRA-grens.)
 
 
 ## 1.9 — Avatar2 unit-test-target
-- status: in_progress
+- status: done
 - owner: INFRA
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
@@ -131,4 +131,4 @@ voor Avatar2. Toevoegen via project.yml (Avatar2Tests, XCTest, host Avatar2) + o
 scripts/build-v2.sh. (Story toegevoegd door FEAT bij oplevering E04.1 — project.yml is
 INFRA-grens.)
 
-**Result:** _(invullen bij done)_
+**Result:** Avatar2Tests-target (bundle.unit-test, gehost in Aaavatar 2.app) via project.yml, incl. expliciete PRODUCT_MODULE_NAME=Avatar2 (PRODUCT_NAME bevat een spatie) en scheme-testTargets op Avatar2; 9 OnboardingModel-unit-tests (stap-overgangen, e-mailgate, code-gate, completion-persistentie — Supabase-paden bewust buiten bereik); teststap opgenomen in scripts/build-v2.sh; beide targets bouwen groen, alle suites groen (Avatar2Tests 9/9, AvatarKit 31, AvatarUI 1).
