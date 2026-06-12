@@ -21,32 +21,29 @@ struct ShellView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(DSColor.Background.app)
             .preferredColorScheme(.dark)
-            // Heel het venster is droptarget (Fitts); glow op de rand
-            // zolang er iets boven hangt.
+            // Heel het venster is droptarget (Fitts); de Figma-dropzone
+            // (App / Dropzone, 4017:1622) verschijnt zolang er iets boven
+            // hangt: 465×456, r-4xl, dashed lime b-medium, "Drop it" H3.
             .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
                 handleDrop(providers)
             }
             .overlay {
                 if model.isDropTargeted {
-                    RoundedRectangle(cornerRadius: DSRadius.xl)
-                        .strokeBorder(
-                            DSColor.Action.primary,
-                            style: StrokeStyle(lineWidth: DSBorderWidth.medium, dash: [8, 6])
-                        )
-                        .padding(DSSpacing.gap2)
+                    DropzoneOverlay()
                         .allowsHitTesting(false)
                 }
             }
-            // Tijdelijke paywall-opstap (E08.3) tot E06 echte gating levert.
-            .overlay(alignment: .topTrailing) {
-                EntitlementStatusStrip(model: entitlement)
-                    .padding(DSSpacing.gap4)
+            // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
+            // de "top"-strook uit de App-frames.
+            .overlay(alignment: .top) {
+                ShellTopBar(model: entitlement)
             }
-            // Name/Role-header (E05.5) zodra er een portret op canvas staat.
-            .overlay(alignment: .topLeading) {
+            // Name/Role-header (E05.5) zodra er een portret op canvas
+            // staat — gecentreerd boven het canvas (Figma Frame 2, y=32).
+            .overlay(alignment: .top) {
                 if case .result = model.canvas {
                     PortraitHeader(model: model)
-                        .padding(DSSpacing.gap4)
+                        .padding(.top, DSSpacing.gap8)
                 }
             }
     }
@@ -82,6 +79,27 @@ struct ShellView: View {
                 }
             }
             .padding(DSSpacing.gap8)
+        }
+    }
+
+    /// Figma App / Dropzone (4017:1622): Frame 11 465×456 gecentreerd,
+    /// r-4xl, dashed b-medium in lime, vulling lime ~5% (gesampled — het
+    /// frame exposeert er geen variabele voor), "Drop it" in H3 primary.
+    private struct DropzoneOverlay: View {
+        var body: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: DSRadius.xl4)
+                    .fill(DSColor.Action.primary.opacity(0.05))
+                RoundedRectangle(cornerRadius: DSRadius.xl4)
+                    .strokeBorder(
+                        DSColor.Action.primary,
+                        style: StrokeStyle(lineWidth: DSBorderWidth.medium, dash: [2, 4])
+                    )
+                Text("Drop it")
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+            }
+            .frame(width: 465, height: 456)
         }
     }
 
