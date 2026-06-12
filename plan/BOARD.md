@@ -27,11 +27,11 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | blocked |
 | [E07 Background](E07-background.md) | FEAT | blocked |
 | [E08 Barebones-flows](E08-barebones.md) | FEAT | blocked |
-| [E09 Effects](E09-effects.md) | FEAT+AI | blocked |
+| [E09 Effects](E09-effects.md) | FEAT+AI | ready (9.1) |
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | blocked |
 | [E11 Hair](E11-hair.md) | FEAT+AI | blocked |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | blocked |
-| [E13 Release-voorbereiding](E13-release.md) | INFRA | blocked |
+| [E13 Release-voorbereiding](E13-release.md) | INFRA | ready (13.0) |
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready |
 | [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | ready — design-onafhankelijk |
