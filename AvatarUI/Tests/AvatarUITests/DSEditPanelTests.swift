@@ -72,3 +72,65 @@ extension DSEditPanelTests {
         }
     }
 }
+
+// E03.16 — layoutgarantie (bevinding 19): op de minimummaat 800×600 met
+// geopend paneel zijn toolbar en paneel nooit afgekapt; de foto (rood) is
+// het enige flexibele element. Pixel-probe op de render.
+extension DSEditPanelTests {
+
+    private func pixel(_ cg: CGImage, x: Int, y: Int) -> (r: Int, g: Int, b: Int) {
+        var px = [UInt8](repeating: 0, count: 4)
+        let ctx = CGContext(
+            data: &px, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        // doel-pixel (top-based y) naar (0,0) schuiven; CG tekent bottom-up
+        ctx.draw(cg, in: CGRect(
+            x: -CGFloat(x), y: -CGFloat(cg.height - 1 - y),
+            width: CGFloat(cg.width), height: CGFloat(cg.height)
+        ))
+        return (Int(px[0]), Int(px[1]), Int(px[2]))
+    }
+
+    @MainActor
+    func testToolbarEnPaneelNooitAfgekaptOpMinimummaat() {
+        let foto = Color(red: 1, green: 0, blue: 0)
+        let paneelInhoud = Color(red: 0, green: 0, blue: 1)
+        let view = DSEditPanelContainer(
+            tools: [DSToolbarItem(id: "a", icon: Image(systemName: "sparkles"), label: "A")],
+            activeTool: .constant("a")
+        ) {
+            foto
+        } panel: { _ in
+            DSEditPanel(title: "Panel") { paneelInhoud.frame(height: 200) }
+        }
+        .frame(width: 800, height: 600)
+
+        guard let cg = ImageRenderer(content: view).cgImage else {
+            return XCTFail("render mislukt")
+        }
+        XCTAssertEqual(cg.width, 800)
+        XCTAssertEqual(cg.height, 600)
+
+        // Zelfcheck: bovenin domineert de foto (rood).
+        let top = pixel(cg, x: 400, y: 40)
+        XCTAssertGreaterThan(top.r, 180, "foto hoort bovenin te staan: \(top)")
+
+        // Toolbar-zone (onderste 64pt, gemeten náást de glass-cirkel —
+        // de materiaallagen geven in ImageRenderer artefactkleuren):
+        // nooit foto- of paneelpixels.
+        for y in [600 - 12, 600 - 32, 600 - 56] {
+            for x in [100, 700] {
+                let p = pixel(cg, x: x, y: y)
+                XCTAssertFalse(p.r > 180 && p.g < 80, "foto lekt in toolbar-zone op (\(x),\(y)): \(p)")
+                XCTAssertFalse(p.b > 180 && p.r < 80, "paneel lekt in toolbar-zone op (\(x),\(y)): \(p)")
+            }
+        }
+
+        // Paneel-zone (boven de toolbar): paneelinhoud (blauw) intact.
+        let paneel = pixel(cg, x: 400, y: 600 - 64 - 8 - 28 - 100)
+        XCTAssertGreaterThan(paneel.b, 180, "paneelinhoud hoort intact te zijn: \(paneel)")
+        XCTAssertLessThan(paneel.r, 80, "paneelinhoud hoort blauw te zijn: \(paneel)")
+    }
+}
