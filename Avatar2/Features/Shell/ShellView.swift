@@ -56,15 +56,16 @@ struct ShellView: View {
                 model.presentOpenPanel()
             }
         case .processing(let original):
-            portrait(original)
-                .opacity(DSOpacity.subtle)
-                .overlay(alignment: .bottom) {
-                    // Minimale staat; E05.3 levert de echte isolating-
-                    // animatie met fade-out en 'Cutting out hair…'-copy.
-                    Text("Isolating…")
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                        .padding(.bottom, DSSpacing.gap6)
+            IsolatingCanvas(original: original, cutout: nil)
+                .overlay(alignment: .bottomTrailing) {
+                    IsolatingStatusPill(label: "Removing background...")
+                        .padding(DSSpacing.gap4)
+                }
+        case .revealing(let original, let cutout):
+            IsolatingCanvas(original: original, cutout: cutout)
+                .overlay(alignment: .bottomTrailing) {
+                    IsolatingStatusPill(label: "Cutting out hair...")
+                        .padding(DSSpacing.gap4)
                 }
         case .result(let cutout):
             // Editor-framework (E06.1): toolbar + panel-systeem rond het

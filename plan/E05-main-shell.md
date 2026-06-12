@@ -50,7 +50,7 @@ Notities (FEAT, bij oplevering):
 **Result:** Import in Avatar2/Features/Shell/ (ShellModel + uitgebreide ShellView): drag-drop over het hele venster (fileURL- én image-providers, dashed rand-glow) en NSOpenPanel-bestandskiezer → PipelineRouter(Vision) → canvasstates empty/processing/result/failed; eerste cutout flipt de quota-gating; beide targets bouwen groen, packagetests groen, smoke-run OK.
 
 ## 5.3 — Isolating-animatie
-- status: in_progress
+- status: done
 - owner: FEAT
 - blockedBy: 5.2
 - DoD: beide targets bouwen, tests groen
@@ -58,7 +58,15 @@ Notities (FEAT, bij oplevering):
 Achtergrond fade-out tijdens cutout + status op canvas ('Cutting out hair…'), incl. klaar- en
 faalstaat.
 
-**Result:** _(invullen bij done)_
+Notities (FEAT, bij oplevering):
+- Twee fasen conform de frames: Image added = volle foto (r-2xl) + pill "Removing
+  background..."; Isolating animation = achtergrond fadet naar donker (app-achtergrondlaag
+  animeert tussen origineel en cutout-overlay) + "Cutting out hair...".
+- De "Logo container" in de Figma-pill exposeert geen asset; kleine activity-indicator als
+  invulling (in de geest). Timing gedeeld via IsolatingTiming (view animeert, model wacht).
+- Faalstaat blijft de bestaande copy + retry-knop (geen Figma-frame voor).
+
+**Result:** IsolatingCanvas + IsolatingStatusPill in Avatar2/Features/Shell/ en ShellModel-state .revealing(original:cutout:): processing toont origineel + "Removing background...", cutout klaar → 0,8s zwartfade van de achtergrond onder de cutout-overlay + "Cutting out hair...", daarna .result → editor; status-pill = Figma "Recording" (capsule bg Card, 32-container met spinner, Labels/Small subtle, rechtsonder gap-4). Beide targets bouwen groen, alle tests groen (2 nieuwe Avatar2-tests: ShellModelTests).
 
 ## 5.4 — Sidebar (set)
 - status: ready
