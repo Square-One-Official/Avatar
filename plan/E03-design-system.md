@@ -100,7 +100,7 @@ expliciet markeren.
 **Result:** _(invullen bij done)_
 
 ## 3.9 — Button-aanvullingen: full-width + ghost-tekstknop
-- status: in_progress
+- status: done
 - owner: DS
 - blockedBy: 3.2
 - DoD: beide targets bouwen, tests groen
@@ -110,4 +110,4 @@ expliciet markeren.
 (tekstknop, states 1-op-1 met het ghostNeutral-gedrag van DSIconButton: default muted zonder bg,
 hover bg neutral-stronger + primary, pressed bg neutral-strongest).
 
-**Result:** _(invullen bij done)_
+**Result:** `fullWidth: Bool = false` op DSPrimaryButton én DSNeutralButton (label-HStack strekt vóór de padding, capsule strekt mee — bestaande call sites ongewijzigd) en DSGhostButton (zelfde maten/parameters als DSPrimaryButton; states 1-op-1 het ghostNeutral-gedrag van DSIconButton: muted → hover bg neutral-stronger + primary → pressed bg neutral-strongest, disabled opacityschaal .25). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).

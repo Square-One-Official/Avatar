@@ -9,17 +9,20 @@ public struct DSNeutralButton: View {
     private let title: String
     private let icon: Image?
     private let size: DSPrimaryButton.Size
+    private let fullWidth: Bool
     private let action: () -> Void
 
     public init(
         _ title: String,
         icon: Image? = nil,
         size: DSPrimaryButton.Size = .default,
+        fullWidth: Bool = false,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.icon = icon
         self.size = size
+        self.fullWidth = fullWidth
         self.action = action
     }
 
@@ -37,6 +40,7 @@ public struct DSNeutralButton: View {
                     .lineLimit(1)
             }
             .foregroundStyle(DSColor.Foreground.primary)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.horizontal, size.horizontalPadding)
             .padding(.vertical, size.verticalPadding)
             .background(DSColor.Background.neutral, in: Capsule())

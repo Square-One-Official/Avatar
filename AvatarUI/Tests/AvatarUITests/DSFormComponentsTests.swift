@@ -50,3 +50,18 @@ final class DSFormComponentsTests: XCTestCase {
         XCTAssertNotNil(ImageRenderer(content: DSAddButton("Add person") {}).cgImage)
     }
 }
+
+// E03.9 — full-width + ghost-tekstknop
+extension DSFormComponentsTests {
+
+    @MainActor
+    func testFullWidthEnGhostButtonsRenderen() {
+        XCTAssertNotNil(ImageRenderer(content:
+            DSPrimaryButton("Continue with email", fullWidth: true) {}.frame(width: 360)
+        ).cgImage)
+        XCTAssertNotNil(ImageRenderer(content:
+            DSNeutralButton("Choose file…", fullWidth: true) {}.frame(width: 360)
+        ).cgImage)
+        XCTAssertNotNil(ImageRenderer(content: DSGhostButton("Resend code") {}).cgImage)
+    }
+}
