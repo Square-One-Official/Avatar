@@ -6,6 +6,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 
 ## Hoe dit board werkt (voor elke agent — LEES DIT EERST)
 
+0. Begin elke sessie met het synchroniseren van `v2-main` (`git fetch` + verse `v2-main` in je worktree, of rebase) **vóór** je het board leest — plan-status leeft op `v2-main`, een oude checkout geeft een verouderd board-beeld.
 1. Status leeft per story in het epic-bestand (`plan/E##-*.md`): `backlog` → `ready` → `in_progress` → `done`. Jij werkt alleen stories die `ready` zijn én geen open blockers hebben.
 2. Claim een story door status op `in_progress` te zetten + je team in `owner`, in dezelfde commit waarin je begint. Eén story per team tegelijk (WIP-limiet 1).
 3. `done` mag pas als de Definition of Done haalt: beide targets bouwen (`Avatar` én `Avatar2`), tests groen, één regel resultaat-samenvatting in de story onder **Result:**.
