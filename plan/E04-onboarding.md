@@ -78,8 +78,8 @@ Downloadkaart in barebones Settings (E08.1) — onboarding bevat hem niet meer.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
 - Context: Stories-pagina node 151:1409; werkregel Figma-1-op-1 + placeholder-regel (CLAUDE.md → Vaste kennis, besluit Thierry 2026-06-12).
