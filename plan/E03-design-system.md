@@ -69,3 +69,18 @@ disabled-staten, lime active-state). (Story toegevoegd door FEAT bij E04.3 — A
 DS-grens.)
 
 **Result:** _(invullen bij done)_
+
+## 3.7 — Per-feature-indicatoren: Pro-badge + cloud/AI-glyph
+- status: ready
+- owner: —
+- blockedBy: 3.4
+- DoD: beide targets bouwen, tests groen
+- Context: DSGated/DSProChip uit 3.4; de requiresCloud-vlag per actie komt uit CreditMeter (E14.3). (Story toegevoegd op besluit Thierry 2026-06-12.)
+
+DSGated/DSProChip uitbreiden met twee subtiele per-feature-indicatoren: (1) Pro-badge op features
+die voor free-gebruikers vergrendeld zijn; (2) een cloud/AI-glyph wanneer de feature online vereist
+én online uit staat. Tik op een indicator geeft een korte uitleg + route: upgrade (Pro-badge) resp.
+Settings > AI & Models (cloud-glyph). Géén modals of blokkades — de indicatoren informeren, het
+bestaande DSGated-gedrag blijft het enige gate-mechanisme.
+
+**Result:** _(invullen bij done)_

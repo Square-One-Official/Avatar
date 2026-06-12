@@ -51,3 +51,17 @@ sign out. Geen design — extrapoleer Setting Row-patroon.
 Versie, updatekanaal, check-for-updates (Sparkle), links (privacy, site). Zelfde patroon.
 
 **Result:** _(invullen bij done)_
+
+## 15.5 — Advanced-sectie (dev-only model-picker)
+- status: backlog
+- owner: —
+- blockedBy: 15.2, E01.10
+- DoD: beide targets bouwen, tests groen
+- Context: model-override-API uit E01.10; AI & Models-pagina uit 15.2. Dit is ook het testmechanisme voor de E09.1-bakeoff. (Story toegevoegd op besluit Thierry 2026-06-12.)
+
+"Advanced"-sectie in Settings > AI & Models, alleen zichtbaar voor dev-accounts
+(isDevUnlimitedUser): model-picker per cloud-feature (whitelist uit E01.10) en engine-keuze per
+lokale feature. Keuzes persistent, duidelijk gemarkeerd als dev-only. Geen zichtbaarheid of
+gedrag voor reguliere gebruikers.
+
+**Result:** _(invullen bij done)_
