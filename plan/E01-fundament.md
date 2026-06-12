@@ -120,8 +120,8 @@ oplevering E02.1 — project.yml is INFRA-grens.)
 
 
 ## 1.9 — Avatar2 unit-test-target
-- status: ready
-- owner: —
+- status: in_progress
+- owner: INFRA
 - blockedBy: 1.1
 - DoD: beide targets bouwen, tests groen
 
