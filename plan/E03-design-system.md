@@ -178,3 +178,12 @@ Enter/blur bevestigt, Esc annuleert.
 - Context: visuele-pass-bevindingen 16–17 van Thierry (12 jun): (16) de active-ring op de images-tool verspringt/knippert bij het openen van het zijpaneel — de ring is een conditionele view-insert die buiten de layout-animatie valt; (17) de sidebar-hoekradius loopt niet concentrisch met de vensterradius — binnenradius hoort vensterradius − marge te zijn, als regel vastgelegd in DSLayout voor élke kaart-aan-de-rand (panelen!).
 
 **Result:** Per punt: (16) de active-ring in DSToolButton is geen conditionele view-insert meer maar zit permanent in de button-view en schakelt via opacity (+ .animation op isActive, 0,15s easeOut) — hij beweegt nu mee in dezelfde layout-animatie als de toolbar en kan niet meer los hertekenen/knipperen; (17) DSRadius.window (= 12, gemeten benadering — macOS heeft geen publieke API; bij andere ronding is dit de enige knop) + DSRadius.concentric(inset:) = max(window − inset, 0) als vaste regel in DSLayout; integratie: SidebarView exposeert `edgeInset` (gap-1) die ShellView als padding zet én waarmee de kaartradius concentrisch rekent — elke toekomstige kaart-aan-de-rand volgt dezelfde formule. Beide targets bouwen groen, alle tests groen (1 nieuwe unit-test).
+
+## 3.16 — Review-fixes: container-layoutgarantie + inline-edit-conventies
+- status: in_progress
+- owner: DS
+- blockedBy: 3.13, 3.14
+- DoD: beide targets bouwen, tests groen — incl. expliciete layouttest op de minimummaat (800×600) met geopend paneel (DoD punt 19)
+- Context: visuele-pass-bevindingen 19–21 van Thierry (12 jun): (19) bij beperkte hoogte duwt een geopend paneel de toolbar uit beeld — de foto moet het enige flexibele element zijn, toolbar/paneel nooit afkapbaar; (20) caret staat midden over de placeholder bij een leeg veld — conventie: hint blijft staan in subtle, caret ervóór, eerste toets wist de hint; bestaande waarde volledig selecteren bij focus; (21) buitenklik committet niet — klik in canvas/toolknop/sidebar hoort te committen én de eigen actie uit te voeren.
+
+**Result:** _(invullen bij done)_
