@@ -5,7 +5,7 @@ Team: **FEAT**
 Figma: Onboarding / Splash, Email, OTP, Permissions. Downloadstap is geschrapt (Apple-first). Copy-fixes zijn in Figma verwerkt.
 
 ## 4.1 — Splash + Email-stap
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E01.6, E03.2
 - DoD: beide targets bouwen, tests groen
