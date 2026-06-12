@@ -135,7 +135,7 @@ i.p.v. het idioom na te bouwen.
 **Result:** DSToolButton publiek in AvatarUI/Components (48-cirkel, 18pt-medium-icoon, lime active-ring b-medium) met DSGlassCircle-surface: ultraThinMaterial + background/neutral + rim-gradient die bovenaan oplicht (primary .18 → .04, b-thin) — benadering, Figma exposeert het materiaal niet als variabele, geijkt op App / Edit; DSBottomToolbar gebruikt hem intern (ToolButton-duplicaat weg). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
 
 ## 3.12 — DSCanvasCard + dot-grid-placeholder
-- status: in_progress
+- status: done
 - owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
@@ -145,4 +145,4 @@ DSCanvasCard (bg Card, r-4xl, optionele dot-grid-state, inhoud gevuld geclipt) +
 getekend stippenraster (geen asset): hartafstand 17pt, stip Ø3, kleur wit 15%
 (neutral-strongest-waarde) op Background.card — gemeten 1:1 uit de 465×456-render.
 
-**Result:** _(invullen bij done)_
+**Result:** DSCanvasCard(showsDotGrid:content:) in AvatarUI/Components — bg Card, clip r-4xl, inhoud erbovenop — plus losse publieke DSDotGrid (SwiftUI Canvas, geen asset): stippen Ø3 op 17pt-grid, kleur Background.neutralStrongest, fase spacing/2 (gemeten eerste stip ±(10,6) — fase benaderd, maat/kleur exact). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
