@@ -67,7 +67,9 @@ struct ShellView: View {
                         .padding(.bottom, DSSpacing.gap6)
                 }
         case .result(let cutout):
-            portrait(cutout)
+            // Editor-framework (E06.1): toolbar + panel-systeem rond het
+            // resultaat; foto-verkleining regelt de DS-container centraal.
+            EditorView(portrait: cutout)
         case .failed(let message):
             VStack(spacing: DSSpacing.gap4) {
                 Text(message)

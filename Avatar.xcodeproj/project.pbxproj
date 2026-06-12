@@ -15,6 +15,7 @@
 		0C6211741743F6872B88D183 /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */; };
 		0C7F01C3A11F8D65DF29050A /* ProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */; };
 		0EACA40A9B4E46F1CCEAE54B /* ShellModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2F90C51F873C306E8E73DF /* ShellModel.swift */; };
+		0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */; };
 		127B1D637DF29D44D413A879 /* NewBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */; };
 		14022758E747EEEE44C7592C /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F17C123521D20C3E207A5B /* EdgeBenchmark.swift */; };
 		14308767A851A30F3C0A54DF /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 50D8262C016C4A1E0312CC15 /* AvatarKit */; };
@@ -38,6 +39,7 @@
 		2CC00BB877BB10A664982FB7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
 		31DAF9F07220B9D4B393328C /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
+		32028D20901C7C13C4B668E4 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9319A21481EA22D57BC2DA /* EditorView.swift */; };
 		32BA05BD3FE62DB19FF6512F /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */; };
 		33BFC94F103869184FDAEE4E /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5FEC338C38035806F6E59DFF /* README.md */; };
 		3479E0155E6EF2E5151E251D /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5FEC338C38035806F6E59DFF /* README.md */; };
@@ -181,6 +183,7 @@
 		155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstUseEmptyState.swift; sourceTree = "<group>"; };
 		16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBadge.swift; sourceTree = "<group>"; };
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
+		2B9319A21481EA22D57BC2DA /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
 		2DA1D618559461FE8CE56E1C /* OnboardingOTPView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingOTPView.swift; sourceTree = "<group>"; };
 		2DA344343F0EF03C724D5743 /* LibraryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryArchive.swift; sourceTree = "<group>"; };
@@ -194,6 +197,7 @@
 		42425F916AF8200C81E49949 /* EntitlementModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModel.swift; sourceTree = "<group>"; };
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
 		48EF633AE84A1D2EF9412998 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolTests.swift; sourceTree = "<group>"; };
 		5127F7FAC6DD92487E178E76 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSignInSheet.swift; sourceTree = "<group>"; };
@@ -306,9 +310,18 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
+		321B2081449B5D7591ADF91C /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				2B9319A21481EA22D57BC2DA /* EditorView.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
 		4C7A26FDF118B7356C525C3D /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				321B2081449B5D7591ADF91C /* Editor */,
 				F40AC840E6BA00CF7D839DF1 /* Onboarding */,
 				58511F81207E7EAACF6AF911 /* Paywall */,
 				D3C947F3B98104547D348526 /* Shell */,
@@ -417,6 +430,7 @@
 		B76D45760515CACF423A8362 /* Avatar2Tests */ = {
 			isa = PBXGroup;
 			children = (
+				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 			);
 			path = Avatar2Tests;
@@ -771,6 +785,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
+				32028D20901C7C13C4B668E4 /* EditorView.swift in Sources */,
 				D4B598B61B0C0A9912859FDF /* EntitlementModel.swift in Sources */,
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
 				286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */,
@@ -791,6 +806,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
