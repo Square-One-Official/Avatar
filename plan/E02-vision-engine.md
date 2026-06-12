@@ -92,12 +92,12 @@ ModelManager.
 **Result:** `OrmbgEngine` + `OrmbgModelStore` (actor: installedModelURL/download/removeInstalled/model-cache, SHA-256-gate, versie-in-mapnaam onder Application Support/AvatarKit/Models/ormbg/) in `AvatarKit/Engines/`; 3-staps pad 1-op-1 uit `subjectLiftDownloaded` (1024² → matte → guided r=2 ε=0.01 → composite, linear-sRGB); gedeelde contexten naar `EngineRendering.swift` (VisionCutoutEngine gerefactord); ZIPFoundation 0.9.20 als AvatarKit-dependency (INFRA-review gevraagd); 8 nieuwe tests, totaal 18 groen; beide targets bouwen Debug groen via build-v2.sh.
 
 ## 2.4 — CloudCutoutEngine
-- status: in_progress
+- status: done
 - owner: AI
 - blockedBy: E01.5
 - DoD: beide targets bouwen, tests groen
 
 Op bestaande /v1/cutout via AvatarKit BackendClient.
 
-**Result:** _(invullen bij done)_
+**Result:** `CloudCutoutEngine` (struct, `CutoutEngine`-conform, kind `.replicate`) in `AvatarKit/Engines/` — dunne adapter rond `BackendClient.cutout` (bestaande /v1/cutout incl. Storage-upload-flow en creditaftrek; BackendError's propageren ongewijzigd), PNG↔CGImage via ImageIO, `isAvailable` = sessie-aanwezig via nieuwe één-regel `BackendClient.hasSession` (buiten Engines/ — **INFRA-review gevraagd**); 5 tests zonder netwerk (URLProtocol-stub voor het volledige wire-pad, notSignedIn vóór I/O, alpha-roundtrip), totaal 25 packagetests groen; beide targets bouwen Debug groen via build-v2.sh.
 
