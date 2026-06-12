@@ -63,6 +63,12 @@ public final class BackendClient {
         self.session = session
     }
 
+    /// Of er een sessie is (Bearer-token aanwezig). Gebruikt door
+    /// CloudCutoutEngine.isAvailable (E02.4) zodat de router het cloud-pad
+    /// niet kiest voor uitgelogde gebruikers; zegt niets over credits of
+    /// entitlement. (Eén-regel-toevoeging buiten Engines/ — INFRA-review.)
+    public var hasSession: Bool { auth.accessToken != nil }
+
     // MARK: GET /v1/account
     /// Current tier, credits, and subscription state. Drives `ProEntitlement`.
     /// Anonymous-friendly: when no Bearer token is available the server
