@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { checkRateLimit, requireUser } from "../../lib/auth.js";
+import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
+import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
 import {
   currentCredits,
   ensureUser,
@@ -72,11 +73,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const devEmails = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const isDevUser = !!user.email && devEmails.includes(user.email.toLowerCase());
+  const isDevUser = isDevUnlimitedUser(user.email);
+
+  // E01.10: optional model override — dev-only, whitelist in MODEL_REGISTRY.
+  let modelRef: string | null;
+  try {
+    modelRef = resolveModelOverride("colorize", req.body?.model_override, isDevUser);
+  } catch (e) {
+    if (e instanceof UnknownModelOverrideError) {
+      res.status(400).json({ error: "unknown_model_override" });
+      return;
+    }
+    throw e;
+  }
 
   try {
     await ensureUser(user.id);
@@ -90,14 +99,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // billable work.
     if (!isDevUser) {
       const credits = await currentCredits(user.id);
-      if (credits < 1) {
+      if (credits < MODEL_REGISTRY.colorize.credits) {
         res.status(402).json({ error: "insufficient_credits", credits_remaining: 0 });
         return;
       }
     }
 
     // Step 3: DeOldify colorizes the RGB.
-    const colorizedUrl = await colorize({ imageDataUrl: flattenedDataUrl });
+    const colorizedUrl = await colorize({ imageDataUrl: flattenedDataUrl, model: modelRef });
     const colorizedDownload = await fetch(colorizedUrl);
     if (!colorizedDownload.ok) {
       throw new Error(`DeOldify result fetch failed: ${colorizedDownload.status}`);
@@ -111,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!isDevUser) {
       await logCredit({
         userId: user.id,
-        delta: -1,
+        delta: -MODEL_REGISTRY.colorize.credits,
         reason: "colorize",
         ref: colorizedUrl,
       });

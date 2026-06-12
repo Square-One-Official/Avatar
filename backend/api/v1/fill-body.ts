@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { checkRateLimit, requireUser } from "../../lib/auth.js";
+import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
+import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
 import {
   currentCredits,
   ensureUser,
@@ -92,11 +93,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const devEmails = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const isDevUser = !!user.email && devEmails.includes(user.email.toLowerCase());
+  const isDevUser = isDevUnlimitedUser(user.email);
+
+  // E01.10: optional model override voor de outpaint-stap — dev-only,
+  // whitelist in MODEL_REGISTRY. De alpha-herextractie (stap 4) blijft
+  // bewust op het cutout-default: die stap is interne plumbing, geen
+  // bakeoff-onderwerp.
+  let modelRef: string | null;
+  try {
+    modelRef = resolveModelOverride("fill_body", req.body?.model_override, isDevUser);
+  } catch (e) {
+    if (e instanceof UnknownModelOverrideError) {
+      res.status(400).json({ error: "unknown_model_override" });
+      return;
+    }
+    throw e;
+  }
 
   try {
     await ensureUser(user.id);
@@ -111,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // billable work.
     if (!isDevUser) {
       const credits = await currentCredits(user.id);
-      if (credits < 1) {
+      if (credits < MODEL_REGISTRY.fill_body.credits) {
         res.status(402).json({ error: "insufficient_credits", credits_remaining: 0 });
         return;
       }
@@ -121,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const filledUrl = await outpaintPortrait({
       imageDataUrl: paddedDataUrl,
       maskDataUrl,
+      model: modelRef,
     });
     const filledDownload = await fetch(filledUrl);
     if (!filledDownload.ok) {
@@ -141,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!isDevUser) {
       await logCredit({
         userId: user.id,
-        delta: -1,
+        delta: -MODEL_REGISTRY.fill_body.credits,
         reason: "fill_body",
         ref: filledUrl,
       });

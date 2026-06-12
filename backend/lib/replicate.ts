@@ -1,4 +1,5 @@
 import Replicate from "replicate";
+import { defaultModelRef } from "./models.js";
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 
@@ -40,26 +41,21 @@ async function runWithTimeout<T>(model: string, p: Promise<T>): Promise<T> {
  * Returns the URL of the resulting transparent-PNG. The caller downloads it
  * and re-encodes for the client.
  *
- * Model: `men1scus/birefnet` — BiRefNet (Bilateral Reference Network), the
- * academic gold-standard for portrait matting. Produces fine alpha at hair
- * boundaries that the cheaper alternatives (transparent-background,
- * tracer_b7, U2Net) can't match. ~$0.0017 per call.
- *
- * The version hash is pinned: it makes the call deterministic across model
- * updates AND avoids the `/v1/models/{slug}/predictions` 404 we hit before
- * (some Replicate models don't expose a default version for the
- * `replicate.run("slug")` shortcut). To upgrade: pick a new hash from
- * https://replicate.com/men1scus/birefnet/versions after smoke-testing.
+ * Default model: BiRefNet (Bilateral Reference Network), the academic
+ * gold-standard for portrait matting — fine alpha at hair boundaries that
+ * the cheaper alternatives (transparent-background, tracer_b7, U2Net)
+ * can't match. ~$0.0017 per call. The ref (incl. pinned version) lives in
+ * MODEL_REGISTRY (lib/models.ts); `model` accepts a whitelisted override
+ * ref from `resolveModelOverride` (E01.10) and must point to a model that
+ * takes the same input payload.
  */
-const MODEL_VERSION =
-  "men1scus/birefnet:f74986db0355b58403ed20963af156525e2891ea3c2d499bfbfb2a28cd87c5d7";
-
 export async function magicCutout(input: {
   imageDataUrl: string;
+  model?: string | null;
 }): Promise<string> {
   const output = (await runWithTimeout(
     "magicCutout",
-    replicate.run(MODEL_VERSION, {
+    replicate.run((input.model ?? defaultModelRef("cutout")) as `${string}/${string}`, {
       input: {
         image: input.imageDataUrl,
         // 2048x2048 is the practical upper bound — BiRefNet runs at this on a
@@ -88,13 +84,14 @@ export async function magicCutout(input: {
  * pixels are guaranteed to round-trip unchanged — no identity drift, no
  * second-subject hallucinations, no flatten-then-regenerate seam.
  *
- * Replicate exposes the model under the unversioned slug; pin a hash from
- * https://replicate.com/black-forest-labs/flux-fill-pro/versions if a 404
- * appears (same fallback we use for BiRefNet).
+ * The default ref (black-forest-labs/flux-fill-pro) lives in MODEL_REGISTRY
+ * (lib/models.ts); `model` accepts a whitelisted override ref from
+ * `resolveModelOverride` (E01.10) with the same input contract.
  */
 export async function outpaintPortrait(input: {
   imageDataUrl: string;
   maskDataUrl: string;
+  model?: string | null;
 }): Promise<string> {
   // Negative phrasing matters: without "no objects/props/hands/etc"
   // the model will happily invent context to fill the margin (an
@@ -118,7 +115,7 @@ export async function outpaintPortrait(input: {
 
   const output = (await runWithTimeout(
     "outpaintPortrait",
-    replicate.run("black-forest-labs/flux-fill-pro", {
+    replicate.run((input.model ?? defaultModelRef("fill_body")) as `${string}/${string}`, {
       input: {
         image: input.imageDataUrl,
         mask: input.maskDataUrl,
@@ -141,27 +138,25 @@ export async function outpaintPortrait(input: {
  * on RGB only and will silently flatten any alpha) and for re-attaching
  * the alpha channel afterwards. Same dimensions in/out.
  *
- * Model: `arielreplicate/deoldify_image` — DeOldify, the long-running
- * standard for B&W photo colorization. Warm photo-realistic palette,
- * ~$0.001 per call. `model_name: "Artistic"` lifts saturation slightly
- * for portraits (the alternative "Stable" is tuned for landscapes and
- * leaves portraits looking washed-out). `render_factor` is a quality knob:
- * 35 is the documented sweet spot — higher sharpens detail at the cost
- * of speed/$ but rarely changes the colour decisions on a portrait.
+ * Default model: DeOldify, the long-running standard for B&W photo
+ * colorization. Warm photo-realistic palette, ~$0.001 per call.
+ * `model_name: "Artistic"` lifts saturation slightly for portraits (the
+ * alternative "Stable" is tuned for landscapes and leaves portraits
+ * looking washed-out). `render_factor` is a quality knob: 35 is the
+ * documented sweet spot — higher sharpens detail at the cost of speed/$
+ * but rarely changes the colour decisions on a portrait.
  *
- * Version is pinned because the unversioned slug 404s for this community
- * model (same fallback we use for BiRefNet). To upgrade, pick a new hash
- * from https://replicate.com/arielreplicate/deoldify_image/versions.
+ * The ref (incl. pinned version) lives in MODEL_REGISTRY (lib/models.ts);
+ * `model` accepts a whitelisted override ref from `resolveModelOverride`
+ * (E01.10) with the same input contract.
  */
-const DEOLDIFY_VERSION =
-  "arielreplicate/deoldify_image:0da600fab0c45a66211339f1c16b71345d22f26ef5fea3dca1bb90bb5711e950";
-
 export async function colorize(input: {
   imageDataUrl: string;
+  model?: string | null;
 }): Promise<string> {
   const output = (await runWithTimeout(
     "colorize",
-    replicate.run(DEOLDIFY_VERSION, {
+    replicate.run((input.model ?? defaultModelRef("colorize")) as `${string}/${string}`, {
       input: {
         input_image: input.imageDataUrl,
         model_name: "Artistic",
