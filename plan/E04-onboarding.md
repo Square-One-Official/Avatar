@@ -82,8 +82,9 @@ de onboarding-kant is heroverwogen en leeft nu in E04.6.
 
 
 ## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
-- status: done
+- status: in_progress
 - owner: FEAT
+- Heropend (2026-06-12): visuele-pass-bevindingen 1–9 van Thierry (app vs frames) verwerken; DS-leveringen E03.10–3.13 zijn er al.
 - blockedBy: E03.1
 - DoD: beide targets bouwen, tests groen
 - Context: Stories-pagina node 151:1409; werkregel Figma-1-op-1 + placeholder-regel (CLAUDE.md → Vaste kennis, besluit Thierry 2026-06-12).
