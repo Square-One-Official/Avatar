@@ -19,6 +19,7 @@ Kernregels (samenvatting, details in BOARD.md):
   - Components (tokens/componenten): node `11:180` — https://www.figma.com/design/NtX3dQvGU29gwYQKEcOkSy/Aaavatar?node-id=11-180
   - Settings-voorbeelden: node `4017:10181` · Pro-modal: node `4019:953`
   Check bij twijfel eerst met get_metadata of je het juiste bestand te pakken hebt (verwacht pagina's Stories/Components); zo niet: meld het aan Thierry i.p.v. op een ander bestand door te bouwen.
+- Figma is de bron, 1-op-1 overnemen; visuele afwijkingen alleen met expliciet besluit van Thierry, gedocumenteerd in de story. Interacties/states die Figma niet toont: interpreteren in de geest van het hoofddesign. Tokens komen uit Figma's variabelen (get_variable_defs), niet uit benaderingen. Assets (afbeeldingen/illustraties): bouw met een duidelijk gemarkeerde placeholder op de juiste afmetingen/verhouding uit Figma, zodat interacties en animaties volledig uitgewerkt kunnen worden; registreer elke placeholder in plan/ASSETS.md (wat, Figma-frame, formaat). Thierry levert definitieve assets later in één batch — een placeholder stilletjes als definitief behandelen mag niet.
 - Plandocumenten: `~/Documents/Claude/Projects/Aaavatar/` (redesign-audit-en-plan.md, aaavatar-2.0-bouwplan.md, pipeline-audit-2.0.md, figma-design-review.md).
 - Auth 2.0 = e-mail + OTP, geen Google-UI (Google-infra bewaren). Stripe hangt aan Supabase user-id + e-mail; zie E01.7 voor de identiteitstest.
 - Builds: `xcodegen` voor projectgeneratie waar een project.yml ligt; test op beide targets.

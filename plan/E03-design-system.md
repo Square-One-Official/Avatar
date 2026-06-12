@@ -84,3 +84,17 @@ Settings > AI & Models (cloud-glyph). Géén modals of blokkades — de indicato
 bestaande DSGated-gedrag blijft het enige gate-mechanisme.
 
 **Result:** DSFeatureIndicator (.pro = brand-chip, .cloudOff = cloud-glyph in neutral cirkel à la Icon-Only Button Small) in AvatarUI/Components: tik → popover (geen modal) met één regel uitleg + route-knop in lime (Upgrade resp. "Open AI & Models settings"). DSGated uitgebreid (source-compatible): `DSGated(isLocked:chipLabel:requiresOnline:isOnlineEnabled:onUpgradeRequested:onOpenAISettings:content:)` — cloud-glyph verschijnt alleen bij requiresOnline && !isOnlineEnabled (vlag uit CreditMeter E14.3 geeft de aanroeper door), naast de Pro-chip top-trailing (inzet gap-1); indicatoren staan buiten de gate-knop zodat ze zelf tikbaar zijn, élke tik op vergrendelde inhoud blijft → onUpgradeRequested. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
+
+## 3.8 — Token-verificatie tegen Figma-variabelen
+- status: ready
+- owner: —
+- blockedBy: 3.1
+- DoD: beide targets bouwen, tests groen
+- Context: werkregel "tokens uit Figma's variabelen, niet uit benaderingen" (besluit Thierry 2026-06-12). 3.1 noteerde al één geïnterpoleerde waarde (neutral-stronger).
+
+get_variable_defs draaien op de Components-pagina (node 11:180), de uitkomst naast
+DSColor/DSTypography/DSLayout leggen, afwijkingen corrigeren. Volledige mapping
+(Figma-variabele → token) in de Result-regel; geïnterpoleerde of niet-opvraagbare waarden
+expliciet markeren.
+
+**Result:** _(invullen bij done)_

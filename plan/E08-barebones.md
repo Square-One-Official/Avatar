@@ -47,7 +47,8 @@ Notities (FEAT, bij oplevering):
 - Tijdelijke EntitlementStatusStrip (quota-badge + upgrade-knop) op de placeholder tot E05/E06
   echte callsites leveren; verwijderen bij de main-shell.
 - StoreKit-tak van CheckoutResult bewust niet gebouwd (DMG-pad eerst, zoals v1) — hoort bij een
-  latere MAS-story. Geen Figma-paywall-frame; opgebouwd uit DS-componenten, visuele pass later.
+  latere MAS-story. Geen Figma-paywall-frame; opgebouwd uit DS-componenten — visuele pass
+  verplaatst: vermelding naar E04.5, pixel-volgen Pro-modal via E14.1.
 - Logica alleen build-gedekt tot E01.9 (Avatar2-testtarget, INFRA) landt.
 
 **Result:** Paywall barebones in Avatar2/Features/Paywall/ — EntitlementModel (me/subscribeAnonymous/topup via AvatarKit BackendClient, jaar- en best-value-ankers uit v1), state-aware PaywallSheet (subscribe ↔ top-up-ladder), op=op-DSToast met timer en tik-naar-paywall, EntitlementStatusStrip als tijdelijke opstap; beide targets bouwen groen, packagetests groen, smoke-run OK.

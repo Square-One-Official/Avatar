@@ -16,7 +16,7 @@ voor Pro-gebruikers met ander e-mailadres.
 Notities (FEAT, bij oplevering):
 - Figma was niet bereikbaar (desktop-app had een ander bestand open dan "Aaavatar"); gebouwd op
   de DS-componenten (1-op-1 Figma) + copy-fixes uit figma-design-review.md. Visuele pass tegen
-  de Stories-frames nog doen zodra Figma open staat.
+  de Stories-frames → verplaatst naar story 4.5.
 - Splash is dark (niet het lichte Figma-moment): de review markeerde de licht→donker-overgang
   als onopgelost; tot dat designbesluit valt blijft de flow dark-only.
 - Na e-mail verstuurd → tijdelijke "Check your inbox"-landing met skip-escape; E04.2 vervangt
@@ -76,3 +76,24 @@ Downloadkaart in barebones Settings (E08.1) — onboarding bevat hem niet meer.
 
 **Result:** _(invullen bij done)_
 
+
+## 4.5 — Visuele pass onboarding + shell tegen Stories-frames
+- status: ready
+- owner: —
+- blockedBy: E03.1
+- DoD: beide targets bouwen, tests groen
+- Context: Stories-pagina node 151:1409; werkregel Figma-1-op-1 + placeholder-regel (CLAUDE.md → Vaste kennis, besluit Thierry 2026-06-12).
+
+Gebouwde onboarding (4.1/4.2) en main-shell-delen naast de echte Stories-frames leggen en
+1-op-1 trekken: spacing, formaten, states, interacties en animaties. Assets als gemarkeerde
+placeholder op de juiste afmetingen/verhouding, geregistreerd in plan/ASSETS.md (o.a.
+splash-achtergrond, memoji-cirkel). Visuele afwijkingen alleen met expliciet besluit van
+Thierry, gedocumenteerd in de story.
+
+Hierheen verplaatst (losse 'visuele pass'-vermeldingen):
+- Uit 4.1-notities: "Visuele pass tegen de Stories-frames nog doen zodra Figma open staat."
+- Uit E08.3-notities: paywall-barebones is zonder Figma-frame opgebouwd uit DS-componenten,
+  "visuele pass later" — het Pro-modal-frame bestaat inmiddels (4019:953); de paywall-pass
+  loopt via E14.1 (pixel-volgen), niet via deze story.
+
+**Result:** _(invullen bij done)_
