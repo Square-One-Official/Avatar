@@ -21,8 +21,8 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 |------|------|--------|
 | [E01 Fundament](E01-fundament.md) | INFRA | ready |
 | [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | ready (na E01.2) |
-| [E03 Design system](E03-design-system.md) | DS | ready (3.6, 3.7 open) |
-| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | blocked |
+| [E03 Design system](E03-design-system.md) | DS | done |
+| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | ready (4.3) |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | blocked |
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | blocked |
 | [E07 Background](E07-background.md) | FEAT | blocked |
@@ -32,6 +32,6 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E11 Hair](E11-hair.md) | FEAT+AI | blocked |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | blocked |
 | [E13 Release-voorbereiding](E13-release.md) | INFRA | ready (13.0) |
-| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready |
+| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready (14.1, 14.3, 14.6) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | ready — design-onafhankelijk |

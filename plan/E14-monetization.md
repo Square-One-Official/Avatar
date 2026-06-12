@@ -16,6 +16,9 @@ design — pixel-volgen, maar met de werkelijke prijzen: **€4,99/mnd, €49,90
 (besluit Thierry 2026-06-12). Jaarlabel: **"2 months free"** (klopt exact: €49,90 = 10 × €4,99) —
 vervangt de "Save 20%"-tekst; Thierry past Figma hierop aan.
 
+Let op: review-fix **14.6** (authed subscribe-flow i.p.v. subscribeAnonymous voor ingelogde
+gebruikers) hoort hierbij — meenemen of eerst doen.
+
 **Result:** _(invullen bij done)_
 
 ## 14.2 — Free-gate: 3 afbeeldingen totaal
@@ -31,7 +34,7 @@ overschrijding → pro-modal. Watermark op Starter-export.
 **Result:** _(invullen bij done)_
 
 ## 14.3 — Credit-metering per feature
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E03.4, E01.5
 - DoD: beide targets bouwen, tests groen
@@ -89,5 +92,24 @@ geen legacy-mapping, `CREDITS_PER_TIER.pro` blijft 200. Zie `plan/E14.4-stripe-p
 - Context: v1 ProUpgradeSheet top-up-variant + backend checkout/topup.ts.
 
 Bestaande packs (50/200/750) bereikbaar vanuit op=op-state; alleen voor Pro.
+
+**Result:** _(invullen bij done)_
+
+## 14.6 — Review-fix: authed subscribe-flow in PaywallSheet
+- status: ready
+- owner: —
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- Context: review DS 2026-06-12 op E08.3-code; hoort inhoudelijk bij 14.1 — wie 14.1 oppakt neemt dit mee of doet 14.6 eerst.
+
+PaywallSheet/EntitlementModel start de checkout nu onvoorwaardelijk via
+`BackendClient.subscribeAnonymous` (Avatar2/Features/Paywall/EntitlementModel.swift:91), ook
+voor ingelogde gebruikers. In 2.0 (e-mail + OTP) is de gebruiker doorgaans ingelogd: anonieme
+checkout maakt dan een tweede Stripe-customer op e-mail aan; de webhook reconcilieert dat, maar
+dat is een vangnet, geen pad. Fix: bij een ingelogde gebruiker de authed subscribe-flow
+(backend `/v1/checkout/subscribe`, gekoppeld aan Supabase user-id) gebruiken; anoniem alleen
+voor niet-ingelogde gebruikers. Let op: BackendClient (AvatarKit = INFRA-grens) heeft nog géén
+wrapper voor `/v1/checkout/subscribe` — ontbreekt die bij de bouw, dan per boardregel 4 een
+INFRA-story toevoegen i.p.v. zelf in AvatarKit bouwen.
 
 **Result:** _(invullen bij done)_
