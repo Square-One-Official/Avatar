@@ -32,7 +32,7 @@ public struct DSSidebarRow<Avatar: View>: View {
             HStack(spacing: DSSpacing.gap2) {
                 avatar
                     .frame(width: 48, height: 48)
-                    .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+                    .clipShape(.rect(cornerRadius: DSRadius.xl2, style: .continuous))
                 VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
                     Text(name)
                         .dsTextStyle(.labelBase)

@@ -65,3 +65,13 @@ extension DSFormComponentsTests {
         XCTAssertNotNil(ImageRenderer(content: DSGhostButton("Resend code") {}).cgImage)
     }
 }
+
+// E03.10 — search input
+extension DSFormComponentsTests {
+
+    @MainActor
+    func testSearchFieldRendert() {
+        let view = DSSearchField(text: .constant("")).frame(width: 224)
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
+}
