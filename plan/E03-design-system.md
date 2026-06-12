@@ -122,7 +122,7 @@ hover bg neutral-stronger + primary, pressed bg neutral-strongest).
 **Result:** _(invullen bij done)_
 
 ## 3.11 — Glass-effect op icon-/toolknoppen
-- status: in_progress
+- status: done
 - owner: DS
 - blockedBy: 3.3
 - DoD: beide targets bouwen, tests groen
@@ -132,4 +132,4 @@ Publieke DSToolButton (48-cirkel, glass-surface, optionele lime active-ring, 18p
 DSBottomToolbar intern erop; FEAT-callsites (gear) kunnen dan dezelfde component gebruiken
 i.p.v. het idioom na te bouwen.
 
-**Result:** _(invullen bij done)_
+**Result:** DSToolButton publiek in AvatarUI/Components (48-cirkel, 18pt-medium-icoon, lime active-ring b-medium) met DSGlassCircle-surface: ultraThinMaterial + background/neutral + rim-gradient die bovenaan oplicht (primary .18 → .04, b-thin) — benadering, Figma exposeert het materiaal niet als variabele, geijkt op App / Edit; DSBottomToolbar gebruikt hem intern (ToolButton-duplicaat weg). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
