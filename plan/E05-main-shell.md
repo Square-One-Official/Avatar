@@ -5,8 +5,8 @@ Team: **FEAT**
 Figma: App / First use, Dropzone, Image added, Isolating animation, Sidebar images.
 
 ## 5.1 — First use-empty-state
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
 
@@ -47,7 +47,7 @@ Canvas-overgang zonder layoutshift. SwiftData-model Portrait2, los van v1-store.
 **Result:** _(invullen bij done)_
 
 ## 5.5 — Name/Role-header
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen

@@ -5,7 +5,7 @@ Team: **FEAT**
 Bewust minimaal; volledige flows volgen als Figma af is.
 
 ## 8.1 — Settings barebones
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: E03.2
 - DoD: beide targets bouwen, tests groen
