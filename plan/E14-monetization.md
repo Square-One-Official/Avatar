@@ -42,8 +42,8 @@ credits.
 **Result:** _(invullen bij done)_
 
 ## 14.4 — Stripe-prijzen 2.0 [INFRA + actie Thierry]
-- status: backlog
-- owner: —
+- status: in_progress — WACHT OP THIERRY (prijzen aanmaken + credits-beslissing)
+- owner: INFRA
 - blockedBy: 14.1
 - DoD: beide targets bouwen, tests groen
 - Context: backend/lib/stripe.ts (PRICE_ID_PRO/_ANNUAL, creditsForTier 200→100 voor 2.0 bepalen).
@@ -51,6 +51,10 @@ credits.
 Nieuwe price-IDs (€12,99/mnd, jaarlijks −20%) in backend-env koppelen; tier-mapping en webhook
 ongewijzigd. THIERRY maakt de prijzen aan in het Stripe-dashboard — agent levert de exacte
 specificatie en wacht.
+
+Spec opgeleverd: zie `plan/E14.4-stripe-prijzen-spec.md` (exacte dashboard-stappen, €124,70
+jaarprijs, waarom v1-prijzen niet gearchiveerd mogen worden, legacy-env-plan en de open
+credits-beslissing a/b/c). Implementatie volgt zodra de price-IDs + credits-keuze binnen zijn.
 
 **Result:** _(invullen bij done)_
 
