@@ -55,6 +55,20 @@ public enum DSRadius {
     public static let xl4: CGFloat = 24
     /// `border-radius/r-full`
     public static let full: CGFloat = 96
+
+    /// Vensterradius van macOS (E03.15, bevinding 17). Geen publieke API
+    /// om hem op te vragen; 12 is de gemeten benadering voor het
+    /// titelbalkloze venster — bij een andere macOS-ronding is dít de
+    /// enige constante die bijgesteld hoeft te worden.
+    public static let window: CGFloat = 12
+
+    /// Concentrische binnenradius voor een kaart die op `inset` van de
+    /// vensterrand staat: binnenradius = vensterradius − inset, zodat de
+    /// twee rondingen parallel lopen. Dé regel voor elke kaart-aan-de-rand
+    /// (sidebar, toekomstige panelen).
+    public static func concentric(inset: CGFloat) -> CGFloat {
+        max(window - inset, 0)
+    }
 }
 
 /// `border-width/*`

@@ -11,6 +11,10 @@ import SwiftData
 import SwiftUI
 
 struct SidebarView: View {
+    /// Marge t.o.v. de vensterrand — ShellView gebruikt dezelfde waarde
+    /// als padding, de kaartradius rekent er concentrisch mee.
+    static let edgeInset: CGFloat = DSSpacing.gap1
+
     @Query(sort: \Portrait2.createdAt) private var portraits: [Portrait2]
     @State private var searchText = ""
 
@@ -55,9 +59,15 @@ struct SidebarView: View {
         }
         .frame(width: 248)
         .frame(maxHeight: .infinity)
+        // Concentrisch met de vensterrand (E03.15, bevinding 17):
+        // binnenradius = vensterradius − marge; ShellView zet de kaart op
+        // dezelfde `edgeInset`.
         .background(
             DSColor.Background.card,
-            in: .rect(cornerRadius: DSRadius.xl4, style: .continuous)
+            in: .rect(
+                cornerRadius: DSRadius.concentric(inset: Self.edgeInset),
+                style: .continuous
+            )
         )
     }
 
