@@ -58,7 +58,7 @@ Figma).
 
 
 ## 3.6 — Toggle/switch-component
-- status: in_progress
+- status: done
 - owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
@@ -68,7 +68,7 @@ heeft nog geen toggle/switch. Component 1-op-1 uit Figma "Components" (incl. on/
 disabled-staten, lime active-state). (Story toegevoegd door FEAT bij E04.3 — AvatarUI is
 DS-grens.)
 
-**Result:** _(invullen bij done)_
+**Result:** DSToggle 1-op-1 uit Figma Toggle (61:944) in AvatarUI/Components: track 48×24 r-full — uit neutral→neutral-stronger (hover)→neutral-strongest (pressed), aan background/action (lime, alle staten); thumb 22 met gap-px-inzet — foreground/default/thumb (uit) resp. on-action (aan), hover schuift thumb 2pt naar binnen, pressed toont thumb alvast aan de doelzijde (zo staan de Figma-pressed-frames erin); Figma kent géén disabled-variant → opacityschaal .25 zoals DSTextField; a11y via accessibilityRepresentation als echte Toggle. Contract: `DSToggle(isOn: Binding<Bool>)`. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
 
 ## 3.7 — Per-feature-indicatoren: Pro-badge + cloud/AI-glyph
 - status: ready
