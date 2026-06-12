@@ -17,6 +17,9 @@ public enum DSColor {
         public static let inset = Color(hex: 0x292524)
         /// `background/neutral` — #ffffff0d
         public static let neutral = Color(hex: 0xFFFFFF, alpha: 0x0D)
+        /// `background/neutral-stronger` — geen dark-frame gebruikt deze;
+        /// geïnterpoleerd op de dark-schaal 5/10/15% wit (= divider-waarde).
+        public static let neutralStronger = Color(hex: 0xFFFFFF, alpha: 0x1A)
         /// `background/neutral-strongest` — #ffffff26
         public static let neutralStrongest = Color(hex: 0xFFFFFF, alpha: 0x26)
         /// `background/action` — #d5f466 (lime-accent)

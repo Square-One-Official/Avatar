@@ -85,11 +85,13 @@ public struct DSTextStyle: Sendable {
 }
 
 extension View {
-    /// Figma-tekststijl: font + exacte regelhoogte (via lineSpacing-delta).
+    /// Figma-tekststijl: font + regelhoogte. Single-line krijgt exact de
+    /// Figma-regelhoogte via minHeight; multi-line benadert die via
+    /// lineSpacing (SF's natuurlijke regelhoogte ≈ 1.2 × puntgrootte).
     public func dsTextStyle(_ style: DSTextStyle) -> some View {
         self
             .font(style.font)
-            .lineSpacing(style.lineHeight - style.size)
-            .padding(.vertical, (style.lineHeight - style.size) / 2)
+            .lineSpacing(max(0, style.lineHeight - style.size * 1.2))
+            .frame(minHeight: style.lineHeight)
     }
 }
