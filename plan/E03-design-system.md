@@ -133,3 +133,16 @@ DSBottomToolbar intern erop; FEAT-callsites (gear) kunnen dan dezelfde component
 i.p.v. het idioom na te bouwen.
 
 **Result:** DSToolButton publiek in AvatarUI/Components (48-cirkel, 18pt-medium-icoon, lime active-ring b-medium) met DSGlassCircle-surface: ultraThinMaterial + background/neutral + rim-gradient die bovenaan oplicht (primary .18 → .04, b-thin) — benadering, Figma exposeert het materiaal niet als variabele, geijkt op App / Edit; DSBottomToolbar gebruikt hem intern (ToolButton-duplicaat weg). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
+
+## 3.12 — DSCanvasCard + dot-grid-placeholder
+- status: in_progress
+- owner: DS
+- blockedBy: 3.1
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-bevindingen 6–7 van Thierry (12 jun). De foto hoort in een afgeronde donkere kaart met marge (App / Edit, App / Image added); zonder ingestelde achtergrond toont de kaart een stippenraster zodat transparante cutout-delen "achtergrond verwijderd" communiceren. NB: het door Thierry genoemde node-id 4031:1876 bestaat niet in het document (alle pagina's doorzocht); bron = de canvas-"Image"-nodes in de feature-frames (bv. 4017:1811, App / Effects), patroon gemeten uit de render.
+
+DSCanvasCard (bg Card, r-4xl, optionele dot-grid-state, inhoud gevuld geclipt) + programmatisch
+getekend stippenraster (geen asset): hartafstand 17pt, stip Ø3, kleur wit 15%
+(neutral-strongest-waarde) op Background.card — gemeten 1:1 uit de 465×456-render.
+
+**Result:** _(invullen bij done)_
