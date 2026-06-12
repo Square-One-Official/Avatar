@@ -132,3 +132,18 @@ scripts/build-v2.sh. (Story toegevoegd door FEAT bij oplevering E04.1 — projec
 INFRA-grens.)
 
 **Result:** Avatar2Tests-target (bundle.unit-test, gehost in Aaavatar 2.app) via project.yml, incl. expliciete PRODUCT_MODULE_NAME=Avatar2 (PRODUCT_NAME bevat een spatie) en scheme-testTargets op Avatar2; 9 OnboardingModel-unit-tests (stap-overgangen, e-mailgate, code-gate, completion-persistentie — Supabase-paden bewust buiten bereik); teststap opgenomen in scripts/build-v2.sh; beide targets bouwen groen, alle suites groen (Avatar2Tests 9/9, AvatarKit 31, AvatarUI 1).
+
+## 1.10 — Model-override-parameter + MODEL_REGISTRY [backend]
+- status: ready
+- owner: —
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- Context: backend/lib/replicate.ts (gepinde model-versies per feature); isDevUnlimitedUser-gate bestaat in backend/lib. Voer voor E15.5 (dev-model-picker) en testmechanisme voor E09.1. (Story toegevoegd op besluit Thierry 2026-06-12.)
+
+Backend-endpoints (cutout/colorize/fill-body, straks stylize) krijgen een optionele
+model-override-parameter, uitsluitend gehonoreerd via de bestaande `isDevUnlimitedUser`-gate, met
+een whitelist per endpoint (geen vrije slugs — alleen geregistreerde alternatieven). Model-slugs
+en gepinde versies verhuizen uit de losse constanten naar één `MODEL_REGISTRY` in `backend/lib`,
+zodat override-whitelist, credit-tarief (E14.3) en `requiresCloud` per feature op één plek leven.
+
+**Result:** _(invullen bij done)_

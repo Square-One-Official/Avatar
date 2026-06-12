@@ -21,7 +21,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 |------|------|--------|
 | [E01 Fundament](E01-fundament.md) | INFRA | ready |
 | [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | ready (na E01.2) |
-| [E03 Design system](E03-design-system.md) | DS | done |
+| [E03 Design system](E03-design-system.md) | DS | ready (3.6, 3.7 open) |
 | [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | blocked |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | blocked |
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | blocked |
