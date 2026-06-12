@@ -30,17 +30,47 @@ struct FirstUseEmptyState: View {
     ]
 
     var body: some View {
-        ZStack {
-            ForEach(Array(Self.memojiOffsets.enumerated()), id: \.offset) { index, position in
-                MemojiPlaceholder(color: Self.memojiColors[index % Self.memojiColors.count])
-                    .frame(width: Self.avatarSize, height: Self.avatarSize)
-                    .offset(
-                        x: position.width - (Self.ringSize.width - Self.avatarSize) / 2,
-                        y: position.height - (Self.ringSize.height - Self.avatarSize) / 2
+        // Punt 18b: de ring schaalt met de beschikbare ruimte — bij een
+        // kleiner venster komen de cirkels dichter bij elkaar en worden ze
+        // kleiner i.p.v. buiten beeld te vallen. Geen vaste offsets: alle
+        // Figma-maten vermenigvuldigen met één schaalfactor; de center-
+        // content (plus + copy) blijft op ware grootte.
+        GeometryReader { geometry in
+            let scale = Self.ringScale(for: geometry.size)
+            ZStack {
+                ForEach(Array(Self.memojiOffsets.enumerated()), id: \.offset) { index, position in
+                    MemojiPlaceholder(
+                        color: Self.memojiColors[index % Self.memojiColors.count],
+                        diameter: Self.avatarSize * scale
                     )
-            }
+                    .offset(
+                        x: (position.width - (Self.ringSize.width - Self.avatarSize) / 2) * scale,
+                        y: (position.height - (Self.ringSize.height - Self.avatarSize) / 2) * scale
+                    )
+                }
 
-            VStack(spacing: DSSpacing.gap4) {
+                centerContent
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(DSColor.Background.app)
+        .preferredColorScheme(.dark)
+    }
+
+    /// Schaal t.o.v. de Figma-ring (469×524) binnen de beschikbare ruimte,
+    /// met ademruimte voor de topbar; nooit groter dan ontwerpformaat.
+    private static func ringScale(for size: CGSize) -> CGFloat {
+        let reserveWidth: CGFloat = 48
+        let reserveHeight: CGFloat = 120
+        let fit = min(
+            (size.width - reserveWidth) / ringSize.width,
+            (size.height - reserveHeight) / ringSize.height
+        )
+        return min(1, max(0.35, fit))
+    }
+
+    private var centerContent: some View {
+        VStack(spacing: DSSpacing.gap4) {
                 DSIconButton(Image(systemName: "plus"), style: .fillBrand) {
                     onChooseFile()
                 }
@@ -61,26 +91,22 @@ struct FirstUseEmptyState: View {
                     }
                 }
             }
-        }
-        .frame(width: Self.ringSize.width, height: Self.ringSize.height)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DSColor.Background.app)
-        .preferredColorScheme(.dark)
     }
 }
 
 /// ASSET-PLACEHOLDER (plan/ASSETS.md #2): memoji-figuur uit App / First
 /// use. Cirkel in projects-paletkleur (zoals het frame) met persoonsglyph
 /// en dashed markeringsrand; de echte memoji-beelden komen in de
-/// assetbatch van Thierry.
+/// assetbatch van Thierry. Diameter schaalt mee met de ring (punt 18b).
 private struct MemojiPlaceholder: View {
     let color: Color
+    let diameter: CGFloat
 
     var body: some View {
         ZStack {
             Circle().fill(color)
             Image(systemName: "person.fill")
-                .font(.system(size: 48, weight: .regular))
+                .font(.system(size: diameter * (48.0 / 112.0), weight: .regular))
                 .foregroundStyle(DSColor.Foreground.primaryStaticBlack.opacity(DSOpacity.subtle))
             Circle()
                 .strokeBorder(
@@ -88,6 +114,7 @@ private struct MemojiPlaceholder: View {
                     style: StrokeStyle(lineWidth: DSBorderWidth.thin, dash: [4, 4])
                 )
         }
+        .frame(width: diameter, height: diameter)
         .accessibilityHidden(true)
     }
 }
