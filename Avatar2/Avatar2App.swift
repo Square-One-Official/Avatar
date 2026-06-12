@@ -21,13 +21,7 @@ struct Avatar2App: App {
                 if onboarding.isActive {
                     OnboardingFlow(model: onboarding)
                 } else {
-                    ContentPlaceholderView()
-                        // Tijdelijke paywall-opstap tot E05/E06 echte
-                        // gating-callsites leveren.
-                        .overlay(alignment: .topTrailing) {
-                            EntitlementStatusStrip(model: entitlement)
-                                .padding(DSSpacing.gap4)
-                        }
+                    ShellView(entitlement: entitlement)
                 }
             }
             .frame(minWidth: 480, minHeight: 320)
@@ -49,22 +43,3 @@ struct Avatar2App: App {
     }
 }
 
-/// Tijdelijke placeholder tot de main-shell (E05) landt.
-struct ContentPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.crop.square.badge.camera")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("Aaavatar 2.0")
-                .font(.title2.weight(.semibold))
-            Text("Scaffold — E01.1")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Text("Engines: \(CutoutEngineKind.allCases.map(\.rawValue).joined(separator: " · "))")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
