@@ -15,8 +15,8 @@ Kleuren (lime-accent, dark surfaces), typografie, spacing, radii uit Figma → A
 **Result:** Dark-mode tokens 1-op-1 uit Figma-variabelen (Stories→Dark-secties) in AvatarUI/Tokens: DSColor (surfaces #000/#1c1917/#292524, lime #d5f466, foregrounds, projects-palet), DSTextStyle/DSTypography (Labels/Body/H1-H6-subset), DSSpacing/DSRadius/DSBorderWidth/DSOpacity/DSShadow; signaalkleuren (error/warning/success/info) komen in geen enkel dark-frame voor en zijn bewust buiten scope; beide targets bouwen groen, testtargets bestaan nog niet (E01.4 open).
 
 ## 3.2 — Basiscomponenten
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 
