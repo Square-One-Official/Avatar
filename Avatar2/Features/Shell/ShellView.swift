@@ -42,6 +42,13 @@ struct ShellView: View {
                 EntitlementStatusStrip(model: entitlement)
                     .padding(DSSpacing.gap4)
             }
+            // Name/Role-header (E05.5) zodra er een portret op canvas staat.
+            .overlay(alignment: .topLeading) {
+                if case .result = model.canvas {
+                    PortraitHeader(model: model)
+                        .padding(DSSpacing.gap4)
+                }
+            }
     }
 
     @ViewBuilder

@@ -23,6 +23,11 @@ final class ShellModel {
     private(set) var canvas: CanvasState = .empty
     var isDropTargeted = false
 
+    /// Naam/rol van het huidige portret (E05.5). Verhuist naar het
+    /// SwiftData-model Portrait2 zodra E05.4 landt.
+    var portraitName = ""
+    var portraitRole = ""
+
     private let entitlement: EntitlementModel
 
     @ObservationIgnored
