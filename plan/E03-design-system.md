@@ -113,8 +113,8 @@ hover bg neutral-stronger + primary, pressed bg neutral-strongest).
 **Result:** `fullWidth: Bool = false` op DSPrimaryButton én DSNeutralButton (label-HStack strekt vóór de padding, capsule strekt mee — bestaande call sites ongewijzigd) en DSGhostButton (zelfde maten/parameters als DSPrimaryButton; states 1-op-1 het ghostNeutral-gedrag van DSIconButton: muted → hover bg neutral-stronger + primary → pressed bg neutral-strongest, disabled opacityschaal .25). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
 
 ## 3.10 — Search input-component
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 - Context: Figma Components "Search input" (4016:14176, 6 states); gebruikt in de sidebar (App / Sidebar images, instance 224×48). E05.4 gebruikt tijdelijk DSTextField (h40) als stand-in — vervangen zodra deze component er is. (Story toegevoegd door FEAT bij E05.4 — AvatarUI is DS-grens.)
