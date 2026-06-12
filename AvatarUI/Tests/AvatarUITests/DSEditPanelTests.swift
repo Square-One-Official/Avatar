@@ -57,3 +57,18 @@ extension DSEditPanelTests {
         }
     }
 }
+
+// E03.12 — canvas-kaart + dot-grid
+extension DSEditPanelTests {
+
+    @MainActor
+    func testCanvasCardRendertMetEnZonderDotGrid() {
+        for dots in [true, false] {
+            let view = DSCanvasCard(showsDotGrid: dots) {
+                Color.clear
+            }
+            .frame(width: 465, height: 456)
+            XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+        }
+    }
+}
