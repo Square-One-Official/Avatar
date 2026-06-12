@@ -58,18 +58,18 @@ vandaaruit. Enige story die Avatar/ mag raken.
 **Result:** BackendClient + TLSPinning + DeviceFingerprint + entitlement-wire-types + Announcement-modellen naar AvatarKit/Backend/ (public API, AuthManager gekoppeld via nieuw AccessTokenProviding-protocol); Avatar, Avatar-MAS en Avatar2 bouwen groen, tests groen, v1 start-smoke OK.
 
 ## 1.6 — Auth 2.0: e-mail + code
-- status: ready
-- owner: —
+- status: done
+- owner: INFRA
 - blockedBy: 1.2
 - DoD: beide targets bouwen, tests groen
 
 Nieuwe AuthService in AvatarKit op Supabase signInWithOTP/verifyOTP. Geen OAuth/PKCE/deep-link voor
 auth. Backend auth.ts ongewijzigd. Google-infra blijft bestaan maar krijgt geen UI in 2.0.
 
-**Result:** _(invullen bij done)_
+**Result:** AuthService (@Observable, requestCode/verifyCode/signOut via Supabase signInWithOTP+verifyOTP, conformeert aan AccessTokenProviding) in AvatarKit/Auth/ met AES-GCM-versleutelde sessie-opslag (eigen Keychain-service nl.squareone.aaavatar2, zelfde ontwerp als v1 audit-fix HIGH #7); supabase-swift 2.x als package-dependency; beide targets bouwen groen, 31 AvatarKit-tests groen (6 nieuwe storage-tests).
 
 ## 1.7 — Stripe/identiteit-verificatie OTP-switch
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 1.6
 - DoD: beide targets bouwen, tests groen
