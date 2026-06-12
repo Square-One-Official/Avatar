@@ -146,3 +146,17 @@ getekend stippenraster (geen asset): hartafstand 17pt, stip Ø3, kleur wit 15%
 (neutral-strongest-waarde) op Background.card — gemeten 1:1 uit de 465×456-render.
 
 **Result:** DSCanvasCard(showsDotGrid:content:) in AvatarUI/Components — bg Card, clip r-4xl, inhoud erbovenop — plus losse publieke DSDotGrid (SwiftUI Canvas, geen asset): stippen Ø3 op 17pt-grid, kleur Background.neutralStrongest, fase spacing/2 (gemeten eerste stip ±(10,6) — fase benaderd, maat/kleur exact). Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).
+
+## 3.13 — DSInlineEditLabel (inline edit met hover-affordance)
+- status: done
+- owner: DS
+- blockedBy: 3.1
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-bevinding 9 van Thierry (12 jun): de Name/Role-inline-edit is buggy (caret over statische tekst). Drie staten gewenst; herbruikbaar voor Name/Role-header (E04.5-fix) en later sidebar-rename.
+
+Eén component, twee varianten (heading/subtitle): rust = pure tekst; hover = badge-affordance
+(bg neutral, padding, zachte radius, pointer-cursor); edit = smal inputveld op dezelfde plek
+(zelfde typografie/uitlijning, caret in het veld, hover-bg + focus-rand, geen layoutshift) —
+Enter/blur bevestigt, Esc annuleert.
+
+**Result:** DSInlineEditLabel in AvatarUI/Components. Contract: `DSInlineEditLabel(_ placeholder: String, text: Binding<String>, variant: .heading|.subtitle)`; drie staten — rust: pure tekst (heading Body/Medium primary, subtitle Body/Small subtle; leeg = placeholder muted); hover: bg neutral, padding gap-2/gap-0.5, r-md continuous, pointer-cursor (NSCursor push/pop); edit: TextField op dezelfde plek met identieke typografie, breedte volgt inhoud via verborgen maattekst + overlay, hover-bg + focus-rand b-thin muted — padding in alle staten gelijk, dus geen layoutshift. Enter/blur committen (getrimd), Esc annuleert (onExitCommand); blur-commit gegate op isEditing zodat Esc niet alsnog commit. Beide targets bouwen groen, alle tests groen (1 nieuwe smoke-test).

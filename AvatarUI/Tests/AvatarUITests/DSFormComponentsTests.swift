@@ -75,3 +75,17 @@ extension DSFormComponentsTests {
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)
     }
 }
+
+// E03.13 — inline-edit-label
+extension DSFormComponentsTests {
+
+    @MainActor
+    func testInlineEditLabelRendertBeideVarianten() {
+        for variant in [DSInlineEditLabel.Variant.heading, .subtitle] {
+            let leeg = DSInlineEditLabel("Name", text: .constant(""), variant: variant)
+            let gevuld = DSInlineEditLabel("Name", text: .constant("Sonja"), variant: variant)
+            XCTAssertNotNil(ImageRenderer(content: leeg).cgImage)
+            XCTAssertNotNil(ImageRenderer(content: gevuld).cgImage)
+        }
+    }
+}
