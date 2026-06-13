@@ -192,6 +192,8 @@ struct ShellView: View {
             EditorView(
                 portrait: cutout,
                 portraitModel: model.selectedPortrait,
+                entitlement: entitlement,
+                onApplyResult: { model.applyEffectResult($0) },
                 isSidebarVisible: $model.isSidebarVisible
             )
         case .failed(let message):

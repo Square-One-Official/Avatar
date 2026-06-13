@@ -58,6 +58,12 @@ struct EditorView: View {
     /// Model-referentie voor de persistente canvas-transform (E06.4);
     /// nil = transform alleen in-memory (komt in de praktijk niet voor).
     var portraitModel: Portrait2?
+    /// E09.2: Effects-paneel heeft het entitlement nodig voor de gegate
+    /// stylize-call (credits/402); nil = paneel valt terug op de stub.
+    var entitlement: EntitlementModel?
+    /// E09.2: een bewerkt portret-beeld terug naar de ShellModel (canvas +
+    /// opgeslagen cutout vervangen).
+    var onApplyResult: (NSImage) -> Void = { _ in }
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -219,6 +225,9 @@ struct EditorView: View {
                 // E10.2: kleding-paneel (presets + vrije prompt). Generatie-
                 // route geparkeerd (DECISIONS-PENDING); actie nu stub.
                 ClothesPanel()
+            } else if tool == .effects, let entitlement {
+                // E09.2: stijl-kaarten op het productie-/v1/stylize.
+                EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")

@@ -270,6 +270,41 @@ public final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/stylize
+    /// Effects (E09.2) — stuurt het huidige portret + een vaste stijl-key naar
+    /// het productie-`/v1/stylize`. De server mapt de key naar de stijlprompt
+    /// (incl. identity-clausule uit de E09.1-bakeoff); een vrij prompt-veld is
+    /// dev-only en hier bewust niet bereikbaar. nano-banana is de default;
+    /// `model_override` (dev) gaat mee als de DevModelOverrides-store een keuze
+    /// heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
+    ///
+    /// Op 402 (geen credits) gooit dit `BackendError.noCredits` → de caller
+    /// toont de paywall; andere fouten propageren voor de faaltoast.
+    private struct StylizeResponse: Decodable {
+        let image: String
+        let creditsRemaining: Int          // decoded from `credits_remaining`
+    }
+    public func stylize(imagePNG: Data, style: StylizeStyle) async throws -> (Data, Int) {
+        struct Body: Encodable {
+            let image: String
+            let style: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case image, style
+                case modelOverride = "model_override"
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(image: imagePNG.base64EncodedString(), style: style.rawValue,
+                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/checkout/subscribe-anonymous
     /// Start a subscription checkout WITHOUT requiring a signed-in user.
     /// Stripe collects the email during checkout; the webhook links that

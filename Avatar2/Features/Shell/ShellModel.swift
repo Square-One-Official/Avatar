@@ -170,6 +170,18 @@ final class ShellModel {
         isSidebarVisible.toggle()
     }
 
+    /// E09.2: een door een feature-paneel bewerkt portret-beeld (Effects-
+    /// stijl, later kleding/haar) vervangt het canvas-resultaat én het
+    /// opgeslagen cutout. Het canvas toont de NSImage uit `canvas`, niet uit
+    /// het model — beide moeten dus mee, anders blijft de oude foto staan.
+    func applyEffectResult(_ image: NSImage) {
+        canvas = .result(image)
+        if let png = pngData(from: image), let portrait = selectedPortrait {
+            portrait.cutoutData = png
+            portrait.touch()
+        }
+    }
+
     // MARK: - Hifi-haar-nudge (E05.6)
 
     /// Subtiele, eenmalige nudge onder het resultaat.
