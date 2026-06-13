@@ -212,3 +212,12 @@ Enter/blur bevestigt, Esc annuleert.
 - [x] 3. Intrinsieke breedte via pure meetfunctie measuredSize (max(tekst, placeholder) + caret-marge; hoogte = vaste Figma-regelhoogte) — unit-getest op leeg/kort/lang (clipt nooit, groeit mee); PortraitHeader reserveert vast 52pt (28+24) zodat Name/Role in elke staat vrij van de canvas-kaart blijven (integratie Avatar2).
 - [x] 4. Enter (insertNewline) en Esc (cancelOperation) via de NSTextFieldDelegate — unit-getest op de Coordinator; blur (controlTextDidEndEditing) commit — unit-getest; klik-buiten commit via doorlatende NSEvent-monitor (aangeklikte control voert z'n actie uit), re-entrancy gedekt door de isEditing-guard. De fysieke drieklik (canvas/toolknop/sidebar) blijft de handmatige eindcheck.
 Beide targets bouwen groen, alle tests groen (3 nieuwe unit-tests: delegate-routes, blur-commit, meetfunctie).
+
+## 3.18 — DSSidebarRow hover-state (+ sidebar-padding ruimer)
+- status: in_progress
+- owner: DS
+- blockedBy: 3.5
+- DoD: beide targets bouwen, tests groen
+- Context: visuele-pass-punten 22–23 van Thierry (13 jun). (22) Rijen krijgen op hover hetzelfde afgeronde Inset-kleurvlak als de selectie, fade ~100ms, selectie één tint sterker — in het component, niet per gebruiksplek. (23) De binnenpadding van de sidebar-kaart mag ruimer: bewuste afwijking van het Figma-frame (besluit Thierry), één stap omhoog op de DSLayout-schaal.
+
+**Result:** _(invullen bij done)_
