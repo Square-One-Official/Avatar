@@ -103,6 +103,7 @@
 		89AA16048F395B4CF00BA39D /* ProBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED2448B10A7B5504F841578 /* ProBadge.swift */; };
 		89C89D347949E200275051E3 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		8BA79F365F5F7B49329FF371 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
+		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
@@ -284,6 +285,7 @@
 		F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementService.swift; sourceTree = "<group>"; };
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPage.swift; sourceTree = "<group>"; };
 		FE77E379438EC1069416EA09 /* OnboardingSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSplashView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -442,6 +444,7 @@
 			isa = PBXGroup;
 			children = (
 				60E31735EC49E308BA808F7F /* PrivacyPreferences2.swift */,
+				FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */,
 				3FE4A6E054F04E9AF5422E8D /* SettingsAIModelsPage.swift */,
 				1D40E681885CB6D731F70EDA /* SettingsModel.swift */,
 				18A2A30C157ECE416A5F149E /* SettingsPreferencesPage.swift */,
@@ -846,6 +849,7 @@
 				D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */,
 				D7CFDCF65F3FA907C6C87990 /* PrivacyPreferences2.swift in Sources */,
 				AB116BF57A42F4C1EC0CA933 /* SettingsAIModelsPage.swift in Sources */,
+				8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */,
 				58BC823E9AD033A9C17F7636 /* SettingsModel.swift in Sources */,
 				4136DDEA29ECC6C5D4896AAB /* SettingsPreferencesPage.swift in Sources */,
 				58A132E1A87DB573598AF991 /* SettingsRootView.swift in Sources */,

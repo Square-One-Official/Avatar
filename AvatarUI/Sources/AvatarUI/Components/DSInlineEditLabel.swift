@@ -1,8 +1,9 @@
 // Inline-edit-label — definitieve herbouw op een echt NSTextField (E03.17;
 // na drie gefaalde iteraties op eigen caret/focus-afhandeling: bevindingen
 // 9, 12, 20, 21). Acceptatiecriteria:
-// 1. Rust: platte tekst zonder chrome; hover-badge (bg neutral, r-md,
-//    pointer-cursor) alleen op het veld onder de cursor.
+// 1. Rust: platte tekst zonder chrome; hover-badge (bg neutral-stronger,
+//    r-md, pointer-cursor — punt 24a) alleen op het veld onder de cursor;
+//    alle staten delen exact hetzelfde kader (punt 24b).
 // 2. Edit: native NSTextField — caret op tekstpositie, placeholder links
 //    van de caret die bij de eerste toetsaanslag verdwijnt, bestaande
 //    waarde volledig geselecteerd bij focus (becomeFirstResponder).
@@ -54,6 +55,16 @@ public struct DSInlineEditLabel: View {
     }
 
     public var body: some View {
+        // Punt 24b: alle staten delen exact hetzelfde kader — breedte uit
+        // de meetfunctie (incl. caret-marge, óók in rust gereserveerd),
+        // leading-alignment, vaste regelhoogte. Alleen achtergrond en rand
+        // veranderen; de tekst beweegt geen pixel.
+        let size = InlineEditTextField.measuredSize(
+            text: isEditing ? draft : text,
+            placeholder: placeholder,
+            font: variant.nsFont,
+            lineHeight: variant.textStyle.lineHeight
+        )
         Group {
             if isEditing {
                 InlineEditTextField(
@@ -72,10 +83,13 @@ public struct DSInlineEditLabel: View {
                     .lineLimit(1)
             }
         }
+        .frame(width: size.width, height: size.height, alignment: .leading)
         .padding(.horizontal, DSSpacing.gap2)
         .padding(.vertical, DSSpacing.gap0_5)
+        // Punt 24a: hover-tint één stap sterker (neutral-stronger) —
+        // neutral was op zwart nauwelijks zichtbaar.
         .background(
-            isEditing || isHovering ? DSColor.Background.neutral : .clear,
+            isEditing || isHovering ? DSColor.Background.neutralStronger : .clear,
             in: .rect(cornerRadius: DSRadius.md, style: .continuous)
         )
         .overlay {

@@ -1,8 +1,9 @@
 // Figma "Stories" → App / Sidebar images (dark) → "Slot" (4011:5010):
 // rij met padding gap-2 en gap-2, avatar 48×48 (radius 16), titelkolom
 // gap-0.5 met naam (UI/Labels/Base, primary) en rol (UI/Labels/Base,
-// muted). Geselecteerde rij krijgt bg background/Inset op r-2xl; de
-// overige rijen zijn transparant.
+// muted). Hover krijgt het afgeronde Inset-kleurvlak met ~100ms fade
+// (E03.18, punt 22); selectie is één tint sterker (Inset + neutral-laag)
+// zodat de actieve rij herkenbaar blijft terwijl je elders hovert.
 
 import SwiftUI
 
@@ -27,6 +28,8 @@ public struct DSSidebarRow<Avatar: View>: View {
         self.avatar = avatar()
     }
 
+    @State private var isHovering = false
+
     public var body: some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
@@ -47,12 +50,22 @@ public struct DSSidebarRow<Avatar: View>: View {
                 Spacer(minLength: 0)
             }
             .padding(DSSpacing.gap2)
-            .background(
-                isSelected ? DSColor.Background.inset : .clear,
-                in: RoundedRectangle(cornerRadius: DSRadius.xl2)
-            )
+            .background {
+                let shape = RoundedRectangle(cornerRadius: DSRadius.xl2)
+                ZStack {
+                    if isSelected || isHovering {
+                        shape.fill(DSColor.Background.inset)
+                    }
+                    if isSelected {
+                        // Eén tint sterker dan hover (Inset + neutral-laag).
+                        shape.fill(DSColor.Background.neutral)
+                    }
+                }
+            }
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.1), value: isHovering)
         .accessibilityLabel(Text(role.map { "\(name), \($0)" } ?? name))
     }
 }
