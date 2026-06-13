@@ -24,14 +24,29 @@ Notities (FEAT, bij oplevering):
 **Result:** EditorView in Avatar2/Features/Editor/ op DSEditPanelContainer (E03.3): zes tools uit App / Edit als DSToolbarItem-enum (EditorTool) met lime active-ring, tik-op-actief deselecteert, foto verkleint centraal via de container-spring; per tool een lege DSEditPanel-chrome met stub-regel die naar de leverende story wijst (6.3/E07.1/E09.2/E10.2/E11.2/E05.4); gemount in ShellView op canvas .result. Beide targets bouwen groen, alle tests groen (1 nieuwe Avatar2-test: EditorToolTests).
 
 ## 6.2 — Undo/redo + hold-to-compare
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: 6.1
 - DoD: beide targets bouwen, tests groen
 
 Beide staan in het design (10 jun); bouwen conform Figma, op canvas-niveau.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. Frame App / Edit (4008:7340): undo/redo zijn twee extra cirkels ín de bottom-toolbar;
+   integratie in DSBottomToolbar = AvatarUI (verboden terrein deze sessie) → DS-story E03.19
+   aangemaakt; tot die landt staan ze als losse DSToolButtons direct naast de toolbar
+   (zelfde glass-idioom), gedocumenteerde tijdelijke plaatsing.
+2. Undo-mechaniek: native NSUndoManager (environment) — EditorCanvasView registreert per
+   afgerond gebaar (drag/zoom) een before-snapshot van de Portrait2-transform; AutoFramer
+   registreert vóór het schrijven. Cmd+Z/Shift-Cmd+Z en het Edit-menu werken gratis mee.
+3. Hold-to-compare: portret-thumb rechtsboven (Frame 27) — ingedrukt houden toont de
+   ORIGINELE importfoto op het canvas. Daarvoor Portrait2.originalData (externalStorage,
+   optional; migratie default nil) gevuld bij import; zonder origineel (bestaande rijen)
+   blijft de knop verborgen.
+4. Smoke (wachtrij): toolbar met undo/redo-cirkels, compare-thumb zichtbaar, undo na
+   auto-frame herstelt de vorige transform.
+
+**Result:** _(invullen bij done — wacht op smoke)_
 
 ## 6.3 — Edit-paneel
 - status: ready
