@@ -61,6 +61,25 @@ final class EntitlementModel {
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
     var monthlyResetAt: Date? { account?.monthlyResetAt }
 
+    // MARK: - Account-pagina (E15.3)
+
+    var accountEmail: String? { auth.email }
+    var isSignedIn: Bool { auth.isSignedIn }
+    var planLabel: String { isProActive ? "Pro" : "Starter" }
+
+    func signOutAccount() {
+        auth.signOut()
+    }
+
+    /// Stripe Customer Portal in de browser ("Manage subscription").
+    func openManageSubscription() {
+        Task {
+            if let url = try? await backend.openPortal() {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
     /// Anoniem-vriendelijk: zonder token valt /v1/account terug op de
     /// device-grant-lookup. Offline of fout → state blijft staan.
     func refresh() async {

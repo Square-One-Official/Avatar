@@ -13,6 +13,9 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsRootView: View {
+    /// E15.3: Account-pagina leest plan/credits/e-mail via het entitlement.
+    let entitlement: EntitlementModel
+
     #if DEBUG
     /// Smoke-run-haak (--show-settings <pagina>); zie ShellView.
     @MainActor static var debugInitialPage: SettingsPage?
