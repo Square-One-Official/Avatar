@@ -108,8 +108,8 @@ Notities (AI, bij oplevering):
 **Result:** About-pagina in Avatar2/Features/Settings/ (SettingsAboutPage): Updates-sectie (versie + build uit de bundle, Automatic updates-DSToggle persistent, Check now-knop disabled tot E01.11/Sparkle), Links-sectie (aaavatar.nl + privacy policy via NSWorkspace); gemount in SettingsRootView; beide targets bouwen groen, packagetests groen.
 
 ## 15.5 — Advanced-sectie (dev-only model-picker)
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 15.2, E01.10
 - DoD: beide targets bouwen, tests groen
 - Context: model-override-API uit E01.10; AI & Models-pagina uit 15.2. Dit is ook het testmechanisme voor de E09.1-bakeoff. (Story toegevoegd op besluit Thierry 2026-06-12.)
@@ -121,7 +121,18 @@ gedrag voor reguliere gebruikers. Deploy: MODEL_REGISTRY/model_override staan si
 van 2026-06-12 op productie; backend-werk dat daarna op v2-main landt in-app testen tegen een
 **Vercel-preview-deploy** tot de volgende port.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. Dev-detectie: account.ts geeft `is_dev_unlimited` mee in de dev-tak (port-only); AccountPayload
+   + EntitlementModel.isDevUnlimited. DEBUG-force voor de smoke (productie levert de vlag pas bij
+   de volgende port).
+2. AvatarKit DevModelCatalog (whitelist-spiegel van MODEL_REGISTRY per cloud-feature) +
+   DevModelOverrides (UserDefaults-store, feature→model-key); BackendClient.cutout/colorize/
+   fillBody sturen `model_override` mee als de store een keuze heeft (stylize deed dat al).
+3. Advanced-sectie in SettingsAIModelsPage, alléén bij isDevUnlimited: Menu-picker per
+   cloud-feature + de lokale engine-keuze (PrivacyPreferences2.engine), persistent, gemarkeerd
+   dev-only. Geen zichtbaarheid/gedrag voor reguliere gebruikers.
+
+**Result:** _(invullen bij done — wacht op smoke)_
 
 ## 15.6 — Generatie-model-keuze in Settings (nano-banana / OpenAI)
 - status: ready
