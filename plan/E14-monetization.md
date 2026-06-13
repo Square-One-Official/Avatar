@@ -5,8 +5,8 @@ Team: **FEAT + INFRA**
 Pro-model: Starter Free (3 afbeeldingen totaal, lokale features, watermark) vs Pro **€4,99/mnd of €49,90/jr** (onbeperkt, alle features, **200 credits/mnd**, top-up). Principe: on-device = 0 credits, cloud = kosten-proportionele credits (zie 14.3). **Besluit Thierry 2026-06-12: prijs en credits blijven gelijk aan v1 — de €12,99/100 uit het bouwplan §Pro-model was een voorbeeld en is vervallen.**
 
 ## 14.1 — Pro-modal conform Figma
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: E03.2, E01.5
 - DoD: beide targets bouwen, tests groen
 - Context: Figma node 4019:953 'Choose your plan'; v1 ProUpgradeSheet-logica via AvatarKit als basis.
@@ -19,7 +19,18 @@ vervangt de "Save 20%"-tekst; Thierry past Figma hierop aan.
 Let op: review-fix **14.6** (authed subscribe-flow i.p.v. subscribeAnonymous voor ingelogde
 gebruikers) hoort hierbij — meenemen of eerst doen.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. PaywallSheet subscribe-tak herbouwen als de "Choose your plan"-kiezer (frame 4019:953):
+   gecentreerde titel, Monthly/Yearly-segmented (Yearly = "2 months free"), twee kaarten
+   Starter (Free, feature-list) + Pro (lime rand, "Upgrade"-chip, prijs per interval,
+   feature-list, "Upgrade to pro"-CTA). Top-up-tak (actieve Pro) blijft ongewijzigd.
+2. Echte prijzen uit ProTier (€4,99/mnd · €49,90/jr · 200 credits) — al correct in E14.4;
+   prijs schakelt met het interval.
+3. Lokale segmented-pill in de Paywall-feature (geen AvatarUI-wijziging).
+4. 14.6 (authed subscribe) wordt apart in de keten gedaan; subscribe gebruikt nu nog de
+   anonymous-flow (werkt voor iedereen).
+
+**Result:** _(invullen bij done — wacht op smoke)_
 
 ## 14.2 — Free-gate: 3 afbeeldingen totaal
 - status: backlog
