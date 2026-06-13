@@ -123,11 +123,16 @@ struct EditorCanvasView: View {
     }
 
     private func resetToFit() {
-        // Dubbelklik = auto-frame (spec); tot E06.5 de echte
-        // AutoAligner-port levert is fill-fit de beste benadering.
-        withAnimation(.spring(duration: 0.35)) {
-            writeTransform(fitTransform(), touch: true)
+        // Dubbelklik = auto-frame (E06.5): echte AutoAligner-port wanneer
+        // er een model + CGImage is; anders fill-fit.
+        guard let portrait,
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            withAnimation(.spring(duration: 0.35)) {
+                writeTransform(fitTransform(), touch: true)
+            }
+            return
         }
+        Task { await AutoFramer.apply(to: portrait, image: cg) }
     }
 
     // MARK: - Drag = pan + snap (v1-port)

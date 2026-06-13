@@ -116,6 +116,20 @@ struct EditorView: View {
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
+            } else if tool == .edit {
+                // E06.5: de eerste echte actie in het Edit-paneel; E06.3
+                // neemt hem op in de volledige actielijst.
+                DSEditPanel(title: tool.label) {
+                    VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+                        DSNeutralButton("Automatic framing") {
+                            runAutomaticFraming()
+                        }
+                        Text("More tools land here (E06.3).")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")
@@ -135,5 +149,13 @@ struct EditorView: View {
             }
         }
         #endif
+    }
+
+    /// E06.5: AutoFramer op het huidige portret; zonder model of CGImage
+    /// is er niets te kadreren (knop is dan een no-op).
+    private func runAutomaticFraming() {
+        guard let portraitModel,
+              let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        Task { await AutoFramer.apply(to: portraitModel, image: cg) }
     }
 }

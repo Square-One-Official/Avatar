@@ -111,4 +111,8 @@ percentage van de canvasbreedte; geanimeerde overgang.
 4. Unit-tests op de pure transform-math in het Avatar2-testtarget (eye-based, fallback,
    body-overshoot, no-face → fit).
 
-**Result:** _(invullen bij done — wacht op smoke)_
+Notitie (marathon): code + builds klaar, AutoFramer-tests groen; visuele smoke in de
+unlock-wachtrij. NB: 2 AvatarKit-tests (AuthSessionStorage) falen tijdelijk door het
+vergrendelde scherm (keychain niet beschikbaar) — rerun bij unlock staat in de wachtrij.
+
+**Result:** _(invullen bij done — wacht op smoke + suite-rerun)_

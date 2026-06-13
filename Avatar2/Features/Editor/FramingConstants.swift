@@ -25,4 +25,19 @@ enum FramingConstants {
     // Zoomgrenzen van het portret binnen de kaart (spec E06.4).
     static let minZoomFactor: Double = 0.5
     static let maxZoomFactor: Double = 3.0
+
+    // MARK: Face-rect-fallback + body (E06.5, v1-waarden)
+
+    /// Doelhoogte van de face-box als fractie van de canvashoogte (fallback
+    /// zonder ooglandmarks).
+    static let targetFaceHeightRatio: CGFloat = 0.38
+
+    /// Verticale positie van het face-centrum (fallback).
+    static let targetFaceCenterY: CGFloat = 0.42
+
+    /// Horizontale positie van het face-centrum (fallback).
+    static let targetFaceCenterX: CGFloat = 0.50
+
+    /// Hoe ver de romp voorbij de canvasonderkant moet doorlopen.
+    static let bodyOvershoot: CGFloat = 0.03
 }
