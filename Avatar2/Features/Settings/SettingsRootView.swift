@@ -13,7 +13,18 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsRootView: View {
-    @State private var page: SettingsPage = .preferences
+    #if DEBUG
+    /// Smoke-run-haak (--show-settings <pagina>); zie ShellView.
+    @MainActor static var debugInitialPage: SettingsPage?
+    #endif
+
+    @State private var page: SettingsPage = {
+        #if DEBUG
+        return SettingsRootView.debugInitialPage ?? .preferences
+        #else
+        return .preferences
+        #endif
+    }()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -56,7 +67,7 @@ struct SettingsRootView: View {
         case .preferences:
             SettingsPreferencesPage()
         case .aiModels:
-            SettingsPlaceholderPage(title: SettingsPage.aiModels.title)
+            SettingsAIModelsPage()
         case .account:
             SettingsPlaceholderPage(title: SettingsPage.account.title)
         case .about:

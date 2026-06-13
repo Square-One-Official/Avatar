@@ -38,11 +38,31 @@ Notities (AI, bij oplevering):
 **Result:** Settings-venster (SwiftUI Settings-scene, hiddenTitleBar, 1000×700) in Avatar2/Features/Settings/ — SettingsRootView (sub-nav 320 met SETTINGS-kop + 4 Navigation Buttons incl. action-balkje/hover, content 656), SettingsPreferencesPage (H1-header, Appearance-sectie met System/Light/Dark-dropdown op DS-tokens, Notifications-sectie met icoonrij + DSToggle), sectie/rij als herbruikbare lokale views; gear werkt nu via showSettingsWindow:; beide targets bouwen groen, packagetests groen.
 
 ## 15.2 — AI & Models-pagina
-- status: backlog
-- owner: —
+- status: done
+- owner: AI (E15-reeks op directe instructie Thierry)
 - blockedBy: 15.1, E02.3
 - DoD: beide targets bouwen, tests groen
 - Context: Figma 'App / Settings / AI & Models' (4019:823); ModelManager-vereenvoudiging uit E02.3. Let op: waveform-icoon in design is placeholder — gebruik cloud/sparkle.
+
+Notities (AI, bij oplevering):
+- PrivacyPreferences2 (Avatar2/Features/Settings/) draagt de v1-keys/rawValues incl.
+  fingerprint-beleid; E04.3 (onboarding-privacy-stap) kan hem direct hergebruiken.
+- OrmbgModelStore.download kreeg een optionele voortgangscallback (AvatarKit/Engines,
+  AI-grens): bytes-stream naar schijf met fractie per 256 KB-chunk; zonder callback
+  ongewijzigd gedrag. Geslaagde download activeert de engine meteen; trash zet terug naar
+  Apple Vision.
+- Router-wiring: ShellModel registreert nu Vision + ORMBG en prefereert de engine-voorkeur
+  per import (terugval = eerste beschikbare = Vision) — de Active-state is dus echt.
+- Frame-afwijkingen gedocumenteerd in de code: headernode draagt "Preferences"
+  (template-bug) → "AI & Models"; waveform → cloud-glyph; echte modelwaarden (78 MB —
+  niet de ±175 MB uit figma-design-review.md; "8 GB RAM" uit het frame klopt voor elke
+  ondersteunde Mac).
+- Visuele check geblokkeerd: een Xcode-debug-instantie van Aaavatar 2 (Thierry) hield de
+  bundle-id bezet en assistive access voor osascript is ingetrokken. DEBUG-launchhaak
+  toegevoegd: `open "Aaavatar 2.app" --args --show-settings aiModels` opent de pagina
+  direct — check kan zodra de debugsessie vrij is.
+
+**Result:** AI & Models-pagina in Avatar2/Features/Settings/ (SettingsAIModelsPage): online-modellen-toggle op PrivacyPreferences2 (zelfde keys/rawValues/fingerprint-beleid als v1, klaar voor E04.3), Local models-kaart met High-fidelity edges op OrmbgModelStore — download met lineaire voortgang + percentage, Active-state gekoppeld aan de engine-voorkeur, delete → terugval Apple Vision; ShellModel-router gebruikt de voorkeur per import; beide targets bouwen groen, packagetests groen.
 
 'Allow online models'-toggle (zelfde PrivacyPreferences als onboarding) + Local models-lijst (naam •
 RAM-eis • grootte, Active-state, download/delete via icon-button). Hier landt de High-fidelity

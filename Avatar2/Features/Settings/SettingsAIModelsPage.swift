@@ -1,0 +1,219 @@
+// AI & Models-pagina (E15.2) — Figma 4019:823. Twee kaarten met 4pt
+// tussenruimte: de online-modellen-toggle (zelfde PrivacyPreferences als
+// onboarding/E04.3) en de Local models-lijst met de High-fidelity
+// edges-kaart op OrmbgModelStore (E02.3) — dezelfde store als de
+// onboarding-downloadstap (E04.6): één download-state, twee vensters.
+//
+// Frame-afwijkingen, gedocumenteerd:
+// - header-tekstnode draagt nog "Preferences" (template-bug) → "AI & Models";
+// - waveform-icoon is per het bord een placeholder → cloud-glyph;
+// - modelnaam/grootte zijn echte waarden: High-fidelity edges, 78 MB
+//   (manifest-zip; de ±175 MB uit figma-design-review.md klopte niet).
+//   "8 GB RAM" uit het frame blijft: elke ondersteunde Mac haalt dat.
+
+import AvatarKit
+import AvatarUI
+import SwiftUI
+
+struct SettingsAIModelsPage: View {
+    @State private var prefs = PrivacyPreferences2.shared
+    @State private var model = HighFidelityModelState()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("AI & Models")
+                .dsTextStyle(.h1)
+                .foregroundStyle(DSColor.Foreground.primary)
+
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                onlineModelsCard
+                localModelsCard
+            }
+            .padding(.top, DSSpacing.gap8)
+
+            Spacer()
+        }
+        .padding(.top, 76)
+        .padding(.leading, DSSpacing.gap6)
+        .padding(.trailing, DSSpacing.gap6)
+        .task { model.refreshInstalledState() }
+    }
+
+    // MARK: Allow online models (frame "row-system-audio", h94)
+
+    private var onlineModelsCard: some View {
+        HStack(spacing: DSSpacing.gap3) {
+            Circle()
+                .fill(DSColor.Background.action)
+                .frame(width: 28, height: 28)
+                .overlay {
+                    Image(systemName: "cloud.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(DSColor.Action.onAction)
+                }
+            VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
+                Text("Allow online models")
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Text("This will give you more advanced editing features")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            Spacer(minLength: DSSpacing.gap4)
+            DSToggle(isOn: Binding(
+                get: { prefs.mode == .cloudAllowed },
+                set: { prefs.mode = $0 ? .cloudAllowed : .localOnly }
+            ))
+        }
+        .padding(DSSpacing.gap6)
+        .frame(maxWidth: 608, alignment: .leading)
+        .background(DSColor.Background.card)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+    }
+
+    // MARK: Local models (frame "list")
+
+    private var localModelsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Local models")
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+
+            HStack(spacing: DSSpacing.gap3) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: DSSpacing.gap2) {
+                        Text("Cut out")
+                            .dsTextStyle(.labelBase)
+                            .foregroundStyle(DSColor.Foreground.primary)
+                        Text("•")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                        Text("High-fidelity edges")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                        Text("•")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                        Text("8 GB RAM")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                    subtitleLine
+                }
+                Spacer(minLength: DSSpacing.gap4)
+                trailingControls
+            }
+            .padding(.top, DSSpacing.gap6)
+        }
+        .padding(DSSpacing.gap6)
+        .frame(maxWidth: 608, alignment: .leading)
+        .background(DSColor.Background.card)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+    }
+
+    @ViewBuilder
+    private var subtitleLine: some View {
+        switch model.phase {
+        case .downloading(let fraction):
+            // Downloadvoortgang (E04.6/E15.2-besluit: zichtbaar in deze
+            // kaart, ook wanneer de download in onboarding gestart is —
+            // zelfde store, dus zodra E04.6 bestaat deelt hij deze state).
+            HStack(spacing: DSSpacing.gap2) {
+                ProgressView(value: fraction)
+                    .progressViewStyle(.linear)
+                    .tint(DSColor.Action.primary)
+                    .frame(width: 160)
+                Text("\(Int(fraction * 100))%")
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .monospacedDigit()
+            }
+            .frame(minHeight: 20)
+        case .failed:
+            Text("Download failed — check your connection and try again")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+        case .idle, .installed:
+            Text("78 MB")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+        }
+    }
+
+    @ViewBuilder
+    private var trailingControls: some View {
+        switch model.phase {
+        case .installed:
+            HStack(spacing: DSSpacing.gap2) {
+                if prefs.engine == .downloadedModel {
+                    Text("Active")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Action.primary)
+                }
+                DSIconButton(Image(systemName: "trash")) {
+                    model.delete()
+                    prefs.engine = .appleVision
+                }
+                .accessibilityLabel("Delete model")
+            }
+        case .downloading:
+            ProgressView()
+                .controlSize(.small)
+        case .idle, .failed:
+            DSIconButton(Image(systemName: "arrow.down.circle")) {
+                model.download { prefs.engine = .downloadedModel }
+            }
+            .accessibilityLabel("Download model")
+        }
+    }
+}
+
+/// UI-state rond OrmbgModelStore.shared. Geslaagde download activeert de
+/// engine meteen (de gebruiker downloadde hem om hem te gebruiken) — de
+/// trash-knop zet de keuze terug naar Apple Vision.
+@MainActor
+@Observable
+final class HighFidelityModelState {
+    enum Phase: Equatable {
+        case idle
+        case downloading(Double)
+        case installed
+        case failed
+    }
+
+    private(set) var phase: Phase = .idle
+
+    private let store = OrmbgModelStore.shared
+
+    func refreshInstalledState() {
+        if case .downloading = phase { return }
+        phase = store.installedModelURL() != nil ? .installed : .idle
+    }
+
+    func download(onInstalled: @escaping () -> Void) {
+        guard phase != .installed else { return }
+        phase = .downloading(0)
+        Task {
+            do {
+                _ = try await store.download { fraction in
+                    Task { @MainActor [weak self] in
+                        if case .downloading = self?.phase {
+                            self?.phase = .downloading(fraction)
+                        }
+                    }
+                }
+                phase = .installed
+                onInstalled()
+            } catch {
+                phase = .failed
+            }
+        }
+    }
+
+    func delete() {
+        phase = .idle
+        Task {
+            try? await store.removeInstalled()
+        }
+    }
+}

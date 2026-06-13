@@ -92,14 +92,26 @@ public actor OrmbgModelStore {
     /// Downloadt en installeert het model. Idempotent: al geïnstalleerd →
     /// geeft direct de bestaande URL terug; een lopende download wordt
     /// gedeeld door gelijktijdige aanroepers.
-    public func download() async throws -> URL {
+    ///
+    /// `onProgress` (E15.2): fractie 0…1 van de downloadfase; checksum/
+    /// uitpakken melden geen tussenstappen (sub-seconde werk). Alleen de
+    /// aanroeper die de download stárt krijgt voortgang — een tweede,
+    /// gelijktijdige aanroeper deelt het resultaat zonder callbacks
+    /// (UI-vereenvoudiging: er is één Settings-venster).
+    public func download(
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> URL {
         if let installed = installedModelURL() { return installed }
         if let active = activeDownload { return try await active.value }
 
         let manifest = self.manifest
         let installDirectory = self.installDirectory
         let task = Task<URL, Error>.detached(priority: .userInitiated) {
-            try await Self.fetchAndInstall(manifest: manifest, installDirectory: installDirectory)
+            try await Self.fetchAndInstall(
+                manifest: manifest,
+                installDirectory: installDirectory,
+                onProgress: onProgress
+            )
         }
         activeDownload = task
         defer { activeDownload = nil }
@@ -132,7 +144,11 @@ public actor OrmbgModelStore {
 
     // MARK: - Download + installatie (synchroon, draait detached)
 
-    private static func fetchAndInstall(manifest: Manifest, installDirectory: URL) async throws -> URL {
+    private static func fetchAndInstall(
+        manifest: Manifest,
+        installDirectory: URL,
+        onProgress: (@Sendable (Double) -> Void)? = nil
+    ) async throws -> URL {
         let fm = FileManager.default
         let scratch = fm.temporaryDirectory
             .appendingPathComponent("ormbg-download-\(UUID().uuidString)", isDirectory: true)
@@ -140,10 +156,38 @@ public actor OrmbgModelStore {
         defer { try? fm.removeItem(at: scratch) }
 
         // 1. Download de zip — gestreamd naar schijf, niet via Data in
-        //    het geheugen.
+        //    het geheugen. Met voortgangscallback gaat het via bytes(from:)
+        //    zodat de fractie per chunk gemeld kan worden; zonder callback
+        //    blijft het de kant-en-klare download(from:).
         let zipURL = scratch.appendingPathComponent("model.zip")
-        let (tempFile, _) = try await URLSession.shared.download(from: manifest.zipURL)
-        try fm.moveItem(at: tempFile, to: zipURL)
+        if let onProgress {
+            let (bytes, response) = try await URLSession.shared.bytes(from: manifest.zipURL)
+            let expected = response.expectedContentLength
+            fm.createFile(atPath: zipURL.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: zipURL)
+            defer { try? handle.close() }
+            var buffer = Data()
+            buffer.reserveCapacity(1 << 18)
+            var received: Int64 = 0
+            for try await byte in bytes {
+                buffer.append(byte)
+                if buffer.count >= 1 << 18 {
+                    try handle.write(contentsOf: buffer)
+                    received += Int64(buffer.count)
+                    buffer.removeAll(keepingCapacity: true)
+                    if expected > 0 {
+                        onProgress(min(1, Double(received) / Double(expected)))
+                    }
+                }
+            }
+            if !buffer.isEmpty {
+                try handle.write(contentsOf: buffer)
+            }
+            onProgress(1)
+        } else {
+            let (tempFile, _) = try await URLSession.shared.download(from: manifest.zipURL)
+            try fm.moveItem(at: tempFile, to: zipURL)
+        }
 
         // 2. SHA-256-gate.
         let actual = try sha256(of: zipURL)

@@ -47,6 +47,19 @@ struct ShellView: View {
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
+            #if DEBUG
+            // Smoke-run-haak: `--show-settings [pagina]` opent de
+            // in-window Settings direct (visuele verificatie zonder
+            // assistive access). Compiled out of Release.
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "--show-settings") {
+                model.isShowingSettings = true
+                if args.indices.contains(i + 1),
+                   let page = SettingsPage(rawValue: args[i + 1]) {
+                    SettingsRootView.debugInitialPage = page
+                }
+            }
+            #endif
         }
     }
 
