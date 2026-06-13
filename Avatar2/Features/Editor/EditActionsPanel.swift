@@ -18,6 +18,9 @@ import SwiftUI
 struct EditActionsPanel: View {
     /// Auto-crop & center draait op het geselecteerde portret (E06.5).
     let onAutomaticFraming: () -> Void
+    /// E12.1: lokale Core Image-retouch + belichting (geen cloud/credits).
+    var onRetouch: () -> Void = {}
+    var onImproveLighting: () -> Void = {}
 
     private struct Action: Identifiable {
         let id = UUID()
@@ -48,14 +51,16 @@ struct EditActionsPanel: View {
                 // upscale = lichte cloud-call). Modelkeuze open → AI-spike E10.3.
                 Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: nil),
             ]),
-            // Beauty onderaan. Generatieve retouch = standaardtarief (4);
-            // Restore body = fill-body-route (2).
+            // Beauty onderaan. One-click retouch + Improve lighting zijn
+            // sinds E12.1 lokale Core Image-acties (geen credits/chip);
+            // gerichte semantische edits (tanden/rimpels/make-up) blijven
+            // generatief (4); Restore body = fill-body-route (2).
             Section(title: "Retouch", actions: [
-                Action(title: "One click retouch", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "One click retouch", meter: nil, isCloud: false, handler: onRetouch),
+                Action(title: "Improve lighting", meter: nil, isCloud: false, handler: onImproveLighting),
                 Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: nil),
                 Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: nil),
                 Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: nil),
-                Action(title: "Improve lighting", meter: .generativeStandard, isCloud: true, handler: nil),
                 Action(title: "Restore body", meter: .fillBody, isCloud: true, handler: nil),
             ]),
         ]

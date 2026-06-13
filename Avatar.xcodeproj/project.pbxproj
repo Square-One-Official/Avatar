@@ -120,6 +120,7 @@
 		9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
 		9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
+		98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */; };
 		994378F65582B21AD619D0A3 /* ShellMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */; };
 		9A0AC0FD42FB23057D7EA406 /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */; };
 		9BEB5AA558E17FA90A34DCB5 /* Mesh 04.png in Resources */ = {isa = PBXBuildFile; fileRef = ECB59382EAC176D9739FE9C7 /* Mesh 04.png */; };
@@ -313,6 +314,7 @@
 		E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellMetrics.swift; sourceTree = "<group>"; };
 		E550B398D542F0234C2B9396 /* GoogleGMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleGMark.swift; sourceTree = "<group>"; };
 		EA293E7F1CF952594B0EB25E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
+		EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEnhanceUndo.swift; sourceTree = "<group>"; };
 		EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		ECB59382EAC176D9739FE9C7 /* Mesh 04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 04.png"; sourceTree = "<group>"; };
 		EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoAligner.swift; sourceTree = "<group>"; };
@@ -393,6 +395,7 @@
 				0FF5244B77EE121141D48309 /* FramingConstants.swift */,
 				193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */,
 				48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */,
+				EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */,
 				9C2B6957003039CB34DD8610 /* PortraitExporter.swift */,
 				B8BF6F54BCF4084CCFDFFFBC /* TransformUndo.swift */,
 			);
@@ -905,6 +908,7 @@
 				20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */,
 				A4595011162E8E75689EB453 /* HairNudgeBanner.swift in Sources */,
 				491B02E74B243F21C30E93AC /* HairPanel.swift in Sources */,
+				98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */,
 				44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */,
 				D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */,
 				286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */,

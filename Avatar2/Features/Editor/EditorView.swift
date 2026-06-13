@@ -8,6 +8,7 @@
 // E10 Clothes, E11 Hair, E05.4 Images/sidebar) en tonen tot die landen een
 // lege paneel-chrome. Undo/redo naast de toolbar komen met E06.2.
 
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
@@ -216,7 +217,11 @@ struct EditorView: View {
                 // E06.3: volledige actielijst (zakelijk boven beauty); de
                 // auto-frame-actie (E06.5) is "Auto-crop & center".
                 DSEditPanel(title: tool.label) {
-                    EditActionsPanel(onAutomaticFraming: runAutomaticFraming)
+                    EditActionsPanel(
+                        onAutomaticFraming: runAutomaticFraming,
+                        onRetouch: { applyLocalEnhance("One-click retouch") { PortraitEnhancer.magicRetouch($0) } },
+                        onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } }
+                    )
                 }
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
@@ -259,5 +264,22 @@ struct EditorView: View {
         guard let portraitModel,
               let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
         Task { await AutoFramer.apply(to: portraitModel, image: cg, undoManager: undoManager) }
+    }
+
+    /// E12.1: lokale Core Image-enhance op het huidige portret. Niet-
+    /// destructief — het origineel (`originalData`) blijft, hold-to-compare
+    /// toont het, en de wissel is undo'baar. Vervangt canvas + cutout via
+    /// `onApplyResult`. No-op zonder model/CGImage of bij renderfout.
+    private func applyLocalEnhance(_ name: String, _ transform: (CGImage) -> CGImage?) {
+        guard let portraitModel,
+              let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let outCG = transform(cg) else { return }
+        let before = portrait
+        let after = NSImage(cgImage: outCG, size: portrait.size)
+        onApplyResult(after)
+        ImageEnhanceUndo.register(
+            undoManager, target: portraitModel, apply: onApplyResult,
+            undoTo: before, redoTo: after, actionName: name
+        )
     }
 }
