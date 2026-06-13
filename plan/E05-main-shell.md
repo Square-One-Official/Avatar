@@ -132,3 +132,21 @@ Spec (Thierry): past het auto-frame-profiel (E06.5) toe op álle portretten in d
 previewanimatie in de thumbnails; undo geldt set-breed als één stap.
 
 **Result:** _(invullen bij done)_
+
+## 5.8 — Topbar-randmarges op het venster-marge-token
+- status: in_progress
+- owner: FEAT (AI-agent, marathon 2026-06-13)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen, visuele smoke-run
+- Context: visuele punt Thierry (13 jun): het rechter topbar-cluster staat te ver van de vensterrand; trailing-padding moet hetzelfde token zijn als de venster-marge van sidebar/canvas — geen los magic number. Linkerkant meteen gecheckt.
+
+**Plan:**
+1. `ShellMetrics.windowEdgeInset` (= DSSpacing.gap1, de marge die E03.15 als kaart-vensterrand
+   introduceerde) als één bron in Features/Shell/; SidebarView.edgeInset verwijst ernaar.
+2. Gear-cluster trailing: 16 (magic) → windowEdgeInset, zodat de glascirkel uitlijnt met de
+   sidebar-kaartrand; top blijft het strook-ritme (gap3).
+3. Linkerkant gecheckt: de quota-x (76) is opgebouwd uit de OS-window-controls (≈68, vast bij
+   hiddenTitleBar) + gap2 — geen tokenbreuk; als constante met die afleiding gedocumenteerd.
+4. Visuele smoke-run vóór/na.
+
+**Result:** _(invullen bij done)_
