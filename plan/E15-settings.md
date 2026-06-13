@@ -76,8 +76,8 @@ rafelig haarresultaat) hangt hier ook op.
 **Result:** _(invullen bij done)_
 
 ## 15.3 — Account-pagina (zelf invullen)
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 15.1, E14.1
 - DoD: beide targets bouwen, tests groen
 - Context: stijl uit 15.1; gegevens via AvatarKit (AuthService, ProEntitlement).
