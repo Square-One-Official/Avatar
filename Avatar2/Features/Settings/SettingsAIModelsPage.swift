@@ -23,6 +23,8 @@ struct SettingsAIModelsPage: View {
     @State private var model = HighFidelityModelState()
     /// E15.5: tick om de pickers te laten herrenderen na een keuze.
     @State private var overridesTick = 0
+    /// E15.6: gebruikersgerichte generatie-modelkeuze (nano / OpenAI).
+    @State private var generationModel = GenerationModelStore.shared.current
 
     private let overrides = DevModelOverrides.shared
 
@@ -35,6 +37,8 @@ struct SettingsAIModelsPage: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                 onlineModelsCard
                 localModelsCard
+                // E15.6: generatie-modelkeuze (nano / OpenAI), alle gebruikers.
+                generationModelCard
                 // E15.5: alléén voor dev-accounts.
                 if entitlement?.isDevUnlimited == true {
                     advancedCard
@@ -48,6 +52,59 @@ struct SettingsAIModelsPage: View {
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { model.refreshInstalledState() }
+    }
+
+    // MARK: Generation model (E15.6, user-facing nano / OpenAI)
+
+    private var generationModelCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Generation model")
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+            Text("Used for AI styles, clothing and hair")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+
+            VStack(spacing: DSSpacing.gap2) {
+                ForEach(GenerationModel.allCases) { option in
+                    generationOptionRow(option)
+                }
+            }
+            .padding(.top, DSSpacing.gap4)
+        }
+        .padding(DSSpacing.gap6)
+        .frame(maxWidth: 608, alignment: .leading)
+        .background(DSColor.Background.card)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+    }
+
+    private func generationOptionRow(_ option: GenerationModel) -> some View {
+        let isSelected = generationModel == option
+        return Button {
+            generationModel = option
+            GenerationModelStore.shared.current = option
+        } label: {
+            HStack(spacing: DSSpacing.gap3) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
+                    Text(option.label)
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    Text(option.detail)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                }
+                Spacer(minLength: DSSpacing.gap4)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.muted)
+            }
+            .padding(DSSpacing.gap3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? DSColor.Background.neutral : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Advanced (E15.5, dev-only model-picker)

@@ -127,6 +127,44 @@ export function defaultModelRef(feature: CloudFeature): string {
   return reg.models[reg.defaultModel].ref;
 }
 
+/**
+ * Door gebruikers kiesbare generatie-modellen per feature (E15.6). I.t.t.
+ * `model_override` (dev-only, hele whitelist) is dit een kleine, openbare
+ * keuze: de Settings-rij "Generation model" laat de gebruiker schakelen
+ * tussen nano-banana (default) en het OpenAI-model. Alleen deze keys mogen
+ * van een gewone gebruiker komen.
+ */
+export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
+  stylize: ["nano-banana", "gpt-image-1.5"],
+};
+
+/**
+ * Resolve de optionele, gebruikersgerichte `generation_model`-parameter naar
+ * een Replicate-ref.
+ *
+ *   - geen/lege waarde → null (caller gebruikt de feature-default);
+ *   - waarde gelijk aan de feature-default → null (zelfde gedrag, geen ruis);
+ *   - waarde in de user-selectable whitelist → die ref;
+ *   - onbekende/niet-toegestane waarde → null, stil genegeerd (geen oracle;
+ *     valt terug op de default i.p.v. een 400 zoals de dev-override, want
+ *     een verouderde client-voorkeur mag de feature niet breken).
+ */
+export function resolveGenerationModel(
+  feature: CloudFeature,
+  rawKey: unknown,
+): string | null {
+  if (typeof rawKey !== "string" || rawKey === "") return null;
+  const reg = MODEL_REGISTRY[feature];
+  if (rawKey === reg.defaultModel) return null;
+  const allowed = USER_SELECTABLE_MODELS[feature] ?? [];
+  if (!allowed.includes(rawKey)) {
+    console.warn(`[models] generation_model not user-selectable feature=${feature} key=${rawKey}`);
+    return null;
+  }
+  const entry = reg.models[rawKey];
+  return entry ? entry.ref : null;
+}
+
 export class UnknownModelOverrideError extends Error {
   constructor(
     public readonly feature: CloudFeature,

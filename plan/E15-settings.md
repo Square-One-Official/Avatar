@@ -156,8 +156,8 @@ autosave-mechanismen + AppearancePreferenceModifier met een per-build-instabiele
 Dat is INFRA-terrein → losse story **E01.14** (zie E01-bestand). Niet-blokkerend voor 15.5.
 
 ## 15.6 — Generatie-model-keuze in Settings (nano-banana / OpenAI)
-- status: ready
-- owner: —            <!-- Settings-UI = FEAT; registry-registratie = INFRA-substory indien grens geraakt -->
+- status: done
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: E01.10 (MODEL_REGISTRY + override, done), E15.1 (Settings-shell, done)
 - DoD: beide targets bouwen + tests groen + gemerged + Result-regel
 - Context: besluit Thierry 2026-06-13 (kleding-route); E01.10 MODEL_REGISTRY/override-param;
@@ -178,6 +178,24 @@ story alvast model + Settings-keuze en wordt de call-param aangesloten zodra E09
 Acceptatie: model wisselen verandert aantoonbaar de model-param in de /v1/stylize-request;
 nano blijft default; beide targets groen + gemerged.
 
-**Plan:** _(invullen bij claim)_
+**Plan:**
+1. Backend (port-only): OpenAI-model staat al in MODEL_REGISTRY.stylize (`gpt-image-1.5`).
+   `USER_SELECTABLE_MODELS` + `resolveGenerationModel(feature, rawKey)` toevoegen (user-facing
+   whitelist {nano-banana, gpt-image-1.5}, default/onbekend → null = stil terugvallen). stylize.ts
+   precedentie: dev `model_override` > user `generation_model` > default.
+2. AvatarKit: `GenerationModel`-enum (rawValue = backend-key) + `GenerationModelStore`
+   (UserDefaults, default nano); BackendClient.stylize stuurt `generation_model` mee.
+3. FEAT: "Generation model"-kaart in SettingsAIModelsPage (alle gebruikers, niet dev-only):
+   twee opties (Nano Banana / OpenAI) met radio-select, persistent via de store.
 
-**Result:** _(invullen bij done)_
+**Result:** Gebruikersgerichte modelkeuze end-to-end. **Backend** (port-only, preview-test):
+`resolveGenerationModel` + `USER_SELECTABLE_MODELS` in models.ts; stylize.ts honoreert
+`generation_model` (precedentie dev-override > user-keuze > nano-default); onbekende/verouderde
+keys vallen stil terug op nano (geen 400). `npm run typecheck` groen. **AvatarKit:**
+`GenerationModel` {nanoBanana="nano-banana", openAI="gpt-image-1.5"} + `GenerationModelStore`
+(default nano); BackendClient.stylize stuurt `generation_model` = store-keuze. 3 nieuwe tests
+(default = nano, OpenAI persisteert met key `gpt-image-1.5`, round-trip). **FEAT:** "Generation
+model"-kaart in SettingsAIModelsPage met Nano Banana (default, checkmark) / OpenAI, persistent.
+Smoke (`--show-settings aiModels`): kaart rendert met nano geselecteerd. Beide targets groen,
+alle suites groen. Live request-param-wissel verifieerbaar tegen de Vercel-preview (port-only;
+landt op productie bij de volgende E13.0-port samen met E09.2's stylize.ts).

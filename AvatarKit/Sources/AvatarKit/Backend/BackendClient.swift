@@ -288,14 +288,17 @@ public final class BackendClient {
         struct Body: Encodable {
             let image: String
             let style: String
+            let generationModel: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
                 case image, style
+                case generationModel = "generation_model"
                 case modelOverride = "model_override"
             }
         }
         let body = try JSONEncoder().encode(
             Body(image: imagePNG.base64EncodedString(), style: style.rawValue,
+                 generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
         let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
 import {
   MODEL_REGISTRY,
+  resolveGenerationModel,
   resolveModelOverride,
   UnknownModelOverrideError,
 } from "../../lib/models.js";
@@ -123,7 +124,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // E01.10: optionele model-override — dev-only, whitelist in MODEL_REGISTRY.
+  // Modelkeuze, in volgorde van precedentie:
+  //   1. E01.10 dev-only `model_override` (hele whitelist) — wint altijd;
+  //   2. E15.6 gebruikersgerichte `generation_model` (nano / OpenAI);
+  //   3. anders de feature-default (nano-banana).
   let modelRef: string | null;
   try {
     modelRef = resolveModelOverride("stylize", req.body?.model_override, isDevUser);
@@ -133,6 +137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     throw e;
+  }
+  if (!modelRef) {
+    modelRef = resolveGenerationModel("stylize", req.body?.generation_model);
   }
 
   try {
