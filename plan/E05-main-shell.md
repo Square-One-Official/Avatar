@@ -120,3 +120,15 @@ langs de bovenrand van het silhouet) is onderdeel van de story — afstemmen met
 over een bruikbaar signaal uit de engine.
 
 **Result:** _(invullen bij done)_
+
+## 5.7 — "Align set"-actie in de sidebar
+- status: backlog
+- owner: —
+- blockedBy: E06.5
+- DoD: beide targets bouwen, tests groen
+- Context: besluit Thierry 2026-06-13. GEEN Figma-afhankelijkheid (spec-bron in E06.4/6.5). Dit is de kern-merkbelofte als één knop — prominent maar niet schreeuwerig.
+
+Spec (Thierry): past het auto-frame-profiel (E06.5) toe op álle portretten in de set, met
+previewanimatie in de thumbnails; undo geldt set-breed als één stap.
+
+**Result:** _(invullen bij done)_

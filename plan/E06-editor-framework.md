@@ -44,3 +44,33 @@ Let op: paneel krijgt later nog een design-iteratie — vervangbaar bouwen.
 
 **Result:** _(invullen bij done)_
 
+
+## 6.4 — Canvas-transform: pan/zoom/snap
+- status: ready
+- owner: —
+- blockedBy: 6.1 (done)
+- DoD: beide targets bouwen, tests groen
+- Context: besluit Thierry 2026-06-13 — port van v1-mechanics. GEEN Figma-afhankelijkheid: implementeer op macOS-conventies + onderstaande spec (de ontwerpbron van deze story). Mechanics 1-op-1 porten uit v1 EditorView (drag/snap/haptics, regels ~252–350) en de guide-overlay; visueel in DS-stijl.
+
+Spec (Thierry):
+- Drag = pan, scroll/pinch = zoom (0,5×–3×) van de foto binnen de vaste 1:1-canvaskaart;
+  dubbelklik = auto-frame.
+- Tijdens drag een subtiele alignment-guide-overlay (ooglijn + hoofd-ovaal), fade-in bij
+  dragstart, fade-out na loslaten.
+- Magnetische snapping op canvas-midden-X en de standaard-ooglijn, met haptic tick.
+- Transform persistent per portret (Portrait2-velden; bewerking → updatedAt).
+
+**Result:** _(invullen bij done)_
+
+## 6.5 — Automatic framing-actie
+- status: backlog
+- owner: —
+- blockedBy: 6.4
+- DoD: beide targets bouwen, tests groen
+- Context: besluit Thierry 2026-06-13. GEEN Figma-afhankelijkheid (zelfde spec-bron als 6.4). v1 AutoAligner is de referentie: neem de getunede doelwaarden over — niet opnieuw raden. ProcessedSubject (eyeCenter/interEyeDistance/bodyBottomY) zit in AvatarKit.
+
+Spec (Thierry): "Automatic framing"-actie in het Edit-paneel — ogen op de standaard-ooglijn
+(~44% van boven), horizontaal centreren op eyeCenter, schalen op interEyeDistance als vast
+percentage van de canvasbreedte; geanimeerde overgang.
+
+**Result:** _(invullen bij done)_
