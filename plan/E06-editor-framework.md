@@ -46,7 +46,7 @@ Let op: paneel krijgt later nog een design-iteratie — vervangbaar bouwen.
 
 
 ## 6.4 — Canvas-transform: pan/zoom/snap
-- status: in_progress
+- status: done
 - owner: AI (autonome sessie 2026-06-13)
 - blockedBy: 6.1 (done)
 - DoD: beide targets bouwen, tests groen
@@ -83,10 +83,10 @@ Spec (Thierry):
 6. DoD incl. visuele smoke-run via de --show-settings-achtige route (launch + rendercheck
    met transform).
 
-**Result:** _(invullen bij done)_
+**Result:** EditorCanvasView (Features/Editor/) vervangt de statische fill in de canvaskaart: drag-pan met shift-as-constraint en v1-snapmechanics (hysterese 12/24, .alignment-tick bij snap, .generic per 24 units), pinch- én scroll-zoom 0,5×–3× om het canvasmidden (NSEvent-monitor onder hover), dubbelklik = fill-fit-reset (E06.5 maakt er echt auto-frame van), guide-overlay in DS-lime (midden-X, standaard-ooglijn 0.37, oogmarkers, hoofd-ovaal) met 0,15s-fade tijdens drag; transform persistent op Portrait2.offsetX/offsetY/scale (scale 0 = fill-fit, lichtgewicht migratie) met touch() per afgerond gebaar; FramingConstants = 1-op-1 v1-port. Beide targets bouwen groen, packagetests groen, rendercheck gedaan (canvas + dot-grid + transform).
 
 ## 6.5 — Automatic framing-actie
-- status: backlog
+- status: ready
 - owner: —
 - blockedBy: 6.4
 - DoD: beide targets bouwen, tests groen

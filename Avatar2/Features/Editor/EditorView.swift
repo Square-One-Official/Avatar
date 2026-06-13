@@ -55,6 +55,9 @@ enum EditorTool: String, CaseIterable, Identifiable {
 
 struct EditorView: View {
     let portrait: NSImage
+    /// Model-referentie voor de persistente canvas-transform (E06.4);
+    /// nil = transform alleen in-memory (komt in de praktijk niet voor).
+    var portraitModel: Portrait2?
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -94,11 +97,8 @@ struct EditorView: View {
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
             // transparante delen tonen het raster: achtergrond verwijderd.
             DSCanvasCard(showsDotGrid: true) {
-                Image(nsImage: portrait)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
+                EditorCanvasView(image: portrait, portrait: portraitModel)
             }
             .frame(maxWidth: 456, maxHeight: 456)
             .padding(.top, DSSpacing.gap8)

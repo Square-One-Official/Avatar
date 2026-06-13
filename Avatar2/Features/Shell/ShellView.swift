@@ -163,7 +163,11 @@ struct ShellView: View {
             // Editor-framework (E06.1): toolbar + panel-systeem rond het
             // resultaat; foto-verkleining regelt de DS-container centraal.
             // Images-tool toggelt de sidebar (E05.4).
-            EditorView(portrait: cutout, isSidebarVisible: $model.isSidebarVisible)
+            EditorView(
+                portrait: cutout,
+                portraitModel: model.selectedPortrait,
+                isSidebarVisible: $model.isSidebarVisible
+            )
         case .failed(let message):
             VStack(spacing: DSSpacing.gap4) {
                 Text(message)

@@ -20,6 +20,15 @@ final class Portrait2 {
     var updatedAt: Date = Date.distantPast
     @Attribute(.externalStorage) var cutoutData: Data
 
+    /// Canvas-transform (E06.4) in 1024-units canvasruimte (v1-conventie):
+    /// het cutout-beeld tekent op (offsetX, offsetY) × scale binnen het
+    /// 1:1-canvas. scale 0 = nog geen transform — de editor toont dan de
+    /// berekende fill-fit en persisteert pas bij het eerste gebaar.
+    /// Lichtgewicht migratie via de defaults.
+    var offsetX: Double = 0
+    var offsetY: Double = 0
+    var scale: Double = 0
+
     init(name: String = "", role: String = "", createdAt: Date = .now, cutoutData: Data) {
         self.name = name
         self.role = role
