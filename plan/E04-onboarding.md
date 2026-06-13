@@ -153,3 +153,21 @@ vensters erop. Modelgrootte in de copy = de echte ORMBG-grootte (±175 MB, niet 
 uit het oude frame).
 
 **Result:** _(invullen bij done)_
+
+## 4.7 — Canvas-kaart-inbedding: responsief 1:1 zonder clippen
+- status: in_progress
+- owner: FEAT (AI-agent, marathon 2026-06-13)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen, visuele smoke-run op 800×600 / default / fullscreen, mét en zónder paneel
+- Context: weesfix uit E03.16 (de container-garantie bestond, maar de ShellView/EditorView-inbedding cap'te de kaart op 456 en liet hem niet responsief meeschalen). Nieuwe story conform de regel "Result mag geen werk doorschuiven naar een done-story".
+
+**Plan:**
+1. EditorView: 456-cap weg — kaart krijgt `.aspectRatio(1, .fit)` binnen de foto-slot van
+   DSEditPanelContainer (layoutPriority −1 uit 3.16), zodat hij meegroeit met venster én
+   krimpt wanneer een paneel opent; nooit clippen (fit, geen fill).
+2. DEBUG-launchhaak `--open-panel <tool>` (zelfde patroon als --show-settings) zodat de
+   smoke-runs het paneel hands-off kunnen openen.
+3. Smoke-matrix via frame-autosave-seed (NSWindow Frame-default): 800×600, default 1100×760,
+   fullscreen-formaat; telkens met en zonder paneel — kaart vierkant, niets afgekapt.
+
+**Result:** _(invullen bij done)_
