@@ -6,6 +6,8 @@
 // Inset-highlight) en de DSAddButton (sidebar-add-besluit 10 jun).
 // Thumbnails in Figma zijn placeholderfoto's; wij renderen de cutouts.
 
+import AppKit
+import AvatarKit
 import AvatarUI
 import SwiftData
 import SwiftUI
@@ -26,6 +28,8 @@ struct SidebarView: View {
     @Environment(\.undoManager) private var undoManager
     /// E05.7: loopt tijdens een set-brede align (knop disabled + pulse).
     @State private var isAligning = false
+    /// E12.2: loopt tijdens de set-brede lichtnormalisatie.
+    @State private var isMatchingLight = false
 
     private var filtered: [Portrait2] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
@@ -69,6 +73,16 @@ struct SidebarView: View {
                         alignSet()
                     }
                     .disabled(isAligning)
+                    // E12.2: set-brede lichtnormalisatie naar het geselecteerde
+                    // portret als referentie. Secundair t.o.v. "Align set".
+                    DSNeutralButton(
+                        isMatchingLight ? "Matching lighting…" : "Match lighting",
+                        icon: Image(systemName: "sun.max"),
+                        fullWidth: true
+                    ) {
+                        matchLighting()
+                    }
+                    .disabled(isMatchingLight)
                 }
                 DSAddButton("Add portrait") {
                     onAdd()
@@ -143,5 +157,54 @@ struct SidebarView: View {
             undoManager?.endUndoGrouping()
             isAligning = false
         }
+    }
+
+    /// E12.2: trekt de belichting/kleurbalans van álle portretten naar het
+    /// geselecteerde portret (of het meest recente) als referentie, in één
+    /// set-brede undo-groep. Lokaal (SetLightingNormalizer); de referentie
+    /// zelf blijft ongemoeid (gain ≈ 1 → geen wijziging → geen undo-stap).
+    private func matchLighting() {
+        guard !isMatchingLight else { return }
+        isMatchingLight = true
+        let targets = portraits
+        let reference = targets.first { $0.persistentModelID == selectedID } ?? targets.first
+        Task {
+            defer { isMatchingLight = false }
+            guard let reference,
+                  let refCG = Self.cgImage(from: reference.cutoutData),
+                  let refStats = SetLightingNormalizer.referenceStats(of: refCG) else { return }
+
+            // 1. Bereken de genormaliseerde bytes per (niet-referentie-)portret.
+            var items: [(Portrait2, Data, Data)] = []
+            for portrait in targets where portrait.persistentModelID != reference.persistentModelID {
+                guard let cg = Self.cgImage(from: portrait.cutoutData),
+                      let outCG = SetLightingNormalizer.match(cg, to: refStats),
+                      let png = Self.pngData(from: outCG) else { continue }
+                items.append((portrait, portrait.cutoutData, png))
+            }
+
+            // 2. Schrijf + registreer alles in één undo-groep.
+            undoManager?.beginUndoGrouping()
+            undoManager?.setActionName("Match Lighting")
+            withAnimation(.spring(duration: 0.4)) {
+                for (portrait, before, after) in items {
+                    portrait.cutoutData = after
+                    portrait.touch()
+                    CutoutDataUndo.register(
+                        undoManager, portrait: portrait,
+                        undoTo: before, redoTo: after, actionName: "Match Lighting"
+                    )
+                }
+            }
+            undoManager?.endUndoGrouping()
+        }
+    }
+
+    private static func cgImage(from data: Data) -> CGImage? {
+        NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    }
+
+    private static func pngData(from image: CGImage) -> Data? {
+        NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
     }
 }

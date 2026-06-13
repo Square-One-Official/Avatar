@@ -35,12 +35,33 @@ als actieve lokale rijen zonder credit-chip, de cloud-edits gedimd-gegated. Beid
 groen, alle suites groen.
 
 ## 12.2 — Set-brede lighting-normalisatie
-- status: backlog
-- owner: —
-- blockedBy: 12.1, E05.4
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- blockedBy: 12.1 (done), E05.4 (done)
 - DoD: beide targets bouwen, tests groen
 
 Cross-photo match als set-actie in de sidebar (bekende v1-beperking).
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. AvatarKit `SetLightingNormalizer` (Imaging/): `referenceStats(of:)` (grijs-geflattende
+   gemiddelde kleur, alpha-stabiel) + `match(_:to:)` (per-kanaal gain via CIColorMatrix, geklemd
+   0.6–1.6, alpha behouden). Lokaal, geen credits.
+2. FEAT: "Match lighting"-set-actie in de sidebar (zelfde patroon als "Align set", zichtbaar bij
+   ≥2 portretten), referentie = geselecteerd portret; één set-brede undo-groep via nieuwe
+   `CutoutDataUndo`.
+3. v1 had geen echte cross-photo-match (alleen een fill-body-flavor-string) → dit is nieuw, met
+   de bekende beperking: globale gemiddelde-match, geen lokale relighting.
+
+**Result:** Set-brede lichtnormalisatie als sidebar-actie. **AvatarKit:** `SetLightingNormalizer`
+(Sources/AvatarKit/Imaging/) — `referenceStats` (gemiddelde kleur op een grijs-geflattende kopie,
+zodat transparante randen het gemiddelde niet vertekenen) + `match` (per-kanaal gain via
+CIColorMatrix, geklemd 0.6–1.6, alpha behouden), lokaal/geen credits. 2 tests (donker→referentie
+schuift omhoog zonder voorbij te schieten; afmetingen behouden). **FEAT:** "Match lighting"-knop
+in SidebarView (DSNeutralButton + sun.max, naast "Align set", alléén bij ≥2 portretten); trekt
+alle portretten naar het geselecteerde (of meest recente) portret als referentie in één
+undo-groep via nieuwe `CutoutDataUndo` (recursieve before→after-registratie). Referentie zelf
+blijft ongemoeid (gain ≈ 1 → geen wijziging → geen undo-stap). **Bekende beperking** (gedocumenteerd
+in de code): globale gemiddelde-kleur-match, geen lokale relighting/contrast — sterk afwijkende
+opnames trekken niet perfect gelijk (v1 had dit überhaupt niet). Smoke (`--seed-set`): de knop
+verschijnt onder "Align set" in de set-sidebar. Beide targets bouwen groen, alle suites groen.
 
