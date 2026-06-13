@@ -107,8 +107,8 @@ Bestaande packs (50/200/750) bereikbaar vanuit op=op-state; alleen voor Pro.
 **Result:** _(invullen bij done)_
 
 ## 14.6 — Review-fix: authed subscribe-flow in PaywallSheet
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen
 - Context: review DS 2026-06-12 op E08.3-code; hoort inhoudelijk bij 14.1 — wie 14.1 oppakt neemt dit mee of doet 14.6 eerst.
@@ -122,5 +122,14 @@ dat is een vangnet, geen pad. Fix: bij een ingelogde gebruiker de authed subscri
 voor niet-ingelogde gebruikers. Let op: BackendClient (AvatarKit = INFRA-grens) heeft nog géén
 wrapper voor `/v1/checkout/subscribe` — ontbreekt die bij de bouw, dan per boardregel 4 een
 INFRA-story toevoegen i.p.v. zelf in AvatarKit bouwen.
+
+**Plan:**
+1. De backend-endpoint `/v1/checkout/subscribe` (authed) bestaat al (subscribe.ts, zelfde
+   body/response als de anonieme); alleen de client-wrapper ontbrak.
+2. `BackendClient.subscribe(interval:)` toegevoegd (authed `request`, vereist token) naast
+   `subscribeAnonymous` — kleine AvatarKit-toevoeging (cross-team conform marathonregel; geen
+   AvatarUI/E01.11). INFRA-review genoteerd.
+3. EntitlementModel.startSubscribe kiest nu: `auth.isSignedIn` → subscribe(); anders
+   subscribeAnonymous(). Rest van de checkout-flow ongewijzigd.
 
 **Result:** _(invullen bij done)_
