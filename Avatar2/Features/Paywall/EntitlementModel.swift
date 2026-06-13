@@ -88,7 +88,13 @@ final class EntitlementModel {
 
     func startSubscribe() async {
         await startCheckout {
-            try await self.backend.subscribeAnonymous(interval: self.selectedInterval)
+            // E14.6: ingelogd → authed flow (gekoppeld aan Supabase user-id,
+            // hergebruikt de Stripe-customer; geen dubbele customer). Anoniem
+            // → de e-mail-gebaseerde flow.
+            if self.auth.isSignedIn {
+                return try await self.backend.subscribe(interval: self.selectedInterval)
+            }
+            return try await self.backend.subscribeAnonymous(interval: self.selectedInterval)
         }
     }
 

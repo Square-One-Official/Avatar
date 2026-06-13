@@ -107,7 +107,7 @@ Bestaande packs (50/200/750) bereikbaar vanuit op=op-state; alleen voor Pro.
 **Result:** _(invullen bij done)_
 
 ## 14.6 — Review-fix: authed subscribe-flow in PaywallSheet
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen
@@ -132,4 +132,4 @@ INFRA-story toevoegen i.p.v. zelf in AvatarKit bouwen.
 3. EntitlementModel.startSubscribe kiest nu: `auth.isSignedIn` → subscribe(); anders
    subscribeAnonymous(). Rest van de checkout-flow ongewijzigd.
 
-**Result:** _(invullen bij done)_
+**Result:** `BackendClient.subscribe(interval:)` toegevoegd (authed `request`, hit `/v1/checkout/subscribe` — endpoint bestond al in productie) naast `subscribeAnonymous`; EntitlementModel.startSubscribe routeert ingelogde gebruikers (`auth.isSignedIn`) naar de authed flow (gekoppeld aan Supabase user-id, hergebruikt de Stripe-customer → geen dubbele customer), anonieme gebruikers naar de e-mail-flow. Geen UI-wijziging (zelfde paywall) → geen visuele smoke nodig. Kleine AvatarKit-toevoeging (INFRA-review genoteerd); geen backend-deploy nodig. Beide targets bouwen groen, suite groen.

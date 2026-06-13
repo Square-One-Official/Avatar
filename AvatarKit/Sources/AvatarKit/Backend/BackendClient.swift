@@ -264,6 +264,21 @@ public final class BackendClient {
         return try resp.toResult()
     }
 
+    // MARK: POST /v1/checkout/subscribe (authed)
+    /// Start a subscription checkout for the SIGNED-IN user — the checkout is
+    /// tied to the Supabase user-id (and reuses their Stripe customer), so no
+    /// duplicate customer is created. Use this whenever a session exists
+    /// (E14.6 review-fix); `subscribeAnonymous` is for signed-out users only.
+    /// Same body/response shape as the anonymous endpoint.
+    public func subscribe(interval: SubscriptionInterval = .month) async throws -> CheckoutResult {
+        struct Body: Encodable { let interval: String }
+        let body = try JSONEncoder().encode(Body(interval: interval.rawValue))
+        let resp: CheckoutResponse = try await request(
+            "/v1/checkout/subscribe", method: "POST", body: body
+        )
+        return try resp.toResult()
+    }
+
     // MARK: POST /v1/account/resend-magic-link
     /// Asks the backend to email a Supabase magic-link to the address on
     /// file (the email Stripe captured during the pre-auth checkout). The
