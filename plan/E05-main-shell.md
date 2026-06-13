@@ -134,7 +134,7 @@ previewanimatie in de thumbnails; undo geldt set-breed als één stap.
 **Result:** _(invullen bij done)_
 
 ## 5.8 — Topbar-randmarges op het venster-marge-token
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen, visuele smoke-run
@@ -149,4 +149,4 @@ previewanimatie in de thumbnails; undo geldt set-breed als één stap.
    hiddenTitleBar) + gap2 — geen tokenbreuk; als constante met die afleiding gedocumenteerd.
 4. Visuele smoke-run vóór/na.
 
-**Result:** _(invullen bij done)_
+**Result:** ShellMetrics (Features/Shell/) met `windowEdgeInset` (gap-1, de E03.15-vensterrand) en `topBarLeadingAfterWindowControls` (68 OS-controls + gap-2, gedocumenteerde afleiding i.p.v. magic 76); gear-cluster trailing van losse 16 → windowEdgeInset (lijnt met de sidebar-kaartrand), SidebarView.edgeInset verwijst nu naar hetzelfde token; linkerkant gecheckt — OS-gebonden, geen tokenbreuk. Beide targets bouwen groen, tests groen, smoke-run: gear op de kaartrand-lijn.

@@ -13,7 +13,7 @@ import SwiftUI
 struct SidebarView: View {
     /// Marge t.o.v. de vensterrand — ShellView gebruikt dezelfde waarde
     /// als padding, de kaartradius rekent er concentrisch mee.
-    static let edgeInset: CGFloat = DSSpacing.gap1
+    static let edgeInset: CGFloat = ShellMetrics.windowEdgeInset
 
     // Laatst bewerkt bovenaan, zoals v1 (punt 13).
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]

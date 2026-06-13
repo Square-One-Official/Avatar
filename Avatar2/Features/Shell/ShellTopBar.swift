@@ -28,8 +28,9 @@ struct ShellTopBar: View {
                 }
                 // Figma "top": kwota-regel gecentreerd in de 52-strook…
                 .frame(height: 52)
-                // …en exact op x76, direct na de window-controls.
-                .padding(.leading, 76)
+                // …direct na de OS-window-controls (E05.8: afgeleide
+                // constante i.p.v. magic 76).
+                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
             }
             Spacer()
             DSToolButton(
@@ -39,9 +40,11 @@ struct ShellTopBar: View {
             ) {
                 onToggleSettings()
             }
-            // Figma "Frame 27": gear op y12, 16 uit de rechterrand.
+            // E05.8: trailing = het venster-marge-token (zelfde rand als
+            // de sidebar-kaart) i.p.v. de losse 16 uit het frame — besluit
+            // Thierry 13 jun. Top houdt het strook-ritme (Frame 27: y12).
             .padding(.top, DSSpacing.gap3)
-            .padding(.trailing, DSSpacing.gap4)
+            .padding(.trailing, ShellMetrics.windowEdgeInset)
         }
         .task { await model.refresh() }
     }
