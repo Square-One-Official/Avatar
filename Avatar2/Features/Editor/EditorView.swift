@@ -228,6 +228,10 @@ struct EditorView: View {
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize.
                 EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
+            } else if tool == .hair, let entitlement {
+                // E11.2: kapsel-chips + vrije prompt op de hair-intent van
+                // /v1/stylize (nano-banana instruction-edit, E11.1-route).
+                HairPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")

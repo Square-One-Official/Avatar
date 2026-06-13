@@ -44,6 +44,39 @@ const STYLE_PROMPTS: Record<string, string> = {
 };
 
 /**
+ * Hair-intent (E11.2). De E09.1-bakeoff koos nano-banana instruction-edit
+ * voor kapselwissel (gezicht/expressie/kleding exact behouden). De clausule
+ * spiegelt de winnende `edit-hair`-prompt. Twee paden, beide server-gemapt:
+ *   - `hair_preset` → vaste prompt uit deze tabel;
+ *   - `hair_prompt` → vrije kapselbeschrijving, in een VAST sjabloon gegoten
+ *     (`HAIR_FREE_TEMPLATE`) zodat het een hair-only edit blijft — geen rauw
+ *     promptveld op andermans Replicate-rekening.
+ */
+const HAIR_CLAUSE =
+  "Keep the face, expression and clothing exactly the same. Change nothing else about the image.";
+
+const HAIR_PRESETS: Record<string, string> = {
+  "trim-flyaways":
+    "Tidy up stray flyaway hairs and smooth the hairline for a neat, clean look, keeping the same hairstyle. " +
+    HAIR_CLAUSE,
+  curly:
+    "Change the hairstyle to natural-looking curly hair in the person's own hair colour. " +
+    HAIR_CLAUSE,
+  straight:
+    "Change the hairstyle to smooth, straight hair in the person's own hair colour. " +
+    HAIR_CLAUSE,
+  short:
+    "Change the hairstyle to a short, neatly trimmed haircut in the person's natural hair colour. " +
+    HAIR_CLAUSE,
+  updo:
+    "Change the hairstyle to an elegant updo with the hair tied up, in the person's own hair colour. " +
+    HAIR_CLAUSE,
+};
+
+const HAIR_FREE_TEMPLATE = (desc: string) =>
+  `Change the hairstyle to ${desc}. ` + HAIR_CLAUSE;
+
+/**
  * POST /v1/stylize — Effects (E09.2; productie sinds de promotie van het
  * dev-only E09.1-bakeoff-endpoint).
  *
@@ -87,10 +120,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const isDevUser = isDevUnlimitedUser(user.email);
 
-  // Prompt-bepaling: productie kiest een `style` (server-side mapping); een
-  // vrij `prompt` is alléén voor dev-users (bakeoff/handmatig testen).
+  // Prompt-bepaling, in volgorde: een Effects-`style` (E09.2), een hair-intent
+  // (E11.2, `hair_preset`/`hair_prompt` — server-gemapt), of een vrij `prompt`
+  // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
   const styleKey = (req.body?.style ?? "") as string;
+  const hairPreset = (req.body?.hair_preset ?? "") as string;
+  const hairPrompt = (req.body?.hair_prompt ?? "") as string;
   const freePrompt = (req.body?.prompt ?? "") as string;
   if (styleKey) {
     const mapped = STYLE_PROMPTS[styleKey];
@@ -99,6 +135,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     prompt = mapped;
+  } else if (hairPreset) {
+    const mapped = HAIR_PRESETS[hairPreset];
+    if (!mapped) {
+      res.status(400).json({ error: "unknown_hair_preset" });
+      return;
+    }
+    prompt = mapped;
+  } else if (hairPrompt) {
+    // Vrije kapselbeschrijving: in een vast hair-only-sjabloon gegoten, niet
+    // als rauwe instructie. Strak begrensd op lengte.
+    if (typeof hairPrompt !== "string" || hairPrompt.length > 200) {
+      res.status(400).json({ error: "missing_or_oversized_prompt" });
+      return;
+    }
+    prompt = HAIR_FREE_TEMPLATE(hairPrompt.trim());
   } else if (freePrompt && isDevUser) {
     if (typeof freePrompt !== "string" || freePrompt.length > 2000) {
       res.status(400).json({ error: "missing_or_oversized_prompt" });
@@ -106,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = freePrompt;
   } else {
-    // Niet-dev zonder geldige `style`, of dev zonder style én zonder prompt.
+    // Niet-dev zonder geldige intent, of dev zonder enige prompt.
     res.status(400).json({ error: "unknown_style" });
     return;
   }
