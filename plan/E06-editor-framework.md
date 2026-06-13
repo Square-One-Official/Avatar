@@ -86,8 +86,8 @@ Spec (Thierry):
 **Result:** EditorCanvasView (Features/Editor/) vervangt de statische fill in de canvaskaart: drag-pan met shift-as-constraint en v1-snapmechanics (hysterese 12/24, .alignment-tick bij snap, .generic per 24 units), pinch- én scroll-zoom 0,5×–3× om het canvasmidden (NSEvent-monitor onder hover), dubbelklik = fill-fit-reset (E06.5 maakt er echt auto-frame van), guide-overlay in DS-lime (midden-X, standaard-ooglijn 0.37, oogmarkers, hoofd-ovaal) met 0,15s-fade tijdens drag; transform persistent op Portrait2.offsetX/offsetY/scale (scale 0 = fill-fit, lichtgewicht migratie) met touch() per afgerond gebaar; FramingConstants = 1-op-1 v1-port. Beide targets bouwen groen, packagetests groen, rendercheck gedaan (canvas + dot-grid + transform).
 
 ## 6.5 — Automatic framing-actie
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: 6.4
 - DoD: beide targets bouwen, tests groen
 - Context: besluit Thierry 2026-06-13. GEEN Figma-afhankelijkheid (zelfde spec-bron als 6.4). v1 AutoAligner is de referentie: neem de getunede doelwaarden over — niet opnieuw raden. ProcessedSubject (eyeCenter/interEyeDistance/bodyBottomY) zit in AvatarKit.
@@ -96,4 +96,19 @@ Spec (Thierry): "Automatic framing"-actie in het Edit-paneel — ogen op de stan
 (~44% van boven), horizontaal centreren op eyeCenter, schalen op interEyeDistance als vast
 percentage van de canvasbreedte; geanimeerde overgang.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. Correctie board-context: ProcessedSubject leeft in v1 Avatar/Services, níét in AvatarKit —
+   de detectie wordt als FEAT-helper geport (Features/Editor/AutoFramer.swift) met Vision
+   direct (VNDetectFaceLandmarksRequest pupil-centroids, VNDetectHumanBodyPoseRequest +
+   alpha-scan-fallback voor bodyBottomY).
+2. AutoFramer.computeTransform = 1-op-1 v1 AutoAligner-math (eye-based: ooglijn 0.37,
+   interoog 0.12; face-rect-fallback 0.38/0.42; body-overshoot 0.03 als minimum-scale);
+   doelwaarden uit FramingConstants (uitgebreid met de fallback-constanten).
+3. Actie schrijft het transform op Portrait2 binnen withAnimation — het E06.4-canvas
+   observeert het model en animeert vanzelf. Dubbelklik (E06.4) gaat van fill-fit-reset
+   naar echt auto-frame; knop "Automatic framing" komt alvast in de Edit-paneel-stub
+   (E06.3 neemt hem op in de echte actielijst).
+4. Unit-tests op de pure transform-math in het Avatar2-testtarget (eye-based, fallback,
+   body-overshoot, no-face → fit).
+
+**Result:** _(invullen bij done — wacht op smoke)_
