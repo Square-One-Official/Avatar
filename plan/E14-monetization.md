@@ -96,7 +96,7 @@ geen legacy-mapping, `CREDITS_PER_TIER.pro` blijft 200. Zie `plan/E14.4-stripe-p
 **Result:** Geen dashboard- of backend-wijziging nodig: 2.0 hergebruikt de live v1-prijzen en env-vars één-op-één (checkout, webhook, credits ongewijzigd); spec-document herschreven naar dit besluit; geen codewijziging, dus DoD-builds n.v.t. (plan-only).
 
 ## 14.5 — Top-up-flow
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 14.3, 14.4
 - DoD: beide targets bouwen, tests groen
@@ -104,7 +104,7 @@ geen legacy-mapping, `CREDITS_PER_TIER.pro` blijft 200. Zie `plan/E14.4-stripe-p
 
 Bestaande packs (50/200/750) bereikbaar vanuit op=op-state; alleen voor Pro.
 
-**Result:** _(invullen bij done)_
+**Result:** Top-up-flow compleet (grotendeels al gelegd in E08.3/E14.1, nu geverifieerd + afgerond): PaywallSheet topup-tak toont CreditPack 50 (€1,99) / 200 (€4,99) / 750 (€14,99, "Best value", default-selectie) + "Buy N credits" → EntitlementModel.startTopup() → BackendClient.topup (checkout/topup.ts); Pro-gating via `showsTopup = isProActive`; bereikbaar vanuit de op=op-state (handleOutOfCredits → OutOfCreditsToast → requestUpgrade → paywall toont de topup-variant voor Pro). DEBUG-haak --show-paywall-topup. Smoke-run (ontgrendeld): topup-paywall met de drie packs + Best-value + CTA. Beide targets bouwen groen, suite groen.
 
 ## 14.6 — Review-fix: authed subscribe-flow in PaywallSheet
 - status: done

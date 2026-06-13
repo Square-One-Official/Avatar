@@ -46,6 +46,11 @@ struct Avatar2App: App {
                 }
                 // E14.1: `--show-paywall` opent de plan-kiezer voor de smoke.
                 if args.contains("--show-paywall") { entitlement.requestUpgrade() }
+                // E14.5: top-up-variant van de paywall (Pro op=op).
+                if args.contains("--show-paywall-topup") {
+                    entitlement.debugForceTopup = true
+                    entitlement.requestUpgrade()
+                }
             }
             #endif
             // Frame-autosave: AppKit onthoudt de gebruikersmaat tussen

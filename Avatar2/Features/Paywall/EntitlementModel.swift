@@ -55,7 +55,17 @@ final class EntitlementModel {
 
     /// Routekeuze in de paywall (v1 `showsTopup`): actieve Pro zonder
     /// credits krijgt de top-up-ladder, ieder ander de subscribe-flow.
-    var showsTopup: Bool { isProActive }
+    var showsTopup: Bool {
+        #if DEBUG
+        if debugForceTopup { return true }
+        #endif
+        return isProActive
+    }
+
+    #if DEBUG
+    /// Smoke-run-haak (E14.5): forceer de top-up-variant van de paywall.
+    var debugForceTopup = false
+    #endif
 
     var creditsRemaining: Int { account?.creditsRemaining ?? 0 }
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
