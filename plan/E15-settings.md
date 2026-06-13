@@ -123,11 +123,29 @@ van 2026-06-12 op productie; backend-werk dat daarna op v2-main landt in-app tes
 
 **Result:** _(invullen bij done)_
 
-## 15.6 — Generatie-model kiesbaar in Settings (nano-banana / OpenAI)
-- status: backlog
-- owner: FEAT (Settings-UI) + INFRA/AI (registry) — splitsen per grens
-- blockedBy: 15.2, E01.10, E09.2
-- DoD: beide targets bouwen, tests groen
-- Context: nieuw besluit Thierry 2026-06-13. Bouw bovenop MODEL_REGISTRY + de model_override-parameter (E01.10) en de model-picker (E15.5). nano-banana = standaard; een OpenAI image-model als alternatief. Registreer het OpenAI-model in MODEL_REGISTRY (stylize-feature; INFRA/AI-grens — backend, landt op productie pas bij de volgende E13.0-port) en expose de keuze in Settings > AI & Models als reguliere (niet dev-only) optie. Onderscheid met E15.5: 15.5 is de dev-only picker over de hele whitelist; 15.6 is één gebruikersgerichte keuze tussen de twee productie-modellen voor generatieve edits.
+## 15.6 — Generatie-model-keuze in Settings (nano-banana / OpenAI)
+- status: ready
+- owner: —            <!-- Settings-UI = FEAT; registry-registratie = INFRA-substory indien grens geraakt -->
+- blockedBy: E01.10 (MODEL_REGISTRY + override, done), E15.1 (Settings-shell, done)
+- DoD: beide targets bouwen + tests groen + gemerged + Result-regel
+- Context: besluit Thierry 2026-06-13 (kleding-route); E01.10 MODEL_REGISTRY/override-param;
+  E15.2 PrivacyPreferences2-store als voorbeeld; generatie-route uit E10.2/E09.2 (nano = default).
+  E15.5 (dev-only Advanced-picker) blijft een apart, technischer pad.
+
+De generatieve cloud-acties (Effects-stijl E09.2, Clothes E10.2, latere stylize-routes) draaien
+standaard op nano-banana. Voeg één gebruikersinstelling toe waarmee het generatie-model kiesbaar
+is: **nano-banana (default)** of **OpenAI image-model**. Registreer het OpenAI-model in
+MODEL_REGISTRY (E01.10) met de juiste override-parameter; de stylize-call leest de voorkeur mee.
+Settings-UI: een "Generation model"-rij met twee opties, in de stijl van 15.1/15.2, persistent in
+dezelfde Preferences-store. Default ongewijzigd gedrag.
+
+Bewust NIET in deze story: per-actie-override, en de dev-only Advanced-picker (dat blijft E15.5).
+Call-wiring leunt op het productie-/v1/stylize uit E09.2 — landt die later, dan registreert deze
+story alvast model + Settings-keuze en wordt de call-param aangesloten zodra E09.2 er is.
+
+Acceptatie: model wisselen verandert aantoonbaar de model-param in de /v1/stylize-request;
+nano blijft default; beide targets groen + gemerged.
+
+**Plan:** _(invullen bij claim)_
 
 **Result:** _(invullen bij done)_
