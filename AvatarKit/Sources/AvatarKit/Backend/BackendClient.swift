@@ -344,6 +344,41 @@ public final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/stylize (clothes-intent, E10.4)
+    /// Kledingwissel via hetzelfde productie-`/v1/stylize` (nano-banana
+    /// instruction-edit, besluit Thierry 2026-06-13). Eén van `preset`/
+    /// `freeText`; de server mapt het naar een clothes-only edit-prompt met
+    /// het harde acceptatiecriterium (gezicht/haar/pose/achtergrond
+    /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
+    public func editClothes(imagePNG: Data, preset: ClothesStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
+        struct Body: Encodable {
+            let image: String
+            let clothesPreset: String?
+            let clothesPrompt: String?
+            let generationModel: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case image
+                case clothesPreset = "clothes_preset"
+                case clothesPrompt = "clothes_prompt"
+                case generationModel = "generation_model"
+                case modelOverride = "model_override"
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(image: imagePNG.base64EncodedString(),
+                 clothesPreset: preset?.rawValue,
+                 clothesPrompt: freeText,
+                 generationModel: GenerationModelStore.shared.current.rawValue,
+                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/checkout/subscribe-anonymous
     /// Start a subscription checkout WITHOUT requiring a signed-in user.
     /// Stripe collects the email during checkout; the webhook links that

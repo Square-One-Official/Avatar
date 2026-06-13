@@ -77,6 +77,28 @@ const HAIR_FREE_TEMPLATE = (desc: string) =>
   `Change the hairstyle to ${desc}. ` + HAIR_CLAUSE;
 
 /**
+ * Clothes-intent (E10.4). Besluit Thierry 2026-06-13: nano-banana
+ * instruction-edit is het primaire kledingpad. De clausule is het harde
+ * acceptatiecriterium — alléén de kleding wijzigt, gezicht/haar/pose/
+ * achtergrond identiek. `clothes_preset` → vaste prompt; `clothes_prompt` →
+ * vrije beschrijving in een vast clothes-only-sjabloon. (FLUX-Fill + mask
+ * uit E10.1 blijft de precisie-fallback, niet hier.)
+ */
+const CLOTHES_CLAUSE =
+  "Keep the face, hair, pose and background exactly the same. Change only the clothing, nothing else.";
+
+const CLOTHES_PRESETS: Record<string, string> = {
+  tshirt: "Change the upper clothing to a plain, well-fitted t-shirt. " + CLOTHES_CLAUSE,
+  polo: "Change the upper clothing to a neat polo shirt. " + CLOTHES_CLAUSE,
+  blazer: "Change the upper clothing to a tailored blazer over a shirt. " + CLOTHES_CLAUSE,
+  hoody: "Change the upper clothing to a casual hoodie. " + CLOTHES_CLAUSE,
+  sweater: "Change the upper clothing to a knitted sweater. " + CLOTHES_CLAUSE,
+};
+
+const CLOTHES_FREE_TEMPLATE = (desc: string) =>
+  `Change the upper clothing to ${desc}. ` + CLOTHES_CLAUSE;
+
+/**
  * POST /v1/stylize — Effects (E09.2; productie sinds de promotie van het
  * dev-only E09.1-bakeoff-endpoint).
  *
@@ -127,6 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const styleKey = (req.body?.style ?? "") as string;
   const hairPreset = (req.body?.hair_preset ?? "") as string;
   const hairPrompt = (req.body?.hair_prompt ?? "") as string;
+  const clothesPreset = (req.body?.clothes_preset ?? "") as string;
+  const clothesPrompt = (req.body?.clothes_prompt ?? "") as string;
   const freePrompt = (req.body?.prompt ?? "") as string;
   if (styleKey) {
     const mapped = STYLE_PROMPTS[styleKey];
@@ -150,6 +174,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     prompt = HAIR_FREE_TEMPLATE(hairPrompt.trim());
+  } else if (clothesPreset) {
+    const mapped = CLOTHES_PRESETS[clothesPreset];
+    if (!mapped) {
+      res.status(400).json({ error: "unknown_clothes_preset" });
+      return;
+    }
+    prompt = mapped;
+  } else if (clothesPrompt) {
+    // Vrije kledingbeschrijving: in een vast clothes-only-sjabloon gegoten.
+    if (typeof clothesPrompt !== "string" || clothesPrompt.length > 200) {
+      res.status(400).json({ error: "missing_or_oversized_prompt" });
+      return;
+    }
+    prompt = CLOTHES_FREE_TEMPLATE(clothesPrompt.trim());
   } else if (freePrompt && isDevUser) {
     if (typeof freePrompt !== "string" || freePrompt.length > 2000) {
       res.status(400).json({ error: "missing_or_oversized_prompt" });

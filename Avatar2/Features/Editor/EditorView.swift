@@ -226,10 +226,10 @@ struct EditorView: View {
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
                 BackgroundPanel(portrait: portraitModel)
-            } else if tool == .clothing {
-                // E10.2: kleding-paneel (presets + vrije prompt). Generatie-
-                // route geparkeerd (DECISIONS-PENDING); actie nu stub.
-                ClothesPanel()
+            } else if tool == .clothing, let entitlement {
+                // E10.4: kleding-paneel gewired op de clothes-intent van
+                // /v1/stylize (nano-banana instruction-edit).
+                ClothesPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize.
                 EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)

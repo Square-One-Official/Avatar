@@ -39,10 +39,36 @@ Person-seg minus gezicht/haar (macOS 26-pad); tap-to-segment volgt bij macOS 27.
 **Result:** _(invullen bij done)_
 
 ## 10.4 — Kledingwissel-route wiren (na E09.2)
-- status: blocked
-- owner: FEAT
-- blockedBy: E09.2
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- blockedBy: E09.2 (done)
 - DoD: beide targets bouwen, tests groen; acceptatiecriterium gehaald
 - Context: besluit Thierry 2026-06-13 — nano-banana instruction-edit is het PRIMAIRE pad ("change the upper clothing to <preset>, keep face/hair/pose"). **Acceptatiecriterium (hard):** alléén kleding wijzigt; gezicht/haar/pose/achtergrond pixel-identiek. ClothesMaskGenerator (E10.1) + FLUX Fill = precisie-fallback. E10.2's ClothesPanel-onApply (nu stub) hierop aansluiten zodra E09.2 het productie-/v1/stylize levert.
 
-**Result:** _(invullen bij done)_
+**Plan:** (zelfde patroon als E11.2 hair-intent)
+1. Backend (port-only, preview-test): `/v1/stylize` krijgt een server-gemapte **clothes-intent** —
+   `clothes_preset` (whitelist tshirt/polo/blazer/hoody/sweater → vaste prompt + "keep the face,
+   hair, pose and background exactly the same"-clausule = het harde acceptatiecriterium) en
+   `clothes_prompt` (vrije beschrijving in vast clothes-only-sjabloon, ≤200 tekens).
+2. AvatarKit: `ClothesStyle`-enum (rawValue = backend-key) + `BackendClient.editClothes(imagePNG:
+   preset:freeText:)`.
+3. FEAT: ClothesPanel omzetten naar het HairPanel-patroon (baseImage + entitlement + ClothesModel),
+   onApply-stub vervangen door echte editClothes-call → `onApplyResult` (canvas + cutout), 402 →
+   paywall. FLUX-Fill-mask blijft de gedocumenteerde precisie-fallback (E10.1), geen default.
+
+**Result:** Kledingwissel end-to-end op de nano-banana instruction-edit-route (besluit Thierry
+2026-06-13). **Backend** (port-only, preview-test): `/v1/stylize` clothes-intent — `clothes_preset`
+(whitelist tshirt/polo/blazer/hoody/sweater → vaste prompt) en `clothes_prompt` (vrije
+beschrijving in vast clothes-only-sjabloon, ≤200 tekens), beide met de `CLOTHES_CLAUSE` = het
+harde acceptatiecriterium ("Keep the face, hair, pose and background exactly the same. Change only
+the clothing"). nano-default + credit-gate + `generation_model` erven van E09.2/E15.6. `npm run
+typecheck` groen. **AvatarKit:** `ClothesStyle`-enum + `BackendClient.editClothes(imagePNG:preset:
+freeText:)`. **FEAT:** ClothesPanel omgezet naar het HairPanel-patroon (`ClothesModel`, baseImage
++ entitlement) — de E10.2-stub `onApply` is vervangen door echte editClothes-calls → resultaat via
+`onApplyResult` naar canvas + cutout, busy-state, 402 → `handleOutOfCredits`, saldo-refresh.
+Gemount op de Clothing-tool in EditorView. FLUX-Fill + mask (E10.1) blijft de gedocumenteerde
+precisie-fallback (geen default). Het harde acceptatiecriterium (alléén kleding wijzigt) wordt
+server-side door de clausule afgedwongen; visuele verificatie van pixel-identiteit vergt een live
+generatie tegen de Vercel-preview (port-only). Smoke (`--open-panel clothing`): paneel rendert
+1100×760 met alle vijf chips, "⚡4"-kostenhint, vrije prompt + send, actieve tool. Beide targets
+bouwen groen, alle suites groen.

@@ -1,47 +1,128 @@
-// Clothes-paneel (E10.2, Figma App / Clothes 4016:13760): "Change upper
-// clothes" + vaste outfit-chips + een vrije prompt ("Describe a color or
-// style") met lime send-knop.
+// Clothes-paneel (E10.2 + E10.4-wiring, Figma App / Clothes 4016:13760):
+// "Change upper clothes" + vaste outfit-chips + een vrije prompt ("Describe
+// a color or style") met lime send-knop.
 //
-// Generatie-route is een open architectuurbeslissing (DECISIONS-PENDING):
-// E10.1 bouwde een kledingmasker voor een masked FLUX-Fill-route, maar de
-// E09.1-bakeoff koos nano-banana instruction-edit (zónder mask) als beste
-// voor kledingwissel. Tot dat besluit valt is de generate-actie een stub;
-// het paneel + de input zijn volledig (vervangbaar bouwen). Kosten:
-// generatief standaard = 4 credits (CreditMeter), getoond bij de actie in
-// het Edit-paneel (E06.3) — hier volgt het frame (geen losse chip).
+// Generatie-route (besluit Thierry 2026-06-13): nano-banana instruction-edit
+// via het productie-`/v1/stylize` (clothes-intent, E10.4). Hard
+// acceptatiecriterium server-side afgedwongen: alléén de kleding wijzigt,
+// gezicht/haar/pose/achtergrond identiek. FLUX-Fill + mask (E10.1) blijft de
+// precisie-fallback, geen default. Credit-gegated (generatief standaard = 4),
+// 402 → paywall.
 
+import AppKit
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
-struct ClothesPanel: View {
-    /// Stub tot de generatie-route vastligt; krijgt de gekozen prompt mee.
-    var onApply: (String) -> Void = { _ in }
+/// Stuurt de kledingwissel aan en reikt het resultaat omhoog naar de
+/// ShellModel (canvas + opgeslagen cutout). Zelfde patroon als HairModel.
+@MainActor
+@Observable
+final class ClothesModel {
+    enum Phase: Equatable {
+        case idle
+        case working
+        case failed(String)
+    }
 
+    private(set) var phase: Phase = .idle
+
+    private let entitlement: EntitlementModel
+    private let onApply: (NSImage) -> Void
+
+    init(entitlement: EntitlementModel, onApply: @escaping (NSImage) -> Void) {
+        self.entitlement = entitlement
+        self.onApply = onApply
+    }
+
+    var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
+    var isBusy: Bool { phase == .working }
+
+    func apply(preset: ClothesStyle? = nil, freeText: String? = nil, base: NSImage) async {
+        guard !isBusy else { return }
+        guard let png = Self.pngData(from: base) else {
+            phase = .failed("Couldn't read the portrait.")
+            return
+        }
+        phase = .working
+        do {
+            let (data, _) = try await entitlement.backend.editClothes(imagePNG: png, preset: preset, freeText: freeText)
+            guard let image = NSImage(data: data) else {
+                phase = .failed("The result came back unreadable.")
+                return
+            }
+            phase = .idle
+            onApply(image)
+            await entitlement.refresh()
+        } catch BackendError.noCredits {
+            phase = .idle
+            entitlement.handleOutOfCredits()
+        } catch {
+            phase = .failed("Couldn't change the clothing. Please try again.")
+        }
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
+    }
+}
+
+struct ClothesPanel: View {
+    let baseImage: NSImage
+    let entitlement: EntitlementModel
+    var onApply: (NSImage) -> Void = { _ in }
+
+    @State private var model: ClothesModel
     @State private var prompt = ""
 
-    private let presets = ["T-Shirt", "Polo", "Blazer", "Hoody", "Sweater"]
+    init(baseImage: NSImage, entitlement: EntitlementModel, onApply: @escaping (NSImage) -> Void = { _ in }) {
+        self.baseImage = baseImage
+        self.entitlement = entitlement
+        self.onApply = onApply
+        _model = State(initialValue: ClothesModel(entitlement: entitlement, onApply: onApply))
+    }
 
     var body: some View {
         DSEditPanel(title: "Change upper clothes") {
             VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+                HStack(spacing: DSSpacing.gap2) {
+                    if model.isBusy {
+                        ProgressView().controlSize(.small)
+                        Text("Changing clothing…")
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    } else if case .failed(let message) = model.phase {
+                        Text(message)
+                            .dsTextStyle(.bodySmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                    Spacer(minLength: DSSpacing.gap4)
+                    Label("\(model.creditCost)", systemImage: "bolt.fill")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .labelStyle(.titleAndIcon)
+                }
+
                 // Outfit-presets.
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
-                        ForEach(presets, id: \.self) { preset in
-                            DSChip(preset, type: .neutral) {
-                                onApply(preset)
+                        ForEach(ClothesStyle.allCases) { preset in
+                            DSChip(preset.label, type: .neutral) {
+                                Task { await model.apply(preset: preset, base: baseImage) }
                             }
                         }
                     }
                 }
 
-                // Vrije prompt + send.
+                // Vrije beschrijving + send.
                 HStack(spacing: DSSpacing.gap2) {
                     DSTextField(placeholder: "Describe a color or style", text: $prompt)
                     Button {
                         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
-                        onApply(trimmed)
+                        Task { await model.apply(freeText: trimmed, base: baseImage) }
                     } label: {
                         Image(systemName: "chevron.up")
                             .font(.system(size: 15, weight: .semibold))
@@ -56,6 +137,7 @@ struct ClothesPanel: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .disabled(model.isBusy)
         }
     }
 }
