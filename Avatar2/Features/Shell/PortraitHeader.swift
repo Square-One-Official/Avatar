@@ -18,5 +18,9 @@ struct PortraitHeader: View {
             DSInlineEditLabel("Role", text: $model.portraitRole, variant: .subtitle)
         }
         .frame(maxWidth: 280)
+        // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24 = de twee
+        // regelhoogtes incl. badge-padding) — Name/Role blijven in élke
+        // staat vrij van de canvas-kaart, niets verspringt.
+        .frame(height: 52)
     }
 }

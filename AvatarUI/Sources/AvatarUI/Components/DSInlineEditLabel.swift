@@ -1,19 +1,20 @@
-// Inline-edit-label (E03.13 + E03.16; bevindingen 9/12/20/21). Drie staten:
-// 1. Rust — pure tekst (heading = Body/Medium primary, subtitle =
-//    Body/Small subtle; lege waarde toont de placeholder in muted).
-// 2. Hover — badge-affordance: bg background/neutral, padding rond de
-//    tekst, zachte radius (r-md, continuous), pointer-cursor.
-// 3. Edit (na klik) — een écht NSTextField-gedreven veld op dezelfde plek,
-//    leading uitgelijnd binnen een gecentreerde container (bevinding 20):
-//    de caret staat vóór de hint (subtle) die op zijn plek blijft tot de
-//    eerste toetsaanslag, en een bestaande waarde wordt bij focus volledig
-//    geselecteerd (native NSTextField-becomeFirstResponder). Breedte volgt
-//    de inhoud (verborgen maattekst), padding in alle staten gelijk — geen
-//    layoutshift, nooit clippen (bevinding 12). Enter/blur committen, Esc
-//    annuleert, en een klik búiten het veld committet ook (bevinding 21):
-//    een NSEvent-monitor die het event gewoon doorlaat — de aangeklikte
-//    control voert dus z'n eigen actie uit; geen view-blokkerende catcher.
+// Inline-edit-label — definitieve herbouw op een echt NSTextField (E03.17;
+// na drie gefaalde iteraties op eigen caret/focus-afhandeling: bevindingen
+// 9, 12, 20, 21). Acceptatiecriteria:
+// 1. Rust: platte tekst zonder chrome; hover-badge (bg neutral, r-md,
+//    pointer-cursor) alleen op het veld onder de cursor.
+// 2. Edit: native NSTextField — caret op tekstpositie, placeholder links
+//    van de caret die bij de eerste toetsaanslag verdwijnt, bestaande
+//    waarde volledig geselecteerd bij focus (becomeFirstResponder).
+// 3. Intrinsieke breedte via een pure meetfunctie (max van tekst en
+//    placeholder + caret-marge) — nooit clippen; hoogte = de vaste
+//    Figma-regelhoogte, identiek in alle staten.
+// 4. Enter (insertNewline), blur (controlTextDidEndEditing) en klik-buiten
+//    committen; Esc (cancelOperation) annuleert. De klik-buiten loopt via
+//    een lokale NSEvent-monitor die het event dóórgeeft, zodat de
+//    aangeklikte control z'n eigen actie uitvoert.
 
+import AppKit
 import SwiftUI
 
 public struct DSInlineEditLabel: View {
@@ -24,6 +25,14 @@ public struct DSInlineEditLabel: View {
         var textStyle: DSTextStyle { self == .heading ? .bodyMedium : .bodySmall }
         var color: Color {
             self == .heading ? DSColor.Foreground.primary : DSColor.Foreground.subtle
+        }
+        // Beide varianten zijn Content/Body (regular); alleen maat/kleur
+        // verschillen. Alpha's = de exacte tokenwaarden (subtle 0xB2).
+        var nsFont: NSFont {
+            NSFont.systemFont(ofSize: textStyle.size, weight: .regular)
+        }
+        var nsColor: NSColor {
+            self == .heading ? .white : NSColor.white.withAlphaComponent(0xB2 / 255.0)
         }
     }
 
@@ -36,7 +45,7 @@ public struct DSInlineEditLabel: View {
     @State private var draft = ""
     @State private var fieldFrame: CGRect = .zero
     @State private var clickMonitor: Any?
-    @FocusState private var fieldFocused: Bool
+    @State private var cursorPushed = false
 
     public init(_ placeholder: String, text: Binding<String>, variant: Variant = .heading) {
         self.placeholder = placeholder
@@ -47,30 +56,15 @@ public struct DSInlineEditLabel: View {
     public var body: some View {
         Group {
             if isEditing {
-                // Breedte = max(maattekst + caret-marge, intrinsieke
-                // veldbreedte); leading-alignment zodat de caret vóór de
-                // hint staat (bevinding 20) — de container centreert het
-                // geheel, dus visueel blijft alles op zijn plek.
-                ZStack(alignment: .leading) {
-                    Text(draft.isEmpty ? placeholder : draft)
-                        .dsTextStyle(variant.textStyle)
-                        .opacity(DSOpacity.hidden)
-                        .lineLimit(1)
-                        .padding(.horizontal, DSSpacing.gap1)
-                    TextField(
-                        "",
-                        text: $draft,
-                        prompt: Text(placeholder)
-                            .foregroundStyle(DSColor.Foreground.subtle)
-                    )
-                    .textFieldStyle(.plain)
-                    .dsTextStyle(variant.textStyle)
-                    .foregroundStyle(variant.color)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .focused($fieldFocused)
-                    .onSubmit { commit() }
-                    .onExitCommand { cancel() }
-                }
+                InlineEditTextField(
+                    placeholder: placeholder,
+                    text: $draft,
+                    font: variant.nsFont,
+                    textColor: variant.nsColor,
+                    lineHeight: variant.textStyle.lineHeight,
+                    onCommit: { commit() },
+                    onCancel: { cancel() }
+                )
             } else {
                 Text(text.isEmpty ? placeholder : text)
                     .dsTextStyle(variant.textStyle)
@@ -102,31 +96,38 @@ public struct DSInlineEditLabel: View {
         }
         .contentShape(Rectangle())
         .onHover { hovering in
-            isHovering = hovering
-            if hovering && !isEditing {
-                NSCursor.pointingHand.push()
-            } else if !hovering {
-                NSCursor.pop()
-            }
+            isHovering = hovering && !isEditing
+            setCursor(pushed: isHovering)
         }
         .onTapGesture {
             guard !isEditing else { return }
             beginEditing()
         }
-        .onChange(of: fieldFocused) { _, focused in
-            // Blur bevestigt — tenzij Esc/commit de editstaat al sloot.
-            if !focused && isEditing { commit() }
+        .onDisappear {
+            removeClickMonitor()
+            setCursor(pushed: false)
         }
-        .onDisappear { removeClickMonitor() }
         .animation(.easeOut(duration: 0.1), value: isHovering)
         .accessibilityLabel(Text(placeholder))
         .accessibilityValue(Text(text))
     }
 
+    /// Gebalanceerde push/pop zodat de pointer-cursor nooit blijft hangen.
+    private func setCursor(pushed: Bool) {
+        guard pushed != cursorPushed else { return }
+        cursorPushed = pushed
+        if pushed {
+            NSCursor.pointingHand.push()
+        } else {
+            NSCursor.pop()
+        }
+    }
+
     private func beginEditing() {
         draft = text
         isEditing = true
-        fieldFocused = true
+        isHovering = false
+        setCursor(pushed: false)
         installClickMonitor()
     }
 
@@ -142,16 +143,11 @@ public struct DSInlineEditLabel: View {
 
     private func endEditing() {
         isEditing = false
-        fieldFocused = false
         removeClickMonitor()
     }
 
-    // MARK: - Buitenklik (bevinding 21)
-
-    /// Lokale event-monitor zolang het veld actief is: een muisklik buiten
-    /// het veld committet en wordt vervolgens gewoon doorgegeven, zodat de
-    /// aangeklikte control (canvas, toolknop, sidebar-rij) z'n eigen actie
-    /// uitvoert. AppKit flipt de y-as t.o.v. SwiftUI's globale ruimte.
+    /// Klik buiten het veld committet; het event passeert, dus de
+    /// aangeklikte control (canvas/toolknop/sidebar) doet z'n eigen werk.
     private func installClickMonitor() {
         removeClickMonitor()
         clickMonitor = NSEvent.addLocalMonitorForEvents(
@@ -174,5 +170,108 @@ public struct DSInlineEditLabel: View {
             NSEvent.removeMonitor(clickMonitor)
         }
         clickMonitor = nil
+    }
+}
+
+/// Echt NSTextField als editveld: native caret/placeholder/selectie,
+/// Enter/Esc via de delegate, blur via controlTextDidEndEditing.
+struct InlineEditTextField: NSViewRepresentable {
+    let placeholder: String
+    @Binding var text: String
+    let font: NSFont
+    let textColor: NSColor
+    let lineHeight: CGFloat
+    let onCommit: () -> Void
+    let onCancel: () -> Void
+
+    /// Pure meetfunctie (unit-getest): breedte = max(tekst, placeholder)
+    /// + caret-marge; hoogte = de vaste Figma-regelhoogte.
+    static func measuredSize(
+        text: String, placeholder: String, font: NSFont, lineHeight: CGFloat
+    ) -> CGSize {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let textWidth = (text as NSString).size(withAttributes: attributes).width
+        let placeholderWidth = (placeholder as NSString).size(withAttributes: attributes).width
+        return CGSize(
+            width: ceil(max(textWidth, placeholderWidth)) + 8,
+            height: ceil(lineHeight)
+        )
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = font
+        field.textColor = textColor
+        field.usesSingleLineMode = true
+        field.lineBreakMode = .byClipping
+        field.placeholderAttributedString = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .font: font,
+                // foreground/default/muted (#ffffff66) — de hint-tint.
+                .foregroundColor: NSColor.white.withAlphaComponent(0x66 / 255.0)
+            ]
+        )
+        field.delegate = context.coordinator
+        // Native focus: becomeFirstResponder selecteert een bestaande
+        // waarde volledig — typen vervangt direct (criterium 2).
+        DispatchQueue.main.async {
+            field.window?.makeFirstResponder(field)
+        }
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text {
+            field.stringValue = text
+        }
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize, nsView: NSTextField, context: Context
+    ) -> CGSize? {
+        Self.measuredSize(
+            text: text, placeholder: placeholder, font: font, lineHeight: lineHeight
+        )
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: InlineEditTextField
+
+        init(_ parent: InlineEditTextField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            parent.onCommit()
+        }
+
+        func control(
+            _ control: NSControl, textView: NSTextView, doCommandBy selector: Selector
+        ) -> Bool {
+            switch selector {
+            case #selector(NSResponder.insertNewline(_:)):
+                parent.onCommit()
+                return true
+            case #selector(NSResponder.cancelOperation(_:)):
+                parent.onCancel()
+                return true
+            default:
+                return false
+            }
+        }
     }
 }
