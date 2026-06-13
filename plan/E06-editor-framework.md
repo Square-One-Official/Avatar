@@ -46,8 +46,8 @@ Let op: paneel krijgt later nog een design-iteratie — vervangbaar bouwen.
 
 
 ## 6.4 — Canvas-transform: pan/zoom/snap
-- status: ready
-- owner: —
+- status: in_progress
+- owner: AI (autonome sessie 2026-06-13)
 - blockedBy: 6.1 (done)
 - DoD: beide targets bouwen, tests groen
 - Context: besluit Thierry 2026-06-13 — port van v1-mechanics. GEEN Figma-afhankelijkheid: implementeer op macOS-conventies + onderstaande spec (de ontwerpbron van deze story). Mechanics 1-op-1 porten uit v1 EditorView (drag/snap/haptics, regels ~252–350) en de guide-overlay; visueel in DS-stijl.
@@ -59,6 +59,29 @@ Spec (Thierry):
   dragstart, fade-out na loslaten.
 - Magnetische snapping op canvas-midden-X en de standaard-ooglijn, met haptic tick.
 - Transform persistent per portret (Portrait2-velden; bewerking → updatedAt).
+
+**Plan:**
+1. Portrait2 + `offsetX/offsetY/scale` (Double, default 0; scale 0 = "nog geen transform" →
+   canvas toont berekende fill-fit; lichtgewicht migratie). Gestures schrijven echte waarden
+   + touch().
+2. `EditorCanvasView` in Features/Editor/: 1024-units canvasruimte (v1-conventie, maakt de
+   AutoAligner-port in 6.5 1-op-1), drag = pan met shift-as-constraint, snap met hysterese
+   (enter 12 / exit 24 canvas-units) + NSHapticFeedbackManager (.alignment bij snap,
+   .generic per 24 units), pinch = zoom en scroll = zoom (NSEvent-monitor onder hover),
+   0,5×–3× om het canvasmidden, dubbelklik = reset naar fill-fit (6.5 vervangt dit door
+   echt auto-frame).
+3. Snapdoelen: canvas-midden-X (v1-port). Y: zonder oog-metadata (komt met 6.5/
+   ProcessedSubject) snapt het beeldmidden op canvas-midden-Y zoals v1; de guide toont wél
+   de standaard-ooglijn (0.37, v1-doelwaarde — de ~44% uit de spec is de benadering) zodat
+   handmatig uitlijnen op de lijn kan. 6.5 verlegt de Y-snap naar de ooglijn zodra
+   eyeCenter bekend is — genoteerd in 6.5.
+4. Guide-overlay: v1 AlignmentGuideOverlay geport naar DS-stijl (action-lime i.p.v. cyaan,
+   zelfde geometrie: ooglijn + oogmarkers + hoofd-ovaal op 0.12-interoog), fade-in bij
+   dragstart, fade-out bij loslaten (0,15 s).
+5. FramingConstants (0.12 / 0.37 / 0.50, editCanvas 1024) als gedeelde port in
+   Features/Editor/ — 6.5 hergebruikt ze voor de AutoAligner.
+6. DoD incl. visuele smoke-run via de --show-settings-achtige route (launch + rendercheck
+   met transform).
 
 **Result:** _(invullen bij done)_
 
