@@ -96,8 +96,8 @@ geen legacy-mapping, `CREDITS_PER_TIER.pro` blijft 200. Zie `plan/E14.4-stripe-p
 **Result:** Geen dashboard- of backend-wijziging nodig: 2.0 hergebruikt de live v1-prijzen en env-vars één-op-één (checkout, webhook, credits ongewijzigd); spec-document herschreven naar dit besluit; geen codewijziging, dus DoD-builds n.v.t. (plan-only).
 
 ## 14.5 — Top-up-flow
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 14.3, 14.4
 - DoD: beide targets bouwen, tests groen
 - Context: v1 ProUpgradeSheet top-up-variant + backend checkout/topup.ts.
