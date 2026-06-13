@@ -11,6 +11,7 @@
 //
 // Geïmplementeerde actie: "Auto-crop & center" → AutoFramer (E06.5).
 
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
@@ -21,6 +22,9 @@ struct EditActionsPanel: View {
     private struct Action: Identifiable {
         let id = UUID()
         let title: String
+        /// E14.3: credit-tier voor het kosten-label. nil = lokaal/gratis óf
+        /// (bij isCloud) een nog-niet-vastgesteld tarief → generieke chip.
+        let meter: CreditMeter.Action?
         let isCloud: Bool
         let handler: (() -> Void)?
     }
@@ -33,23 +37,27 @@ struct EditActionsPanel: View {
 
     private var sections: [Section] {
         [
-            // Zakelijk eerst.
+            // Zakelijk eerst. Uitlijnen draait on-device → geen credits.
             Section(title: "Position and alignment", actions: [
-                Action(title: "Auto-crop & center", isCloud: false, handler: onAutomaticFraming),
-                Action(title: "Fix camera angle", isCloud: false, handler: nil),
+                Action(title: "Auto-crop & center", meter: nil, isCloud: false, handler: onAutomaticFraming),
+                Action(title: "Fix camera angle", meter: nil, isCloud: false, handler: nil),
             ]),
             Section(title: "Optimise", actions: [
-                Action(title: "Colorise", isCloud: true, handler: nil),
-                Action(title: "Boost resolution", isCloud: true, handler: nil),
+                Action(title: "Colorise", meter: .colorize, isCloud: true, handler: nil),
+                // Boost resolution: tarief nog niet vastgesteld (geen model
+                // gekozen, niet in de besluit-tabel) → DECISIONS-PENDING;
+                // toont voorlopig de generieke chip.
+                Action(title: "Boost resolution", meter: nil, isCloud: true, handler: nil),
             ]),
-            // Beauty onderaan.
+            // Beauty onderaan. Generatieve retouch = standaardtarief (4);
+            // Restore body = fill-body-route (2).
             Section(title: "Retouch", actions: [
-                Action(title: "One click retouch", isCloud: true, handler: nil),
-                Action(title: "Whiten teeth", isCloud: true, handler: nil),
-                Action(title: "Apply make-up", isCloud: true, handler: nil),
-                Action(title: "Reduce wrinkles", isCloud: true, handler: nil),
-                Action(title: "Improve lighting", isCloud: true, handler: nil),
-                Action(title: "Restore body", isCloud: true, handler: nil),
+                Action(title: "One click retouch", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "Improve lighting", meter: .generativeStandard, isCloud: true, handler: nil),
+                Action(title: "Restore body", meter: .fillBody, isCloud: true, handler: nil),
             ]),
         ]
     }
@@ -87,9 +95,11 @@ struct EditActionsPanel: View {
                     .foregroundStyle(DSColor.Foreground.primary)
                     .lineLimit(1)
                 Spacer(minLength: DSSpacing.gap2)
-                if action.isCloud {
-                    // Gating-indicator; CreditMeter (E14.3) vult straks het
-                    // echte credit-label in.
+                if let meter = action.meter {
+                    // E14.3: kosten in credits vóór uitvoering.
+                    DSProChip(CreditMeter.chipLabel(for: meter))
+                } else if action.isCloud {
+                    // Cloud-actie met nog niet-vastgesteld tarief.
                     DSProChip()
                 }
             }

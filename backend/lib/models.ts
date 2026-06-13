@@ -85,7 +85,10 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
         label: "FLUX.1 Fill [pro]",
       },
     },
-    credits: 1,
+    // E14.3: 1 → 2 (FLUX Fill ~$0,05/call, kosten-proportioneel tarief;
+    // spiegelt CreditMeter.fillBody). Landt op productie bij de volgende
+    // E13.0-port, niet nu.
+    credits: 2,
     requiresCloud: true,
   },
   // Instruction-edit (stijlen + retouch). De drie entries zijn de E09.1

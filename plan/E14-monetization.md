@@ -45,7 +45,7 @@ overschrijding → pro-modal. Watermark op Starter-export.
 **Result:** _(invullen bij done)_
 
 ## 14.3 — Credit-metering per feature
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: E03.4, E01.5
 - DoD: beide targets bouwen, tests groen
@@ -80,7 +80,7 @@ Bij modelwissel of koersdaling de tabel herijken. Secundaire check: het 750-top-
 credits voor €0,020 bruto/stuk — duurste actie mag ook dáár niet structureel boven uitkomen.
 GPT Image 2 op kwaliteit high ($0,211) past in geen enkel tarief — niet inzetten.
 
-**Result:** _(invullen bij done)_
+**Result (incl. CreditMeter-API):** `CreditMeter` (AvatarKit/Backend) is het client-contract voor kosten-display. API: `CreditMeter.Action` (magicCutout/colorize/fillBody/generativeStandard/generativePremium), `credits(for:) -> Int` (1/1/2/4/7, spiegelt de besluit-tabel), `requiresCloud(for:) -> Bool` (voer voor de E03.7-glyph; alle huidige acties cloud), `chipLabel(for:) -> String` ("1 credit"/"N credits"), `canAfford(_:creditsRemaining:)`. Werkelijke aftrek blijft server-side (MODEL_REGISTRY.credits per CloudFeature). EditActionsPanel toont nu echte credit-chips: Colorise 1, retouch-generatief 4, Restore body 2; lokale acties (uitlijnen) geen chip. Backend `MODEL_REGISTRY.fill_body.credits` 1→2 gezet (spiegelt CreditMeter.fillBody) — landt op productie bij de volgende E13.0-port, niet nu. Geparkeerd: "Boost resolution"-tarief (geen model/tarief vastgesteld → DECISIONS-PENDING; toont voorlopig generieke chip, aanbeveling 1). 4 unit-tests groen; models-smoke OK; beide targets bouwen groen; smoke-run: credit-chips in het Edit-paneel.
 
 ## 14.4 — Stripe-prijzen 2.0 [INFRA + actie Thierry]
 - status: done
