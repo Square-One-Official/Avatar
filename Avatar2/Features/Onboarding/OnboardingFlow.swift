@@ -24,6 +24,9 @@ struct OnboardingFlow: View {
             case .privacy:
                 OnboardingPrivacyView(model: model)
                     .transition(.opacity)
+            case .download:
+                OnboardingDownloadView(model: model)
+                    .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.step)

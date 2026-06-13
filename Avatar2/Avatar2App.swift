@@ -37,6 +37,7 @@ struct Avatar2App: App {
                    args.indices.contains(i + 1) {
                     switch args[i + 1] {
                     case "privacy": onboarding.debugForce(step: .privacy)
+                    case "download": onboarding.debugForce(step: .download)
                     case "email": onboarding.debugForce(step: .email)
                     case "otp": onboarding.debugForce(step: .otp)
                     case "splash": onboarding.debugForce(step: .splash)

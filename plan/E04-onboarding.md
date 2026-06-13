@@ -139,8 +139,8 @@ Beide targets bouwen groen, alle tests groen.
 **Result:** Onboarding en shell 1-op-1 getrokken op de Stories-frames: Splash licht conform frame (H1 primary-static-black, Continue onder, fluid-gradient als geregistreerde placeholder — ASSETS.md #1); Email-kolom 360 gecentreerd (H1-kop uit het frame, veld "Work email address" + envelop, full-width "Continue with email", footer Body/Small muted op gap-12 met Terms/Privacy-links in lime, v1-URL's); OTP-kolom 332 ("Check your email" H1, sub Body/Medium subtle, gaps 48, full-width Verify + DSGhostButton "Resend code"); First use met memoji-ring 469×524 (6 placeholder-avatars 112 op exacte Figma-posities, projects-palet — ASSETS.md #2), lime plus (fillBrand 40) + "Drop a portrait / or choose a file"-link; ShellTopBar (quota Labels/Small + Upgrade-brand-chip links op x76, gear 48-cirkel rechts) vervangt EntitlementStatusStrip; dropzone = Figma-vierkant 465×456 r-4xl dashed lime b-medium met "Drop it" H3 (vervangt randglow); PortraitHeader gecentreerd boven canvas in Body/Medium + Body/Small subtle. Beide targets bouwen groen, alle tests groen.
 
 ## 4.6 — Onboarding-stappen "Download now" + "Downloading"
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: E03.2 (done) — Figma-frames staan inmiddels op de Stories-pagina: 'Onboarding / Download now' (4030:1131) en 'Onboarding / Downloading' (4030:1149); op ready gezet conform het besluit
 - DoD: beide targets bouwen, tests groen
 - Context: besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening). Copy-basis: figma-design-review.md §"Onboarding / Download now" + §"Onboarding / Downloading", aangevuld met het bewijs-argument "beter op krullend/fijn haar" (besluit Thierry). NB (AI): de E02.2-beslisrun zag op de huidige 7 fixtures geen ORMBG-meerwaarde boven v2.0-minimal — bij de bouw de copy-claim staven met eigen voorbeelden (bijv. de E05.6-nudge-cases) of de claim zachter formuleren.
@@ -152,7 +152,7 @@ E15.2) — zelfde OrmbgModelStore (E02.3) als de Settings-kaart: één download-
 vensters erop. Modelgrootte in de copy = de echte ORMBG-grootte (±175 MB, niet de 1,2 GB
 uit het oude frame).
 
-**Result:** _(invullen bij done)_
+**Result:** OnboardingDownloadView (frames 4030:1131/4030:1149) als `.download`-stap ná privacy. **Hiërarchie omgedraaid t.o.v. het frame (besluit Thierry):** primair "Continue with built-in engine", secundair ghost "Download model (78 MB)"; tijdens download → progresskaart (X of 78 MB) + primair "Continue" met achtergrond-belofte. Op OrmbgModelStore (zelfde state als E15.2 — achtergrond-download, voortgang ook in Settings); download zet engine-voorkeur op downloadedModel. Modelgrootte = echte 78 MB (niet 1,2 GB); copy-claim verzacht (E02.2 toonde geen harde meerwaarde). Flow: privacy → download → finishFromDownload. DEBUG-haak --onboarding-step download. Twee OnboardingModel-tests bijgewerkt op de nieuwe skip→privacy→download-flow. Smoke-run (ontgrendeld): inverted hiërarchie correct gerenderd. Beide targets bouwen groen, suite groen.
 
 ## 4.7 — Canvas-kaart-inbedding: responsief 1:1 zonder clippen
 - status: done

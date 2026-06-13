@@ -78,10 +78,19 @@ final class OnboardingModelTests: XCTestCase {
 
     // MARK: completion-persistentie
 
-    func testSkipOnboardingCompletesAndDeactivates() {
+    // E04.3/E04.6: skip rondt niet meer meteen af — het pad loopt via de
+    // privacy- en download-stap; pas finishFromDownload() voltooit.
+    func testSkipRoutesThroughPrivacyAndDownloadThenCompletes() {
         let (model, _) = makeModel()
         XCTAssertFalse(model.hasCompleted)
         model.skipOnboarding()
+        XCTAssertEqual(model.step, .privacy)
+        XCTAssertFalse(model.hasCompleted)
+        XCTAssertTrue(model.isActive)
+        model.finishFromPrivacy()
+        XCTAssertEqual(model.step, .download)
+        XCTAssertFalse(model.hasCompleted)
+        model.finishFromDownload()
         XCTAssertTrue(model.hasCompleted)
         XCTAssertFalse(model.isActive)
     }
@@ -89,6 +98,8 @@ final class OnboardingModelTests: XCTestCase {
     func testCompletionPersistsAcrossModelInstances() {
         let (model, defaults) = makeModel()
         model.skipOnboarding()
+        model.finishFromPrivacy()
+        model.finishFromDownload()
         let revived = OnboardingModel(auth: AuthService(), defaults: defaults)
         XCTAssertTrue(revived.hasCompleted)
     }

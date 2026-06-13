@@ -16,6 +16,9 @@ final class OnboardingModel {
         /// E04.3: privacy/online-modellen-stap; OTP-verify én skip landen
         /// hier i.p.v. direct af te ronden.
         case privacy
+        /// E04.6: optionele high-fidelity-model-download (skipbaar,
+        /// achtergrond). Komt na privacy.
+        case download
     }
 
     private static let completedKey = "onboarding2.completed"
@@ -120,10 +123,16 @@ final class OnboardingModel {
         step = .privacy
     }
 
-    /// E04.3: Continue op de privacy-stap rondt de onboarding af. De
-    /// online-modellen-keuze is dan al naar PrivacyPreferences2 geschreven
-    /// (de toggle schrijft live).
+    /// E04.3 → E04.6: Continue op de privacy-stap gaat naar de optionele
+    /// download-stap. De online-modellen-keuze is dan al weggeschreven.
     func finishFromPrivacy() {
+        step = .download
+    }
+
+    /// E04.6: Continue/skip op de download-stap rondt de onboarding af. Een
+    /// gestarte download loopt door in de achtergrond (OrmbgModelStore is
+    /// een actor; voortgang blijft zichtbaar in Settings > AI & Models).
+    func finishFromDownload() {
         markCompleted()
     }
 
