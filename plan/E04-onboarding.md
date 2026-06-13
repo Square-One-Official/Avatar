@@ -170,7 +170,4 @@ uit het oude frame).
 3. Smoke-matrix via frame-autosave-seed (NSWindow Frame-default): 800×600, default 1100×760,
    fullscreen-formaat; telkens met en zonder paneel — kaart vierkant, niets afgekapt.
 
-Notitie (marathon): code + builds + tests klaar; smoke-matrix in de wachtrij — het scherm is
-vergrendeld (GUI-vensters bereiken de window-server niet), unlock-monitor staat aan.
-
-**Result:** _(invullen bij done — wacht op smoke-matrix)_
+**Result:** Canvas-kaart vult nu de foto-slot van DSEditPanelContainer met `.aspectRatio(1, .fit)` + `maxWidth/maxHeight .infinity` (456-cap weg) — altijd vierkant, groeit/krimpt met venster en geopend paneel, fit (nooit clippen); de 3.16-garantie (foto layoutPriority −1) houdt paneel/toolbar buiten schot. DEBUG-haak `--open-panel <tool>`. Smoke-run (scherm ontgrendeld): kaart 1:1 met geopend Edit-paneel, responsief; geen clipping. Beide targets bouwen groen, tests groen.

@@ -115,7 +115,7 @@ final class ShellModel {
             canvas = .result(cutout)
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
-            persist(cutout: cutout)
+            persist(cutout: cutout, original: original)
         } catch {
             canvas = .failed("Couldn't find a person in that photo. Try another portrait.")
         }
@@ -124,9 +124,10 @@ final class ShellModel {
     // MARK: - Set/sidebar (E05.4)
 
     /// Geslaagde cutout → nieuw portret in de set; wordt meteen de selectie.
-    private func persist(cutout: NSImage) {
+    /// De originele importfoto gaat mee voor hold-to-compare (E06.2).
+    private func persist(cutout: NSImage, original: NSImage) {
         guard let modelContext, let png = pngData(from: cutout) else { return }
-        let portrait = Portrait2(cutoutData: png)
+        let portrait = Portrait2(cutoutData: png, originalData: pngData(from: original))
         modelContext.insert(portrait)
         select(portrait)
     }

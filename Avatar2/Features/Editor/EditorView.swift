@@ -62,11 +62,23 @@ struct EditorView: View {
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
     @State private var activeTool: EditorTool?
+    /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
+    @State private var isComparing = false
+    @Environment(\.undoManager) private var undoManager
+    /// UndoManager is niet observable; deze tick (gebumpt op undo-
+    /// notificaties) forceert her-evaluatie van de enabled-state.
+    @State private var undoTick = 0
 
     #if DEBUG
     /// Smoke-run-haak (--open-panel <tool>); gezet door ShellView.
     @MainActor static var debugInitialTool: EditorTool?
     #endif
+
+    /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
+    private var originalImage: NSImage? {
+        guard let data = portraitModel?.originalData else { return nil }
+        return NSImage(data: data)
+    }
 
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
         EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
@@ -96,14 +108,64 @@ struct EditorView: View {
     }
 
     var body: some View {
+        editorBody
+            // E06.2: undo/redo + hold-to-compare. Frame App / Edit zet undo/
+            // redo ín de toolbar-strip (x344/x400) en de compare-thumb
+            // top-right; integratie in DSBottomToolbar is DS-werk (E03.19).
+            // Tot die landt staan ze als glass-cirkels rechtsonder, op één
+            // lijn met de toolbar — gedocumenteerde tijdelijke plaatsing.
+            .overlay(alignment: .bottomTrailing) { editorControls }
+            // UndoManager publiceert geen state → luister op de
+            // change-notificaties en bump de tick zodat de knoppen
+            // enable/disablen.
+            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in undoTick += 1 }
+            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in undoTick += 1 }
+            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in undoTick += 1 }
+    }
+
+    @ViewBuilder
+    private var editorControls: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo") {
+                undoManager?.undo()
+            }
+            .disabled(undoManager?.canUndo != true)
+            DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo") {
+                undoManager?.redo()
+            }
+            .disabled(undoManager?.canRedo != true)
+            if originalImage != nil {
+                DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing) {}
+                    .opacity(isComparing ? 0.85 : 1)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in isComparing = true }
+                            .onEnded { _ in isComparing = false }
+                    )
+            }
+        }
+        .padding(.trailing, DSSpacing.gap3)
+        .padding(.bottom, DSSpacing.gap4)
+    }
+
+    private var editorBody: some View {
         DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
             // transparante delen tonen het raster: achtergrond verwijderd.
             DSCanvasCard(showsDotGrid: true) {
-                // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
-                EditorCanvasView(image: portrait, portrait: portraitModel)
+                // E06.2: hold-to-compare toont de originele importfoto
+                // (aspect-fit, geen transform) bovenop het cutout-canvas.
+                if isComparing, let original = originalImage {
+                    Image(nsImage: original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
+                    EditorCanvasView(image: portrait, portrait: portraitModel)
+                }
             }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
@@ -156,6 +218,6 @@ struct EditorView: View {
     private func runAutomaticFraming() {
         guard let portraitModel,
               let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        Task { await AutoFramer.apply(to: portraitModel, image: cg) }
+        Task { await AutoFramer.apply(to: portraitModel, image: cg, undoManager: undoManager) }
     }
 }

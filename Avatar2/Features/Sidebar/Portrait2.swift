@@ -19,6 +19,10 @@ final class Portrait2 {
     /// SwiftData kan niet naar een ander veld defaulten).
     var updatedAt: Date = Date.distantPast
     @Attribute(.externalStorage) var cutoutData: Data
+    /// Originele importfoto (E06.2 hold-to-compare): ingedrukt houden toont
+    /// dit i.p.v. de cutout. Optioneel + externalStorage; bestaande rijen
+    /// (migratie default nil) verbergen de compare-knop.
+    @Attribute(.externalStorage) var originalData: Data?
 
     /// Canvas-transform (E06.4) in 1024-units canvasruimte (v1-conventie):
     /// het cutout-beeld tekent op (offsetX, offsetY) × scale binnen het
@@ -29,12 +33,19 @@ final class Portrait2 {
     var offsetY: Double = 0
     var scale: Double = 0
 
-    init(name: String = "", role: String = "", createdAt: Date = .now, cutoutData: Data) {
+    init(
+        name: String = "",
+        role: String = "",
+        createdAt: Date = .now,
+        cutoutData: Data,
+        originalData: Data? = nil
+    ) {
         self.name = name
         self.role = role
         self.createdAt = createdAt
         self.updatedAt = createdAt
         self.cutoutData = cutoutData
+        self.originalData = originalData
     }
 
     /// Markeer als zojuist bewerkt.

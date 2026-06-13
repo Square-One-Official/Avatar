@@ -199,8 +199,9 @@ enum AutoFramer {
     /// geanimeerde overgang komt uit de withAnimation rond de model-writes
     /// (het E06.4-canvas observeert Portrait2).
     @MainActor
-    static func apply(to portrait: Portrait2, image: CGImage) async {
+    static func apply(to portrait: Portrait2, image: CGImage, undoManager: UndoManager? = nil) async {
         let size = CGSize(width: image.width, height: image.height)
+        let before = TransformUndo.snapshot(of: portrait)
         let metrics = await Task.detached(priority: .userInitiated) {
             Self.metrics(for: image)
         }.value
@@ -217,5 +218,12 @@ enum AutoFramer {
             portrait.scale = transform.scale
         }
         portrait.touch()
+        TransformUndo.register(
+            undoManager,
+            portrait: portrait,
+            undoTo: before,
+            redoTo: TransformUndo.snapshot(of: portrait),
+            actionName: "Automatic Framing"
+        )
     }
 }

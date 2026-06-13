@@ -30,6 +30,11 @@ struct EditorCanvasView: View {
     @State private var isHovering = false
     @State private var scrollMonitor: Any?
 
+    // E06.2: before-snapshots zodat een afgerond gebaar één undo-stap is.
+    @State private var dragBefore: TransformUndo.Snapshot?
+    @State private var zoomBefore: TransformUndo.Snapshot?
+    @Environment(\.undoManager) private var undoManager
+
     /// In-memory transform voor het (theoretische) geval zonder model —
     /// het canvas werkt dan gewoon, alleen zonder persistentie.
     @State private var localTransform = CanvasTransform(offsetX: 0, offsetY: 0, scale: 0)
@@ -132,7 +137,7 @@ struct EditorCanvasView: View {
             }
             return
         }
-        Task { await AutoFramer.apply(to: portrait, image: cg) }
+        Task { await AutoFramer.apply(to: portrait, image: cg, undoManager: undoManager) }
     }
 
     // MARK: - Drag = pan + snap (v1-port)
@@ -143,6 +148,7 @@ struct EditorCanvasView: View {
                 var t = resolvedTransform()
                 if dragStart == nil {
                     dragStart = CGSize(width: t.offsetX, height: t.offsetY)
+                    if let portrait { dragBefore = TransformUndo.snapshot(of: portrait) }
                     isDragging = true
                     lastHapticTickX = t.offsetX
                     lastHapticTickY = t.offsetY
@@ -215,14 +221,27 @@ struct EditorCanvasView: View {
             }
             .onEnded { _ in
                 if dragStart != nil {
-                    // Eén touch per afgeronde drag — niet per pixel.
+                    // Eén touch + één undo-stap per afgeronde drag.
                     writeTransform(resolvedTransform(), touch: true)
+                    registerUndo(from: dragBefore, actionName: "Move")
                 }
                 dragStart = nil
+                dragBefore = nil
                 isDragging = false
                 snappedX = false
                 snappedY = false
             }
+    }
+
+    private func registerUndo(from before: TransformUndo.Snapshot?, actionName: String) {
+        guard let portrait, let before else { return }
+        TransformUndo.register(
+            undoManager,
+            portrait: portrait,
+            undoTo: before,
+            redoTo: TransformUndo.snapshot(of: portrait),
+            actionName: actionName
+        )
     }
 
     // MARK: - Zoom (pinch + scroll), 0,5×–3× om het canvasmidden
@@ -230,6 +249,9 @@ struct EditorCanvasView: View {
     private var magnifyGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
+                if zoomBefore == nil, let portrait {
+                    zoomBefore = TransformUndo.snapshot(of: portrait)
+                }
                 let delta = Double(value) / max(0.0001, lastMagnification)
                 lastMagnification = Double(value)
                 applyZoom(delta: delta, touch: false)
@@ -237,6 +259,8 @@ struct EditorCanvasView: View {
             .onEnded { _ in
                 lastMagnification = 1
                 writeTransform(resolvedTransform(), touch: true)
+                registerUndo(from: zoomBefore, actionName: "Zoom")
+                zoomBefore = nil
             }
     }
 

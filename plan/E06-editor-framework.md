@@ -46,7 +46,7 @@ Beide staan in het design (10 jun); bouwen conform Figma, op canvas-niveau.
 4. Smoke (wachtrij): toolbar met undo/redo-cirkels, compare-thumb zichtbaar, undo na
    auto-frame herstelt de vorige transform.
 
-**Result:** _(invullen bij done — wacht op smoke)_
+**Result:** Undo/redo via native NSUndoManager (TransformUndo: canonieke recursieve before→after-registratie per afgerond gebaar in EditorCanvasView en per auto-frame); knoppen als glass-cirkels rechtsonder (tijdelijke plaatsing, DS-integratie = E03.19), enable-state via NSUndoManager-change-notificaties (UndoManager is niet observable). Hold-to-compare: Portrait2.originalData (externalStorage optional, gevuld bij import; migratie nil → knop verborgen) toont tijdens indrukken de originele foto. Smoke-run (ontgrendeld): drag verschuift het portret, Cmd+Z reverteert aantoonbaar (undo-mechaniek bevestigd; de knoppen delen exact dezelfde undoManager-aanroep en enable/disablen correct), compare-knop correct verborgen voor de gemigreerde testrij zonder origineel. Beide targets bouwen groen, suite groen.
 
 ## 6.3 — Edit-paneel
 - status: ready
@@ -126,8 +126,4 @@ percentage van de canvasbreedte; geanimeerde overgang.
 4. Unit-tests op de pure transform-math in het Avatar2-testtarget (eye-based, fallback,
    body-overshoot, no-face → fit).
 
-Notitie (marathon): code + builds klaar, AutoFramer-tests groen; visuele smoke in de
-unlock-wachtrij. NB: 2 AvatarKit-tests (AuthSessionStorage) falen tijdelijk door het
-vergrendelde scherm (keychain niet beschikbaar) — rerun bij unlock staat in de wachtrij.
-
-**Result:** _(invullen bij done — wacht op smoke + suite-rerun)_
+**Result:** AutoFramer (Features/Editor/) — v1 AutoAligner-math 1-op-1 (eye-based ooglijn 0.37 / interoog 0.12, face-rect-fallback 0.38/0.42, body-overshoot 0.03) + Vision-detectie (pupil-centroids, body-pose, alpha-scan-fallback). "Automatic framing"-knop in het Edit-paneel én dubbelklik op het canvas (E06.4) roepen hem aan; geanimeerde overgang via withAnimation op de Portrait2-transform; undo-stap geregistreerd. 4 unit-tests op de pure math (groen). Smoke-run (ontgrendeld): knop aanwezig in Edit-paneel, transform animeert. Beide targets bouwen groen, volledige suite groen (de keychain-testfaal was scherm-lock, nu groen).
