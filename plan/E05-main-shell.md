@@ -107,8 +107,8 @@ Notities (FEAT, bij oplevering):
 
 
 ## 5.6 — Nudge: high-fidelity model na rafelig haarresultaat
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: E15.2
 - DoD: beide targets bouwen, tests groen
 - Context: besluit Thierry 2026-06-12 (vervolg op de ORMBG-herziening); derde plek van de optionele model-download naast E04.6 (onboarding) en E15.2 (Settings > AI & Models). Zelfde OrmbgModelStore-state.
@@ -119,7 +119,20 @@ het resultaat een aanbod om het high-fidelity model te downloaden. Hard in de st
 langs de bovenrand van het silhouet) is onderdeel van de story — afstemmen met AI-team
 over een bruikbaar signaal uit de engine.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. HairEdgeHeuristic (Features/Editor, FEAT-lane — werkt op de cutout-output, geen
+   AvatarKit-wijziging; een diepere engine-confidence kan dit later vervangen, notitie voor AI):
+   pure functie isLikelyRagged(cutout:) — downsample, per kolom de bovenste opake rij zoeken,
+   gemiddelde absolute sprong tussen buurkolommen / hoogte > drempel → rafelige (spikey)
+   haarrand zoals Vision's semi-binaire matte die geeft. Unit-getest (glad vs gekarteld).
+2. Nudge alleen wanneer: cutout kwam van de Vision-engine (niet al ORMBG/cloud), ORMBG níét
+   geïnstalleerd, heuristiek = rafelig, én nog niet eerder getoond (UserDefaults one-time flag).
+3. UI: subtiele inline banner bij het resultaat (geen modal), wegklikbaar (× → one-time flag),
+   met "Download" die dezelfde OrmbgModelStore-download start (gedeelde state met E04.6/E15.2);
+   na start verdwijnt de nudge.
+4. Beide targets bouwen, tests groen, visuele smoke-run.
+
+**Result:** _(invullen bij done — wacht op smoke)_
 
 ## 5.7 — "Align set"-actie in de sidebar
 - status: backlog
