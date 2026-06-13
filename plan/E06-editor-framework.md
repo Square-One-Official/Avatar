@@ -49,15 +49,22 @@ Beide staan in het design (10 jun); bouwen conform Figma, op canvas-niveau.
 **Result:** Undo/redo via native NSUndoManager (TransformUndo: canonieke recursieve before→after-registratie per afgerond gebaar in EditorCanvasView en per auto-frame); knoppen als glass-cirkels rechtsonder (tijdelijke plaatsing, DS-integratie = E03.19), enable-state via NSUndoManager-change-notificaties (UndoManager is niet observable). Hold-to-compare: Portrait2.originalData (externalStorage optional, gevuld bij import; migratie nil → knop verborgen) toont tijdens indrukken de originele foto. Smoke-run (ontgrendeld): drag verschuift het portret, Cmd+Z reverteert aantoonbaar (undo-mechaniek bevestigd; de knoppen delen exact dezelfde undoManager-aanroep en enable/disablen correct), compare-knop correct verborgen voor de gemigreerde testrij zonder origineel. Beide targets bouwen groen, suite groen.
 
 ## 6.3 — Edit-paneel
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: 6.1, E03.4
 - DoD: beide targets bouwen, tests groen
 
 Actielijst (zakelijke acties boven beauty-acties), elke actie via ProChip. Acties mogen stubs zijn.
 Let op: paneel krijgt later nog een design-iteratie — vervangbaar bouwen.
 
-**Result:** _(invullen bij done)_
+**Plan:** EditActionsPanel (Features/Editor/) — secties Position → Optimise → Retouch (zakelijk
+boven beauty, spec); rijen uit het frame App / Edit (4014:10761) als pill-rijen in een
+2-koloms-grid; cloud/generatieve acties krijgen de DSProChip-gating-indicator (exacte
+credit-labels uit CreditMeter E14.3 later), lokale acties niet. Eén actie live: "Auto-crop &
+center" → AutoFramer (E06.5); rest stubs (gedimd, disabled). Vervangbaar opgezet voor de
+latere design-iteratie.
+
+**Result:** EditActionsPanel in het Edit-paneel: secties Position and alignment → Optimise → Retouch (zakelijk boven beauty, gedocumenteerde herordening t.o.v. de frame-volgorde), pill-rijen in een 2-koloms-grid uit frame 4014:10761; cloud/generatieve acties met DSProChip-gating (credit-labels later uit CreditMeter E14.3), lokale acties zonder. "Auto-crop & center" live op AutoFramer (E06.5); overige acties stubs (gedimd/disabled), vervangbaar voor de latere design-iteratie. Smoke-run (ontgrendeld): alle drie de secties renderen met chips en active/disabled-states. Beide targets bouwen groen, suite groen.
 
 
 ## 6.4 — Canvas-transform: pan/zoom/snap

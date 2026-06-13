@@ -179,18 +179,10 @@ struct EditorView: View {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
             } else if tool == .edit {
-                // E06.5: de eerste echte actie in het Edit-paneel; E06.3
-                // neemt hem op in de volledige actielijst.
+                // E06.3: volledige actielijst (zakelijk boven beauty); de
+                // auto-frame-actie (E06.5) is "Auto-crop & center".
                 DSEditPanel(title: tool.label) {
-                    VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                        DSNeutralButton("Automatic framing") {
-                            runAutomaticFraming()
-                        }
-                        Text("More tools land here (E06.3).")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    EditActionsPanel(onAutomaticFraming: runAutomaticFraming)
                 }
             } else {
                 DSEditPanel(title: tool.label) {
