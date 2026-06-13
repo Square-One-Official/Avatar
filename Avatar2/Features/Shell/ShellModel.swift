@@ -62,8 +62,11 @@ final class ShellModel {
 
     private let entitlement: EntitlementModel
 
+    /// Vision + ORMBG (E15.2): de voorkeur uit PrivacyPreferences2 bepaalt
+    /// per import welk lokaal pad de router probeert; zonder geïnstalleerd
+    /// model valt hij terug op Vision (eerste beschikbare).
     @ObservationIgnored
-    private let router = PipelineRouter(engines: [VisionCutoutEngine()])
+    private let router = PipelineRouter(engines: [VisionCutoutEngine(), OrmbgEngine()])
 
     init(entitlement: EntitlementModel) {
         self.entitlement = entitlement
@@ -100,7 +103,9 @@ final class ShellModel {
         let original = nsImage(from: cgImage)
         canvas = .processing(original)
         do {
-            let cutout = nsImage(from: try await router.cutout(cgImage))
+            let preferred: CutoutEngineKind =
+                PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
+            let cutout = nsImage(from: try await router.cutout(cgImage, preferring: preferred))
             // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
             // animeert, het model wacht dezelfde duur en stapt dan door.
             canvas = .revealing(original: original, cutout: cutout)
