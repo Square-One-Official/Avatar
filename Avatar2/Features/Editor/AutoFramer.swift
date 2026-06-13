@@ -193,6 +193,22 @@ enum AutoFramer {
         return nil
     }
 
+    /// Berekent (off-main) het auto-frame-transform voor een cutout —
+    /// gebruikt door de set-brede "Align set" (E05.7) die zelf de
+    /// undo-groepering en het schrijven verzorgt.
+    static func transform(forCutout image: CGImage) async -> Transform {
+        let m = await Task.detached(priority: .userInitiated) {
+            Self.metrics(for: image)
+        }.value
+        return computeTransform(
+            faceRect: m.faceRect,
+            eyeCenter: m.eyeCenter,
+            interEyeDistance: m.interEyeDistance,
+            cutoutSize: CGSize(width: image.width, height: image.height),
+            bodyBottomY: m.bodyBottomY
+        )
+    }
+
     // MARK: - Actie
 
     /// Bereken en schrijf het auto-frame-transform voor dit portret; de

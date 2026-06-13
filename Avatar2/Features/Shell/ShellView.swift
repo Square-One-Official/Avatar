@@ -63,6 +63,8 @@ struct ShellView: View {
             // uit de proces-argumenten gelezen (geen race).
             // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.
             if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
+            // E05.7: `--seed-set` dupliceert het portret en opent de sidebar.
+            if args.contains("--seed-set") { model.debugSeedSecondPortraitAndOpenSidebar() }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),

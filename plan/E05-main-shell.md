@@ -135,7 +135,7 @@ over een bruikbaar signaal uit de engine.
 **Result:** HairEdgeHeuristic (Features/Editor, FEAT-lane): pure isLikelyRagged(cutout:) — meet de gemiddelde absolute top-randsprong tussen buurkolommen (genormaliseerd), drempel 0.02; semi-binaire Vision-haarranden scoren hoog, gladde randen ~0. 3 unit-tests (glad ≠ rafelig, ordering). ShellModel toont de nudge eenmalig (UserDefaults `nudge.hifiHairShown`) wanneer: Vision-engine gebruikt, ORMBG niet geïnstalleerd, rand rafelig. HairNudgeBanner (Features/Shell): subtiele niet-modale banner onderin ("Rough hair edges? … Download / ×"), wegklikbaar (× → one-time), Download start de gedeelde OrmbgModelStore-download + zet engine-voorkeur. Detectie werkt op de cutout-output; een diepere engine-confidence kan dit later vervangen (notitie AI). DEBUG-haak --force-hair-nudge. Smoke-run (ontgrendeld): banner subtiel onderin gerenderd. Beide targets bouwen groen, suite groen.
 
 ## 5.7 — "Align set"-actie in de sidebar
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: E06.5
 - DoD: beide targets bouwen, tests groen
@@ -155,7 +155,7 @@ previewanimatie in de thumbnails; undo geldt set-breed als één stap.
 4. Previewanimatie: korte thumbnail-puls (scaleEffect) tijdens het alignen; knop toont
    "Aligning…" en is disabled.
 
-**Result:** _(invullen bij done — wacht op smoke)_
+**Result:** "Align set"-knop (DSPrimaryButton brand + wand-icoon) in de sidebar boven Add, zichtbaar bij ≥2 portretten; past AutoFramer (E06.5) toe op álle portretten. Set-breed undo als één stap: transforms eerst (off-main, AutoFramer.transform(forCutout:)) berekend, dan binnen één NSUndoManager-groep (begin/endUndoGrouping) geschreven + geregistreerd → één Cmd+Z draait de hele set terug. Previewanimatie: thumbnail-puls (scaleEffect) tijdens align, knop toont "Aligning…"/disabled. DEBUG-haak --seed-set. Smoke-run (ontgrendeld): hero-knop prominent boven Add met geopende set-sidebar. Beide targets bouwen groen, suite groen.
 
 ## 5.8 — Topbar-randmarges op het venster-marge-token
 - status: done

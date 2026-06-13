@@ -175,6 +175,17 @@ final class ShellModel {
     #if DEBUG
     /// Smoke-run-haak: forceer de nudge zichtbaar.
     func debugForceHairNudge() { showHairNudge = true }
+
+    /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
+    /// te dupliceren, en open de sidebar.
+    func debugSeedSecondPortraitAndOpenSidebar() {
+        if let modelContext, let p = selectedPortrait {
+            let copy = Portrait2(name: p.name, cutoutData: p.cutoutData, originalData: p.originalData)
+            copy.backgroundColorHex = p.backgroundColorHex
+            modelContext.insert(copy)
+        }
+        isSidebarVisible = true
+    }
     #endif
 
     /// Wegklikken (×) — eenmalig, komt niet terug.
