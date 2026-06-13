@@ -34,5 +34,11 @@ backend-werk dat ná die port op v2-main landt geldt: in-app testen tegen een
 Geen Original-card: gekozen stijl = active state, nogmaals klikken deselecteert. Previews in eigen
 stijl volgen later (placeholder-previews nu). Endpoint /v1/stylize.
 
+Notitie (besluit Thierry 2026-06-13): E09.2 levert het productie-`/v1/stylize`-endpoint
+(nano-banana default, zie E09.1) dat óók E10.4 (kledingwissel) en E11.2 (haar) consumeren —
+instruction-edit met het harde acceptatiecriterium "alléén het doel wijzigt, rest pixel-identiek".
+Het dev-only /v1/stylize uit E09.1 wordt hier de gegate productie-route (credits via CreditMeter,
+402 → paywall). Model kiesbaar maken = E15.6 (nano-banana standaard, OpenAI alternatief).
+
 **Result:** _(invullen bij done)_
 

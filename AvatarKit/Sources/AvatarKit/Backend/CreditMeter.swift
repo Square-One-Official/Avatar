@@ -25,6 +25,9 @@ public enum CreditMeter {
     public enum Action: String, Sendable, CaseIterable {
         case magicCutout
         case colorize
+        /// Upscale / resolutie verhogen (besluit Thierry 2026-06-13: 1 credit,
+        /// lichte cloud-call; modelkeuze nog open — losse AI-spike).
+        case upscale
         case fillBody
         /// Generatieve stijl/kleding/haar — standaardmodel (nano-banana c.s.).
         case generativeStandard
@@ -35,7 +38,7 @@ public enum CreditMeter {
     /// Kosten in credits voor een actie (besluit-tabel).
     public static func credits(for action: Action) -> Int {
         switch action {
-        case .magicCutout, .colorize: return 1
+        case .magicCutout, .colorize, .upscale: return 1
         case .fillBody: return 2
         case .generativeStandard: return 4
         case .generativePremium: return 7
@@ -47,7 +50,7 @@ public enum CreditMeter {
     /// kan teruggeven zonder de call-sites te wijzigen.
     public static func requiresCloud(for action: Action) -> Bool {
         switch action {
-        case .magicCutout, .colorize, .fillBody, .generativeStandard, .generativePremium:
+        case .magicCutout, .colorize, .upscale, .fillBody, .generativeStandard, .generativePremium:
             return true
         }
     }

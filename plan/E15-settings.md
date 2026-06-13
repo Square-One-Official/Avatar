@@ -122,3 +122,12 @@ van 2026-06-12 op productie; backend-werk dat daarna op v2-main landt in-app tes
 **Vercel-preview-deploy** tot de volgende port.
 
 **Result:** _(invullen bij done)_
+
+## 15.6 — Generatie-model kiesbaar in Settings (nano-banana / OpenAI)
+- status: backlog
+- owner: FEAT (Settings-UI) + INFRA/AI (registry) — splitsen per grens
+- blockedBy: 15.2, E01.10, E09.2
+- DoD: beide targets bouwen, tests groen
+- Context: nieuw besluit Thierry 2026-06-13. Bouw bovenop MODEL_REGISTRY + de model_override-parameter (E01.10) en de model-picker (E15.5). nano-banana = standaard; een OpenAI image-model als alternatief. Registreer het OpenAI-model in MODEL_REGISTRY (stylize-feature; INFRA/AI-grens — backend, landt op productie pas bij de volgende E13.0-port) en expose de keuze in Settings > AI & Models als reguliere (niet dev-only) optie. Onderscheid met E15.5: 15.5 is de dev-only picker over de hele whitelist; 15.6 is één gebruikersgerichte keuze tussen de twee productie-modellen voor generatieve edits.
+
+**Result:** _(invullen bij done)_

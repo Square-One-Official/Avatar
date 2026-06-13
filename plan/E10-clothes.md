@@ -29,3 +29,20 @@ Person-seg minus gezicht/haar (macOS 26-pad); tap-to-segment volgt bij macOS 27.
 
 **Result:** ClothesPanel (Features/Editor, frame 4016:13760): "Change upper clothes" + outfit-preset-chips (T-Shirt/Polo/Blazer/Hoody/Sweater) + vrije prompt ("Describe a color or style") met lime send-knop (disabled bij lege input); gemount op de Clothing-tool. **Generatie-route geparkeerd** (DECISIONS-PENDING): E10.1's kledingmasker (masked FLUX Fill) vs E09.1's nano-banana instruction-edit — aanbeveling nano-banana via productie-/v1/stylize (E09.2); generate-actie is nu een stub (onApply), paneel vervangbaar opgezet. Smoke-run (ontgrendeld): 1-op-1 het frame. Beide targets bouwen groen, suite groen.
 
+## 10.3 — [AI] Upscale/Boost-resolution-model (spike)
+- status: backlog
+- owner: AI
+- blockedBy: —
+- DoD: model gekozen + kosten bevestigd
+- Context: besluit Thierry 2026-06-13 — "Boost resolution" = 1 credit (CreditMeter.upscale, al live). Alleen de MODELKEUZE is open: kies een Replicate-upscale-model (bv. Real-ESRGAN/Clarity), bevestig kosten/call (verwacht ~$0,002–0,01, past binnen 1 credit), en wire de actie. Geen blocker voor andere stories.
+
+**Result:** _(invullen bij done)_
+
+## 10.4 — Kledingwissel-route wiren (na E09.2)
+- status: blocked
+- owner: FEAT
+- blockedBy: E09.2
+- DoD: beide targets bouwen, tests groen; acceptatiecriterium gehaald
+- Context: besluit Thierry 2026-06-13 — nano-banana instruction-edit is het PRIMAIRE pad ("change the upper clothing to <preset>, keep face/hair/pose"). **Acceptatiecriterium (hard):** alléén kleding wijzigt; gezicht/haar/pose/achtergrond pixel-identiek. ClothesMaskGenerator (E10.1) + FLUX Fill = precisie-fallback. E10.2's ClothesPanel-onApply (nu stub) hierop aansluiten zodra E09.2 het productie-/v1/stylize levert.
+
+**Result:** _(invullen bij done)_

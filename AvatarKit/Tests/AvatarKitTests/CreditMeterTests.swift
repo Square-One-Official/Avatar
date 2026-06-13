@@ -6,6 +6,7 @@ final class CreditMeterTests: XCTestCase {
     func testTariffs() {
         XCTAssertEqual(CreditMeter.credits(for: .magicCutout), 1)
         XCTAssertEqual(CreditMeter.credits(for: .colorize), 1)
+        XCTAssertEqual(CreditMeter.credits(for: .upscale), 1)
         XCTAssertEqual(CreditMeter.credits(for: .fillBody), 2)
         XCTAssertEqual(CreditMeter.credits(for: .generativeStandard), 4)
         XCTAssertEqual(CreditMeter.credits(for: .generativePremium), 7)

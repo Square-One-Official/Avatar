@@ -44,10 +44,9 @@ struct EditActionsPanel: View {
             ]),
             Section(title: "Optimise", actions: [
                 Action(title: "Colorise", meter: .colorize, isCloud: true, handler: nil),
-                // Boost resolution: tarief nog niet vastgesteld (geen model
-                // gekozen, niet in de besluit-tabel) → DECISIONS-PENDING;
-                // toont voorlopig de generieke chip.
-                Action(title: "Boost resolution", meter: nil, isCloud: true, handler: nil),
+                // Boost resolution: 1 credit (besluit Thierry 2026-06-13;
+                // upscale = lichte cloud-call). Modelkeuze open → AI-spike E10.3.
+                Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: nil),
             ]),
             // Beauty onderaan. Generatieve retouch = standaardtarief (4);
             // Restore body = fill-body-route (2).
