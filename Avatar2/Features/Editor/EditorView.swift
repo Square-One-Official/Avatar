@@ -70,14 +70,37 @@ struct EditorView: View {
     @State private var undoTick = 0
 
     #if DEBUG
-    /// Smoke-run-haak (--open-panel <tool>); gezet door ShellView.
-    @MainActor static var debugInitialTool: EditorTool?
+    /// Smoke-run-haak (--open-panel <tool>): direct uit de proces-argumenten
+    /// gelezen (geen race met een setter); één keer geconsumeerd in onAppear.
+    @MainActor static var debugInitialTool: EditorTool? = {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "--open-panel"), args.indices.contains(i + 1) else { return nil }
+        return EditorTool(rawValue: args[i + 1])
+    }()
     #endif
 
     /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
     private var originalImage: NSImage? {
         guard let data = portraitModel?.originalData else { return nil }
         return NSImage(data: data)
+    }
+
+    /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit).
+    private var hasBackground: Bool {
+        portraitModel?.backgroundColorHex != nil || portraitModel?.backgroundImageData != nil
+    }
+
+    @ViewBuilder
+    private var backgroundLayer: some View {
+        if let data = portraitModel?.backgroundImageData, let image = NSImage(data: data) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else if let hex = portraitModel?.backgroundColorHex, let color = Color(hexRGB: hex) {
+            color
+        }
     }
 
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
@@ -154,17 +177,22 @@ struct EditorView: View {
             // dot-grid eronder zolang er geen achtergrond is ingesteld
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
             // transparante delen tonen het raster: achtergrond verwijderd.
-            DSCanvasCard(showsDotGrid: true) {
-                // E06.2: hold-to-compare toont de originele importfoto
-                // (aspect-fit, geen transform) bovenop het cutout-canvas.
-                if isComparing, let original = originalImage {
-                    Image(nsImage: original)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
-                    EditorCanvasView(image: portrait, portrait: portraitModel)
+            DSCanvasCard(showsDotGrid: !hasBackground) {
+                ZStack {
+                    // E07.1: gekozen achtergrond achter de cutout (preview;
+                    // exportkwaliteit-compositing volgt in E07.2).
+                    backgroundLayer
+                    // E06.2: hold-to-compare toont de originele importfoto
+                    // (aspect-fit, geen transform) bovenop het cutout-canvas.
+                    if isComparing, let original = originalImage {
+                        Image(nsImage: original)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
+                        EditorCanvasView(image: portrait, portrait: portraitModel)
+                    }
                 }
             }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
@@ -184,6 +212,9 @@ struct EditorView: View {
                 DSEditPanel(title: tool.label) {
                     EditActionsPanel(onAutomaticFraming: runAutomaticFraming)
                 }
+            } else if tool == .background {
+                // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
+                BackgroundPanel(portrait: portraitModel)
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")

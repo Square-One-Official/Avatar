@@ -33,6 +33,13 @@ final class Portrait2 {
     var offsetY: Double = 0
     var scale: Double = 0
 
+    /// Achtergrond (E07.1): kleur (hex #RRGGBB) óf afbeelding (preset/
+    /// upload). Eén van beide is gezet, of beide nil = geen achtergrond
+    /// (dot-grid). Export-kwaliteit compositing volgt in E07.2; dit is de
+    /// selectie + preview-bron. Migratie: defaults nil.
+    var backgroundColorHex: String?
+    @Attribute(.externalStorage) var backgroundImageData: Data?
+
     init(
         name: String = "",
         role: String = "",
