@@ -44,6 +44,8 @@ struct Avatar2App: App {
                     default: break
                     }
                 }
+                // E14.1: `--show-paywall` opent de plan-kiezer voor de smoke.
+                if args.contains("--show-paywall") { entitlement.requestUpgrade() }
             }
             #endif
             // Frame-autosave: AppKit onthoudt de gebruikersmaat tussen

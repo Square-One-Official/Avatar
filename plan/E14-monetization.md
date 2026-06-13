@@ -5,7 +5,7 @@ Team: **FEAT + INFRA**
 Pro-model: Starter Free (3 afbeeldingen totaal, lokale features, watermark) vs Pro **€4,99/mnd of €49,90/jr** (onbeperkt, alle features, **200 credits/mnd**, top-up). Principe: on-device = 0 credits, cloud = kosten-proportionele credits (zie 14.3). **Besluit Thierry 2026-06-12: prijs en credits blijven gelijk aan v1 — de €12,99/100 uit het bouwplan §Pro-model was een voorbeeld en is vervallen.**
 
 ## 14.1 — Pro-modal conform Figma
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: E03.2, E01.5
 - DoD: beide targets bouwen, tests groen
@@ -30,7 +30,7 @@ gebruikers) hoort hierbij — meenemen of eerst doen.
 4. 14.6 (authed subscribe) wordt apart in de keten gedaan; subscribe gebruikt nu nog de
    anonymous-flow (werkt voor iedereen).
 
-**Result:** _(invullen bij done — wacht op smoke)_
+**Result:** PaywallSheet subscribe-tak herbouwd als "Choose your plan"-kiezer (frame 4019:953, breedte 900): gecentreerde titel + ×, Monthly/Yearly-segmented pill (Yearly = "2 months free", lokale control — geen AvatarUI-wijziging), Starter-kaart (Free + 3 images total/Local processing/No bots/Export) en gehighlighte Pro-kaart (lime rand, "Upgrade"-chip, prijs per interval uit ProTier €4,99/mo · €49,90/yr, Unlimited images/All Starter features/All editing features/200 editing credits, "Upgrade to pro"-CTA). Top-up-tak (actieve Pro) ongewijzigd. Default-interval jaar (anker). 14.6 (authed subscribe) volgt apart in de keten; subscribe gebruikt nu de anonymous-flow. DEBUG-haak --show-paywall. Smoke-run (ontgrendeld): 1-op-1 het frame, interval-toggle schakelt de prijs. Beide targets bouwen groen, suite groen.
 
 ## 14.2 — Free-gate: 3 afbeeldingen totaal
 - status: backlog

@@ -12,25 +12,36 @@ struct PaywallSheet: View {
     @Bindable var model: EntitlementModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap5) {
-            header
+        Group {
             if model.showsTopup {
-                topupSection
+                // Top-up (actieve Pro) — barebones, smal (ongewijzigd).
+                VStack(alignment: .leading, spacing: DSSpacing.gap5) {
+                    header
+                    topupSection
+                    checkoutErrorView
+                    footer
+                }
+                .padding(DSSpacing.gap6)
+                .frame(width: 440)
             } else {
-                subscribeSection
+                // E14.1: plan-kiezer conform frame 4019:953.
+                planChooser
+                    .padding(DSSpacing.gap8)
+                    .frame(width: 900)
             }
-            if let error = model.checkoutError {
-                Text(error)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.subtle)
-            }
-            footer
         }
-        .padding(DSSpacing.gap6)
-        .frame(width: 440)
         .background(DSColor.Background.card)
         .preferredColorScheme(.dark)
         .task { await model.refresh() }
+    }
+
+    @ViewBuilder
+    private var checkoutErrorView: some View {
+        if let error = model.checkoutError {
+            Text(error)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.subtle)
+        }
     }
 
     // MARK: - Header
@@ -62,54 +73,132 @@ struct PaywallSheet: View {
         return "One look for every team portrait — unlimited, on your Mac."
     }
 
-    // MARK: - Subscribe (free/lapsed → Pro)
+    // MARK: - Plan-kiezer (E14.1, frame 4019:953)
 
-    private var subscribeSection: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            HStack(spacing: DSSpacing.gap2) {
-                DSChip(
-                    "Yearly · 2 months free",
-                    type: model.selectedInterval == .year ? .brand : .neutral
-                ) {
-                    model.selectedInterval = .year
-                }
-                DSChip(
-                    "Monthly",
-                    type: model.selectedInterval == .month ? .brand : .neutral
-                ) {
-                    model.selectedInterval = .month
+    private var planChooser: some View {
+        VStack(spacing: DSSpacing.gap6) {
+            ZStack {
+                Text("Choose your plan")
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                HStack {
+                    Spacer()
+                    DSIconButton(Image(systemName: "xmark"), size: .small) {
+                        model.isPaywallPresented = false
+                    }
                 }
             }
 
-            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                HStack(alignment: .firstTextBaseline, spacing: DSSpacing.gap1) {
-                    Text(model.selectedInterval == .year ? ProTier.pro.annualPriceEUR : ProTier.pro.monthlyPriceEUR)
-                        .dsTextStyle(.h3)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                        .contentTransition(.numericText())
-                    Text(model.selectedInterval == .year ? "/year" : "/month")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                }
-                if model.selectedInterval == .year {
-                    Text("\(ProTier.pro.annualPricePerMonthEUR)/mo billed annually")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
+            intervalToggle
+
+            HStack(alignment: .top, spacing: DSSpacing.gap4) {
+                starterCard
+                proCard
             }
 
+            checkoutErrorView
+            footer
+        }
+        .animation(.easeOut(duration: 0.18), value: model.selectedInterval)
+    }
+
+    // Monthly / Yearly segmented pill (lokaal; geen AvatarUI-wijziging).
+    private var intervalToggle: some View {
+        HStack(spacing: 0) {
+            segment("Monthly", interval: .month)
+            segment("Yearly (2 months free)", interval: .year)
+        }
+        .padding(DSSpacing.gap0_5)
+        .background(DSColor.Background.neutral, in: Capsule())
+    }
+
+    private func segment(_ title: String, interval: SubscriptionInterval) -> some View {
+        let isSelected = model.selectedInterval == interval
+        return Button {
+            model.selectedInterval = interval
+        } label: {
+            Text(title)
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.muted)
+                .padding(.horizontal, DSSpacing.gap4)
+                .padding(.vertical, DSSpacing.gap2)
+                .background {
+                    if isSelected {
+                        Capsule().fill(DSColor.Background.neutralStronger)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var starterCard: some View {
+        planCard(highlighted: false) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                Text("Starter")
+                    .dsTextStyle(.labelLarge)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Text("Free")
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+            }
             VStack(alignment: .leading, spacing: DSSpacing.gap1_5) {
-                featureRow("Unlimited portraits")
-                featureRow("\(ProTier.pro.monthlyCredits) credits per month for cloud edits")
-                featureRow("Magic Cutout, clothing and hair edits")
+                featureRow("3 images total")
+                featureRow("Local processing")
+                featureRow("No bots")
+                featureRow("Export")
             }
+            .padding(.top, DSSpacing.gap3)
+            Spacer(minLength: 0)
+        }
+    }
 
-            DSPrimaryButton("Subscribe") {
+    private var proCard: some View {
+        planCard(highlighted: true) {
+            HStack(alignment: .top) {
+                Text("Pro")
+                    .dsTextStyle(.labelLarge)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Spacer()
+                DSBadge("Upgrade", type: .brand)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: DSSpacing.gap1) {
+                Text(model.selectedInterval == .year ? ProTier.pro.annualPriceEUR : ProTier.pro.monthlyPriceEUR)
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .contentTransition(.numericText())
+                Text(model.selectedInterval == .year ? "/yr" : "/mo")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+            }
+            VStack(alignment: .leading, spacing: DSSpacing.gap1_5) {
+                featureRow("Unlimited images")
+                featureRow("All Starter features")
+                featureRow("All editing features")
+                featureRow("\(ProTier.pro.monthlyCredits) editing credits")
+            }
+            .padding(.top, DSSpacing.gap3)
+            Spacer(minLength: DSSpacing.gap6)
+            DSPrimaryButton("Upgrade to pro", fullWidth: true) {
                 Task { await model.startSubscribe() }
             }
             .disabled(model.isCheckoutBusy)
         }
-        .animation(.easeOut(duration: 0.18), value: model.selectedInterval)
+    }
+
+    @ViewBuilder
+    private func planCard<Content: View>(highlighted: Bool, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+        }
+        .padding(DSSpacing.gap5)
+        .frame(maxWidth: .infinity, minHeight: 380, alignment: .topLeading)
+        .background(DSColor.Background.app, in: RoundedRectangle(cornerRadius: DSRadius.xl2))
+        .overlay {
+            RoundedRectangle(cornerRadius: DSRadius.xl2).strokeBorder(
+                highlighted ? DSColor.Action.primary : DSColor.Foreground.divider,
+                lineWidth: highlighted ? DSBorderWidth.medium : DSBorderWidth.thin
+            )
+        }
     }
 
     private func featureRow(_ text: String) -> some View {
@@ -119,7 +208,7 @@ struct PaywallSheet: View {
                 .foregroundStyle(DSColor.Action.primary)
             Text(text)
                 .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.primary)
+                .foregroundStyle(DSColor.Foreground.subtle)
         }
     }
 
