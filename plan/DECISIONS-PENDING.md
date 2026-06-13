@@ -2,7 +2,18 @@
 
 ## Open
 
-_(geen)_
+### Upscale-model voor "Boost resolution" (E10.3, AI-spike) — AANBEVELING, wacht op AI/Thierry
+- **Status:** E10.3 is AI-territory (model-spike) en als enige keten-item open gelaten tijdens de
+  FEAT-marathon — de FEAT-keten (E09.2/E11.x/E12.x/E10.4/E15.x) is verder af.
+- **Wat al vastligt:** tarief = 1 credit (CreditMeter.upscale, live); de "Boost resolution"-actie
+  staat als gegate stub in EditActionsPanel (handler nil) klaar om gewired te worden.
+- **Aanbeveling (te bevestigen door AI-spike):** `nightmareai/real-esrgan` (Real-ESRGAN, 4×) als
+  default — robuust, goedkoop (~$0,002–0,005/call, ruim binnen 1 credit), face-enhance-optie. Als
+  hogere kwaliteit gewenst is: `philz1337x/clarity-upscaler` (duurder/trager, ~$0,01+). Bevestig
+  kosten/call op Replicate, registreer in MODEL_REGISTRY (nieuwe feature `upscale`), bouw
+  `/v1/upscale` (credit-gate zoals colorize) + `BackendClient.upscale` + wire de actie.
+- **Waarom niet door FEAT gedaan:** modelkeuze + kostenbevestiging is een AI/infra-spike, geen
+  FEAT-UI-werk; niet gokken conform de marathon-regels.
 
 ## Beslist
 
