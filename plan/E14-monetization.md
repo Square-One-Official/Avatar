@@ -45,8 +45,8 @@ overschrijding → pro-modal. Watermark op Starter-export.
 **Result:** _(invullen bij done)_
 
 ## 14.3 — Credit-metering per feature
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: E03.4, E01.5
 - DoD: beide targets bouwen, tests groen
 - Context: backend credits-administratie bestaat; ProChip uit E03.4. INTERFACE-STORY: CreditMeter-API documenteren in Result.
