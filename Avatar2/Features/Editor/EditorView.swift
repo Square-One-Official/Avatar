@@ -215,6 +215,10 @@ struct EditorView: View {
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
                 BackgroundPanel(portrait: portraitModel)
+            } else if tool == .clothing {
+                // E10.2: kleding-paneel (presets + vrije prompt). Generatie-
+                // route geparkeerd (DECISIONS-PENDING); actie nu stub.
+                ClothesPanel()
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")
