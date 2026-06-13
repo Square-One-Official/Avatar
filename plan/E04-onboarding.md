@@ -48,8 +48,8 @@ Notities (FEAT, bij oplevering):
 **Result:** OTP-stap in Avatar2/Features/Onboarding/ (OnboardingOTPView op DSOTPField + AuthService.verifyCode): auto-verify bij het 6e cijfer, Verify-knop met disabled-state, Resend code met bevestiging, 'Wrong email? Go back'; geslaagde verify rondt onboarding af; stub-landing uit 4.1 verwijderd; beide targets bouwen groen, alle packagetests groen.
 
 ## 4.3 — Privacy-stap
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: E03.2, E03.6
 - DoD: beide targets bouwen, tests groen
 
@@ -66,7 +66,7 @@ Notities (FEAT, vóór de bouw):
 - Flow-rewire bij de bouw: OTP-verify én skip-pad landen straks op de privacy-stap i.p.v.
   direct afronden.
 
-**Result:** _(invullen bij done)_
+**Result:** OnboardingPrivacyView (Onboarding / Permissions 2611:39477): H1 "Allow online models" + consequentie-subregel, toggle-kaart (cloud-glyph, dezelfde rij als E15.2) op PrivacyPreferences2 (live schrijven, v1-keys + fingerprint-beleid), één Continue. Flow-rewire: OTP-verify én continue-without-account landen nu op de privacy-stap, Continue → finishFromPrivacy() rondt af. DEBUG-haak --onboarding-step. Smoke-run (ontgrendeld): 1-op-1 het frame. Beide targets bouwen groen, suite groen.
 
 ## 4.4 — High-fidelity edges naar Settings [VERVALLEN — opgegaan in E15.2]
 - status: done

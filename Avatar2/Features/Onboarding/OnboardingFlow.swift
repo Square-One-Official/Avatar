@@ -21,6 +21,9 @@ struct OnboardingFlow: View {
             case .otp:
                 OnboardingOTPView(model: model)
                     .transition(.opacity)
+            case .privacy:
+                OnboardingPrivacyView(model: model)
+                    .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.step)

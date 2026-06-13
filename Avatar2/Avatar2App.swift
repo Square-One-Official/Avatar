@@ -28,6 +28,23 @@ struct Avatar2App: App {
             // Punt 18a: minimum waarbij de layout nooit kapot kan (de
             // first-use-ring schaalt mee, 18b); default-opening hieronder.
             .frame(minWidth: 800, minHeight: 600)
+            #if DEBUG
+            .task {
+                // Smoke-run-haak (--onboarding-step <stap>): forceer de flow
+                // open op een stap voor de visuele verificatie.
+                let args = ProcessInfo.processInfo.arguments
+                if let i = args.firstIndex(of: "--onboarding-step"),
+                   args.indices.contains(i + 1) {
+                    switch args[i + 1] {
+                    case "privacy": onboarding.debugForce(step: .privacy)
+                    case "email": onboarding.debugForce(step: .email)
+                    case "otp": onboarding.debugForce(step: .otp)
+                    case "splash": onboarding.debugForce(step: .splash)
+                    default: break
+                    }
+                }
+            }
+            #endif
             // Frame-autosave: AppKit onthoudt de gebruikersmaat tussen
             // sessies; bij de eerste start geldt defaultSize.
             .background(WindowFrameAutosave(name: "Avatar2MainWindow"))

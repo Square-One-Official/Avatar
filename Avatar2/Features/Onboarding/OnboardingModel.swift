@@ -13,6 +13,9 @@ final class OnboardingModel {
         case splash
         case email
         case otp
+        /// E04.3: privacy/online-modellen-stap; OTP-verify én skip landen
+        /// hier i.p.v. direct af te ronden.
+        case privacy
     }
 
     private static let completedKey = "onboarding2.completed"
@@ -84,7 +87,8 @@ final class OnboardingModel {
         didResendCode = false
         do {
             try await auth.verifyCode(email: trimmedEmail, code: otpCode)
-            markCompleted()
+            // E04.3: na verify naar de privacy-stap, niet meteen afronden.
+            step = .privacy
         } catch {
             // Boodschap staat in auth.lastError; code blijft staan zodat
             // de gebruiker hem kan corrigeren.
@@ -110,9 +114,16 @@ final class OnboardingModel {
         step = .email
     }
 
-    /// Continue-without-account: app in zonder sessie; inloggen kan later
-    /// alsnog via Settings.
+    /// Continue-without-account: geen sessie, maar nog wél de privacy-stap
+    /// (E04.3) — de online-modellen-keuze geldt ook anoniem.
     func skipOnboarding() {
+        step = .privacy
+    }
+
+    /// E04.3: Continue op de privacy-stap rondt de onboarding af. De
+    /// online-modellen-keuze is dan al naar PrivacyPreferences2 geschreven
+    /// (de toggle schrijft live).
+    func finishFromPrivacy() {
         markCompleted()
     }
 
@@ -125,4 +136,12 @@ final class OnboardingModel {
         hasCompleted = true
         defaults.set(true, forKey: Self.completedKey)
     }
+
+    #if DEBUG
+    /// Smoke-run-haak: forceer de flow open op een stap (--onboarding-step).
+    func debugForce(step: Step) {
+        hasCompleted = false
+        self.step = step
+    }
+    #endif
 }
