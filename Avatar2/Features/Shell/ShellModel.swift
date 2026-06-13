@@ -151,6 +151,21 @@ final class ShellModel {
         isSidebarVisible.toggle()
     }
 
+    /// Er valt te exporteren zodra er een portret op het canvas staat.
+    var canExport: Bool {
+        if case .result = canvas { return selectedPortrait != nil }
+        return false
+    }
+
+    /// E08.2: exporteer het huidige portret als vierkante PNG (1024) en open
+    /// het share sheet. Free-tier krijgt een watermerk.
+    func exportCurrentPortrait() {
+        guard let selectedPortrait else { return }
+        let watermark = !entitlement.isProActive
+        guard let data = PortraitExporter.makePNG(for: selectedPortrait, watermark: watermark) else { return }
+        PortraitExporter.share(data, from: nil)
+    }
+
     // MARK: - Launch-selectie (visuele pass punt 13)
 
     private static let lastSelectedKey = "shell.lastSelectedPortraitID"

@@ -24,14 +24,14 @@ venster, drie secties.
 **Result:** Vervallen zonder implementatie — vervangen door E15 (Settings volledig); zie E15.1–E15.4.
 
 ## 8.2 — Export barebones
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: E07.2
 - DoD: beide targets bouwen, tests groen
 
 Eén preset (vierkant PNG 1024) + share sheet; watermark voor free.
 
-**Result:** _(invullen bij done)_
+**Result:** PortraitExporter (Features/Editor): vierkante 1024-PNG via de E07.2-BackgroundCompositor (achtergrond + cutout-transform WYSIWYG; geen achtergrond → transparante PNG), free-tier krijgt een "Made with Aaavatar"-watermerk (CoreText, rechtsonder, met leesbaarheidsschaduw); macOS share sheet via NSSharingServicePicker. Share-knop in de shell-topbar (Frame 27 share-icoon, links van de gear), zichtbaar in result-state. ShellModel.exportCurrentPortrait() kiest watermerk op !isProActive. DEBUG-haak --export-png. Smoke-run (ontgrendeld): share-knop gerenderd; geëxporteerde PNG visueel geverifieerd (1024² composite over achtergrond + watermerk). Beide targets bouwen groen, suite groen.
 
 ## 8.3 — Paywall/credit-states barebones
 - status: done

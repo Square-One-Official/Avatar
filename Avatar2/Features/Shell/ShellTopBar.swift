@@ -14,6 +14,9 @@ struct ShellTopBar: View {
     let model: EntitlementModel
     let isSettingsActive: Bool
     let onToggleSettings: () -> Void
+    /// E08.2: export/share. Verborgen tot er een portret op het canvas staat.
+    var canExport: Bool = false
+    var onExport: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -33,12 +36,20 @@ struct ShellTopBar: View {
                 .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
             }
             Spacer()
-            DSToolButton(
-                Image(systemName: "gearshape.fill"),
-                label: "Settings",
-                isActive: isSettingsActive
-            ) {
-                onToggleSettings()
+            HStack(spacing: DSSpacing.gap2) {
+                if canExport {
+                    // Frame 27 share-icoon → export/share (E08.2).
+                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
+                        onExport()
+                    }
+                }
+                DSToolButton(
+                    Image(systemName: "gearshape.fill"),
+                    label: "Settings",
+                    isActive: isSettingsActive
+                ) {
+                    onToggleSettings()
+                }
             }
             // E05.8: trailing = het venster-marge-token (zelfde rand als
             // de sidebar-kaart) i.p.v. de losse 16 uit het frame — besluit

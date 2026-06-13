@@ -61,6 +61,19 @@ struct ShellView: View {
             }
             // E04.7/E07.1: `--open-panel <tool>` wordt door EditorView zelf
             // uit de proces-argumenten gelezen (geen race).
+            // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
+            // huidige portret weg voor visuele verificatie (free = watermerk).
+            if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
+               let portrait = model.selectedPortrait {
+                let pro = args.contains("pro")
+                // Sandbox: schrijf in de container-tmp en log het pad.
+                let url = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(URL(fileURLWithPath: args[i + 1]).lastPathComponent)
+                if let data = PortraitExporter.makePNG(for: portrait, watermark: !pro) {
+                    try? data.write(to: url)
+                    NSLog("EXPORT_PNG_WRITTEN \(url.path)")
+                }
+            }
             #endif
         }
     }
@@ -114,7 +127,9 @@ struct ShellView: View {
             ShellTopBar(
                 model: entitlement,
                 isSettingsActive: model.isShowingSettings,
-                onToggleSettings: { model.isShowingSettings.toggle() }
+                onToggleSettings: { model.isShowingSettings.toggle() },
+                canExport: model.canExport && !model.isShowingSettings,
+                onExport: { model.exportCurrentPortrait() }
             )
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
