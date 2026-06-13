@@ -89,8 +89,8 @@ sign out. Geen design — extrapoleer Setting Row-patroon.
 **Result:** _(invullen bij done)_
 
 ## 15.4 — About/Updates-pagina (zelf invullen)
-- status: backlog
-- owner: —
+- status: in_progress
+- owner: AI (E15-reeks op directe instructie Thierry; 15.3 overgeslagen — blocked op E14.1)
 - blockedBy: 15.1
 - DoD: beide targets bouwen, tests groen
 - Context: v1 UpdatesSection als functionele referentie; appcast.

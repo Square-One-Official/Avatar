@@ -147,3 +147,16 @@ en gepinde versies verhuizen uit de losse constanten naar één `MODEL_REGISTRY`
 zodat override-whitelist, credit-tarief (E14.3) en `requiresCloud` per feature op één plek leven.
 
 **Result:** MODEL_REGISTRY in backend/lib/models.ts (default + override-whitelist, credits en requiresCloud per feature; BiRefNet/DeOldify/FLUX-Fill-refs verhuisd uit replicate.ts); optionele `model_override`-bodyparameter op /v1/cutout, /v1/colorize en /v1/fill-body — alleen gehonoreerd voor isDevUnlimitedUser (gate gecentraliseerd in lib/auth.ts; onbekende key → 400 unknown_model_override, niet-dev → stil genegeerd); credit-aftrek leest het tarief uit het registry (gedrag ongewijzigd, alle tarieven 1 — E14.3 hoeft alleen registry-getallen te wijzigen); tsc-typecheck + tsx-smoke-driver (backend/scripts/models-smoke.ts) groen, beide app-targets + alle testsuites groen. Let op: productie-deploy vereist port naar `main` (Vercel deployt v1-main, niet v2-main) — zelfde situatie als het recovery-endpoint uit E01.7.
+
+## 1.11 — Sparkle aan Avatar2-target + UpdateManager-port
+- status: ready
+- owner: —
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- Context: aangevraagd vanuit E15.4 (About-pagina heeft een disabled "Check now"-knop tot dit landt). project.yml is INFRA-grens; v1 UpdateManager + appcast als referentie. Auto-check-voorkeur staat al persistent onder settings2.autoUpdateCheck; update-notificatievoorkeur onder settings2.updateNotifications (E15.1).
+
+Sparkle als dependency van het Avatar2-target (zelfde versie als v1), UpdateManager-equivalent
+in Avatar2 (of gedeeld via AvatarKit indien INFRA dat verkiest), gevoed door dezelfde appcast;
+E15.4's About-pagina koppelt de knop + auto-check-toggle erop aan.
+
+**Result:** _(invullen bij done)_
