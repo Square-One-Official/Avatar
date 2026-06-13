@@ -35,7 +35,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             DSSearchField(text: $searchText)
-                .padding(DSSpacing.gap3)
+                .padding(DSSpacing.gap4)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -49,14 +49,14 @@ struct SidebarView: View {
                         )
                     }
                 }
-                .padding(.horizontal, DSSpacing.gap3)
-                .padding(.top, DSSpacing.gap3)
+                .padding(.horizontal, DSSpacing.gap4)
+                .padding(.top, DSSpacing.gap4)
             }
 
             DSAddButton("Add portrait") {
                 onAdd()
             }
-            .padding(DSSpacing.gap3)
+            .padding(DSSpacing.gap4)
         }
         .frame(width: 248)
         .frame(maxHeight: .infinity)

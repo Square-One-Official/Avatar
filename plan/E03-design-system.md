@@ -213,11 +213,11 @@ Enter/blur bevestigt, Esc annuleert.
 - [x] 4. Enter (insertNewline) en Esc (cancelOperation) via de NSTextFieldDelegate — unit-getest op de Coordinator; blur (controlTextDidEndEditing) commit — unit-getest; klik-buiten commit via doorlatende NSEvent-monitor (aangeklikte control voert z'n actie uit), re-entrancy gedekt door de isEditing-guard. De fysieke drieklik (canvas/toolknop/sidebar) blijft de handmatige eindcheck.
 Beide targets bouwen groen, alle tests groen (3 nieuwe unit-tests: delegate-routes, blur-commit, meetfunctie).
 
-## 3.18 — DSSidebarRow hover-state (+ sidebar-padding ruimer)
-- status: in_progress
+## 3.18 — DSSidebarRow hover-state, sidebar-padding, inline-edit-polish
+- status: done
 - owner: DS
 - blockedBy: 3.5
 - DoD: beide targets bouwen, tests groen
-- Context: visuele-pass-punten 22–23 van Thierry (13 jun). (22) Rijen krijgen op hover hetzelfde afgeronde Inset-kleurvlak als de selectie, fade ~100ms, selectie één tint sterker — in het component, niet per gebruiksplek. (23) De binnenpadding van de sidebar-kaart mag ruimer: bewuste afwijking van het Figma-frame (besluit Thierry), één stap omhoog op de DSLayout-schaal.
+- Context: visuele-pass-punten 22–24 van Thierry (13 jun). (22) Rijen krijgen op hover hetzelfde afgeronde Inset-kleurvlak als de selectie, fade ~100ms, selectie één tint sterker — in het component, niet per gebruiksplek. (23) De binnenpadding van de sidebar-kaart mag ruimer: bewuste afwijking van het Figma-frame (besluit Thierry), één stap omhoog op de DSLayout-schaal. (24) Inline-edit: hover-bg te onzichtbaar op zwart + tekst verspringt bij klik.
 
-**Result:** _(invullen bij done)_
+**Result:** Per punt: (22) DSSidebarRow heeft nu een component-eigen hover-state: Inset-kleurvlak op r-2xl met 100ms easeOut-fade; selectie is één tint sterker (Inset + neutral-laag erbovenop) zodat de actieve rij herkenbaar blijft terwijl je elders hovert. (23) Sidebar-binnenpadding van gap-3 (12) naar gap-4 (16) rond zoekveld, lijst en add-knop — bewuste afwijking van het Figma-frame op besluit Thierry 2026-06-13, binnen de DSLayout-schaal. (24a) DSInlineEditLabel-hoverachtergrond van neutral naar neutral-stronger. (24b) Alle drie de staten delen exact hetzelfde kader: breedte/hoogte uit de meetfunctie (caret-marge óók in rust gereserveerd), leading-alignment, vaste regelhoogte — alleen achtergrond en rand wisselen, de tekst beweegt geen pixel; de 10×-snelkliktest is de handmatige eindcheck. Beide targets bouwen groen, alle tests groen.
