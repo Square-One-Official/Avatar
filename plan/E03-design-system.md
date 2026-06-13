@@ -86,8 +86,8 @@ bestaande DSGated-gedrag blijft het enige gate-mechanisme.
 **Result:** DSFeatureIndicator (.pro = brand-chip, .cloudOff = cloud-glyph in neutral cirkel à la Icon-Only Button Small) in AvatarUI/Components: tik → popover (geen modal) met één regel uitleg + route-knop in lime (Upgrade resp. "Open AI & Models settings"). DSGated uitgebreid (source-compatible): `DSGated(isLocked:chipLabel:requiresOnline:isOnlineEnabled:onUpgradeRequested:onOpenAISettings:content:)` — cloud-glyph verschijnt alleen bij requiresOnline && !isOnlineEnabled (vlag uit CreditMeter E14.3 geeft de aanroeper door), naast de Pro-chip top-trailing (inzet gap-1); indicatoren staan buiten de gate-knop zodat ze zelf tikbaar zijn, élke tik op vergrendelde inhoud blijft → onUpgradeRequested. Beide targets bouwen groen, alle tests groen (2 nieuwe smoke-tests).
 
 ## 3.8 — Token-verificatie tegen Figma-variabelen
-- status: ready
-- owner: —
+- status: done
+- owner: DS
 - blockedBy: 3.1
 - DoD: beide targets bouwen, tests groen
 - Context: werkregel "tokens uit Figma's variabelen, niet uit benaderingen" (besluit Thierry 2026-06-12). 3.1 noteerde al één geïnterpoleerde waarde (neutral-stronger).
@@ -97,7 +97,18 @@ DSColor/DSTypography/DSLayout leggen, afwijkingen corrigeren. Volledige mapping
 (Figma-variabele → token) in de Result-regel; geïnterpoleerde of niet-opvraagbare waarden
 expliciet markeren.
 
-**Result:** Per punt: (19) DSEditPanelContainer garandeert de layout — foto-slot layoutPriority −1 (krimpt desnoods naar nul), paneel fixedSize verticaal en toolbar fixedSize (nooit afkapbaar of samengedrukt); DoD-test toegevoegd die op 800×600 mét geopend paneel pixel-probet dat foto/paneel niet in de toolbar-zone lekken en het paneel intact is (meting náást de glass-cirkel — de materiaallagen geven ImageRenderer-artefactkleuren; de probe bevestigde overigens dat de container-stack zelf al paste en het zichtbare afkappen uit de verticale centrering in ShellView kwam, FEAT-fix in E04.5). (20) DSInlineEditLabel-editveld is leading uitgelijnd binnen de gecentreerde container: caret staat vóór de hint, de hint (nu Foreground/subtle) blijft staan tot de eerste toetsaanslag, en select-all-bij-focus komt native mee met NSTextField-becomeFirstResponder — geen eigen caret-tekening. (21) Buitenklik committet: lokale NSEvent-monitor zolang het veld actief is; klik buiten het veldframe → commit, het event wordt dóórgegeven zodat canvas/toolknop/sidebar hun eigen actie gewoon uitvoeren (geen view-blokkerende click-catcher); monitor wordt opgeruimd bij commit/cancel/disappear. Handmatige drieklik-test (canvas/toolknop/sidebar) blijft de eindcheck bij de eerstvolgende run. Beide targets bouwen groen, alle tests groen (1 nieuwe layouttest).
+Notities (DS, bij uitvoering):
+- Herstel: de afronding van E03.16 had per abuis deze open Result-placeholder mee-overschreven
+  (replace-all); hieronder de echte 3.8-Result.
+- De Components-pagina staat in light mode: get_variable_defs geeft daar líghtwaarden — voor de
+  dark-tokens is geverifieerd tegen de get_variable_defs-dumps van de dark Stories-frames
+  (Email 2611:39442, OTP 2611:39463, First use 4008:7050, Edit-Frame 2 4010:1940,
+  Dropzone-Frame 11 4017:1628) plus de Components-dumps van Toggle (61:944) en Search input
+  (4016:14177) uit deze sessie.
+- Sectie-brede calls (App/Onboarding/Settings/Upgrade Dark) konden niet meer: de Figma
+  desktop-app is gesloten (connection refused); de frame-dumps dekken het gebruikte bereik.
+
+**Result:** Geen afwijkingen — alle live geverifieerde waarden zijn 1-op-1 met de codetokens, nul codewijzigingen. Geverifieerd: kleuren background/App #000000, neutral #ffffff0d, action #d5f466, foreground primary #ffffff / subtle #ffffffb2 / muted #ffffff66 / divider #ffffff1a / primary-static-black #111111 / thumb #ffffff, on-action #073c31 (= DSColor); typografie xs 12/16, sm 14.2/20, base 16/24, lg 18, 3xl 25.6/40, 5xl 32.4/48, weights 400/500/600, letterspacing 0, stijlen Labels/Small+Base(+Large), Body/Small+Medium, H1/H3 (= DSTypography; ui="SF Pro"/display="SF Pro Display" via .system — ≥20pt kiest macOS de Display-optical size); spacing gap-0/px/1/1.5/2/2.5/3/3.5/4/5/8/12, radii r-sm/default/md/lg/xl/2xl/4xl/full, borders b-thin 1/b-medium 2, opacity Strong 100. Indirect (renderpixels): background/Card #1c1917, neutral-strongest ≈ wit 15% (dot-grid). Expliciet gemarkeerd, nu niet (her)opvraagbaar: neutral-stronger (geïnterpoleerd, E03.1-besluit), Inset #292524, shadow #190b0859, Projects-palet, gap-0.5/6, r-3xl, lineheight/lg 28, fontsize/2xl 22.8 (H4), opacity Hidden/Disabled/Subtle/Medium (afgeleid uit E03.2-states) — E03.1/3.2-extracties zonder afwijkingssignaal; her-check in één ronde zodra Figma open staat. DSRadius.window (12) is een eigen meetaanname (E03.15), geen Figma-variabele. Beide targets bouwen groen, alle tests groen.
 
 ## 3.9 — Button-aanvullingen: full-width + ghost-tekstknop
 - status: done
