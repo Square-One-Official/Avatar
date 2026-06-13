@@ -160,3 +160,27 @@ in Avatar2 (of gedeeld via AvatarKit indien INFRA dat verkiest), gevoed door dez
 E15.4's About-pagina koppelt de knop + auto-check-toggle erop aan.
 
 **Result:** _(invullen bij done)_
+
+## 1.14 — WindowGroup/frame-autosave opschonen (hiddenTitleBar-inklap)
+- status: ready
+- owner: —
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen; smoke met twee launch-flags tegelijk laat het venster
+  niet meer inklappen
+- Context: opgedoken in E15.5-smoke (2026-06-14). Twee launch-flags tegelijk
+  (`--dev-advanced --show-settings <pagina>`) laten het hiddenTitleBar-hoofdvenster bij opstart
+  naar volle schermbreedte × ~33px inklappen. Elke flag los werkt; de Settings-/Advanced-UI zelf
+  rendert prima. **Niet reproduceerbaar voor echte gebruikers** (de twee condities vallen in de
+  praktijk nooit in hetzelfde opstart-frame), dus puur opschoon-/robuustheidswerk.
+
+Vermoedelijke oorzaak (Avatar2App = INFRA-grens): twee concurrerende frame-autosave-mechanismen
+op hetzelfde NSWindow — de handmatige `WindowFrameAutosave(name: "Avatar2MainWindow")` én SwiftUI's
+eigen per-WindowGroup-persistentie, waarvan de sleutel vervuild raakt doordat
+`.appliedAppearancePreference()` (AppearancePreferenceModifier) een per-build instabiele
+type-signatuur ("unknown context at $adres") in de autosave-sleutel injecteert (65+ wees-sleutels
+in de prefs-domain `nl.squareone.aaavatar2`). Aanpak: één autosave-bron kiezen (SwiftUI's eigen of
+de handmatige, niet beide), de AppearancePreferenceModifier-wrapper stabiliseren of buiten de
+window-root halen, en `defaultSize`/`minHeight` borgen zodat een lege/ambigue contenthoogte het
+venster nooit kan laten inklappen. Eventueel de vervuilde frame-sleutels eenmalig opruimen.
+
+**Result:** _(invullen bij done)_

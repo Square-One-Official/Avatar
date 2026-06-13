@@ -16,8 +16,15 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsAIModelsPage: View {
+    /// E15.5: dev-detectie voor de Advanced-sectie.
+    var entitlement: EntitlementModel?
+
     @State private var prefs = PrivacyPreferences2.shared
     @State private var model = HighFidelityModelState()
+    /// E15.5: tick om de pickers te laten herrenderen na een keuze.
+    @State private var overridesTick = 0
+
+    private let overrides = DevModelOverrides.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -28,6 +35,10 @@ struct SettingsAIModelsPage: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                 onlineModelsCard
                 localModelsCard
+                // E15.5: alléén voor dev-accounts.
+                if entitlement?.isDevUnlimited == true {
+                    advancedCard
+                }
             }
             .padding(.top, DSSpacing.gap8)
 
@@ -37,6 +48,76 @@ struct SettingsAIModelsPage: View {
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { model.refreshInstalledState() }
+    }
+
+    // MARK: Advanced (E15.5, dev-only model-picker)
+
+    private var advancedCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: DSSpacing.gap2) {
+                Text("Advanced")
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                DSBadge("Dev only", type: .neutral)
+            }
+
+            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                // Lokale cutout-engine (Vision / gedownload model) — chips
+                // i.p.v. Menu (Menu's blokkeerden de first-render-window).
+                pickerColumn(title: "Cut out engine (local)") {
+                    optionChip("Apple Vision", selected: prefs.engine == .appleVision) {
+                        prefs.engine = .appleVision
+                    }
+                    optionChip("High-fidelity", selected: prefs.engine == .downloadedModel) {
+                        prefs.engine = .downloadedModel
+                    }
+                }
+                // Per cloud-feature het override-model.
+                ForEach(DevModelFeature.allCases, id: \.self) { feature in
+                    pickerColumn(title: feature.label) {
+                        let current = overrides.override(for: feature)
+                        optionChip("Default", selected: current == nil) { setOverride(nil, feature) }
+                        ForEach(feature.modelKeys, id: \.self) { key in
+                            optionChip(key, selected: current == key) { setOverride(key, feature) }
+                        }
+                    }
+                }
+            }
+            .padding(.top, DSSpacing.gap4)
+            .id(overridesTick)
+        }
+        .padding(DSSpacing.gap6)
+        .frame(maxWidth: 608, alignment: .leading)
+        .background(DSColor.Background.card)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+    }
+
+    private func setOverride(_ key: String?, _ feature: DevModelFeature) {
+        overrides.setOverride(key, for: feature)
+        overridesTick += 1
+    }
+
+    private func pickerColumn(title: String, @ViewBuilder chips: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            Text(title)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.subtle)
+            HStack(spacing: DSSpacing.gap2) { chips() }
+        }
+    }
+
+    private func optionChip(_ text: String, selected: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
+                .lineLimit(1)
+                .padding(.horizontal, DSSpacing.gap3)
+                .frame(height: 30)
+                .background(selected ? DSColor.Action.primary : DSColor.Background.neutral)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Allow online models (frame "row-system-audio", h94)

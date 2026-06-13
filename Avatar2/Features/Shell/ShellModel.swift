@@ -70,6 +70,21 @@ final class ShellModel {
 
     init(entitlement: EntitlementModel) {
         self.entitlement = entitlement
+        #if DEBUG
+        // Smoke-run-haak (`--show-settings [pagina]`): zet de settings-view
+        // vóór de first render i.p.v. in ShellView's .task. Een post-render
+        // state-write hier raakte onder .windowStyle(.hiddenTitleBar) in een
+        // venster-presentatie-race zodra een tweede launch-conditie (bv.
+        // --dev-advanced) de opstart-timing verschoof. Pre-render = geen race.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "--show-settings") {
+            isShowingSettings = true
+            if args.indices.contains(i + 1),
+               let page = SettingsPage(rawValue: args[i + 1]) {
+                SettingsRootView.debugInitialPage = page
+            }
+        }
+        #endif
     }
 
     func presentOpenPanel() {

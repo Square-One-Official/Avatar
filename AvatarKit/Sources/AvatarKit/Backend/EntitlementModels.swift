@@ -143,4 +143,7 @@ public struct AccountPayload: Codable, Sendable {
     /// Email captured by Stripe at the pre-auth checkout. Used by the
     /// banner so the user knows which inbox to check.
     public let linkEmail: String?
+    /// E15.5: true voor dev-allowlisted accounts → toont de Advanced
+    /// model-picker. Backend `is_dev_unlimited` (convertFromSnakeCase).
+    public let isDevUnlimited: Bool?
 }

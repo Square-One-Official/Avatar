@@ -165,11 +165,17 @@ public final class BackendClient {
         // 3. Tell the backend the bytes have landed; receive the cutout.
         struct Body: Encodable {
             let storageKey: String
+            let modelOverride: String?
             // Matches the snake_case the backend reads — JSONEncoder doesn't
             // apply a key-encoding strategy here so we map explicitly.
-            enum CodingKeys: String, CodingKey { case storageKey = "storage_key" }
+            enum CodingKeys: String, CodingKey {
+                case storageKey = "storage_key"
+                case modelOverride = "model_override"
+            }
         }
-        let body = try JSONEncoder().encode(Body(storageKey: upload.key))
+        let body = try JSONEncoder().encode(
+            Body(storageKey: upload.key, modelOverride: DevModelOverrides.shared.override(for: .cutout))
+        )
         let resp: CutoutResponse = try await request(
             "/v1/cutout", method: "POST", body: body
         )
@@ -214,9 +220,15 @@ public final class BackendClient {
         struct Body: Encodable {
             let image: String
             let face: FaceBox?
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case image, face
+                case modelOverride = "model_override"
+            }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(), face: faceBox)
+            Body(image: imagePNG.base64EncodedString(), face: faceBox,
+                 modelOverride: DevModelOverrides.shared.override(for: .fillBody))
         )
         let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {
@@ -239,8 +251,18 @@ public final class BackendClient {
         let creditsRemaining: Int
     }
     public func colorize(imagePNG: Data) async throws -> (Data, Int) {
-        struct Body: Encodable { let image: String }
-        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+        struct Body: Encodable {
+            let image: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case image
+                case modelOverride = "model_override"
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(image: imagePNG.base64EncodedString(),
+                 modelOverride: DevModelOverrides.shared.override(for: .colorize))
+        )
         let resp: ColorizeResponse = try await request("/v1/colorize", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {
             throw BackendError.decode

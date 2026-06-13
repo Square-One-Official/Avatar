@@ -48,17 +48,10 @@ struct ShellView: View {
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
             #if DEBUG
-            // Smoke-run-haak: `--show-settings [pagina]` opent de
-            // in-window Settings direct (visuele verificatie zonder
-            // assistive access). Compiled out of Release.
+            // Smoke-run-haak: `--show-settings [pagina]` wordt in
+            // ShellModel.init gelezen (vóór first render, geen venster-race);
+            // zie de toelichting daar. Compiled out of Release.
             let args = ProcessInfo.processInfo.arguments
-            if let i = args.firstIndex(of: "--show-settings") {
-                model.isShowingSettings = true
-                if args.indices.contains(i + 1),
-                   let page = SettingsPage(rawValue: args[i + 1]) {
-                    SettingsRootView.debugInitialPage = page
-                }
-            }
             // E04.7/E07.1: `--open-panel <tool>` wordt door EditorView zelf
             // uit de proces-argumenten gelezen (geen race).
             // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.

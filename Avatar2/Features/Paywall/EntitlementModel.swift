@@ -47,11 +47,33 @@ final class EntitlementModel {
     init(auth: AuthService) {
         self.auth = auth
         self.backend = BackendClient(auth: auth)
+        #if DEBUG
+        // Smoke-run-haak (E15.5): zet de dev-vlag vóór de first render i.p.v.
+        // in een .task — twee post-render state-writes in hetzelfde frame
+        // (deze + ShellView's --show-settings) wedgen het hiddenTitleBar-
+        // venster. Een echt dev-account heeft de vlag óók al bij first render.
+        if ProcessInfo.processInfo.arguments.contains("--dev-advanced") {
+            debugForceDevUnlimited = true
+        }
+        #endif
     }
 
     var isProActive: Bool {
         account?.tier == .pro && account?.subscriptionStatus == .active
     }
+
+    /// E15.5: dev-allowlisted account → toont de Advanced model-picker.
+    var isDevUnlimited: Bool {
+        #if DEBUG
+        if debugForceDevUnlimited { return true }
+        #endif
+        return account?.isDevUnlimited ?? false
+    }
+
+    #if DEBUG
+    /// Smoke-run-haak (E15.5): forceer de Advanced-sectie zichtbaar.
+    var debugForceDevUnlimited = false
+    #endif
 
     /// Routekeuze in de paywall (v1 `showsTopup`): actieve Pro zonder
     /// credits krijgt de top-up-ladder, ieder ander de subscribe-flow.

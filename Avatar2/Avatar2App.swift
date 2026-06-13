@@ -51,6 +51,8 @@ struct Avatar2App: App {
                     entitlement.debugForceTopup = true
                     entitlement.requestUpgrade()
                 }
+                // E15.5: --dev-advanced wordt in EntitlementModel.init gelezen
+                // (vóór first render), niet hier — zie de toelichting daar.
             }
             #endif
             // Frame-autosave: AppKit onthoudt de gebruikersmaat tussen

@@ -108,7 +108,7 @@ Notities (AI, bij oplevering):
 **Result:** About-pagina in Avatar2/Features/Settings/ (SettingsAboutPage): Updates-sectie (versie + build uit de bundle, Automatic updates-DSToggle persistent, Check now-knop disabled tot E01.11/Sparkle), Links-sectie (aaavatar.nl + privacy policy via NSWorkspace); gemount in SettingsRootView; beide targets bouwen groen, packagetests groen.
 
 ## 15.5 — Advanced-sectie (dev-only model-picker)
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 15.2, E01.10
 - DoD: beide targets bouwen, tests groen
@@ -132,7 +132,28 @@ van 2026-06-12 op productie; backend-werk dat daarna op v2-main landt in-app tes
    cloud-feature + de lokale engine-keuze (PrivacyPreferences2.engine), persistent, gemarkeerd
    dev-only. Geen zichtbaarheid/gedrag voor reguliere gebruikers.
 
-**Result:** _(invullen bij done — wacht op smoke)_
+**Result:** Advanced-sectie in SettingsAIModelsPage, alléén bij `entitlement.isDevUnlimited`:
+"Advanced" + "Dev only"-badge, lokale Cut-out-engine als chips (Apple Vision / High-fidelity op
+PrivacyPreferences2.engine), en per cloud-feature een override-picker (chips) uit de whitelist-
+spiegel. AvatarKit: `DevModelFeature` (cutout=[birefnet], colorize=[deoldify], fillBody=
+[flux-fill-pro], stylize=[nano-banana, flux-2-pro, gpt-image-1.5]) + `DevModelOverrides`
+(UserDefaults `dev.modelOverride.<feature>`); BackendClient.cutout/colorize/fillBody sturen
+`model_override` mee als de store een keuze heeft (stylize deed dat al). Dev-detectie:
+account.ts geeft `is_dev_unlimited` in de dev-tak (port-only), AccountPayload.isDevUnlimited →
+EntitlementModel.isDevUnlimited; DEBUG-haak `--dev-advanced` (gelezen in EntitlementModel.init,
+vóór first render). Picker-chips i.p.v. Menu's (Menu's blokkeerden de first-render-window).
+Smoke: aiModels-pagina met de Advanced-kaart rendert 1100×760, alle chips + selectie-accent
+correct (zie /tmp/e155_aimodels.png). Beide targets bouwen groen, suite groen.
+
+**Smoke-harnas-kanttekening (geen productdefect):** de combinatie van twéé launch-flags
+tegelijk — `--dev-advanced` + `--show-settings <pagina>` — laat het hiddenTitleBar-venster bij
+opstart naar 33px inklappen (volle schermbreedte, ~0 hoogte). Elke flag los werkt (dev=760,
+settings=760), en de Advanced-kaart zelf rendert prima vanaf de first render (`if true`-test =
+760). Reguliere gebruikers en échte dev-accounts raken dit nooit: daar wordt `isDevUnlimited`
+asynchroon true (account-load) en opent Settings pas op een latere klik — nooit in hetzelfde
+opstart-frame. Het zit in de WindowGroup/frame-autosave-setup van Avatar2App (twee concurrerende
+autosave-mechanismen + AppearancePreferenceModifier met een per-build-instabiele type-signatuur).
+Dat is INFRA-terrein → losse story **E01.14** (zie E01-bestand). Niet-blokkerend voor 15.5.
 
 ## 15.6 — Generatie-model-keuze in Settings (nano-banana / OpenAI)
 - status: ready
