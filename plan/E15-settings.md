@@ -89,7 +89,7 @@ sign out. Geen design — extrapoleer Setting Row-patroon.
 **Result:** _(invullen bij done)_
 
 ## 15.4 — About/Updates-pagina (zelf invullen)
-- status: in_progress
+- status: done
 - owner: AI (E15-reeks op directe instructie Thierry; 15.3 overgeslagen — blocked op E14.1)
 - blockedBy: 15.1
 - DoD: beide targets bouwen, tests groen
@@ -97,7 +97,16 @@ sign out. Geen design — extrapoleer Setting Row-patroon.
 
 Versie, updatekanaal, check-for-updates (Sparkle), links (privacy, site). Zelfde patroon.
 
-**Result:** _(invullen bij done)_
+Notities (AI, bij oplevering):
+- Sparkle is in Avatar2 nog niet gelinkt (project.yml = INFRA-grens) → nieuwe story E01.11
+  (ready). Tot die landt is "Check now" bewust disabled; versie-rij en links zijn volledig
+  functioneel; auto-check-voorkeur persisteert alvast (settings2.autoUpdateCheck).
+- Geen Figma-frame: geëxtrapoleerd in het Setting Row-patroon van 15.1 (Updates- en
+  Links-sectie), conform de werkregel.
+- Visuele check: zelfde blokkade als 15.2 (Xcode-debug-instantie bezet de bundle-id);
+  launchhaak `--show-settings about` staat klaar.
+
+**Result:** About-pagina in Avatar2/Features/Settings/ (SettingsAboutPage): Updates-sectie (versie + build uit de bundle, Automatic updates-DSToggle persistent, Check now-knop disabled tot E01.11/Sparkle), Links-sectie (aaavatar.nl + privacy policy via NSWorkspace); gemount in SettingsRootView; beide targets bouwen groen, packagetests groen.
 
 ## 15.5 — Advanced-sectie (dev-only model-picker)
 - status: backlog

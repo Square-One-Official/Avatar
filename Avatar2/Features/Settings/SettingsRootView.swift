@@ -71,7 +71,7 @@ struct SettingsRootView: View {
         case .account:
             SettingsPlaceholderPage(title: SettingsPage.account.title)
         case .about:
-            SettingsPlaceholderPage(title: SettingsPage.about.title)
+            SettingsAboutPage()
         }
     }
 }
