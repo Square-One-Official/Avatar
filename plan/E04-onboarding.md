@@ -155,7 +155,7 @@ uit het oude frame).
 **Result:** _(invullen bij done)_
 
 ## 4.7 — Canvas-kaart-inbedding: responsief 1:1 zonder clippen
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen, visuele smoke-run op 800×600 / default / fullscreen, mét en zónder paneel

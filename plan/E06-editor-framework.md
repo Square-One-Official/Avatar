@@ -24,7 +24,7 @@ Notities (FEAT, bij oplevering):
 **Result:** EditorView in Avatar2/Features/Editor/ op DSEditPanelContainer (E03.3): zes tools uit App / Edit als DSToolbarItem-enum (EditorTool) met lime active-ring, tik-op-actief deselecteert, foto verkleint centraal via de container-spring; per tool een lege DSEditPanel-chrome met stub-regel die naar de leverende story wijst (6.3/E07.1/E09.2/E10.2/E11.2/E05.4); gemount in ShellView op canvas .result. Beide targets bouwen groen, alle tests groen (1 nieuwe Avatar2-test: EditorToolTests).
 
 ## 6.2 — Undo/redo + hold-to-compare
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: 6.1
 - DoD: beide targets bouwen, tests groen
@@ -101,7 +101,7 @@ Spec (Thierry):
 **Result:** EditorCanvasView (Features/Editor/) vervangt de statische fill in de canvaskaart: drag-pan met shift-as-constraint en v1-snapmechanics (hysterese 12/24, .alignment-tick bij snap, .generic per 24 units), pinch- én scroll-zoom 0,5×–3× om het canvasmidden (NSEvent-monitor onder hover), dubbelklik = fill-fit-reset (E06.5 maakt er echt auto-frame van), guide-overlay in DS-lime (midden-X, standaard-ooglijn 0.37, oogmarkers, hoofd-ovaal) met 0,15s-fade tijdens drag; transform persistent op Portrait2.offsetX/offsetY/scale (scale 0 = fill-fit, lichtgewicht migratie) met touch() per afgerond gebaar; FramingConstants = 1-op-1 v1-port. Beide targets bouwen groen, packagetests groen, rendercheck gedaan (canvas + dot-grid + transform).
 
 ## 6.5 — Automatic framing-actie
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: 6.4
 - DoD: beide targets bouwen, tests groen
