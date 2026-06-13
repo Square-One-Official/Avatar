@@ -57,10 +57,9 @@ Notities (AI, bij oplevering):
   (template-bug) → "AI & Models"; waveform → cloud-glyph; echte modelwaarden (78 MB —
   niet de ±175 MB uit figma-design-review.md; "8 GB RAM" uit het frame klopt voor elke
   ondersteunde Mac).
-- Visuele check geblokkeerd: een Xcode-debug-instantie van Aaavatar 2 (Thierry) hield de
-  bundle-id bezet en assistive access voor osascript is ingetrokken. DEBUG-launchhaak
-  toegevoegd: `open "Aaavatar 2.app" --args --show-settings aiModels` opent de pagina
-  direct — check kan zodra de debugsessie vrij is.
+- Visuele check alsnog gedaan (debugsessie vrijgekomen): pagina rendert 1-op-1 het frame
+  (cloud-glyph, toggle, modelkaart 78 MB + download-knop). DEBUG-launchhaak
+  `--show-settings <pagina>` blijft beschikbaar voor latere smoke-runs.
 
 **Result:** AI & Models-pagina in Avatar2/Features/Settings/ (SettingsAIModelsPage): online-modellen-toggle op PrivacyPreferences2 (zelfde keys/rawValues/fingerprint-beleid als v1, klaar voor E04.3), Local models-kaart met High-fidelity edges op OrmbgModelStore — download met lineaire voortgang + percentage, Active-state gekoppeld aan de engine-voorkeur, delete → terugval Apple Vision; ShellModel-router gebruikt de voorkeur per import; beide targets bouwen groen, packagetests groen.
 
@@ -103,8 +102,8 @@ Notities (AI, bij oplevering):
   functioneel; auto-check-voorkeur persisteert alvast (settings2.autoUpdateCheck).
 - Geen Figma-frame: geëxtrapoleerd in het Setting Row-patroon van 15.1 (Updates- en
   Links-sectie), conform de werkregel.
-- Visuele check: zelfde blokkade als 15.2 (Xcode-debug-instantie bezet de bundle-id);
-  launchhaak `--show-settings about` staat klaar.
+- Visuele check alsnog gedaan: Updates- en Links-sectie renderen in het 15.1-patroon
+  (versie uit de bundle, disabled Check now, werkende link-rijen).
 
 **Result:** About-pagina in Avatar2/Features/Settings/ (SettingsAboutPage): Updates-sectie (versie + build uit de bundle, Automatic updates-DSToggle persistent, Check now-knop disabled tot E01.11/Sparkle), Links-sectie (aaavatar.nl + privacy policy via NSWorkspace); gemount in SettingsRootView; beide targets bouwen groen, packagetests groen.
 
