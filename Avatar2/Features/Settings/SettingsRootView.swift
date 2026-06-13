@@ -72,7 +72,7 @@ struct SettingsRootView: View {
         case .aiModels:
             SettingsAIModelsPage()
         case .account:
-            SettingsPlaceholderPage(title: SettingsPage.account.title)
+            SettingsAccountPage(entitlement: entitlement)
         case .about:
             SettingsAboutPage()
         }

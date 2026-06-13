@@ -89,7 +89,7 @@ struct ShellView: View {
                 // hoofdvenster; topbar (quota + gear) blijft als overlay
                 // staan. Esc sluit (verborgen cancel-knop, werkt
                 // venster-breed); de gear toggelt.
-                SettingsRootView()
+                SettingsRootView(entitlement: entitlement)
                     .background(
                         Button("") { model.isShowingSettings = false }
                             .keyboardShortcut(.cancelAction)

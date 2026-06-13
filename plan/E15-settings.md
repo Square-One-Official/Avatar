@@ -76,7 +76,7 @@ rafelig haarresultaat) hangt hier ook op.
 **Result:** _(invullen bij done)_
 
 ## 15.3 — Account-pagina (zelf invullen)
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 15.1, E14.1
 - DoD: beide targets bouwen, tests groen
@@ -85,7 +85,7 @@ rafelig haarresultaat) hangt hier ook op.
 In dezelfde stijl: e-mail, plan (Starter/Pro) + Manage subscription, credits-saldo + resetdatum,
 sign out. Geen design — extrapoleer Setting Row-patroon.
 
-**Result:** _(invullen bij done)_
+**Result:** SettingsAccountPage (Features/Settings/), geëxtrapoleerd in de 15.1-stijl (SettingsSectionCard/SettingsRow): Account-sectie (e-mail uit AuthService; Plan-rij = "Starter" + Upgrade-chip → paywall, of "Manage subscription" → Stripe-portal voor Pro), Credits-sectie (saldo + resetdatum/`monthlyResetAt`), Session-sectie met Sign out (alleen ingelogd). Data via nieuwe EntitlementModel-passthroughs (accountEmail/isSignedIn/planLabel/signOutAccount/openManageSubscription); SettingsRootView(entitlement:) gethread vanuit ShellView. DEBUG-haak --show-settings account. Smoke-run (ontgrendeld): pagina rendert in 15.1-stijl (signed-out state correct: e-mail "—", Sign out verborgen). Beide targets bouwen groen, suite groen.
 
 ## 15.4 — About/Updates-pagina (zelf invullen)
 - status: done
