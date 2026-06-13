@@ -63,6 +63,11 @@ struct EditorView: View {
     @Binding var isSidebarVisible: Bool
     @State private var activeTool: EditorTool?
 
+    #if DEBUG
+    /// Smoke-run-haak (--open-panel <tool>); gezet door ShellView.
+    @MainActor static var debugInitialTool: EditorTool?
+    #endif
+
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
         EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
@@ -100,7 +105,12 @@ struct EditorView: View {
                 // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
                 EditorCanvasView(image: portrait, portrait: portraitModel)
             }
-            .frame(maxWidth: 456, maxHeight: 456)
+            // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
+            // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
+            // en geopend paneel; de 3.16-garantie houdt paneel en toolbar
+            // buiten schot. 456 was de Figma-maat bij 1000×700, geen cap.
+            .aspectRatio(1, contentMode: .fit)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, DSSpacing.gap8)
         } panel: { tool in
             if tool == .images {
@@ -117,5 +127,13 @@ struct EditorView: View {
         }
         .padding(.horizontal, DSSpacing.gap3)
         .padding(.bottom, DSSpacing.gap2)
+        #if DEBUG
+        .onAppear {
+            if let tool = Self.debugInitialTool {
+                activeTool = tool
+                Self.debugInitialTool = nil
+            }
+        }
+        #endif
     }
 }

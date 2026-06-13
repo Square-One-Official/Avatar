@@ -59,6 +59,13 @@ struct ShellView: View {
                     SettingsRootView.debugInitialPage = page
                 }
             }
+            // E04.7: `--open-panel <tool>` opent een editor-paneel voor de
+            // smoke-matrix (kaart moet meekrimpen, nooit clippen).
+            if let i = args.firstIndex(of: "--open-panel"),
+               args.indices.contains(i + 1),
+               let tool = EditorTool(rawValue: args[i + 1]) {
+                EditorView.debugInitialTool = tool
+            }
             #endif
         }
     }

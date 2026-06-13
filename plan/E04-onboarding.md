@@ -170,4 +170,7 @@ uit het oude frame).
 3. Smoke-matrix via frame-autosave-seed (NSWindow Frame-default): 800×600, default 1100×760,
    fullscreen-formaat; telkens met en zonder paneel — kaart vierkant, niets afgekapt.
 
-**Result:** _(invullen bij done)_
+Notitie (marathon): code + builds + tests klaar; smoke-matrix in de wachtrij — het scherm is
+vergrendeld (GUI-vensters bereiken de window-server niet), unlock-monitor staat aan.
+
+**Result:** _(invullen bij done — wacht op smoke-matrix)_
