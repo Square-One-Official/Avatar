@@ -61,6 +61,8 @@ struct ShellView: View {
             }
             // E04.7/E07.1: `--open-panel <tool>` wordt door EditorView zelf
             // uit de proces-argumenten gelezen (geen race).
+            // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.
+            if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
@@ -141,6 +143,18 @@ struct ShellView: View {
                     .padding(DSSpacing.gap4)
             }
         }
+        // E05.6: eenmalige hifi-haar-nudge — subtiel onderin, geen modal.
+        .overlay(alignment: .bottom) {
+            if model.showHairNudge && !model.isShowingSettings {
+                HairNudgeBanner(
+                    onDownload: { model.acceptHairNudge() },
+                    onDismiss: { model.dismissHairNudge() }
+                )
+                .padding(.bottom, DSSpacing.gap4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: model.showHairNudge)
         .animation(.easeOut(duration: 0.15), value: model.isDropTargeted)
     }
 

@@ -107,7 +107,7 @@ Notities (FEAT, bij oplevering):
 
 
 ## 5.6 — Nudge: high-fidelity model na rafelig haarresultaat
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon 2026-06-13)
 - blockedBy: E15.2
 - DoD: beide targets bouwen, tests groen
@@ -132,7 +132,7 @@ over een bruikbaar signaal uit de engine.
    na start verdwijnt de nudge.
 4. Beide targets bouwen, tests groen, visuele smoke-run.
 
-**Result:** _(invullen bij done — wacht op smoke)_
+**Result:** HairEdgeHeuristic (Features/Editor, FEAT-lane): pure isLikelyRagged(cutout:) — meet de gemiddelde absolute top-randsprong tussen buurkolommen (genormaliseerd), drempel 0.02; semi-binaire Vision-haarranden scoren hoog, gladde randen ~0. 3 unit-tests (glad ≠ rafelig, ordering). ShellModel toont de nudge eenmalig (UserDefaults `nudge.hifiHairShown`) wanneer: Vision-engine gebruikt, ORMBG niet geïnstalleerd, rand rafelig. HairNudgeBanner (Features/Shell): subtiele niet-modale banner onderin ("Rough hair edges? … Download / ×"), wegklikbaar (× → one-time), Download start de gedeelde OrmbgModelStore-download + zet engine-voorkeur. Detectie werkt op de cutout-output; een diepere engine-confidence kan dit later vervangen (notitie AI). DEBUG-haak --force-hair-nudge. Smoke-run (ontgrendeld): banner subtiel onderin gerenderd. Beide targets bouwen groen, suite groen.
 
 ## 5.7 — "Align set"-actie in de sidebar
 - status: backlog

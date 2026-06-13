@@ -105,7 +105,8 @@ final class ShellModel {
         do {
             let preferred: CutoutEngineKind =
                 PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
-            let cutout = nsImage(from: try await router.cutout(cgImage, preferring: preferred))
+            let cutoutCG = try await router.cutout(cgImage, preferring: preferred)
+            let cutout = nsImage(from: cutoutCG)
             // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
             // animeert, het model wacht dezelfde duur en stapt dan door.
             canvas = .revealing(original: original, cutout: cutout)
@@ -116,6 +117,9 @@ final class ShellModel {
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
             persist(cutout: cutout, original: original)
+            // E05.6: eenmalige nudge als de Vision-rand rafelig oogt en het
+            // hifi-model nog niet binnen is.
+            evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
         } catch {
             canvas = .failed("Couldn't find a person in that photo. Try another portrait.")
         }
@@ -149,6 +153,46 @@ final class ShellModel {
 
     func toggleSidebar() {
         isSidebarVisible.toggle()
+    }
+
+    // MARK: - Hifi-haar-nudge (E05.6)
+
+    /// Subtiele, eenmalige nudge onder het resultaat.
+    private(set) var showHairNudge = false
+    private static let hairNudgeShownKey = "nudge.hifiHairShown"
+
+    /// Toon de nudge alleen als: Vision-engine gebruikt, ORMBG niet
+    /// geïnstalleerd, rand rafelig, en nog niet eerder getoond.
+    private func evaluateHairNudge(cutout: CGImage, usedEngine: CutoutEngineKind) {
+        guard usedEngine == .vision,
+              !UserDefaults.standard.bool(forKey: Self.hairNudgeShownKey),
+              OrmbgModelStore.shared.installedModelURL() == nil,
+              HairEdgeHeuristic.isLikelyRagged(cutout: cutout)
+        else { return }
+        showHairNudge = true
+    }
+
+    #if DEBUG
+    /// Smoke-run-haak: forceer de nudge zichtbaar.
+    func debugForceHairNudge() { showHairNudge = true }
+    #endif
+
+    /// Wegklikken (×) — eenmalig, komt niet terug.
+    func dismissHairNudge() {
+        showHairNudge = false
+        UserDefaults.standard.set(true, forKey: Self.hairNudgeShownKey)
+    }
+
+    /// "Download" op de nudge: start de achtergrond-download (gedeelde
+    /// OrmbgModelStore-state met E04.6/E15.2), kies het model als engine,
+    /// en sluit de nudge eenmalig af.
+    func acceptHairNudge() {
+        UserDefaults.standard.set(true, forKey: Self.hairNudgeShownKey)
+        showHairNudge = false
+        Task {
+            _ = try? await OrmbgModelStore.shared.download()
+            PrivacyPreferences2.shared.engine = .downloadedModel
+        }
     }
 
     /// Er valt te exporteren zodra er een portret op het canvas staat.
