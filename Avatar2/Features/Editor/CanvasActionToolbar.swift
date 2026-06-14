@@ -161,10 +161,10 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     }
 
     private var aiMenu: some View {
+        // E24.27: Improve lighting/Colorise/Boost zijn verhuisd naar het
+        // Light & color-paneel (Adjust). De AI-dropdown houdt de generatieve
+        // Restore body.
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            menuRow("Improve lighting", icon: .sun, action: onImproveLighting)
-            menuRow("Colorise", icon: .palette, pro: !isPro, action: onColorise)
-            menuRow("Boost resolution", icon: .arrowsOut, pro: !isPro, action: onBoost)
             menuRow("Restore body", icon: .userRectangle, pro: !isPro, action: onRestoreBody)
         }
     }

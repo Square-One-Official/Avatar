@@ -57,6 +57,21 @@ struct EditColorPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+            // E24.27: één-tik AI-acties bovenin als compacte DS-chips (Pro/credit
+            // waar van toepassing) → divider → de manuele sliders eronder.
+            if showAutoEnhance {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DSSpacing.gap2) {
+                        quickAction("Improve lighting", icon: "sun.max", action: onImproveLighting)
+                        quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                        quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
+                                    credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                    }
+                    .padding(.vertical, DSSpacing.gap1)
+                }
+                Divider()
+            }
+
             slider("Brightness", value: $brightness, range: -0.4...0.4)
             slider("Contrast", value: $contrast, range: 0.6...1.4)
             slider("Saturation", value: $saturation, range: 0...2)
@@ -66,7 +81,6 @@ struct EditColorPanel: View {
                 DSGhostButton("Reset") { reset() }
                     .disabled(!hasAdjustments)
                 Spacer()
-                if showAutoEnhance { autoEnhanceMenu }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,24 +95,26 @@ struct EditColorPanel: View {
         }
     }
 
-    private var autoEnhanceMenu: some View {
-        Menu {
-            Button("Improve lighting", action: onImproveLighting)
-            Button(isPro ? "Colorise" : "Colorise · Pro", action: onColorise)
-            Button(isPro ? "Boost resolution" : "Boost resolution · Pro", action: onBoost)
-        } label: {
+    /// E24.27: compacte één-tik-actie-chip met optionele Pro-badge of credit-chip.
+    private func quickAction(_ label: String, icon: String, pro: Bool = false,
+                             credit: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: DSSpacing.gap1) {
-                DSIcon(.sparkle, size: 16)
-                Text("Auto enhance").dsTextStyle(.labelBase)
-                Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+                Image(systemName: icon).font(.system(size: 12, weight: .medium))
+                Text(label).dsTextStyle(.labelSmall)
+                if pro {
+                    DSProChip()
+                } else if let credit {
+                    DSProChip(credit)
+                }
             }
             .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap3)
-            .frame(height: 36)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
             .background(DSColor.Background.neutral, in: Capsule())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .dsHoverScale()
         .fixedSize()
     }
 
