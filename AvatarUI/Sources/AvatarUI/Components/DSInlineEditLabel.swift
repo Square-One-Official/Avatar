@@ -40,6 +40,8 @@ public struct DSInlineEditLabel: View {
     private let placeholder: String
     @Binding private var text: String
     private let variant: Variant
+    /// E24.7: meldt begin/eind van de edit-staat (voor container-uitlijning).
+    private let onEditingChanged: (Bool) -> Void
 
     @State private var isHovering = false
     @State private var isEditing = false
@@ -48,10 +50,16 @@ public struct DSInlineEditLabel: View {
     @State private var clickMonitor: Any?
     @State private var cursorPushed = false
 
-    public init(_ placeholder: String, text: Binding<String>, variant: Variant = .heading) {
+    public init(
+        _ placeholder: String,
+        text: Binding<String>,
+        variant: Variant = .heading,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in }
+    ) {
         self.placeholder = placeholder
         self._text = text
         self.variant = variant
+        self.onEditingChanged = onEditingChanged
     }
 
     public var body: some View {
@@ -143,6 +151,7 @@ public struct DSInlineEditLabel: View {
         isHovering = false
         setCursor(pushed: false)
         installClickMonitor()
+        onEditingChanged(true)
     }
 
     private func commit() {
@@ -158,6 +167,7 @@ public struct DSInlineEditLabel: View {
     private func endEditing() {
         isEditing = false
         removeClickMonitor()
+        onEditingChanged(false)
     }
 
     /// Klik buiten het veld committet; het event passeert, dus de

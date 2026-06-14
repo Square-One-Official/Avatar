@@ -58,3 +58,13 @@
   2. Een font-gebaseerde Phosphor-bron gebruiken (geen asset-catalog → CLI-vriendelijk).
   3. Phosphor-SVG's als eigen resources vendoren zonder asset-catalog.
 - Tot dan blijft DSIcon op SF Symbols (visueel benaderend, niet 1-op-1 Figma).
+
+### E24.8 — canvas-zoom vs afbeelding-schaling via selectie-handles (2026-06-14)
+- **Gevraagd:** scroll/pinch = canvas-zoom (view); de afbeelding zélf schalen via een SELECTIE
+  (resize-handles / scale-grip), niet via zoom. Referenties volgen.
+- **Waarom geparkeerd:** dit is een eigen interactie-ontwerp: een handle-laag op EditorCanvasView
+  (4–8 resize-grips + hit-testing + drag-to-scale, met aspect-lock?), gescheiden van de bestaande
+  pan/zoom (E06.4). Te groot/risicovol om in de marathon af te raffelen; vraagt visuele iteratie.
+- **Te beslissen door Thierry:** (a) welke handles (hoeken + zijden, of alleen hoeken?), (b)
+  aspect-lock standaard?, (c) waar leeft de scale — op `Portrait2.scale` (bestaand) of een aparte
+  selectie-transform?, (d) interactie bij meerdere lagen later. Daarna bouw ik het als losse story.

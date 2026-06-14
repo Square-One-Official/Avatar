@@ -11,18 +11,26 @@ import SwiftUI
 
 struct PortraitHeader: View {
     @Bindable var model: ShellModel
+    // E24.7: gecentreerd in rust, links tijdens typen, hercentreren bij commit.
+    @State private var isEditing = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            DSInlineEditLabel("Name", text: $model.portraitName, variant: .heading)
-            DSInlineEditLabel("Role", text: $model.portraitRole, variant: .subtitle)
+        VStack(alignment: isEditing ? .leading : .center, spacing: 0) {
+            DSInlineEditLabel(
+                "Name", text: $model.portraitName, variant: .heading,
+                onEditingChanged: { isEditing = $0 }
+            )
+            DSInlineEditLabel(
+                "Role", text: $model.portraitRole, variant: .subtitle,
+                onEditingChanged: { isEditing = $0 }
+            )
         }
-        .frame(maxWidth: 280)
+        .frame(maxWidth: 280, alignment: isEditing ? .leading : .center)
         // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24 = de twee
         // regelhoogtes incl. badge-padding) — Name/Role blijven in élke
         // staat vrij van de canvas-kaart. E18.5: top-alignment zodat het
-        // editveld bij focus alleen naar BENEDEN ruimte pakt — "Name"
-        // verspringt niet meer naar boven.
+        // editveld bij focus alleen naar BENEDEN ruimte pakt.
         .frame(height: 52, alignment: .top)
+        .animation(.easeOut(duration: 0.18), value: isEditing)
     }
 }

@@ -32,6 +32,17 @@ selecteerbaar) maar onschadelijk — opgeruimd laten tot een rustige refactor.
 **Figma-TODO:** canvas-toolbar tegen de referenties leggen (groepering, tekst+icoon-stijl, popover-
 styling Adjust/Background/AI); iconen → DSIcon/Phosphor (E20/21).
 ## 24.7 — Name/Role: gecentreerd in rust, links bij typen, hercentreren bij commit
-- status: todo
+- status: done
+- owner: FEAT (AI-agent, marathon)
+
+**Result:** DSInlineEditLabel kreeg `onEditingChanged`; PortraitHeader schakelt de VStack- +
+frame-uitlijning tussen `.center` (rust) en `.leading` (typen), geanimeerd. Bij commit/blur
+(endEditing) hercentreert het. Build groen. (Edit-staat niet synthetisch te smoken; rust =
+gecentreerd zichtbaar in alle smokes.)
+
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
-- status: todo
+- status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
+  handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),
+  plus de referentie-interacties. Beter dedicated te bouwen + visueel te itereren dan binnen deze
+  marathon af te raffelen. **Voorstel/keuze in DECISIONS-PENDING.** Huidige canvas houdt pan/zoom
+  (E06.4) — geen regressie; alleen de handle-based scaling rest.
