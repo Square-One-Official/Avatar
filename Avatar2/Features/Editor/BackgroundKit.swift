@@ -43,6 +43,27 @@ enum BackgroundKit {
         LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
+    /// E24.23/24.24: schaal een upload terug naar `maxSide` en her-encodeer als
+    /// PNG. Voorkomt enorme blobs (24.23) en levert een uniforme swatch-bron.
+    static func downscaledPNG(_ rawData: Data, maxSide: CGFloat = 1024) -> Data? {
+        guard let img = NSImage(data: rawData),
+              let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let w = CGFloat(cg.width), h = CGFloat(cg.height)
+        let scale = min(1, maxSide / max(w, h))
+        if scale >= 1 {
+            return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        }
+        let nw = Int((w * scale).rounded()), nh = Int((h * scale).rounded())
+        guard let cs = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: nw, height: nh, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: nw, height: nh))
+        guard let out = ctx.makeImage() else { return nil }
+        return NSBitmapImageRep(cgImage: out).representation(using: .png, properties: [:])
+    }
+
     /// Rendert een gradient-preset naar PNG zodat hij als
     /// `backgroundImageData` opgeslagen en uniform getoond kan worden.
     @MainActor
@@ -79,6 +100,55 @@ final class BrandColorKit {
         guard !hexColors.contains(hex) else { return }
         hexColors.append(hex)
         defaults.set(hexColors, forKey: Self.key)
+    }
+}
+
+/// E24.24: persistente custom achtergrond-AFBEELDINGEN (uploads). Net als de
+/// brand colors herbruikbaar, maar als PNG-bestanden in Application Support
+/// (ids in UserDefaults) i.p.v. hex in UserDefaults — beelden horen niet in
+/// UserDefaults. @Observable zodat de Image-rij live een nieuwe swatch toont.
+@MainActor
+@Observable
+final class BackgroundImageKit {
+    static let shared = BackgroundImageKit()
+
+    private static let key = "backgroundCustomImageIDs"
+
+    /// Volgorde van opgeslagen uploads (nieuwste achteraan).
+    private(set) var imageIDs: [String]
+
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.imageIDs = defaults.stringArray(forKey: Self.key) ?? []
+    }
+
+    private var dir: URL? {
+        guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        let d = base.appendingPathComponent("CustomBackgrounds", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    private func url(_ id: String) -> URL? { dir?.appendingPathComponent("\(id).png") }
+
+    func data(for id: String) -> Data? { url(id).flatMap { try? Data(contentsOf: $0) } }
+
+    func image(for id: String) -> NSImage? { data(for: id).flatMap { NSImage(data: $0) } }
+
+    /// Slaat een upload (downscaled) persistent op + voegt 'm als swatch toe.
+    /// Geeft de opgeslagen (downscaled) PNG terug voor direct gebruik als
+    /// achtergrond. nil bij een onleesbare afbeelding.
+    @discardableResult
+    func add(_ rawData: Data) -> Data? {
+        guard let png = BackgroundKit.downscaledPNG(rawData) else { return nil }
+        let id = UUID().uuidString
+        guard let u = url(id) else { return png }
+        do { try png.write(to: u) } catch { return png }
+        imageIDs.append(id)
+        defaults.set(imageIDs, forKey: Self.key)
+        return png
     }
 }
 

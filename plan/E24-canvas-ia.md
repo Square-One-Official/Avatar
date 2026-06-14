@@ -97,6 +97,24 @@ zichtbaar (/tmp/c17_selected.png). Klik-naar-selecteren/deselecteren is in code 
 — bevestig of deselect daar via buiten-canvas/escape moet. Handle-stijl + alignment-guide-gedrag
 verder in 24.19.
 
+## 24.24 — Custom background-upload persistent als herbruikbare swatch
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** nieuwe `BackgroundImageKit` (@Observable, shared) bewaart custom-uploads persistent als
+PNG-bestanden in Application Support (`CustomBackgrounds/<uuid>.png`); de id-volgorde staat in
+UserDefaults (beelden horen niet in UserDefaults — net als de brand-kit voor kleuren, maar
+file-backed). `uploadCustom` downscalet de upload (`BackgroundKit.downscaledPNG`, max 1024 — lost
+ook 24.23's restpunt op), slaat 'm op via de kit én zet 'm als achtergrond. De Image-rij toont elke
+opgeslagen upload als swatch (ná de "+"), klik = die achtergrond.
+
+**DoD/Verificatie:** beide targets + tests groen. Smoke (`--upload-bg <pad>`): upload → blauwe swatch
+verschijnt direct ná de "+" + wordt de achtergrond (/tmp/c24_upload.png); herstart (zonder upload) →
+swatch staat er nog en werkt, geladen uit UserDefaults+bestand (/tmp/c24_persist.png). Persisted id
+bevestigd in `backgroundCustomImageIDs`.
+**Figma-TODO:** swatch-volgorde (nieuwste vóór/na presets) + een verwijder-affordance voor custom
+swatches bevestigen.
+
 ## 24.23 — Bug: custom background-upload zoomt de UI in
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

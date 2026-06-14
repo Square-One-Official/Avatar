@@ -301,6 +301,17 @@ final class ShellModel {
         p.touch()
     }
 
+    /// E24.24 smoke-haak: simuleer uploadCustom via de persistente kit (zonder
+    /// NSOpenPanel) — voegt een swatch toe én zet 'm als achtergrond.
+    func debugUploadBackground(path: String) {
+        guard let p = selectedPortrait,
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
+        let stored = BackgroundImageKit.shared.add(data) ?? data
+        p.backgroundImageData = stored
+        p.backgroundColorHex = nil
+        p.touch()
+    }
+
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
     /// te dupliceren, en open de sidebar.
     func debugSeedSecondPortraitAndOpenSidebar() {
