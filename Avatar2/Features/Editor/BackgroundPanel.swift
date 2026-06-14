@@ -27,10 +27,14 @@ struct BackgroundPanel: View {
     }
 
     /// E24-fix: rechter-rand-fade als scroll-affordance + trailing-inset zodat
-    /// geen swatch hard tegen de rand wordt afgesneden.
+    /// geen swatch hard tegen de rand wordt afgesneden. E24.10: verticale +
+    /// leading-padding zodat de hover-scale van een swatch niet wordt afgekapt
+    /// door de scroll-/mask-grens.
     private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DSSpacing.gap2) { content() }
+                .padding(.vertical, DSSpacing.gap2)
+                .padding(.leading, DSSpacing.gap1)
                 .padding(.trailing, DSSpacing.gap4)
         }
         .mask(
