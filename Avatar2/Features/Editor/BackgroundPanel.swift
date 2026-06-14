@@ -70,6 +70,7 @@ struct BackgroundPanel: View {
                     }
             }
             .buttonStyle(.plain)
+            .dsHoverScale()
 
             ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
                 Button { selectGradient(colors) } label: {
@@ -78,6 +79,7 @@ struct BackgroundPanel: View {
                         .frame(width: swatch, height: swatch)
                 }
                 .buttonStyle(.plain)
+                .dsHoverScale()
             }
         }
     }
@@ -103,6 +105,7 @@ struct BackgroundPanel: View {
                     }
             }
             .buttonStyle(.plain)
+            .dsHoverScale()
             .help("Pick a brand colour")
         }
     }
@@ -120,6 +123,7 @@ struct BackgroundPanel: View {
                 }
         }
         .buttonStyle(.plain)
+        .dsHoverScale()
     }
 
     // MARK: Acties

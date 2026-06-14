@@ -92,6 +92,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             .frame(height: 36)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
     }
@@ -123,5 +124,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
         .padding(.horizontal, DSSpacing.gap2)
         .frame(height: 32)
         .background(isActive ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+        // E24-fix: hover-affordance op de toolbar-knoppen (was afwezig).
+        .dsHoverHighlight(cornerRadius: 16)
     }
 }
