@@ -33,15 +33,24 @@ undone" → `modelContext.delete`). Build groen. (Rechtermuis/modal niet synthet
 **Figma-TODO:** context-menu-styling + delete-confirm tegen Figma bevestigen.
 
 ## 19.4 — Multi-select + bulk-export (rechtermuis)
-- status: GEPARKEERD (met plan) — eigen selectie-model nodig
-**Waarom:** vereist een multi-select-laag in de sidebar (cmd/shift-klik) die LOS staat van de
-canvas-selectie (`selectedID`), plus de bulk-export-flow. Te groot om aan het eind van de marathon
-veilig af te ronden zonder de bestaande selectie te regresseren.
-**Plan:** (1) `@State selectedForBulk: Set<PersistentIdentifier>` in SidebarView; cmd-klik toggelt,
-shift-klik = bereik; visuele multi-select-state op DSSidebarRow. (2) Context-menu bij ≥2 geselecteerd:
-"Export N portraits…" → NSOpenPanel (map kiezen) → `PortraitExporter.makePNG` per portret wegschrijven
-(met de bestaande vorm/maat-defaults of een mini-variant van ExportSheet). (3) Voortgangs-toast
-(hergebruik 19.5-patroon). Dedicated story.
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** multi-select-laag los van de canvas-selectie. `SidebarView.selectedForBulk`
+(`Set<PersistentIdentifier>`) + `lastClickedID`; `handleRowClick` leest `NSApp.currentEvent`-mods:
+cmd-klik toggelt een rij, shift-klik = bereik vanaf het anker, gewone klik = canvas-selectie (en
+wist de bulk-selectie). `DSSidebarRow` kreeg `isMultiSelected` → lime check + lime rand. Het
+DS-rechtermuis-menu (24.22) toont bij ≥2 geselecteerd bovenaan **"Export N portraits…"** →
+`NSOpenPanel` (map kiezen) → `PortraitExporter.makePNG(shape: frameShape, watermark: !isPro)` per
+portret naar de map (bestandsnaam = portret-naam), met de 19.5-voortgangs-toast (`onSetBusy`).
+`isPro` komt van de shell (entitlement).
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: 3 rijen met lime multi-select-check +
+het menu met "Export 3 portraits…" boven Rename/Export/Delete (/tmp/e194_bulk.png). Smoke-haak
+(#if DEBUG): `--seed-bulk`. cmd/shift-klik + de NSOpenPanel-map-export zijn niet synthetisch te
+driven; de selectie-state, het menu en de export-wiring (hergebruik van de geverifieerde makePNG)
+zijn bevestigd.
+**Figma-TODO:** multi-select-affordance (check + rand) + "Export N…"-positie tegen de referenties.
 
 ## 19.5 — Align set / Match lighting → voortgangs-toast (DSToast)
 - status: done

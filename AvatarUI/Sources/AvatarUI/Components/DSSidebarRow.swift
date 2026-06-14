@@ -11,6 +11,7 @@ public struct DSSidebarRow<Avatar: View>: View {
     private let name: String
     private let role: String?
     private let isSelected: Bool
+    private let isMultiSelected: Bool
     private let action: () -> Void
     private let avatar: Avatar
 
@@ -18,12 +19,14 @@ public struct DSSidebarRow<Avatar: View>: View {
         name: String,
         role: String? = nil,
         isSelected: Bool = false,
+        isMultiSelected: Bool = false,
         action: @escaping () -> Void,
         @ViewBuilder avatar: () -> Avatar
     ) {
         self.name = name
         self.role = role
         self.isSelected = isSelected
+        self.isMultiSelected = isMultiSelected
         self.action = action
         self.avatar = avatar()
     }
@@ -48,17 +51,28 @@ public struct DSSidebarRow<Avatar: View>: View {
                 }
                 .lineLimit(1)
                 Spacer(minLength: 0)
+                // E19.4: multi-select-indicator (lime check), los van de
+                // canvas-selectie-highlight.
+                if isMultiSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(DSColor.Action.primary)
+                }
             }
             .padding(DSSpacing.gap2)
             .background {
                 let shape = RoundedRectangle(cornerRadius: DSRadius.xl2)
                 ZStack {
-                    if isSelected || isHovering {
+                    if isSelected || isHovering || isMultiSelected {
                         shape.fill(DSColor.Background.inset)
                     }
                     if isSelected {
                         // Eén tint sterker dan hover (Inset + neutral-laag).
                         shape.fill(DSColor.Background.neutral)
+                    }
+                    // E19.4: lime rand bij multi-select.
+                    if isMultiSelected {
+                        shape.strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
                     }
                 }
             }
