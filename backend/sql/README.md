@@ -19,6 +19,7 @@ do not branch or skip numbers.
 | 009 | `009_current_credits_fix.sql` | `current_credits()` handles multi-active subs correctly (audit MEDIUM #18) | 001, 007 |
 | 010 | `010_newsletter_cohorts_view.sql` | Materialised view + refresh function so admin doesn't need service role (audit HIGH #12) | 001, 008 |
 | 011 | `011_free_import_counter_merge.sql` | Account/device counter merge on sign-in (audit MEDIUM #19) | 001, 004, 007 |
+| 013 | `013_newsletter_cohorts_revoke_public.sql` | Revoke anon/authenticated grants on cohort view + refresh fn (linter ERROR) | 010 |
 
 ## Data classification
 

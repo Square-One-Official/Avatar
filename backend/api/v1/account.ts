@@ -79,6 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           free_imports_used: 0,
           free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
           needs_account_link: false,
+          // E15.5: dev-only Advanced model-picker zichtbaar maken in de app.
+          is_dev_unlimited: true,
         });
         return;
       }

@@ -277,6 +277,133 @@ export async function recordNewsletterUnsubscribe(
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// E17.2 — Messages (verenigd model, slug "messages"). Naast de announcement-
+// functies hierboven; niet-destructief. Spiegelt admin/src/collections/
+// Messages.ts: kanaal + targeting-group + schedule-group + body/image/cta.
+// ---------------------------------------------------------------------------
+
+export type PayloadMessage = {
+  slug: string;
+  title: string;
+  channel: "inApp" | "email" | "both";
+  body: string;
+  imageUrl: string | null;
+  cta: { label: string; url: string } | null;
+  // schedule (flat)
+  frequency: "once" | "everySignInUntilDismissed" | "untilDate" | "delayedNthSignIn";
+  untilDate: string | null;
+  delayN: number | null;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  // targeting (flat)
+  cohort: "all" | "freeUsers" | "proUsers" | "specificEmails";
+  audienceEmails: string[];
+  signupAfter: string | null;
+  signupBefore: string | null;
+  minAppVersion: string | null;
+  platform: "all" | "macos";
+};
+
+let messageCache: { expiresAt: number; payload: PayloadMessage[] } | null = null;
+
+export async function fetchPublishedMessages(): Promise<PayloadMessage[]> {
+  const now = Date.now();
+  if (messageCache && messageCache.expiresAt > now) {
+    return messageCache.payload;
+  }
+  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — messages disabled");
+    return [];
+  }
+
+  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/messages`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "1");
+  // publishedAt leeft onder de schedule-group → dot-notation in de where.
+  url.searchParams.set("where[schedule.publishedAt][exists]", "true");
+  url.searchParams.set("where[schedule.publishedAt][less_than_equal]", new Date().toISOString());
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload messages fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const messages = docs.map(normalizeMessage).filter((m): m is PayloadMessage => m !== null);
+  messageCache = { expiresAt: now + CACHE_TTL_MS, payload: messages };
+  return messages;
+}
+
+function normalizeMessage(raw: unknown): PayloadMessage | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const slug = typeof r.slug === "string" ? r.slug : null;
+  const title = typeof r.title === "string" ? r.title : null;
+  if (!slug || !title) return null;
+
+  const channel = (() => {
+    const c = r.channel;
+    return c === "inApp" || c === "email" || c === "both" ? c : "inApp";
+  })();
+
+  const image = r.image as { url?: string } | null | undefined;
+  const imageUrl = image && typeof image.url === "string" ? image.url : null;
+
+  const cta = (() => {
+    const c = r.primaryCta as { label?: string; url?: string } | null | undefined;
+    if (!c || typeof c.label !== "string" || typeof c.url !== "string") return null;
+    if (!c.label.trim() || !c.url.trim()) return null;
+    return { label: c.label, url: c.url };
+  })();
+
+  const schedule = (r.schedule as Record<string, unknown>) ?? {};
+  const frequency = (() => {
+    const f = schedule.frequency;
+    if (f === "once" || f === "everySignInUntilDismissed" || f === "untilDate" || f === "delayedNthSignIn") return f;
+    return "once";
+  })();
+
+  const targeting = (r.targeting as Record<string, unknown>) ?? {};
+  const cohort = (() => {
+    const a = targeting.cohort;
+    if (a === "all" || a === "freeUsers" || a === "proUsers" || a === "specificEmails") return a;
+    return "all";
+  })();
+  const audienceEmails = Array.isArray(targeting.audienceEmails)
+    ? (targeting.audienceEmails as unknown[])
+        .map((e) => (typeof e === "object" && e !== null ? (e as { email?: string }).email : e))
+        .filter((e): e is string => typeof e === "string" && e.trim().length > 0)
+        .map((e) => e.trim().toLowerCase())
+    : [];
+  const platform = targeting.platform === "macos" ? "macos" : "all";
+
+  const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
+  return {
+    slug,
+    title,
+    channel,
+    body: lexicalToMarkdown(r.body),
+    imageUrl,
+    cta,
+    frequency,
+    untilDate: str(schedule.untilDate),
+    delayN: typeof schedule.delayN === "number" ? schedule.delayN : null,
+    publishedAt: str(schedule.publishedAt),
+    expiresAt: str(schedule.expiresAt),
+    cohort,
+    audienceEmails,
+    signupAfter: str(targeting.signupAfter),
+    signupBefore: str(targeting.signupBefore),
+    minAppVersion: str(targeting.minAppVersion),
+    platform,
+  };
+}
+
 /**
  * Best-effort semver compare — returns true if `version >= min`. Falls
  * back to "true" on anything unparseable so a typo in `minAppVersion`
