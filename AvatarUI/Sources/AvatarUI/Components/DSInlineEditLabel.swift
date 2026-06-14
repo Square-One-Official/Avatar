@@ -33,7 +33,8 @@ public struct DSInlineEditLabel: View {
             NSFont.systemFont(ofSize: textStyle.size, weight: .regular)
         }
         var nsColor: NSColor {
-            self == .heading ? .white : NSColor.white.withAlphaComponent(0xB2 / 255.0)
+            // E23: theme-bewust (wit in dark, warm bijna-zwart in light).
+            self == .heading ? DSNSColor.foregroundPrimary : DSNSColor.foregroundSubtle
         }
     }
 
@@ -257,8 +258,8 @@ struct InlineEditTextField: NSViewRepresentable {
             string: placeholder,
             attributes: [
                 .font: font,
-                // foreground/default/muted (#ffffff66) — de hint-tint.
-                .foregroundColor: NSColor.white.withAlphaComponent(0x66 / 255.0)
+                // E23: foreground/default/muted, theme-bewust (40% wit/zwart).
+                .foregroundColor: DSNSColor.foregroundMuted
             ]
         )
         field.delegate = context.coordinator

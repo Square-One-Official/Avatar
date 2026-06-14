@@ -14,14 +14,15 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsPreferencesPage: View {
+    // E23: default = Dark (zie AppearancePreferenceModifier).
     @AppStorage(SettingsDefaults.appearanceKey)
-    private var appearanceRaw: String = AppearancePreference.system.rawValue
+    private var appearanceRaw: String = AppearancePreference.dark.rawValue
 
     @AppStorage(SettingsDefaults.updateNotificationsKey)
     private var updateNotifications: Bool = true
 
     private var appearance: AppearancePreference {
-        AppearancePreference(rawValue: appearanceRaw) ?? .system
+        AppearancePreference(rawValue: appearanceRaw) ?? .dark
     }
 
     var body: some View {

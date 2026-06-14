@@ -54,7 +54,7 @@ struct FirstUseEmptyState: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(DSColor.Background.app)
-        .preferredColorScheme(.dark)
+        // E23: volgt de AppearancePreference (geen forced .dark meer).
     }
 
     /// Schaal t.o.v. de Figma-ring (469×524) binnen de beschikbare ruimte,
