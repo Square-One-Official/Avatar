@@ -20,6 +20,8 @@ struct ShellView: View {
     }
 
     @Environment(\.modelContext) private var modelContext
+    /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
+    @State private var setBusyMessage: String?
 
     var body: some View {
         // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
@@ -31,7 +33,8 @@ struct ShellView: View {
                     selectedID: model.selectedPortrait?.persistentModelID,
                     onSelect: { model.select($0) },
                     onAdd: { model.presentOpenPanel() },
-                    onExport: { model.select($0); model.exportCurrentPortrait() }
+                    onExport: { model.select($0); model.exportCurrentPortrait() },
+                    onSetBusy: { setBusyMessage = $0 }
                 )
                 // Losstaande kaart met marge rondom (bevinding 8; frame-
                 // inzet 4) — zelfde inset waarmee de kaartradius
@@ -58,6 +61,15 @@ struct ShellView: View {
                 ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
             }
         }
+        // E19.5: voortgangs-toast voor Align set / Match lighting.
+        .overlay(alignment: .bottomTrailing) {
+            if let message = setBusyMessage {
+                DSToast(title: message) {}
+                    .padding(DSSpacing.gap5)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.3), value: setBusyMessage)
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde

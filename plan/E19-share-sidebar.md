@@ -36,7 +36,13 @@ undone" → `modelContext.delete`). Build groen. (Rechtermuis/modal niet synthet
 - status: todo
 
 ## 19.5 — Align set / Match lighting → voortgangs-toast (DSToast)
-- status: todo
+- status: done
+- owner: FEAT (AI-agent, marathon)
+
+**Result:** SidebarView meldt set-brede voortgang via `onSetBusy(String?)`; ShellView toont een
+DSToast rechtsonderin ("Aligning set…" / "Matching lighting…") met slide-in/out, en wist 'm bij
+afronding (defer). De inline knop-labels blijven als secundaire indicatie. Build groen. (Vereist
+een set ≥2 + klik → niet synthetisch ge-smoket; zelfde DSToast-patroon als elders.)
 
 ## 19.6 — Sidebar hover-performance onderzoeken + fixen
 - status: todo (meting voor/na in Result)

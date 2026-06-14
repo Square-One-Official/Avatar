@@ -26,6 +26,8 @@ struct SidebarView: View {
     let onAdd: () -> Void
     /// E19.2: export het portret via de shell (selecteert + opent de popup).
     var onExport: (Portrait2) -> Void = { _ in }
+    /// E19.5: set-brede voortgang (Align/Match lighting) → shell-toast.
+    var onSetBusy: (String?) -> Void = { _ in }
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.modelContext) private var modelContext
@@ -162,8 +164,10 @@ struct SidebarView: View {
     private func alignSet() {
         guard !isAligning else { return }
         isAligning = true
+        onSetBusy("Aligning set…")
         let targets = portraits
         Task {
+            defer { onSetBusy(nil) }
             // 1. Bereken alle transforms (off-main per cutout).
             var items: [(Portrait2, TransformUndo.Snapshot, AutoFramer.Transform)] = []
             for portrait in targets {
@@ -203,10 +207,11 @@ struct SidebarView: View {
     private func matchLighting() {
         guard !isMatchingLight else { return }
         isMatchingLight = true
+        onSetBusy("Matching lighting…")
         let targets = portraits
         let reference = targets.first { $0.persistentModelID == selectedID } ?? targets.first
         Task {
-            defer { isMatchingLight = false }
+            defer { isMatchingLight = false; onSetBusy(nil) }
             guard let reference,
                   let refCG = Self.cgImage(from: reference.cutoutData),
                   let refStats = SetLightingNormalizer.referenceStats(of: refCG) else { return }
