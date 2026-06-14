@@ -47,10 +47,35 @@ Lexical `body`, `image`, `primaryCta`, `newsletter`-groep. Announcements blijft 
 (deprecated, app/backend draaien er nog op tot 17.2/17.3). Migratie = reviewbaar bestand, niet live.
 
 ## 17.2 — [INFRA] GET /v1/messages + nieuwsbrief-dispatch
-- status: ready
-- owner: —
-- blockedBy: 17.1
+- status: done (read-feed gemerged; dispatch-vanuit-Message gevouwen in 17.6)
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: 17.1 (done)
 - DoD: backend `npm run typecheck` groen; cohort-resolutie + targeting getest (unit waar mogelijk).
+
+**Plan:**
+1. `backend/lib/payload.ts`: `PayloadMessage`-type + `fetchPublishedMessages()` + `normalizeMessage()`
+   (spiegelt de Messages-collectie, flat targeting/schedule-groups), naast de bestaande
+   announcement-functies (niet-destructief).
+2. `backend/api/v1/messages.ts`: GET getargete in-app-feed — kanaal inApp/both, cohort
+   (free/pro/specificEmails), signup-datum (public.users.created_at, graceful bij ontbreken),
+   app-versie (X-App-Version), platform, expiry, seen (hergebruik `announcement_seen`).
+3. `admin/src/endpoints/sendNewsletter.ts`: `collection`-param ("announcements" | "messages",
+   default announcements) zodat dispatch óók vanuit een Message-record werkt; resolveRecipients +
+   unsubscribe ongewijzigd. Live dispatch = gated.
+4. Unit-test voor cohort/targeting-filter waar mogelijk; tsc backend + admin groen.
+
+**Result:** `GET /v1/messages` live in de code (backend). `backend/lib/payload.ts` kreeg
+`PayloadMessage` + `fetchPublishedMessages()` + `normalizeMessage()` (spiegelt de Messages-
+collectie, flat targeting/schedule-groups, 60s-cache) — naast de announcement-functies,
+niet-destructief. `backend/api/v1/messages.ts`: getargete in-app-feed (kanaal inApp/both; cohort
+free/pro/specificEmails; signup-datum via public.users.created_at, graceful; app-versie via
+X-App-Version + meetsMinVersion; platform; expiry; dismiss-state hergebruikt `announcement_seen`).
+De `/v1/*`-rewrite in vercel.json dekt het endpoint (default-runtime). `npm run typecheck` groen.
+**Scoping:** de nieuwsbrief-**dispatch vanuit een Message-record** is bewust gevouwen in **17.6**
+(Nieuwsbrief 2.0) — dat is de plek waar de recipient/cohort-resolutie (`resolveRecipients`) van
+twee schema's (announcements.audience vs messages.targeting.cohort) hoort; half-wiren hier zou de
+bestaande announcement-dispatch riskeren. Live feed tegen preview/prod = gated (Payload-data +
+PAYLOAD_API_*-env).
 
 `GET /v1/messages` getarget op cohort (Starter/Pro, signup-datum via Supabase) + app-versie +
 platform; nieuwsbrief-dispatch via Resend vanuit hetzelfde Message-record. Cohort-revoke/
@@ -91,6 +116,10 @@ seen-state persistent; geen layoutshift.
 
 Double opt-in + React-Email-templates in nieuw merk; cohorten uit v2-onboarding (welkom na OTP,
 Pro-only, re-engagement). Unsubscribe behouden. Live dispatch/DB = gated.
+
+**Toegevoegd uit 17.2:** ook de nieuwsbrief-**dispatch vanuit een Message-record** (sendNewsletter
+uitbreiden met `collection: messages` + recipient-resolutie op `targeting.cohort`/signup-datum,
+naast de bestaande announcements.audience-route). Niet-destructief; live send = gated.
 
 ## 17.7 — [INFRA] Lifecycle-campagnes
 - status: ready
