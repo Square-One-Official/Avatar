@@ -68,11 +68,13 @@
 - Tot dan blijft DSIcon op SF Symbols (visueel benaderend, niet 1-op-1 Figma).
 
 ### E24.8 — canvas-zoom vs afbeelding-schaling via selectie-handles (2026-06-14)
+- **Status:** DEFAULT GEBOUWD (24.8 done). De keuzes hieronder blijven open ter bevestiging/iteratie
+  door Thierry — niet-blokkerend.
 - **Gevraagd:** scroll/pinch = canvas-zoom (view); de afbeelding zélf schalen via een SELECTIE
   (resize-handles / scale-grip), niet via zoom. Referenties volgen.
-- **Waarom geparkeerd:** dit is een eigen interactie-ontwerp: een handle-laag op EditorCanvasView
-  (4–8 resize-grips + hit-testing + drag-to-scale, met aspect-lock?), gescheiden van de bestaande
-  pan/zoom (E06.4). Te groot/risicovol om in de marathon af te raffelen; vraagt visuele iteratie.
-- **Te beslissen door Thierry:** (a) welke handles (hoeken + zijden, of alleen hoeken?), (b)
-  aspect-lock standaard?, (c) waar leeft de scale — op `Portrait2.scale` (bestaand) of een aparte
-  selectie-transform?, (d) interactie bij meerdere lagen later. Daarna bouw ik het als losse story.
+- **Gebouwde default:** view-zoom (efemeer 1×–4×) op pinch/scroll/dubbelklik + zoom-HUD; subject-
+  schaal via 4 HOEK-handles (aspect-locked, om het onderwerp-midden, op `Portrait2.scale`, undo'baar).
+- **Nog te beslissen/itereren door Thierry:** (a) welke handles — alléén hoeken (huidige default) of
+  ook zijkanten?, (b) aspect-lock altijd aan (default) of vrij?, (c) scale op `Portrait2.scale`
+  (default) of een aparte selectie-transform?, (d) gedrag bij meerdere lagen later, (e) moet de
+  view-zoom pannen wanneer ingezoomd? Pas ik aan zodra Thierry kiest.
