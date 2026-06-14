@@ -8,6 +8,7 @@ import { s3Storage } from "@payloadcms/storage-s3";
 import { Users } from "./collections/Users";
 import { Media } from "./collections/Media";
 import { Announcements } from "./collections/Announcements";
+import { Messages } from "./collections/Messages";
 import { BadgeComponents } from "./collections/BadgeComponents";
 import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
 import { AuditLog } from "./collections/AuditLog";
@@ -24,7 +25,7 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, BadgeComponents, NewsletterUnsubscribes, AuditLog],
+  collections: [Users, Media, Announcements, Messages, BadgeComponents, NewsletterUnsubscribes, AuditLog],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {
