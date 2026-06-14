@@ -89,7 +89,8 @@ enum AutoFramer {
         guard cutoutSize.width > 0, cutoutSize.height > 0 else {
             return Transform(scale: 1, offset: .zero)
         }
-        let padding: CGFloat = 0.85
+        // E24.18: gedeelde frame-ademruimte-padding (was hier hardcoded 0.85).
+        let padding = FramingConstants.frameFitPadding
         let scale = min(canvas.width / cutoutSize.width, canvas.height / cutoutSize.height) * padding
         return Transform(
             scale: scale,

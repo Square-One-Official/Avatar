@@ -132,8 +132,9 @@ struct EditorCanvasView: View {
         }
     }
 
-    /// scale 0 = nog geen transform → fill-fit (beeld vult het canvas,
-    /// gecentreerd) — het gedrag dat de kaart vóór E06.4 had.
+    /// scale 0 = nog geen transform → fit-met-marge (beeld past binnen het
+    /// canvas, gecentreerd, met frame-ademruimte) — gelijkgetrokken met
+    /// AutoFramer.fitTransform (E24.18). Voorheen FILL (edge-to-edge).
     private func resolvedTransform() -> CanvasTransform {
         let current = currentTransform()
         if current.scale > 0 { return current }
@@ -145,7 +146,10 @@ struct EditorCanvasView: View {
         guard image.size.width > 0, image.size.height > 0 else {
             return CanvasTransform(offsetX: 0, offsetY: 0, scale: 1)
         }
-        let scale = max(canvas.width / image.size.width, canvas.height / image.size.height)
+        // E24.18: padded FIT i.p.v. FILL → het onderwerp raakt de framerand niet
+        // (marge in circle én square). Zelfde padding-constante als AutoFramer.
+        let scale = min(canvas.width / image.size.width, canvas.height / image.size.height)
+            * FramingConstants.frameFitPadding
         return CanvasTransform(
             offsetX: (canvas.width - image.size.width * scale) / 2,
             offsetY: (canvas.height - image.size.height * scale) / 2,

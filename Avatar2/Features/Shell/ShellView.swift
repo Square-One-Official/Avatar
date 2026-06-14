@@ -98,6 +98,8 @@ struct ShellView: View {
             // E24.16: forceer de frame-vorm voor de smoke.
             if args.contains("--frame-square") { model.debugSetFrameShape(.square) }
             if args.contains("--frame-circle") { model.debugSetFrameShape(.circle) }
+            // E24.18: reset transform → padded fit-fallback (frame-ademruimte).
+            if args.contains("--reset-transform") { model.debugResetTransform() }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),

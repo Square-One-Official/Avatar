@@ -5,6 +5,39 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.18 — Panel-fade weg (alle menu's) + frame-ademruimte
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result (A — panel-fade):** de `dsEdgeFade` (24.12) is uit `DSEditPanel` gehaald — die kapte
+boven/onder content af op álle bottom-panelen. Centraal opgelost (DSEditPanel) → geldt voor
+Effects/Face/Clothing/Hair tegelijk. Inhoud is nu overal volledig zichtbaar; bij overflow scrollt het
+paneel (scrollbar + paneel-rand = de enige rand-affordance). (De `dsEdgeFade`-helper blijft ongebruikt
+in DSPanelSurface — restpunt: opruimen bij rustige refactor.)
+
+**Result (B — frame-ademruimte):** gedeelde `FramingConstants.frameFitPadding` (0.85).
+`EditorCanvasView.fitTransform` ging van FILL (`max`, edge-to-edge) → padded FIT (`min × 0.85`),
+gelijk aan `AutoFramer.fitTransform` (die de constante nu ook gebruikt). Het onderwerp houdt zo
+standaard marge binnen het frame in circle én square. WYSIWYG meegenomen: de export-fallbacks voor
+"geen transform" (`PortraitExporter.transparentSquare` + `BackgroundCompositor.resolvedPlacement`,
+AvatarKit) gingen mee van FILL → padded FIT (`BackgroundCompositor.fitPadding = 0.85`, moet gelijk
+blijven aan de app-constante). Geldt voor vers geïmporteerde portretten (scale 0); eerder
+edge-to-edge-getransformeerde portretten houden hun stand tot reset/auto-frame.
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (build-v2.sh; AutoFramer-noFace-test
+blijft 0.85 → ongewijzigd). Screenshots: Face-paneel volledig zichtbaar zonder fade-clipping
+(/tmp/panel_face_2418.png); circle-frame met onderwerp-marge + zichtbare hoek-handles
+(/tmp/margin_circle_2418.png). Smoke-haak (#if DEBUG): `--reset-transform` (toont de padded
+fit-fallback). Part A geldt centraal voor alle 4 de bottom-panelen; Part B is frame-agnostisch
+(zelfde scale-math, circle + square).
+
+**Figma-TODO:** exacte frame-ademruimte-marge (nu 0.85 / 15%) bevestigen tegen de referenties; bevestig
+of een decoratieve buitenrand-fade gewenst is (nu volledig verwijderd).
+
+## 24.17 — Canvas-audit (nieuwe indeling)
+- status: ready (na 24.18) — visuele audit van de canvas na de E24-revisie (toolbar/panelen/frame/
+  zoom/handles) in beide frame-vormen + beide themes; losse fixes loggen.
+
 ## 24.5 — Sidebar-toggle uiterst rechts in de app-bar
 - status: done
 **Result:** ShellTopBar-app-chrome rechts = Share → Settings → **Library (uiterst rechts)**. Smoke ✓.
