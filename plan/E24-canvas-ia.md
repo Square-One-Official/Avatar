@@ -5,6 +5,32 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.17-reopened — Canvas-interactie opnieuw
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** canvas-interactie herzien naar Figma/Preview-gedrag.
+- **Handles alléén bij selectie:** `EditorCanvasView` kreeg `isSelected`; de handles + selectie-kader
+  renderen alleen als geselecteerd. Klik OP de afbeelding (`contentShape` = frame-vorm) → selecteren;
+  klik ERBUITEN (hoeken/marge, een `Color.clear`-laag) → deselecteren. (Vervangt de altijd-zichtbare
+  handles — de 24.17-audit-bevinding.)
+- **−/+ slider weg:** de `ZoomHUD` is verwijderd (uit EditorView + de struct). View-zoom gaat nu
+  alléén via pinch (+ dubbelklik = fit/1×).
+- **Scroll schaalt niets:** de scroll-wheel-monitor is verwijderd → trackpad/scroll zoomt/schaalt de
+  afbeelding niet meer.
+- **Pinch = canvas-view-zoom:** `MagnificationGesture` → `applyViewZoom` (efemeer, ongewijzigd).
+- **Background clipt naar de cirkel (canvas + export):** al geborgd in 24.18 (canvas:
+  `backgroundLayer.clipShape(frameClipShape)`) + 24.16/24.23 (export: circle-mask + `Color.clear`-
+  container). Geen vierkant kleurvlak meer om de cirkel; bevestigd, geen extra fix nodig.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshots: default = GEEN handles + GEEN
+slider-HUD (/tmp/c17_default.png); geselecteerd (`--select-subject`) = selectie-kader/handles
+zichtbaar (/tmp/c17_selected.png). Klik-naar-selecteren/deselecteren is in code gewired
+(`onTapGesture`); beide render-staten visueel bevestigd. Smoke-haak (#if DEBUG): `--select-subject`.
+**Figma-TODO:** voor SQUARE-frame is "klik buiten" binnen het canvas beperkt (de vorm vult het canvas)
+— bevestig of deselect daar via buiten-canvas/escape moet. Handle-stijl + alignment-guide-gedrag
+verder in 24.19.
+
 ## 24.23 — Bug: custom background-upload zoomt de UI in
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
