@@ -8,7 +8,26 @@ Werkwijze per story: claim → Plan → bouwen → DoD (beide targets groen) →
 (done = ná merge). UI = visuele smoke + screenshot.
 
 ## 25.1 — DSColorPicker-component (AvatarUI)
-- status: ready
+- status: done
+- owner: DS (AI-agent, marathon 2)
+
+**Result:** `DSColorPicker` (AvatarUI/Components/DSColorPicker.swift) — HSV-veld (saturation × value,
+draggable), hue-slider (regenboog), alpha-slider (dambord + kleur-gradient), eyedropper
+(`NSColorSampler`), hex-veld (DSTextField, two-way), opacity-%, en format-dropdown (Hex default;
+RGB/HSL als placeholder). Alle thumbs zijn ZICHTBARE witte ringen met schaduw (les uit 24.11). HSV↔
+Color via `NSColor.getHue…`. In de dark/lime-huisstijl op `dsPanelSurface`.
+**API:**
+```swift
+DSColorPicker(color: $color)                    // met alpha-slider
+DSColorPicker(color: $color, supportsAlpha: false)
+```
+De gekozen kleur komt live terug via de `color`-binding (HSV→Color in `push()`; hex/eyedropper→HSV).
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (incl. AvatarUI-package-compile). Smoke
+(`--show-colorpicker`, #if DEBUG): de picker toont HSV-veld + zichtbare thumb, hue/alpha-sliders,
+eyedropper, Hex-dropdown, hex-veld (#45B5E5) + 100% (/tmp/c25_1_picker.png).
+**Figma-TODO:** definitieve maatvoering/tints; RGB/HSL-formats activeren; precieze thumb-stijl tegen
+de referentie-screenshot.
 - **Plan:** een herbruikbare `DSColorPicker` in AvatarUI met:
   - **HSV-veld** (saturation × value vlak) met een draggable, ZICHTBARE thumb (les uit 24.11: thumbs
     moeten duidelijk zichtbaar zijn);
