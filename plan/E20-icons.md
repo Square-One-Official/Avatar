@@ -47,7 +47,10 @@ sun/palette/arrowsOut/userRectangle). De bottom-toolbar (Effects/Face/Clothing/H
 userRectangle, fix-angle=perspective).
 
 ## 20.2 / 21.3 — Leading Phosphor-icoon per actie (Edit + Face-paneel)
-- status: deels — menu/dropdown-iconen done (20.4). Edit = sliders (geen actie-rijen meer); Face-
+- status: done (via 24.15) — de Face-acties zijn nu Phosphor-thumbnail-kaarten (magicWand/tooth/
+  palette/smiley) en de canvas-menu's zijn Phosphor (20.4). Edit is sliders (geen actie-rijen meer).
+  Daarmee zijn alle "leading icoon per actie"-plekken in de nieuwe indeling Phosphor.
+- (historie) deels — menu/dropdown-iconen done (20.4). Edit = sliders (geen actie-rijen meer); Face-
   paneel-rijen krijgen iconen in 24.15 (thumbnail-kaarten). De Phosphor-route is nu vrij.
   (oorspronkelijke parkeer-noot:) De visuele
   deliverable is Phosphor; SF-interim zou alleen gokwerk zijn voor teeth/make-up/wrinkles.
@@ -56,7 +59,8 @@ userRectangle, fix-angle=perspective).
   Face-paneel. Oppakken zodra Phosphor werkt + de Figma-iconkeuze bekend is.
 
 ## 20.3 / 21.2-iconen — Tools/app-bar/undo-redo/add naar DSIcon/Phosphor
-- status: GEPARKEERD — geblokkeerd op Phosphor. DSIcon-mapping + `EditorTool.dsSymbol` staan klaar;
-  de toolbar/app-bar/cluster gebruiken nu SF Symbols die 1-op-1 op de DSIcon-namen mappen, dus de
-  swap is één plek (DSIcon-backing) zodra Phosphor bouwt. Toolbar-fit (6 tools) gevalideerd in de
-  E22.1-smoke. Edit-icoon = kleur-glyph (paintpalette) gezet in E22.3.
+- status: SUPERSEDED door 20.4-besluit (Thierry): de bottom-toolbar (Effects/Face/Clothing/Hair),
+  app-bar (Share/Settings/Library) en undo/redo/add blijven **bewust SF Symbols** — Phosphor alleen
+  voor de menu-/dropdown-iconen (gedaan). Deze story is dus géén openstaande Phosphor-taak meer.
+  Mocht Thierry later tóch Phosphor op die chrome willen: de DSIcon-mapping + `EditorTool.dsSymbol`
+  staan klaar, het is één plek (DSIcon-backing).
