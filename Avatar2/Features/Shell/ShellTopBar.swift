@@ -19,7 +19,37 @@ struct ShellTopBar: View {
     var onExport: () -> Void = {}
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        // E18.14: counter op een EIGEN rij ónder de OS-traffic-lights, zodat
+        // hij écht ~12pt (gap-3) van de linkerrand zit i.p.v. ~72pt ernaast.
+        // Rij 1 = de top-strook met rechts Share/Settings (de lights bezetten
+        // links); rij 2 = quota + Upgrade, gap-3 van de rand.
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            HStack(spacing: 0) {
+                Spacer()
+                HStack(spacing: DSSpacing.gap2) {
+                    if canExport {
+                        // Frame 27 share-icoon → export/share (E08.2).
+                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
+                            onExport()
+                        }
+                    }
+                    DSToolButton(
+                        Image(systemName: "gearshape.fill"),
+                        label: "Settings",
+                        isActive: isSettingsActive
+                    ) {
+                        onToggleSettings()
+                    }
+                }
+                // E18.6: trailing = gedeelde topbar-inset (gap-3), gelijk aan
+                // de redo-knop rechtsonder — niet tegen de vensterrand geplakt.
+                .padding(.top, DSSpacing.gap3)
+                .padding(.trailing, ShellMetrics.topBarInset)
+            }
+            // De top-strook (h52) reserveert de hoogte van de traffic-lights,
+            // zodat de counter eronder valt i.p.v. ernaast.
+            .frame(height: 52, alignment: .top)
+
             if model.hasCompletedFirstCutout {
                 HStack(spacing: DSSpacing.gap2) {
                     Text(quotaLabel)
@@ -29,32 +59,9 @@ struct ShellTopBar: View {
                         model.requestUpgrade()
                     }
                 }
-                // Figma "top": kwota-regel gecentreerd in de 52-strook…
-                .frame(height: 52)
-                // …direct na de OS-window-controls (E05.8: afgeleide
-                // constante i.p.v. magic 76).
-                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
+                // E18.14: gap-3 van de linkerrand (gelijk aan de gear-trailing).
+                .padding(.leading, ShellMetrics.topBarInset)
             }
-            Spacer()
-            HStack(spacing: DSSpacing.gap2) {
-                if canExport {
-                    // Frame 27 share-icoon → export/share (E08.2).
-                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
-                        onExport()
-                    }
-                }
-                DSToolButton(
-                    Image(systemName: "gearshape.fill"),
-                    label: "Settings",
-                    isActive: isSettingsActive
-                ) {
-                    onToggleSettings()
-                }
-            }
-            // E18.6: trailing = gedeelde topbar-inset (gap-3), gelijk aan de
-            // redo-knop rechtsonder — niet meer tegen de vensterrand geplakt.
-            .padding(.top, DSSpacing.gap3)
-            .padding(.trailing, ShellMetrics.topBarInset)
         }
         .task { await model.refresh() }
     }

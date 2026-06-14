@@ -46,9 +46,10 @@ afvinken. UI-fixes met visuele smoke.
       het een aan/uit-knop.
 - [ ] **18.13 Credit-badge subtieler** — groene badge = Pro-indicator (voor niet-Pro); credit-kost
       subtiel grijs ónder de titel i.p.v. prominente groene chip (knop mag hoger).
-- [ ] **18.14 Counter nóg dichter op de linkerrand** — zelfde padding als de gear (12). Constraint:
-      macOS-traffic-lights bezetten links ~60–70pt → óf vlak naast de lights (huidig) óf counter op
-      eigen rij ónder de lights om écht 12-van-de-rand te halen. **Keuze Thierry nodig.**
+- [x] **18.14 Counter op eigen rij ónder de traffic-lights** — DONE+gemerged (keuze Thierry).
+      ShellTopBar is nu een VStack: rij 1 = top-strook (h52) met rechts Share/Settings, links de
+      OS-lights; rij 2 = quota + Upgrade-chip, leading = `topBarInset` (gap-3 = 12). Counter zit nu
+      écht ~12pt van de linkerrand i.p.v. ~72pt ernaast. Smoke ✓.
 - [ ] **18.15 Edit-paneel compacter + scrollbaar** — alle acties onder elkaar in een scrollbare
       lijst; paneel minder hoog + niet volle vensterbreedte (compacter); foto groter. Idem voor de
       andere menupanelen (Effects/Hair/Clothing/Background).
