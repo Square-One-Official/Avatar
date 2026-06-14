@@ -176,6 +176,8 @@ struct EffectsPanel: View {
             }
         }
         .buttonStyle(.plain)
+        // E24.15: hover-state op de stijl-thumbnails (was afwezig).
+        .dsHoverScale()
         .disabled(model.isBusy)
         .opacity(model.isBusy && !isWorking ? 0.5 : 1)
     }
