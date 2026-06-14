@@ -11,25 +11,41 @@ import SwiftUI
 
 public struct DSCanvasCard<Content: View>: View {
     private let showsDotGrid: Bool
+    private let surfaceClip: AnyShape
     private let content: Content
 
-    public init(showsDotGrid: Bool = false, @ViewBuilder content: () -> Content) {
+    public init(
+        showsDotGrid: Bool = false,
+        surfaceClip: AnyShape = AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4)),
+        @ViewBuilder content: () -> Content
+    ) {
         self.showsDotGrid = showsDotGrid
+        self.surfaceClip = surfaceClip
         self.content = content()
     }
 
     public var body: some View {
         ZStack {
-            DSColor.Background.card
-            if showsDotGrid {
-                DSDotGrid()
+            // E24.26: de kaart-surface + het dot-grid clippen naar de frame-vorm
+            // (`surfaceClip`). Bij een cirkel is buiten de cirkel dus niets meer
+            // (transparant) → de window-bg (zwart) schijnt door, géén lichter
+            // vierkant. Bij square = de normale afgeronde kaart.
+            ZStack {
+                DSColor.Background.card
+                if showsDotGrid {
+                    DSDotGrid()
+                }
             }
+            .clipShape(surfaceClip)
+
             content
         }
         // Vast vierkant (E03.14, bevinding 11): het canvas is het
         // exportformaat (1:1); de inhoud vult de kaart (aspect-fill door
-        // de caller) en wordt door de kaart geclipt.
+        // de caller).
         .aspectRatio(1, contentMode: .fit)
+        // Buitenste clip = de kaartvorm zodat overlays (gids/handles) binnen het
+        // canvas blijven; de surface zelf is al naar `surfaceClip` geclipt.
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
     }
 }

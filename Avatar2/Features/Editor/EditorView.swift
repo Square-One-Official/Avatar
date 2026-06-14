@@ -100,6 +100,8 @@ struct EditorView: View {
     /// + pinch/scroll.
     @State private var canvasViewZoom: Double = 1
     private let canvasMaxViewZoom: Double = 4
+    /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
+    @State private var canvasGridEnabled = false
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
@@ -155,6 +157,14 @@ struct EditorView: View {
     /// hoeken zelf al af).
     private var frameClipShape: AnyShape {
         (portraitModel?.frameShape ?? .circle) == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
+    }
+
+    /// E24.26: clip-vorm voor de KAART-surface + dot-grid. Cirkel = Circle
+    /// (hoeken puur zwart); square = de afgeronde kaart (xl4) zoals altijd.
+    private var cardSurfaceClip: AnyShape {
+        (portraitModel?.frameShape ?? .circle) == .circle
+            ? AnyShape(Circle())
+            : AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
     }
 
     /// E24.16: persisteer de gekozen frame-vorm op het portret (canvas + export
@@ -297,7 +307,7 @@ struct EditorView: View {
             // dot-grid eronder zolang er geen achtergrond is ingesteld
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
             // transparante delen tonen het raster: achtergrond verwijderd.
-            DSCanvasCard(showsDotGrid: !hasBackground) {
+            DSCanvasCard(showsDotGrid: !hasBackground, surfaceClip: cardSurfaceClip) {
                 ZStack {
                     // E07.1: gekozen achtergrond achter de cutout (preview;
                     // exportkwaliteit-compositing volgt in E07.2).
@@ -321,6 +331,7 @@ struct EditorView: View {
                         EditorCanvasView(
                             image: portrait, portrait: portraitModel,
                             viewZoom: $canvasViewZoom, maxViewZoom: canvasMaxViewZoom,
+                            gridEnabled: canvasGridEnabled,
                             frameShape: portraitModel?.frameShape ?? .circle
                         )
                     }
@@ -360,6 +371,7 @@ struct EditorView: View {
                     onBoost: runBoostResolution,
                     isPro: entitlement?.isProActive ?? false,
                     activeMenu: $canvasMenu,
+                    gridEnabled: $canvasGridEnabled,
                     adjust: { editColorPanel },
                     background: { BackgroundPanel(portrait: portraitModel) }
                 )
@@ -443,6 +455,8 @@ struct EditorView: View {
                 localToggleBaselines["One click retouch"] = portrait
                 localToggleBaselines["Improve lighting"] = portrait
             }
+            // E24.26: smoke-haak — grid-toggle aan.
+            if ProcessInfo.processInfo.arguments.contains("--grid-on") { canvasGridEnabled = true }
             // E24.8: smoke-haak — forceer een view-zoom-niveau.
             if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "--seed-viewzoom"),
                ProcessInfo.processInfo.arguments.indices.contains(i + 1),
