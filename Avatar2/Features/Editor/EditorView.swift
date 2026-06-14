@@ -296,8 +296,12 @@ struct EditorView: View {
                     )
                 }
             },
+            onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+            onColorise: { _ = entitlement?.allowCloudFeature() },
+            onBoost: runBoostResolution,
             isPro: entitlement?.isProActive ?? false,
-            showAutoEnhance: false
+            // E24.27: AI-één-tik-acties zitten nu IN het Light & color-paneel.
+            showAutoEnhance: true
         )
     }
 

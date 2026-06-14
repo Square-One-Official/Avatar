@@ -5,6 +5,23 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.27 — Light & color-paneel: AI-acties netjes samengevoegd
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** de AI-één-tik-acties zitten nu IN het Light & color-paneel (Adjust-popover), niet als
+losse rommel: bovenin een horizontale rij compacte DS-chips (Improve lighting · Colorise [Pro] ·
+Boost [1 credit] — via `quickAction`, Pro-badge/credit waar van toepassing) → `Divider` → de manuele
+sliders (Brightness/Contrast/Saturation/Temperature) + Reset. Eén DS-paneelstijl (24.12), compact,
+geen afkappende fade (24.18). De drie acties zijn uit de AI-dropdown gehaald (die houdt nu de
+generatieve Restore body) → geen duplicatie. `editColorPanel` wired nu ook de AI-closures +
+`showAutoEnhance: true`.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: quick-actions-rij (met Pro-badge op
+Colorise) + divider + sliders + Reset in de Adjust-popover (/tmp/c27_panel.png).
+**Figma-TODO:** chip-labels/iconen + volgorde tegen de referenties; paneeltitel ("Light & color")
+formaliseren.
+
 ## 24.26 — Hele canvas naar framevorm clippen (zwarte hoeken) + grid-toggle
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
