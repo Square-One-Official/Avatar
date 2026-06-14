@@ -47,7 +47,7 @@ public enum CheckoutResult {
 /// `AccessTokenProviding` (v1: `AuthManager`; 2.0: `AuthService`).
 @MainActor
 public final class BackendClient {
-    public let baseURL: URL = URL(string: "https://api.aaavatar.nl")!
+    public let baseURL: URL
 
     /// Marketing version pulled from the app bundle, e.g. "1.1.4". Sent as
     /// `X-App-Version` on every request so the backend can gate
@@ -61,6 +61,26 @@ public final class BackendClient {
     public init(auth: any AccessTokenProviding, session: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
         self.session = session
+        self.baseURL = Self.resolveBaseURL()
+    }
+
+    /// Productie = `api.aaavatar.nl`. In DEBUG kan een override de client
+    /// tegen een Vercel-preview richten (E01.15): env `AAAVATAR_API_BASE` of
+    /// UserDefaults `dev.apiBase` (Advanced-settings). Een Release-build
+    /// negeert beide → altijd productie. TLS-pinning raakt dit niet: alleen
+    /// `api.aaavatar.nl` is gepind; andere hosts (zoals *.vercel.app) vallen
+    /// terug op OS-trust (TLSPinningDelegate).
+    private static func resolveBaseURL() -> URL {
+        let production = URL(string: "https://api.aaavatar.nl")!
+        #if DEBUG
+        let raw = ProcessInfo.processInfo.environment["AAAVATAR_API_BASE"]
+            ?? UserDefaults.standard.string(forKey: "dev.apiBase")
+        if let raw, !raw.isEmpty, let override = URL(string: raw) {
+            print("[BackendClient] DEBUG baseURL override → \(override.absoluteString)")
+            return override
+        }
+        #endif
+        return production
     }
 
     /// Of er een sessie is (Bearer-token aanwezig). Gebruikt door
@@ -575,6 +595,17 @@ public final class BackendClient {
         }
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        #if DEBUG
+        // E01.15: Vercel-preview deployment-protection bypass, zodat een
+        // DEBUG-build de beveiligde preview kan bereiken. Alleen actief als
+        // gezet (env `VERCEL_PROTECTION_BYPASS` of UserDefaults
+        // `dev.vercelBypass`); geen effect op productie/Release.
+        if let bypass = ProcessInfo.processInfo.environment["VERCEL_PROTECTION_BYPASS"]
+            ?? UserDefaults.standard.string(forKey: "dev.vercelBypass"), !bypass.isEmpty {
+            req.setValue(bypass, forHTTPHeaderField: "x-vercel-protection-bypass")
+            req.setValue("true", forHTTPHeaderField: "x-vercel-set-bypass-cookie")
+        }
+        #endif
         req.httpBody = body
         req.timeoutInterval = 120  // Magic Cutout calls can take ~15-30s
 

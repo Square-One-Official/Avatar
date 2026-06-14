@@ -201,3 +201,48 @@ CGWindowListCopyWindowInfo): de eerder deterministisch falende combo `--dev-adva
 Bestaande prefs-vervuiling van oude buggy builds eenmalig gewist tijdens de smoke; reguliere
 gebruikers schrijven nooit een inklap-frame, dus geen in-app pref-deletie nodig. Beide targets
 bouwen groen, alle suites groen.
+
+## 1.15 — DEBUG backend-endpoint-override (lokaal tegen Vercel-preview)
+- status: done (implementatie + unit-bewijs gemerged) — **live e2e = wacht-op-Thierry** (zie Result)
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen; DEBUG-override aantoonbaar actief; e2e Clothes/Effects/
+  Hair/Boost op echte portretten tegen de preview + hard kleding-acceptatiecriterium geverifieerd.
+- Context: de nieuwe cloud-routes (E09.2/E11.2/E10.4/E10.3) staan op v2-main maar nog niet op
+  productie (api.aaavatar.nl) — testen moet tegen de Vercel-preview kunnen, terwijl Release
+  hardgecodeerd op productie blijft.
+
+**Plan:**
+1. `BackendClient.baseURL` van hardgecodeerde `let` → in `init` resolved; `#if DEBUG` override via
+   env `AAAVATAR_API_BASE` of UserDefaults `dev.apiBase` (Advanced-settings), anders productie.
+2. DEBUG: Vercel deployment-protection-bypass-header (`x-vercel-protection-bypass` uit env
+   `VERCEL_PROTECTION_BYPASS`/UserDefaults `dev.vercelBypass`) in `send`, zodat de beveiligde
+   preview bereikbaar is. TLS-pinning ongemoeid: alleen api.aaavatar.nl is gepind, *.vercel.app
+   valt al terug op OS-trust (TLSPinningDelegate, geen wijziging nodig).
+3. Advanced-settings (E15.5, dev-only): velden voor API-base + bypass-secret, persistent in
+   dezelfde UserDefaults-keys.
+4. Credit-gating: lokaal testen met een DEV_UNLIMITED_EMAILS-account → de backend bypass't de
+   credit-gate (isDevUser → 999), dus geen client-wijziging nodig.
+
+**Result (implementatie, gemerged):** `BackendClient.baseURL` wordt nu in `init` resolved:
+`#if DEBUG` override via env `AAAVATAR_API_BASE` of UserDefaults `dev.apiBase`, anders productie;
+Release compileert het override-pad niet mee. `send()` zet in DEBUG de
+`x-vercel-protection-bypass`-header (+ set-bypass-cookie) uit env `VERCEL_PROTECTION_BYPASS` /
+UserDefaults `dev.vercelBypass` zodat de beveiligde preview bereikbaar is. TLS-pinning ongemoeid:
+de `TLSPinningDelegate` valt voor niet-gepinde hosts (zoals *.vercel.app) al terug op OS-trust —
+geen wijziging nodig. Advanced-card (E15.5, dev-only) kreeg twee velden ("Backend endpoint (dev)"
++ bypass-secret) op `@AppStorage("dev.apiBase"/"dev.vercelBypass")`. 3 nieuwe AvatarKit-tests
+bewijzen de resolver (default = productie; `dev.apiBase` verlegt de baseURL in DEBUG; lege waarde
+genegeerd). Credit-gating: lokaal testen met een DEV_UNLIMITED_EMAILS-account (backend bypass) —
+geen client-wijziging. Beide targets bouwen groen, alle suites groen.
+
+**WACHT-OP-THIERRY (live e2e):** de echte e2e (Clothes/Effects/Hair/Boost op echte portretten
+tegen de preview + visuele verificatie van het harde kleding-acceptatiecriterium) kon ik
+autonoom niet draaien — die vergt twee zaken die ik niet heb: (1) het Vercel
+deployment-protection-bypass-secret van de preview (in de bakeoff aangemaakt, staat niet in de
+repo), en (2) een ingelogde DEV_UNLIMITED_EMAILS-sessie (OTP-mail of een gescript dev-JWT met
+`SUPABASE_SERVICE_ROLE_KEY`). **Om de e2e te draaien:** start Avatar2 (DEBUG) met
+`AAAVATAR_API_BASE=<preview-url>` en `VERCEL_PROTECTION_BYPASS=<secret>` (of vul ze in de
+Advanced-card in + herstart), log in met een dev-account, doe per feature één edit op een echt
+portret en vergelijk gezicht/haar/pose/achtergrond (hold-to-compare). Zodra de routes op
+productie staan (E13.0-port) vervalt de preview-omweg.

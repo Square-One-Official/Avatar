@@ -25,6 +25,10 @@ struct SettingsAIModelsPage: View {
     @State private var overridesTick = 0
     /// E15.6: gebruikersgerichte generatie-modelkeuze (nano / OpenAI).
     @State private var generationModel = GenerationModelStore.shared.current
+    /// E01.15: DEBUG backend-override (lokaal tegen Vercel-preview). Bindt
+    /// direct op de UserDefaults-keys die BackendClient.resolveBaseURL leest.
+    @AppStorage("dev.apiBase") private var devApiBase: String = ""
+    @AppStorage("dev.vercelBypass") private var devVercelBypass: String = ""
 
     private let overrides = DevModelOverrides.shared
 
@@ -138,6 +142,17 @@ struct SettingsAIModelsPage: View {
                             optionChip(key, selected: current == key) { setOverride(key, feature) }
                         }
                     }
+                }
+                // E01.15: backend-endpoint-override (lokaal tegen Vercel-preview).
+                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                    Text("Backend endpoint (dev)")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                    DSTextField(placeholder: "https://…preview.vercel.app", text: $devApiBase)
+                    DSTextField(placeholder: "Vercel protection bypass secret", text: $devVercelBypass)
+                    Text("Leeg = productie. Herstart de app om een wijziging toe te passen.")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
                 }
             }
             .padding(.top, DSSpacing.gap4)
