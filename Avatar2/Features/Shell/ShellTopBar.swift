@@ -51,11 +51,10 @@ struct ShellTopBar: View {
                     onToggleSettings()
                 }
             }
-            // E05.8: trailing = het venster-marge-token (zelfde rand als
-            // de sidebar-kaart) i.p.v. de losse 16 uit het frame — besluit
-            // Thierry 13 jun. Top houdt het strook-ritme (Frame 27: y12).
+            // E18.6: trailing = gedeelde topbar-inset (gap-3), gelijk aan de
+            // redo-knop rechtsonder — niet meer tegen de vensterrand geplakt.
             .padding(.top, DSSpacing.gap3)
-            .padding(.trailing, ShellMetrics.windowEdgeInset)
+            .padding(.trailing, ShellMetrics.topBarInset)
         }
         .task { await model.refresh() }
     }

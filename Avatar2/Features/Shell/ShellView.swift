@@ -90,11 +90,12 @@ struct ShellView: View {
                             .accessibilityHidden(true)
                     )
             } else {
-                // Header in de flow, los bóven de kaart (bevinding 6) —
-                // Figma Frame 2: y=32, kaart begint op 108.
+                // Header in de flow, los bóven de kaart (bevinding 6).
+                // E18.5: top-uitgelijnd met de topbar-knoppen (gear/share/
+                // upgrade staan op gap-3) i.p.v. lager op gap-8.
                 if showsPortraitHeader {
                     PortraitHeader(model: model)
-                        .padding(.top, DSSpacing.gap8)
+                        .padding(.top, DSSpacing.gap3)
                 }
                 canvas
             }

@@ -20,7 +20,9 @@ struct PortraitHeader: View {
         .frame(maxWidth: 280)
         // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24 = de twee
         // regelhoogtes incl. badge-padding) — Name/Role blijven in élke
-        // staat vrij van de canvas-kaart, niets verspringt.
-        .frame(height: 52)
+        // staat vrij van de canvas-kaart. E18.5: top-alignment zodat het
+        // editveld bij focus alleen naar BENEDEN ruimte pakt — "Name"
+        // verspringt niet meer naar boven.
+        .frame(height: 52, alignment: .top)
     }
 }

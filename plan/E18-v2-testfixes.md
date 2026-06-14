@@ -26,11 +26,12 @@ afvinken. UI-fixes met visuele smoke.
       sidebar-undoManager niet of de @Query ververst de thumb niet na revert — onderzoeken.)
 
 ## Layout / styling
-- [ ] **18.5 Name/Role-header springt** — bij focus op de Name/Role-input verspringt de tekst naar
-      boven i.p.v. op z'n plek blijven.
-- [ ] **18.6 Topbar-padding** — settings-gear (rechts) zit tegen de vensterrand; "x/3 left" +
-      Upgrade (links) zit te ver van de rand. Beide gelijke zij-padding geven, gelijk aan de
-      redo-knop rechtsonder (ShellMetrics.windowEdgeInset).
+- [x] **18.5 Name/Role-header** — DONE+gemerged. Header top-uitgelijnd met de topbar-knoppen
+      (padding gap8→gap3) en `.frame(height:52, alignment:.top)` zodat het editveld bij focus alleen
+      naar beneden uitklapt — "Name" springt niet meer naar boven. Smoke ✓.
+- [x] **18.6 Topbar-padding** — DONE+gemerged. Gedeelde `ShellMetrics.topBarInset` (gap-3, == redo):
+      gear-trailing gap-3 (niet meer tegen de rand), counter zit gap-3 ná de window-controls. Smoke ✓.
+      (Links kan niet hélemaal tegen de rand — macOS traffic lights bezetten ~60pt.)
 
 **Volgorde:** 18.6 + 18.5 (snelle visuele wins) → 18.1 (login) → 18.3 (toast) → 18.2 (pro→upgrade)
 → 18.4 (undo-audit) → 18.7 (backend, beslissing).
