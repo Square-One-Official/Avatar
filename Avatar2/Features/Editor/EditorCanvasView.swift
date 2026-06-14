@@ -19,6 +19,14 @@ import SwiftUI
 struct EditorCanvasView: View {
     let image: NSImage
     let portrait: Portrait2?
+    /// E24.8: VIEW-zoom (efemere viewport-zoom, 1×–maxViewZoom). Leeft in
+    /// EditorView zodat de zoom-HUD búiten de frame-clip (24.16) kan renderen.
+    /// Losgekoppeld van de SUBJECT-schaal (Portrait2.scale, via de handles).
+    @Binding var viewZoom: Double
+    let maxViewZoom: Double
+    /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
+    /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
+    var frameShape: ExportShape = .square
 
     @State private var dragStart: CGSize?
     @State private var isDragging = false
@@ -30,9 +38,13 @@ struct EditorCanvasView: View {
     @State private var isHovering = false
     @State private var scrollMonitor: Any?
 
+    // E24.8: hoek-handle-drag schaalt het onderwerp (Portrait2.scale).
+    @State private var handleStartScale: Double?
+    @State private var handleStartDist: CGFloat = 0
+    @State private var handleBefore: TransformUndo.Snapshot?
+
     // E06.2: before-snapshots zodat een afgerond gebaar één undo-stap is.
     @State private var dragBefore: TransformUndo.Snapshot?
-    @State private var zoomBefore: TransformUndo.Snapshot?
     @Environment(\.undoManager) private var undoManager
 
     /// In-memory transform voor het (theoretische) geval zonder model —
@@ -57,31 +69,45 @@ struct EditorCanvasView: View {
             let side = min(geo.size.width, geo.size.height)
             let transform = resolvedTransform()
             let factor = side / FramingConstants.editCanvas.width
+            let imgW = image.size.width * transform.scale * factor
+            let imgH = image.size.height * transform.scale * factor
+            let imgCenter = CGPoint(
+                x: (transform.offsetX + image.size.width * transform.scale / 2) * factor,
+                y: (transform.offsetY + image.size.height * transform.scale / 2) * factor
+            )
 
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .frame(
-                    width: image.size.width * transform.scale * factor,
-                    height: image.size.height * transform.scale * factor
-                )
-                .position(
-                    x: (transform.offsetX + image.size.width * transform.scale / 2) * factor,
-                    y: (transform.offsetY + image.size.height * transform.scale / 2) * factor
-                )
-                .contentShape(Rectangle())
-                .gesture(dragGesture(canvasSide: side))
-                .simultaneousGesture(magnifyGesture)
-                .onTapGesture(count: 2) { resetToFit() }
-                .overlay {
-                    AlignmentGuideOverlay2(isVisible: isDragging)
-                }
-                .clipped()
-                .onHover { hovering in
-                    isHovering = hovering
-                    hovering ? installScrollMonitor(canvasSide: side) : removeScrollMonitor()
-                }
-                .onDisappear { removeScrollMonitor() }
+            ZStack {
+                // Onderwerp + ooglijn-guide, ónder de VIEW-zoom (scaleEffect om
+                // het canvasmidden) — los van de SUBJECT-schaal. Tot de
+                // frame-vorm geclipt (cirkel = transparante hoeken).
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: imgW, height: imgH)
+                    .position(x: imgCenter.x, y: imgCenter.y)
+                    .overlay { AlignmentGuideOverlay2(isVisible: isDragging) }
+                    .scaleEffect(viewZoom, anchor: .center)
+                    .frame(width: side, height: side)
+                    .clipShape(frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle()))
+
+                // E24.8: selectie-handles op het onderwerp (hoeken, aspect-lock)
+                // — BUITEN de frame-clip zodat ze bij een cirkel zichtbaar zijn.
+                handleLayer(side: side, imgW: imgW, imgH: imgH, center: imgCenter)
+            }
+            .contentShape(Rectangle())
+            .gesture(dragGesture(canvasSide: side))
+            .simultaneousGesture(magnifyGesture)
+            .onTapGesture(count: 2) {
+                resetToFit()
+                withAnimation(.spring(duration: 0.3)) { viewZoom = 1 }
+            }
+            .coordinateSpace(name: Self.canvasSpace)
+            .clipped()
+            .onHover { hovering in
+                isHovering = hovering
+                hovering ? installScrollMonitor(canvasSide: side) : removeScrollMonitor()
+            }
+            .onDisappear { removeScrollMonitor() }
         }
         .aspectRatio(1, contentMode: .fit)
     }
@@ -244,33 +270,27 @@ struct EditorCanvasView: View {
         )
     }
 
-    // MARK: - Zoom (pinch + scroll), 0,5×–3× om het canvasmidden
+    // MARK: - View-zoom (pinch + scroll + HUD), 1×–maxViewZoom om het midden
 
+    // E24.8: pinch/scroll sturen nu de VIEW-zoom (efemeer), niet meer de
+    // subject-schaal. Het onderwerp schalen gaat via de selectie-handles.
     private var magnifyGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
-                if zoomBefore == nil, let portrait {
-                    zoomBefore = TransformUndo.snapshot(of: portrait)
-                }
                 let delta = Double(value) / max(0.0001, lastMagnification)
                 lastMagnification = Double(value)
-                applyZoom(delta: delta, touch: false)
+                applyViewZoom(delta: delta)
             }
-            .onEnded { _ in
-                lastMagnification = 1
-                writeTransform(resolvedTransform(), touch: true)
-                registerUndo(from: zoomBefore, actionName: "Zoom")
-                zoomBefore = nil
-            }
+            .onEnded { _ in lastMagnification = 1 }
     }
 
     private func installScrollMonitor(canvasSide: CGFloat) {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard isHovering else { return event }
-            // Natuurlijke richting: omhoog scrollen = inzoomen.
+            // Natuurlijke richting: omhoog scrollen = inzoomen (view).
             let delta = 1 + (event.scrollingDeltaY * -0.0035)
-            applyZoom(delta: delta, touch: false)
+            applyViewZoom(delta: delta)
             return nil
         }
     }
@@ -282,23 +302,145 @@ struct EditorCanvasView: View {
         scrollMonitor = nil
     }
 
-    /// Zoomt om het canvasmidden; grenzen zijn relatief aan de fill-fit
-    /// (0,5×–3× van de natuurlijke maat, spec E06.4).
-    private func applyZoom(delta: Double, touch: Bool) {
+    /// E24.8: efemere viewport-zoom (1×–maxViewZoom). Geen persist, geen undo.
+    private func applyViewZoom(delta: Double) {
+        viewZoom = min(maxViewZoom, max(1, viewZoom * delta))
+    }
+
+    // MARK: - Selectie-handles (E24.8) — onderwerp schalen via de hoeken
+
+    static let canvasSpace = "editorCanvas"
+
+    /// Vier hoek-handles + selectiekader op het onderwerp; positie volgt de
+    /// view-zoom (geschaald om het canvasmidden). DEFAULT-gedrag: aspect-locked,
+    /// schaalt om het onderwerp-midden, op `Portrait2.scale`. De open keuzes
+    /// (welke handles / aspect-lock / scale-bron / meerdere lagen) staan in
+    /// DECISIONS-PENDING voor Thierry.
+    @ViewBuilder
+    private func handleLayer(side: CGFloat, imgW: CGFloat, imgH: CGFloat, center: CGPoint) -> some View {
+        if portrait != nil {
+            let canvasCenter = CGPoint(x: side / 2, y: side / 2)
+            let centerS = CGPoint(
+                x: canvasCenter.x + (center.x - canvasCenter.x) * viewZoom,
+                y: canvasCenter.y + (center.y - canvasCenter.y) * viewZoom
+            )
+            let halfW = imgW / 2 * viewZoom
+            let halfH = imgH / 2 * viewZoom
+            let corners = [
+                CGPoint(x: centerS.x - halfW, y: centerS.y - halfH),
+                CGPoint(x: centerS.x + halfW, y: centerS.y - halfH),
+                CGPoint(x: centerS.x - halfW, y: centerS.y + halfH),
+                CGPoint(x: centerS.x + halfW, y: centerS.y + halfH),
+            ]
+            ZStack {
+                Rectangle()
+                    .strokeBorder(DSColor.Action.primary.opacity(0.7), lineWidth: 1)
+                    .frame(width: halfW * 2, height: halfH * 2)
+                    .position(centerS)
+                    .allowsHitTesting(false)
+                ForEach(0..<corners.count, id: \.self) { i in
+                    handleDot(at: corners[i], imageCenterOnScreen: centerS)
+                }
+            }
+            // Alléén tonen in rust (niet tijdens pannen) zodat ze niet storen.
+            .opacity(isDragging ? 0 : 1)
+            .animation(.easeOut(duration: 0.12), value: isDragging)
+        }
+    }
+
+    private func handleDot(at pos: CGPoint, imageCenterOnScreen: CGPoint) -> some View {
+        Circle()
+            .fill(.white)
+            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 2))
+            .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
+            .frame(width: 14, height: 14)
+            .position(pos)
+            .gesture(
+                DragGesture(coordinateSpace: .named(Self.canvasSpace))
+                    .onChanged { value in
+                        if handleStartScale == nil {
+                            handleStartScale = resolvedTransform().scale
+                            handleStartDist = max(1, distance(value.startLocation, imageCenterOnScreen))
+                            if let portrait { handleBefore = TransformUndo.snapshot(of: portrait) }
+                        }
+                        guard let startScale = handleStartScale else { return }
+                        // viewZoom valt uit de verhouding (beide afstanden zijn
+                        // even hard meegeschaald rond het onderwerp-midden).
+                        let ratio = distance(value.location, imageCenterOnScreen) / handleStartDist
+                        applySubjectScale(to: startScale * ratio)
+                    }
+                    .onEnded { _ in
+                        if portrait != nil {
+                            writeTransform(resolvedTransform(), touch: true)
+                            registerUndo(from: handleBefore, actionName: "Scale")
+                        }
+                        handleStartScale = nil
+                        handleBefore = nil
+                    }
+            )
+    }
+
+    /// Schaalt het onderwerp om zijn eigen midden (blijft staan), geclampt aan
+    /// de fill-fit-grenzen (zelfde band als de oude pinch-zoom).
+    private func applySubjectScale(to newScale: Double) {
         var t = resolvedTransform()
         let baseline = fitTransform().scale
         let clamped = min(
             baseline * FramingConstants.maxZoomFactor,
-            max(baseline * FramingConstants.minZoomFactor, t.scale * delta)
+            max(baseline * FramingConstants.minZoomFactor, newScale)
         )
-        let effective = clamped / t.scale
-        guard effective != 1 else { return }
-
-        let center = FramingConstants.editCanvas.width / 2
-        t.offsetX = center - (center - t.offsetX) * effective
-        t.offsetY = center - (center - t.offsetY) * effective
+        guard clamped != t.scale else { return }
+        let cxU = t.offsetX + image.size.width * t.scale / 2
+        let cyU = t.offsetY + image.size.height * t.scale / 2
+        t.offsetX = cxU - image.size.width * clamped / 2
+        t.offsetY = cyU - image.size.height * clamped / 2
         t.scale = clamped
-        writeTransform(t, touch: touch)
+        writeTransform(t, touch: false)
+    }
+
+    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+        hypot(a.x - b.x, a.y - b.y)
+    }
+}
+
+// MARK: - Zoom-HUD (E24.8)
+
+/// −/slider/+/fit voor de VIEW-zoom. Leeft in EditorView (buiten de frame-clip).
+/// SF Symbols (geen Phosphor in AvatarUI/EditorCanvasView).
+struct ZoomHUD: View {
+    @Binding var zoom: Double
+    let maxZoom: Double
+
+    var body: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            button("minus") { set(zoom - 0.25) }
+            Slider(value: $zoom, in: 1...maxZoom)
+                .controlSize(.mini)
+                .frame(width: 96)
+                .tint(DSColor.Action.primary)
+            button("plus") { set(zoom + 0.25) }
+            Divider().frame(height: 14)
+            button("arrow.up.left.and.arrow.down.right.magnifyingglass") {
+                withAnimation(.spring(duration: 0.3)) { zoom = 1 }
+            }
+        }
+        .padding(.horizontal, DSSpacing.gap3)
+        .padding(.vertical, DSSpacing.gap1)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+    }
+
+    private func set(_ z: Double) { zoom = min(maxZoom, max(1, z)) }
+
+    private func button(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

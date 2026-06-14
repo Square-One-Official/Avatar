@@ -95,6 +95,11 @@ struct EditorView: View {
     /// E24.12: open canvas-toolbar-dropdown (caret-loze DS-kaart). Hier zodat
     /// een klik op de canvas 'm sluit — net als de bottom-panelen.
     @State private var canvasMenu: CanvasToolbarMenu?
+    /// E24.8: efemere VIEW-zoom (1×–maxViewZoom). Hier zodat de zoom-HUD búiten
+    /// de frame-clip (24.16) rendert; de canvas zelf gebruikt 'm voor scaleEffect
+    /// + pinch/scroll.
+    @State private var canvasViewZoom: Double = 1
+    private let canvasMaxViewZoom: Double = 4
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
@@ -292,7 +297,10 @@ struct EditorView: View {
                 ZStack {
                     // E07.1: gekozen achtergrond achter de cutout (preview;
                     // exportkwaliteit-compositing volgt in E07.2).
+                    // E24.16: clip de achtergrond tot de frame-vorm (cirkel =
+                    // transparante hoeken die het dot-grid eronder tonen).
                     backgroundLayer
+                        .clipShape(frameClipShape)
                     // E06.2: hold-to-compare toont de originele importfoto
                     // (aspect-fit, geen transform) bovenop het cutout-canvas.
                     if isComparing, let original = originalImage {
@@ -302,13 +310,17 @@ struct EditorView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
-                        EditorCanvasView(image: portrait, portrait: portraitModel)
+                        // E24.8: view-zoom (binding) + subject-schaal via handles.
+                        // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
+                        // de frame-vorm, zodat de selectie-handles eromheen niet
+                        // mee-geclipt worden.
+                        EditorCanvasView(
+                            image: portrait, portrait: portraitModel,
+                            viewZoom: $canvasViewZoom, maxViewZoom: canvasMaxViewZoom,
+                            frameShape: portraitModel?.frameShape ?? .circle
+                        )
                     }
                 }
-                // E24.16: clip de achtergrond + cutout tot de frame-vorm. Cirkel
-                // = transparante hoeken (tonen het kaart-/dot-grid eronder) en
-                // matcht de export-mask; vierkant = de normale kaart-vorm.
-                .clipShape(frameClipShape)
             }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
@@ -349,6 +361,18 @@ struct EditorView: View {
                 )
                 .padding(.top, DSSpacing.gap4)
             }
+            // E24.8: zoom-HUD onderaan, búiten de frame-clip (toont altijd; fit
+            // = terug naar 1×). Verdwijnt zodra een paneel/sidebar de onderkant
+            // overlapt zodat hij niet botst.
+            .overlay(alignment: .bottom) {
+                if activeTool == nil && !isSidebarVisible {
+                    ZoomHUD(zoom: $canvasViewZoom, maxZoom: canvasMaxViewZoom)
+                        .padding(.bottom, DSSpacing.gap4)
+                        .transition(.opacity)
+                }
+            }
+            // E24.8: een vers portret opent op 1× view-zoom.
+            .onChange(of: portraitModel?.persistentModelID) { _, _ in canvasViewZoom = 1 }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
@@ -422,6 +446,12 @@ struct EditorView: View {
             if ProcessInfo.processInfo.arguments.contains("--retouch-on") {
                 localToggleBaselines["One click retouch"] = portrait
                 localToggleBaselines["Improve lighting"] = portrait
+            }
+            // E24.8: smoke-haak — forceer een view-zoom-niveau.
+            if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "--seed-viewzoom"),
+               ProcessInfo.processInfo.arguments.indices.contains(i + 1),
+               let z = Double(ProcessInfo.processInfo.arguments[i + 1]) {
+                canvasViewZoom = min(canvasMaxViewZoom, max(1, z))
             }
         }
         #endif

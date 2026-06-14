@@ -212,8 +212,27 @@ dismiss = logisch geverifieerd (canvas-tap nuleert `canvasMenu`, gedeeld met de 
 exacte fade-lengte + rand-opaciteit tegen de referenties leggen.
 
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
-- status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
-  handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),
-  plus de referentie-interacties. Beter dedicated te bouwen + visueel te itereren dan binnen deze
-  marathon af te raffelen. **Voorstel/keuze in DECISIONS-PENDING.** Huidige canvas houdt pan/zoom
-  (E06.4) — geen regressie; alleen de handle-based scaling rest.
+- status: done (default; open keuzes blijven bij Thierry — DECISIONS-PENDING)
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** view-zoom losgekoppeld van subject-schaal. **VIEW-zoom** (efemeer, niet persistent,
+1×–4×) zit nu op pinch/scroll/dubbelklik én op een nieuwe **zoom-HUD** (−/slider/+/fit) onderaan het
+canvas — `viewZoom` leeft in `EditorView` (binding) zodat de HUD búiten de frame-clip (24.16) rendert;
+`EditorCanvasView` past 'm toe via `scaleEffect(anchor:.center)`. **SUBJECT-schaal** gaat nu via
+**selectie-handles**: 4 hoek-dots + selectiekader op het onderwerp; drag = aspect-locked schalen om
+het onderwerp-midden, op `Portrait2.scale`, geclampt aan de fill-fit-band (E06.4), undo'baar ("Scale").
+De handles renderen BUITEN de frame-clip (het beeld clipt EditorCanvasView intern) zodat ze ook bij
+een cirkel-frame zichtbaar/bruikbaar zijn. Pan/snap/haptics (E06.4 drag) ongewijzigd → geen regressie.
+
+**Default-keuzes gemaakt (open voor Thierry, zie DECISIONS-PENDING):** (a) 4 HOEK-handles (geen
+zijkanten), (b) aspect-lock AAN, (c) schaal op de bestaande `Portrait2.scale` (geen aparte
+selectie-transform), (d) één laag/onderwerp.
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (build-v2.sh). Screenshots: default =
+selectiekader + hoek-handles op het onderwerp + zoom-HUD onderaan (/tmp/zoom_default_248.png);
+`--seed-viewzoom 2.2` = onderwerp ingezoomd-gecropt in de cirkel, HUD-slider op ~2.2×
+(/tmp/zoom_2x_248.png). Handle-drag = logisch geverifieerd (gesture gewired; niet synthetisch te
+slepen). Smoke-haak (#if DEBUG): `--seed-viewzoom <n>`.
+
+**Figma-TODO:** handle-stijl (dot-grootte/kleur), HUD-stijl + fit-icoon, en of de view-zoom ook moet
+kunnen pannen wanneer ingezoomd — tegen de referenties leggen zodra die er zijn.
