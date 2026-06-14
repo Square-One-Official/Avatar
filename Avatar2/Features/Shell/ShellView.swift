@@ -208,6 +208,7 @@ struct ShellView: View {
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
                 onApplyResult: { model.applyEffectResult($0) },
+                onPreview: { model.previewCanvas($0) },
                 isSidebarVisible: $model.isSidebarVisible
             )
         case .failed(let message):

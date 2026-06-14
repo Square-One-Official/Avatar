@@ -39,4 +39,21 @@ geslankt Edit-paneel).
 angle = nog te bouwen (eigen stories).
 
 ## 22.3 — Edit-paneel = live color-sliders + AI-dropdown
-- status: todo
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- DoD: beide targets bouwen + tests groen + smoke
+
+**Plan:** Edit-paneel wordt handmatige live color-correctie (4 sliders + Reset); de AI-acties
+(Colorise/Boost + Improve lighting) onder een Auto-enhance-dropdown. Edit-icoon = kleur-glyph.
+
+**Result:** `PortraitEnhancer.colorAdjust` (CIColorControls + temperatureAndTint). `ShellModel.
+previewCanvas` (goedkope canvas-only preview, geen PNG-encode per tick). Nieuw `EditColorPanel`:
+Brightness/Contrast/Saturation/Temperature-sliders → live preview via onPreview; op slider-loslaten
+één undo-bare commit (before→after via onApplyResult + ImageEnhanceUndo). Reset → neutraal (undo-
+baar). "Auto enhance"-Menu = Improve lighting / Colorise / Boost resolution (Pro-labels voor niet-
+Pro). `.edit`-branch in EditorView vervangt EditActionsPanel door EditColorPanel; EditActionsPanel
+verwijderd (dood). Edit-tool-icoon → kleur-glyph (paintpalette). Smoke ✓ (4 sliders + Reset +
+Auto-enhance-dropdown).
+
+**Figma-TODO:** geen DS-slider-component → SwiftUI Slider met DS-tint (vervangen zodra in library);
+Auto-enhance-dropdown-styling tegen Figma bevestigen; live-drag niet synthetisch ge-smoket.

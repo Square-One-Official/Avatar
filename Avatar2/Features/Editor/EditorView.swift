@@ -47,7 +47,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     /// SF-benadering van de toolbar-glyphs (tot 21.2 de toolbar op DSIcon zet).
     var icon: Image {
         switch self {
-        case .edit: Image(systemName: "wand.and.stars")
+        case .edit: Image(systemName: "paintpalette")  // E22.3: kleur-glyph
         case .effects: Image(systemName: "sparkles")
         case .face: Image(systemName: "face.smiling")
         case .clothing: Image(systemName: "tshirt.fill")
@@ -83,6 +83,8 @@ struct EditorView: View {
     /// E09.2: een bewerkt portret-beeld terug naar de ShellModel (canvas +
     /// opgeslagen cutout vervangen).
     var onApplyResult: (NSImage) -> Void = { _ in }
+    /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
+    var onPreview: (NSImage) -> Void = { _ in }
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -281,13 +283,23 @@ struct EditorView: View {
                 // E06.3: volledige actielijst (zakelijk boven beauty); de
                 // auto-frame-actie (E06.5) is "Auto-crop & center".
                 DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
-                    EditActionsPanel(
+                    // E22.3: live color-sliders + Auto-enhance-dropdown.
+                    EditColorPanel(
+                        source: portrait,
+                        onPreview: onPreview,
+                        onCommit: { before, after in
+                            onApplyResult(after)
+                            if let portraitModel {
+                                ImageEnhanceUndo.register(
+                                    undoManager, target: portraitModel, apply: onApplyResult,
+                                    undoTo: before, redoTo: after, actionName: "Color adjust"
+                                )
+                            }
+                        },
                         onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-                        onBoostResolution: runBoostResolution,
-                        isBoosting: isBoosting,
-                        onProFeature: { _ = entitlement?.allowCloudFeature() },
-                        isPro: entitlement?.isProActive ?? false,
-                        activeToggles: Set(localToggleBaselines.keys)
+                        onColorise: { _ = entitlement?.allowCloudFeature() },
+                        onBoost: runBoostResolution,
+                        isPro: entitlement?.isProActive ?? false
                     )
                 }
             } else if tool == .face {

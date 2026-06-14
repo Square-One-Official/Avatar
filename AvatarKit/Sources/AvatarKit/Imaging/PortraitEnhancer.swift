@@ -75,6 +75,37 @@ public enum PortraitEnhancer {
         return render(current, like: image)
     }
 
+    /// E22.3: handmatige live color-correctie (Edit-paneel). Brightness/
+    /// contrast/saturation via CIColorControls, temperature via
+    /// temperatureAndTint. Neutrale defaults: brightness 0, contrast 1,
+    /// saturation 1, temperatureShift 0 (−1…1 ≈ ±1500K). nil bij renderfout.
+    public static func colorAdjust(
+        _ image: CGImage,
+        brightness: Double,
+        contrast: Double,
+        saturation: Double,
+        temperatureShift: Double
+    ) -> CGImage? {
+        var current = CIImage(cgImage: image)
+
+        let controls = CIFilter.colorControls()
+        controls.inputImage = current
+        controls.brightness = Float(brightness)
+        controls.contrast = Float(contrast)
+        controls.saturation = Float(saturation)
+        if let out = controls.outputImage { current = out }
+
+        if temperatureShift != 0 {
+            let temp = CIFilter.temperatureAndTint()
+            temp.inputImage = current
+            temp.neutral = CIVector(x: 6500, y: 0)
+            temp.targetNeutral = CIVector(x: 6500 + temperatureShift * 1500, y: 0)
+            if let out = temp.outputImage { current = out }
+        }
+
+        return render(current, like: image)
+    }
+
     /// Rendert terug naar CGImage op de oorspronkelijke extent/kleurruimte
     /// (auto-adjust kan de extent oneindig maken → croppen).
     private static func render(_ ci: CIImage, like image: CGImage) -> CGImage? {

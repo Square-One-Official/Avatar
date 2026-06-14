@@ -185,6 +185,13 @@ final class ShellModel {
         }
     }
 
+    /// E22.3: goedkope live-preview voor de color-sliders — alléén het canvas,
+    /// niet cutoutData (geen PNG-encode per tick). De commit gaat via
+    /// `applyEffectResult` (+ undo).
+    func previewCanvas(_ image: NSImage) {
+        canvas = .result(image)
+    }
+
     /// E18.4: her-afleidt het canvas uit de cutoutData van het geselecteerde
     /// portret. Set-brede edits (Match lighting, Align Set) wijzigen alleen
     /// cutoutData via CutoutDataUndo — niet het canvas. Wordt aangeroepen na
