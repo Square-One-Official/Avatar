@@ -13,10 +13,15 @@ import AvatarUI
 import SwiftUI
 
 struct EditColorPanel: View {
-    /// Cutout bij het openen van de sessie (wordt eenmalig de basis).
+    /// E24.14: de RAUWE cutout (zonder Adjust-laag). De sliders renderen er live
+    /// bovenop; de commit persisteert alléén de params (niet-destructief).
     let source: NSImage
+    /// E24.14: de persisted Adjust-stand bij het openen — heropenen toont 'm.
+    var initial: PortraitAdjust = .neutral
     var onPreview: (NSImage) -> Void = { _ in }
-    var onCommit: (_ before: NSImage, _ after: NSImage) -> Void = { _, _ in }
+    /// E24.14: commit levert de param-stand (before→after) i.p.v. beelden, zodat
+    /// de caller ze niet-destructief op het portret kan persisteren + undo'en.
+    var onCommit: (_ before: PortraitAdjust, _ after: PortraitAdjust) -> Void = { _, _ in }
     var onImproveLighting: () -> Void = {}
     var onColorise: () -> Void = {}
     var onBoost: () -> Void = {}
@@ -25,25 +30,29 @@ struct EditColorPanel: View {
     /// dus dan tonen we alléén de sliders + Reset.
     var showAutoEnhance: Bool = true
 
-    @State private var base: NSImage?
+    @State private var seeded = false
     @State private var brightness = 0.0
     @State private var contrast = 1.0
     @State private var saturation = 1.0
     @State private var temperature = 0.0
-    @State private var dragStart: NSImage?
+    /// Param-stand bij het begin van een sleep (voor de undo-bare commit).
+    @State private var dragStart: PortraitAdjust?
 
-    private var hasAdjustments: Bool {
-        brightness != 0 || contrast != 1 || saturation != 1 || temperature != 0
+    private var current: PortraitAdjust {
+        PortraitAdjust(brightness: brightness, contrast: contrast,
+                       saturation: saturation, temperature: temperature)
     }
 
+    private var hasAdjustments: Bool { !current.isNeutral }
+
     private func adjusted() -> NSImage {
-        let ref = base ?? source
-        guard let cg = ref.cgImage(forProposedRect: nil, context: nil, hints: nil),
+        guard !current.isNeutral,
+              let cg = source.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let out = PortraitEnhancer.colorAdjust(
                 cg, brightness: brightness, contrast: contrast,
                 saturation: saturation, temperatureShift: temperature
-              ) else { return ref }
-        return NSImage(cgImage: out, size: ref.size)
+              ) else { return source }
+        return NSImage(cgImage: out, size: source.size)
     }
 
     var body: some View {
@@ -61,7 +70,15 @@ struct EditColorPanel: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onAppear { if base == nil { base = source } }
+        .onAppear {
+            // Seed de sliders eenmalig op de persisted stand (heropenen toont 'm).
+            guard !seeded else { return }
+            brightness = initial.brightness
+            contrast = initial.contrast
+            saturation = initial.saturation
+            temperature = initial.temperature
+            seeded = true
+        }
     }
 
     private var autoEnhanceMenu: some View {
@@ -95,9 +112,9 @@ struct EditColorPanel: View {
                 in: range,
                 onEditingChanged: { editing in
                     if editing {
-                        dragStart = adjusted()
+                        dragStart = current
                     } else if let before = dragStart {
-                        onCommit(before, adjusted())
+                        onCommit(before, current)
                         dragStart = nil
                     }
                 }
@@ -109,10 +126,9 @@ struct EditColorPanel: View {
     }
 
     private func reset() {
-        let before = adjusted()
+        let before = current
         brightness = 0; contrast = 1; saturation = 1; temperature = 0
-        let after = base ?? source
-        onPreview(after)
-        onCommit(before, after)
+        onPreview(source)
+        onCommit(before, .neutral)
     }
 }

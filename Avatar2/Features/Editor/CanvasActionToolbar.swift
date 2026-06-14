@@ -62,6 +62,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             if args.contains("--show-bg-popover") { showBackground = true }
             if args.contains("--show-ai-popover") { showAI = true }
             if args.contains("--show-frame-popover") { showFrame = true }
+            if args.contains("--show-adjust-popover") { showAdjust = true }
         }
         #endif
     }

@@ -90,6 +90,10 @@ struct ShellView: View {
             if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
             // E05.7: `--seed-set` dupliceert het portret en opent de sidebar.
             if args.contains("--seed-set") { model.debugSeedSecondPortraitAndOpenSidebar() }
+            // E24.14: `--seed-adjust` zet een zichtbare Adjust-laag (canvas +
+            // export tonen 'm; cutoutData blijft rauw).
+            if args.contains("--seed-adjust") { model.debugSeedAdjust() }
+            if args.contains("--reset-adjust") { model.debugResetAdjust() }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
@@ -232,6 +236,7 @@ struct ShellView: View {
                 entitlement: entitlement,
                 onApplyResult: { model.applyEffectResult($0) },
                 onPreview: { model.previewCanvas($0) },
+                onCommitAdjust: { model.commitAdjust($0) },
                 isSidebarVisible: $model.isSidebarVisible
             )
         case .failed(let message):

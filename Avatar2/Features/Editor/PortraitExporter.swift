@@ -30,8 +30,20 @@ enum PortraitExporter {
         side: Int = exportSide,
         shape: ExportShape = .square
     ) -> Data? {
-        guard let cutout = NSImage(data: portrait.cutoutData)?
+        guard var cutout = NSImage(data: portrait.cutoutData)?
             .cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+
+        // E24.14: pas de niet-destructieve Adjust-laag toe vóór compositing,
+        // zodat de export exact het canvas volgt (WYSIWYG). cutoutData zelf
+        // blijft rauw; de params leven op het portret.
+        let adjust = portrait.adjust
+        if !adjust.isNeutral,
+           let adjusted = PortraitEnhancer.colorAdjust(
+            cutout, brightness: adjust.brightness, contrast: adjust.contrast,
+            saturation: adjust.saturation, temperatureShift: adjust.temperature
+           ) {
+            cutout = adjusted
+        }
 
         let placement = BackgroundCompositor.Placement(
             offsetX: portrait.offsetX,
