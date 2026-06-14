@@ -173,6 +173,30 @@ export async function colorize(input: {
 }
 
 /**
+ * Upscale (E10.3, "Boost resolution") — Real-ESRGAN op een geflattende RGB.
+ * Werkt op de op-grijs-geflattende cutout (Real-ESRGAN negeert alpha); de
+ * endpoint hangt het oorspronkelijke alfa er ná weer aan (op de nieuwe maat).
+ * `scale` = 2 (genoeg "boost" zonder de outputmaat te laten ontploffen).
+ */
+export async function upscale(input: {
+  imageDataUrl: string;
+  model?: string | null;
+}): Promise<string> {
+  const output = (await runWithTimeout(
+    "upscale",
+    replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
+      input: {
+        image: input.imageDataUrl,
+        scale: 2,
+        face_enhance: false,
+      },
+    }),
+  )) as unknown;
+
+  return extractUrl(output, "upscale");
+}
+
+/**
  * Stylize — instruction-edit on a flattened RGB portrait (stijlen én
  * retouch-edits). In tegenstelling tot outpaintPortrait is er geen mask:
  * het model herschrijft het hele beeld op basis van de prompt, dus

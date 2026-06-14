@@ -8,6 +8,7 @@
 // E10 Clothes, E11 Hair, E05.4 Images/sidebar) en tonen tot die landen een
 // lege paneel-chrome. Undo/redo naast de toolbar komen met E06.2.
 
+import AppKit
 import AvatarKit
 import AvatarUI
 import SwiftUI
@@ -71,6 +72,8 @@ struct EditorView: View {
     @State private var activeTool: EditorTool?
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
+    /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
+    @State private var isBoosting = false
     @Environment(\.undoManager) private var undoManager
     /// UndoManager is niet observable; deze tick (gebumpt op undo-
     /// notificaties) forceert her-evaluatie van de enabled-state.
@@ -220,7 +223,9 @@ struct EditorView: View {
                     EditActionsPanel(
                         onAutomaticFraming: runAutomaticFraming,
                         onRetouch: { applyLocalEnhance("One-click retouch") { PortraitEnhancer.magicRetouch($0) } },
-                        onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } }
+                        onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+                        onBoostResolution: runBoostResolution,
+                        isBoosting: isBoosting
                     )
                 }
             } else if tool == .background {
@@ -281,5 +286,37 @@ struct EditorView: View {
             undoManager, target: portraitModel, apply: onApplyResult,
             undoTo: before, redoTo: after, actionName: name
         )
+    }
+
+    /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
+    /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
+    private func runBoostResolution() {
+        guard !isBoosting, let entitlement, let portraitModel,
+              let png = Self.pngData(from: portrait) else { return }
+        let before = portrait
+        Task {
+            isBoosting = true
+            defer { isBoosting = false }
+            do {
+                let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
+                guard let after = NSImage(data: data) else { return }
+                onApplyResult(after)
+                ImageEnhanceUndo.register(
+                    undoManager, target: portraitModel, apply: onApplyResult,
+                    undoTo: before, redoTo: after, actionName: "Boost resolution"
+                )
+                await entitlement.refresh()
+            } catch BackendError.noCredits {
+                entitlement.handleOutOfCredits()
+            } catch {
+                // Stil falen; een toast hangt aan de shell, niet aan dit paneel.
+            }
+        }
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
     }
 }

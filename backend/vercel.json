@@ -17,6 +17,10 @@
       "maxDuration": 90,
       "memory": 1024
     },
+    "api/v1/upscale.ts": {
+      "maxDuration": 90,
+      "memory": 1024
+    },
     "api/stripe-webhook.ts": {
       "maxDuration": 30
     },

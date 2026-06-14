@@ -2,20 +2,19 @@
 
 ## Open
 
-### Upscale-model voor "Boost resolution" (E10.3, AI-spike) — AANBEVELING, wacht op AI/Thierry
-- **Status:** E10.3 is AI-territory (model-spike) en als enige keten-item open gelaten tijdens de
-  FEAT-marathon — de FEAT-keten (E09.2/E11.x/E12.x/E10.4/E15.x) is verder af.
-- **Wat al vastligt:** tarief = 1 credit (CreditMeter.upscale, live); de "Boost resolution"-actie
-  staat als gegate stub in EditActionsPanel (handler nil) klaar om gewired te worden.
-- **Aanbeveling (te bevestigen door AI-spike):** `nightmareai/real-esrgan` (Real-ESRGAN, 4×) als
-  default — robuust, goedkoop (~$0,002–0,005/call, ruim binnen 1 credit), face-enhance-optie. Als
-  hogere kwaliteit gewenst is: `philz1337x/clarity-upscaler` (duurder/trager, ~$0,01+). Bevestig
-  kosten/call op Replicate, registreer in MODEL_REGISTRY (nieuwe feature `upscale`), bouw
-  `/v1/upscale` (credit-gate zoals colorize) + `BackendClient.upscale` + wire de actie.
-- **Waarom niet door FEAT gedaan:** modelkeuze + kostenbevestiging is een AI/infra-spike, geen
-  FEAT-UI-werk; niet gokken conform de marathon-regels.
+_(geen)_
 
 ## Beslist
+
+### Upscale-model voor "Boost resolution" (E10.3) — BESLIST 2026-06-14
+- **Besluit:** **Real-ESRGAN** (`nightmareai/real-esrgan`, gepind op versie) als default-upscaler,
+  scale 2. Robuust en goedkoop (~$0,002–0,005/call, ruim binnen het 1-credit-tarief). Clarity
+  blijft een latere kwaliteits-optie indien gewenst.
+- **Verwerkt (E10.3):** `upscale` als CloudFeature in MODEL_REGISTRY (credits 1); `/v1/upscale`
+  (credit-gate zoals colorize, flatten→real-esrgan→reapplyAlpha herschaalt alfa naar 2×);
+  `BackendClient.upscale`; "Boost resolution"-actie in EditActionsPanel gewired (→ canvas+cutout,
+  undo, 402→paywall). Backend = port-only → preview-test; kostenbevestiging op de Replicate-
+  modelpagina vóór productie. Bij 404 op de gepinde versie: herpinnen.
 
 ### Boost resolution — credit-tarief (E14.3) — BESLIST 2026-06-13
 - **Besluit (Thierry):** **1 credit** (upscale = lichte cloud-call). Verwerkt: `CreditMeter.upscale` (1 credit) toegevoegd; de "Boost resolution"-actie toont nu de credit-chip i.p.v. de generieke Pro-chip.

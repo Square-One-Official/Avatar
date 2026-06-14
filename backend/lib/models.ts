@@ -20,7 +20,7 @@
  * adapter in lib/replicate.ts first and only then register it.
  */
 
-export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize";
+export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale";
 
 export interface ModelEntry {
   /** Replicate ref: unversioned `owner/slug` or pinned `owner/slug:version`. */
@@ -117,6 +117,21 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     // E14.3: generatief standaardtarief (4); premium-features (7) krijgen
     // bij dat besluit hun eigen registratie.
     credits: 4,
+    requiresCloud: true,
+  },
+  // E10.3: Boost resolution. Real-ESRGAN — robuuste, goedkope 2–4× upscaler
+  // (~$0,002–0,005/call, ruim binnen 1 credit). Community-model → gepind op
+  // versie (unversioned slug 404t, zelfde patroon als birefnet). Bij een
+  // 404 op de preview de hash herpinnen via replicate.com/nightmareai/real-esrgan.
+  upscale: {
+    defaultModel: "real-esrgan",
+    models: {
+      "real-esrgan": {
+        ref: "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
+        label: "Real-ESRGAN",
+      },
+    },
+    credits: 1,
     requiresCloud: true,
   },
 };

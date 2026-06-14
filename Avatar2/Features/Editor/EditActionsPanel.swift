@@ -21,6 +21,9 @@ struct EditActionsPanel: View {
     /// E12.1: lokale Core Image-retouch + belichting (geen cloud/credits).
     var onRetouch: () -> Void = {}
     var onImproveLighting: () -> Void = {}
+    /// E10.3: cloud-upscale ("Boost resolution", 1 credit) + busy-vlag.
+    var onBoostResolution: () -> Void = {}
+    var isBoosting: Bool = false
 
     private struct Action: Identifiable {
         let id = UUID()
@@ -48,8 +51,8 @@ struct EditActionsPanel: View {
             Section(title: "Optimise", actions: [
                 Action(title: "Colorise", meter: .colorize, isCloud: true, handler: nil),
                 // Boost resolution: 1 credit (besluit Thierry 2026-06-13;
-                // upscale = lichte cloud-call). Modelkeuze open → AI-spike E10.3.
-                Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: nil),
+                // upscale = lichte cloud-call). E10.3: Real-ESRGAN, gewired.
+                Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: onBoostResolution),
             ]),
             // Beauty onderaan. One-click retouch + Improve lighting zijn
             // sinds E12.1 lokale Core Image-acties (geen credits/chip);
@@ -73,6 +76,14 @@ struct EditActionsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+            if isBoosting {
+                HStack(spacing: DSSpacing.gap2) {
+                    ProgressView().controlSize(.small)
+                    Text("Boosting resolution…")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                }
+            }
             ForEach(sections) { section in
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                     Text(section.title)
@@ -87,6 +98,7 @@ struct EditActionsPanel: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .disabled(isBoosting)
     }
 
     private func row(_ action: Action) -> some View {

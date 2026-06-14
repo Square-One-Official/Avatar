@@ -308,6 +308,35 @@ public final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/upscale (Boost resolution, E10.3)
+    /// Verhoogt de resolutie van het cutout via Real-ESRGAN (2×). De backend
+    /// flattent op grijs, upscalet de RGB en hangt het alfa herschaald weer
+    /// aan, dus het resultaat blijft een transparante cutout. 1 credit; 402 →
+    /// `BackendError.noCredits` (paywall).
+    private struct UpscaleResponse: Decodable {
+        let cutout: String
+        let creditsRemaining: Int
+    }
+    public func upscale(imagePNG: Data) async throws -> (Data, Int) {
+        struct Body: Encodable {
+            let image: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case image
+                case modelOverride = "model_override"
+            }
+        }
+        // Geen dev-override-UI voor upscale → altijd het registry-default-model.
+        let body = try JSONEncoder().encode(
+            Body(image: imagePNG.base64EncodedString(), modelOverride: nil)
+        )
+        let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.cutout) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/stylize (hair-intent, E11.2)
     /// Kapselwissel via hetzelfde productie-`/v1/stylize` (nano-banana
     /// instruction-edit, E11.1-route). Eén van `preset`/`freeText` wordt

@@ -30,13 +30,35 @@ Person-seg minus gezicht/haar (macOS 26-pad); tap-to-segment volgt bij macOS 27.
 **Result:** ClothesPanel (Features/Editor, frame 4016:13760): "Change upper clothes" + outfit-preset-chips (T-Shirt/Polo/Blazer/Hoody/Sweater) + vrije prompt ("Describe a color or style") met lime send-knop (disabled bij lege input); gemount op de Clothing-tool. **Generatie-route geparkeerd** (DECISIONS-PENDING): E10.1's kledingmasker (masked FLUX Fill) vs E09.1's nano-banana instruction-edit — aanbeveling nano-banana via productie-/v1/stylize (E09.2); generate-actie is nu een stub (onApply), paneel vervangbaar opgezet. Smoke-run (ontgrendeld): 1-op-1 het frame. Beide targets bouwen groen, suite groen.
 
 ## 10.3 — [AI] Upscale/Boost-resolution-model (spike)
-- status: backlog
-- owner: AI
+- status: done
+- owner: FEAT (AI-agent, marathon — op directe Thierry-opdracht buiten FEAT-grens)
 - blockedBy: —
-- DoD: model gekozen + kosten bevestigd
+- DoD: model gekozen + kosten bevestigd; beide targets bouwen, tests groen, gemerged
 - Context: besluit Thierry 2026-06-13 — "Boost resolution" = 1 credit (CreditMeter.upscale, al live). Alleen de MODELKEUZE is open: kies een Replicate-upscale-model (bv. Real-ESRGAN/Clarity), bevestig kosten/call (verwacht ~$0,002–0,01, past binnen 1 credit), en wire de actie. Geen blocker voor andere stories.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. Backend (port-only, preview-test): `upscale` als nieuwe CloudFeature in MODEL_REGISTRY
+   (`nightmareai/real-esrgan`, scale 2, credits 1); `replicate.upscale()`; `/v1/upscale`-endpoint
+   met credit-gate zoals colorize (flatten op grijs → real-esrgan → `reapplyAlpha` herschaalt het
+   alfa naar 2× zodat het een cutout blijft).
+2. AvatarKit: `BackendClient.upscale(imagePNG:) -> (Data, Int)`.
+3. FEAT: "Boost resolution"-actie in EditActionsPanel wiren (handler via EditorView →
+   backend.upscale → onApplyResult + undo, 402 → paywall); credit-chip = 1 (CreditMeter.upscale).
+4. DECISIONS-PENDING.md: E10.3-besluit Open → Beslist (Real-ESRGAN, datum).
+
+**Result:** Boost-resolution end-to-end op **Real-ESRGAN** (besluit verplaatst naar
+DECISIONS-PENDING/Beslist 2026-06-14). **Backend** (port-only, preview-test): `upscale` als nieuwe
+CloudFeature in MODEL_REGISTRY (`nightmareai/real-esrgan` gepind, scale 2, credits 1);
+`replicate.upscale()`; `/v1/upscale`-endpoint met credit-gate zoals colorize — flatten op grijs →
+real-esrgan → `reapplyAlpha` herschaalt het alfa naar de 2×-maat zodat het een transparante cutout
+blijft. vercel.json-functie toegevoegd (maxDuration 90). `npm run typecheck` groen. **AvatarKit:**
+`BackendClient.upscale(imagePNG:) -> (Data, Int)`. **FEAT:** de "Boost resolution"-actie in
+EditActionsPanel is gewired (handler via EditorView `runBoostResolution` → backend.upscale →
+`onApplyResult` canvas+cutout, undo via ImageEnhanceUndo, 402 → `handleOutOfCredits`), met een
+"Boosting resolution…"-busy-hint en disabled-paneel tijdens de call; credit-chip toont "1 credit"
+(CreditMeter.upscale). Smoke (`--open-panel edit`): "Boost resolution" is nu actief (volle opacity,
+heldere 1-credit-chip) i.t.t. de gedimde stubs. Live upscale → preview-test (port-only). Beide
+targets bouwen groen, alle suites groen.
 
 ## 10.4 — Kledingwissel-route wiren (na E09.2)
 - status: done
