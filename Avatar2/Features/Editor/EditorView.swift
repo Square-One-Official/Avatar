@@ -14,7 +14,8 @@ import AvatarUI
 import SwiftUI
 
 enum EditorTool: String, CaseIterable, Identifiable {
-    case edit, effects, clothing, hair, background, images
+    // E21.1: Face-tool tussen Effects en Clothing (beauty-acties uit Edit).
+    case edit, effects, face, clothing, hair, background, images
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         switch self {
         case .edit: "Edit"
         case .effects: "Effects"
+        case .face: "Face"
         case .clothing: "Clothing"
         case .hair: "Hair"
         case .background: "Background"
@@ -29,11 +31,25 @@ enum EditorTool: String, CaseIterable, Identifiable {
         }
     }
 
-    /// SF-benadering van de gerenderde toolbar-glyphs uit App / Edit.
+    /// E20.1: semantisch DSIcon per tool (de toolbar schakelt hierop in 21.2).
+    var dsSymbol: DSIcon.Symbol {
+        switch self {
+        case .edit: .edit
+        case .effects: .effects
+        case .face: .face
+        case .clothing: .clothing
+        case .hair: .hair
+        case .background: .background
+        case .images: .images
+        }
+    }
+
+    /// SF-benadering van de toolbar-glyphs (tot 21.2 de toolbar op DSIcon zet).
     var icon: Image {
         switch self {
         case .edit: Image(systemName: "wand.and.stars")
         case .effects: Image(systemName: "sparkles")
+        case .face: Image(systemName: "face.smiling")
         case .clothing: Image(systemName: "tshirt.fill")
         case .hair: Image(systemName: "comb.fill")
         case .background: Image(systemName: "person.and.background.dotted")
@@ -47,6 +63,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         switch self {
         case .edit: "E06.3"
         case .effects: "E09.2"
+        case .face: "E21.1"
         case .clothing: "E10.2"
         case .hair: "E11.2"
         case .background: "E07.1"
@@ -248,10 +265,19 @@ struct EditorView: View {
                 DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
                     EditActionsPanel(
                         onAutomaticFraming: runAutomaticFraming,
-                        onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
                         onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                         onBoostResolution: runBoostResolution,
                         isBoosting: isBoosting,
+                        onProFeature: { _ = entitlement?.allowCloudFeature() },
+                        isPro: entitlement?.isProActive ?? false,
+                        activeToggles: Set(localToggleBaselines.keys)
+                    )
+                }
+            } else if tool == .face {
+                // E21.1: beauty-acties, gesplitst uit Edit.
+                DSEditPanel(title: tool.label) {
+                    FaceActionsPanel(
+                        onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
                         onProFeature: { _ = entitlement?.allowCloudFeature() },
                         isPro: entitlement?.isProActive ?? false,
                         activeToggles: Set(localToggleBaselines.keys)

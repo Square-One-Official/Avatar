@@ -1,15 +1,7 @@
-// Edit-paneel actielijst (E06.3) — Figma App / Edit dropdownMenu
-// (4014:10761). Het frame groepeert Retouch / Optimise / Position and
-// alignment; de story vraagt **zakelijke acties boven beauty-acties**, dus
-// de volgorde hier is Position → Optimise → Retouch (beauty onderaan).
-// Elke actie is een pill-rij met links het label en — voor cloud/
-// generatieve acties — een gating-chip (DSProChip); lokale gratis acties
-// (uitlijnen) krijgen geen chip. Exacte credit-labels komen uit de
-// CreditMeter (E14.3); tot die landt tonen cloud-acties de default
-// "Pro"-chip als gating-indicator. Op één na zijn de acties stubs — het
-// paneel krijgt nog een design-iteratie (story: vervangbaar bouwen).
-//
-// Geïmplementeerde actie: "Auto-crop & center" → AutoFramer (E06.5).
+// Edit-paneel (E21.1) — kleur/technische acties. De beauty-acties zijn
+// verhuisd naar het Face-paneel (FaceActionsPanel); framing/restore-body
+// verhuizen later naar de canvas-cluster (E22.2) en Edit wordt dan live
+// color-sliders (E22.3). Rijen via de gedeelde EditorActionList.
 
 import AvatarKit
 import AvatarUI
@@ -18,72 +10,38 @@ import SwiftUI
 struct EditActionsPanel: View {
     /// Auto-crop & center draait op het geselecteerde portret (E06.5).
     let onAutomaticFraming: () -> Void
-    /// E12.1: lokale Core Image-retouch + belichting (geen cloud/credits).
-    var onRetouch: () -> Void = {}
+    /// E12.1: lokale Core Image-belichting (geen cloud/credits) — aan/uit.
     var onImproveLighting: () -> Void = {}
     /// E10.3: cloud-upscale ("Boost resolution", 1 credit) + busy-vlag.
     var onBoostResolution: () -> Void = {}
     var isBoosting: Bool = false
-    /// E18.2: nog niet-gebouwde Pro-acties zijn klikbaar → contextuele gate
-    /// (online/login/upgrade) i.p.v. een dode/gedimde knop.
+    /// E18.2: nog niet-gebouwde Pro-acties → contextuele gate.
     var onProFeature: () -> Void = {}
-    /// E18.13: groene badge = Pro-indicator, alleen voor niet-Pro. Voor Pro
-    /// is de feature inbegrepen → geen badge (credit-kost blijft subtiel zichtbaar).
     var isPro: Bool = false
-    /// E18.12: lokale enhances (One-click retouch, Improve lighting) zijn
-    /// aan/uit-knoppen; deze set bevat de titels die momenteel "aan" staan
-    /// (checkmark + accentrand).
+    /// E18.12: titels van lokale enhances die momenteel "aan" staan.
     var activeToggles: Set<String> = []
 
-    private struct Action: Identifiable {
-        let id = UUID()
-        let title: String
-        /// E14.3: credit-tier voor het kosten-label. nil = lokaal/gratis óf
-        /// (bij isCloud) een nog-niet-vastgesteld tarief → generieke chip.
-        let meter: CreditMeter.Action?
-        let isCloud: Bool
-        let handler: (() -> Void)?
-        /// E18.12: toggle-acties (One-click retouch) tonen een aan/uit-staat.
-        var isOn: Bool = false
-    }
-
-    private struct Section: Identifiable {
-        let id = UUID()
-        let title: String
-        let actions: [Action]
-    }
-
-    private var sections: [Section] {
+    private var sections: [EditorActionSection] {
         [
-            // Zakelijk eerst. Uitlijnen draait on-device → geen credits.
-            Section(title: "Position and alignment", actions: [
-                Action(title: "Auto-crop & center", meter: nil, isCloud: false, handler: onAutomaticFraming),
-                Action(title: "Fix camera angle", meter: nil, isCloud: false, handler: nil),
+            EditorActionSection(title: "Position and alignment", actions: [
+                EditorAction(title: "Auto-crop & center", handler: onAutomaticFraming),
+                EditorAction(title: "Fix camera angle", handler: nil),
             ]),
-            Section(title: "Optimise", actions: [
-                Action(title: "Colorise", meter: .colorize, isCloud: true, handler: onProFeature),
-                // Boost resolution: 1 credit (besluit Thierry 2026-06-13;
-                // upscale = lichte cloud-call). E10.3: Real-ESRGAN, gewired.
-                Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: onBoostResolution),
+            EditorActionSection(title: "Optimise", actions: [
+                EditorAction(title: "Colorise", meter: .colorize, isCloud: true, handler: onProFeature),
+                EditorAction(title: "Boost resolution", meter: .upscale, isCloud: true, handler: onBoostResolution),
             ]),
-            // Beauty onderaan. One-click retouch + Improve lighting zijn
-            // sinds E12.1 lokale Core Image-acties (geen credits/chip);
-            // gerichte semantische edits (tanden/rimpels/make-up) blijven
-            // generatief (4); Restore body = fill-body-route (2).
-            Section(title: "Retouch", actions: [
-                Action(title: "One click retouch", meter: nil, isCloud: false, handler: onRetouch, isOn: activeToggles.contains("One click retouch")),
-                Action(title: "Improve lighting", meter: nil, isCloud: false, handler: onImproveLighting, isOn: activeToggles.contains("Improve lighting")),
-                Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: onProFeature),
-                Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: onProFeature),
-                Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: onProFeature),
-                Action(title: "Restore body", meter: .fillBody, isCloud: true, handler: onProFeature),
+            EditorActionSection(title: "Adjust", actions: [
+                EditorAction(
+                    title: "Improve lighting", handler: onImproveLighting,
+                    isOn: activeToggles.contains("Improve lighting")
+                ),
+                EditorAction(title: "Restore body", meter: .fillBody, isCloud: true, handler: onProFeature),
             ]),
         ]
     }
 
     var body: some View {
-        // E18.15: één kolom (alles onder elkaar) i.p.v. een 2-koloms grid;
-        // DSEditPanel maakt het scrollbaar en begrenst de hoogte.
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             if isBoosting {
                 HStack(spacing: DSSpacing.gap2) {
@@ -93,69 +51,9 @@ struct EditActionsPanel: View {
                         .foregroundStyle(DSColor.Foreground.muted)
                 }
             }
-            ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                    Text(section.title)
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                    ForEach(section.actions) { action in
-                        row(action)
-                    }
-                }
-            }
+            EditorActionList(sections: sections, isPro: isPro)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .disabled(isBoosting)
-    }
-
-    private func row(_ action: Action) -> some View {
-        Button {
-            action.handler?()
-        } label: {
-            HStack(spacing: DSSpacing.gap2) {
-                // E18.13: titel boven, credit-kost subtiel grijs eronder —
-                // de groene chip trok te veel aandacht voor een prijskaartje.
-                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    Text(action.title)
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                        .lineLimit(1)
-                    if let meter = action.meter {
-                        Text(CreditMeter.chipLabel(for: meter))
-                            .dsTextStyle(.labelSmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                }
-                Spacer(minLength: DSSpacing.gap2)
-                // E18.12: aan/uit-actie toont een checkmark in de accentkleur.
-                if action.isOn {
-                    Image(systemName: "checkmark")
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Action.primary)
-                }
-                // E18.13: groene badge alleen nog als Pro-indicator voor
-                // niet-Pro — niet meer als credit-label.
-                if action.isCloud && !isPro {
-                    DSProChip()
-                }
-            }
-            .padding(.horizontal, DSSpacing.gap4)
-            .frame(height: 52)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(action.isOn ? DSColor.Background.neutralStronger : DSColor.Background.neutral)
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))
-            // E18.12: subtiele accent-rand markeert de aan-staat.
-            .overlay {
-                if action.isOn {
-                    RoundedRectangle(cornerRadius: DSRadius.xl)
-                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
-        }
-        .buttonStyle(.plain)
-        // Stubs (handler == nil) zijn nog niet actief; visueel gedimd.
-        .opacity(action.handler == nil ? 0.55 : 1)
-        .disabled(action.handler == nil)
     }
 }
