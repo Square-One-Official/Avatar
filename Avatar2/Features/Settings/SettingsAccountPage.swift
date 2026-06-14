@@ -8,6 +8,8 @@ import SwiftUI
 
 struct SettingsAccountPage: View {
     @Bindable var entitlement: EntitlementModel
+    /// E18.1: e-mail+OTP-login vanuit Account als je uitgelogd bent.
+    @State private var showSignIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -63,8 +65,8 @@ struct SettingsAccountPage: View {
                     }
                 }
 
-                if entitlement.isSignedIn {
-                    SettingsSectionCard(title: "Session") {
+                SettingsSectionCard(title: "Session") {
+                    if entitlement.isSignedIn {
                         SettingsRow(
                             title: "Sign out",
                             subtitle: "You can sign back in any time with a code"
@@ -72,6 +74,13 @@ struct SettingsAccountPage: View {
                             DSNeutralButton("Sign out") {
                                 entitlement.signOutAccount()
                             }
+                        }
+                    } else {
+                        SettingsRow(
+                            title: "Sign in",
+                            subtitle: "Use your email to restore Pro and credits"
+                        ) {
+                            DSPrimaryButton("Sign in") { showSignIn = true }
                         }
                     }
                 }
@@ -84,6 +93,9 @@ struct SettingsAccountPage: View {
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { await entitlement.refresh() }
+        .sheet(isPresented: $showSignIn) {
+            SignInSheet(entitlement: entitlement)
+        }
     }
 
     private var creditsSubtitle: String {

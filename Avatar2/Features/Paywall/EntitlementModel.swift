@@ -101,6 +101,28 @@ final class EntitlementModel {
 
     func signOutAccount() {
         auth.signOut()
+        account = nil
+    }
+
+    // MARK: - Sign-in (E18.1) — e-mail + OTP vanuit Account/gate
+    var authBusy: Bool { auth.isBusy }
+    var authError: String? { auth.lastError }
+
+    /// Stap 1: Supabase mailt een OTP-code naar dit adres.
+    func sendSignInCode(_ email: String) async {
+        try? await auth.requestCode(email: email)
+    }
+
+    /// Stap 2: verifieer de code; bij succes ververst het account (plan/credits).
+    @discardableResult
+    func verifySignInCode(_ email: String, code: String) async -> Bool {
+        do {
+            try await auth.verifyCode(email: email, code: code)
+        } catch {
+            return false
+        }
+        await refresh()
+        return true
     }
 
     /// Stripe Customer Portal in de browser ("Manage subscription").
