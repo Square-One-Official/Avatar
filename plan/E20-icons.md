@@ -34,7 +34,14 @@ opgelost (AvatarUI-tests via xcodebuild i.p.v. `swift test`, óf een font-gebase
 restore-body = arrowsOutCardinal — bevestigen tegen definitieve Figma-keuze.
 
 ## 20.2 / 21.3 — Leading Phosphor-icoon per actie (Edit + Face-paneel)
-- status: todo (na 21.1/21.2)
+- status: GEPARKEERD — geblokkeerd op de Phosphor-package (zie 20.1-blocker). De visuele
+  deliverable is Phosphor; SF-interim zou alleen gokwerk zijn voor teeth/make-up/wrinkles.
+  EditorActionList heeft al een leading-icoon-slot (`EditorAction.icon: DSIcon.Symbol`) klaar.
+  Edit-paneel is bovendien naar sliders gegaan (E22.3) → leading-iconen gelden nu vooral het
+  Face-paneel. Oppakken zodra Phosphor werkt + de Figma-iconkeuze bekend is.
 
-## 20.3 — Overige knoppen naar Phosphor/DSIcon (app-bar, undo/redo, add)
-- status: todo (na E22)
+## 20.3 / 21.2-iconen — Tools/app-bar/undo-redo/add naar DSIcon/Phosphor
+- status: GEPARKEERD — geblokkeerd op Phosphor. DSIcon-mapping + `EditorTool.dsSymbol` staan klaar;
+  de toolbar/app-bar/cluster gebruiken nu SF Symbols die 1-op-1 op de DSIcon-namen mappen, dus de
+  swap is één plek (DSIcon-backing) zodra Phosphor bouwt. Toolbar-fit (6 tools) gevalideerd in de
+  E22.1-smoke. Edit-icoon = kleur-glyph (paintpalette) gezet in E22.3.
