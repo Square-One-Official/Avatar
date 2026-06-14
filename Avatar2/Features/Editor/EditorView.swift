@@ -132,25 +132,26 @@ struct EditorView: View {
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
         EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
-    /// Onderschept .images: ring aan = sidebar open; andere tools sluiten
-    /// de sidebar en openen hun paneel. Eén withAnimation-transactie zodat
-    /// kaart, toolbar en sidebar samen veren — geen sprong (bevinding 5).
+    /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
+    /// sidebar en openen hun paneel. E18.20: GEEN eigen withAnimation meer —
+    /// activeTool en isSidebarVisible hebben elk al een impliciete spring
+    /// (DSEditPanelContainer resp. ShellView, identieke duur), dus die veren
+    /// samen. De extra withAnimation dreef dezelfde wijziging dubbel → de
+    /// eerste paneel-open sprong/snelde (de tweede was wél goed).
     private var toolSelection: Binding<EditorTool?> {
         Binding(
             get: { isSidebarVisible ? .images : activeTool },
             set: { newValue in
-                withAnimation(.spring(duration: 0.35)) {
-                    switch newValue {
-                    case .images:
-                        isSidebarVisible = true
-                        activeTool = nil
-                    case nil:
-                        isSidebarVisible = false
-                        activeTool = nil
-                    default:
-                        isSidebarVisible = false
-                        activeTool = newValue
-                    }
+                switch newValue {
+                case .images:
+                    isSidebarVisible = true
+                    activeTool = nil
+                case nil:
+                    isSidebarVisible = false
+                    activeTool = nil
+                default:
+                    isSidebarVisible = false
+                    activeTool = newValue
                 }
             }
         )
