@@ -34,6 +34,8 @@ struct SidebarView: View {
     /// E19.2/19.3: context-menu-acties.
     @State private var renameTarget: Portrait2?
     @State private var deleteTarget: Portrait2?
+    /// E24.22: portret waarvoor het DS-rechtermuis-menu open is.
+    @State private var menuTarget: Portrait2?
     /// E05.7: loopt tijdens een set-brede align (knop disabled + pulse).
     @State private var isAligning = false
     /// E12.2: loopt tijdens de set-brede lichtnormalisatie.
@@ -60,15 +62,15 @@ struct SidebarView: View {
                             name: portrait.name.isEmpty ? "Name" : portrait.name,
                             role: portrait.role.isEmpty ? "Role" : portrait.role,
                             isSelected: portrait.persistentModelID == selectedID,
-                            action: { onSelect(portrait) },
+                            action: { menuTarget = nil; onSelect(portrait) },
                             avatar: { thumbnail(for: portrait) }
                         )
-                        // E19.2: rechtermuis → Rename / Export / Delete.
-                        .contextMenu {
-                            Button("Rename") { renameTarget = portrait }
-                            Button("Export…") { onExport(portrait) }
-                            Divider()
-                            Button("Delete", role: .destructive) { deleteTarget = portrait }
+                        // E24.22: rechtermuis → ons DS-menu (i.p.v. native
+                        // `.contextMenu`). Positie via anchor-preference (zie de
+                        // overlay onderaan de lijst).
+                        .onRightClick { menuTarget = portrait }
+                        .anchorPreference(key: RowAnchorKey.self, value: .bounds) {
+                            [portrait.persistentModelID: $0]
                         }
                     }
                 }
@@ -107,6 +109,35 @@ struct SidebarView: View {
         }
         .frame(width: 248)
         .frame(maxHeight: .infinity)
+        #if DEBUG
+        // E24.22 smoke-haak: forceer het DS-menu open op de eerste rij.
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("--show-sidebar-menu") {
+                menuTarget = filtered.first
+            }
+        }
+        #endif
+        // E24.22: DS-rechtermuis-menu — gepositioneerd onder de aangeklikte rij
+        // (anchor-preference). Een transparante scrim eronder sluit bij een klik
+        // buiten het menu.
+        .overlayPreferenceValue(RowAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                if let target = menuTarget, let anchor = anchors[target.persistentModelID] {
+                    let rect = proxy[anchor]
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { menuTarget = nil }
+                        rowContextMenu(for: target)
+                            .fixedSize()
+                            .offset(
+                                x: min(rect.minX + DSSpacing.gap2, proxy.size.width - 182),
+                                y: rect.maxY - 4
+                            )
+                    }
+                }
+            }
+        }
         // Concentrisch met de vensterrand (E03.15, bevinding 17):
         // binnenradius = vensterradius − marge; ShellView zet de kaart op
         // dezelfde `edgeInset`.
@@ -141,6 +172,37 @@ struct SidebarView: View {
         } message: {
             Text("This can't be undone.")
         }
+    }
+
+    // MARK: - E24.22 DS-rechtermuis-menu
+
+    private func rowContextMenu(for portrait: Portrait2) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTarget = portrait }
+            menuRow("Export…", icon: "square.and.arrow.up") { menuTarget = nil; onExport(portrait) }
+            Divider().padding(.vertical, 2)
+            menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTarget = portrait }
+        }
+        .padding(DSSpacing.gap1)
+        .frame(width: 170)
+        .dsPanelSurface(cornerRadius: DSRadius.lg)
+    }
+
+    private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap2) {
+                Image(systemName: icon).font(.system(size: 12, weight: .medium)).frame(width: 16)
+                Text(title).dsTextStyle(.labelBase)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -249,5 +311,17 @@ struct SidebarView: View {
 
     private static func pngData(from image: CGImage) -> Data? {
         NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    }
+}
+
+/// E24.22: rij-frames (per portret-id) zodat het DS-rechtermuis-menu onder de
+/// juiste rij gepositioneerd kan worden.
+private struct RowAnchorKey: PreferenceKey {
+    static var defaultValue: [PersistentIdentifier: Anchor<CGRect>] = [:]
+    static func reduce(
+        value: inout [PersistentIdentifier: Anchor<CGRect>],
+        nextValue: () -> [PersistentIdentifier: Anchor<CGRect>]
+    ) {
+        value.merge(nextValue()) { current, _ in current }
     }
 }

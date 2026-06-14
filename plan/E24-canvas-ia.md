@@ -5,6 +5,25 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.22 — Sidebar rechtermuis → DS-menu (i.p.v. native)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** de native `.contextMenu` op de sidebar-rijen is vervangen door ons DS-menu. Nieuwe
+herbruikbare `View.onRightClick { }` (AvatarUI, `DSRightClick.swift`) — een overlay-NSView die
+ALLEEN rechtskliks vangt (`hitTest` geeft self enkel bij een rechtsklik-event; links-klik/hover
+gaan door). Rechtsklik op een rij zet `menuTarget`; het DS-menu (Rename/Export/Delete, Delete in
+`Signal.error`) is een `dsPanelSurface`-kaart, gepositioneerd ónder de rij via een anchor-preference
+(`RowAnchorKey`). Een transparante scrim eronder sluit bij klik-buiten; een menukeuze of rij-selectie
+sluit ook.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: sidebar open met het DS-menu
+(Rename/Export/Delete, Delete rood) op de eerste rij (/tmp/c22_menu.png). Smoke-haak (#if DEBUG):
+`--show-sidebar-menu`. Rechtsklik-detectie + scrim-dismiss zijn gewired (niet synthetisch te
+rechtsklikken; menu-render + plaatsing visueel bevestigd).
+**Figma-TODO:** menu-positie (onder rij vs. bij cursor) + exacte rij-iconen/-styling tegen de
+referenties.
+
 ## 24.15-rev — Face-menu in ÉÉN rij (geen sectie-labels)
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
