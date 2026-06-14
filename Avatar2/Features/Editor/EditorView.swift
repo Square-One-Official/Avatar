@@ -74,6 +74,13 @@ struct EditorView: View {
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
     @State private var isBoosting = false
+    /// E18.12: lokale (gratis, omkeerbare) enhances zijn aan/uit-knoppen —
+    /// One-click retouch + Improve lighting. Key = actietitel; waarde = de foto
+    /// van vóór het toepassen (om naar terug te keren). Aanwezig = aan. 2e klik
+    /// herstelt i.p.v. stapelen. Cloud/generatief en uitlijnen blijven gewone
+    /// "pas toe"-acties (toggle-logica is daar niet logisch: kosten credits /
+    /// niet zuiver omkeerbaar).
+    @State private var localToggleBaselines: [String: NSImage] = [:]
     @Environment(\.undoManager) private var undoManager
     /// UndoManager is niet observable; deze tick (gebumpt op undo-
     /// notificaties) forceert her-evaluatie van de enabled-state.
@@ -88,6 +95,15 @@ struct EditorView: View {
         return EditorTool(rawValue: args[i + 1])
     }()
     #endif
+
+    /// Edit-paneel-cap. Smoke-haak (`--expand-panel`, alleen DEBUG) toont alle
+    /// rijen zonder scrollen zodat de toggle-staten te capturen zijn.
+    private var editPanelMaxHeight: CGFloat {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--expand-panel") { return 700 }
+        #endif
+        return 280
+    }
 
     /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
     private var originalImage: NSImage? {
@@ -212,6 +228,15 @@ struct EditorView: View {
             .aspectRatio(1, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, DSSpacing.gap8)
+            // E18.17: staat er een paneel/sidebar open, dan sluit een klik
+            // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
+            .overlay {
+                if activeTool != nil || isSidebarVisible {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { toolSelection.wrappedValue = nil }
+                }
+            }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
@@ -219,15 +244,16 @@ struct EditorView: View {
             } else if tool == .edit {
                 // E06.3: volledige actielijst (zakelijk boven beauty); de
                 // auto-frame-actie (E06.5) is "Auto-crop & center".
-                DSEditPanel(title: tool.label) {
+                DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
                     EditActionsPanel(
                         onAutomaticFraming: runAutomaticFraming,
-                        onRetouch: { applyLocalEnhance("One-click retouch") { PortraitEnhancer.magicRetouch($0) } },
-                        onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+                        onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
+                        onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                         onBoostResolution: runBoostResolution,
                         isBoosting: isBoosting,
                         onProFeature: { _ = entitlement?.allowCloudFeature() },
-                        isPro: entitlement?.isProActive ?? false
+                        isPro: entitlement?.isProActive ?? false,
+                        activeToggles: Set(localToggleBaselines.keys)
                     )
                 }
             } else if tool == .background {
@@ -261,6 +287,11 @@ struct EditorView: View {
                 activeTool = tool
                 Self.debugInitialTool = nil
             }
+            // E18.12: smoke-haak — toon de aan-staat van de lokale toggles.
+            if ProcessInfo.processInfo.arguments.contains("--retouch-on") {
+                localToggleBaselines["One click retouch"] = portrait
+                localToggleBaselines["Improve lighting"] = portrait
+            }
         }
         #endif
     }
@@ -277,17 +308,41 @@ struct EditorView: View {
     /// destructief — het origineel (`originalData`) blijft, hold-to-compare
     /// toont het, en de wissel is undo'baar. Vervangt canvas + cutout via
     /// `onApplyResult`. No-op zonder model/CGImage of bij renderfout.
-    private func applyLocalEnhance(_ name: String, _ transform: (CGImage) -> CGImage?) {
-        guard let portraitModel,
-              let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let outCG = transform(cg) else { return }
-        let before = portrait
-        let after = NSImage(cgImage: outCG, size: portrait.size)
-        onApplyResult(after)
-        ImageEnhanceUndo.register(
-            undoManager, target: portraitModel, apply: onApplyResult,
-            undoTo: before, redoTo: after, actionName: name
-        )
+    /// E18.12: generieke aan/uit voor lokale enhances. Aan → bewaar de huidige
+    /// foto en pas de transform toe; uit → herstel de bewaarde foto. Beide
+    /// stappen zijn undo'baar; undo/redo houden de toggle-staat in sync.
+    private func toggleLocalEnhance(_ key: String, _ transform: (CGImage) -> CGImage?) {
+        guard let portraitModel else { return }
+        if let baseline = localToggleBaselines[key] {
+            // Uit: terug naar de foto van vóór deze enhance.
+            let current = portrait
+            onApplyResult(baseline)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel,
+                apply: { img in
+                    onApplyResult(img)
+                    localToggleBaselines[key] = (img === current) ? baseline : nil
+                },
+                undoTo: current, redoTo: baseline, actionName: "Undo \(key)"
+            )
+            localToggleBaselines[key] = nil
+        } else {
+            // Aan: enhance toepassen op de huidige foto.
+            guard let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let outCG = transform(cg) else { return }
+            let before = portrait
+            let after = NSImage(cgImage: outCG, size: portrait.size)
+            onApplyResult(after)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel,
+                apply: { img in
+                    onApplyResult(img)
+                    localToggleBaselines[key] = (img === after) ? before : nil
+                },
+                undoTo: before, redoTo: after, actionName: key
+            )
+            localToggleBaselines[key] = before
+        }
     }
 
     /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).

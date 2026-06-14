@@ -30,6 +30,10 @@ struct EditActionsPanel: View {
     /// E18.13: groene badge = Pro-indicator, alleen voor niet-Pro. Voor Pro
     /// is de feature inbegrepen → geen badge (credit-kost blijft subtiel zichtbaar).
     var isPro: Bool = false
+    /// E18.12: lokale enhances (One-click retouch, Improve lighting) zijn
+    /// aan/uit-knoppen; deze set bevat de titels die momenteel "aan" staan
+    /// (checkmark + accentrand).
+    var activeToggles: Set<String> = []
 
     private struct Action: Identifiable {
         let id = UUID()
@@ -39,6 +43,8 @@ struct EditActionsPanel: View {
         let meter: CreditMeter.Action?
         let isCloud: Bool
         let handler: (() -> Void)?
+        /// E18.12: toggle-acties (One-click retouch) tonen een aan/uit-staat.
+        var isOn: Bool = false
     }
 
     private struct Section: Identifiable {
@@ -65,8 +71,8 @@ struct EditActionsPanel: View {
             // gerichte semantische edits (tanden/rimpels/make-up) blijven
             // generatief (4); Restore body = fill-body-route (2).
             Section(title: "Retouch", actions: [
-                Action(title: "One click retouch", meter: nil, isCloud: false, handler: onRetouch),
-                Action(title: "Improve lighting", meter: nil, isCloud: false, handler: onImproveLighting),
+                Action(title: "One click retouch", meter: nil, isCloud: false, handler: onRetouch, isOn: activeToggles.contains("One click retouch")),
+                Action(title: "Improve lighting", meter: nil, isCloud: false, handler: onImproveLighting, isOn: activeToggles.contains("Improve lighting")),
                 Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: onProFeature),
                 Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: onProFeature),
                 Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: onProFeature),
@@ -121,6 +127,12 @@ struct EditActionsPanel: View {
                     }
                 }
                 Spacer(minLength: DSSpacing.gap2)
+                // E18.12: aan/uit-actie toont een checkmark in de accentkleur.
+                if action.isOn {
+                    Image(systemName: "checkmark")
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Action.primary)
+                }
                 // E18.13: groene badge alleen nog als Pro-indicator voor
                 // niet-Pro — niet meer als credit-label.
                 if action.isCloud && !isPro {
@@ -130,8 +142,15 @@ struct EditActionsPanel: View {
             .padding(.horizontal, DSSpacing.gap4)
             .frame(height: 52)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DSColor.Background.neutral)
+            .background(action.isOn ? DSColor.Background.neutralStronger : DSColor.Background.neutral)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))
+            // E18.12: subtiele accent-rand markeert de aan-staat.
+            .overlay {
+                if action.isOn {
+                    RoundedRectangle(cornerRadius: DSRadius.xl)
+                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
         }
         .buttonStyle(.plain)

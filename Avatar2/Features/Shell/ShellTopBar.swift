@@ -19,37 +19,12 @@ struct ShellTopBar: View {
     var onExport: () -> Void = {}
 
     var body: some View {
-        // E18.14: counter op een EIGEN rij ónder de OS-traffic-lights, zodat
-        // hij écht ~12pt (gap-3) van de linkerrand zit i.p.v. ~72pt ernaast.
-        // Rij 1 = de top-strook met rechts Share/Settings (de lights bezetten
-        // links); rij 2 = quota + Upgrade, gap-3 van de rand.
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            HStack(spacing: 0) {
-                Spacer()
-                HStack(spacing: DSSpacing.gap2) {
-                    if canExport {
-                        // Frame 27 share-icoon → export/share (E08.2).
-                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
-                            onExport()
-                        }
-                    }
-                    DSToolButton(
-                        Image(systemName: "gearshape.fill"),
-                        label: "Settings",
-                        isActive: isSettingsActive
-                    ) {
-                        onToggleSettings()
-                    }
-                }
-                // E18.6: trailing = gedeelde topbar-inset (gap-3), gelijk aan
-                // de redo-knop rechtsonder — niet tegen de vensterrand geplakt.
-                .padding(.top, DSSpacing.gap3)
-                .padding(.trailing, ShellMetrics.topBarInset)
-            }
-            // De top-strook (h52) reserveert de hoogte van de traffic-lights,
-            // zodat de counter eronder valt i.p.v. ernaast.
-            .frame(height: 52, alignment: .top)
-
+        // E18.19: counter + Upgrade staan weer op de top-rij, verticaal
+        // uitgelijnd met de naam-header en de Share/Settings-knoppen (gelijke
+        // top-inset gap-3, gecentreerd in dezelfde 48-band als de knoppen).
+        // De OS-traffic-lights bezetten links ~60pt, dus de counter begint
+        // dáárná (eigen rij ónder de lights bleek te laag — besluit Thierry).
+        HStack(alignment: .top, spacing: 0) {
             if model.hasCompletedFirstCutout {
                 HStack(spacing: DSSpacing.gap2) {
                     Text(quotaLabel)
@@ -59,9 +34,32 @@ struct ShellTopBar: View {
                         model.requestUpgrade()
                     }
                 }
-                // E18.14: gap-3 van de linkerrand (gelijk aan de gear-trailing).
-                .padding(.leading, ShellMetrics.topBarInset)
+                // Gecentreerd in de knop-band (h48) op dezelfde top-inset, en
+                // direct na de OS-window-controls (E05.8: afgeleide constante).
+                .frame(height: 48)
+                .padding(.top, DSSpacing.gap3)
+                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
             }
+            Spacer()
+            HStack(spacing: DSSpacing.gap2) {
+                if canExport {
+                    // Frame 27 share-icoon → export/share (E08.2).
+                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
+                        onExport()
+                    }
+                }
+                DSToolButton(
+                    Image(systemName: "gearshape.fill"),
+                    label: "Settings",
+                    isActive: isSettingsActive
+                ) {
+                    onToggleSettings()
+                }
+            }
+            // E18.6: trailing = gedeelde topbar-inset (gap-3), gelijk aan de
+            // redo-knop rechtsonder — niet meer tegen de vensterrand geplakt.
+            .padding(.top, DSSpacing.gap3)
+            .padding(.trailing, ShellMetrics.topBarInset)
         }
         .task { await model.refresh() }
     }

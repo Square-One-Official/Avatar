@@ -42,16 +42,19 @@ afvinken. UI-fixes met visuele smoke.
 - [ ] **18.10 Tooltips op icon-buttons** — hover ~1–1.5s → label (bv. "Edit") boven de knop.
 - [ ] **18.11 Name/Role springt NOG steeds** bij focus (18.5 top-align loste het niet op — echte
       oorzaak = baseline-verschil Text vs NSTextField in DSInlineEditLabel).
-- [ ] **18.12 One-click retouch = toggle** — 2e klik herhaalt nu i.p.v. terug naar origineel; maak
-      het een aan/uit-knop.
+- [x] **18.12 Lokale enhances = aan/uit-knoppen** — DONE+gemerged. One-click retouch ÉN Improve
+      lighting (besluit Thierry: alle lokale, gratis, omkeerbare enhances) zijn nu toggles: 2e klik
+      herstelt de foto van vóór i.p.v. stapelen. Generiek `toggleLocalEnhance(key,transform)` +
+      `localToggleBaselines`-dict in EditorView; undo/redo houden de staat in sync. Aan-staat =
+      checkmark + lime accentrand (EditActionsPanel.activeToggles). Cloud/generatief (Colorise,
+      Whiten teeth, …) en uitlijnen (Auto-crop) blijven gewone "pas toe"-acties — toggle is daar
+      niet logisch (kost credits / niet zuiver omkeerbaar). Smoke ✓ (beide rijen tonen aan-staat).
 - [x] **18.13 Credit-badge subtieler** — DONE+gemerged. EditActionsPanel-rij: titel boven, credit-
       kost (1/2/4 credits) subtiel grijs (Foreground.muted) eronder; rijhoogte 40→52. Groene
       DSProChip alléén nog als Pro-indicator voor niet-Pro (isPro=false). Smoke ✓. (Effects/Hair/
       Clothing tonen de kost al subtiel via een bolt-label — ongemoeid.)
-- [x] **18.14 Counter op eigen rij ónder de traffic-lights** — DONE+gemerged (keuze Thierry).
-      ShellTopBar is nu een VStack: rij 1 = top-strook (h52) met rechts Share/Settings, links de
-      OS-lights; rij 2 = quota + Upgrade-chip, leading = `topBarInset` (gap-3 = 12). Counter zit nu
-      écht ~12pt van de linkerrand i.p.v. ~72pt ernaast. Smoke ✓.
+- [x] **18.14 Counter op eigen rij ónder de traffic-lights** — DONE, later TERUGGEDRAAID door 18.19
+      (Thierry vond de eigen rij te laag). Zie 18.19.
 - [x] **18.15 Edit-paneel compacter + scrollbaar** — DONE+gemerged. Centraal in DSEditPanel:
       `maxWidth: 600` (niet meer volle breedte) + `maxContentHeight: 280` met interne ScrollView
       (minder hoog, scrollbaar) → geldt meteen voor álle panelen (Edit/Effects/Hair/Clothing/
@@ -60,6 +63,20 @@ afvinken. UI-fixes met visuele smoke.
       merkbaar groter. DSEditPanel-pixeltest aangepast (ImageRenderer rastert scroll-inhoud niet;
       toetst nu op de paneel-kaart i.p.v. scroll-inhoud). Smoke ✓ (smal paneel, één kolom, scroll,
       grotere foto).
+
+## Ronde 3 (test 2026-06-14, live correcties tijdens AI-feature-test)
+- [x] **18.17 Klik buiten paneel sluit het** — DONE+gemerged. Staat er een paneel/sidebar open, dan
+      sluit een klik op de foto/canvas het (toolSelection → nil). Overlay op de foto-slot, alleen
+      actief als er iets open is (anders blijft pan/zoom werken). Smoke ✓ (Background-paneel sloot
+      bij klik op de foto).
+- [x] **18.18 Paneel hugt de inhoud** — DONE+gemerged. DSEditPanel meet de inhoudshoogte
+      (GeometryReader + PreferenceKey) en zet de ScrollView op `min(inhoud, cap)` → géén lege ruimte
+      meer onderaan korte panelen (bv. Background). Boven de cap scrollt het. Smoke ✓ (Background
+      strak om kleur/afbeelding-rijen, foto groter).
+- [x] **18.19 Counter+Upgrade terug op de top-rij** — DONE+gemerged. 18.14 (eigen rij onder de
+      lights) bleek te laag; nu weer op de top-rij, verticaal uitgelijnd met de naam-header en de
+      Share/Settings-knoppen (gelijke top-inset gap-3, gecentreerd in de 48-knop-band), beginnend ná
+      de OS-traffic-lights. Smoke ✓.
 
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-

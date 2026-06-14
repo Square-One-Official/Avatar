@@ -9,11 +9,22 @@ import SwiftUI
 /// een sectie met padding gap-5 (totale inset 28); titel UI/Labels/Base
 /// (primary), kolomgap gap-2. Figma-schaduw 0/12/24/-12 zwart 25%
 /// (hardcoded in design, geen token; spread benaderd via halve blur).
+/// E18.18: meet de natuurlijke inhoudshoogte zodat het paneel de inhoud
+/// "hugt" (geen lege ruimte onderaan bij korte panelen zoals Background) en
+/// pas scrollt wanneer de inhoud de cap overschrijdt.
+private struct DSPanelContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 public struct DSEditPanel<Content: View>: View {
     private let title: String
     private let content: Content
     private let maxWidth: CGFloat
     private let maxContentHeight: CGFloat
+    @State private var contentHeight: CGFloat = 0
 
     /// E18.15: panelen waren overweldigend — volle vensterbreedte en hoog.
     /// Default nu compacter: `maxWidth` houdt het paneel weg van de randen
@@ -36,13 +47,23 @@ public struct DSEditPanel<Content: View>: View {
             Text(title)
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
-            // E18.15: één scrollbare kolom; het paneel groeit niet voorbij
-            // maxContentHeight (foto houdt ruimte), inhoud scrollt erin.
+            // E18.15/18.18: één scrollbare kolom die de inhoud hugt — de
+            // ScrollView krijgt exact de inhoudshoogte (gemeten) tot de cap;
+            // daarboven scrollt hij. Géén lege ruimte bij korte panelen.
             ScrollView(.vertical, showsIndicators: true) {
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: DSPanelContentHeightKey.self,
+                                value: proxy.size.height
+                            )
+                        }
+                    )
             }
-            .frame(maxHeight: maxContentHeight)
+            .frame(height: scrollHeight, alignment: .top)
+            .onPreferenceChange(DSPanelContentHeightKey.self) { contentHeight = $0 }
         }
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
@@ -50,6 +71,12 @@ public struct DSEditPanel<Content: View>: View {
         .background(DSColor.Background.card)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
         .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
+    }
+
+    /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet
+    /// propageert) → natuurlijke maat; daarna de inhoudshoogte, gecapt.
+    private var scrollHeight: CGFloat? {
+        contentHeight > 0 ? min(contentHeight, maxContentHeight) : nil
     }
 }
 
