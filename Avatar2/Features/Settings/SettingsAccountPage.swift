@@ -26,9 +26,15 @@ struct SettingsAccountPage: View {
                                 ? "The address linked to your account"
                                 : "You're not signed in"
                         ) {
-                            Text(entitlement.accountEmail ?? "—")
-                                .dsTextStyle(.labelBase)
-                                .foregroundStyle(DSColor.Foreground.muted)
+                            if entitlement.isSignedIn {
+                                Text(entitlement.accountEmail ?? "—")
+                                    .dsTextStyle(.labelBase)
+                                    .foregroundStyle(DSColor.Foreground.muted)
+                            } else {
+                                // E18.8: sign-in zit nu in de Email-rij i.p.v.
+                                // een los Session-blok.
+                                DSPrimaryButton("Sign in", size: .small) { showSignIn = true }
+                            }
                         }
                         SettingsRow(
                             title: "Plan",
@@ -65,8 +71,10 @@ struct SettingsAccountPage: View {
                     }
                 }
 
-                SettingsSectionCard(title: "Session") {
-                    if entitlement.isSignedIn {
+                // E18.8: Session-blok alleen nog voor Sign out (ingelogd);
+                // sign-in zit nu in de Email-rij hierboven.
+                if entitlement.isSignedIn {
+                    SettingsSectionCard(title: "Session") {
                         SettingsRow(
                             title: "Sign out",
                             subtitle: "You can sign back in any time with a code"
@@ -74,13 +82,6 @@ struct SettingsAccountPage: View {
                             DSNeutralButton("Sign out") {
                                 entitlement.signOutAccount()
                             }
-                        }
-                    } else {
-                        SettingsRow(
-                            title: "Sign in",
-                            subtitle: "Use your email to restore Pro and credits"
-                        ) {
-                            DSPrimaryButton("Sign in") { showSignIn = true }
                         }
                     }
                 }

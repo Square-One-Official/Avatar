@@ -33,5 +33,33 @@ afvinken. UI-fixes met visuele smoke.
       gear-trailing gap-3 (niet meer tegen de rand), counter zit gap-3 ná de window-controls. Smoke ✓.
       (Links kan niet hélemaal tegen de rand — macOS traffic lights bezetten ~60pt.)
 
-**Volgorde:** 18.6 + 18.5 (snelle visuele wins) → 18.1 (login) → 18.3 (toast) → 18.2 (pro→upgrade)
-→ 18.4 (undo-audit) → 18.7 (backend, beslissing).
+## Ronde 2 (test 2026-06-14, vervolg)
+- [x] **18.8 Account sign-in in Email-rij** — DONE+gemerged. "Sign in"-knop in de Email-rij; los
+      Session-blok weg (alleen nog Sign out bij ingelogd). Smoke ✓.
+- [x] **18.9 Disabled-knop leesbaar** — DONE+gemerged. DSPrimaryButton: disabled = neutrale pil +
+      muted-leesbare tekst i.p.v. donkere tekst op dof-lime.
+- [ ] **18.10 Tooltips op icon-buttons** — hover ~1–1.5s → label (bv. "Edit") boven de knop.
+- [ ] **18.11 Name/Role springt NOG steeds** bij focus (18.5 top-align loste het niet op — echte
+      oorzaak = baseline-verschil Text vs NSTextField in DSInlineEditLabel).
+- [ ] **18.12 One-click retouch = toggle** — 2e klik herhaalt nu i.p.v. terug naar origineel; maak
+      het een aan/uit-knop.
+- [ ] **18.13 Credit-badge subtieler** — groene badge = Pro-indicator (voor niet-Pro); credit-kost
+      subtiel grijs ónder de titel i.p.v. prominente groene chip (knop mag hoger).
+- [ ] **18.14 Counter nóg dichter op de linkerrand** — zelfde padding als de gear (12). Constraint:
+      macOS-traffic-lights bezetten links ~60–70pt → óf vlak naast de lights (huidig) óf counter op
+      eigen rij ónder de lights om écht 12-van-de-rand te halen. **Keuze Thierry nodig.**
+- [ ] **18.15 Edit-paneel compacter + scrollbaar** — alle acties onder elkaar in een scrollbare
+      lijst; paneel minder hoog + niet volle vensterbreedte (compacter); foto groter. Idem voor de
+      andere menupanelen (Effects/Hair/Clothing/Background).
+
+## DB-migraties — GEBLOKKEERD op creds (wacht-op-Thierry)
+- `PAYLOAD_DATABASE_URL` is een **Sensitive** Vercel-var → `vercel env pull` geeft 'm leeg; geen
+  psql/connection lokaal. Ik kan dus géén SQL tegen de live DB draaien.
+- **013 + 014** (newsletter cohorts-grants + newsletter_optins): draai in de Supabase SQL-editor
+  (bestanden in backend/sql/) — of geef me de connection-string, dan doe ik 't.
+- **Payload `messages`-tabellen**: ontstaan automatisch via `push:true` bij de volgende
+  **avatar-admin**-deploy met de v2-config (kan ik triggeren als je wilt).
+
+**Volgorde:** 18.6 + 18.5 → 18.1 → 18.8 + 18.9 (done) → dan 18.2 (pro-gate) → 18.13 (credit-badge)
+→ 18.15 (paneel-redesign) → 18.12 (retouch-toggle) → 18.3 (toast) → 18.4 (undo) → 18.11 (baseline)
+→ 18.10 (tooltips). 18.7 backend = productie gedeployed; DB-migraties wacht-op-Thierry.

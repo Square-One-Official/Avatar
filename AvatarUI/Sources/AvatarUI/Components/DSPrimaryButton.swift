@@ -22,6 +22,11 @@ public struct DSPrimaryButton: View {
     private let fullWidth: Bool
     private let action: () -> Void
 
+    /// E18.9: leesbare disabled-staat — i.p.v. de hele lime-pil te dimmen
+    /// (donkere tekst op dof-lime = onleesbaar) een neutrale pil met
+    /// muted-maar-leesbare tekst.
+    @Environment(\.isEnabled) private var isEnabled
+
     public init(
         _ title: String,
         icon: Image? = nil,
@@ -49,11 +54,11 @@ public struct DSPrimaryButton: View {
                     .dsTextStyle(size.textStyle)
                     .lineLimit(1)
             }
-            .foregroundStyle(DSColor.Action.onAction)
+            .foregroundStyle(isEnabled ? DSColor.Action.onAction : DSColor.Foreground.muted)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.horizontal, size.horizontalPadding)
             .padding(.vertical, size.verticalPadding)
-            .background(DSColor.Background.action, in: Capsule())
+            .background(isEnabled ? DSColor.Background.action : DSColor.Background.neutralStronger, in: Capsule())
         }
         .buttonStyle(DSStateOpacityButtonStyle())
     }
