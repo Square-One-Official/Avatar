@@ -134,10 +134,27 @@ Avatar2). AvatarUI bouwt + alle suites groen.
 CTA + dismiss. (AvatarUI tijdelijk toegestaan binnen deze marathon-opdracht.)
 
 ## 17.5 — [FEAT] In-app integratie Avatar2
-- status: ready
-- owner: —
-- blockedBy: 17.3, 17.4
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- blockedBy: 17.3 (done), 17.4 (done)
 - DoD: beide targets bouwen, tests groen; visuele smoke.
+
+**Plan:**
+1. `MessagingService` als @State in Avatar2App (backend = entitlement.backend); `refresh()` in de
+   app-.task (start). DEBUG `MessagingService.debugInject(_:)` + launchhaak `--show-message`.
+2. Overlay (geen layoutshift): bij `messaging.current` een gedimde backdrop + `DSMessageSheet`
+   gecentreerd; CTA → `NSWorkspace.open(cta.url)` (aaavatar:// of extern) + `acknowledge`; dismiss
+   → `messaging.dismiss`. Backdrop-tik = dismiss.
+3. Visuele smoke via `--show-message`.
+
+**Result:** MessagingService gemount in Avatar2App (@State, backend = entitlement.backend);
+`refresh()` bij app-start (faalt stil). In-app bericht verschijnt als gecentreerd `DSMessageSheet`
+boven een gedimde backdrop (overlay → geen layoutshift); CTA opent `cta.url` via
+`NSWorkspace.open` (aaavatar://-deeplink of extern) + `acknowledge` (server-seen + lokaal), dismiss
+(kruis of backdrop-tik) → `MessagingService.dismiss` (persistente seen-state). DEBUG-launchhaak
+`--show-message` injecteert een test-bericht. Smoke (`--show-message`): sheet rendert met titel,
+markdown-body (bold), lime "Explore effects"-CTA en dismiss-kruis (zie /tmp/e175_message.png).
+Beide targets bouwen groen, alle suites groen.
 
 Toon getarget bericht bij app-start / na eerste cutout; CTA naar feature/deeplink of extern;
 seen-state persistent; geen layoutshift.

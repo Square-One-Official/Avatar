@@ -49,6 +49,14 @@ public final class MessagingService {
         messages.filter { !dismissed.contains($0.slug) }
     }
 
+    #if DEBUG
+    /// Smoke-run-haak (E17.5): injecteer een test-bericht zodat het sheet
+    /// zonder backend/CMS verschijnt.
+    public func debugInject(_ message: Message) {
+        queue = [message]
+    }
+    #endif
+
     private func dismissedSlugs() -> Set<String> {
         Set(defaults.stringArray(forKey: Self.dismissedKey) ?? [])
     }

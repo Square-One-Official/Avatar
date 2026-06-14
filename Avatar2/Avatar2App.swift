@@ -1,3 +1,4 @@
+import AppKit
 import AvatarKit
 import AvatarUI
 import SwiftData
@@ -8,12 +9,16 @@ struct Avatar2App: App {
     @State private var auth: AuthService
     @State private var onboarding: OnboardingModel
     @State private var entitlement: EntitlementModel
+    /// E17.5: getargete in-app-berichten (verenigd Message-model).
+    @State private var messaging: MessagingService
 
     init() {
         let auth = AuthService()
+        let entitlement = EntitlementModel(auth: auth)
         _auth = State(initialValue: auth)
         _onboarding = State(initialValue: OnboardingModel(auth: auth))
-        _entitlement = State(initialValue: EntitlementModel(auth: auth))
+        _entitlement = State(initialValue: entitlement)
+        _messaging = State(initialValue: MessagingService(backend: entitlement.backend))
     }
 
     var body: some Scene {
@@ -53,8 +58,22 @@ struct Avatar2App: App {
                 }
                 // E15.5: --dev-advanced wordt in EntitlementModel.init gelezen
                 // (vóór first render), niet hier — zie de toelichting daar.
+                // E17.5: forceer een test-bericht voor de smoke.
+                if args.contains("--show-message") {
+                    messaging.debugInject(Message(
+                        slug: "smoke-welcome",
+                        title: "Welcome to Aaavatar 2",
+                        body: "**New:** styles, hair and clothing edits — all in one place.",
+                        cta: .init(label: "Explore effects", url: URL(string: "aaavatar://effects")!)
+                    ))
+                }
             }
             #endif
+            // E17.5: getargete berichten ophalen bij app-start (faalt stil).
+            .task { await messaging.refresh() }
+            // E17.5: in-app bericht-sheet (overlay → geen layoutshift).
+            .overlay { messageOverlay }
+            .animation(.easeOut(duration: 0.18), value: messaging.current)
             // E01.14: géén handmatige setFrameAutosaveName meer — SwiftUI's
             // WindowGroup persisteert het venster-frame zelf (defaultSize bij
             // eerste start, daarna de gebruikersmaat). Twee autosave-bronnen
@@ -92,6 +111,32 @@ struct Avatar2App: App {
         // maat — extra vangnet naast de content-minHeight, zodat een ambigue
         // contenthoogte het venster niet kan laten inklappen.
         .windowResizability(.contentMinSize)
+    }
+
+    /// E17.5: gecentreerd in-app bericht-sheet boven een gedimde backdrop.
+    /// Overlay, dus geen layoutshift; backdrop-tik of het kruis sluit.
+    @ViewBuilder
+    private var messageOverlay: some View {
+        if let message = messaging.current {
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { messaging.dismiss(message) }
+                DSMessageSheet(
+                    title: message.title,
+                    body: message.body,
+                    imageURL: message.imageUrl,
+                    ctaLabel: message.cta?.label,
+                    onCTA: {
+                        if let url = message.cta?.url { NSWorkspace.shared.open(url) }
+                        messaging.acknowledge(message)
+                    },
+                    onDismiss: { messaging.dismiss(message) }
+                )
+                .padding(DSSpacing.gap8)
+            }
+            .transition(.opacity)
+        }
     }
 }
 
