@@ -40,15 +40,18 @@ final class ClothesModel {
 
     func apply(preset: ClothesStyle? = nil, freeText: String? = nil, base: NSImage) async {
         guard !isBusy else { return }
+        // E18.2: contextuele gate (online uit → login → upgrade).
+        guard entitlement.allowCloudFeature() else { return }
         guard let png = Self.pngData(from: base) else {
-            phase = .failed("Couldn't read the portrait.")
+            entitlement.presentError("Couldn't read the portrait.")
             return
         }
         phase = .working
         do {
             let (data, _) = try await entitlement.backend.editClothes(imagePNG: png, preset: preset, freeText: freeText)
             guard let image = NSImage(data: data) else {
-                phase = .failed("The result came back unreadable.")
+                phase = .idle
+                entitlement.presentError("The result came back unreadable.")
                 return
             }
             phase = .idle
@@ -58,7 +61,8 @@ final class ClothesModel {
             phase = .idle
             entitlement.handleOutOfCredits()
         } catch {
-            phase = .failed("Couldn't change the clothing. Please try again.")
+            phase = .idle
+            entitlement.presentError("Couldn't change the clothing. Please try again.")
         }
     }
 

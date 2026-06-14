@@ -24,6 +24,9 @@ struct EditActionsPanel: View {
     /// E10.3: cloud-upscale ("Boost resolution", 1 credit) + busy-vlag.
     var onBoostResolution: () -> Void = {}
     var isBoosting: Bool = false
+    /// E18.2: nog niet-gebouwde Pro-acties zijn klikbaar → contextuele gate
+    /// (online/login/upgrade) i.p.v. een dode/gedimde knop.
+    var onProFeature: () -> Void = {}
 
     private struct Action: Identifiable {
         let id = UUID()
@@ -49,7 +52,7 @@ struct EditActionsPanel: View {
                 Action(title: "Fix camera angle", meter: nil, isCloud: false, handler: nil),
             ]),
             Section(title: "Optimise", actions: [
-                Action(title: "Colorise", meter: .colorize, isCloud: true, handler: nil),
+                Action(title: "Colorise", meter: .colorize, isCloud: true, handler: onProFeature),
                 // Boost resolution: 1 credit (besluit Thierry 2026-06-13;
                 // upscale = lichte cloud-call). E10.3: Real-ESRGAN, gewired.
                 Action(title: "Boost resolution", meter: .upscale, isCloud: true, handler: onBoostResolution),
@@ -61,10 +64,10 @@ struct EditActionsPanel: View {
             Section(title: "Retouch", actions: [
                 Action(title: "One click retouch", meter: nil, isCloud: false, handler: onRetouch),
                 Action(title: "Improve lighting", meter: nil, isCloud: false, handler: onImproveLighting),
-                Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: nil),
-                Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: nil),
-                Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: nil),
-                Action(title: "Restore body", meter: .fillBody, isCloud: true, handler: nil),
+                Action(title: "Whiten teeth", meter: .generativeStandard, isCloud: true, handler: onProFeature),
+                Action(title: "Apply make-up", meter: .generativeStandard, isCloud: true, handler: onProFeature),
+                Action(title: "Reduce wrinkles", meter: .generativeStandard, isCloud: true, handler: onProFeature),
+                Action(title: "Restore body", meter: .fillBody, isCloud: true, handler: onProFeature),
             ]),
         ]
     }

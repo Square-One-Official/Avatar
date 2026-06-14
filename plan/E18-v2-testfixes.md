@@ -13,13 +13,14 @@ afvinken. UI-fixes met visuele smoke.
       raakt nu ook de live v1-app. DB-migraties (013/014/Payload-messages) blijven gated.
 
 ## UX / gedrag
-- [ ] **18.2 Pro-opties zichtbaar+klikbaar voor niet-Pro** — alle Pro-opties (Apply make-up,
-      Restore body, Whiten teeth, Reduce wrinkles, Colorise, …) niet dimmen/disablen; tik → de
-      upgrade-modal (paywall) i.p.v. dode knop.
-- [ ] **18.3 Cloud-fouten als toast** — "Couldn't apply that style…" verschijnt nu als tekst onder
-      de menutitel; wil een toast-notificatie. (Oorzaak van de fout zelf: 401 niet-ingelogd / 404
-      backend — zie 18.1/18.7.) Generieke error-toast in EntitlementModel + Avatar2App-overlay;
-      Effects/Hair/Clothes/Boost-failures daarheen routen.
+- [x] **18.2 Pro-opties klikbaar → contextuele gate** — DONE+gemerged. Stub-cloud-acties (Colorise,
+      Whiten teeth, Apply make-up, Reduce wrinkles, Restore body) niet meer gedimd; tik →
+      `EntitlementModel.allowCloudFeature()`: (1) online uit → "Turn on online models?"-alert; (2)
+      niet ingelogd → SignInSheet; (3) geen Pro/credits → paywall. Effects/Hair/Clothing/Boost
+      gaan ook door de gate. Smoke ✓ (acties enabled).
+- [x] **18.3 Cloud-fouten als toast** — DONE+gemerged (samen met 18.2). `EntitlementModel.errorToast`
+      + `presentError`; DSToast-overlay onderin (auto-dismiss 4s). Effects/Hair/Clothes/Boost-
+      failures → toast i.p.v. inline tekst onder de menutitel.
 - [ ] **18.4 Undo/redo dekt álle stappen** — "Match lighting" (sidebar) undo't niet. Controleer dat
       undo/redo écht elke stap meeneemt: effects, kleding, haar, boost, match-lighting, reframing.
       (Match lighting gebruikt CutoutDataUndo + eigen undo-groep; waarschijnlijk werkt de
@@ -52,13 +53,11 @@ afvinken. UI-fixes met visuele smoke.
       lijst; paneel minder hoog + niet volle vensterbreedte (compacter); foto groter. Idem voor de
       andere menupanelen (Effects/Hair/Clothing/Background).
 
-## DB-migraties — GEBLOKKEERD op creds (wacht-op-Thierry)
-- `PAYLOAD_DATABASE_URL` is een **Sensitive** Vercel-var → `vercel env pull` geeft 'm leeg; geen
-  psql/connection lokaal. Ik kan dus géén SQL tegen de live DB draaien.
-- **013 + 014** (newsletter cohorts-grants + newsletter_optins): draai in de Supabase SQL-editor
-  (bestanden in backend/sql/) — of geef me de connection-string, dan doe ik 't.
-- **Payload `messages`-tabellen**: ontstaan automatisch via `push:true` bij de volgende
-  **avatar-admin**-deploy met de v2-config (kan ik triggeren als je wilt).
+## DB-migraties
+- [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-
+      grants ingetrokken + newsletter_optins-tabel aangemaakt.
+- [ ] **Payload `messages`-tabellen** — wacht-op-Thierry: ontstaan via `push:true` bij de volgende
+      **avatar-admin**-deploy met de v2-config. /v1/messages geeft tot dan leeg terug (geen fout).
 
 **Volgorde:** 18.6 + 18.5 → 18.1 → 18.8 + 18.9 (done) → dan 18.2 (pro-gate) → 18.13 (credit-badge)
 → 18.15 (paneel-redesign) → 18.12 (retouch-toggle) → 18.3 (toast) → 18.4 (undo) → 18.11 (baseline)

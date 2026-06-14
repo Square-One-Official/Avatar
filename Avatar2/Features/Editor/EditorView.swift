@@ -225,7 +225,8 @@ struct EditorView: View {
                         onRetouch: { applyLocalEnhance("One-click retouch") { PortraitEnhancer.magicRetouch($0) } },
                         onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                         onBoostResolution: runBoostResolution,
-                        isBoosting: isBoosting
+                        isBoosting: isBoosting,
+                        onProFeature: { _ = entitlement?.allowCloudFeature() }
                     )
                 }
             } else if tool == .background {
@@ -293,6 +294,8 @@ struct EditorView: View {
     private func runBoostResolution() {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = Self.pngData(from: portrait) else { return }
+        // E18.2: contextuele gate (online uit → login → upgrade).
+        guard entitlement.allowCloudFeature() else { return }
         let before = portrait
         Task {
             isBoosting = true
@@ -309,7 +312,8 @@ struct EditorView: View {
             } catch BackendError.noCredits {
                 entitlement.handleOutOfCredits()
             } catch {
-                // Stil falen; een toast hangt aan de shell, niet aan dit paneel.
+                // E18.3: fout als toast.
+                entitlement.presentError("Couldn't boost the resolution. Please try again.")
             }
         }
     }

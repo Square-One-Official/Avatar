@@ -18,6 +18,14 @@ final class EntitlementModel {
     /// Op=op-toast (HTTP 402 / credits op): toast eerst, paywall op tik.
     private(set) var isShowingOutOfCreditsToast = false
 
+    /// E18.3: generieke fout-toast voor cloud-acties (Effects/Hair/Clothing/
+    /// Boost) i.p.v. inline tekst onder de menutitel.
+    private(set) var errorToast: String?
+
+    /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
+    enum CloudGate: Equatable { case enableOnline, signIn }
+    var cloudGate: CloudGate?
+
     /// Jaar als default-anker ("2 months free") — zelfde besluit als v1:
     /// het betere-waardepad is het pad zonder kliks.
     var selectedInterval: SubscriptionInterval = .year
@@ -151,6 +159,47 @@ final class EntitlementModel {
 
     func handleOutOfCredits() {
         isShowingOutOfCreditsToast = true
+    }
+
+    // MARK: - E18.3 fout-toast
+
+    func presentError(_ message: String) {
+        errorToast = message
+    }
+
+    func dismissErrorToast() {
+        errorToast = nil
+    }
+
+    // MARK: - E18.2 contextuele cloud-feature-gate
+
+    /// Mag een cloud-/Pro-feature draaien? Zo niet, toont de juiste pop-up in
+    /// volgorde: (1) online-modellen uit → vraag aanzetten; (2) niet ingelogd
+    /// → sign-in; (3) ingelogd zonder Pro/credits → upgrade. Dev-unlimited en
+    /// credit-houders mogen door.
+    func allowCloudFeature() -> Bool {
+        if PrivacyPreferences2.shared.mode == .localOnly {
+            cloudGate = .enableOnline
+            return false
+        }
+        if !isSignedIn {
+            cloudGate = .signIn
+            return false
+        }
+        if isProActive || isDevUnlimited || creditsRemaining > 0 {
+            return true
+        }
+        requestUpgrade()
+        return false
+    }
+
+    func enableOnlineModels() {
+        PrivacyPreferences2.shared.mode = .cloudAllowed
+        cloudGate = nil
+    }
+
+    func dismissCloudGate() {
+        cloudGate = nil
     }
 
     /// E14.2: free-tier importgate (3 lifetime-afbeeldingen, source-agnostic).

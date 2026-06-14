@@ -56,15 +56,18 @@ final class EffectsModel {
     }
 
     private func apply(_ style: StylizeStyle) async {
+        // E18.2: contextuele gate (online uit → login → upgrade).
+        guard entitlement.allowCloudFeature() else { return }
         guard let png = Self.pngData(from: baseImage) else {
-            phase = .failed("Couldn't read the portrait.")
+            entitlement.presentError("Couldn't read the portrait.")
             return
         }
         phase = .working(style)
         do {
             let (data, _) = try await entitlement.backend.stylize(imagePNG: png, style: style)
             guard let image = NSImage(data: data) else {
-                phase = .failed("The styled image came back unreadable.")
+                phase = .idle
+                entitlement.presentError("The styled image came back unreadable.")
                 return
             }
             selected = style
@@ -76,7 +79,9 @@ final class EffectsModel {
             phase = .idle
             entitlement.handleOutOfCredits()
         } catch {
-            phase = .failed("Couldn't apply that style. Please try again.")
+            // E18.3: fout als toast i.p.v. inline tekst onder de menutitel.
+            phase = .idle
+            entitlement.presentError("Couldn't apply that style. Please try again.")
         }
     }
 

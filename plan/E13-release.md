@@ -74,5 +74,12 @@ Checklist-items uit E01.7 (INFRA, 2026-06-12):
 push NIET autonoom gedaan) en (b) de DB-migratie 013 tegen de live database. Doe bij voorkeur
 eerst de E01.15-e2e tegen de preview (kleding-acceptatiecriterium) vóór go-live.
 
-**Result:** _(invullen door Thierry ná de productie-deploy)_
+**Result:** Productie-deploy gedaan 2026-06-14 (op expliciete go van Thierry). Gecureerde port van
+`main` (3bc2a76) → `b27b31b`: alle v2-cloud-routes (stylize style/hair/clothes-intents, /v1/upscale,
+generation_model, account.is_dev_unlimited, fill_body 1→2) + de E17-messaging-endpoints; `send-
+recovery-email.ts` behouden. `npm run typecheck` groen; gepusht naar origin/main → Vercel-prod;
+prod-smoke OK (/v1/stylize + /v1/upscale 401, /v1/messages 405, /v1/cutout + send-recovery intact).
+DB-migraties 013 + 014 door Thierry in Supabase gedraaid (2026-06-14). **fill_body 1→2 credits is
+bewust** en geldt nu ook voor live v1. Rest: Payload `messages`-tabellen via avatar-admin-deploy
+(push:true) — apart, wacht-op-Thierry.
 

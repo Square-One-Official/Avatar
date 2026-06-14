@@ -89,7 +89,39 @@ struct Avatar2App: App {
                     OutOfCreditsToastView(model: entitlement)
                         .padding(.bottom, DSSpacing.gap6)
                         .transition(.opacity)
+                } else if let message = entitlement.errorToast {
+                    // E18.3: cloud-fout als toast i.p.v. inline tekst.
+                    DSToast(title: "Something went wrong", description: message) {
+                        entitlement.dismissErrorToast()
+                    }
+                    .padding(.bottom, DSSpacing.gap6)
+                    .transition(.opacity)
+                    .task {
+                        try? await Task.sleep(for: .seconds(4))
+                        entitlement.dismissErrorToast()
+                    }
                 }
+            }
+            .animation(.easeOut(duration: 0.18), value: entitlement.errorToast)
+            // E18.2: contextuele cloud-feature-gate — online aanzetten.
+            .alert(
+                "Turn on online models?",
+                isPresented: Binding(
+                    get: { entitlement.cloudGate == .enableOnline },
+                    set: { if !$0 { entitlement.dismissCloudGate() } }
+                )
+            ) {
+                Button("Turn on") { entitlement.enableOnlineModels() }
+                Button("Not now", role: .cancel) { entitlement.dismissCloudGate() }
+            } message: {
+                Text("Effects, Hair and Clothing use secure online models. Turn them on to continue — your photos are processed securely and never stored.")
+            }
+            // E18.2: gate — inloggen om Pro te checken.
+            .sheet(isPresented: Binding(
+                get: { entitlement.cloudGate == .signIn },
+                set: { if !$0 { entitlement.dismissCloudGate() } }
+            )) {
+                SignInSheet(entitlement: entitlement)
             }
             .animation(.easeOut(duration: 0.18), value: entitlement.isShowingOutOfCreditsToast)
             // E15.1: persistente Theme-voorkeur (Preferences > Appearance).
