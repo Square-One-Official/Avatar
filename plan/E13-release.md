@@ -54,3 +54,25 @@ Checklist-items uit E01.7 (INFRA, 2026-06-12):
 
 **Result:** _(invullen bij done)_
 
+## 13.4 — Backend-port ronde 2 (v2-main → main) — KLAARGEZET
+- status: wacht-op-Thierry (gated: productie-deploy + DB-migratie)
+- owner: FEAT (AI-agent, marathon — voorbereiding; uitvoering door Thierry)
+- blockedBy: — (klaar; alleen de gated uitvoering rest)
+- DoD: de nieuwe cloud-routes draaien op productie; prod-smoke groen
+- Context: vervolg op E13.0. De cloud-routes uit deze marathon (E09.2 prod-`/v1/stylize` +
+  style/hair/clothes-intents, E10.3 `/v1/upscale`, E15.6 `generation_model`, E15.5
+  `is_dev_unlimited`, E14.3 fill_body 2 cr) staan op v2-main maar nog niet op productie.
+
+**Plan/voorbereiding (gedaan):**
+1. Gecureerde port-manifest geschreven: **`backend/PORT-2026-06-14.md`** — exacte bestandenlijst,
+   de val (send-recovery-email.ts niet verwijderen), DB-migratie 013 (gated), env/Replicate-checks,
+   deploy-stappen + prod-smoke.
+2. Verse Vercel-**preview** gedeployd vanaf v2-main (alle nieuwe routes):
+   **https://avatars-r5jafqkdn-square-one-69d6814b.vercel.app**.
+
+**WACHT-OP-THIERRY:** (a) de productie-deploy naar api.aaavatar.nl (stappen in PORT-2026-06-14.md;
+push NIET autonoom gedaan) en (b) de DB-migratie 013 tegen de live database. Doe bij voorkeur
+eerst de E01.15-e2e tegen de preview (kleding-acceptatiecriterium) vóór go-live.
+
+**Result:** _(invullen door Thierry ná de productie-deploy)_
+
