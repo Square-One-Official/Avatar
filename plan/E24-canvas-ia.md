@@ -5,6 +5,18 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.15-rev — Face-menu in ÉÉN rij (geen sectie-labels)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** `FaceActionsPanel` liet de sectie-labels (Retouch/Beauty) vallen. Alle vier de
+Face-acties (One click retouch · Whiten teeth · Apply make-up · Reduce wrinkles) staan nu in ÉÉN
+horizontaal-scrollbare rij gedeelde `DSThumbnailCard`s — direct zichtbaar, geen secties. (Restore
+body hoort niet hier; die zit in de AI-dropdown, 24.9.) Geen content-fade meer (24.18).
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: Face-menu = één doorlopende rij van 4
+kaarten zonder sectie-labels, volledig zichtbaar (/tmp/c15rev_face.png).
+
 ## 24.19 — Uitlijn-gids VAST als doel-overlay + auto-align-standaard
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
