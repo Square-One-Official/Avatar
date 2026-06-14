@@ -52,5 +52,19 @@
 	<string>Aaavatar</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableDownloaderService</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://api.aaavatar.nl/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

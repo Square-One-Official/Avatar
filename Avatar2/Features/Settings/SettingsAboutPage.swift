@@ -13,13 +13,27 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsAboutPage: View {
-    @AppStorage("settings2.autoUpdateCheck")
-    private var autoUpdateCheck: Bool = true
+    /// E01.11: Sparkle-updater. Eigen instance voor de Settings-sessie; de
+    /// auto-check-voorkeur leeft in Sparkle's eigen store (niet langer in
+    /// settings2.autoUpdateCheck).
+    @State private var updater = UpdateManager()
 
     private var versionLabel: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "–"
         return "\(version) (\(build))"
+    }
+
+    /// Spiegelt de Sparkle-status onder de "Check now"-rij.
+    private var checkSubtitle: String {
+        switch updater.state {
+        case .idle: return "Updates arrive via the Aaavatar update channel"
+        case .checking: return "Checking for updates…"
+        case .downloading: return "Downloading update…"
+        case .extracting: return "Preparing update…"
+        case .readyToRelaunch(let version): return "Version \(version) ready — relaunch to install"
+        case .error: return "Update check failed — try again later"
+        }
     }
 
     var body: some View {
@@ -43,16 +57,21 @@ struct SettingsAboutPage: View {
                             title: "Automatic updates",
                             subtitle: "Check for new versions in the background"
                         ) {
-                            DSToggle(isOn: $autoUpdateCheck)
+                            DSToggle(isOn: Binding(
+                                get: { updater.automaticallyChecksForUpdates },
+                                set: { updater.automaticallyChecksForUpdates = $0 }
+                            ))
                         }
                         SettingsRow(
                             title: "Check for updates",
-                            subtitle: "Updates arrive via the Aaavatar update channel"
+                            subtitle: checkSubtitle
                         ) {
-                            // Sparkle-koppeling volgt in E01.11 (INFRA);
-                            // tot die tijd bewust disabled, geen dode actie.
-                            DSNeutralButton("Check now") {}
-                                .disabled(true)
+                            // E01.11: live op Sparkle. Disabled zolang een
+                            // check loopt (canCheckForUpdates = false).
+                            DSNeutralButton("Check now") {
+                                updater.checkForUpdates()
+                            }
+                            .disabled(!updater.canCheckForUpdates)
                         }
                     }
                 }

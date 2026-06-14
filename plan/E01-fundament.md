@@ -149,8 +149,8 @@ zodat override-whitelist, credit-tarief (E14.3) en `requiresCloud` per feature o
 **Result:** MODEL_REGISTRY in backend/lib/models.ts (default + override-whitelist, credits en requiresCloud per feature; BiRefNet/DeOldify/FLUX-Fill-refs verhuisd uit replicate.ts); optionele `model_override`-bodyparameter op /v1/cutout, /v1/colorize en /v1/fill-body — alleen gehonoreerd voor isDevUnlimitedUser (gate gecentraliseerd in lib/auth.ts; onbekende key → 400 unknown_model_override, niet-dev → stil genegeerd); credit-aftrek leest het tarief uit het registry (gedrag ongewijzigd, alle tarieven 1 — E14.3 hoeft alleen registry-getallen te wijzigen); tsc-typecheck + tsx-smoke-driver (backend/scripts/models-smoke.ts) groen, beide app-targets + alle testsuites groen. Let op: productie-deploy vereist port naar `main` (Vercel deployt v1-main, niet v2-main) — zelfde situatie als het recovery-endpoint uit E01.7.
 
 ## 1.11 — Sparkle aan Avatar2-target + UpdateManager-port
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
 - blockedBy: —
 - DoD: beide targets bouwen, tests groen
 - Context: aangevraagd vanuit E15.4 (About-pagina heeft een disabled "Check now"-knop tot dit landt). project.yml is INFRA-grens; v1 UpdateManager + appcast als referentie. Auto-check-voorkeur staat al persistent onder settings2.autoUpdateCheck; update-notificatievoorkeur onder settings2.updateNotifications (E15.1).
@@ -159,7 +159,26 @@ Sparkle als dependency van het Avatar2-target (zelfde versie als v1), UpdateMana
 in Avatar2 (of gedeeld via AvatarKit indien INFRA dat verkiest), gevoed door dezelfde appcast;
 E15.4's About-pagina koppelt de knop + auto-check-toggle erop aan.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. project.yml: `Sparkle` als dependency op het Avatar2-target + de SU*-Info.plist-keys
+   (SUFeedURL, SUPublicEDKey, auto-check) — zelfde self-hosted feed + EdDSA-publieke sleutel als v1.
+2. `Avatar2/Features/Settings/UpdateManager.swift`: 1-op-1 port van de v1-UpdateManager (SPUUpdater
+   + in-app SPUUserDriver), zonder de `#if !APP_STORE`-gate (Avatar2 = DMG-only).
+3. SettingsAboutPage: "Check now" live op `updater.checkForUpdates()` (disabled tijdens een check
+   via `canCheckForUpdates`), auto-check-toggle gebonden aan `updater.automaticallyChecksForUpdates`,
+   subtitle spiegelt de Sparkle-status.
+
+**Result:** Sparkle gelinkt op het Avatar2-target (project.yml dependency + SU*-Info.plist-keys:
+self-hosted `api.aaavatar.nl/appcast.xml` + de gedeelde EdDSA-publieke sleutel). `UpdateManager`
+geport naar Avatar2 (SPUUpdater + eigen in-app `SPUUserDriver`, @Observable, `canCheckForUpdates`-
+mirror; `#if !APP_STORE`-gate weggelaten want Avatar2 is DMG-only). SettingsAboutPage gewired: de
+voorheen disabled "Check now"-knop draait nu op `updater.checkForUpdates()` (disabled zolang een
+check loopt), de auto-update-toggle stuurt `updater.automaticallyChecksForUpdates`, en de subtitle
+spiegelt de status (checking/downloading/ready/error). Smoke (`--show-settings about`): "Check now"
+is nu actief, toggle aan, versie 1.2.1 (18). **wacht-op-Thierry voor publiceren:** updates
+downloaden/installeren vergt een code-getekende build + een gepubliceerde, met de private EdDSA-key
+ondertekende appcast — dat is release-infra (E13.1), niet in deze story. Beide targets bouwen
+groen, alle suites groen.
 
 ## 1.14 — WindowGroup/frame-autosave opschonen (hiddenTitleBar-inklap)
 - status: done

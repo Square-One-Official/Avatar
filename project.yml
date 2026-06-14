@@ -194,6 +194,7 @@ targets:
     dependencies:
       - package: AvatarKit
       - package: AvatarUI
+      - package: Sparkle
     resources:
       - path: Avatar2/Assets.xcassets
     info:
@@ -209,6 +210,16 @@ targets:
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
+        # E01.11: Sparkle (self-hosted feed, gedeeld met v1). Zelfde
+        # EdDSA-publieke sleutel → updates getekend met dezelfde private key
+        # (release-infra, E13.1). Bouwen vergt geen signing; publiceren wel.
+        SUFeedURL: "https://api.aaavatar.nl/appcast.xml"
+        SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUEnableInstallerLauncherService: true
+        SUEnableDownloaderService: true
+        SUAllowsAutomaticUpdates: true
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
           NSAllowsArbitraryLoadsForMedia: false

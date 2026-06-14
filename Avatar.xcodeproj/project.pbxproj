@@ -26,6 +26,7 @@
 		176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DF6691A4EAE77341E894EDB /* Avatar2App.swift */; };
 		18502D4C8D4A768A79D51330 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 20A4DAB201F8977DBA3B00FD /* ZIPFoundation */; };
 		1897B785C302A96575308BB7 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B1818524625F66274E218 /* GoogleSignInButton.swift */; };
+		18B4690E8B43BA765620B155 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 183C72136A3DB4697DABE7C7 /* Sparkle */; };
 		18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */; };
 		1958745818A9BA0756947D05 /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA293E7F1CF952594B0EB25E /* UpdateManager.swift */; };
 		1B091FC5D688FFD174F50657 /* Mesh 03.png in Resources */ = {isa = PBXBuildFile; fileRef = 947924202C732493D553BD14 /* Mesh 03.png */; };
@@ -119,6 +120,7 @@
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
+		934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
 		9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
 		98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */; };
@@ -207,6 +209,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		051B298A2948690FF14EB935 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
 		05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairEdgeHeuristicTests.swift; sourceTree = "<group>"; };
@@ -359,6 +362,7 @@
 			files = (
 				248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */,
 				CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */,
+				18B4690E8B43BA765620B155 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -506,6 +510,7 @@
 				1D40E681885CB6D731F70EDA /* SettingsModel.swift */,
 				18A2A30C157ECE416A5F149E /* SettingsPreferencesPage.swift */,
 				363170BAE87D782CD9CDDB50 /* SettingsRootView.swift */,
+				017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -709,6 +714,7 @@
 			packageProductDependencies = (
 				3A383A9104F04C87490DC691 /* AvatarKit */,
 				7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */,
+				183C72136A3DB4697DABE7C7 /* Sparkle */,
 			);
 			productName = Avatar2;
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
@@ -939,6 +945,7 @@
 				5C11985FD936B0FECF929EB7 /* ShellView.swift in Sources */,
 				383F6B236F23534C5389909D /* SidebarView.swift in Sources */,
 				31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */,
+				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1408,6 +1415,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		183C72136A3DB4697DABE7C7 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		20A4DAB201F8977DBA3B00FD /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FAD8C4AE8E294733D9421134 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
