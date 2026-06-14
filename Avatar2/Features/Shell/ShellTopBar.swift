@@ -44,14 +44,15 @@ struct ShellTopBar: View {
             HStack(spacing: DSSpacing.gap2) {
                 if canExport {
                     // Frame 27 share-icoon → export/share (E08.2).
-                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share") {
+                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
                         onExport()
                     }
                 }
                 DSToolButton(
                     Image(systemName: "gearshape.fill"),
                     label: "Settings",
-                    isActive: isSettingsActive
+                    isActive: isSettingsActive,
+                    tooltipEdge: .bottom
                 ) {
                     onToggleSettings()
                 }

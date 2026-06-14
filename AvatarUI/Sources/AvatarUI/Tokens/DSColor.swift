@@ -26,6 +26,8 @@ public enum DSColor {
         public static let action = Color(hex: 0xD5F466)
         /// `background/shadow` — #190b0859
         public static let shadow = Color(hex: 0x190B08, alpha: 0x59)
+        /// `background/tooltip` — #000000 (Figma Tooltip-component)
+        public static let tooltip = Color(hex: 0x000000)
     }
 
     /// `foreground/default/*`

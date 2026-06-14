@@ -76,7 +76,15 @@ public struct DSEditPanel<Content: View>: View {
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
         .frame(maxWidth: maxWidth)
-        .background(DSColor.Background.card)
+        // E18.22: subtiel glas — in-window-blur + een donkere tint die net
+        // genoeg doorlaat om de foto erachter te voelen, maar donker genoeg
+        // blijft om de inhoud helder te lezen.
+        .background {
+            ZStack {
+                WithinWindowBlur(material: .hudWindow)
+                DSColor.Background.card.opacity(0.82)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
         .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
     }
@@ -112,21 +120,21 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
 
     public var body: some View {
         VStack(spacing: DSSpacing.gap2) {
-            // Layoutgarantie (E03.16, bevinding 19): de foto is het ENIGE
-            // flexibele element — lagere layoutPriority zodat paneel en
-            // toolbar eerst hun volle hoogte krijgen en nooit afgekapt
-            // kunnen worden; de foto krimpt desnoods naar nul.
+            // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt
+            // de onderkant i.p.v. de foto te verkleinen. Wisselen tussen
+            // menu's geeft zo geen onrustige resize meer. Het paneel schuift
+            // van onderen in (glas-materiaal: de foto schemert subtiel door).
             photo
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(-1)
-
-            if let tool = activeTool {
-                // E18.15: geen fixedSize meer — het paneel begrenst zijn
-                // eigen hoogte (DSEditPanel.maxContentHeight) en scrollt; de
-                // foto (layoutPriority -1) krijgt de resterende ruimte.
-                panel(tool)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+                .overlay(alignment: .bottom) {
+                    if let tool = activeTool {
+                        panel(tool)
+                            .padding(.bottom, DSSpacing.gap2)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                // Clip zodat het paneel netjes vanaf de onderrand in schuift.
+                .clipped()
 
             DSBottomToolbar(items: tools, selection: $activeTool)
                 .fixedSize()

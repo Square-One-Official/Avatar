@@ -46,10 +46,12 @@ afvinken. UI-fixes met visuele smoke.
       Session-blok weg (alleen nog Sign out bij ingelogd). Smoke ✓.
 - [x] **18.9 Disabled-knop leesbaar** — DONE+gemerged. DSPrimaryButton: disabled = neutrale pil +
       muted-leesbare tekst i.p.v. donkere tekst op dof-lime.
-- [x] **18.10 Tooltips op icon-buttons** — DONE+gemerged. `.help(label)` op DSToolButton → native
-      macOS-tooltip na de systeem-hover-vertraging (~1–1.5s); dekt alle icon-buttons (topbar + de
-      DSBottomToolbar-tools gebruiken DSToolButton). (Niet via screenshot ge-smoket: native tooltips
-      vragen echte HID-hover; synthetische mouse-events triggeren de tooltip-timer niet.)
+- [x] **18.10 Tooltips op icon-buttons** — DONE+gemerged (ronde 3: nu de Figma Tooltip-component).
+      Nieuwe `DSTooltip` 1-op-1 op Figma Components 58:1298: zwart (background/tooltip #000000), witte
+      Body/Small, r-lg-hoeken, caret naar het doel. Op DSToolButton: **gecentreerd** bóven (toolbar/
+      editor) of ónder (topbar gear/share, tegen de rand) het icoon, caret **4px** (gap-1) van de
+      knop, na ~1,2s hover. (Niet via screenshot ge-smoket: .onHover leunt op NSTrackingArea-enter —
+      synthetische events triggeren dat niet; Thierry bevestigt hands-on.)
 - [x] **18.11 Name/Role-baseline bij focus** — DONE+gemerged. Oorzaak bevestigd: NSTextField
       top-uitlijnt z'n tekst in een hoogte kleiner dan z'n natuurlijke celhoogte, terwijl de
       rust-SwiftUI-Text centreert → de tekst sprong omhoog bij focus. Fix: `VerticallyCenteredText
@@ -97,6 +99,13 @@ afvinken. UI-fixes met visuele smoke.
       mee-veerde met de open-animatie (0 → inhoudshoogte). De meting wordt nu zonder animatie gezet
       (`Transaction.disablesAnimations`), zodat het paneel meteen op maat opent. (Animatie-timing
       niet via screenshot te smoken — Thierry bevestigt hands-on of de naspring weg is.)
+
+- [x] **18.22 Panelen overlappen de foto + glas** — DONE+gemerged. De foto houdt nu een CONSTANTE
+      maat; het paneel overlapt de onderkant i.p.v. de foto te verkleinen (wisselen tussen menu's gaf
+      een onrustige resize). DSEditPanelContainer: foto vult de ruimte, paneel als `.overlay(.bottom)`
+      dat van onderen in schuift (clip). DSEditPanel-achtergrond is nu subtiel glas
+      (WithinWindowBlur + Background.card 0.82) → de foto schemert licht door, inhoud blijft leesbaar.
+      Smoke ✓.
 
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-

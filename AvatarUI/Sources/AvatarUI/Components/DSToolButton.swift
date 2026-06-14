@@ -13,15 +13,24 @@ public struct DSToolButton: View {
     private let isActive: Bool
     private let action: () -> Void
 
+    /// E18.10: aan welke kant de tooltip verschijnt. Top-bar-knoppen (gear/
+    /// share) staan tegen de vensterrand → tooltip eronder; toolbar/editor-
+    /// knoppen onderin → tooltip erboven.
+    private let tooltipEdge: VerticalEdge
+    @State private var isHovering = false
+    @State private var showTooltip = false
+
     public init(
         _ icon: Image,
         label: String,
         isActive: Bool = false,
+        tooltipEdge: VerticalEdge = .top,
         action: @escaping () -> Void
     ) {
         self.icon = icon
         self.label = label
         self.isActive = isActive
+        self.tooltipEdge = tooltipEdge
         self.action = action
     }
 
@@ -49,9 +58,31 @@ public struct DSToolButton: View {
         }
         .buttonStyle(DSStateOpacityButtonStyle())
         .accessibilityLabel(Text(label))
-        // E18.10: tooltip met het label na de systeem-hover-vertraging
-        // (~1–1.5s), zoals macOS-standaard — bv. "Edit", "Settings".
-        .help(label)
+        // E18.10: eigen tooltip (Figma Tooltip-component) i.p.v. native .help
+        // (die plaatste 'm willekeurig en oogde te subtiel). Gecentreerd bóven
+        // (of, voor topbar-knoppen tegen de rand, ónder) het icoon, met de
+        // caret 4px van de knop, na ~1,2s hover.
+        .onHover { isHovering = $0 }
+        .task(id: isHovering) {
+            guard isHovering else { showTooltip = false; return }
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            showTooltip = true
+        }
+        .overlay(alignment: tooltipEdge == .top ? .top : .bottom) {
+            if showTooltip {
+                DSTooltip(label, caretEdge: tooltipEdge == .top ? .bottom : .top)
+                    .alignmentGuide(tooltipEdge == .top ? .top : .bottom) { dims in
+                        // Caret 4px (min.) van de knop; gecentreerd via .top/.bottom.
+                        tooltipEdge == .top
+                            ? dims[.bottom] + DSSpacing.gap1
+                            : dims[.top] - DSSpacing.gap1
+                    }
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: showTooltip)
     }
 }
 
@@ -91,15 +122,20 @@ struct DSGlassCircle: View {
 
 /// In-window-blur: NSVisualEffectView die de content erónder in hetzelfde
 /// venster vervaagt (SwiftUI's .ultraThinMaterial blendt op macOS achter
-/// het venster en oogt vlak op een zwart vlak).
-private struct WithinWindowBlur: NSViewRepresentable {
+/// het venster en oogt vlak op een zwart vlak). E18.22: ook gebruikt voor de
+/// glas-panelen, instelbaar materiaal.
+struct WithinWindowBlur: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .hudWindow
+        view.material = material
         view.blendingMode = .withinWindow
         view.state = .active
         return view
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+    }
 }

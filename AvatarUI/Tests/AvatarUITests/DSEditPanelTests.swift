@@ -128,18 +128,18 @@ extension DSEditPanelTests {
             }
         }
 
-        // Paneel-zone (boven de toolbar): het paneel is gelayout en niet
-        // ingeklapt. E18.15: de inhoud zit nu in een ScrollView — ImageRenderer
-        // rastert scroll-inhoud niet betrouwbaar, dus toets op de paneel-kaart
-        // (donker-neutrale Background.card) in de band tussen foto en toolbar:
-        // is die aanwezig op de middenas, dan heeft het paneel echte hoogte.
-        let kaartGevonden = stride(from: 250, through: 600 - 64 - 16, by: 8).contains { y in
-            let p = pixel(cg, x: 400, y: y)
-            let neutraal = max(p.r, p.g, p.b) - min(p.r, p.g, p.b) < 24
-            let donker = max(p.r, p.g, p.b) < 70
-            let nietRood = !(p.r > 120 && p.g < 80)
-            return neutraal && donker && nietRood
+        // Paneel-zone: E18.22 — het paneel OVERLAPT nu de onderkant van de
+        // foto (glas) i.p.v. een eigen rij. Bovenin is de foto helder rood;
+        // in de onderste foto-band dempt de glas-kaart dat rood merkbaar. Eis
+        // dus dat de onderband donkerder is dan de bovenband → paneel ligt
+        // erover. (ImageRenderer rastert blur/scroll-inhoud niet, maar de
+        // Background.card.opacity-laag dempt het rood wél.)
+        let onderband = stride(from: 600 - 64 - 16, through: 600 - 64 - 120, by: -8).map {
+            pixel(cg, x: 400, y: $0).r
         }
-        XCTAssertTrue(kaartGevonden, "paneel-kaart hoort zichtbaar te zijn (niet ingeklapt) tussen foto en toolbar")
+        XCTAssertTrue(
+            onderband.contains { $0 < 150 },
+            "glas-paneel hoort de onderkant van de foto te dempen: \(onderband)"
+        )
     }
 }
