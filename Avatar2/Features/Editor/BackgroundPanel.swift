@@ -16,13 +16,33 @@ struct BackgroundPanel: View {
     private let swatch: CGFloat = 36
 
     var body: some View {
-        DSEditPanel(title: "Background") {
-            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                section("Image") { imageRow }
-                section("Color") { colorRow }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // E24-fix: in de canvas-toolbar-popover tonen we de inhoud direct
+        // (zoals de Adjust-popover), niet in een tweede DSEditPanel-kaart —
+        // de popover ís de kaart. Rijen scrollen met rand-inset + fade.
+        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+            section("Image") { imageRow }
+            section("Color") { colorRow }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// E24-fix: rechter-rand-fade als scroll-affordance + trailing-inset zodat
+    /// geen swatch hard tegen de rand wordt afgesneden.
+    private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DSSpacing.gap2) { content() }
+                .padding(.trailing, DSSpacing.gap4)
+        }
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.88),
+                    .init(color: .clear, location: 1),
+                ],
+                startPoint: .leading, endPoint: .trailing
+            )
+        )
     }
 
     @ViewBuilder
@@ -38,28 +58,26 @@ struct BackgroundPanel: View {
     // MARK: Image-rij — upload + gradient-presets
 
     private var imageRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DSSpacing.gap2) {
-                Button(action: uploadCustom) {
+        scrollRow {
+            Button(action: uploadCustom) {
+                RoundedRectangle(cornerRadius: DSRadius.lg)
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+            }
+            .buttonStyle(.plain)
+
+            ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
+                Button { selectGradient(colors) } label: {
                     RoundedRectangle(cornerRadius: DSRadius.lg)
-                        .fill(DSColor.Background.neutral)
+                        .fill(BackgroundKit.gradient(colors))
                         .frame(width: swatch, height: swatch)
-                        .overlay {
-                            Image(systemName: "plus")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(DSColor.Foreground.subtle)
-                        }
                 }
                 .buttonStyle(.plain)
-
-                ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
-                    Button { selectGradient(colors) } label: {
-                        RoundedRectangle(cornerRadius: DSRadius.lg)
-                            .fill(BackgroundKit.gradient(colors))
-                            .frame(width: swatch, height: swatch)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
     }
@@ -67,27 +85,25 @@ struct BackgroundPanel: View {
     // MARK: Color-rij — presets + brand + eyedropper
 
     private var colorRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DSSpacing.gap2) {
-                ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
-                    colorSwatch(color)
-                }
-                ForEach(brand.hexColors, id: \.self) { hex in
-                    if let color = Color(hexRGB: hex) { colorSwatch(color, hex: hex) }
-                }
-                Button(action: sampleColor) {
-                    Circle()
-                        .fill(DSColor.Background.neutral)
-                        .frame(width: swatch, height: swatch)
-                        .overlay {
-                            Image(systemName: "eyedropper")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(DSColor.Foreground.subtle)
-                        }
-                }
-                .buttonStyle(.plain)
-                .help("Pick a brand colour")
+        scrollRow {
+            ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
+                colorSwatch(color)
             }
+            ForEach(brand.hexColors, id: \.self) { hex in
+                if let color = Color(hexRGB: hex) { colorSwatch(color, hex: hex) }
+            }
+            Button(action: sampleColor) {
+                Circle()
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "eyedropper")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+            }
+            .buttonStyle(.plain)
+            .help("Pick a brand colour")
         }
     }
 

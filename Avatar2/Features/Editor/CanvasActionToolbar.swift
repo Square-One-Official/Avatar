@@ -23,6 +23,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
 
     @State private var showAdjust = false
     @State private var showBackground = false
+    @State private var showAI = false
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
@@ -43,21 +44,56 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
                     adjust().padding(DSSpacing.gap5).frame(width: 360)
                 }
 
-            // E24.2: AI-edits als zichtbare dropdown.
-            Menu {
-                Button("Improve lighting", action: onImproveLighting)
-                Button(isPro ? "Colorise" : "Colorise · Pro", action: onColorise)
-                Button(isPro ? "Boost resolution" : "Boost resolution · Pro", action: onBoost)
-            } label: {
-                label("AI", systemImage: "sparkles", chevron: true)
+            // E24.2-fix: AI-edits via dezelfde DS-popover als Background/Adjust
+            // (geen native menu).
+            Button { showAI = true } label: {
+                label("AI", systemImage: "sparkles", isActive: showAI, chevron: true)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .buttonStyle(.plain)
+            .popover(isPresented: $showAI, arrowEdge: .bottom) {
+                aiMenu.padding(DSSpacing.gap2).frame(width: 240)
+            }
         }
         .padding(DSSpacing.gap1)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        #if DEBUG
+        .onAppear {
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("--show-bg-popover") { showBackground = true }
+            if args.contains("--show-ai-popover") { showAI = true }
+        }
+        #endif
+    }
+
+    // E24.2-fix: AI-popover-inhoud — DS-typografie, Pro via DSProChip (zoals
+    // elders), zelfde look als de Background/Adjust-popovers.
+    private var aiMenu: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            aiItem("Improve lighting", pro: false, action: onImproveLighting)
+            aiItem("Colorise", pro: !isPro, action: onColorise)
+            aiItem("Boost resolution", pro: !isPro, action: onBoost)
+        }
+    }
+
+    private func aiItem(_ title: String, pro: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            showAI = false
+            action()
+        } label: {
+            HStack(spacing: DSSpacing.gap2) {
+                Text(title)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Spacer(minLength: DSSpacing.gap2)
+                if pro { DSProChip() }
+            }
+            .padding(.horizontal, DSSpacing.gap3)
+            .frame(height: 36)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var divider: some View {
