@@ -35,8 +35,9 @@ struct EditorCanvasView: View {
     @State private var lastHapticTickX: Double = 0
     @State private var lastHapticTickY: Double = 0
     @State private var lastMagnification: Double = 1
-    @State private var isHovering = false
-    @State private var scrollMonitor: Any?
+    // E24.17: onderwerp geselecteerd → transform-handles zichtbaar (klik op de
+    // afbeelding selecteert, klik erbuiten deselecteert).
+    @State private var isSelected = false
 
     // E24.8: hoek-handle-drag schaalt het onderwerp (Portrait2.scale).
     @State private var handleStartScale: Double?
@@ -76,7 +77,14 @@ struct EditorCanvasView: View {
                 y: (transform.offsetY + image.size.height * transform.scale / 2) * factor
             )
 
+            let clip: AnyShape = frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
             ZStack {
+                // E24.17: klik BUITEN het onderwerp (de hoeken bij een cirkel,
+                // of de marge) = deselecteren → handles weg.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { isSelected = false }
+
                 // Onderwerp + ooglijn-guide, ónder de VIEW-zoom (scaleEffect om
                 // het canvasmidden) — los van de SUBJECT-schaal. Tot de
                 // frame-vorm geclipt (cirkel = transparante hoeken).
@@ -88,13 +96,19 @@ struct EditorCanvasView: View {
                     .overlay { AlignmentGuideOverlay2(isVisible: isDragging) }
                     .scaleEffect(viewZoom, anchor: .center)
                     .frame(width: side, height: side)
-                    .clipShape(frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle()))
+                    .clipShape(clip)
+                    // E24.17: klik OP de afbeelding (binnen de vorm) = selecteren
+                    // → transform-handles verschijnen.
+                    .contentShape(clip)
+                    .onTapGesture { isSelected = true }
 
-                // E24.8: selectie-handles op het onderwerp (hoeken, aspect-lock)
-                // — BUITEN de frame-clip zodat ze bij een cirkel zichtbaar zijn.
-                handleLayer(side: side, imgW: imgW, imgH: imgH, center: imgCenter)
+                // E24.8/24.17: selectie-handles — alléén zichtbaar als geselecteerd.
+                if isSelected {
+                    handleLayer(side: side, imgW: imgW, imgH: imgH, center: imgCenter)
+                }
             }
-            .contentShape(Rectangle())
+            // E24.17: pinch = canvas-VIEW-zoom (Figma/Preview). Trackpad/scroll
+            // schaalt niets meer (scroll-monitor verwijderd). Pan blijft op drag.
             .gesture(dragGesture(canvasSide: side))
             .simultaneousGesture(magnifyGesture)
             .onTapGesture(count: 2) {
@@ -103,11 +117,12 @@ struct EditorCanvasView: View {
             }
             .coordinateSpace(name: Self.canvasSpace)
             .clipped()
-            .onHover { hovering in
-                isHovering = hovering
-                hovering ? installScrollMonitor(canvasSide: side) : removeScrollMonitor()
+            #if DEBUG
+            // E24.17 smoke-haak: forceer de geselecteerde staat (handles zichtbaar).
+            .onAppear {
+                if ProcessInfo.processInfo.arguments.contains("--select-subject") { isSelected = true }
             }
-            .onDisappear { removeScrollMonitor() }
+            #endif
         }
         .aspectRatio(1, contentMode: .fit)
     }
@@ -274,10 +289,11 @@ struct EditorCanvasView: View {
         )
     }
 
-    // MARK: - View-zoom (pinch + scroll + HUD), 1×–maxViewZoom om het midden
+    // MARK: - View-zoom (alléén pinch), 1×–maxViewZoom om het midden
 
-    // E24.8: pinch/scroll sturen nu de VIEW-zoom (efemeer), niet meer de
-    // subject-schaal. Het onderwerp schalen gaat via de selectie-handles.
+    // E24.17: pinch = canvas-VIEW-zoom (efemeer, Figma/Preview-gedrag). Scroll
+    // schaalt bewust NIETS meer (de scroll-monitor is verwijderd); het onderwerp
+    // schalen gaat via de selectie-handles.
     private var magnifyGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
@@ -286,24 +302,6 @@ struct EditorCanvasView: View {
                 applyViewZoom(delta: delta)
             }
             .onEnded { _ in lastMagnification = 1 }
-    }
-
-    private func installScrollMonitor(canvasSide: CGFloat) {
-        guard scrollMonitor == nil else { return }
-        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard isHovering else { return event }
-            // Natuurlijke richting: omhoog scrollen = inzoomen (view).
-            let delta = 1 + (event.scrollingDeltaY * -0.0035)
-            applyViewZoom(delta: delta)
-            return nil
-        }
-    }
-
-    private func removeScrollMonitor() {
-        if let scrollMonitor {
-            NSEvent.removeMonitor(scrollMonitor)
-        }
-        scrollMonitor = nil
     }
 
     /// E24.8: efemere viewport-zoom (1×–maxViewZoom). Geen persist, geen undo.
@@ -404,47 +402,6 @@ struct EditorCanvasView: View {
 
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
         hypot(a.x - b.x, a.y - b.y)
-    }
-}
-
-// MARK: - Zoom-HUD (E24.8)
-
-/// −/slider/+/fit voor de VIEW-zoom. Leeft in EditorView (buiten de frame-clip).
-/// SF Symbols (geen Phosphor in AvatarUI/EditorCanvasView).
-struct ZoomHUD: View {
-    @Binding var zoom: Double
-    let maxZoom: Double
-
-    var body: some View {
-        HStack(spacing: DSSpacing.gap2) {
-            button("minus") { set(zoom - 0.25) }
-            Slider(value: $zoom, in: 1...maxZoom)
-                .controlSize(.mini)
-                .frame(width: 96)
-                .tint(DSColor.Action.primary)
-            button("plus") { set(zoom + 0.25) }
-            Divider().frame(height: 14)
-            button("arrow.up.left.and.arrow.down.right.magnifyingglass") {
-                withAnimation(.spring(duration: 0.3)) { zoom = 1 }
-            }
-        }
-        .padding(.horizontal, DSSpacing.gap3)
-        .padding(.vertical, DSSpacing.gap1)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
-    }
-
-    private func set(_ z: Double) { zoom = min(maxZoom, max(1, z)) }
-
-    private func button(_ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(DSColor.Foreground.primary)
-                .frame(width: 22, height: 22)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 

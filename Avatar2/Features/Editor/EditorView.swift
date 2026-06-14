@@ -365,16 +365,8 @@ struct EditorView: View {
                 )
                 .padding(.top, DSSpacing.gap4)
             }
-            // E24.8: zoom-HUD onderaan, búiten de frame-clip (toont altijd; fit
-            // = terug naar 1×). Verdwijnt zodra een paneel/sidebar de onderkant
-            // overlapt zodat hij niet botst.
-            .overlay(alignment: .bottom) {
-                if activeTool == nil && !isSidebarVisible {
-                    ZoomHUD(zoom: $canvasViewZoom, maxZoom: canvasMaxViewZoom)
-                        .padding(.bottom, DSSpacing.gap4)
-                        .transition(.opacity)
-                }
-            }
+            // E24.17: de losse −/+ zoom-HUD is verwijderd (overbodig). View-zoom
+            // gaat nu alléén via pinch (+ dubbelklik = terug naar fit/1×).
             // E24.8: een vers portret opent op 1× view-zoom.
             .onChange(of: portraitModel?.persistentModelID) { _, _ in canvasViewZoom = 1 }
         } panel: { tool in
