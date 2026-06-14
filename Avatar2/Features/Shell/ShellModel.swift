@@ -38,6 +38,10 @@ final class ShellModel {
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
     var isShowingExport = false
 
+    /// E24.21: gedeelde rename-modal (Name + Role), geopend vanuit de
+    /// Name/Role-knop op het canvas (sidebar gebruikt z'n eigen renameTarget).
+    var isShowingRename = false
+
     /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
     private(set) var selectedPortrait: Portrait2?
     /// ModelContext komt uit de environment (ShellView .task) — SwiftData

@@ -1,10 +1,9 @@
-// Name/Role-header (E05.5 + E04.5-fix, Figma: App / Edit Frame 2,
-// 4010:1940 — gecentreerd boven de canvas-kaart). Bevinding 9: inline
-// edit via DSInlineEditLabel (E03.13) — rust = pure tekst, hover =
-// badge-affordance, klik = echt veld op dezelfde plek; Enter/blur
-// bevestigt, Esc annuleert. Naam = heading-variant (Body/Medium primary),
-// rol = subtitle (Body/Small subtle). Waarden schrijven via ShellModel
-// door naar het geselecteerde Portrait2 (E05.4).
+// Name/Role-header (E05.5 → herzien E24.21). Eén knop (geen inline-inputs meer)
+// die de gedeelde rename-modal opent (Name + Role). Rust = pure tekst
+// (gecentreerd boven de canvas-kaart), hover = subtiele affordance. Naam =
+// Body/Medium primary, rol = Body/Small subtle. De modal schrijft door naar
+// het geselecteerde Portrait2; deze view leest het portret direct zodat de
+// wijziging meteen zichtbaar is.
 
 import AvatarUI
 import SwiftUI
@@ -12,18 +11,38 @@ import SwiftUI
 struct PortraitHeader: View {
     @Bindable var model: ShellModel
 
-    /// E24.7-revisie: vaste veldbreedte → het veld blijft op z'n gecentreerde
-    /// plek staan; alleen de tekst lijnt links uit tijdens typen en centreert
-    /// bij commit.
-    private static let fieldWidth: CGFloat = 240
+    private var name: String {
+        let n = model.selectedPortrait?.name ?? ""
+        return n.isEmpty ? "Name" : n
+    }
+    private var role: String {
+        let r = model.selectedPortrait?.role ?? ""
+        return r.isEmpty ? "Role" : r
+    }
+    private var hasName: Bool { !(model.selectedPortrait?.name ?? "").isEmpty }
+    private var hasRole: Bool { !(model.selectedPortrait?.role ?? "").isEmpty }
 
     var body: some View {
-        VStack(spacing: 0) {
-            DSInlineEditLabel("Name", text: $model.portraitName, variant: .heading, fixedWidth: Self.fieldWidth)
-            DSInlineEditLabel("Role", text: $model.portraitRole, variant: .subtitle, fixedWidth: Self.fieldWidth)
+        Button {
+            model.isShowingRename = true
+        } label: {
+            VStack(spacing: 0) {
+                Text(name)
+                    .dsTextStyle(.bodyMedium)
+                    .foregroundStyle(hasName ? DSColor.Foreground.primary : DSColor.Foreground.muted)
+                    .lineLimit(1)
+                Text(role)
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(hasRole ? DSColor.Foreground.subtle : DSColor.Foreground.muted)
+                    .lineLimit(1)
+            }
+            // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24).
+            .frame(height: 52, alignment: .top)
+            .padding(.horizontal, DSSpacing.gap3)
+            .contentShape(Rectangle())
         }
-        // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24 = de twee
-        // regelhoogtes incl. badge-padding). E18.5: top-alignment.
-        .frame(height: 52, alignment: .top)
+        .buttonStyle(.plain)
+        .dsHoverHighlight(cornerRadius: DSRadius.md)
+        .help("Rename")
     }
 }
