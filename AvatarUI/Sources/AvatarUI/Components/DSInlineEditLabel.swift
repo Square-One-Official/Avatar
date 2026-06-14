@@ -42,6 +42,10 @@ public struct DSInlineEditLabel: View {
     private let variant: Variant
     /// E24.7: meldt begin/eind van de edit-staat (voor container-uitlijning).
     private let onEditingChanged: (Bool) -> Void
+    /// E24.7-revisie: vaste veldbreedte zodat het veld NIET meebeweegt met de
+    /// inhoud. Tekst centreert in rust en lijnt links uit tijdens typen. nil =
+    /// oud gedrag (breedte = gemeten tekst, leading).
+    private let fixedWidth: CGFloat?
 
     @State private var isHovering = false
     @State private var isEditing = false
@@ -54,11 +58,13 @@ public struct DSInlineEditLabel: View {
         _ placeholder: String,
         text: Binding<String>,
         variant: Variant = .heading,
+        fixedWidth: CGFloat? = nil,
         onEditingChanged: @escaping (Bool) -> Void = { _ in }
     ) {
         self.placeholder = placeholder
         self._text = text
         self.variant = variant
+        self.fixedWidth = fixedWidth
         self.onEditingChanged = onEditingChanged
     }
 
@@ -91,7 +97,13 @@ public struct DSInlineEditLabel: View {
                     .lineLimit(1)
             }
         }
-        .frame(width: size.width, height: size.height, alignment: .leading)
+        // E24.7-revisie: bij een vaste breedte beweegt het veld niet; de tekst
+        // centreert in rust en lijnt links uit tijdens typen.
+        .frame(
+            width: fixedWidth ?? size.width,
+            height: size.height,
+            alignment: fixedWidth == nil ? .leading : (isEditing ? .leading : .center)
+        )
         .padding(.horizontal, DSSpacing.gap2)
         .padding(.vertical, DSSpacing.gap0_5)
         // Punt 24a: hover-tint één stap sterker (neutral-stronger) —

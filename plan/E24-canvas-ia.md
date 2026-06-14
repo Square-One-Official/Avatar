@@ -86,6 +86,17 @@ niet meer in Settings.
 **leftmost = 13pt** van de vensterrand (target ~12 = gap-3). Settings-screenshot: geen quota-badge
 linksboven (alleen de gear rechtsboven). Screenshots: /tmp/counter_fixed2.png + /tmp/settings_noquota.png.
 
+## 24.7-revisie — Name/Role-veld blijft vast; alleen de tekst lijnt uit
+- status: done
+- owner: FEAT (AI-agent, marathon)
+
+**Result:** Eerdere 24.7 verschoof het hele veld (fout). Nu: `DSInlineEditLabel(fixedWidth:)` →
+het veld heeft een VASTE breedte (240) en blijft gecentreerd staan; het beweegt niet bij focus.
+De tekst centreert in rust en lijnt **links** uit tijdens typen (frame-alignment center↔leading),
+en centreert weer bij commit/blur. PortraitHeader: container-alignment-switch teruggedraaid, beide
+velden vaste breedte. Smoke: rust = Name/Role gecentreerd ✓ (typen/commit = logisch geverifieerd
+via de vaste-breedte-frame; klein veld niet synthetisch te focussen).
+
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
 - status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
   handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),

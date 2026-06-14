@@ -11,26 +11,19 @@ import SwiftUI
 
 struct PortraitHeader: View {
     @Bindable var model: ShellModel
-    // E24.7: gecentreerd in rust, links tijdens typen, hercentreren bij commit.
-    @State private var isEditing = false
+
+    /// E24.7-revisie: vaste veldbreedte → het veld blijft op z'n gecentreerde
+    /// plek staan; alleen de tekst lijnt links uit tijdens typen en centreert
+    /// bij commit.
+    private static let fieldWidth: CGFloat = 240
 
     var body: some View {
-        VStack(alignment: isEditing ? .leading : .center, spacing: 0) {
-            DSInlineEditLabel(
-                "Name", text: $model.portraitName, variant: .heading,
-                onEditingChanged: { isEditing = $0 }
-            )
-            DSInlineEditLabel(
-                "Role", text: $model.portraitRole, variant: .subtitle,
-                onEditingChanged: { isEditing = $0 }
-            )
+        VStack(spacing: 0) {
+            DSInlineEditLabel("Name", text: $model.portraitName, variant: .heading, fixedWidth: Self.fieldWidth)
+            DSInlineEditLabel("Role", text: $model.portraitRole, variant: .subtitle, fixedWidth: Self.fieldWidth)
         }
-        .frame(maxWidth: 280, alignment: isEditing ? .leading : .center)
         // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24 = de twee
-        // regelhoogtes incl. badge-padding) — Name/Role blijven in élke
-        // staat vrij van de canvas-kaart. E18.5: top-alignment zodat het
-        // editveld bij focus alleen naar BENEDEN ruimte pakt.
+        // regelhoogtes incl. badge-padding). E18.5: top-alignment.
         .frame(height: 52, alignment: .top)
-        .animation(.easeOut(duration: 0.18), value: isEditing)
     }
 }
