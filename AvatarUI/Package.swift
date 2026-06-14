@@ -10,6 +10,8 @@ let package = Package(
         .library(name: "AvatarUI", targets: ["AvatarUI"])
     ],
     targets: [
+        // E20.1: Phosphor-package geblokkeerd in de CLI-DoD (zie DSIcon /
+        // DECISIONS-PENDING). DSIcon draait interim op SF Symbols.
         .target(name: "AvatarUI"),
         .testTarget(name: "AvatarUITests", dependencies: ["AvatarUI"])
     ]

@@ -43,3 +43,18 @@
   3. flowType/PKCE: AuthService gebruikt `.implicit` (correct voor OTP) — waarschijnlijk niet de oorzaak.
 - **Te doen door Thierry:** Supabase → Authentication → Email template + OTP-expiry checken; daarna
   in-app opnieuw testen. App-kant (verify + foutweergave als input-error-state) is klaar.
+
+### Phosphor-iconen: SPM-package incompatibel met CLI-DoD (2026-06-14)
+- **Probleem:** `phosphor-icons/swift` (2.1.0) bevat een **asset-catalog**. CLI `swift build`/
+  `swift test` heeft geen `actool`, dus de resource-bundle-accessor wordt niet gegenereerd →
+  `type 'Bundle?' has no member 'module'` in PhosphorSwift.swift. De DoD-stap
+  `swift test --package-path AvatarUI` faalt daardoor. Onder xcodebuild (app-target) zou het
+  wél bouwen.
+- **Interim (gedaan):** `DSIcon`-laag draait op SF Symbols met de bedoelde Phosphor-naam per case
+  in commentaar; één plek om later om te zetten.
+- **Opties voor Thierry (kies één):**
+  1. AvatarUI-unittests vía xcodebuild draaien (scheme/host opzetten) i.p.v. `swift test`, dan kan
+     de Phosphor-package mee. Build-v2.sh aanpassen.
+  2. Een font-gebaseerde Phosphor-bron gebruiken (geen asset-catalog → CLI-vriendelijk).
+  3. Phosphor-SVG's als eigen resources vendoren zonder asset-catalog.
+- Tot dan blijft DSIcon op SF Symbols (visueel benaderend, niet 1-op-1 Figma).
