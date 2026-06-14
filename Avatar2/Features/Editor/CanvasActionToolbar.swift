@@ -1,9 +1,12 @@
-// Canvas action-toolbar (E24.1–24.4, verslankt in E24.9) — scène/beeld-acties
-// bovenaan het portret. Vier top-level items, secundaire acties in dropdowns:
-//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip) · Background · Adjust ·
-//   AI ▾ (Improve lighting/Colorise/Boost/Restore body).
-// Alle dropdowns zijn dezelfde DS-popover (geen native menu); rijen hebben
-// hover-highlight. De toolbar staat alleen op de canvas als er een portret is.
+// Canvas action-toolbar (E24.1–24.4, verslankt in E24.9, popover-stijl E24.12)
+// — scène/beeld-acties bovenaan het portret. Vier top-level items, secundaire
+// acties in dropdowns:
+//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background ·
+//   Adjust · AI ▾ (Improve lighting/Colorise/Boost/Restore body).
+// E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
+// `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
+// aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
+// een klik op de canvas (EditorView) de dropdown sluit, net als de panelen.
 //
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
@@ -12,6 +15,11 @@
 import PhosphorSwift
 import AvatarUI
 import SwiftUI
+
+/// E24.12: de vier canvas-toolbar-dropdowns (open-staat gedeeld met EditorView).
+enum CanvasToolbarMenu: Hashable {
+    case frame, background, adjust, ai
+}
 
 struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     var onCrop: (() -> Void)?
@@ -26,48 +34,67 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     var onColorise: () -> Void = {}
     var onBoost: () -> Void = {}
     var isPro: Bool = false
+    /// E24.12: welke dropdown open is (nil = geen). Binding zodat de
+    /// canvas-tap-dismiss in EditorView 'm ook sluit.
+    @Binding var activeMenu: CanvasToolbarMenu?
     @ViewBuilder var adjust: () -> Adjust
     @ViewBuilder var background: () -> Background
 
-    @State private var showFrame = false
-    @State private var showAdjust = false
-    @State private var showBackground = false
-    @State private var showAI = false
-
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
-            menuButton("Frame", icon: .frameCorners, isActive: showFrame) { showFrame = true }
-                .popover(isPresented: $showFrame, arrowEdge: .bottom) {
-                    frameMenu.padding(DSSpacing.gap2).frame(width: 240)
-                }
-
-            menuButton("Background", icon: .image, isActive: showBackground, chevron: false) { showBackground = true }
-                .popover(isPresented: $showBackground, arrowEdge: .bottom) {
-                    background().padding(DSSpacing.gap4).frame(width: 320)
-                }
-
-            menuButton("Adjust", icon: .slidersHorizontal, isActive: showAdjust, chevron: false) { showAdjust = true }
-                .popover(isPresented: $showAdjust, arrowEdge: .bottom) {
-                    adjust().padding(DSSpacing.gap5).frame(width: 360)
-                }
-
-            menuButton("AI", icon: .sparkle, isActive: showAI, chevron: true) { showAI = true }
-                .popover(isPresented: $showAI, arrowEdge: .bottom) {
-                    aiMenu.padding(DSSpacing.gap2).frame(width: 240)
-                }
+            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
+                frameMenu
+            }
+            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
+                background()
+            }
+            toolbarItem(.adjust, "Adjust", icon: .slidersHorizontal, chevron: false, width: 360, padding: DSSpacing.gap5) {
+                adjust()
+            }
+            toolbarItem(.ai, "AI", icon: .sparkle, chevron: true, width: 240, padding: DSSpacing.gap2) {
+                aiMenu
+            }
         }
         .padding(DSSpacing.gap1)
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        .animation(.easeOut(duration: 0.14), value: activeMenu)
         #if DEBUG
         .onAppear {
             let args = ProcessInfo.processInfo.arguments
-            if args.contains("--show-bg-popover") { showBackground = true }
-            if args.contains("--show-ai-popover") { showAI = true }
-            if args.contains("--show-frame-popover") { showFrame = true }
-            if args.contains("--show-adjust-popover") { showAdjust = true }
+            if args.contains("--show-bg-popover") { activeMenu = .background }
+            if args.contains("--show-ai-popover") { activeMenu = .ai }
+            if args.contains("--show-frame-popover") { activeMenu = .frame }
+            if args.contains("--show-adjust-popover") { activeMenu = .adjust }
         }
         #endif
+    }
+
+    /// E24.12: een toolbar-knop met zijn caret-loze, zwevende dropdown-kaart
+    /// eronder (overlay, niet door de capsule geclipt). De kaart deelt het
+    /// `dsPanelSurface`-oppervlak met de bottom-panelen.
+    @ViewBuilder
+    private func toolbarItem<Content: View>(
+        _ menu: CanvasToolbarMenu, _ title: String, icon: Ph,
+        chevron: Bool, width: CGFloat, padding: CGFloat,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        menuButton(title, icon: icon, isActive: activeMenu == menu, chevron: chevron) {
+            activeMenu = (activeMenu == menu) ? nil : menu
+        }
+        .overlay(alignment: .top) {
+            if activeMenu == menu {
+                content()
+                    .padding(padding)
+                    .frame(width: width)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .dsPanelSurface(cornerRadius: DSRadius.xl)
+                    // Onder de capsule (knop 32 + capsule-padding + lucht).
+                    .offset(y: 44)
+                    .zIndex(10)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+            }
+        }
     }
 
     // MARK: Dropdown-inhoud
@@ -94,7 +121,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
 
     private func shapeRow(_ title: String, icon: Ph, shape: ExportShape) -> some View {
         Button {
-            showFrame = false
+            activeMenu = nil
             onSetFrameShape(shape)
         } label: {
             HStack(spacing: DSSpacing.gap2) {
@@ -129,7 +156,7 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     /// Een dropdown-rij; `action == nil` = nog-niet-gebouwde stub (gedimd).
     private func menuRow(_ title: String, icon: Ph, pro: Bool = false, action: (() -> Void)?) -> some View {
         Button {
-            showFrame = false; showAI = false
+            activeMenu = nil
             action?()
         } label: {
             HStack(spacing: DSSpacing.gap2) {

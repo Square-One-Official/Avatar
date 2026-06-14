@@ -72,21 +72,17 @@ public struct DSEditPanel<Content: View>: View {
                 transaction.disablesAnimations = true
                 withTransaction(transaction) { contentHeight = height }
             }
+            // E24.12: zachte rand-fade boven/onder zodat scroll-inhoud niet
+            // hard afsnijdt (gedeeld met de toolbar-popovers via de DS-stijl).
+            .dsEdgeFade()
         }
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
         .frame(maxWidth: maxWidth)
-        // E18.22: subtiel glas — in-window-blur + een donkere tint die net
-        // genoeg doorlaat om de foto erachter te voelen, maar donker genoeg
-        // blijft om de inhoud helder te lezen.
-        .background {
-            ZStack {
-                WithinWindowBlur(material: .hudWindow)
-                DSColor.Background.card.opacity(0.82)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
-        .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
+        // E24.12: gedeeld paneel-oppervlak (glas + rand + radius + schaduw),
+        // identiek aan de canvas-toolbar-dropdowns. Voorheen inline (zonder
+        // rand) en niet deelbaar met de systeem-`.popover`.
+        .dsPanelSurface(cornerRadius: DSRadius.xl4)
     }
 
     /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet
