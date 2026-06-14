@@ -109,10 +109,26 @@ alle suites groen.
 respecteert targeting/schedule, seen/dismiss lokaal (los van v1).
 
 ## 17.4 — [DS] DSMessageSheet + banner-variant
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon — DS-werk op directe Thierry-opdracht)
 - blockedBy: —
 - DoD: AvatarUI bouwt + tests groen; snapshot/preview-smoke.
+
+**Plan:**
+1. `DSMessageSheet` (AvatarUI): hero (16:9 AsyncImage, optioneel) + titel + markdown-body +
+   optionele CTA (DSPrimaryButton, fullWidth) + dismiss (DSIconButton xmark). Card-stijl als
+   DSEditPanel (bg Card, r-xl4, shadow), tokens uit E03.
+2. `DSMessageBanner` (compacte inline-variant): optionele thumb + titel + 1-regel body + CTA-chevron
+   + dismiss.
+3. ImageRenderer-smoke-tests (met/zonder image + CTA) zoals DSEditPanelTests.
+
+**Result:** `DSMessageSheet` + `DSMessageBanner` in AvatarUI (Components/DSMessageSheet.swift),
+v2-huisstijl op E03-tokens: sheet = optionele 16:9 AsyncImage-hero + titel (h3) + markdown-body
+(AttributedString, met platte-tekst-fallback) + optionele lime CTA (DSPrimaryButton fullWidth) +
+dismiss-kruis (DSIconButton), card-stijl als DSEditPanel (bg Card, r-xl4, shadow); banner =
+compacte thumb + titel + 1-regel body + CTA-chevron + dismiss. 2 ImageRenderer-smoke-tests
+(sheet met/zonder image+CTA; banner met/zonder CTA). On-screen-smoke volgt in 17.5 (mount in
+Avatar2). AvatarUI bouwt + alle suites groen.
 
 `DSMessageSheet` + banner-variant in de v2-huisstijl (lime/dark, tokens uit E03): image + body +
 CTA + dismiss. (AvatarUI tijdelijk toegestaan binnen deze marathon-opdracht.)
