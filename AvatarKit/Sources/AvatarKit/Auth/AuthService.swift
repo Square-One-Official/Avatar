@@ -72,24 +72,39 @@ public final class AuthService {
 
     /// Stap 2: verifieer de code. Spiegelt de sessie eager naar
     /// `accessToken`/`email`.
+    ///
+    /// `signInWithOTP(shouldCreateUser: true)` levert voor een BESTAANDE
+    /// gebruiker een `.email`-OTP, maar voor een NIEUW adres een
+    /// `.signup`-token. Dezelfde 6-cijfercode met het verkeerde type geeft
+    /// "Token has expired or is invalid" — daarom proberen we eerst `.email`
+    /// en vallen we terug op `.signup` (E18.21).
     public func verifyCode(email: String, code: String) async throws {
         isBusy = true
         lastError = nil
         defer { isBusy = false }
         do {
-            let response = try await supabase.auth.verifyOTP(
-                email: email,
-                token: code,
-                type: .email
-            )
-            if let session = response.session {
-                accessToken = session.accessToken
-                self.email = session.user.email
-            }
+            try await verifySession(email: email, code: code, type: .email)
         } catch {
-            lastError = friendlyMessage(error)
-            throw error
+            do {
+                try await verifySession(email: email, code: code, type: .signup)
+            } catch {
+                lastError = friendlyMessage(error)
+                throw error
+            }
         }
+    }
+
+    private func verifySession(email: String, code: String, type: EmailOTPType) async throws {
+        let response = try await supabase.auth.verifyOTP(email: email, token: code, type: type)
+        if let session = response.session {
+            accessToken = session.accessToken
+            self.email = session.user.email
+        }
+    }
+
+    /// Wist de laatste foutmelding (bv. nadat de toast 'm getoond heeft).
+    public func clearError() {
+        lastError = nil
     }
 
     public func signOut() {

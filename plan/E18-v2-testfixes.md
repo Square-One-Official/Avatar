@@ -107,6 +107,17 @@ afvinken. UI-fixes met visuele smoke.
       (WithinWindowBlur + Background.card 0.82) → de foto schemert licht door, inhoud blijft leesbaar.
       Smoke ✓.
 
+- [x] **18.21 OTP "token expired" + fout als toast** — DONE+gemerged.
+      • Vermoedelijke oorzaak: `signInWithOTP(shouldCreateUser: true)` geeft voor een NIEUW adres een
+        `.signup`-token, maar we verifieerden altijd met type `.email` → "Token has expired or is
+        invalid". `AuthService.verifyCode` probeert nu `.email` en valt terug op `.signup`.
+        (Andere mogelijke oorzaak — te korte OTP-expiry in Supabase — = wacht-op-Thierry, live config.)
+      • Fout als **toast**: SignInSheet toonde de fout als blijvende inline-tekst; nu een DSToast
+        (auto-dismiss 4s) i.p.v. lingerende tekst. Inline-fouttekst in beide stappen verwijderd.
+      • Lingerende tekst gewist: `dismissAuthError()` bij sheet-open en bij "Wrong email? Go back";
+        code-veld leegt bij een mislukte verify. (Toast-weergave niet ge-smoket: vraagt een live
+        Supabase-auth-fout; Thierry bevestigt hands-on.)
+
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-
       grants ingetrokken + newsletter_optins-tabel aangemaakt.

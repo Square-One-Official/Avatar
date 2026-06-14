@@ -116,6 +116,11 @@ final class EntitlementModel {
     var authBusy: Bool { auth.isBusy }
     var authError: String? { auth.lastError }
 
+    /// E18.21: wis de auth-fout (nadat de toast 'm getoond heeft / bij stap-wissel).
+    func dismissAuthError() {
+        auth.clearError()
+    }
+
     /// Stap 1: Supabase mailt een OTP-code naar dit adres.
     func sendSignInCode(_ email: String) async {
         try? await auth.requestCode(email: email)

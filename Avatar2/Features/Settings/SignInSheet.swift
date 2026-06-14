@@ -39,6 +39,24 @@ struct SignInSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
+        // E18.21: auth-fouten (bv. "Token expired") als toast i.p.v. blijvende
+        // inline-tekst; auto-dismiss zodat hij niet blijft hangen.
+        .overlay(alignment: .bottom) {
+            if let error = entitlement.authError {
+                DSToast(title: "Couldn't sign you in", description: error) {
+                    entitlement.dismissAuthError()
+                }
+                .padding(DSSpacing.gap4)
+                .transition(.opacity)
+                .task {
+                    try? await Task.sleep(for: .seconds(4))
+                    entitlement.dismissAuthError()
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: entitlement.authError)
+        // Schone start: geen oude fout van een vorige poging.
+        .onAppear { entitlement.dismissAuthError() }
     }
 
     private var emailStep: some View {
@@ -53,9 +71,6 @@ struct SignInSheet: View {
                 .onSubmit { sendCode() }
             DSPrimaryButton("Send code", fullWidth: true) { sendCode() }
                 .disabled(!canSubmitEmail || entitlement.authBusy)
-            if let error = entitlement.authError {
-                Text(error).dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.subtle)
-            }
         }
     }
 
@@ -73,14 +88,11 @@ struct SignInSheet: View {
                 .onChange(of: code) { _, newValue in
                     if newValue.count == Self.otpLength { verify() }
                 }
-            if let error = entitlement.authError {
-                Text(error).dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.subtle)
-            }
             DSPrimaryButton("Verify", fullWidth: true) { verify() }
                 .disabled(code.count != Self.otpLength || entitlement.authBusy)
             DSGhostButton("Resend code", fullWidth: true) { sendCode() }
                 .disabled(entitlement.authBusy)
-            Button("Wrong email? Go back") { phase = .email; code = "" }
+            Button("Wrong email? Go back") { phase = .email; code = ""; entitlement.dismissAuthError() }
                 .buttonStyle(.plain)
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.subtle)
