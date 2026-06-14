@@ -41,7 +41,20 @@ de referentie-screenshot.
     via de binding. Definitieve API in de Result.
 
 ## 25.2 — Background-menu: "+" → DSColorPicker
-- status: ready (na 25.1)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** de losse eyedropper-knop in de Color-rij is vervangen door een **"+"-knop HELEMAAL
+LINKS** die een `DSColorPicker` (zonder alpha) in een `.popover` opent. Terwijl de picker open is
+werkt de achtergrond live mee (`onChange(pickerColor)` → `selectColor(hex)`); bij sluiten wordt de
+kleur als persistente brand-swatch bewaard (`BrandColorKit.add`). De picker heeft zijn eigen
+eyedropper (NSColorSampler), dus de losse knop is overbodig.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: Background-dropdown met de "+" links in
+de Color-rij (vóór de presets) (/tmp/c25_2_bg.png); DSColorPicker-render is in 25.1 bevestigd. De
+"+"-klik → picker → bg/brand-wiring is via `onChange` gewired.
+**Figma-TODO:** popover-positionering vanuit de toolbar-dropdown bevestigen; of de gekozen kleur
+altijd als brand-swatch moet of alleen op expliciet opslaan.
 - **Plan:** vervang de losse eyedropper-knop in de Color-rij door een **"+"-knop HELEMAAL LINKS** in
   de Color-rij die de DSColorPicker opent (popover/sheet). De gekozen/gesamplede kleur wordt de
   achtergrond (`backgroundColorHex`) én een persistente brand-kit-swatch (`BrandColorKit`, E07.1).
