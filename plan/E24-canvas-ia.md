@@ -5,6 +5,31 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.19 — Uitlijn-gids VAST als doel-overlay + auto-align-standaard
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** `AlignmentGuideOverlay2` is herzien naar een **rule-of-thirds-grid over de VOLLE canvas**
++ een nadruk-ooglijn (volle breedte) op de standaard-positie + oogmarkers. De gids wordt nu als
+ZStack-SIBLING gerenderd, BUITEN de `scaleEffect`(view-zoom) én buiten de afbeeldings-`clipShape` en
+op canvasmaat geframed → hij **schaalt/beweegt niet mee** en wordt **niet door de frame/cirkel-clip
+afgekapt** (lijnen beslaan de hele canvas, ook in de hoeken). Alléén de afbeelding/achtergrond clipt
+naar de frame-vorm; de overlay-lijnen + de selectie-handles (24.8, al sibling) liggen erbóven.
+Zichtbaar tijdens positioneren (`isSelected || isDragging`).
+
+**Auto-align-standaard (vastgelegd, "mooiste portretcrop"):** ogen op de **bovenste derde**
+(`targetEyeCenterY = 0.37`), horizontaal **gecentreerd** (`targetEyeCenterX = 0.50`), kopgrootte via
+vaste interoogafstand (`targetInterEyeRatio = 0.12` → consistente koppen, **headroom** doordat de
+kruin ~18% bóven de ooglijn valt), face-rect-fallback 0.38/0.42, **geen zwevend onderwerp**
+(`bodyOvershoot = 0.03`), en **frame-ademruimte** `frameFitPadding = 0.85` (24.18). De afbeelding
+lijnt naar deze gids uit. Waarden zijn de getunede v1-constanten (test-gepind) — bewust ongewijzigd.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot (square, selected + `--show-guide`):
+thirds-grid + ooglijn + 4 hoek-handles beslaan de volle canvas, niet afgekapt (/tmp/c19_guide2.png).
+Smoke-haak (#if DEBUG): `--show-guide`.
+**Figma-TODO:** grid-stijl (opacity/dash), of de gids ook bij rust subtiel zichtbaar moet zijn, en
+exacte eye-line-positie (0.37 vs. exacte 1/3) tegen de referenties.
+
 ## 24.20 — Counter uitlijnen met de Name/Role-kop + top-right iconen
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
