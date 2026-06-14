@@ -17,6 +17,10 @@ struct ShellTopBar: View {
     /// E08.2: export/share. Verborgen tot er een portret op het canvas staat.
     var canExport: Bool = false
     var onExport: () -> Void = {}
+    /// E22.1: bibliotheek/sidebar-toggle, verhuisd uit de bottom-toolbar.
+    var canToggleSidebar: Bool = false
+    var isSidebarActive: Bool = false
+    var onToggleSidebar: () -> Void = {}
 
     var body: some View {
         // E18.19: counter + Upgrade staan weer op de top-rij, verticaal
@@ -42,6 +46,17 @@ struct ShellTopBar: View {
             }
             Spacer()
             HStack(spacing: DSSpacing.gap2) {
+                if canToggleSidebar {
+                    // E22.1: bibliotheek/sidebar-toggle in de app-bar.
+                    DSToolButton(
+                        Image(systemName: "sidebar.right"),
+                        label: "Library",
+                        isActive: isSidebarActive,
+                        tooltipEdge: .bottom
+                    ) {
+                        onToggleSidebar()
+                    }
+                }
                 if canExport {
                     // Frame 27 share-icoon → export/share (E08.2).
                     DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {

@@ -146,8 +146,12 @@ struct EditorView: View {
         }
     }
 
+    // E22.1: de bottom-toolbar is puur subject-edits — de Images/sidebar-
+    // toggle is verhuisd naar de app-bar (ShellTopBar).
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
-        EditorTool.allCases.map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
+        EditorTool.allCases
+            .filter { $0 != .images }
+            .map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
     /// sidebar en openen hun paneel. E18.20: GEEN eigen withAnimation meer —
@@ -188,6 +192,11 @@ struct EditorView: View {
             .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in undoTick += 1 }
             .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in undoTick += 1 }
             .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in undoTick += 1 }
+            // E22.1: de sidebar (nu via de app-bar) en een open paneel sluiten
+            // elkaar uit — opent de sidebar, dan klapt het paneel dicht.
+            .onChange(of: isSidebarVisible) { _, visible in
+                if visible { activeTool = nil }
+            }
     }
 
     @ViewBuilder

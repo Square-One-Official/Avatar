@@ -136,7 +136,11 @@ struct ShellView: View {
                 isSettingsActive: model.isShowingSettings,
                 onToggleSettings: { model.isShowingSettings.toggle() },
                 canExport: model.canExport && !model.isShowingSettings,
-                onExport: { model.exportCurrentPortrait() }
+                onExport: { model.exportCurrentPortrait() },
+                // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
+                canToggleSidebar: model.canExport && !model.isShowingSettings,
+                isSidebarActive: model.isSidebarVisible,
+                onToggleSidebar: { model.toggleSidebar() }
             )
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
