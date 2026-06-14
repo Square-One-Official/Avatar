@@ -82,10 +82,28 @@ platform; nieuwsbrief-dispatch via Resend vanuit hetzelfde Message-record. Cohor
 unsubscribe behouden. Live tegen preview = gated.
 
 ## 17.3 — [AI] MessagingService in AvatarKit
-- status: ready
-- owner: —
-- blockedBy: 17.2
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- blockedBy: 17.2 (done)
 - DoD: beide targets bouwen, tests groen.
+
+**Plan:**
+1. `Message`-model (AvatarKit, mirror van Announcement + `frequency`), met publieke memberwise init
+   voor gebruik/tests + Decodable.
+2. `BackendClient.fetchMessages() -> [Message]` (GET /v1/messages, `{messages:[…]}`) +
+   `markMessageSeen(slug:action:)` (hergebruikt /v1/announcements/seen → gedeelde announcement_seen).
+3. `MessagingService` (@MainActor @Observable): refresh → queue (server-getarget), `current`,
+   `dismiss()` (lokale dismissed-set in UserDefaults + server-seen). Pure `filterDismissed`-helper
+   voor de testbaarheid.
+
+**Result:** `Message`-model (AvatarKit/Backend/Message.swift, mirror van Announcement + `frequency`,
+publieke memberwise init + Decodable). `BackendClient.fetchMessages()` (GET /v1/messages) +
+`markMessageSeen(slug:action:)` (hergebruikt het seen-endpoint → gedeelde announcement_seen-tabel).
+`MessagingService` (@MainActor @Observable): `refresh()` → server-getargete queue met lokaal-
+gedismisste slugs eruit, `current`, `dismiss()`/`acknowledge()` (lokale UserDefaults-set +
+fire-and-forget server-seen), pure `filterDismissed`-helper. 4 nieuwe tests (filter + Message-
+decode incl. defaults). Niet-destructief — Announcement-pad blijft. Beide targets bouwen groen,
+alle suites groen.
 
 `MessagingService` (port + verbetering van `AnnouncementService`): haalt getargete messages,
 respecteert targeting/schedule, seen/dismiss lokaal (los van v1).

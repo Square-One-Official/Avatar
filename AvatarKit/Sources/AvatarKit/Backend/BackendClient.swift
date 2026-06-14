@@ -545,6 +545,25 @@ public final class BackendClient {
         return resp.badges
     }
 
+    // MARK: GET /v1/messages (E17.3)
+    /// Getargete in-app-berichten (verenigd Message-model, E17.2). De server
+    /// filtert op cohort/signup-datum/app-versie/platform/expiry/seen; de
+    /// client krijgt de lijst en beheert de queue (MessagingService).
+    private struct MessagesResponse: Decodable {
+        let messages: [Message]
+    }
+    public func fetchMessages() async throws -> [Message] {
+        let resp: MessagesResponse = try await request("/v1/messages", method: "GET")
+        return resp.messages
+    }
+
+    /// Markeer een bericht als gezien/gedismissed. Hergebruikt het
+    /// announcement-seen-endpoint (gedeelde `announcement_seen`-tabel die
+    /// /v1/messages óók leest), zodat dismiss server-side persisteert.
+    public func markMessageSeen(slug: String, action: String) async throws {
+        try await markAnnouncementSeen(slug: slug, action: action)
+    }
+
     // MARK: - Generic request
     private func request<R: Decodable>(
         _ path: String,
