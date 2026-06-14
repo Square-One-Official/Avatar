@@ -12,9 +12,22 @@ import SwiftUI
 public struct DSEditPanel<Content: View>: View {
     private let title: String
     private let content: Content
+    private let maxWidth: CGFloat
+    private let maxContentHeight: CGFloat
 
-    public init(title: String, @ViewBuilder content: () -> Content) {
+    /// E18.15: panelen waren overweldigend — volle vensterbreedte en hoog.
+    /// Default nu compacter: `maxWidth` houdt het paneel weg van de randen
+    /// (foto groter), `maxContentHeight` begrenst de hoogte → inhoud scrollt
+    /// i.p.v. het paneel op te rekken.
+    public init(
+        title: String,
+        maxWidth: CGFloat = 600,
+        maxContentHeight: CGFloat = 280,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
+        self.maxWidth = maxWidth
+        self.maxContentHeight = maxContentHeight
         self.content = content()
     }
 
@@ -23,10 +36,17 @@ public struct DSEditPanel<Content: View>: View {
             Text(title)
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
-            content
+            // E18.15: één scrollbare kolom; het paneel groeit niet voorbij
+            // maxContentHeight (foto houdt ruimte), inhoud scrollt erin.
+            ScrollView(.vertical, showsIndicators: true) {
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: maxContentHeight)
         }
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
+        .frame(maxWidth: maxWidth)
         .background(DSColor.Background.card)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
         .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
@@ -66,8 +86,10 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
                 .layoutPriority(-1)
 
             if let tool = activeTool {
+                // E18.15: geen fixedSize meer — het paneel begrenst zijn
+                // eigen hoogte (DSEditPanel.maxContentHeight) en scrollt; de
+                // foto (layoutPriority -1) krijgt de resterende ruimte.
                 panel(tool)
-                    .fixedSize(horizontal: false, vertical: true)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 

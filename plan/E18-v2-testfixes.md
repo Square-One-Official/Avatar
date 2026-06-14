@@ -52,9 +52,14 @@ afvinken. UI-fixes met visuele smoke.
       ShellTopBar is nu een VStack: rij 1 = top-strook (h52) met rechts Share/Settings, links de
       OS-lights; rij 2 = quota + Upgrade-chip, leading = `topBarInset` (gap-3 = 12). Counter zit nu
       écht ~12pt van de linkerrand i.p.v. ~72pt ernaast. Smoke ✓.
-- [ ] **18.15 Edit-paneel compacter + scrollbaar** — alle acties onder elkaar in een scrollbare
-      lijst; paneel minder hoog + niet volle vensterbreedte (compacter); foto groter. Idem voor de
-      andere menupanelen (Effects/Hair/Clothing/Background).
+- [x] **18.15 Edit-paneel compacter + scrollbaar** — DONE+gemerged. Centraal in DSEditPanel:
+      `maxWidth: 600` (niet meer volle breedte) + `maxContentHeight: 280` met interne ScrollView
+      (minder hoog, scrollbaar) → geldt meteen voor álle panelen (Edit/Effects/Hair/Clothing/
+      Background). EditActionsPanel: 2-koloms grid → één kolom (alles onder elkaar). Container:
+      fixedSize weg zodat de hoogte-cap regeert; foto (layoutPriority -1) krijgt de extra ruimte →
+      merkbaar groter. DSEditPanel-pixeltest aangepast (ImageRenderer rastert scroll-inhoud niet;
+      toetst nu op de paneel-kaart i.p.v. scroll-inhoud). Smoke ✓ (smal paneel, één kolom, scroll,
+      grotere foto).
 
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-

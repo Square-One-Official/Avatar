@@ -75,12 +75,9 @@ struct EditActionsPanel: View {
         ]
     }
 
-    private let columns = [
-        GridItem(.flexible(), spacing: DSSpacing.gap2),
-        GridItem(.flexible(), spacing: DSSpacing.gap2),
-    ]
-
     var body: some View {
+        // E18.15: één kolom (alles onder elkaar) i.p.v. een 2-koloms grid;
+        // DSEditPanel maakt het scrollbaar en begrenst de hoogte.
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             if isBoosting {
                 HStack(spacing: DSSpacing.gap2) {
@@ -95,10 +92,8 @@ struct EditActionsPanel: View {
                     Text(section.title)
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.muted)
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: DSSpacing.gap2) {
-                        ForEach(section.actions) { action in
-                            row(action)
-                        }
+                    ForEach(section.actions) { action in
+                        row(action)
                     }
                 }
             }
