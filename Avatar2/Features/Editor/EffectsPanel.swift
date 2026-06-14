@@ -132,6 +132,10 @@ struct EffectsPanel: View {
                             styleCard(style)
                         }
                     }
+                    // E24.15: ruimte zodat de hover-scale niet tegen de scroll-
+                    // grens clipt (zoals de background-swatch-fix 24.10).
+                    .padding(.vertical, DSSpacing.gap1)
+                    .padding(.horizontal, DSSpacing.gap1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,43 +145,18 @@ struct EffectsPanel: View {
     private func styleCard(_ style: StylizeStyle) -> some View {
         let isSelected = model.selected == style
         let isWorking = model.phase == .working(style)
+        // E24.15: gedeelde DSThumbnailCard (placeholder-icoon tot echte
+        // stijl-thumbnails landen — ASSETS.md). Geen per-kaart credits: de
+        // kost staat al in de panel-header.
         return Button {
             model.toggle(style)
         } label: {
-            VStack(spacing: DSSpacing.gap2) {
-                ZStack {
-                    // Placeholder-preview (ASSETS.md): echte stijl-thumbnails
-                    // levert Thierry later in batch.
-                    RoundedRectangle(cornerRadius: DSRadius.lg)
-                        .fill(DSColor.Background.neutral)
-                        .frame(width: 84, height: 84)
-                        .overlay {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 22, weight: .regular))
-                                .foregroundStyle(DSColor.Foreground.muted)
-                        }
-                    if isWorking {
-                        RoundedRectangle(cornerRadius: DSRadius.lg)
-                            .fill(.black.opacity(0.35))
-                            .frame(width: 84, height: 84)
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: DSRadius.lg)
-                        .strokeBorder(DSColor.Action.primary, lineWidth: 2)
-                        .frame(width: 84, height: 84)
-                        .opacity(isSelected ? 1 : 0)
-                }
-                Text(style.label)
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
+            DSThumbnailCard(label: style.label, isSelected: isSelected, isWorking: isWorking, tileSize: 84) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 22, weight: .regular))
             }
         }
         .buttonStyle(.plain)
-        // E24.15: hover-state op de stijl-thumbnails (was afwezig).
-        .dsHoverScale()
         .disabled(model.isBusy)
         .opacity(model.isBusy && !isWorking ? 0.5 : 1)
     }

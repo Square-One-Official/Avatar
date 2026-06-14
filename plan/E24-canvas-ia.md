@@ -98,14 +98,31 @@ velden vaste breedte. Smoke: rust = Name/Role gecentreerd ✓ (typen/commit = lo
 via de vaste-breedte-frame; klein veld niet synthetisch te focussen).
 
 ## 24.15 — Effects-hover + Face thumbnail-kaarten
-- status: DEELS — Effects-thumbnail-hover **done** (dsHoverScale). REST GEPARKEERD: Face-acties als
-  thumbnail-kaarten (phosphor-icoon + label, Pro-badge bovenin, credits onderin met gradient-overlay,
-  per sectie horizontaal scrollbaar) + één **gedeelde DS-thumbnail-kaart** (Effects+Face, klaar voor
-  Clothing/Hair). **Plan:** maak `DSThumbnailCard` (AvatarUI of Avatar2): vierkante preview-tile
-  (84–96) met optionele top-leading Pro-badge (DSProChip) + bottom credits over een
-  `LinearGradient(.clear→.black)`-overlay, label eronder, selectie-ring, hover (dsHoverScale).
-  Refactor EffectsPanel + FaceActionsPanel ernaar (Face: secties Retouch/Beauty, elk een
-  horizontale scrollRow van kaarten). Phosphor-iconen per actie.
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** nieuwe gedeelde **`DSThumbnailCard`** (AvatarUI) — vierkante preview-tile met optionele
+top-leading Pro-badge (DSProChip), credit-kost onderin over een `LinearGradient(.clear→.black)`-
+overlay, label eronder, selectie-ring en `dsHoverScale`. Icoon-agnostisch (generic `Icon`-view),
+omdat Phosphor aan het app-target hangt, niet aan AvatarUI — Effects/Face leveren het icoon.
+`EffectsPanel.styleCard` refactored ernaar (geen per-kaart credits/Pro; kost staat in de header).
+`FaceActionsPanel` herschreven: secties **Retouch** (One click retouch, magicWand, lokaal/aan-uit)
+en **Beauty** (Whiten teeth/Apply make-up/Reduce wrinkles — tooth/palette/smiley, Pro-badge +
+"4 credits"), elk een horizontaal scrollbare rij kaarten. Scroll-rijen kregen padding zodat de
+hover-scale + Pro-badge niet tegen de grens clippen (24.10-patroon).
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (build-v2.sh, incl. AvatarUI-
+package-compile van de nieuwe component). Smoke: Face-paneel (`--open-panel face`) toont de kaarten
+exact volgens spec — Retouch-kaart (icoon+label, geen badge/credits) + 3 Beauty-kaarten met
+phosphor-icoon, groene Pro-badge bovenin, "4 credits" onderin over de gradient, label eronder,
+horizontaal scrollbaar (/tmp/face_2415.png). Effects gebruikt dezelfde `DSThumbnailCard` (build-
+geverifieerd; dedicated Effects-screenshot werd geblokkeerd door een fullscreen-video op het scherm
+ten tijde van capture — niet-codegerelateerd).
+
+**Restpunt:** `EditorActionList`/`EditorAction` (Avatar2/Features/Editor) zijn nu ongebruikt (Face was
+de laatste gebruiker) — onschadelijk; opruimen bij een rustige refactor.
+**Figma-TODO:** kaart-maten/tinten + de gekozen Phosphor-glyphs per Face-actie (tooth/palette/smiley/
+magicWand) tegen de referenties leggen; echte Effects-thumbnails komen later (ASSETS.md).
 
 ## 24.16 — Frame-vorm: Circle (default) / Square
 - status: done
