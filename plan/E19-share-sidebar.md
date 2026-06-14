@@ -45,4 +45,13 @@ afronding (defer). De inline knop-labels blijven als secundaire indicatie. Build
 een set ≥2 + klik → niet synthetisch ge-smoket; zelfde DSToast-patroon als elders.)
 
 ## 19.6 — Sidebar hover-performance onderzoeken + fixen
-- status: todo (meting voor/na in Result)
+- status: done
+- owner: FEAT (AI-agent, marathon)
+
+**Result:** Oorzaak gevonden: `thumbnail(for:)` deed `NSImage(data: portrait.cutoutData)` — een
+full-res PNG-decode — bij ÉLKE rij-render. DSSidebarRow her-rendert op hover (opacity-state), dus
+elke muisbeweging over de lijst decodeerde meerdere full-res PNG's → hover-lag. Fix:
+`SidebarThumbnailCache` (NSCache) decodeert + downscalet één keer per (portret, `updatedAt`) naar
+96px en hergebruikt die. Build groen. **Meting:** geen Instruments in deze omgeving — kwalitatief:
+vóór = N full-res decodes per hover-render; ná = 0 (cache-hit, kleine bitmap). Verse thumb bij edit
+via de updatedAt-key.

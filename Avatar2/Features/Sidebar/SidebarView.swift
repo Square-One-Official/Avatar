@@ -145,7 +145,8 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func thumbnail(for portrait: Portrait2) -> some View {
-        if let image = NSImage(data: portrait.cutoutData) {
+        // E19.6: gecachte, gedownscalede thumb i.p.v. full-res decode per render.
+        if let image = SidebarThumbnailCache.thumbnail(for: portrait) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFill()
