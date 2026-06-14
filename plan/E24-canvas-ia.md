@@ -115,7 +115,38 @@ via de vaste-breedte-frame; klein veld niet synthetisch te focussen).
   cirkel-PNG. (Besef: dit maakt de cirkel de DEFAULT-merkvorm — bevestigen.)
 
 ## 24.14 — Adjust-waarden persistent (non-destructief)
-- status: GEPARKEERD (grotere refactor). **Plan:** brightness/contrast/saturation/temperature op
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** `Portrait2` kreeg `adjustBrightness/Contrast/Saturation/Temperature` (defaults
+0/1/1/0) + waarde-object `PortraitAdjust` (+ `adjust`-accessor). De Adjust-laag is ORTHOGONAAL:
+`cutoutData` blijft rauw; destructieve ops (Effects/Clothing/Hair/Flip/Retouch/Boost) werken op
+`rawCutout`; de params zijn altijd de bovenste niet-destructieve filterlaag. Canvas
+(`ShellModel.select/applyEffectResult/commitAdjust/refreshCanvasFromSelection` → `adjustedImage`)
+én export (`PortraitExporter.makePNG` past `colorAdjust` toe vóór compositing) = WYSIWYG.
+`EditColorPanel` neemt nu de rauwe `source` + `initial`-params (heropenen toont de stand) en commit
+param-delta's; nieuwe `AdjustUndo` registreert before→after param-snapshots (Cmd-Z/redo). Twee
+undo-stacks blijven onafhankelijk → geen dubbeltelling.
+
+**DoD/Verificatie (geverifieerd, niet "zou moeten"):** build-v2.sh groen — beide targets bouwen +
+alle pakkettests (27 AvatarUI + AvatarKit + Avatar2). Smoke (`--seed-adjust`/`--reset-adjust`/
+`--show-adjust-popover`, allemaal #if DEBUG): (1) Adjust-popover toont 4 sliders + Reset; (2)
+seeded stand niet-destructief op canvas + persisteert: export-meanRGB ging van baseline
+(164.6,84.2,48.6) → warm (183.0,101.2,67.8), en een PLAIN relaunch zónder seed exporteerde
+identiek (183.0,101.2,67.8) = params overleefden de SwiftData-store; (3) heropenen toont de stand
+(sliders niet-neutraal in screenshot warm vs. neutraal+Reset-disabled na reset); (4) Reset zet terug
+naar de rauwe basis (raw cutout intact). Screenshots: /tmp/canvas_adjust_2414.png (warm) +
+/tmp/canvas_reset_2414.png (neutraal). Dev-store na afloop teruggezet op neutraal.
+
+**Figma-TODO:** (a) Adjust-popover gebruikt nog de systeem-`.popover` mét caret → 24.12. (b) geen
+DS-slider-component; SwiftUI `Slider` met DS-tint (bestaande TODO in EditColorPanel-header).
+- **Plan (gekozen aanpak):** Adjust-laag is ORTHOGONAAL aan de cutout. `cutoutData` blijft de RAUWE
+  cutout; destructieve ops (Effects/Flip/Retouch/Boost/Clothing/Hair) bewerken de rauwe cutout;
+  de Adjust-params (`adjust*` op Portrait2) zijn altijd de bovenste niet-destructieve filterlaag.
+  Canvas + export = `colorAdjust(rawCutout, params)`. Twee undo-stacks blijven onafhankelijk (de één
+  swapt cutoutData, de ander de params) → geen dubbeltelling. Per-pixel color-adjust commuteert met
+  flip; voor cloud-ops is adjust een top-filter (Photoshop-adjustment-layer-model).
+- **(oorspr. plan)** brightness/contrast/saturation/temperature op
   `Portrait2` (defaults 0/1/1/0); EditColorPanel bindt de sliders eraan (heropenen toont de stand);
   pas de params NIET-destructief toe op het canvas + in de export (WYSIWYG) i.p.v. bakken in
   cutoutData; meenemen in undo/redo en bij portret-wissel. Raakt canvas-rendering + export +

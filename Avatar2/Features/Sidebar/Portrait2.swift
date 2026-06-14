@@ -40,6 +40,16 @@ final class Portrait2 {
     var backgroundColorHex: String?
     @Attribute(.externalStorage) var backgroundImageData: Data?
 
+    /// Adjust-laag (E24.14): NIET-destructieve color-correctie als bovenste
+    /// filterlaag op de rauwe cutout. `cutoutData` blijft ongewijzigd; canvas
+    /// én export passen deze params live toe (WYSIWYG). Neutraal = identiteit
+    /// (brightness 0, contrast 1, saturation 1, temperature 0). Lichtgewicht
+    /// migratie via de defaults. Heropenen van Adjust toont de stand terug.
+    var adjustBrightness: Double = 0
+    var adjustContrast: Double = 1
+    var adjustSaturation: Double = 1
+    var adjustTemperature: Double = 0
+
     init(
         name: String = "",
         role: String = "",
@@ -59,4 +69,33 @@ final class Portrait2 {
     func touch() {
         updatedAt = .now
     }
+
+    /// E24.14: de Adjust-laag als waarde-object (lezen/schrijven van de vier
+    /// `adjust*`-velden in één keer).
+    var adjust: PortraitAdjust {
+        get {
+            PortraitAdjust(
+                brightness: adjustBrightness, contrast: adjustContrast,
+                saturation: adjustSaturation, temperature: adjustTemperature
+            )
+        }
+        set {
+            adjustBrightness = newValue.brightness
+            adjustContrast = newValue.contrast
+            adjustSaturation = newValue.saturation
+            adjustTemperature = newValue.temperature
+        }
+    }
+}
+
+/// E24.14: niet-destructieve Adjust-laag (brightness/contrast/saturation/
+/// temperature) als waarde-object. Neutraal = identiteit.
+struct PortraitAdjust: Equatable {
+    var brightness: Double = 0
+    var contrast: Double = 1
+    var saturation: Double = 1
+    var temperature: Double = 0
+
+    static let neutral = PortraitAdjust()
+    var isNeutral: Bool { self == .neutral }
 }

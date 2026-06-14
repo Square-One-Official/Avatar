@@ -164,8 +164,10 @@ final class ShellModel {
         selectedPortrait = portrait
         portraitName = portrait.name
         portraitRole = portrait.role
-        if let image = NSImage(data: portrait.cutoutData) {
-            canvas = .result(image)
+        if let raw = NSImage(data: portrait.cutoutData) {
+            // E24.14: canvas toont de rauwe cutout mét de niet-destructieve
+            // Adjust-laag erbovenop (WYSIWYG).
+            canvas = .result(adjustedImage(raw, portrait.adjust))
         }
         if let data = try? JSONEncoder().encode(portrait.persistentModelID) {
             UserDefaults.standard.set(data, forKey: Self.lastSelectedKey)
@@ -180,19 +182,36 @@ final class ShellModel {
     /// stijl, later kleding/haar) vervangt het canvas-resultaat én het
     /// opgeslagen cutout. Het canvas toont de NSImage uit `canvas`, niet uit
     /// het model — beide moeten dus mee, anders blijft de oude foto staan.
+    /// E24.14: destructieve ops bewerken de RAUWE cutout; de Adjust-laag blijft
+    /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
     func applyEffectResult(_ image: NSImage) {
-        canvas = .result(image)
         if let png = pngData(from: image), let portrait = selectedPortrait {
             portrait.cutoutData = png
             portrait.touch()
+            canvas = .result(adjustedImage(image, portrait.adjust))
+        } else {
+            canvas = .result(image)
         }
     }
 
     /// E22.3: goedkope live-preview voor de color-sliders — alléén het canvas,
     /// niet cutoutData (geen PNG-encode per tick). De commit gaat via
-    /// `applyEffectResult` (+ undo).
+    /// `commitAdjust` (+ undo). Het paneel levert hier al de geadjusteerde
+    /// NSImage aan.
     func previewCanvas(_ image: NSImage) {
         canvas = .result(image)
+    }
+
+    /// E24.14: commit de Adjust-laag op het geselecteerde portret (niet-
+    /// destructief) en hercomputeer het canvas. Undo/redo loopt via dezelfde
+    /// closure (AdjustUndo). cutoutData blijft ongemoeid.
+    func commitAdjust(_ adjust: PortraitAdjust) {
+        guard let portrait = selectedPortrait else { return }
+        portrait.adjust = adjust
+        portrait.touch()
+        if let raw = NSImage(data: portrait.cutoutData) {
+            canvas = .result(adjustedImage(raw, adjust))
+        }
     }
 
     /// E18.4: her-afleidt het canvas uit de cutoutData van het geselecteerde
@@ -200,11 +219,24 @@ final class ShellModel {
     /// cutoutData via CutoutDataUndo — niet het canvas. Wordt aangeroepen na
     /// elke undo/redo zodat zo'n wijziging (en het terugdraaien ervan) ook op
     /// het canvas zichtbaar wordt. No-op buiten de result-staat.
+    /// E24.14: render altijd mét de Adjust-laag erbovenop.
     func refreshCanvasFromSelection() {
         guard case .result = canvas,
               let portrait = selectedPortrait,
-              let image = NSImage(data: portrait.cutoutData) else { return }
-        canvas = .result(image)
+              let raw = NSImage(data: portrait.cutoutData) else { return }
+        canvas = .result(adjustedImage(raw, portrait.adjust))
+    }
+
+    /// E24.14: pas de niet-destructieve Adjust-laag toe op een rauwe cutout.
+    /// Neutraal → het origineel ongewijzigd (geen render-overhead).
+    private func adjustedImage(_ raw: NSImage, _ adjust: PortraitAdjust) -> NSImage {
+        guard !adjust.isNeutral,
+              let cg = raw.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let out = PortraitEnhancer.colorAdjust(
+                cg, brightness: adjust.brightness, contrast: adjust.contrast,
+                saturation: adjust.saturation, temperatureShift: adjust.temperature
+              ) else { return raw }
+        return NSImage(cgImage: out, size: raw.size)
     }
 
     // MARK: - Hifi-haar-nudge (E05.6)
@@ -227,6 +259,17 @@ final class ShellModel {
     #if DEBUG
     /// Smoke-run-haak: forceer de nudge zichtbaar.
     func debugForceHairNudge() { showHairNudge = true }
+
+    /// E24.14 smoke-haak: zet een zichtbare niet-destructieve Adjust-stand op
+    /// het geselecteerde portret (warm + helder) en hercomputeer het canvas.
+    /// Bewijst dat cutoutData rauw blijft terwijl canvas/export de laag tonen.
+    func debugSeedAdjust() {
+        commitAdjust(PortraitAdjust(brightness: 0.18, contrast: 1.15, saturation: 1.4, temperature: 0.6))
+    }
+
+    /// E24.14 smoke-haak: zet de Adjust-laag terug op neutraal (inverse van
+    /// debugSeedAdjust) — laat de dev-store schoon achter voor andere smokes.
+    func debugResetAdjust() { commitAdjust(.neutral) }
 
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
     /// te dupliceren, en open de sidebar.

@@ -54,6 +54,7 @@
 		35BA180F51EA4E407C8CE194 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2908C8F495E33C31BC66686B /* Supabase */; };
 		36C01F9F1DC90CF4F7731F3F /* logo.svg in Resources */ = {isa = PBXBuildFile; fileRef = DB0C0C9C43AFC1383D6C54E2 /* logo.svg */; };
 		36DA0CF01E7F1EBB5CF7CB7A /* NewBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */; };
+		37DBE53613C79814FFD858A2 /* AdjustUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DD6F25623AC483A733A2EA /* AdjustUndo.swift */; };
 		383F6B236F23534C5389909D /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DB5F24C632ED79CFC435879 /* SidebarView.swift */; };
 		3D000915F635A4D128130DB4 /* Mesh 02.png in Resources */ = {isa = PBXBuildFile; fileRef = E21A227552D65C64EBB609A5 /* Mesh 02.png */; };
 		3E68E52E884B6BF3BEEB5AFF /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3181E7327476F43F448EA102 /* LibraryImportSheet.swift */; };
@@ -219,6 +220,7 @@
 /* Begin PBXFileReference section */
 		017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
+		04DD6F25623AC483A733A2EA /* AdjustUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustUndo.swift; sourceTree = "<group>"; };
 		051B298A2948690FF14EB935 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
 		05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairEdgeHeuristicTests.swift; sourceTree = "<group>"; };
 		0ED61BA47F9EEBF8B65EBD9D /* OnboardingDownloadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingDownloadView.swift; sourceTree = "<group>"; };
@@ -408,6 +410,7 @@
 		321B2081449B5D7591ADF91C /* Editor */ = {
 			isa = PBXGroup;
 			children = (
+				04DD6F25623AC483A733A2EA /* AdjustUndo.swift */,
 				8483B0B526A772D660C1ECB8 /* AutoFramer.swift */,
 				64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */,
 				04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */,
@@ -935,6 +938,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				37DBE53613C79814FFD858A2 /* AdjustUndo.swift in Sources */,
 				88F219E35BB48BDC77DA3BAF /* AutoFramer.swift in Sources */,
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
 				C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */,

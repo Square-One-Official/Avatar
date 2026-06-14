@@ -85,6 +85,9 @@ struct EditorView: View {
     var onApplyResult: (NSImage) -> Void = { _ in }
     /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
     var onPreview: (NSImage) -> Void = { _ in }
+    /// E24.14: commit van de niet-destructieve Adjust-laag (params persisteren
+    /// op het portret + canvas hercomputeren). Undo loopt via dezelfde closure.
+    var onCommitAdjust: (PortraitAdjust) -> Void = { _ in }
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -128,6 +131,15 @@ struct EditorView: View {
     private var originalImage: NSImage? {
         guard let data = portraitModel?.originalData else { return nil }
         return NSImage(data: data)
+    }
+
+    /// E24.14: de RAUWE cutout (zonder Adjust-laag). `portrait` is het
+    /// canvasbeeld (mét Adjust); destructieve ops + de Adjust-sliders moeten op
+    /// de rauwe pixels werken, zodat de Adjust-laag orthogonaal blijft en niet
+    /// dubbel telt. Zonder model is er geen Adjust → het canvasbeeld is rauw.
+    private var rawCutout: NSImage {
+        if let portraitModel, let raw = NSImage(data: portraitModel.cutoutData) { return raw }
+        return portrait
     }
 
     /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit).
@@ -231,14 +243,17 @@ struct EditorView: View {
     /// in de canvas-toolbar, dus hier zonder Auto-enhance-menu).
     private var editColorPanel: some View {
         EditColorPanel(
-            source: portrait,
+            source: rawCutout,
+            initial: portraitModel?.adjust ?? .neutral,
             onPreview: onPreview,
             onCommit: { before, after in
-                onApplyResult(after)
+                // E24.14: niet-destructief — persisteer alléén de params; het
+                // canvas hercomputeert (adjust(raw)). cutoutData blijft rauw.
+                onCommitAdjust(after)
                 if let portraitModel {
-                    ImageEnhanceUndo.register(
-                        undoManager, target: portraitModel, apply: onApplyResult,
-                        undoTo: before, redoTo: after, actionName: "Color adjust"
+                    AdjustUndo.register(
+                        undoManager, target: portraitModel, apply: onCommitAdjust,
+                        undoTo: before, redoTo: after, actionName: "Adjust"
                     )
                 }
             },
@@ -314,14 +329,15 @@ struct EditorView: View {
                 DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
                     // E22.3: live color-sliders + Auto-enhance-dropdown.
                     EditColorPanel(
-                        source: portrait,
+                        source: rawCutout,
+                        initial: portraitModel?.adjust ?? .neutral,
                         onPreview: onPreview,
                         onCommit: { before, after in
-                            onApplyResult(after)
+                            onCommitAdjust(after)
                             if let portraitModel {
-                                ImageEnhanceUndo.register(
-                                    undoManager, target: portraitModel, apply: onApplyResult,
-                                    undoTo: before, redoTo: after, actionName: "Color adjust"
+                                AdjustUndo.register(
+                                    undoManager, target: portraitModel, apply: onCommitAdjust,
+                                    undoTo: before, redoTo: after, actionName: "Adjust"
                                 )
                             }
                         },
@@ -347,14 +363,14 @@ struct EditorView: View {
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit).
-                ClothesPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Change clothes"))
+                ClothesPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change clothes"))
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize.
-                EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Apply effect"))
+                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Apply effect"))
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
                 // /v1/stylize (nano-banana instruction-edit, E11.1-route).
-                HairPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Change hair"))
+                HairPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change hair"))
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")
@@ -400,7 +416,7 @@ struct EditorView: View {
         guard let portraitModel else { return }
         if let baseline = localToggleBaselines[key] {
             // Uit: terug naar de foto van vóór deze enhance.
-            let current = portrait
+            let current = rawCutout
             onApplyResult(baseline)
             ImageEnhanceUndo.register(
                 undoManager, target: portraitModel,
@@ -412,11 +428,12 @@ struct EditorView: View {
             )
             localToggleBaselines[key] = nil
         } else {
-            // Aan: enhance toepassen op de huidige foto.
-            guard let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
+            // Aan: enhance toepassen op de huidige (rauwe) foto.
+            let base = rawCutout
+            guard let cg = base.cgImage(forProposedRect: nil, context: nil, hints: nil),
                   let outCG = transform(cg) else { return }
-            let before = portrait
-            let after = NSImage(cgImage: outCG, size: portrait.size)
+            let before = base
+            let after = NSImage(cgImage: outCG, size: base.size)
             onApplyResult(after)
             ImageEnhanceUndo.register(
                 undoManager, target: portraitModel,
@@ -432,7 +449,8 @@ struct EditorView: View {
 
     /// E22.2: spiegel het portret horizontaal (undo'baar via onApplyResult).
     private func flipHorizontally() {
-        guard let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
+        let base = rawCutout
+        guard let cg = base.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(
                 data: nil, width: cg.width, height: cg.height,
@@ -443,7 +461,7 @@ struct EditorView: View {
         ctx.scaleBy(x: -1, y: 1)
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
         guard let out = ctx.makeImage() else { return }
-        undoableApply("Flip")(NSImage(cgImage: out, size: portrait.size))
+        undoableApply("Flip")(NSImage(cgImage: out, size: base.size))
     }
 
     /// E18.4: maak cloud-resultaten (Effects/Clothing/Hair) undo'baar. De
@@ -469,10 +487,10 @@ struct EditorView: View {
     /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
     private func runBoostResolution() {
         guard !isBoosting, let entitlement, let portraitModel,
-              let png = Self.pngData(from: portrait) else { return }
+              let png = Self.pngData(from: rawCutout) else { return }
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        let before = portrait
+        let before = rawCutout
         Task {
             isBoosting = true
             defer { isBoosting = false }
