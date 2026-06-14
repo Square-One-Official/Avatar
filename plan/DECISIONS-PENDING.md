@@ -2,7 +2,13 @@
 
 ## Open
 
-_(geen)_
+### Double-opt-in filtering bij nieuwsbrief-dispatch (E17.6) — VOORSTEL, wacht op Thierry
+- **Context:** `newsletter_optins` (sql 014) is een additief opt-in-grootboek. De dispatch filtert
+  er nu bewust NIET op, zodat bestaande account-houders (die al opt-in gaven bij registratie) niet
+  retroactief uitgesloten raken.
+- **Voorstel:** voor puur-marketing-/re-engagement-cohorten de dispatch optioneel laten filteren op
+  `confirmed_at IS NOT NULL` (ontgrendel dan ook de `payload_app`-SELECT-grant in sql 014).
+  Transactionele/welkom-mails blijven ongefilterd. Te bevestigen door Thierry vóór live.
 
 ## Beslist
 

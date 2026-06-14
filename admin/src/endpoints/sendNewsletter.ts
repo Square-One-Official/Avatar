@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as React from "react";
 import AnnouncementEmail from "../emails/AnnouncementEmail";
+import MessageEmail from "../emails/MessageEmail";
 import { lexicalToHtml } from "../lib/lexical";
 import { resolveRecipients } from "../lib/recipients";
 import { unsubscribeUrlFor } from "../lib/unsubscribe-token";
@@ -31,6 +32,10 @@ const handler: PayloadHandler = async (req) => {
   const announcementId = typeof body.announcementId === "string" ? body.announcementId : "";
   const testMode = body.testMode === true;
   const testEmail = typeof body.testEmail === "string" ? body.testEmail : "";
+  // E17.6: hetzelfde endpoint dient nu ook het verenigde Message-model.
+  // Default blijft "announcements" zodat de bestaande knop ongewijzigd werkt.
+  const collection: "announcements" | "messages" =
+    body.collection === "messages" ? "messages" : "announcements";
 
   if (!announcementId) {
     return Response.json({ error: "announcementId required" }, { status: 400 });
@@ -45,18 +50,27 @@ const handler: PayloadHandler = async (req) => {
   }
 
   const ann = await req.payload.findByID({
-    collection: "announcements",
+    collection,
     id: announcementId,
     depth: 2,
   });
   if (!ann) {
-    return Response.json({ error: "Announcement not found" }, { status: 404 });
+    return Response.json({ error: "Record not found" }, { status: 404 });
   }
   const newsletter = (ann as Record<string, unknown>).newsletter as
     | { send?: boolean; subject?: string; fromName?: string; customBody?: unknown; sentAt?: string }
     | undefined;
-  if (!newsletter?.send && !testMode) {
-    return Response.json({ error: "newsletter.send is false" }, { status: 400 });
+  // Send-gate: announcements op newsletter.send; messages op channel email/both.
+  const channel = (ann as { channel?: string }).channel;
+  const sendEnabled =
+    collection === "messages"
+      ? channel === "email" || channel === "both"
+      : newsletter?.send === true;
+  if (!sendEnabled && !testMode) {
+    return Response.json(
+      { error: collection === "messages" ? "channel is not email/both" : "newsletter.send is false" },
+      { status: 400 },
+    );
   }
   if (newsletter?.sentAt && !testMode) {
     return Response.json({ error: "Already sent at " + newsletter.sentAt }, { status: 409 });
@@ -79,9 +93,11 @@ const handler: PayloadHandler = async (req) => {
   // bound to the specific address — Resend's `batch.send` accepts an
   // array of distinct messages, so the per-recipient cost is just an HMAC
   // + a `render()` call (both cheap; the JSX tree is tiny).
+  // E17.6: messages krijgen het v2-merk-template; announcements het oude.
+  const EmailTemplate = collection === "messages" ? MessageEmail : AnnouncementEmail;
   const renderForRecipient = async (recipient: string): Promise<string> =>
     render(
-      React.createElement(AnnouncementEmail, {
+      React.createElement(EmailTemplate, {
         title,
         bodyHtml,
         imageUrl,
@@ -113,14 +129,19 @@ const handler: PayloadHandler = async (req) => {
     return Response.json({ ok: true, testMessageId: data?.id });
   }
 
-  // Resolve audience.
-  const audience = ((ann as { audience?: string }).audience ?? "all") as
-    | "all"
-    | "freeUsers"
-    | "proUsers"
-    | "specificEmails";
+  // Resolve audience. Announcements dragen `audience` top-level; messages
+  // dragen het onder `targeting.cohort` (zelfde waarden).
+  const targeting = (ann as { targeting?: { cohort?: string; audienceEmails?: { email?: string }[] } }).targeting;
+  const audience = (
+    collection === "messages"
+      ? targeting?.cohort ?? "all"
+      : (ann as { audience?: string }).audience ?? "all"
+  ) as "all" | "freeUsers" | "proUsers" | "specificEmails";
   const audienceEmails = (() => {
-    const arr = (ann as { audienceEmails?: { email?: string }[] }).audienceEmails ?? [];
+    const arr =
+      collection === "messages"
+        ? targeting?.audienceEmails ?? []
+        : (ann as { audienceEmails?: { email?: string }[] }).audienceEmails ?? [];
     return arr.map((e) => e.email ?? "").filter(Boolean);
   })();
   const cohort = await resolveRecipients(audience, audienceEmails);
@@ -188,7 +209,7 @@ const handler: PayloadHandler = async (req) => {
 
   // Stamp sentAt so the endpoint can't double-fire.
   await req.payload.update({
-    collection: "announcements",
+    collection,
     id: announcementId,
     data: {
       newsletter: {

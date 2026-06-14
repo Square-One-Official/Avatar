@@ -160,10 +160,36 @@ Toon getarget bericht bij app-start / na eerste cutout; CTA naar feature/deeplin
 seen-state persistent; geen layoutshift.
 
 ## 17.6 — [INFRA] Nieuwsbrief 2.0
-- status: ready
-- owner: —
-- blockedBy: 17.1, 17.2
+- status: done (code + tsc gemerged) — **live dispatch + DB-migratie 014 + env = wacht-op-Thierry**
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: 17.1 (done), 17.2 (done)
 - DoD: admin/backend-TS typecheckt; templates renderen (unit waar mogelijk).
+
+**Plan:**
+1. `admin/src/emails/MessageEmail.tsx`: React-Email-template in het v2-merk (lime/dark), zelfde
+   props als AnnouncementEmail + unsubscribe-footer.
+2. `admin/src/endpoints/sendNewsletter.ts`: `collection`-param ("announcements"|"messages",
+   default announcements); messages-tak gate't op `channel` email/both, resolve't recipients op
+   `targeting.cohort`/audienceEmails, gebruikt MessageEmail, stempelt newsletter.sentAt. recipients.ts
+   ongewijzigd (zelfde cohort-keys).
+3. Double opt-in: `admin/src/lib/optin-token.ts` (HMAC-signer, mirror unsubscribe-token) +
+   `backend/api/v1/newsletter/confirm.ts` (verifieert token, markeert bevestigd). DB =
+   `backend/sql/014_newsletter_double_optin.sql` (reviewbaar, gated).
+4. `admin/NIEUWSBRIEF-2.0.md`: flow, cohort/signup-datum-note, gated stappen. admin/backend tsc groen.
+
+**Result:** Nieuwsbrief 2.0 code-compleet (tsc groen). (b) `MessageEmail.tsx` — v2-merk (dark +
+lime CTA), zelfde props/footer als AnnouncementEmail (blijft bestaan). (d) `sendNewsletter.ts`
+accepteert nu `collection: "messages"` (default announcements, niet-destructief): gate op
+`channel` email/both, recipients uit `targeting.cohort`/`audienceEmails` (zelfde keys →
+bestaande resolveRecipients), MessageEmail-template, sentAt-stempel — dit is de uit 17.2 gevouwen
+message-dispatch. (a) Double opt-in: `admin/src/lib/optin-token.ts` (signer + confirmUrlFor) +
+`backend/lib/optin-token.ts` (verifier, 14d) + `backend/api/v1/newsletter/confirm.ts` (token →
+`newsletter_optins.confirmed_at` → bevestigingspagina). (c) cohorten + flow in
+`admin/NIEUWSBRIEF-2.0.md` (welkom-na-OTP via confirmUrlFor, Pro-only, re-engagement;
+signup-datum-filter = view-uitbreiding, gated). admin tsc + backend tsc groen; Swift onaangeroerd.
+**WACHT-OP-THIERRY:** DB-migratie `backend/sql/014_newsletter_double_optin.sql`, env
+`OPTIN_SIGNING_SECRET`/`OPTIN_BASE_URL`, en de echte Resend-verzending. Double-opt-in-filtering =
+voorstel in DECISIONS-PENDING (Open).
 
 Double opt-in + React-Email-templates in nieuw merk; cohorten uit v2-onboarding (welkom na OTP,
 Pro-only, re-engagement). Unsubscribe behouden. Live dispatch/DB = gated.
