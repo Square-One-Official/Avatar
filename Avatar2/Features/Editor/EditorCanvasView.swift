@@ -38,6 +38,8 @@ struct EditorCanvasView: View {
     // E24.17: onderwerp geselecteerd → transform-handles zichtbaar (klik op de
     // afbeelding selecteert, klik erbuiten deselecteert).
     @State private var isSelected = false
+    // E24.19 smoke-haak: forceer de (vaste) uitlijn-gids zichtbaar.
+    @State private var debugShowGuide = false
 
     // E24.8: hoek-handle-drag schaalt het onderwerp (Portrait2.scale).
     @State private var handleStartScale: Double?
@@ -85,15 +87,14 @@ struct EditorCanvasView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { isSelected = false }
 
-                // Onderwerp + ooglijn-guide, ónder de VIEW-zoom (scaleEffect om
-                // het canvasmidden) — los van de SUBJECT-schaal. Tot de
-                // frame-vorm geclipt (cirkel = transparante hoeken).
+                // Onderwerp, ónder de VIEW-zoom (scaleEffect om het
+                // canvasmidden) — los van de SUBJECT-schaal. Tot de frame-vorm
+                // geclipt (cirkel = transparante hoeken).
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: imgW, height: imgH)
                     .position(x: imgCenter.x, y: imgCenter.y)
-                    .overlay { AlignmentGuideOverlay2(isVisible: isDragging) }
                     .scaleEffect(viewZoom, anchor: .center)
                     .frame(width: side, height: side)
                     .clipShape(clip)
@@ -101,6 +102,16 @@ struct EditorCanvasView: View {
                     // → transform-handles verschijnen.
                     .contentShape(clip)
                     .onTapGesture { isSelected = true }
+
+                // E24.19: uitlijn-gids als VAST doel-overlay — buiten de
+                // scaleEffect/clip en op canvasmaat, dus hij schaalt/beweegt NIET
+                // mee met de afbeelding of de view-zoom én wordt NIET door de
+                // frame-vorm afgekapt (volle canvas). De afbeelding lijnt
+                // hiernaartoe uit (auto-align mikt op dezelfde FramingConstants).
+                // Zichtbaar tijdens positioneren (selectie of drag).
+                AlignmentGuideOverlay2(isVisible: isSelected || isDragging || debugShowGuide)
+                    .frame(width: side, height: side)
+                    .allowsHitTesting(false)
 
                 // E24.8/24.17: selectie-handles — alléén zichtbaar als geselecteerd.
                 if isSelected {
@@ -118,9 +129,12 @@ struct EditorCanvasView: View {
             .coordinateSpace(name: Self.canvasSpace)
             .clipped()
             #if DEBUG
-            // E24.17 smoke-haak: forceer de geselecteerde staat (handles zichtbaar).
+            // E24.17/24.19 smoke-haken: forceer de geselecteerde staat resp. de
+            // (vaste) uitlijn-gids zichtbaar.
             .onAppear {
-                if ProcessInfo.processInfo.arguments.contains("--select-subject") { isSelected = true }
+                let args = ProcessInfo.processInfo.arguments
+                if args.contains("--select-subject") { isSelected = true }
+                if args.contains("--show-guide") { debugShowGuide = true }
             }
             #endif
         }
@@ -405,11 +419,14 @@ struct EditorCanvasView: View {
     }
 }
 
-// MARK: - Guide-overlay (v1 AlignmentGuideOverlay in DS-stijl)
+// MARK: - Uitlijn-gids (E24.19 — rule-of-thirds + ooglijn-doel, DS-stijl)
 
-/// Ooglijn + oogmarkers + hoofd-ovaal op de standaard-positie
-/// (FramingConstants), action-lime i.p.v. v1-cyaan. Fade 0,15 s — de
-/// overlay leeft alleen tijdens een drag.
+/// VASTE doel-overlay: een rule-of-thirds-grid over de VOLLE canvas + een
+/// nadruk-ooglijn op de standaard-positie (FramingConstants, ogen op de
+/// bovenste derde) met oogmarkers. Action-lime. De afbeelding lijnt hiernaartoe
+/// uit (auto-align mikt op dezelfde constants). Wordt BOVEN de frame-clip
+/// gerenderd en op canvasmaat geframed → de lijnen beslaan de hele canvas en
+/// breken niet af op de cirkel-/frame-rand. Fade 0,15 s.
 struct AlignmentGuideOverlay2: View {
     let isVisible: Bool
 
@@ -419,33 +436,27 @@ struct AlignmentGuideOverlay2: View {
             let ied = FramingConstants.targetInterEyeRatio * side
             let eyeCX = FramingConstants.targetEyeCenterX * side
             let eyeCY = FramingConstants.targetEyeCenterY * side
-            let ovalW = ied * 2.5
-            let ovalH = ied * 3.6
-            let ovalCY = eyeCY + ovalH * 0.10
 
             ZStack {
-                // Verticale midden-X-lijn (snapdoel).
+                // Rule-of-thirds-grid over de VOLLE canvas (compositie-aid).
                 Path { p in
-                    p.move(to: CGPoint(x: side / 2, y: 0))
-                    p.addLine(to: CGPoint(x: side / 2, y: side))
+                    for f in [1.0 / 3.0, 2.0 / 3.0] {
+                        p.move(to: CGPoint(x: side * f, y: 0))
+                        p.addLine(to: CGPoint(x: side * f, y: side))
+                        p.move(to: CGPoint(x: 0, y: side * f))
+                        p.addLine(to: CGPoint(x: side, y: side * f))
+                    }
                 }
-                .stroke(DSColor.Action.primary.opacity(0.25),
-                        style: StrokeStyle(lineWidth: 0.75, dash: [4, 3]))
+                .stroke(DSColor.Action.primary.opacity(0.22), lineWidth: 0.75)
 
-                // Hoofd-ovaal.
-                Ellipse()
-                    .stroke(DSColor.Action.primary.opacity(0.40),
-                            style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                    .frame(width: ovalW, height: ovalH)
-                    .position(x: eyeCX, y: ovalCY)
-
-                // Standaard-ooglijn.
+                // Doel-ooglijn (volle breedte, nadruk) — ogen op de bovenste
+                // derde; dit is waar auto-align de ogen plaatst.
                 Path { p in
-                    p.move(to: CGPoint(x: eyeCX - ovalW * 0.55, y: eyeCY))
-                    p.addLine(to: CGPoint(x: eyeCX + ovalW * 0.55, y: eyeCY))
+                    p.move(to: CGPoint(x: 0, y: eyeCY))
+                    p.addLine(to: CGPoint(x: side, y: eyeCY))
                 }
-                .stroke(DSColor.Action.primary.opacity(0.30),
-                        style: StrokeStyle(lineWidth: 0.75, dash: [4, 3]))
+                .stroke(DSColor.Action.primary.opacity(0.55),
+                        style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
 
                 eyeMarker(at: CGPoint(x: eyeCX - ied / 2, y: eyeCY), size: ied * 0.30)
                 eyeMarker(at: CGPoint(x: eyeCX + ied / 2, y: eyeCY), size: ied * 0.30)
