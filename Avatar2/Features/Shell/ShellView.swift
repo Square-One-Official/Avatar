@@ -30,7 +30,8 @@ struct ShellView: View {
                 SidebarView(
                     selectedID: model.selectedPortrait?.persistentModelID,
                     onSelect: { model.select($0) },
-                    onAdd: { model.presentOpenPanel() }
+                    onAdd: { model.presentOpenPanel() },
+                    onExport: { model.select($0); model.exportCurrentPortrait() }
                 )
                 // Losstaande kaart met marge rondom (bevinding 8; frame-
                 // inzet 4) — zelfde inset waarmee de kaartradius

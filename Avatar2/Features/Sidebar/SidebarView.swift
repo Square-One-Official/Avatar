@@ -24,8 +24,14 @@ struct SidebarView: View {
     let selectedID: PersistentIdentifier?
     let onSelect: (Portrait2) -> Void
     let onAdd: () -> Void
+    /// E19.2: export het portret via de shell (selecteert + opent de popup).
+    var onExport: (Portrait2) -> Void = { _ in }
 
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.modelContext) private var modelContext
+    /// E19.2/19.3: context-menu-acties.
+    @State private var renameTarget: Portrait2?
+    @State private var deleteTarget: Portrait2?
     /// E05.7: loopt tijdens een set-brede align (knop disabled + pulse).
     @State private var isAligning = false
     /// E12.2: loopt tijdens de set-brede lichtnormalisatie.
@@ -55,6 +61,13 @@ struct SidebarView: View {
                             action: { onSelect(portrait) },
                             avatar: { thumbnail(for: portrait) }
                         )
+                        // E19.2: rechtermuis → Rename / Export / Delete.
+                        .contextMenu {
+                            Button("Rename") { renameTarget = portrait }
+                            Button("Export…") { onExport(portrait) }
+                            Divider()
+                            Button("Delete", role: .destructive) { deleteTarget = portrait }
+                        }
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap4)
@@ -102,6 +115,30 @@ struct SidebarView: View {
                 style: .continuous
             )
         )
+        // E19.3: rename-modal.
+        .sheet(isPresented: Binding(
+            get: { renameTarget != nil },
+            set: { if !$0 { renameTarget = nil } }
+        )) {
+            if let target = renameTarget { RenameSheet(portrait: target) }
+        }
+        // E19.2: delete met bevestiging.
+        .confirmationDialog(
+            "Delete this portrait?",
+            isPresented: Binding(
+                get: { deleteTarget != nil },
+                set: { if !$0 { deleteTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let target = deleteTarget { modelContext.delete(target) }
+                deleteTarget = nil
+            }
+            Button("Cancel", role: .cancel) { deleteTarget = nil }
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 
     @ViewBuilder
