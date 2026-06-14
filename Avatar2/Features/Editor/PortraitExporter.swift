@@ -10,12 +10,26 @@ import AppKit
 import AvatarKit
 import SwiftUI
 
+/// E19.1: export-vorm (v1-pariteit). Circle maskeert de vierkante output.
+enum ExportShape: String, CaseIterable, Identifiable {
+    case square, circle
+    var id: String { rawValue }
+    var label: String { self == .square ? "Square" : "Circle" }
+}
+
 enum PortraitExporter {
     static let exportSide = 1024
+    /// E19.1: aangeboden maten in de export-popup.
+    static let sizeOptions = [512, 1024, 2048]
 
     /// Bouwt de export-PNG voor een portret. nil als er geen cutout is.
     @MainActor
-    static func makePNG(for portrait: Portrait2, watermark: Bool) -> Data? {
+    static func makePNG(
+        for portrait: Portrait2,
+        watermark: Bool,
+        side: Int = exportSide,
+        shape: ExportShape = .square
+    ) -> Data? {
         guard let cutout = NSImage(data: portrait.cutoutData)?
             .cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
 
@@ -26,24 +40,40 @@ enum PortraitExporter {
             canvasUnit: 1024
         )
 
-        let composited: CGImage
+        var composited: CGImage
         if let data = portrait.backgroundImageData,
            let bg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             composited = (try? BackgroundCompositor.composite(
-                cutout: cutout, over: .image(bg), placement: placement, outputSize: exportSide
+                cutout: cutout, over: .image(bg), placement: placement, outputSize: side
             )) ?? cutout
         } else if let hex = portrait.backgroundColorHex, let rgb = rgbComponents(hex) {
             composited = (try? BackgroundCompositor.composite(
                 cutout: cutout, over: .color(red: rgb.r, green: rgb.g, blue: rgb.b),
-                placement: placement, outputSize: exportSide
+                placement: placement, outputSize: side
             )) ?? cutout
         } else {
             // Geen achtergrond → transparante vierkante PNG.
-            composited = transparentSquare(cutout: cutout, placement: placement, side: exportSide) ?? cutout
+            composited = transparentSquare(cutout: cutout, placement: placement, side: side) ?? cutout
         }
+
+        if shape == .circle { composited = circleMasked(composited) ?? composited }
 
         let final = watermark ? applyWatermark(to: composited) : composited
         return png(from: final)
+    }
+
+    /// E19.1: maskeer de output tot een cirkel (transparant eromheen).
+    private static func circleMasked(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.clear(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.addEllipse(in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.clip()
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 
     /// Presenteert het macOS share sheet vanaf een view-anker.

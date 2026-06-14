@@ -155,6 +155,7 @@
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
 		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
+		C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9329E36279558288146B065 /* ExportSheet.swift */; };
 		C426F97DB055D12226E5CC8F /* ImportDropZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */; };
 		C4DFDE3A0EA223126024DCF6 /* OnboardingSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE77E379438EC1069416EA09 /* OnboardingSplashView.swift */; };
 		C5F6F1CE52391908E654CDB6 /* ProUpsellToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80857857F8C364DD00524644 /* ProUpsellToastView.swift */; };
@@ -311,6 +312,7 @@
 		C447017F67D767535688965F /* Avatar2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Avatar2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
+		C9329E36279558288146B065 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
 		CBFBA66AF626E08F10F1333C /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
 		D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelTests.swift; sourceTree = "<group>"; };
 		DB0C0C9C43AFC1383D6C54E2 /* logo.svg */ = {isa = PBXFileReference; path = logo.svg; sourceTree = "<group>"; };
@@ -420,6 +422,14 @@
 			path = Editor;
 			sourceTree = "<group>";
 		};
+		393665E62C3972ABAF7E0A4B /* Share */ = {
+			isa = PBXGroup;
+			children = (
+				C9329E36279558288146B065 /* ExportSheet.swift */,
+			);
+			path = Share;
+			sourceTree = "<group>";
+		};
 		4C7A26FDF118B7356C525C3D /* Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -427,6 +437,7 @@
 				F40AC840E6BA00CF7D839DF1 /* Onboarding */,
 				58511F81207E7EAACF6AF911 /* Paywall */,
 				83F8F7DF473C7C5DF14AAC3F /* Settings */,
+				393665E62C3972ABAF7E0A4B /* Share */,
 				D3C947F3B98104547D348526 /* Shell */,
 				10AB5FACCD9A81D2DBFDCB68 /* Sidebar */,
 			);
@@ -927,6 +938,7 @@
 				32028D20901C7C13C4B668E4 /* EditorView.swift in Sources */,
 				1C4C56A4E68C65DA7693862C /* EffectsPanel.swift in Sources */,
 				D4B598B61B0C0A9912859FDF /* EntitlementModel.swift in Sources */,
+				C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */,
 				CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */,
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
 				480BA658926DC445242BB6F0 /* FramingConstants.swift in Sources */,

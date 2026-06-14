@@ -35,6 +35,9 @@ final class ShellModel {
     /// Gear toggelt, Esc sluit.
     var isShowingSettings = false
 
+    /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
+    var isShowingExport = false
+
     /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
     private(set) var selectedPortrait: Portrait2?
     /// ModelContext komt uit de environment (ShellView .task) — SwiftData
@@ -263,11 +266,10 @@ final class ShellModel {
 
     /// E08.2: exporteer het huidige portret als vierkante PNG (1024) en open
     /// het share sheet. Free-tier krijgt een watermerk.
+    /// E19.1: opent de DS-export-popup (vorm/maat + Save/Share).
     func exportCurrentPortrait() {
-        guard let selectedPortrait else { return }
-        let watermark = !entitlement.isProActive
-        guard let data = PortraitExporter.makePNG(for: selectedPortrait, watermark: watermark) else { return }
-        PortraitExporter.share(data, from: nil)
+        guard selectedPortrait != nil else { return }
+        isShowingExport = true
     }
 
     // MARK: - Launch-selectie (visuele pass punt 13)

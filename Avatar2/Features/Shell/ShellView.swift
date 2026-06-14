@@ -51,12 +51,22 @@ struct ShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
         }
+        // E19.1: Share/export-popup (DS).
+        .sheet(isPresented: $model.isShowingExport) {
+            if let portrait = model.selectedPortrait {
+                ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
+            }
+        }
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
             #if DEBUG
+            // E19.1 smoke-haak: open de export-popup ná de selectie-restore.
+            if ProcessInfo.processInfo.arguments.contains("--show-export") {
+                model.exportCurrentPortrait()
+            }
             // Smoke-run-haak: `--show-settings [pagina]` wordt in
             // ShellModel.init gelezen (vóór first render, geen venster-race);
             // zie de toelichting daar. Compiled out of Release.
