@@ -62,7 +62,8 @@ struct ShellTopBar: View {
             // De top-strook (h52) reserveert de hoogte van de traffic-lights.
             .frame(height: 52, alignment: .top)
 
-            if model.hasCompletedFirstCutout {
+            // E24.13: quota-badge alléén in de editor — NIET in Settings.
+            if model.hasCompletedFirstCutout && !isSettingsActive {
                 HStack(spacing: DSSpacing.gap2) {
                     Text(quotaLabel)
                         .dsTextStyle(.labelSmall)
@@ -71,10 +72,15 @@ struct ShellTopBar: View {
                         model.requestUpgrade()
                     }
                 }
-                // E24.6: ~12px (gap-3) van de linkerrand.
+                // E24.13: ~12px (gap-3) van de WINDOW-linkerrand.
                 .padding(.leading, ShellMetrics.topBarInset)
             }
         }
+        // E24.13-diagnose+fix: .overlay(alignment:.top) centreert een content-
+        // sized view → de counter (rij 2) zat 12px van een GECENTREERDE kolom,
+        // niet van de vensterrand. Forceer volle breedte + leading zodat de
+        // leading-inset vanaf de echte vensterrand telt.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .task { await model.refresh() }
     }
 

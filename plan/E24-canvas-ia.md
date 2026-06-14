@@ -64,6 +64,28 @@ In de empty/first-use-state (geen portret) is er geen toolbar.
 **Figma-TODO:** Frame-icoon (nu "crop") + de dropdown-iconen → DSIcon/Phosphor; toolbar-groepering
 tegen de referenties bevestigen.
 
+## 24.10 — Background-swatch hover afgekapt
+- status: done. scrollRow kreeg verticale + leading-padding zodat de hover-scale binnen de scroll-/
+  mask-grens past. Build groen.
+
+## 24.13 — Quota-badge uit Settings + counter-padding (diagnose + meting)
+- status: done
+- owner: FEAT (AI-agent, marathon)
+
+**Diagnose (oorzaak):** de counter stond niet 12px van de VENSTERrand maar van een GECENTREERDE
+kolom. Reden: `ShellTopBar` wordt geplaatst met `.overlay(alignment: .top)`, dat een *content-sized*
+view centreert; de VStack vulde de breedte niet gegarandeerd, dus de `leading`-inset telde vanaf het
+midden i.p.v. de vensterrand. (Niet de traffic-light-zone; de counter staat al op een eigen rij
+eronder.)
+
+**Fix:** `ShellTopBar`-VStack `.frame(maxWidth: .infinity, alignment: .leading)` → de leading-inset
+(gap-3) telt nu vanaf de echte vensterrand. Quota-badge gegate op `!isSettingsActive` → verschijnt
+niet meer in Settings.
+
+**Meting (geverifieerd, niet "zou moeten"):** pixel-scan op de witte counter-tekst →
+**leftmost = 13pt** van de vensterrand (target ~12 = gap-3). Settings-screenshot: geen quota-badge
+linksboven (alleen de gear rechtsboven). Screenshots: /tmp/counter_fixed2.png + /tmp/settings_noquota.png.
+
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
 - status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
   handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),
