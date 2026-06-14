@@ -114,6 +114,7 @@ struct ShellView: View {
             // E24.16: forceer de frame-vorm voor de smoke.
             if args.contains("--frame-square") { model.debugSetFrameShape(.square) }
             if args.contains("--frame-circle") { model.debugSetFrameShape(.circle) }
+            if args.contains("--clear-bg") { model.debugClearBackground() }
             // E24.18: reset transform → padded fit-fallback (frame-ademruimte).
             if args.contains("--reset-transform") { model.debugResetTransform() }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).

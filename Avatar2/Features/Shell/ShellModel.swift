@@ -281,6 +281,14 @@ final class ShellModel {
         selectedPortrait?.touch()
     }
 
+    /// E24.26 smoke-haak: wis de achtergrond (→ dot-grid actief) om te checken
+    /// dat card-surface + dot-grid naar de frame-vorm clippen (hoeken zwart).
+    func debugClearBackground() {
+        selectedPortrait?.backgroundColorHex = nil
+        selectedPortrait?.backgroundImageData = nil
+        selectedPortrait?.touch()
+    }
+
     /// E24.18 smoke-haak: reset de canvas-transform naar "geen transform"
     /// (scale 0) zodat de padded fit-fallback (frame-ademruimte) zichtbaar is —
     /// de staat van een vers geïmporteerd portret.

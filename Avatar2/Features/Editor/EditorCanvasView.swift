@@ -24,6 +24,9 @@ struct EditorCanvasView: View {
     /// Losgekoppeld van de SUBJECT-schaal (Portrait2.scale, via de handles).
     @Binding var viewZoom: Double
     let maxViewZoom: Double
+    /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle). De gids verschijnt
+    /// alléén als dit aan staat én er actief geselecteerd/getransformeerd wordt.
+    var gridEnabled: Bool = false
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
@@ -109,7 +112,7 @@ struct EditorCanvasView: View {
                 // frame-vorm afgekapt (volle canvas). De afbeelding lijnt
                 // hiernaartoe uit (auto-align mikt op dezelfde FramingConstants).
                 // Zichtbaar tijdens positioneren (selectie of drag).
-                AlignmentGuideOverlay2(isVisible: isSelected || isDragging || debugShowGuide)
+                AlignmentGuideOverlay2(isVisible: (gridEnabled && (isSelected || isDragging)) || debugShowGuide)
                     .frame(width: side, height: side)
                     .allowsHitTesting(false)
 

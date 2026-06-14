@@ -5,6 +5,29 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.26 — Hele canvas naar framevorm clippen (zwarte hoeken) + grid-toggle
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result (1 — zwarte hoeken):** de échte boosdoeners van het "lichter vierkant" waren de
+canvas-CARD-surface (`DSColor.Background.card`) + het dot-grid in `DSCanvasCard`, die naar een
+afgeronde rechthoek clipten i.p.v. de cirkel (eerdere pogingen clipten alléén de afbeelding).
+`DSCanvasCard` kreeg een `surfaceClip`-parameter; de card-surface + dot-grid clippen nu naar de
+frame-vorm. `EditorView` geeft `cardSurfaceClip` mee (Circle bij circle-frame, anders de afgeronde
+kaart). Buiten de cirkel is nu puur de window-bg (zwart) zichtbaar — geverifieerd met een
+pixel-scan: **alle 4 de hoeken = (0,0,0)** zonder achtergrond (dot-grid actief). Export clipte al naar
+de cirkel (24.16, hoeken alpha=0).
+
+**Result (2 — grid-toggle):** een grid/thirds-toggle (Phosphor `gridNine`) in de canvas-toolbar
+(`gridEnabled`-binding, active-state). De gids verschijnt alléén als de toggle AAN staat én er actief
+geselecteerd/getransformeerd wordt (`gridEnabled && (isSelected || isDragging)`); klik buiten de
+afbeelding deselecteert → grid + handles weg. Toggle uit = nooit grid.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshots: circle+geen-bg met 4 ZWARTE hoeken
+(/tmp/c26_corners.png); grid-toggle aan + selectie = thirds+ooglijn+handles (/tmp/c26_grid_on.png),
+toggle uit = geen grid. Smoke-haken (#if DEBUG): `--clear-bg`, `--grid-on`.
+**Figma-TODO:** grid-icoon-keuze; de gids-laag is nog druk → opgeschoond in 24.29.
+
 ## 24.22 — Sidebar rechtermuis → DS-menu (i.p.v. native)
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

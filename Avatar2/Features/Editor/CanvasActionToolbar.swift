@@ -37,6 +37,8 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     /// E24.12: welke dropdown open is (nil = geen). Binding zodat de
     /// canvas-tap-dismiss in EditorView 'm ook sluit.
     @Binding var activeMenu: CanvasToolbarMenu?
+    /// E24.26: grid/thirds-overlay aan/uit (toggle in de toolbar).
+    @Binding var gridEnabled: Bool
     @ViewBuilder var adjust: () -> Adjust
     @ViewBuilder var background: () -> Background
 
@@ -54,6 +56,20 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             toolbarItem(.ai, "AI", icon: .sparkle, chevron: true, width: 240, padding: DSSpacing.gap2) {
                 aiMenu
             }
+
+            // E24.26: grid/thirds-toggle.
+            Button { gridEnabled.toggle() } label: {
+                Ph.gridNine.regular
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .padding(.horizontal, DSSpacing.gap2)
+                    .frame(height: 32)
+                    .background(gridEnabled ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+                    .dsHoverHighlight(cornerRadius: 16)
+            }
+            .buttonStyle(.plain)
+            .help("Toggle alignment grid")
         }
         .padding(DSSpacing.gap1)
         .background(.ultraThinMaterial, in: Capsule())
