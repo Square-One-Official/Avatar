@@ -33,8 +33,23 @@ opgelost (AvatarUI-tests via xcodebuild i.p.v. `swift test`, óf een font-gebase
 **Figma-TODO:** Hair-icoon = scissors (Phosphor heeft geen kam); fix-camera-angle = perspective;
 restore-body = arrowsOutCardinal — bevestigen tegen definitieve Figma-keuze.
 
+## 20.4 — Phosphor-blocker OPGELOST (split app-target vs AvatarUI)
+- status: done (besluit Thierry: SF voor bottom/app-bar, Phosphor voor menu-iconen)
+
+**Result:** De Phosphor-SPM is toegevoegd aan het **Avatar2-app-target** (project.yml), NIET aan
+AvatarUI. Het app-target bouwt via xcodebuild (heeft actool → asset-catalog → `Bundle.module` werkt);
+`swift test --package-path AvatarUI` ziet Phosphor niet → blijft groen. Volle DoD groen.
+**Toegepast:** de canvas-menu-iconen (Frame/Background/Adjust/AI + alle dropdown-rijen) zijn nu
+Phosphor (Ph.frameCorners/image/slidersHorizontal/sparkle; cornersOut/crop/perspective/flipHorizontal;
+sun/palette/arrowsOut/userRectangle). De bottom-toolbar (Effects/Face/Clothing/Hair) en app-bar
+(Share/Settings/Library) blijven **SF Symbols**. Smoke ✓ (Phosphor-iconen in de toolbar).
+**Figma-TODO:** exacte Phosphor-iconkeuze per actie bevestigen (Frame=frameCorners, restore-body=
+userRectangle, fix-angle=perspective).
+
 ## 20.2 / 21.3 — Leading Phosphor-icoon per actie (Edit + Face-paneel)
-- status: GEPARKEERD — geblokkeerd op de Phosphor-package (zie 20.1-blocker). De visuele
+- status: deels — menu/dropdown-iconen done (20.4). Edit = sliders (geen actie-rijen meer); Face-
+  paneel-rijen krijgen iconen in 24.15 (thumbnail-kaarten). De Phosphor-route is nu vrij.
+  (oorspronkelijke parkeer-noot:) De visuele
   deliverable is Phosphor; SF-interim zou alleen gokwerk zijn voor teeth/make-up/wrinkles.
   EditorActionList heeft al een leading-icoon-slot (`EditorAction.icon: DSIcon.Symbol`) klaar.
   Edit-paneel is bovendien naar sliders gegaan (E22.3) → leading-iconen gelden nu vooral het

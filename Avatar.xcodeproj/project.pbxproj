@@ -70,6 +70,7 @@
 		4B8CBA7DF29D2551F1CB242C /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */; };
 		4D196EDCF34D022689B5109E /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 051B298A2948690FF14EB935 /* OnboardingModel.swift */; };
 		4E0EE3A70A4F2A48E9334B9A /* SignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81677C85F6BBC1623B3AF210 /* SignInSheet.swift */; };
+		51481357AD84A6C1F270498B /* PhosphorSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2EA013076753B0525BADB705 /* PhosphorSwift */; };
 		524B6A85C7C4B12BA53B9ED0 /* PillSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */; };
 		552DB890E25DC4C7C13EB602 /* ImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */; };
 		583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */; };
@@ -377,6 +378,7 @@
 				248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */,
 				CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */,
 				18B4690E8B43BA765620B155 /* Sparkle in Frameworks */,
+				51481357AD84A6C1F270498B /* PhosphorSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -744,6 +746,7 @@
 				3A383A9104F04C87490DC691 /* AvatarKit */,
 				7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */,
 				183C72136A3DB4697DABE7C7 /* Sparkle */,
+				2EA013076753B0525BADB705 /* PhosphorSwift */,
 			);
 			productName = Avatar2;
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
@@ -800,6 +803,7 @@
 			mainGroup = AA5FB63F3F50F7DA1D7BBCD3;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */,
 				C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				FAD8C4AE8E294733D9421134 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
@@ -1432,6 +1436,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/phosphor-icons/swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.0;
+			};
+		};
 		C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -1470,6 +1482,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		2EA013076753B0525BADB705 /* PhosphorSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */;
+			productName = PhosphorSwift;
 		};
 		3A383A9104F04C87490DC691 /* AvatarKit */ = {
 			isa = XCSwiftPackageProductDependency;
