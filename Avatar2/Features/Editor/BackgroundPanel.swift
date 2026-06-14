@@ -14,6 +14,9 @@ struct BackgroundPanel: View {
     @State private var brand = BrandColorKit.shared
     // E24.24: persistente custom-achtergrond-uploads (herbruikbare swatches).
     @State private var customImages = BackgroundImageKit.shared
+    // E25.2: DSColorPicker vanuit de "+"-knop in de Color-rij.
+    @State private var showColorPicker = false
+    @State private var pickerColor: Color = .white
 
     private let swatch: CGFloat = 36
 
@@ -109,29 +112,48 @@ struct BackgroundPanel: View {
         }
     }
 
-    // MARK: Color-rij — presets + brand + eyedropper
+    // MARK: Color-rij — "+" (DSColorPicker) + presets + brand
 
     private var colorRow: some View {
         scrollRow {
+            // E25.2: "+"-knop HELEMAAL LINKS opent de DSColorPicker (met eigen
+            // eyedropper). De losse eyedropper-knop is vervallen.
+            Button {
+                if let hex = portrait?.backgroundColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
+                showColorPicker = true
+            } label: {
+                Circle()
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+            }
+            .buttonStyle(.plain)
+            .dsHoverScale()
+            .help("Pick a colour")
+            .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+                DSColorPicker(color: $pickerColor, supportsAlpha: false)
+                    .padding(DSSpacing.gap3)
+            }
+
             ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
                 colorSwatch(color)
             }
             ForEach(brand.hexColors, id: \.self) { hex in
                 if let color = Color(hexRGB: hex) { colorSwatch(color, hex: hex) }
             }
-            Button(action: sampleColor) {
-                Circle()
-                    .fill(DSColor.Background.neutral)
-                    .frame(width: swatch, height: swatch)
-                    .overlay {
-                        Image(systemName: "eyedropper")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(DSColor.Foreground.subtle)
-                    }
-            }
-            .buttonStyle(.plain)
-            .dsHoverScale()
-            .help("Pick a brand colour")
+        }
+        // E25.2: live de achtergrond bijwerken terwijl de picker open is.
+        .onChange(of: pickerColor) { _, c in
+            guard showColorPicker, let hex = c.hexRGB else { return }
+            selectColor(hex)
+        }
+        // Bij sluiten: de gekozen kleur als persistente brand-swatch bewaren.
+        .onChange(of: showColorPicker) { _, open in
+            if !open, let hex = pickerColor.hexRGB { brand.add(hex) }
         }
     }
 
@@ -190,11 +212,4 @@ struct BackgroundPanel: View {
         portrait.touch()
     }
 
-    private func sampleColor() {
-        NSColorSampler().show { picked in
-            guard let picked, let hex = Color(picked).hexRGB else { return }
-            brand.add(hex)
-            selectColor(hex)
-        }
-    }
 }
