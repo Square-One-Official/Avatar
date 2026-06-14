@@ -97,6 +97,37 @@ en centreert weer bij commit/blur. PortraitHeader: container-alignment-switch te
 velden vaste breedte. Smoke: rust = Name/Role gecentreerd ✓ (typen/commit = logisch geverifieerd
 via de vaste-breedte-frame; klein veld niet synthetisch te focussen).
 
+## 24.15 — Effects-hover + Face thumbnail-kaarten
+- status: DEELS — Effects-thumbnail-hover **done** (dsHoverScale). REST GEPARKEERD: Face-acties als
+  thumbnail-kaarten (phosphor-icoon + label, Pro-badge bovenin, credits onderin met gradient-overlay,
+  per sectie horizontaal scrollbaar) + één **gedeelde DS-thumbnail-kaart** (Effects+Face, klaar voor
+  Clothing/Hair). **Plan:** maak `DSThumbnailCard` (AvatarUI of Avatar2): vierkante preview-tile
+  (84–96) met optionele top-leading Pro-badge (DSProChip) + bottom credits over een
+  `LinearGradient(.clear→.black)`-overlay, label eronder, selectie-ring, hover (dsHoverScale).
+  Refactor EffectsPanel + FaceActionsPanel ernaar (Face: secties Retouch/Beauty, elk een
+  horizontale scrollRow van kaarten). Phosphor-iconen per actie.
+
+## 24.16 — Frame-vorm: Circle (default) / Square
+- status: GEPARKEERD. **Plan:** `Portrait2.frameShape` (default `.circle`); Frame ▾ krijgt een
+  Circle/Square-keuze. Canvas clipt het portret tot de vorm; `PortraitExporter` heeft de
+  cirkel-mask al (E19.1 ExportShape) → koppel de persisted vorm aan export + compositing (E07.2),
+  watermerk binnen de zichtbare vorm. Smoke: Square↔Circle op canvas + transparante hoeken in de
+  cirkel-PNG. (Besef: dit maakt de cirkel de DEFAULT-merkvorm — bevestigen.)
+
+## 24.14 — Adjust-waarden persistent (non-destructief)
+- status: GEPARKEERD (grotere refactor). **Plan:** brightness/contrast/saturation/temperature op
+  `Portrait2` (defaults 0/1/1/0); EditColorPanel bindt de sliders eraan (heropenen toont de stand);
+  pas de params NIET-destructief toe op het canvas + in de export (WYSIWYG) i.p.v. bakken in
+  cutoutData; meenemen in undo/redo en bij portret-wissel. Raakt canvas-rendering + export +
+  EditColorPanel → dedicated story (regressie-risico).
+
+## 24.12 — Eén DS-popover/paneel-stijl (caret weg + bottom-panelen gelijk)
+- status: GEPARKEERD. **Plan:** systeem-`.popover` heeft altijd een caret → vervang door een eigen
+  zwevende DS-kaart (overlay + outside-click-dismiss) zónder pijltje; maak er één gedeelde
+  modifier/component van (border + radius + blur/material + rand-fade) die ZOWEL de toolbar-dropdowns
+  ALS de bottom-panelen (DSEditPanel) gebruiken, zodat top en bottom identiek zijn. Grotere
+  cross-cutting UI-refactor → dedicated.
+
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
 - status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
   handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),
