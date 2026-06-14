@@ -7,10 +7,17 @@
 
 import SwiftUI
 
+/// E18.24: validatiestaat voor input-velden — error/success lichten de rand op
+/// (Figma Badge-signaalkleuren). Figma-TODO: exacte Input-error/success-variant.
+public enum DSValidationState: Sendable {
+    case normal, error, success
+}
+
 public struct DSTextField: View {
     private let label: String?
     private let placeholder: String
     private let icon: Image?
+    private let validation: DSValidationState
     @Binding private var text: String
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
@@ -19,11 +26,13 @@ public struct DSTextField: View {
         label: String? = nil,
         placeholder: String,
         icon: Image? = nil,
+        validation: DSValidationState = .normal,
         text: Binding<String>
     ) {
         self.label = label
         self.placeholder = placeholder
         self.icon = icon
+        self.validation = validation
         self._text = text
     }
 
@@ -58,11 +67,20 @@ public struct DSTextField: View {
             .background(DSColor.Background.neutral, in: Capsule())
             .overlay {
                 Capsule().strokeBorder(
-                    isFocused ? DSColor.Foreground.muted : DSColor.Foreground.divider,
-                    lineWidth: DSBorderWidth.thin
+                    borderColor,
+                    lineWidth: validation == .normal ? DSBorderWidth.thin : DSBorderWidth.medium
                 )
             }
         }
         .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
+        .animation(.easeOut(duration: 0.15), value: validation)
+    }
+
+    private var borderColor: Color {
+        switch validation {
+        case .error: return DSColor.Signal.error
+        case .success: return DSColor.Signal.success
+        case .normal: return isFocused ? DSColor.Foreground.muted : DSColor.Foreground.divider
+        }
     }
 }

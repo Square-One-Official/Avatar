@@ -10,12 +10,14 @@ import SwiftUI
 
 public struct DSOTPField: View {
     private let length: Int
+    private let validation: DSValidationState
     @Binding private var code: String
     @FocusState private var isFocused: Bool
 
-    public init(code: Binding<String>, length: Int = 6) {
+    public init(code: Binding<String>, length: Int = 6, validation: DSValidationState = .normal) {
         self._code = code
         self.length = length
+        self.validation = validation
     }
 
     public var body: some View {
@@ -41,6 +43,7 @@ public struct DSOTPField: View {
         .contentShape(Rectangle())
         .onTapGesture { isFocused = true }
         .accessibilityLabel(Text("One-time password"))
+        .animation(.easeOut(duration: 0.15), value: validation)
     }
 
     private func cell(at index: Int) -> some View {
@@ -56,9 +59,17 @@ public struct DSOTPField: View {
             .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.lg))
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg).strokeBorder(
-                    isActive ? DSColor.Foreground.muted : DSColor.Foreground.divider,
-                    lineWidth: DSBorderWidth.thin
+                    cellBorderColor(isActive: isActive),
+                    lineWidth: validation == .normal ? DSBorderWidth.thin : DSBorderWidth.medium
                 )
             }
+    }
+
+    private func cellBorderColor(isActive: Bool) -> Color {
+        switch validation {
+        case .error: return DSColor.Signal.error
+        case .success: return DSColor.Signal.success
+        case .normal: return isActive ? DSColor.Foreground.muted : DSColor.Foreground.divider
+        }
     }
 }

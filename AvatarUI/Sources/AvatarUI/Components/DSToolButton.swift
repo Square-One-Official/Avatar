@@ -19,6 +19,7 @@ public struct DSToolButton: View {
     private let tooltipEdge: VerticalEdge
     @State private var isHovering = false
     @State private var showTooltip = false
+    @State private var tooltipHeight: CGFloat = 0
 
     public init(
         _ icon: Image,
@@ -69,15 +70,23 @@ public struct DSToolButton: View {
             guard !Task.isCancelled else { return }
             showTooltip = true
         }
+        // E18.10v4: plaats de tooltip volledig BÓVEN (of ónder) de 48-knop —
+        // gemeten hoogte + 4px gap als offset, gecentreerd. (alignmentGuide
+        // bleek 'm midden op het icoon te zetten.)
         .overlay(alignment: tooltipEdge == .top ? .top : .bottom) {
             if showTooltip {
                 DSTooltip(label, caretEdge: tooltipEdge == .top ? .bottom : .top)
-                    .alignmentGuide(tooltipEdge == .top ? .top : .bottom) { dims in
-                        // Caret 4px (min.) van de knop; gecentreerd via .top/.bottom.
-                        tooltipEdge == .top
-                            ? dims[.bottom] + DSSpacing.gap1
-                            : dims[.top] - DSSpacing.gap1
-                    }
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: DSToolButtonTipHeightKey.self, value: proxy.size.height
+                            )
+                        }
+                    )
+                    .offset(y: tooltipEdge == .top
+                        ? -(tooltipHeight + DSSpacing.gap1)
+                        : (tooltipHeight + DSSpacing.gap1))
+                    .onPreferenceChange(DSToolButtonTipHeightKey.self) { tooltipHeight = $0 }
                     .transition(.opacity)
                     .allowsHitTesting(false)
             }
@@ -117,6 +126,14 @@ struct DSGlassCircle: View {
                 lineWidth: DSBorderWidth.thin
             )
         }
+    }
+}
+
+/// E18.10v4: meet de tooltip-hoogte zodat hij precies boven/onder de knop valt.
+private struct DSToolButtonTipHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

@@ -84,25 +84,28 @@ struct Avatar2App: App {
             )) {
                 PaywallSheet(model: entitlement)
             }
-            .overlay(alignment: .bottom) {
-                if entitlement.isShowingOutOfCreditsToast {
-                    OutOfCreditsToastView(model: entitlement)
-                        .padding(.bottom, DSSpacing.gap6)
-                        .transition(.opacity)
-                } else if let message = entitlement.errorToast {
-                    // E18.3: cloud-fout als toast i.p.v. inline tekst.
-                    DSToast(title: "Something went wrong", description: message) {
-                        entitlement.dismissErrorToast()
-                    }
-                    .padding(.bottom, DSSpacing.gap6)
-                    .transition(.opacity)
-                    .task {
-                        try? await Task.sleep(for: .seconds(4))
-                        entitlement.dismissErrorToast()
+            // E18.23: toasts rechtsONDERin, met slide-in/out — niet meer
+            // centraal-onder waar ze knoppen overlapten.
+            .overlay(alignment: .bottomTrailing) {
+                Group {
+                    if entitlement.isShowingOutOfCreditsToast {
+                        OutOfCreditsToastView(model: entitlement)
+                    } else if let message = entitlement.errorToast {
+                        // E18.3: cloud-fout als toast i.p.v. inline tekst.
+                        DSToast(title: "Something went wrong", description: message) {
+                            entitlement.dismissErrorToast()
+                        }
+                        .task {
+                            try? await Task.sleep(for: .seconds(4))
+                            entitlement.dismissErrorToast()
+                        }
                     }
                 }
+                .padding(DSSpacing.gap5)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-            .animation(.easeOut(duration: 0.18), value: entitlement.errorToast)
+            .animation(.spring(duration: 0.3), value: entitlement.errorToast)
+            .animation(.spring(duration: 0.3), value: entitlement.isShowingOutOfCreditsToast)
             // E18.2: contextuele cloud-feature-gate — online aanzetten.
             .alert(
                 "Turn on online models?",
@@ -123,7 +126,6 @@ struct Avatar2App: App {
             )) {
                 SignInSheet(entitlement: entitlement)
             }
-            .animation(.easeOut(duration: 0.18), value: entitlement.isShowingOutOfCreditsToast)
             // E15.1: persistente Theme-voorkeur (Preferences > Appearance).
             .appliedAppearancePreference()
         }

@@ -18,6 +18,9 @@ struct SignInSheet: View {
     @State private var phase: Phase = .email
     @State private var email = ""
     @State private var code = ""
+    // E18.24: error/success-states op de inputvelden i.p.v. een losse toast.
+    @State private var emailValidation: DSValidationState = .normal
+    @State private var otpValidation: DSValidationState = .normal
 
     private static let otpLength = 6
 
@@ -39,22 +42,6 @@ struct SignInSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
-        // E18.21: auth-fouten (bv. "Token expired") als toast i.p.v. blijvende
-        // inline-tekst; auto-dismiss zodat hij niet blijft hangen.
-        .overlay(alignment: .bottom) {
-            if let error = entitlement.authError {
-                DSToast(title: "Couldn't sign you in", description: error) {
-                    entitlement.dismissAuthError()
-                }
-                .padding(DSSpacing.gap4)
-                .transition(.opacity)
-                .task {
-                    try? await Task.sleep(for: .seconds(4))
-                    entitlement.dismissAuthError()
-                }
-            }
-        }
-        .animation(.easeOut(duration: 0.18), value: entitlement.authError)
         // Schone start: geen oude fout van een vorige poging.
         .onAppear { entitlement.dismissAuthError() }
     }
@@ -67,8 +54,15 @@ struct SignInSheet: View {
             Text("We'll email you a 6-digit code. Your photos never leave your Mac.")
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
-            DSTextField(placeholder: "Email address", icon: Image(systemName: "envelope"), text: $email)
-                .onSubmit { sendCode() }
+            DSTextField(
+                placeholder: "Email address",
+                icon: Image(systemName: "envelope"),
+                validation: emailValidation,
+                text: $email
+            )
+            .onSubmit { sendCode() }
+            // Bij bewerken terug naar normaal (E18.24).
+            .onChange(of: email) { _, _ in emailValidation = .normal }
             DSPrimaryButton("Send code", fullWidth: true) { sendCode() }
                 .disabled(!canSubmitEmail || entitlement.authBusy)
         }
@@ -84,18 +78,25 @@ struct SignInSheet: View {
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
             }
-            DSOTPField(code: $code, length: Self.otpLength)
+            DSOTPField(code: $code, length: Self.otpLength, validation: otpValidation)
                 .onChange(of: code) { _, newValue in
+                    // Bewerken wist een error-state (E18.24).
+                    if otpValidation == .error { otpValidation = .normal }
                     if newValue.count == Self.otpLength { verify() }
                 }
             DSPrimaryButton("Verify", fullWidth: true) { verify() }
                 .disabled(code.count != Self.otpLength || entitlement.authBusy)
             DSGhostButton("Resend code", fullWidth: true) { sendCode() }
                 .disabled(entitlement.authBusy)
-            Button("Wrong email? Go back") { phase = .email; code = ""; entitlement.dismissAuthError() }
-                .buttonStyle(.plain)
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.subtle)
+            Button("Wrong email? Go back") {
+                phase = .email
+                code = ""
+                otpValidation = .normal
+                entitlement.dismissAuthError()
+            }
+            .buttonStyle(.plain)
+            .dsTextStyle(.bodySmall)
+            .foregroundStyle(DSColor.Foreground.subtle)
         }
     }
 
@@ -109,7 +110,16 @@ struct SignInSheet: View {
         let address = email.trimmingCharacters(in: .whitespaces)
         Task {
             await entitlement.sendSignInCode(address)
-            if entitlement.authError == nil { phase = .otp }
+            if entitlement.authError == nil {
+                emailValidation = .normal
+                phase = .otp
+            } else {
+                // E18.24: e-mailveld licht rood op; auto-herstel na enkele sec.
+                emailValidation = .error
+                entitlement.dismissAuthError()
+                try? await Task.sleep(for: .seconds(3))
+                if emailValidation == .error { emailValidation = .normal }
+            }
         }
     }
 
@@ -117,10 +127,18 @@ struct SignInSheet: View {
         let address = email.trimmingCharacters(in: .whitespaces)
         Task {
             if await entitlement.verifySignInCode(address, code: code) {
+                // E18.24: success-state kort tonen vóór het sluiten.
+                otpValidation = .success
+                try? await Task.sleep(for: .seconds(0.7))
                 onSignedIn()
                 dismiss()
             } else {
-                code = ""
+                // Fout: code-veld licht rood op, blijft staan tot bewerken of
+                // auto-herstel na enkele seconden.
+                otpValidation = .error
+                entitlement.dismissAuthError()
+                try? await Task.sleep(for: .seconds(3))
+                if otpValidation == .error { otpValidation = .normal }
             }
         }
     }

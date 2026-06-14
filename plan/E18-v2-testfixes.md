@@ -118,6 +118,25 @@ afvinken. UI-fixes met visuele smoke.
         code-veld leegt bij een mislukte verify. (Toast-weergave niet ge-smoket: vraagt een live
         Supabase-auth-fout; Thierry bevestigt hands-on.)
 
+## Ronde 4 (test 2026-06-14, vervolg-correcties)
+- [x] **18.10v4 Tooltip-positie** — DONE+gemerged. Tooltip stond mídden op het icoon i.p.v.
+      erboven; nu via gemeten hoogte (PreferenceKey) + offset volledig bóven (of ónder) de 48-knop,
+      gecentreerd, 4px gap. (Hover-weergave niet synthetisch te smoken.)
+- [x] **18.23 Toasts rechtsonderin + slide** — DONE+gemerged. App-toasts (cloud-fout, out-of-
+      credits) van centraal-onder → `.bottomTrailing` met slide-in/out (move .trailing + opacity),
+      gap-5 marge — overlappen geen knoppen meer. Smoke ✓ (layout).
+- [x] **18.24 Input error/success-states** — DONE+gemerged. `DSValidationState` (normal/error/
+      success) op DSTextField + DSOTPField → rand licht op (Signal.error/success, b-medium). SignInSheet
+      gebruikt deze i.p.v. de toast: e-mail/OTP-fout = rode rand (herstelt bij bewerken of na 3s),
+      succes = groene rand met 0,7s delay vóór het sluiten. **Figma-TODO:** exacte Input-error/
+      success-variant + signaalkleuren op dark bevestigen (nu Badge-signaalkleuren hergebruikt).
+- [ ] **18.21b OTP "token expired" — root cause** — WACHT-OP-THIERRY (live Supabase). De
+      `.email`→`.signup`-fallback (18.21) loste het niet op; verdachte = Supabase-config: e-mail-
+      template stuurt óók een magic-link → link-prefetch door mailclient/scanner verbruikt de
+      single-use token vóór de code-invoer, óf de OTP-expiry staat te kort. Te verifiëren in de
+      Supabase Auth-instellingen (e-mailtemplate alleen `{{ .Token }}`, OTP-expiry). Zie
+      plan/DECISIONS-PENDING.md.
+
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-
       grants ingetrokken + newsletter_optins-tabel aangemaakt.

@@ -46,6 +46,22 @@ public enum DSColor {
         public static let thumb = Color(hex: 0xFFFFFF)
     }
 
+    /// Signaalkleuren (Figma Badge Type=Error/Success/Warning/Info). De
+    /// `background/*`-waarden zijn pastel voor lichte surfaces; op de dark-UI
+    /// gebruiken we ze als duidelijk zichtbare rand/markering (bv. input
+    /// error/success-state). Figma-TODO: bevestig de exacte Input-error/
+    /// success-variant-tokens zodra ze in de library staan.
+    public enum Signal {
+        /// `background/error` — #fdbaba
+        public static let error = Color(hex: 0xFDBABA)
+        /// `background/success` — #bcfad3
+        public static let success = Color(hex: 0xBCFAD3)
+        /// `background/warning` — #ffeeb8
+        public static let warning = Color(hex: 0xFFEEB8)
+        /// `background/info` — #b8d3ff
+        public static let info = Color(hex: 0xB8D3FF)
+    }
+
     /// `foreground/action/primary/*`
     public enum Action {
         /// `foreground/action/primary/default` — #d5f466 (lime-accent)

@@ -28,3 +28,18 @@
 
 ### Kleding-generatie: route (E10.2 / E09.2) — BESLIST 2026-06-13
 - **Besluit (Thierry):** nano-banana **instruction-edit** is het PRIMAIRE pad (prompt: "change the upper clothing to <preset>, keep face/hair/pose"). **Acceptatiecriterium (hard):** alléén de kleding wijzigt — gezicht/haar/pose/achtergrond pixel-identiek. ClothesMaskGenerator (E10.1) + FLUX Fill blijft de precisie-**fallback** voor gevallen waar instruction-edit buiten de kraag kleurt. E09.2 levert het productie-`/v1/stylize`-endpoint; E10.2 wiren zodra dat er is.
+
+### OTP "token has expired or is invalid" bij sign-in — WACHT-OP-THIERRY (2026-06-14)
+- **Symptoom:** e-mail + 6-cijfer-OTP-login geeft direct "Token expired" bij verify, ook met
+  snel ingevoerde code.
+- **Al gedaan (E18.21):** `AuthService.verifyCode` probeert nu `.email` én valt terug op `.signup`
+  (nieuw adres = signup-token). Loste het NIET op.
+- **Verdachte (gated, live Supabase-config):**
+  1. **E-mailtemplate stuurt een magic-link** naast `{{ .Token }}` → een mailclient/security-scanner
+     pre-fetcht de link en verbruikt de single-use token vóórdat de gebruiker de code inttypt →
+     "expired/invalid". **Fix:** template zo zetten dat alléén de OTP-code (`{{ .Token }}`) wordt
+     gemaild, geen `{{ .ConfirmationURL }}`.
+  2. **OTP-expiry te kort** in Auth-instellingen → verhoog naar bv. 3600s.
+  3. flowType/PKCE: AuthService gebruikt `.implicit` (correct voor OTP) — waarschijnlijk niet de oorzaak.
+- **Te doen door Thierry:** Supabase → Authentication → Email template + OTP-expiry checken; daarna
+  in-app opnieuw testen. App-kant (verify + foutweergave als input-error-state) is klaar.
