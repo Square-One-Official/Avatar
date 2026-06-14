@@ -60,4 +60,12 @@ altijd als brand-swatch moet of alleen op expliciet opslaan.
   achtergrond (`backgroundColorHex`) én een persistente brand-kit-swatch (`BrandColorKit`, E07.1).
 
 ## 25.3 — (optioneel) DSColorPicker hergebruiken
-- status: backlog — overal waar een kleur gekozen wordt de DSColorPicker inzetten (consistentie).
+- status: done (audit) — owner DS (AI-agent)
+
+**Result (audit):** de ENIGE plek in de app waar een kleur gekozen wordt is het Background-menu
+(Color-rij), en die gebruikt sinds 25.2 al de `DSColorPicker`. Een scan op `ColorPicker(`,
+`NSColorSampler`, `NSColorPanel/Well` en losse color-swatch-pickers leverde geen andere
+color-choice-UI op (de Adjust-sliders zijn brightness/contrast, geen kleurkeuze). Er is dus niets
+meer te converteren — DSColorPicker is het enige kleurkies-pad. Geen code-wijziging.
+**Figma-TODO:** als er later nieuwe kleurkeuzes bijkomen (bv. tekst/merk-kleuren), DSColorPicker
+hergebruiken.
