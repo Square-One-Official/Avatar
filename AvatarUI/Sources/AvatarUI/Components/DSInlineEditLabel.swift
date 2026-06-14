@@ -214,6 +214,16 @@ struct InlineEditTextField: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField(string: text)
+        // E18.11: NSTextField top-uitlijnt z'n tekst in een hoogte die kleiner
+        // is dan z'n natuurlijke celhoogte → de tekst sprong omhoog bij focus
+        // t.o.v. de SwiftUI-Text (die centreert). Een verticaal centrerende cel
+        // lijnt beide staten gelijk uit.
+        let centeredCell = VerticallyCenteredTextFieldCell(textCell: text)
+        centeredCell.isEditable = true
+        centeredCell.isSelectable = true
+        centeredCell.wraps = false
+        centeredCell.isScrollable = true
+        field.cell = centeredCell
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -255,6 +265,44 @@ struct InlineEditTextField: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
+    }
+
+    /// E18.11: centreert de tekst verticaal in de (kleine) celhoogte zodat de
+    /// editstaat exact op de rust-Text valt — zowel het tekenen als de
+    /// veld-editor (caret/selectie) gebruiken hetzelfde gecentreerde kader.
+    final class VerticallyCenteredTextFieldCell: NSTextFieldCell {
+        private func centered(_ rect: NSRect) -> NSRect {
+            let textHeight = cellSize(forBounds: rect).height
+            guard textHeight < rect.height else { return rect }
+            var result = rect
+            result.origin.y += (rect.height - textHeight) / 2
+            result.size.height = textHeight
+            return result
+        }
+
+        override func drawingRect(forBounds rect: NSRect) -> NSRect {
+            super.drawingRect(forBounds: centered(rect))
+        }
+
+        override func edit(
+            withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+            delegate: Any?, event: NSEvent?
+        ) {
+            super.edit(
+                withFrame: centered(rect), in: controlView, editor: editor,
+                delegate: delegate, event: event
+            )
+        }
+
+        override func select(
+            withFrame rect: NSRect, in controlView: NSView, editor: NSText,
+            delegate: Any?, start selStart: Int, length selLength: Int
+        ) {
+            super.select(
+                withFrame: centered(rect), in: controlView, editor: editor,
+                delegate: delegate, start: selStart, length: selLength
+            )
+        }
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {

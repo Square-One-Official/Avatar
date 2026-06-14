@@ -46,9 +46,16 @@ afvinken. UI-fixes met visuele smoke.
       Session-blok weg (alleen nog Sign out bij ingelogd). Smoke ✓.
 - [x] **18.9 Disabled-knop leesbaar** — DONE+gemerged. DSPrimaryButton: disabled = neutrale pil +
       muted-leesbare tekst i.p.v. donkere tekst op dof-lime.
-- [ ] **18.10 Tooltips op icon-buttons** — hover ~1–1.5s → label (bv. "Edit") boven de knop.
-- [ ] **18.11 Name/Role springt NOG steeds** bij focus (18.5 top-align loste het niet op — echte
-      oorzaak = baseline-verschil Text vs NSTextField in DSInlineEditLabel).
+- [x] **18.10 Tooltips op icon-buttons** — DONE+gemerged. `.help(label)` op DSToolButton → native
+      macOS-tooltip na de systeem-hover-vertraging (~1–1.5s); dekt alle icon-buttons (topbar + de
+      DSBottomToolbar-tools gebruiken DSToolButton). (Niet via screenshot ge-smoket: native tooltips
+      vragen echte HID-hover; synthetische mouse-events triggeren de tooltip-timer niet.)
+- [x] **18.11 Name/Role-baseline bij focus** — DONE+gemerged. Oorzaak bevestigd: NSTextField
+      top-uitlijnt z'n tekst in een hoogte kleiner dan z'n natuurlijke celhoogte, terwijl de
+      rust-SwiftUI-Text centreert → de tekst sprong omhoog bij focus. Fix: `VerticallyCenteredText
+      FieldCell` (centreert teken- én editor-/selectierechthoek) op het editveld → editstaat valt op
+      de rust-Text. Build groen. (Pixel-smoke lastig: het veldje is klein voor synthetische klikken;
+      canonieke centreer-cel-patroon — Thierry bevestigt hands-on.)
 - [x] **18.12 Lokale enhances = aan/uit-knoppen** — DONE+gemerged. One-click retouch ÉN Improve
       lighting (besluit Thierry: alle lokale, gratis, omkeerbare enhances) zijn nu toggles: 2e klik
       herstelt de foto van vóór i.p.v. stapelen. Generiek `toggleLocalEnhance(key,transform)` +
@@ -84,6 +91,12 @@ afvinken. UI-fixes met visuele smoke.
       lights) bleek te laag; nu weer op de top-rij, verticaal uitgelijnd met de naam-header en de
       Share/Settings-knoppen (gelijke top-inset gap-3, gecentreerd in de 48-knop-band), beginnend ná
       de OS-traffic-lights. Smoke ✓.
+
+- [x] **18.20 Icon-button eerste-klik-animatie** — DONE+gemerged (vermoedelijke fix). De eerste
+      paneel-open animeerde "te snel"/naspringerig; oorzaak waarschijnlijk de 18.18-hoogtemeting die
+      mee-veerde met de open-animatie (0 → inhoudshoogte). De meting wordt nu zonder animatie gezet
+      (`Transaction.disablesAnimations`), zodat het paneel meteen op maat opent. (Animatie-timing
+      niet via screenshot te smoken — Thierry bevestigt hands-on of de naspring weg is.)
 
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-

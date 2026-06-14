@@ -49,6 +49,9 @@ public struct DSToolButton: View {
         }
         .buttonStyle(DSStateOpacityButtonStyle())
         .accessibilityLabel(Text(label))
+        // E18.10: tooltip met het label na de systeem-hover-vertraging
+        // (~1–1.5s), zoals macOS-standaard — bv. "Edit", "Settings".
+        .help(label)
     }
 }
 

@@ -63,7 +63,15 @@ public struct DSEditPanel<Content: View>: View {
                     )
             }
             .frame(height: scrollHeight, alignment: .top)
-            .onPreferenceChange(DSPanelContentHeightKey.self) { contentHeight = $0 }
+            // E18.20: de eerste meting (0 → inhoudshoogte) mag niet meeveren
+            // met de open-animatie — dat gaf een snelle "naspring" bij de
+            // eerste klik. Zet 'm zonder animatie zodat het paneel meteen op
+            // maat opent.
+            .onPreferenceChange(DSPanelContentHeightKey.self) { height in
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { contentHeight = height }
+            }
         }
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
