@@ -1,9 +1,10 @@
-// Canvas action-toolbar (E24.1–24.4) — scène/beeld-acties als tekst+icoon-
-// knoppen, vastgemaakt bóven het portret. Vervangt de losse rechter-cluster
-// (E22.2). Bevat: frame-acties (Crop/Auto-frame/Fix angle/Flip/Restore body),
-// Background (popover), Adjust (popover met color-sliders, 24.3) en AI
-// (zichtbare dropdown: Colorise/Boost, 24.2). De persoon-tools (Effects/Face/
-// Clothing/Hair) blijven in de bottom-toolbar.
+// Canvas action-toolbar (E24.1–24.4, verslankt in E24.9) — scène/beeld-acties
+// bovenaan het portret. Vier top-level items, secundaire acties in dropdowns:
+//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip) · Background · Adjust ·
+//   AI ▾ (Improve lighting/Colorise/Boost/Restore body).
+// Alle dropdowns zijn dezelfde DS-popover (geen native menu); rijen hebben
+// hover-highlight. De toolbar staat alleen op de canvas als er een portret is
+// (result-state) — slank en altijd zichtbaar, niet hover-only.
 
 import AvatarUI
 import SwiftUI
@@ -21,38 +22,36 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     @ViewBuilder var adjust: () -> Adjust
     @ViewBuilder var background: () -> Background
 
+    @State private var showFrame = false
     @State private var showAdjust = false
     @State private var showBackground = false
     @State private var showAI = false
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
-            item("Crop", systemImage: "crop", action: onCrop)
-            item("Auto-frame", systemImage: "viewfinder") { onAutoFrame() }
-            item("Fix angle", systemImage: "camera", action: onFixAngle)
-            item("Flip", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right") { onFlip() }
-            item("Restore body", systemImage: "arrow.up.left.and.arrow.down.right") { onRestoreBody() }
+            // Frame ▾
+            menuButton("Frame", systemImage: "crop", isActive: showFrame) { showFrame = true }
+                .popover(isPresented: $showFrame, arrowEdge: .bottom) {
+                    frameMenu.padding(DSSpacing.gap2).frame(width: 240)
+                }
 
-            divider
-
-            button("Background", systemImage: "photo", isActive: showBackground) { showBackground = true }
+            // Background (popover)
+            menuButton("Background", systemImage: "photo", isActive: showBackground, chevron: false) { showBackground = true }
                 .popover(isPresented: $showBackground, arrowEdge: .bottom) {
                     background().padding(DSSpacing.gap4).frame(width: 320)
                 }
-            button("Adjust", systemImage: "slider.horizontal.3", isActive: showAdjust) { showAdjust = true }
+
+            // Adjust (color-sliders popover)
+            menuButton("Adjust", systemImage: "slider.horizontal.3", isActive: showAdjust, chevron: false) { showAdjust = true }
                 .popover(isPresented: $showAdjust, arrowEdge: .bottom) {
                     adjust().padding(DSSpacing.gap5).frame(width: 360)
                 }
 
-            // E24.2-fix: AI-edits via dezelfde DS-popover als Background/Adjust
-            // (geen native menu).
-            Button { showAI = true } label: {
-                label("AI", systemImage: "sparkles", isActive: showAI, chevron: true)
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showAI, arrowEdge: .bottom) {
-                aiMenu.padding(DSSpacing.gap2).frame(width: 240)
-            }
+            // AI ▾
+            menuButton("AI", systemImage: "sparkles", isActive: showAI, chevron: true) { showAI = true }
+                .popover(isPresented: $showAI, arrowEdge: .bottom) {
+                    aiMenu.padding(DSSpacing.gap2).frame(width: 240)
+                }
         }
         .padding(DSSpacing.gap1)
         .background(.ultraThinMaterial, in: Capsule())
@@ -62,29 +61,40 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             let args = ProcessInfo.processInfo.arguments
             if args.contains("--show-bg-popover") { showBackground = true }
             if args.contains("--show-ai-popover") { showAI = true }
+            if args.contains("--show-frame-popover") { showFrame = true }
         }
         #endif
     }
 
-    // E24.2-fix: AI-popover-inhoud — DS-typografie, Pro via DSProChip (zoals
-    // elders), zelfde look als de Background/Adjust-popovers.
-    private var aiMenu: some View {
+    // MARK: Dropdown-inhoud
+
+    private var frameMenu: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            aiItem("Improve lighting", pro: false, action: onImproveLighting)
-            aiItem("Colorise", pro: !isPro, action: onColorise)
-            aiItem("Boost resolution", pro: !isPro, action: onBoost)
+            menuRow("Auto-frame & center", systemImage: "viewfinder", action: onAutoFrame)
+            menuRow("Crop", systemImage: "crop", action: onCrop)
+            menuRow("Fix camera angle", systemImage: "camera", action: onFixAngle)
+            menuRow("Flip horizontal", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right", action: onFlip)
         }
     }
 
-    private func aiItem(_ title: String, pro: Bool, action: @escaping () -> Void) -> some View {
+    private var aiMenu: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            menuRow("Improve lighting", systemImage: "wand.and.stars", action: onImproveLighting)
+            menuRow("Colorise", systemImage: "paintpalette", pro: !isPro, action: onColorise)
+            menuRow("Boost resolution", systemImage: "arrow.up.left.and.arrow.down.right", pro: !isPro, action: onBoost)
+            menuRow("Restore body", systemImage: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+        }
+    }
+
+    /// Een dropdown-rij; `action == nil` = nog-niet-gebouwde stub (gedimd).
+    private func menuRow(_ title: String, systemImage: String, pro: Bool = false, action: (() -> Void)?) -> some View {
         Button {
-            showAI = false
-            action()
+            showFrame = false; showAI = false
+            action?()
         } label: {
             HStack(spacing: DSSpacing.gap2) {
-                Text(title)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
+                Image(systemName: systemImage).font(.system(size: 13, weight: .medium)).frame(width: 18)
+                Text(title).dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary)
                 Spacer(minLength: DSSpacing.gap2)
                 if pro { DSProChip() }
             }
@@ -95,36 +105,23 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
+        .opacity(action == nil ? 0.45 : 1)
+        .disabled(action == nil)
     }
 
-    private var divider: some View {
-        Rectangle().fill(DSColor.Foreground.divider).frame(width: 1, height: 20)
-            .padding(.horizontal, DSSpacing.gap1)
-    }
-
-    /// Knop met optionele handler (nil → gedimde stub).
-    private func item(_ title: String, systemImage: String, action: (() -> Void)?) -> some View {
-        button(title, systemImage: systemImage) { action?() }
-            .disabled(action == nil)
-            .opacity(action == nil ? 0.45 : 1)
-    }
-
-    private func button(_ title: String, systemImage: String, isActive: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) { label(title, systemImage: systemImage, isActive: isActive) }
-            .buttonStyle(.plain)
-    }
-
-    private func label(_ title: String, systemImage: String, isActive: Bool = false, chevron: Bool = false) -> some View {
-        HStack(spacing: DSSpacing.gap1) {
-            Image(systemName: systemImage).font(.system(size: 13, weight: .medium))
-            Text(title).dsTextStyle(.labelSmall)
-            if chevron { Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)) }
+    private func menuButton(_ title: String, systemImage: String, isActive: Bool, chevron: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: systemImage).font(.system(size: 13, weight: .medium))
+                Text(title).dsTextStyle(.labelSmall)
+                if chevron { Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)) }
+            }
+            .foregroundStyle(DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
+            .background(isActive ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+            .dsHoverHighlight(cornerRadius: 16)
         }
-        .foregroundStyle(DSColor.Foreground.primary)
-        .padding(.horizontal, DSSpacing.gap2)
-        .frame(height: 32)
-        .background(isActive ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-        // E24-fix: hover-affordance op de toolbar-knoppen (was afwezig).
-        .dsHoverHighlight(cornerRadius: 16)
+        .buttonStyle(.plain)
     }
 }

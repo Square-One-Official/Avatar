@@ -40,6 +40,30 @@ frame-uitlijning tussen `.center` (rust) en `.leading` (typen), geanimeerd. Bij 
 (endEditing) hercentreert het. Build groen. (Edit-staat niet synthetisch te smoken; rust =
 gecentreerd zichtbaar in alle smokes.)
 
+## 24.9 — Canvas-toolbar verslanken (8 → 4 items)
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- DoD: beide targets bouwen + tests groen + smoke (beide canvas-staten)
+
+**Plan:** Framing-acties bundelen onder "Frame ▾"; "Restore body" naar de AI ▾-dropdown; top-level
+= Frame ▾ · Background · Adjust · AI ▾.
+
+**Result:** `CanvasActionToolbar` herschreven naar 4 top-level items. **Frame ▾** = Auto-frame &
+center (primair, eerst) / Crop (stub) / Fix camera angle (stub) / Flip horizontal — eigen DS-popover
+met icoon-rijen + hover. **AI ▾** = Improve lighting / Colorise (Pro) / Boost (Pro) / **Restore body**
+(Pro, verplaatst — generatief). Background + Adjust blijven directe popover-knoppen (geen chevron).
+Alles via dezelfde DS-popover (geen native menu), met hover-highlight. Smoke ✓ (slanke 4-knoppen-
+balk; Frame- en AI-dropdown).
+
+**Zichtbaarheids-/expand-keuze (Result):** de toolbar wordt alléén gerenderd als er een portret op
+de canvas staat (result-state = portret geselecteerd) en is dan de slanke, altijd-zichtbare
+4-knoppenset — géén hover-only. De "expand" is puur de Frame/AI-dropdown (secundaire acties);
+er is bewust geen aparte hover-expand-animatie (rust = de 4 knoppen, discoverability behouden).
+In de empty/first-use-state (geen portret) is er geen toolbar.
+
+**Figma-TODO:** Frame-icoon (nu "crop") + de dropdown-iconen → DSIcon/Phosphor; toolbar-groepering
+tegen de referenties bevestigen.
+
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
 - status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/
   handle-laag op EditorCanvasView (resize-handles + drag-scale) los van de view-zoom (scroll/pinch),
