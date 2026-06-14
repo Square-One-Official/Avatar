@@ -5,6 +5,21 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.21 — Name/Role als knop → gedeelde rename-modal (Name + Role)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** `RenameSheet` bevat nu Name ÉN Role (twee DSTextFields, Save schrijft beide door).
+`PortraitHeader` is geen inline-edit (DSInlineEditLabel) meer maar één knop (Name/Role als tekst,
+hover-affordance) die de modal opent via `ShellModel.isShowingRename`; de view leest het portret
+direct zodat de save meteen zichtbaar is. De sidebar-rename gebruikt dezelfde `RenameSheet` →
+één modal voor beide ingangen.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshots: rename-modal met Name+Role+Save
+(/tmp/c21_modal.png); canvas-header als Name/Role-tekstknop (/tmp/c21_header.png). Smoke-haak
+(#if DEBUG): `--show-rename`.
+**Figma-TODO:** knop-hover/typografie van de header tegen de referenties; modal-veldvolgorde.
+
 ## 24.17-reopened — Canvas-interactie opnieuw
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

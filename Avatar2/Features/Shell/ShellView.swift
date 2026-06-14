@@ -62,6 +62,12 @@ struct ShellView: View {
                 ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
             }
         }
+        // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
+        .sheet(isPresented: $model.isShowingRename) {
+            if let portrait = model.selectedPortrait {
+                RenameSheet(portrait: portrait)
+            }
+        }
         // E19.5: voortgangs-toast voor Align set / Match lighting.
         .overlay(alignment: .bottomTrailing) {
             if let message = setBusyMessage {
@@ -104,6 +110,8 @@ struct ShellView: View {
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])
             }
+            // E24.21: open de rename-modal voor de smoke.
+            if args.contains("--show-rename") { model.isShowingRename = true }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
