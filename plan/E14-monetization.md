@@ -33,16 +33,32 @@ gebruikers) hoort hierbij — meenemen of eerst doen.
 **Result:** PaywallSheet subscribe-tak herbouwd als "Choose your plan"-kiezer (frame 4019:953, breedte 900): gecentreerde titel + ×, Monthly/Yearly-segmented pill (Yearly = "2 months free", lokale control — geen AvatarUI-wijziging), Starter-kaart (Free + 3 images total/Local processing/No bots/Export) en gehighlighte Pro-kaart (lime rand, "Upgrade"-chip, prijs per interval uit ProTier €4,99/mo · €49,90/yr, Unlimited images/All Starter features/All editing features/200 editing credits, "Upgrade to pro"-CTA). Top-up-tak (actieve Pro) ongewijzigd. Default-interval jaar (anker). 14.6 (authed subscribe) volgt apart in de keten; subscribe gebruikt nu de anonymous-flow. DEBUG-haak --show-paywall. Smoke-run (ontgrendeld): 1-op-1 het frame, interval-toggle schakelt de prijs. Beide targets bouwen groen, suite groen.
 
 ## 14.2 — Free-gate: 3 afbeeldingen totaal
-- status: backlog
-- owner: —
-- blockedBy: 14.1
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- blockedBy: 14.1 (done)
 - DoD: beide targets bouwen, tests groen
 - Context: v1 FreeTierGate + supabase free_cutouts_used; QuotaBadge uit E03.2.
 
 Importgate op 3 lifetime-afbeeldingen voor Starter; teller zichtbaar in QuotaBadge ('x/3'); bij
 overschrijding → pro-modal. Watermark op Starter-export.
 
-**Result:** _(invullen bij done)_
+**Plan:**
+1. Importgate wiren: `ShellModel.runCutout` roept vóór elke import `entitlement.claimImport()`
+   aan (atomic server-claim, `users.free_imports_used` + device-counter, source-agnostic — geldt
+   óók voor lokale Vision-cutouts). Cap → paywall, import afgebroken.
+2. `EntitlementModel.claimImport()`-wrapper: Pro short-circuit; niet-allowed/402 →
+   `requestUpgrade()` + false; transportfout blokkeert niet (offline niet vastlopen) → true; bij
+   succes `refresh()` zodat de teller klopt.
+3. Teller + watermark waren er al: QuotaBadge toont "x/3 left" (ShellTopBar, FreeTier.maxPortraits
+   = 3); PortraitExporter.applyWatermark draait al op `!isProActive` (E08.2).
+
+**Result:** Free-gate compleet. Importgate gewired in `ShellModel.runCutout` via nieuwe
+`EntitlementModel.claimImport()` (atomic server-claim vóór elke import, source-agnostic; cap →
+paywall, geen canvas-wijziging; Pro short-circuit; transport-hik blokkeert niet; succes →
+saldo/teller-refresh). QuotaBadge-teller ("x/3 left", FreeTier.maxPortraits = 3) en de
+Starter-export-watermark (PortraitExporter.applyWatermark op `!isProActive`) waren al aanwezig
+(E03.2/E08.2) en blijven werken. Smoke (plain launch): topbar toont "3/3 left" + Upgrade; happy
+path intact. Beide targets bouwen groen, alle suites groen.
 
 ## 14.3 — Credit-metering per feature
 - status: done

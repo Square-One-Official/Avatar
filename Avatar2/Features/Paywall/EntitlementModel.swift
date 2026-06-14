@@ -131,6 +131,29 @@ final class EntitlementModel {
         isShowingOutOfCreditsToast = true
     }
 
+    /// E14.2: free-tier importgate (3 lifetime-afbeeldingen, source-agnostic).
+    /// Roept de atomic server-claim aan vóór elke import; Pro short-circuit
+    /// `allowed`. Niet toegestaan (cap bereikt / 402) → paywall + false.
+    /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
+    /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
+    func claimImport() async -> Bool {
+        do {
+            let resp = try await backend.claimImport()
+            if !resp.allowed {
+                requestUpgrade()
+                return false
+            }
+            // Bijgewerkte teller meteen zichtbaar in de QuotaBadge.
+            await refresh()
+            return true
+        } catch BackendError.noCredits {
+            requestUpgrade()
+            return false
+        } catch {
+            return true
+        }
+    }
+
     func dismissOutOfCreditsToast() {
         isShowingOutOfCreditsToast = false
     }

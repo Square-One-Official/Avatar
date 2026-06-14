@@ -115,6 +115,9 @@ final class ShellModel {
     }
 
     private func runCutout(on cgImage: CGImage) async {
+        // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
+        // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
+        guard await entitlement.claimImport() else { return }
         let original = nsImage(from: cgImage)
         canvas = .processing(original)
         do {
