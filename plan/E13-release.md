@@ -55,7 +55,7 @@ Checklist-items uit E01.7 (INFRA, 2026-06-12):
 **Result:** _(invullen bij done)_
 
 ## 13.4 — Backend-port ronde 2 (v2-main → main) — KLAARGEZET
-- status: wacht-op-Thierry (gated: productie-deploy + DB-migratie)
+- status: done (productie-deploy 2026-06-14) — DB-migraties blijven wacht-op-Thierry
 - owner: FEAT (AI-agent, marathon — voorbereiding; uitvoering door Thierry)
 - blockedBy: — (klaar; alleen de gated uitvoering rest)
 - DoD: de nieuwe cloud-routes draaien op productie; prod-smoke groen

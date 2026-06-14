@@ -7,10 +7,10 @@ afvinken. UI-fixes met visuele smoke.
 - [x] **18.1 E-mail-login vanuit Settings/Account** — DONE+gemerged. `SignInSheet` (e-mail→OTP via
       AuthService) + EntitlementModel-proxies (sendSignInCode/verifySignInCode/authBusy/authError);
       Account-pagina (uitgelogd) toont nu een "Sign in"-kaart → sheet. Smoke ✓.
-- [ ] **18.7 Backend bereikbaar voor test** — AI-routes geven 404 op productie (v2-port niet
-      gedeployed) en de preview staat achter Vercel-protection. BESLISSING nodig: preview
-      ontsluiten (protection uit/bypass) vs productie-port. Daarna app → preview via DEBUG-override
-      + login met DEV_UNLIMITED_EMAILS-account (credit-bypass).
+- [x] **18.7 Backend bereikbaar voor test** — DONE: Thierry koos productie-deploy. Gecureerde port
+      (main + v2-backend, send-recovery-email behouden) live op api.aaavatar.nl; origin/main → b27b31b.
+      stylize/upscale/messages-routes geverifieerd (401/405 i.p.v. 404). LET OP: fill_body 1→2 credits
+      raakt nu ook de live v1-app. DB-migraties (013/014/Payload-messages) blijven gated.
 
 ## UX / gedrag
 - [ ] **18.2 Pro-opties zichtbaar+klikbaar voor niet-Pro** — alle Pro-opties (Apply make-up,
