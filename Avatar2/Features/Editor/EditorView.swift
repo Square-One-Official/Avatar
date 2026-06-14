@@ -142,6 +142,23 @@ struct EditorView: View {
         return portrait
     }
 
+    /// E24.16: de clip-vorm voor het canvas, volgend op `Portrait2.frameShape`
+    /// (default circle). Square = de normale kaart-rechthoek (de kaart rondt de
+    /// hoeken zelf al af).
+    private var frameClipShape: AnyShape {
+        (portraitModel?.frameShape ?? .circle) == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
+    }
+
+    /// E24.16: persisteer de gekozen frame-vorm op het portret (canvas + export
+    /// volgen reactief). `touch()` zet "laatst bewerkt" bij.
+    private func setFrameShape(_ shape: ExportShape) {
+        guard let portraitModel else { return }
+        withAnimation(.spring(duration: 0.3)) {
+            portraitModel.frameShape = shape
+        }
+        portraitModel.touch()
+    }
+
     /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit).
     private var hasBackground: Bool {
         portraitModel?.backgroundColorHex != nil || portraitModel?.backgroundImageData != nil
@@ -285,6 +302,10 @@ struct EditorView: View {
                         EditorCanvasView(image: portrait, portrait: portraitModel)
                     }
                 }
+                // E24.16: clip de achtergrond + cutout tot de frame-vorm. Cirkel
+                // = transparante hoeken (tonen het kaart-/dot-grid eronder) en
+                // matcht de export-mask; vierkant = de normale kaart-vorm.
+                .clipShape(frameClipShape)
             }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
@@ -309,6 +330,8 @@ struct EditorView: View {
                 CanvasActionToolbar(
                     onAutoFrame: runAutomaticFraming,
                     onFlip: flipHorizontally,
+                    frameShape: portraitModel?.frameShape ?? .circle,
+                    onSetFrameShape: setFrameShape,
                     onRestoreBody: { _ = entitlement?.allowCloudFeature() },
                     onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                     onColorise: { _ = entitlement?.allowCloudFeature() },

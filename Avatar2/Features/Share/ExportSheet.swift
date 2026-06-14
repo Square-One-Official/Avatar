@@ -13,8 +13,15 @@ struct ExportSheet: View {
     var isPro: Bool = false
     @Environment(\.dismiss) private var dismiss
 
-    @State private var shape: ExportShape = .square
+    @State private var shape: ExportShape
     @State private var size: Int = PortraitExporter.exportSide
+
+    init(portrait: Portrait2, isPro: Bool = false) {
+        self.portrait = portrait
+        self.isPro = isPro
+        // E24.16: de export-vorm volgt standaard de per-portret frame-vorm.
+        _shape = State(initialValue: portrait.frameShape)
+    }
 
     private var watermark: Bool { !isPro }
 
