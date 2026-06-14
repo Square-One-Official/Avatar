@@ -199,9 +199,24 @@ uitbreiden met `collection: messages` + recipient-resolutie op `targeting.cohort
 naast de bestaande announcements.audience-route). Niet-destructief; live send = gated.
 
 ## 17.7 — [INFRA] Lifecycle-campagnes
-- status: ready
-- owner: —
-- blockedBy: 17.6
+- status: done (config + dispatch-plan gemerged) — **seed/cron + live = wacht-op-Thierry**
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: 17.6 (done)
 - DoD: config + dispatch-logica typecheckt; reviewbaar.
+
+**Plan:**
+1. `admin/src/lib/lifecycleCampaigns.ts`: getypeerde campagne-set (welkom dag 0 → tips dag 2 →
+   launch dag 7) met channel/cohort/sendAfterDays/body/CTA + `toMessageDraft()` (mapt een stap
+   naar een Payload `messages`-create-payload met targeting.signupAfter/Before-window + schedule).
+2. `admin/LIFECYCLE-CAMPAGNES.md`: seed- + cron-dispatch-plan (reviewbaar, gated).
+3. admin tsc groen; Swift onaangeroerd.
+
+**Result:** `admin/src/lib/lifecycleCampaigns.ts` — getypeerde set welkom (dag 0) → tips (dag 2) →
+launch/Pro (dag 7), elk met channel/cohort/sendAfterDays/window/CTA + `toMessageDraft()` die een
+stap naar een Payload `messages`-create-payload mapt (targeting.signupAfter/Before-venster +
+schedule), zodat de bestaande /v1/messages-feed én sendNewsletter (collection:messages) het
+oppikken zonder extra logica. `admin/LIFECYCLE-CAMPAGNES.md` beschrijft de dagelijkse-cron- en
+handmatige-seed-route + het signup-window-open-punt. admin tsc groen; Swift onaangeroerd.
+**WACHT-OP-THIERRY:** seed/cron instellen + live verzending (vergt E17.1-migratie + E17.6-env/DB).
 
 Welkom → tips → launch-campagnes vanuit het Message-model (schedule/cohort-gestuurd). Live = gated.
