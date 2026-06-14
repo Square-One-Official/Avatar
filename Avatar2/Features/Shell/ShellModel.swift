@@ -185,6 +185,18 @@ final class ShellModel {
         }
     }
 
+    /// E18.4: her-afleidt het canvas uit de cutoutData van het geselecteerde
+    /// portret. Set-brede edits (Match lighting, Align Set) wijzigen alleen
+    /// cutoutData via CutoutDataUndo — niet het canvas. Wordt aangeroepen na
+    /// elke undo/redo zodat zo'n wijziging (en het terugdraaien ervan) ook op
+    /// het canvas zichtbaar wordt. No-op buiten de result-staat.
+    func refreshCanvasFromSelection() {
+        guard case .result = canvas,
+              let portrait = selectedPortrait,
+              let image = NSImage(data: portrait.cutoutData) else { return }
+        canvas = .result(image)
+    }
+
     // MARK: - Hifi-haar-nudge (E05.6)
 
     /// Subtiele, eenmalige nudge onder het resultaat.

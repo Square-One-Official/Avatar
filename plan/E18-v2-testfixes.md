@@ -21,10 +21,17 @@ afvinken. UI-fixes met visuele smoke.
 - [x] **18.3 Cloud-fouten als toast** — DONE+gemerged (samen met 18.2). `EntitlementModel.errorToast`
       + `presentError`; DSToast-overlay onderin (auto-dismiss 4s). Effects/Hair/Clothes/Boost-
       failures → toast i.p.v. inline tekst onder de menutitel.
-- [ ] **18.4 Undo/redo dekt álle stappen** — "Match lighting" (sidebar) undo't niet. Controleer dat
-      undo/redo écht elke stap meeneemt: effects, kleding, haar, boost, match-lighting, reframing.
-      (Match lighting gebruikt CutoutDataUndo + eigen undo-groep; waarschijnlijk werkt de
-      sidebar-undoManager niet of de @Query ververst de thumb niet na revert — onderzoeken.)
+- [x] **18.4 Undo/redo dekt álle stappen** — DONE+gemerged. Audit-uitkomst:
+      • Effects/Clothing/Hair riepen `onApply` rechtstreeks aan → **géén undo**. Nu via
+        `undoableApply(name)` (leest before vers uit het model-cutoutData, registreert
+        ImageEnhanceUndo; undo/redo lopen via onApplyResult → canvas + cutout bewegen mee).
+      • Match lighting (CutoutDataUndo) wijzigt alleen cutoutData, niet het gecachte canvas → de
+        revert was onzichtbaar. ShellModel.`refreshCanvasFromSelection()` her-afleidt het canvas uit
+        het geselecteerde portret; ShellView roept 'm aan op elke undo/redo-notificatie.
+      • Reframing (AutoFramer/TransformUndo) wijzigt offset/scale — het E06.4-canvas observeert het
+        model al reactief, dus dat werkte. Boost + lokale toggles waren al undo'baar.
+      Build groen; undo-wiring spiegelt het werkende boost-pad. (Volledige apply→undo round-trip van
+      cloud-effects vraagt live backend + credits → niet via screenshot ge-smoket.)
 
 ## Layout / styling
 - [x] **18.5 Name/Role-header** — DONE+gemerged. Header top-uitgelijnd met de topbar-knoppen

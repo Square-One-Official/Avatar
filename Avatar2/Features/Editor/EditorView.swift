@@ -262,14 +262,14 @@ struct EditorView: View {
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit).
-                ClothesPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
+                ClothesPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Change clothes"))
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize.
-                EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
+                EffectsPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Apply effect"))
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
                 // /v1/stylize (nano-banana instruction-edit, E11.1-route).
-                HairPanel(baseImage: portrait, entitlement: entitlement, onApply: onApplyResult)
+                HairPanel(baseImage: portrait, entitlement: entitlement, onApply: undoableApply("Change hair"))
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")
@@ -342,6 +342,25 @@ struct EditorView: View {
                 undoTo: before, redoTo: after, actionName: key
             )
             localToggleBaselines[key] = before
+        }
+    }
+
+    /// E18.4: maak cloud-resultaten (Effects/Clothing/Hair) undo'baar. De
+    /// before-foto wordt vers uit het model gelezen op het moment van toepassen
+    /// (referentietype → niet stale), vóór `onApplyResult` 'm overschrijft.
+    /// Undo/redo lopen via `onApplyResult` zodat canvas + cutout meebewegen.
+    private func undoableApply(_ name: String) -> (NSImage) -> Void {
+        { newImage in
+            guard let portraitModel,
+                  let before = NSImage(data: portraitModel.cutoutData) else {
+                onApplyResult(newImage)
+                return
+            }
+            onApplyResult(newImage)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel, apply: onApplyResult,
+                undoTo: before, redoTo: newImage, actionName: name
+            )
         }
     }
 

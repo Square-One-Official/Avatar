@@ -42,6 +42,15 @@ struct ShellView: View {
         .animation(.spring(duration: 0.35), value: model.isSidebarVisible)
         .background(DSColor.Background.app)
         .preferredColorScheme(.dark)
+        // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
+        // ververs het canvas na elke undo/redo zodat zulke stappen — en het
+        // terugdraaien — ook op het canvas zichtbaar zijn.
+        .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in
+            model.refreshCanvasFromSelection()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
+            model.refreshCanvasFromSelection()
+        }
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
