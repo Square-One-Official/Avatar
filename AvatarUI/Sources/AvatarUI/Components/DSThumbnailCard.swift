@@ -94,11 +94,21 @@ public struct DSThumbnailCard<Icon: View>: View {
                         .padding(DSSpacing.gap1)
                 }
             }
-            // Selectie-ring.
+            // Selectie-/active-ring + check-badge (E24.28: duidelijke
+            // active-state, gedeelde regel voor toggle-/selectie-acties).
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg)
                     .strokeBorder(DSColor.Action.primary, lineWidth: 2)
                     .opacity(isSelected ? 1 : 0)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(DSColor.Action.primary)
+                        .background(Circle().fill(.black.opacity(0.4)))
+                        .padding(DSSpacing.gap1)
+                }
             }
     }
 }

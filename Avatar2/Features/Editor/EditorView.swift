@@ -300,6 +300,8 @@ struct EditorView: View {
             onColorise: { _ = entitlement?.allowCloudFeature() },
             onBoost: runBoostResolution,
             isPro: entitlement?.isProActive ?? false,
+            // E24.28: toon de active-state van de Improve lighting-toggle.
+            improveLightingOn: localToggleBaselines["Improve lighting"] != nil,
             // E24.27: AI-één-tik-acties zitten nu IN het Light & color-paneel.
             showAutoEnhance: true
         )

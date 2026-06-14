@@ -5,6 +5,25 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.28 — Toggle-acties tonen een duidelijke active-state
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** gedeelde active-state-regel voor toggle-acties. (1) De `quickAction`-chips (Light&color,
+24.27) kregen een `isOn`: aan = **lime fill (Action.primary) + onAction-tekst + checkmark**;
+"Improve lighting" geeft nu z'n aan/uit-stand door (`improveLightingOn` = staat in
+`localToggleBaselines`). (2) `DSThumbnailCard` (One-click retouch + Effects) kreeg náást de
+selectie-ring een **lime check-badge** (top-trailing) bij `isSelected` → één duidelijke active-taal.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: "Improve lighting" AAN = lime-gevulde
+chip met check in het Light&color-paneel (/tmp/c28_lighting_on.png); UIT = neutrale chip (24.27-shot).
+One-click retouch gebruikt dezelfde `DSThumbnailCard`-active-state (ring + check, build-geverifieerd;
+de wiring `card.isOn = activeToggles.contains` is in code bevestigd). **Let op:** een verse
+Face-screenshot lukte deze run niet — de window-capture-omgeving degradeerde (de app-window werd niet
+meer door de window-list gevonden; full-screen ving andere apps). De active-state zelf is via de
+Improve-lighting-shot + de gedeelde component bevestigd.
+**Figma-TODO:** exacte active-styling (fill vs. ring vs. check) tegen de referenties uniformeren.
+
 ## 24.27 — Light & color-paneel: AI-acties netjes samengevoegd
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
