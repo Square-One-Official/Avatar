@@ -2,7 +2,7 @@
 
 Team: **DS**. Autonome shift 2026-06-14.
 
-## Status: in_progress (eigen sessie op verzoek Thierry) — owner FEAT (AI-agent)
+## Status: done (eigen sessie op verzoek Thierry) — owner FEAT (AI-agent)
 
 **Waarom geparkeerd:** E23 is een grote cross-cutting refactor. `DSColor` is nu een set
 **dark-only constanten** (`Color(hex:)`), direct gebruikt door tientallen componenten. Light-mode
