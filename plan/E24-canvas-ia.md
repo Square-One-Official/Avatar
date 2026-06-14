@@ -97,6 +97,26 @@ zichtbaar (/tmp/c17_selected.png). Klik-naar-selecteren/deselecteren is in code 
 — bevestig of deselect daar via buiten-canvas/escape moet. Handle-stijl + alignment-guide-gedrag
 verder in 24.19.
 
+## 24.25 — Canvas-afbeelding fadet bij menu-open
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Diagnose:** `DSEditPanelContainer` had de foto als `.overlay`-KIND van het transitionende paneel,
+samen onder één `.clipped()` + `.animation(.spring, value: activeTool)`. Bij het openen van een
+bottom-paneel bleedde de opacity-transitie van het paneel via de gedeelde clip/animation-scope kort
+op de foto → korte fade. (De canvas-toolbar-menu's Frame/Background/Adjust/AI hebben géén
+animation-pad naar de foto — die zijn al stabiel.)
+
+**Fix:** de foto is nu een ZUSTER van het paneel in een `ZStack` MET een stabiele identity
+(`.id("editorPhoto")`); alléén het paneel transitionet (schuift van onderen in). De foto deelt geen
+transition/clip-groep meer met de paneel-state → geen fade.
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: bottom-paneel (Effects) open met de
+foto vol-opaak/stabiel (/tmp/c25_panel.png); canvas-toolbar-menu's open met stabiele foto (eerdere
+shots). De sub-seconde transitie-fade is niet als screenshot vast te leggen; de fix verwijdert de
+animation-koppeling structureel (stabiele identity + losgekoppelde transition).
+**Figma-TODO:** n.v.t.
+
 ## 24.24 — Custom background-upload persistent als herbruikbare swatch
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

@@ -118,24 +118,30 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
     public var body: some View {
         VStack(spacing: DSSpacing.gap2) {
             // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt
-            // de onderkant i.p.v. de foto te verkleinen. Wisselen tussen
-            // menu's geeft zo geen onrustige resize meer. Het paneel schuift
-            // van onderen in (glas-materiaal: de foto schemert subtiel door).
-            photo
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .bottom) {
-                    if let tool = activeTool {
-                        panel(tool)
-                            .padding(.bottom, DSSpacing.gap2)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+            // de onderkant i.p.v. de foto te verkleinen.
+            // E24.25-fix: de foto is een ZUSTER van het paneel (geen overlay-
+            // kind van het transitionende paneel) MET een STABIELE identity
+            // (.id) zodat hij niet mee-animeert/faded als `activeTool` wisselt.
+            // Alléén het paneel transitionet (schuift in van onderen); de foto
+            // blijft volledig stabiel — geen korte fade meer bij menu-open.
+            ZStack(alignment: .bottom) {
+                photo
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .id("editorPhoto")
+
+                if let tool = activeTool {
+                    panel(tool)
+                        .padding(.bottom, DSSpacing.gap2)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                // Clip zodat het paneel netjes vanaf de onderrand in schuift.
-                .clipped()
+            }
+            // Clip zodat het paneel netjes vanaf de onderrand in schuift.
+            .clipped()
 
             DSBottomToolbar(items: tools, selection: $activeTool)
                 .fixedSize()
         }
+        // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
         .animation(.spring(duration: 0.35), value: activeTool)
     }
 }
