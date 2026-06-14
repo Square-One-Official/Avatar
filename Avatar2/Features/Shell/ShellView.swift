@@ -45,7 +45,8 @@ struct ShellView: View {
         }
         .animation(.spring(duration: 0.35), value: model.isSidebarVisible)
         .background(DSColor.Background.app)
-        .preferredColorScheme(.dark)
+        // E23: geen forced .dark meer — de hoofdshell volgt de
+        // AppearancePreference (default Dark) zodat Light/System werken.
         // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
         // ververs het canvas na elke undo/redo zodat zulke stappen — en het
         // terugdraaien — ook op het canvas zichtbaar zijn.

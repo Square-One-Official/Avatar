@@ -68,12 +68,15 @@ enum SettingsDefaults {
 /// instabiele "(unknown context at $adres)"-signatuur op → wees-sleutels en
 /// een venster dat bij twee launch-condities tegelijk kan inklappen.
 struct AppearancePreferenceModifier: ViewModifier {
+    // E23: default = Dark (de huidige merk-look). Light/System zijn opt-in via
+    // Settings > Appearance. Vóór E23 stond dit op .system terwijl de app
+    // dark-only was; nu de tokens theme-bewust zijn houdt .dark de look gelijk.
     @AppStorage(SettingsDefaults.appearanceKey)
-    private var appearanceRaw: String = AppearancePreference.system.rawValue
+    private var appearanceRaw: String = AppearancePreference.dark.rawValue
 
     func body(content: Content) -> some View {
         content.preferredColorScheme(
-            (AppearancePreference(rawValue: appearanceRaw) ?? .system).colorScheme
+            (AppearancePreference(rawValue: appearanceRaw) ?? .dark).colorScheme
         )
     }
 }
