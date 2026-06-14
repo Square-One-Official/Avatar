@@ -28,6 +28,8 @@ struct SidebarView: View {
     var onExport: (Portrait2) -> Void = { _ in }
     /// E19.5: set-brede voortgang (Align/Match lighting) → shell-toast.
     var onSetBusy: (String?) -> Void = { _ in }
+    /// E19.4: watermerk-bepaling voor bulk-export (free = watermerk).
+    var isPro: Bool = false
 
     @Environment(\.undoManager) private var undoManager
     @Environment(\.modelContext) private var modelContext
@@ -36,6 +38,10 @@ struct SidebarView: View {
     @State private var deleteTarget: Portrait2?
     /// E24.22: portret waarvoor het DS-rechtermuis-menu open is.
     @State private var menuTarget: Portrait2?
+    /// E19.4: multi-select voor bulk-export (cmd/shift-klik), los van de
+    /// canvas-selectie. lastClickedID = ankerpunt voor shift-bereik.
+    @State private var selectedForBulk: Set<PersistentIdentifier> = []
+    @State private var lastClickedID: PersistentIdentifier?
     /// E05.7: loopt tijdens een set-brede align (knop disabled + pulse).
     @State private var isAligning = false
     /// E12.2: loopt tijdens de set-brede lichtnormalisatie.
@@ -61,8 +67,9 @@ struct SidebarView: View {
                         DSSidebarRow(
                             name: portrait.name.isEmpty ? "Name" : portrait.name,
                             role: portrait.role.isEmpty ? "Role" : portrait.role,
-                            isSelected: portrait.persistentModelID == selectedID,
-                            action: { menuTarget = nil; onSelect(portrait) },
+                            isSelected: portrait.persistentModelID == selectedID && selectedForBulk.isEmpty,
+                            isMultiSelected: selectedForBulk.contains(portrait.persistentModelID),
+                            action: { handleRowClick(portrait) },
                             avatar: { thumbnail(for: portrait) }
                         )
                         // E24.22: rechtermuis → ons DS-menu (i.p.v. native
@@ -110,9 +117,14 @@ struct SidebarView: View {
         .frame(width: 248)
         .frame(maxHeight: .infinity)
         #if DEBUG
-        // E24.22 smoke-haak: forceer het DS-menu open op de eerste rij.
+        // E24.22/19.4 smoke-haken: forceer het DS-menu / een bulk-selectie.
         .onAppear {
-            if ProcessInfo.processInfo.arguments.contains("--show-sidebar-menu") {
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("--seed-bulk") {
+                selectedForBulk = Set(filtered.prefix(3).map(\.persistentModelID))
+                lastClickedID = filtered.first?.persistentModelID
+            }
+            if args.contains("--show-sidebar-menu") {
                 menuTarget = filtered.first
             }
         }
@@ -178,14 +190,65 @@ struct SidebarView: View {
 
     private func rowContextMenu(for portrait: Portrait2) -> some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            // E19.4: bulk-export wanneer ≥2 portretten geselecteerd zijn.
+            if selectedForBulk.count >= 2 {
+                menuRow("Export \(selectedForBulk.count) portraits…", icon: "square.and.arrow.up.on.square") {
+                    menuTarget = nil; bulkExport()
+                }
+                Divider().padding(.vertical, 2)
+            }
             menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTarget = portrait }
             menuRow("Export…", icon: "square.and.arrow.up") { menuTarget = nil; onExport(portrait) }
             Divider().padding(.vertical, 2)
             menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTarget = portrait }
         }
         .padding(DSSpacing.gap1)
-        .frame(width: 170)
+        .frame(width: 190)
         .dsPanelSurface(cornerRadius: DSRadius.lg)
+    }
+
+    /// E19.4: klik-afhandeling met cmd/shift voor multi-select; gewone klik =
+    /// canvas-selectie (en wist de bulk-selectie).
+    private func handleRowClick(_ portrait: Portrait2) {
+        menuTarget = nil
+        let mods = NSApp.currentEvent?.modifierFlags ?? []
+        let id = portrait.persistentModelID
+        if mods.contains(.command) {
+            if selectedForBulk.contains(id) { selectedForBulk.remove(id) } else { selectedForBulk.insert(id) }
+            lastClickedID = id
+        } else if mods.contains(.shift), let last = lastClickedID,
+                  let from = filtered.firstIndex(where: { $0.persistentModelID == last }),
+                  let to = filtered.firstIndex(where: { $0.persistentModelID == id }) {
+            for p in filtered[min(from, to)...max(from, to)] { selectedForBulk.insert(p.persistentModelID) }
+        } else {
+            selectedForBulk.removeAll()
+            lastClickedID = id
+            onSelect(portrait)
+        }
+    }
+
+    /// E19.4: exporteer alle geselecteerde portretten naar een gekozen map.
+    private func bulkExport() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Export"
+        panel.message = "Choose a folder to export the selected portraits"
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        let targets = portraits.filter { selectedForBulk.contains($0.persistentModelID) }
+        guard !targets.isEmpty else { return }
+        onSetBusy("Exporting \(targets.count) portraits…")
+        Task { @MainActor in
+            for (i, p) in targets.enumerated() {
+                guard let data = PortraitExporter.makePNG(for: p, watermark: !isPro, shape: p.frameShape) else { continue }
+                let base = p.name.trimmingCharacters(in: .whitespaces)
+                let name = (base.isEmpty ? "portrait-\(i + 1)" : base.replacingOccurrences(of: "/", with: "-")) + ".png"
+                try? data.write(to: dir.appendingPathComponent(name))
+            }
+            onSetBusy(nil)
+            selectedForBulk.removeAll()
+        }
     }
 
     private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {

@@ -37,7 +37,8 @@ struct ShellView: View {
                     onSelect: { model.select($0) },
                     onAdd: { model.presentOpenPanel() },
                     onExport: { model.select($0); model.exportCurrentPortrait() },
-                    onSetBusy: { setBusyMessage = $0 }
+                    onSetBusy: { setBusyMessage = $0 },
+                    isPro: entitlement.isProActive
                 )
                 // Losstaande kaart met marge rondom (bevinding 8; frame-
                 // inzet 4) — zelfde inset waarmee de kaartradius
