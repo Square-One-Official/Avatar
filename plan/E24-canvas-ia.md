@@ -14,14 +14,23 @@ alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 **Result:** ShellTopBar weer VStack: rij 1 = app-chrome (h52), rij 2 = counter+Upgrade met leading
 gap-3 (~12px). Smoke ✓.
 
-## 24.1 — Canvas action-toolbar (Crop/Auto-frame/Fix angle/Flip/Restore body), tekst+icoon
-- status: todo (vervangt de E22.2-cluster)
-## 24.2 — AI-edits als zichtbare dropdown-knop (Colorise/Boost/generatief)
-- status: todo
-## 24.3 — "Adjust"-knop → popover met color-sliders
-- status: todo
-## 24.4 — Background → canvas-toolbar; bottom = Effects/Face/Clothing/Hair
-- status: todo
+## 24.1–24.4 — Canvas action-toolbar + bottom-toolbar = persoon
+- status: done
+- owner: FEAT (AI-agent, marathon)
+- DoD: beide targets bouwen + tests groen + smoke
+
+**Result:** `CanvasActionToolbar` (glas-capsule, tekst+icoon) bovenaan het portret, vervangt de
+E22.2-cluster: **24.1** Crop (stub)/Auto-frame/Fix angle (stub)/Flip/Restore body; **24.2** AI als
+zichtbare dropdown (Improve lighting/Colorise/Boost, Pro-labels); **24.3** Adjust → popover met de
+color-sliders (`EditColorPanel(showAutoEnhance: false)` = sliders + Reset); **24.4** Background →
+popover in de canvas-toolbar. Bottom-toolbar gefilterd tot **Effects/Face/Clothing/Hair**
+(Edit/Background/Images eruit). CanvasControlsCluster verwijderd. Smoke ✓ (toolbar bovenaan portret;
+4 person-tools onderin).
+
+**Restpunt:** de oude `.edit`/`.background` panel-branches in EditorView zijn nu dood (niet meer
+selecteerbaar) maar onschadelijk — opgeruimd laten tot een rustige refactor.
+**Figma-TODO:** canvas-toolbar tegen de referenties leggen (groepering, tekst+icoon-stijl, popover-
+styling Adjust/Background/AI); iconen → DSIcon/Phosphor (E20/21).
 ## 24.7 — Name/Role: gecentreerd in rust, links bij typen, hercentreren bij commit
 - status: todo
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles

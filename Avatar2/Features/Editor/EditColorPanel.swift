@@ -21,6 +21,9 @@ struct EditColorPanel: View {
     var onColorise: () -> Void = {}
     var onBoost: () -> Void = {}
     var isPro: Bool = false
+    /// E24.3: in de Adjust-popover staat de AI-dropdown apart (canvas-toolbar),
+    /// dus dan tonen we alléén de sliders + Reset.
+    var showAutoEnhance: Bool = true
 
     @State private var base: NSImage?
     @State private var brightness = 0.0
@@ -54,7 +57,7 @@ struct EditColorPanel: View {
                 DSGhostButton("Reset") { reset() }
                     .disabled(!hasAdjustments)
                 Spacer()
-                autoEnhanceMenu
+                if showAutoEnhance { autoEnhanceMenu }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

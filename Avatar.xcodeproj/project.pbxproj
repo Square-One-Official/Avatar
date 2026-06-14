@@ -124,7 +124,6 @@
 		934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
 		9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
-		97D53D22FFFBAEA5DC17B33E /* CanvasControlsCluster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */; };
 		983A557F426FC6252C2681BB /* SidebarThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D030FB1A289475D16F4A82AD /* SidebarThumbnailCache.swift */; };
 		98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */; };
 		994378F65582B21AD619D0A3 /* ShellMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */; };
@@ -197,6 +196,7 @@
 		EB50CDB10D4599C8DE75F64D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		EBE90C07C35BAA7F586C5E6D /* PortraitUndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7194822E14F9864C38869D98 /* PortraitUndoManager.swift */; };
 		EDCEBBF69658512E9483D13B /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
+		EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */; };
 		F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */; };
 		F0D56262FE85216D1648099E /* ExportPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */; };
 		F3AB75972232C58F0B721E8A /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
@@ -217,7 +217,6 @@
 
 /* Begin PBXFileReference section */
 		017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
-		04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasControlsCluster.swift; sourceTree = "<group>"; };
 		04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		051B298A2948690FF14EB935 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
 		05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairEdgeHeuristicTests.swift; sourceTree = "<group>"; };
@@ -257,6 +256,7 @@
 		533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
 		547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutoutDataUndo.swift; sourceTree = "<group>"; };
 		5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
+		5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasActionToolbar.swift; sourceTree = "<group>"; };
 		5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSignInSheet.swift; sourceTree = "<group>"; };
 		5DE64240C8D2B68EB34AA721 /* Mesh 05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 05.png"; sourceTree = "<group>"; };
 		5EF100DCFD517EBCFF88035A /* AvatarUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarUI; path = AvatarUI; sourceTree = SOURCE_ROOT; };
@@ -409,7 +409,7 @@
 				8483B0B526A772D660C1ECB8 /* AutoFramer.swift */,
 				64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */,
 				04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */,
-				04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */,
+				5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */,
 				C1658094DC9377C3D97B55BF /* ClothesPanel.swift */,
 				E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */,
 				F3EDECE3F97F32FC434FC3BE /* EditorActionList.swift */,
@@ -935,7 +935,7 @@
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
 				C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */,
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
-				97D53D22FFFBAEA5DC17B33E /* CanvasControlsCluster.swift in Sources */,
+				EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */,
 				890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */,
 				583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */,
 				B64A1678796BB93D290579D2 /* EditColorPanel.swift in Sources */,

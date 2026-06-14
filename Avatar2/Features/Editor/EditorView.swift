@@ -148,11 +148,12 @@ struct EditorView: View {
         }
     }
 
-    // E22.1: de bottom-toolbar is puur subject-edits — de Images/sidebar-
-    // toggle is verhuisd naar de app-bar (ShellTopBar).
+    // E24.4: de bottom-toolbar is puur de PERSOON (Effects/Face/Clothing/Hair).
+    // Images → app-bar (E22.1); Edit (kleur) → Adjust-popover + AI-dropdown in
+    // de canvas-toolbar; Background → canvas-toolbar (E24.1).
     private static let toolbarItems: [DSToolbarItem<EditorTool>] =
         EditorTool.allCases
-            .filter { $0 != .images }
+            .filter { ![.images, .edit, .background].contains($0) }
             .map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
@@ -226,6 +227,26 @@ struct EditorView: View {
         .padding(.bottom, DSSpacing.gap4)
     }
 
+    /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
+    /// in de canvas-toolbar, dus hier zonder Auto-enhance-menu).
+    private var editColorPanel: some View {
+        EditColorPanel(
+            source: portrait,
+            onPreview: onPreview,
+            onCommit: { before, after in
+                onApplyResult(after)
+                if let portraitModel {
+                    ImageEnhanceUndo.register(
+                        undoManager, target: portraitModel, apply: onApplyResult,
+                        undoTo: before, redoTo: after, actionName: "Color adjust"
+                    )
+                }
+            },
+            isPro: entitlement?.isProActive ?? false,
+            showAutoEnhance: false
+        )
+    }
+
     private var editorBody: some View {
         DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
@@ -266,14 +287,22 @@ struct EditorView: View {
                         .onTapGesture { toolSelection.wrappedValue = nil }
                 }
             }
-            // E22.2: persistente canvas-cluster rechtsboven (boven de tap-
-            // dismiss zodat de knoppen klikbaar blijven; lege ruimte valt door).
-            .overlay(alignment: .topTrailing) {
-                CanvasControlsCluster(
+            // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret —
+            // vervangt de losse rechter-cluster. Boven de tap-dismiss zodat de
+            // knoppen/popovers klikbaar blijven.
+            .overlay(alignment: .top) {
+                CanvasActionToolbar(
                     onAutoFrame: runAutomaticFraming,
                     onFlip: flipHorizontally,
-                    onRestoreBody: { _ = entitlement?.allowCloudFeature() }
+                    onRestoreBody: { _ = entitlement?.allowCloudFeature() },
+                    onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+                    onColorise: { _ = entitlement?.allowCloudFeature() },
+                    onBoost: runBoostResolution,
+                    isPro: entitlement?.isProActive ?? false,
+                    adjust: { editColorPanel },
+                    background: { BackgroundPanel(portrait: portraitModel) }
                 )
+                .padding(.top, DSSpacing.gap4)
             }
         } panel: { tool in
             if tool == .images {
