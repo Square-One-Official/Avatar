@@ -286,6 +286,17 @@ final class ShellModel {
         p.touch()
     }
 
+    /// E24.23 smoke-haak: zet een achtergrond-afbeelding vanaf een pad (zoals
+    /// uploadCustom, maar zonder de NSOpenPanel) om de upload-bug te reproduceren
+    /// + de fix te verifiëren met grote/kleine afbeeldingen.
+    func debugSetBackgroundImage(path: String) {
+        guard let p = selectedPortrait,
+              let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
+        p.backgroundImageData = data
+        p.backgroundColorHex = nil
+        p.touch()
+    }
+
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
     /// te dupliceren, en open de sidebar.
     func debugSeedSecondPortraitAndOpenSidebar() {

@@ -100,6 +100,10 @@ struct ShellView: View {
             if args.contains("--frame-circle") { model.debugSetFrameShape(.circle) }
             // E24.18: reset transform → padded fit-fallback (frame-ademruimte).
             if args.contains("--reset-transform") { model.debugResetTransform() }
+            // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
+            if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
+                model.debugSetBackgroundImage(path: args[i + 1])
+            }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
