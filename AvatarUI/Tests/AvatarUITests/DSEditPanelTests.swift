@@ -2,6 +2,7 @@
 // (geen snapshot-infra; rendert naar een afbeelding zodat de hele view-tree
 // daadwerkelijk wordt opgebouwd).
 
+import AppKit
 import SwiftUI
 import XCTest
 @testable import AvatarUI
@@ -134,12 +135,18 @@ extension DSEditPanelTests {
         // dus dat de onderband donkerder is dan de bovenband → paneel ligt
         // erover. (ImageRenderer rastert blur/scroll-inhoud niet, maar de
         // Background.card.opacity-laag dempt het rood wél.)
+        // E23: de DSColor-tokens zijn nu theme-bewust; in de headless
+        // ImageRenderer (geen window-appearance) resolven ze naar de light-
+        // variant. De invariant blijft echter theme-onafhankelijk: het paneel
+        // ligt over de onderkant en DEMPT het pure rood — donker in dark
+        // (r<150) óf licht in light (de witte card@82% tilt g van ~0 naar hoog).
+        // Nooit nog puur rood = paneel ligt erover.
         let onderband = stride(from: 600 - 64 - 16, through: 600 - 64 - 120, by: -8).map {
-            pixel(cg, x: 400, y: $0).r
+            pixel(cg, x: 400, y: $0)
         }
         XCTAssertTrue(
-            onderband.contains { $0 < 150 },
-            "glas-paneel hoort de onderkant van de foto te dempen: \(onderband)"
+            onderband.contains { $0.r < 150 || $0.g > 120 },
+            "glas-paneel hoort de onderkant van de foto te dempen: \(onderband.map(\.r))"
         )
     }
 }
