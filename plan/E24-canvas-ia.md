@@ -189,11 +189,27 @@ DS-slider-component; SwiftUI `Slider` met DS-tint (bestaande TODO in EditColorPa
   EditColorPanel → dedicated story (regressie-risico).
 
 ## 24.12 — Eén DS-popover/paneel-stijl (caret weg + bottom-panelen gelijk)
-- status: GEPARKEERD. **Plan:** systeem-`.popover` heeft altijd een caret → vervang door een eigen
-  zwevende DS-kaart (overlay + outside-click-dismiss) zónder pijltje; maak er één gedeelde
-  modifier/component van (border + radius + blur/material + rand-fade) die ZOWEL de toolbar-dropdowns
-  ALS de bottom-panelen (DSEditPanel) gebruiken, zodat top en bottom identiek zijn. Grotere
-  cross-cutting UI-refactor → dedicated.
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** nieuw gedeeld oppervlak **`dsPanelSurface(cornerRadius:)`** (AvatarUI): in-window-blur +
+donkere card-tint + dunne divider-rand + radius + schaduw. Plus **`dsEdgeFade()`** (zachte verticale
+rand-fade voor scrollbare inhoud). `DSEditPanel` gebruikt nu `dsPanelSurface(xl4)` + `dsEdgeFade()`
+op de scroll (kreeg dus de rand + fade). `CanvasActionToolbar` vervangt de vier systeem-`.popover`s
+(altijd-caret) door caret-loze, zwevende DS-kaarten: per-knop `.overlay(alignment:.top)` met
+`.offset(y:44)` onder de capsule, `dsPanelSurface(xl)` — exact hetzelfde oppervlak als de bottom-
+panelen. De open-staat is gelift naar `EditorView.canvasMenu` (`CanvasToolbarMenu?`-binding) zodat de
+bestaande canvas-tap-dismiss de dropdown óók sluit (outside-click); een tweede klik op de knop of een
+menukeuze sluit 'm ook. Animatie: fade+scale vanaf de top.
+
+**DoD/Verificatie (geverifieerd):** beide targets bouwen + alle pakkettests groen (build-v2.sh).
+Screenshots: Frame-dropdown nu caret-LOOS (vgl. de 24.16-cirkel-shot mét systeem-caret) — zwevende
+kaart met rand + glas, Shape-sectie intact (/tmp/dd_frame_2412.png); Face bottom-paneel heeft nu
+dezelfde rand + top-edge-fade (/tmp/dd_facepanel_2412.png) → top en bottom identiek. Outside-click-
+dismiss = logisch geverifieerd (canvas-tap nuleert `canvasMenu`, gedeeld met de paneel-dismiss).
+
+**Figma-TODO:** dropdown-radius (xl) vs. paneel-radius (xl4) — bevestigen of ze écht gelijk moeten;
+exacte fade-lengte + rand-opaciteit tegen de referenties leggen.
 
 ## 24.8 — Zoom: scroll/pinch = canvas-zoom; afbeelding schalen via selectie-handles
 - status: GEPARKEERD — grote, op zichzelf staande interactie-story. Vereist een echte selectie-/

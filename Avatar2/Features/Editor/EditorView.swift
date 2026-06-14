@@ -92,6 +92,9 @@ struct EditorView: View {
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
     @State private var activeTool: EditorTool?
+    /// E24.12: open canvas-toolbar-dropdown (caret-loze DS-kaart). Hier zodat
+    /// een klik op de canvas 'm sluit — net als de bottom-panelen.
+    @State private var canvasMenu: CanvasToolbarMenu?
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
@@ -317,10 +320,13 @@ struct EditorView: View {
             // E18.17: staat er een paneel/sidebar open, dan sluit een klik
             // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
             .overlay {
-                if activeTool != nil || isSidebarVisible {
+                if activeTool != nil || isSidebarVisible || canvasMenu != nil {
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { toolSelection.wrappedValue = nil }
+                        .onTapGesture {
+                            toolSelection.wrappedValue = nil
+                            canvasMenu = nil
+                        }
                 }
             }
             // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret —
@@ -337,6 +343,7 @@ struct EditorView: View {
                     onColorise: { _ = entitlement?.allowCloudFeature() },
                     onBoost: runBoostResolution,
                     isPro: entitlement?.isProActive ?? false,
+                    activeMenu: $canvasMenu,
                     adjust: { editColorPanel },
                     background: { BackgroundPanel(portrait: portraitModel) }
                 )
