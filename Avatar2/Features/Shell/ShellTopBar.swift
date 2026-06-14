@@ -23,45 +23,11 @@ struct ShellTopBar: View {
     var onToggleSidebar: () -> Void = {}
 
     var body: some View {
-        // E24.6: counter + Upgrade op een EIGEN rij ónder de traffic-lights,
-        // ~12px (gap-3) van de linkerrand. Rij 1 = app-chrome rechts
-        // (Export → Settings → Library uiterst rechts, E24.5).
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            HStack(spacing: 0) {
-                Spacer()
-                HStack(spacing: DSSpacing.gap2) {
-                    if canExport {
-                        // Frame 27 share-icoon → export/share (E08.2).
-                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
-                            onExport()
-                        }
-                    }
-                    DSToolButton(
-                        Image(systemName: "gearshape.fill"),
-                        label: "Settings",
-                        isActive: isSettingsActive,
-                        tooltipEdge: .bottom
-                    ) {
-                        onToggleSettings()
-                    }
-                    if canToggleSidebar {
-                        // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
-                        DSToolButton(
-                            Image(systemName: "sidebar.right"),
-                            label: "Library",
-                            isActive: isSidebarActive,
-                            tooltipEdge: .bottom
-                        ) {
-                            onToggleSidebar()
-                        }
-                    }
-                }
-                .padding(.top, DSSpacing.gap3)
-                .padding(.trailing, ShellMetrics.topBarInset)
-            }
-            // De top-strook (h52) reserveert de hoogte van de traffic-lights.
-            .frame(height: 52, alignment: .top)
-
+        // E24.20: counter + Upgrade staan nu op DEZELFDE regel als de
+        // top-right app-chrome (Export/Settings/Library) — verticaal uitgelijnd
+        // met die iconen én de Name/Role-kop (die ook op gap-3 vanaf de top
+        // hangt). Counter links (ná de traffic-lights), iconen rechts.
+        HStack(alignment: .center, spacing: 0) {
             // E24.13: quota-badge alléén in de editor — NIET in Settings.
             if model.hasCompletedFirstCutout && !isSettingsActive {
                 HStack(spacing: DSSpacing.gap2) {
@@ -72,14 +38,44 @@ struct ShellTopBar: View {
                         model.requestUpgrade()
                     }
                 }
-                // E24.13: ~12px (gap-3) van de WINDOW-linkerrand.
-                .padding(.leading, ShellMetrics.topBarInset)
+                // Voorbij de window-controls (traffic-lights) i.p.v. eronder.
+                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
             }
+
+            Spacer(minLength: DSSpacing.gap2)
+
+            HStack(spacing: DSSpacing.gap2) {
+                if canExport {
+                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
+                        onExport()
+                    }
+                }
+                DSToolButton(
+                    Image(systemName: "gearshape.fill"),
+                    label: "Settings",
+                    isActive: isSettingsActive,
+                    tooltipEdge: .bottom
+                ) {
+                    onToggleSettings()
+                }
+                if canToggleSidebar {
+                    // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
+                    DSToolButton(
+                        Image(systemName: "sidebar.right"),
+                        label: "Library",
+                        isActive: isSidebarActive,
+                        tooltipEdge: .bottom
+                    ) {
+                        onToggleSidebar()
+                    }
+                }
+            }
+            .padding(.trailing, ShellMetrics.topBarInset)
         }
-        // E24.13-diagnose+fix: .overlay(alignment:.top) centreert een content-
-        // sized view → de counter (rij 2) zat 12px van een GECENTREERDE kolom,
-        // niet van de vensterrand. Forceer volle breedte + leading zodat de
-        // leading-inset vanaf de echte vensterrand telt.
+        // De top-strook (h52) reserveert de hoogte van de traffic-lights; alles
+        // op gap-3 vanaf de top zodat het met de Name/Role-kop uitlijnt.
+        .padding(.top, DSSpacing.gap3)
+        .frame(height: 52, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await model.refresh() }
     }

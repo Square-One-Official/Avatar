@@ -5,6 +5,20 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.20 — Counter uitlijnen met de Name/Role-kop + top-right iconen
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** de counter ("3/3 left" + Upgrade) stond op een eigen rij ónder de traffic-lights (24.6);
+nu staat hij op DEZELFDE regel als de top-right app-chrome (Share/Settings/Library) — `ShellTopBar`
+is van een VStack (2 rijen) naar één `HStack` (counter links ná de window-controls via
+`topBarLeadingAfterWindowControls`, iconen rechts), op `gap-3` vanaf de top zodat het verticaal
+uitlijnt met de Name/Role-kop (die ook op gap-3 hangt).
+
+**DoD/Verificatie:** beide targets + tests groen. Screenshot: counter links + Name/Role gecentreerd
++ iconen rechts, alle drie op één lijn (/tmp/c20_counter.png).
+**Figma-TODO:** exacte verticale centrering (counter-tekst vs. 32pt-icoonknoppen) tegen de referenties.
+
 ## 24.21 — Name/Role als knop → gedeelde rename-modal (Name + Role)
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
