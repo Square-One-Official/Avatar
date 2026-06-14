@@ -27,6 +27,9 @@ struct EditActionsPanel: View {
     /// E18.2: nog niet-gebouwde Pro-acties zijn klikbaar → contextuele gate
     /// (online/login/upgrade) i.p.v. een dode/gedimde knop.
     var onProFeature: () -> Void = {}
+    /// E18.13: groene badge = Pro-indicator, alleen voor niet-Pro. Voor Pro
+    /// is de feature inbegrepen → geen badge (credit-kost blijft subtiel zichtbaar).
+    var isPro: Bool = false
 
     private struct Action: Identifiable {
         let id = UUID()
@@ -109,21 +112,28 @@ struct EditActionsPanel: View {
             action.handler?()
         } label: {
             HStack(spacing: DSSpacing.gap2) {
-                Text(action.title)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .lineLimit(1)
+                // E18.13: titel boven, credit-kost subtiel grijs eronder —
+                // de groene chip trok te veel aandacht voor een prijskaartje.
+                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                    Text(action.title)
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                        .lineLimit(1)
+                    if let meter = action.meter {
+                        Text(CreditMeter.chipLabel(for: meter))
+                            .dsTextStyle(.labelSmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                }
                 Spacer(minLength: DSSpacing.gap2)
-                if let meter = action.meter {
-                    // E14.3: kosten in credits vóór uitvoering.
-                    DSProChip(CreditMeter.chipLabel(for: meter))
-                } else if action.isCloud {
-                    // Cloud-actie met nog niet-vastgesteld tarief.
+                // E18.13: groene badge alleen nog als Pro-indicator voor
+                // niet-Pro — niet meer als credit-label.
+                if action.isCloud && !isPro {
                     DSProChip()
                 }
             }
             .padding(.horizontal, DSSpacing.gap4)
-            .frame(height: 40)
+            .frame(height: 52)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(DSColor.Background.neutral)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))

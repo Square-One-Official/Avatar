@@ -44,8 +44,10 @@ afvinken. UI-fixes met visuele smoke.
       oorzaak = baseline-verschil Text vs NSTextField in DSInlineEditLabel).
 - [ ] **18.12 One-click retouch = toggle** — 2e klik herhaalt nu i.p.v. terug naar origineel; maak
       het een aan/uit-knop.
-- [ ] **18.13 Credit-badge subtieler** — groene badge = Pro-indicator (voor niet-Pro); credit-kost
-      subtiel grijs ónder de titel i.p.v. prominente groene chip (knop mag hoger).
+- [x] **18.13 Credit-badge subtieler** — DONE+gemerged. EditActionsPanel-rij: titel boven, credit-
+      kost (1/2/4 credits) subtiel grijs (Foreground.muted) eronder; rijhoogte 40→52. Groene
+      DSProChip alléén nog als Pro-indicator voor niet-Pro (isPro=false). Smoke ✓. (Effects/Hair/
+      Clothing tonen de kost al subtiel via een bolt-label — ongemoeid.)
 - [x] **18.14 Counter op eigen rij ónder de traffic-lights** — DONE+gemerged (keuze Thierry).
       ShellTopBar is nu een VStack: rij 1 = top-strook (h52) met rechts Share/Settings, links de
       OS-lights; rij 2 = quota + Upgrade-chip, leading = `topBarInset` (gap-3 = 12). Counter zit nu

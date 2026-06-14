@@ -226,7 +226,8 @@ struct EditorView: View {
                         onImproveLighting: { applyLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                         onBoostResolution: runBoostResolution,
                         isBoosting: isBoosting,
-                        onProFeature: { _ = entitlement?.allowCloudFeature() }
+                        onProFeature: { _ = entitlement?.allowCloudFeature() },
+                        isPro: entitlement?.isProActive ?? false
                     )
                 }
             } else if tool == .background {
