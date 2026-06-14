@@ -72,9 +72,10 @@ public struct DSEditPanel<Content: View>: View {
                 transaction.disablesAnimations = true
                 withTransaction(transaction) { contentHeight = height }
             }
-            // E24.12: zachte rand-fade boven/onder zodat scroll-inhoud niet
-            // hard afsnijdt (gedeeld met de toolbar-popovers via de DS-stijl).
-            .dsEdgeFade()
+            // E24.18: GEEN content-fade meer — de 24.12-`dsEdgeFade` kapte
+            // kaarten/chips/tekst af bovenin/onderin álle panelen. Inhoud is nu
+            // overal volledig zichtbaar (scrollt bij overflow; de scrollbar +
+            // de paneel-rand zijn de enige rand-affordance).
         }
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)

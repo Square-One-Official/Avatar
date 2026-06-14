@@ -277,6 +277,15 @@ final class ShellModel {
         selectedPortrait?.touch()
     }
 
+    /// E24.18 smoke-haak: reset de canvas-transform naar "geen transform"
+    /// (scale 0) zodat de padded fit-fallback (frame-ademruimte) zichtbaar is —
+    /// de staat van een vers geïmporteerd portret.
+    func debugResetTransform() {
+        guard let p = selectedPortrait else { return }
+        p.offsetX = 0; p.offsetY = 0; p.scale = 0
+        p.touch()
+    }
+
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
     /// te dupliceren, en open de sidebar.
     func debugSeedSecondPortraitAndOpenSidebar() {

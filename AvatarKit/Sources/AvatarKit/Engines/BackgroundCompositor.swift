@@ -97,8 +97,12 @@ public enum BackgroundCompositor {
         return out
     }
 
-    /// `scale == 0` → fill-fit (zelfde regel als de editor): cutout vult
-    /// de canvas, gecentreerd.
+    /// E24.18: frame-ademruimte-padding (moet gelijk zijn aan de app-zijdige
+    /// `FramingConstants.frameFitPadding`; AvatarKit kent die niet).
+    public static let fitPadding: CGFloat = 0.85
+
+    /// `scale == 0` → fit-met-marge (zelfde regel als de editor, E24.18):
+    /// cutout past binnen de canvas met frame-ademruimte, gecentreerd.
     private static func resolvedPlacement(
         _ p: Placement, cutoutWidth cw: CGFloat, cutoutHeight ch: CGFloat, unit: CGFloat
     ) -> (offsetX: CGFloat, offsetY: CGFloat, scale: CGFloat) {
@@ -106,7 +110,7 @@ public enum BackgroundCompositor {
             return (CGFloat(p.offsetX), CGFloat(p.offsetY), CGFloat(p.scale))
         }
         guard cw > 0, ch > 0 else { return (0, 0, 1) }
-        let s = max(unit / cw, unit / ch)
+        let s = min(unit / cw, unit / ch) * fitPadding
         return ((unit - cw * s) / 2, (unit - ch * s) / 2, s)
     }
 

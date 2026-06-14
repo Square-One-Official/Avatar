@@ -40,4 +40,11 @@ enum FramingConstants {
 
     /// Hoe ver de romp voorbij de canvasonderkant moet doorlopen.
     static let bodyOvershoot: CGFloat = 0.03
+
+    /// E24.18: frame-ademruimte — het onderwerp vult standaard niet edge-to-edge
+    /// maar laat een marge binnen het frame (circle/square). Gedeeld door de
+    /// fill-fit-fallbacks (AutoFramer.fitTransform + EditorCanvasView.fitTransform)
+    /// zodat de marge overal gelijk is. 0.85 = ~15% marge (haar raakt de cirkel
+    /// niet meer). Figma-TODO: exacte marge bevestigen.
+    static let frameFitPadding: CGFloat = 0.85
 }

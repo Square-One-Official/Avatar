@@ -120,7 +120,9 @@ enum PortraitExporter {
             offX = CGFloat(placement.offsetX) * factor
             offY = CGFloat(placement.offsetY) * factor
         } else {
-            let fit = max(CGFloat(unit) / cw, CGFloat(unit) / ch)
+            // E24.18: fit-met-marge (i.p.v. FILL) zodat de export de canvas-
+            // ademruimte volgt (WYSIWYG). Zelfde padding als FramingConstants.
+            let fit = min(CGFloat(unit) / cw, CGFloat(unit) / ch) * FramingConstants.frameFitPadding
             drawScale = fit * factor
             offX = (s - cw * drawScale) / 2
             offY = (s - ch * drawScale) / 2
