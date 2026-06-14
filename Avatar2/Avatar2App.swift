@@ -55,9 +55,10 @@ struct Avatar2App: App {
                 // (vóór first render), niet hier — zie de toelichting daar.
             }
             #endif
-            // Frame-autosave: AppKit onthoudt de gebruikersmaat tussen
-            // sessies; bij de eerste start geldt defaultSize.
-            .background(WindowFrameAutosave(name: "Avatar2MainWindow"))
+            // E01.14: géén handmatige setFrameAutosaveName meer — SwiftUI's
+            // WindowGroup persisteert het venster-frame zelf (defaultSize bij
+            // eerste start, daarna de gebruikersmaat). Twee autosave-bronnen
+            // op één NSWindow lieten het hiddenTitleBar-venster inklappen.
             .sheet(isPresented: Binding(
                 get: { entitlement.isPaywallPresented },
                 set: { entitlement.isPaywallPresented = $0 }
@@ -87,23 +88,10 @@ struct Avatar2App: App {
         // de frames vullen het hele app-venster.
         // Punt 18a: opent ruim boven de 1000×700-ontwerpmaat van de frames.
         .defaultSize(width: 1100, height: 760)
+        // E01.14: laat het venster nooit kleiner worden dan een werkbare
+        // maat — extra vangnet naast de content-minHeight, zodat een ambigue
+        // contenthoogte het venster niet kan laten inklappen.
+        .windowResizability(.contentMinSize)
     }
-}
-
-/// Koppelt AppKit's frame-autosave aan het SwiftUI-venster: de door de
-/// gebruiker gekozen maat/positie overleeft sessies (punt 18a); zonder
-/// opgeslagen frame geldt defaultSize.
-private struct WindowFrameAutosave: NSViewRepresentable {
-    let name: String
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            view.window?.setFrameAutosaveName(name)
-        }
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 

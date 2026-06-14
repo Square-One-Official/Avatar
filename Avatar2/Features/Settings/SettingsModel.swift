@@ -62,8 +62,12 @@ enum SettingsDefaults {
 }
 
 /// Past de persistente Theme-voorkeur toe op een scene-root. System = nil
-/// (volg het systeem — identiek aan het gedrag vóór E15.1).
-private struct AppearancePreferenceModifier: ViewModifier {
+/// (volg het systeem — identiek aan het gedrag vóór E15.1). Bewust internal,
+/// niet private (E01.14): als window-root-modifier zit de type-naam in
+/// SwiftUI's frame-autosave-sleutel; een private type levert een per-build
+/// instabiele "(unknown context at $adres)"-signatuur op → wees-sleutels en
+/// een venster dat bij twee launch-condities tegelijk kan inklappen.
+struct AppearancePreferenceModifier: ViewModifier {
     @AppStorage(SettingsDefaults.appearanceKey)
     private var appearanceRaw: String = AppearancePreference.system.rawValue
 

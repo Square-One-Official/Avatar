@@ -162,9 +162,15 @@ E15.4's About-pagina koppelt de knop + auto-check-toggle erop aan.
 **Result:** _(invullen bij done)_
 
 ## 1.14 — WindowGroup/frame-autosave opschonen (hiddenTitleBar-inklap)
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
 - blockedBy: —
+- Plan: (1) handmatige `WindowFrameAutosave` (setFrameAutosaveName) verwijderen — twee
+  autosave-systemen op één NSWindow is de inklap-oorzaak; SwiftUI's WindowGroup persisteert het
+  frame zelf al. (2) `AppearancePreferenceModifier` van `private` → internal zodat SwiftUI's
+  autosave-sleutel een stabiele type-signatuur krijgt (geen "unknown context at $adres"-churn meer,
+  geen wees-sleutels). (3) `defaultSize`/`minHeight` blijven borgen. Smoke: first start, herstart,
+  én de eerder falende combo `--dev-advanced --show-settings aiModels`.
 - DoD: beide targets bouwen, tests groen; smoke met twee launch-flags tegelijk laat het venster
   niet meer inklappen
 - Context: opgedoken in E15.5-smoke (2026-06-14). Twee launch-flags tegelijk
@@ -183,4 +189,15 @@ de handmatige, niet beide), de AppearancePreferenceModifier-wrapper stabiliseren
 window-root halen, en `defaultSize`/`minHeight` borgen zodat een lege/ambigue contenthoogte het
 venster nooit kan laten inklappen. Eventueel de vervuilde frame-sleutels eenmalig opruimen.
 
-**Result:** _(invullen bij done)_
+**Result:** Inklap opgelost. (1) Handmatige `WindowFrameAutosave` (NSViewRepresentable +
+setFrameAutosaveName) verwijderd uit Avatar2App — twee autosave-bronnen op één NSWindow was de
+kern; SwiftUI's WindowGroup persisteert het frame zelf (defaultSize bij eerste start). (2)
+`AppearancePreferenceModifier` van `private` → internal: als window-root-modifier zat de type-naam
+in SwiftUI's autosave-sleutel; private gaf een per-build instabiele "(unknown context at
+$adres)"-signatuur → 65+ wees-sleutels. Nu stabiel (1 sleutel). (3) `.windowResizability(
+.contentMinSize)` als vangnet naast de content-minHeight (800×600). Smoke (vensterhoogte via
+CGWindowListCopyWindowInfo): de eerder deterministisch falende combo `--dev-advanced
+--show-settings aiModels` = 760, herstart = 760, plain first start = 760 (vóór de fix: 1728×33).
+Bestaande prefs-vervuiling van oude buggy builds eenmalig gewist tijdens de smoke; reguliere
+gebruikers schrijven nooit een inklap-frame, dus geen in-app pref-deletie nodig. Beide targets
+bouwen groen, alle suites groen.
