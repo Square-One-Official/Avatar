@@ -125,6 +125,7 @@
 		934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
 		9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
+		97D53D22FFFBAEA5DC17B33E /* CanvasControlsCluster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */; };
 		98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */; };
 		994378F65582B21AD619D0A3 /* ShellMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */; };
 		9A0AC0FD42FB23057D7EA406 /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */; };
@@ -213,6 +214,7 @@
 
 /* Begin PBXFileReference section */
 		017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
+		04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasControlsCluster.swift; sourceTree = "<group>"; };
 		04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		051B298A2948690FF14EB935 /* OnboardingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModel.swift; sourceTree = "<group>"; };
 		05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairEdgeHeuristicTests.swift; sourceTree = "<group>"; };
@@ -400,6 +402,7 @@
 				8483B0B526A772D660C1ECB8 /* AutoFramer.swift */,
 				64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */,
 				04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */,
+				04968996725BE160F0A4D90C /* CanvasControlsCluster.swift */,
 				C1658094DC9377C3D97B55BF /* ClothesPanel.swift */,
 				FCA2517F14823E4E5E468F8B /* EditActionsPanel.swift */,
 				F3EDECE3F97F32FC434FC3BE /* EditorActionList.swift */,
@@ -915,6 +918,7 @@
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
 				C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */,
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
+				97D53D22FFFBAEA5DC17B33E /* CanvasControlsCluster.swift in Sources */,
 				890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */,
 				583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */,
 				1E3DAB6465A66B4076D567B7 /* EditActionsPanel.swift in Sources */,

@@ -264,6 +264,15 @@ struct EditorView: View {
                         .onTapGesture { toolSelection.wrappedValue = nil }
                 }
             }
+            // E22.2: persistente canvas-cluster rechtsboven (boven de tap-
+            // dismiss zodat de knoppen klikbaar blijven; lege ruimte valt door).
+            .overlay(alignment: .topTrailing) {
+                CanvasControlsCluster(
+                    onAutoFrame: runAutomaticFraming,
+                    onFlip: flipHorizontally,
+                    onRestoreBody: { _ = entitlement?.allowCloudFeature() }
+                )
+            }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
@@ -273,7 +282,6 @@ struct EditorView: View {
                 // auto-frame-actie (E06.5) is "Auto-crop & center".
                 DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
                     EditActionsPanel(
-                        onAutomaticFraming: runAutomaticFraming,
                         onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
                         onBoostResolution: runBoostResolution,
                         isBoosting: isBoosting,
@@ -379,6 +387,22 @@ struct EditorView: View {
             )
             localToggleBaselines[key] = before
         }
+    }
+
+    /// E22.2: spiegel het portret horizontaal (undo'baar via onApplyResult).
+    private func flipHorizontally() {
+        guard let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(
+                data: nil, width: cg.width, height: cg.height,
+                bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return }
+        ctx.translateBy(x: CGFloat(cg.width), y: 0)
+        ctx.scaleBy(x: -1, y: 1)
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        guard let out = ctx.makeImage() else { return }
+        undoableApply("Flip")(NSImage(cgImage: out, size: portrait.size))
     }
 
     /// E18.4: maak cloud-resultaten (Effects/Clothing/Hair) undo'baar. De

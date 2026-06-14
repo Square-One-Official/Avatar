@@ -8,8 +8,6 @@ import AvatarUI
 import SwiftUI
 
 struct EditActionsPanel: View {
-    /// Auto-crop & center draait op het geselecteerde portret (E06.5).
-    let onAutomaticFraming: () -> Void
     /// E12.1: lokale Core Image-belichting (geen cloud/credits) — aan/uit.
     var onImproveLighting: () -> Void = {}
     /// E10.3: cloud-upscale ("Boost resolution", 1 credit) + busy-vlag.
@@ -21,12 +19,10 @@ struct EditActionsPanel: View {
     /// E18.12: titels van lokale enhances die momenteel "aan" staan.
     var activeToggles: Set<String> = []
 
+    // E22.2: framing/crop/flip/restore-body zijn verhuisd naar de canvas-
+    // cluster; Edit houdt kleur/technische acties (22.3: live color-sliders).
     private var sections: [EditorActionSection] {
         [
-            EditorActionSection(title: "Position and alignment", actions: [
-                EditorAction(title: "Auto-crop & center", handler: onAutomaticFraming),
-                EditorAction(title: "Fix camera angle", handler: nil),
-            ]),
             EditorActionSection(title: "Optimise", actions: [
                 EditorAction(title: "Colorise", meter: .colorize, isCloud: true, handler: onProFeature),
                 EditorAction(title: "Boost resolution", meter: .upscale, isCloud: true, handler: onBoostResolution),
@@ -36,7 +32,6 @@ struct EditActionsPanel: View {
                     title: "Improve lighting", handler: onImproveLighting,
                     isOn: activeToggles.contains("Improve lighting")
                 ),
-                EditorAction(title: "Restore body", meter: .fillBody, isCloud: true, handler: onProFeature),
             ]),
         ]
     }
