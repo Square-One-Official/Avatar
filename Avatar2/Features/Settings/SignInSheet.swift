@@ -42,6 +42,22 @@ struct SignInSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
+        // E18.24/18.21: de fout-REDEN als toast onderin (zodat zichtbaar is
+        // wáárom het misging), naast de rode input-state. Auto-dismiss.
+        .overlay(alignment: .bottom) {
+            if let error = entitlement.authError {
+                DSToast(title: "Couldn't sign you in", description: error) {
+                    entitlement.dismissAuthError()
+                }
+                .padding(DSSpacing.gap4)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task {
+                    try? await Task.sleep(for: .seconds(5))
+                    entitlement.dismissAuthError()
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: entitlement.authError)
         // Schone start: geen oude fout van een vorige poging.
         .onAppear { entitlement.dismissAuthError() }
     }
@@ -79,10 +95,11 @@ struct SignInSheet: View {
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             DSOTPField(code: $code, length: Self.otpLength, validation: otpValidation)
-                .onChange(of: code) { _, newValue in
-                    // Bewerken wist een error-state (E18.24).
+                // E18.24-fix: GEEN auto-verify meer op het 6e cijfer (dat gaf
+                // een "error" vóór de gebruiker op Verify klikte). Bewerken
+                // wist wél de error-state.
+                .onChange(of: code) { _, _ in
                     if otpValidation == .error { otpValidation = .normal }
-                    if newValue.count == Self.otpLength { verify() }
                 }
             DSPrimaryButton("Verify", fullWidth: true) { verify() }
                 .disabled(code.count != Self.otpLength || entitlement.authBusy)
@@ -114,9 +131,9 @@ struct SignInSheet: View {
                 emailValidation = .normal
                 phase = .otp
             } else {
-                // E18.24: e-mailveld licht rood op; auto-herstel na enkele sec.
+                // E18.24: e-mailveld licht rood op (de toast toont de reden);
+                // auto-herstel van de rode rand na enkele sec.
                 emailValidation = .error
-                entitlement.dismissAuthError()
                 try? await Task.sleep(for: .seconds(3))
                 if emailValidation == .error { emailValidation = .normal }
             }
@@ -133,10 +150,9 @@ struct SignInSheet: View {
                 onSignedIn()
                 dismiss()
             } else {
-                // Fout: code-veld licht rood op, blijft staan tot bewerken of
-                // auto-herstel na enkele seconden.
+                // Fout: code-veld licht rood op (de toast toont de reden);
+                // auto-herstel van de rode rand na enkele seconden.
                 otpValidation = .error
-                entitlement.dismissAuthError()
                 try? await Task.sleep(for: .seconds(3))
                 if otpValidation == .error { otpValidation = .normal }
             }

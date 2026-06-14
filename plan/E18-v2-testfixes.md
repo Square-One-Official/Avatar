@@ -130,12 +130,14 @@ afvinken. UI-fixes met visuele smoke.
       gebruikt deze i.p.v. de toast: e-mail/OTP-fout = rode rand (herstelt bij bewerken of na 3s),
       succes = groene rand met 0,7s delay vóór het sluiten. **Figma-TODO:** exacte Input-error/
       success-variant + signaalkleuren op dark bevestigen (nu Badge-signaalkleuren hergebruikt).
-- [ ] **18.21b OTP "token expired" — root cause** — WACHT-OP-THIERRY (live Supabase). De
-      `.email`→`.signup`-fallback (18.21) loste het niet op; verdachte = Supabase-config: e-mail-
-      template stuurt óók een magic-link → link-prefetch door mailclient/scanner verbruikt de
-      single-use token vóór de code-invoer, óf de OTP-expiry staat te kort. Te verifiëren in de
-      Supabase Auth-instellingen (e-mailtemplate alleen `{{ .Token }}`, OTP-expiry). Zie
-      plan/DECISIONS-PENDING.md.
+- [~] **18.21b OTP "token expired" — dieper onderzocht; app-kant af, root cause WACHT-OP-THIERRY.**
+      Tweede ronde n.a.v. test: (1) de "error vóór klik" kwam door **auto-verify op het 6e cijfer** →
+      verwijderd; verifiëren vereist nu een klik op Verify. (2) De **toast was weg** (18.24 verving 'm
+      door alleen een input-state) → toast terug (toont de echte fout-reden) náást de rode rand. (3)
+      De `.email→.signup`-fallback verwijderd: een tweede poging kan de single-use token verbruiken →
+      nu één `.email`-verify (correct voor signInWithOTP). Faalt het nog steeds met "Token expired",
+      dan ligt het **serverzijde** (Supabase) — zie DECISIONS-PENDING (e-mailtemplate magic-link-
+      prefetch / OTP-expiry). De ruwe Supabase-fout staat nu in de toast → bevestigt de oorzaak.
 
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-

@@ -73,32 +73,27 @@ public final class AuthService {
     /// Stap 2: verifieer de code. Spiegelt de sessie eager naar
     /// `accessToken`/`email`.
     ///
-    /// `signInWithOTP(shouldCreateUser: true)` levert voor een BESTAANDE
-    /// gebruiker een `.email`-OTP, maar voor een NIEUW adres een
-    /// `.signup`-token. Dezelfde 6-cijfercode met het verkeerde type geeft
-    /// "Token has expired or is invalid" — daarom proberen we eerst `.email`
-    /// en vallen we terug op `.signup` (E18.21).
+    /// `signInWithOTP` levert een email-OTP die met type `.email` geverifieerd
+    /// wordt (zowel voor nieuwe als bestaande adressen in moderne Supabase).
+    /// We doen één poging: een tweede poging met een ander type zou de
+    /// single-use token kunnen verbruiken en alsnog "expired" geven. Faalt het
+    /// hier, dan ligt de oorzaak serverzijde (e-mailtemplate met magic-link die
+    /// door een mailclient ge-prefetcht wordt, of een te korte OTP-expiry) —
+    /// zie plan/DECISIONS-PENDING.md. De ruwe fout gaat naar `lastError` zodat
+    /// de UI 'm in een toast kan tonen.
     public func verifyCode(email: String, code: String) async throws {
         isBusy = true
         lastError = nil
         defer { isBusy = false }
         do {
-            try await verifySession(email: email, code: code, type: .email)
-        } catch {
-            do {
-                try await verifySession(email: email, code: code, type: .signup)
-            } catch {
-                lastError = friendlyMessage(error)
-                throw error
+            let response = try await supabase.auth.verifyOTP(email: email, token: code, type: .email)
+            if let session = response.session {
+                accessToken = session.accessToken
+                self.email = session.user.email
             }
-        }
-    }
-
-    private func verifySession(email: String, code: String, type: EmailOTPType) async throws {
-        let response = try await supabase.auth.verifyOTP(email: email, token: code, type: type)
-        if let session = response.session {
-            accessToken = session.accessToken
-            self.email = session.user.email
+        } catch {
+            lastError = friendlyMessage(error)
+            throw error
         }
     }
 
