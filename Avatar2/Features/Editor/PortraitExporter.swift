@@ -70,7 +70,7 @@ enum PortraitExporter {
 
         if shape == .circle { composited = circleMasked(composited) ?? composited }
 
-        let final = watermark ? applyWatermark(to: composited) : composited
+        let final = watermark ? applyWatermark(to: composited, shape: shape) : composited
         return png(from: final)
     }
 
@@ -131,7 +131,7 @@ enum PortraitExporter {
         return ctx.makeImage()
     }
 
-    private static func applyWatermark(to image: CGImage) -> CGImage {
+    private static func applyWatermark(to image: CGImage, shape: ExportShape = .square) -> CGImage {
         let w = image.width, h = image.height
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
@@ -147,7 +147,15 @@ enum PortraitExporter {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
         let bounds = CTLineGetImageBounds(line, ctx)
         let margin = CGFloat(w) * 0.03
-        ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)
+        // E24.16: bij een cirkel valt de hoek-positie buiten de zichtbare vorm
+        // → centreer horizontaal en til de tekst in de cirkel (≈10% van onder,
+        // ruim binnen de koorde-breedte op die hoogte). Vierkant = hoek
+        // rechtsonder zoals voorheen.
+        if shape == .circle {
+            ctx.textPosition = CGPoint(x: (CGFloat(w) - bounds.width) / 2, y: CGFloat(h) * 0.10)
+        } else {
+            ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)
+        }
         // Subtiele schaduw voor leesbaarheid op lichte achtergronden.
         ctx.setShadow(offset: .zero, blur: fontSize * 0.3, color: NSColor.black.withAlphaComponent(0.5).cgColor)
         CTLineDraw(line, ctx)

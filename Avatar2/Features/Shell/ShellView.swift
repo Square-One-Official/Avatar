@@ -94,6 +94,9 @@ struct ShellView: View {
             // export tonen 'm; cutoutData blijft rauw).
             if args.contains("--seed-adjust") { model.debugSeedAdjust() }
             if args.contains("--reset-adjust") { model.debugResetAdjust() }
+            // E24.16: forceer de frame-vorm voor de smoke.
+            if args.contains("--frame-square") { model.debugSetFrameShape(.square) }
+            if args.contains("--frame-circle") { model.debugSetFrameShape(.circle) }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
@@ -102,7 +105,7 @@ struct ShellView: View {
                 // Sandbox: schrijf in de container-tmp en log het pad.
                 let url = FileManager.default.temporaryDirectory
                     .appendingPathComponent(URL(fileURLWithPath: args[i + 1]).lastPathComponent)
-                if let data = PortraitExporter.makePNG(for: portrait, watermark: !pro) {
+                if let data = PortraitExporter.makePNG(for: portrait, watermark: !pro, shape: portrait.frameShape) {
                     try? data.write(to: url)
                     NSLog("EXPORT_PNG_WRITTEN \(url.path)")
                 }

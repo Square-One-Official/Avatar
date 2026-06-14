@@ -271,6 +271,12 @@ final class ShellModel {
     /// debugSeedAdjust) — laat de dev-store schoon achter voor andere smokes.
     func debugResetAdjust() { commitAdjust(.neutral) }
 
+    /// E24.16 smoke-haak: zet de frame-vorm op het geselecteerde portret.
+    func debugSetFrameShape(_ shape: ExportShape) {
+        selectedPortrait?.frameShape = shape
+        selectedPortrait?.touch()
+    }
+
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
     /// te dupliceren, en open de sidebar.
     func debugSeedSecondPortraitAndOpenSidebar() {

@@ -50,6 +50,12 @@ final class Portrait2 {
     var adjustSaturation: Double = 1
     var adjustTemperature: Double = 0
 
+    /// Frame-vorm (E24.16): de zichtbare vorm van het portret op canvas + in de
+    /// export. Default `circle` (merkvorm; bevestiging-TODO). Opgeslagen als
+    /// rawValue van `ExportShape`; lichtgewicht migratie via de default.
+    /// Bestaande rijen (default "circle") krijgen dus de cirkel — bedoeld.
+    var frameShapeRaw: String = ExportShape.circle.rawValue
+
     init(
         name: String = "",
         role: String = "",
@@ -85,6 +91,13 @@ final class Portrait2 {
             adjustSaturation = newValue.saturation
             adjustTemperature = newValue.temperature
         }
+    }
+
+    /// E24.16: de frame-vorm als enum (val terug op `.circle` bij een
+    /// onbekende rawValue).
+    var frameShape: ExportShape {
+        get { ExportShape(rawValue: frameShapeRaw) ?? .circle }
+        set { frameShapeRaw = newValue.rawValue }
     }
 }
 

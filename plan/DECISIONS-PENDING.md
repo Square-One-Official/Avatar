@@ -2,6 +2,14 @@
 
 ## Open
 
+### Frame-vorm: cirkel als DEFAULT-merkvorm (E24.16) — BEVESTIGEN, wacht op Thierry
+- **Context:** 24.16 maakt de frame-vorm per-portret kiesbaar (Frame ▾ → Shape: Circle/Square) en
+  zet de **default op circle** (zoals het story-plan vroeg). Via de SwiftData-migratie-default
+  (`frameShapeRaw = "circle"`) krijgen óók bestaande portretten de cirkel — d.w.z. de cirkel wordt
+  de zichtbare merkvorm op canvas + in de export (transparante hoeken).
+- **Te bevestigen:** is cirkel de gewenste default (i.p.v. square)? Zo niet: één regel in
+  `Portrait2.frameShapeRaw` (default → `.square.rawValue`). Niet-blokkerend; alles werkt nu met circle.
+
 ### Double-opt-in filtering bij nieuwsbrief-dispatch (E17.6) — VOORSTEL, wacht op Thierry
 - **Context:** `newsletter_optins` (sql 014) is een additief opt-in-grootboek. De dispatch filtert
   er nu bewust NIET op, zodat bestaande account-houders (die al opt-in gaven bij registratie) niet

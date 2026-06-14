@@ -108,11 +108,30 @@ via de vaste-breedte-frame; klein veld niet synthetisch te focussen).
   horizontale scrollRow van kaarten). Phosphor-iconen per actie.
 
 ## 24.16 — Frame-vorm: Circle (default) / Square
-- status: GEPARKEERD. **Plan:** `Portrait2.frameShape` (default `.circle`); Frame ▾ krijgt een
-  Circle/Square-keuze. Canvas clipt het portret tot de vorm; `PortraitExporter` heeft de
-  cirkel-mask al (E19.1 ExportShape) → koppel de persisted vorm aan export + compositing (E07.2),
-  watermerk binnen de zichtbare vorm. Smoke: Square↔Circle op canvas + transparante hoeken in de
-  cirkel-PNG. (Besef: dit maakt de cirkel de DEFAULT-merkvorm — bevestigen.)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** `Portrait2.frameShapeRaw` (default `ExportShape.circle.rawValue`) + computed
+`frameShape`-accessor. Frame ▾ kreeg een **Shape**-sectie (Circle/Square, checkmark op de actieve);
+`CanvasActionToolbar` neemt `frameShape` + `onSetFrameShape`. Canvas clipt achtergrond + cutout via
+`EditorView.frameClipShape` (`AnyShape(Circle())`/`Rectangle()`) → cirkel = transparante hoeken die
+het kaart-/dot-grid tonen, matcht de export-mask. Export: `ExportSheet` defaultt nu naar
+`portrait.frameShape`; de quick-export-haak geeft `shape: portrait.frameShape` mee; `makePNG`'s
+cirkel-mask bestond al (E19.1). Watermerk: bij cirkel gecentreerd + ~10% van onder binnen de
+zichtbare vorm (i.p.v. de hoek die buiten de cirkel viel). `setFrameShape` persisteert + `touch()`,
+geanimeerd; geen undo (lichte toggle).
+
+**DoD/Verificatie (geverifieerd):** beide targets bouwen + alle pakkettests groen (build-v2.sh).
+Export-pixelscan: cirkel-PNG → 4 hoeken alpha=0 (transparant), rand-middens + centrum alpha=255
+(ingeschreven cirkel); vierkant-PNG → alle hoeken alpha=255 (vol). Canvas-screenshots: cirkel =
+portret rond geclipt + Frame ▾ Shape-sectie met Circle gecheckt (/tmp/canvas_circle_2416.png);
+vierkant = vol vierkant (/tmp/canvas_square_2416.png). Smoke-haken (#if DEBUG): `--frame-circle`/
+`--frame-square`. Dev-store na afloop teruggezet op circle (default).
+
+**WACHT-OP-THIERRY (niet-blokkerend):** cirkel is nu de DEFAULT-merkvorm (ook voor bestaande rijen
+via de migratie-default) — bevestigen. Zie DECISIONS-PENDING.
+**Figma-TODO:** Shape-iconen (Phosphor `.circle`/`.square`) + de Shape-sectie-styling tegen de
+referenties leggen; cirkel-watermerk-positie (10%-van-onder) visueel finetunen.
 
 ## 24.14 — Adjust-waarden persistent (non-destructief)
 - status: done
