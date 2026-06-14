@@ -26,6 +26,8 @@ struct EditColorPanel: View {
     var onColorise: () -> Void = {}
     var onBoost: () -> Void = {}
     var isPro: Bool = false
+    /// E24.28: of de lokale "Improve lighting"-toggle momenteel AAN staat.
+    var improveLightingOn: Bool = false
     /// E24.3: in de Adjust-popover staat de AI-dropdown apart (canvas-toolbar),
     /// dus dan tonen we alléén de sliders + Reset.
     var showAutoEnhance: Bool = true
@@ -62,7 +64,7 @@ struct EditColorPanel: View {
             if showAutoEnhance {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
-                        quickAction("Improve lighting", icon: "sun.max", action: onImproveLighting)
+                        quickAction("Improve lighting", icon: "sun.max", isOn: improveLightingOn, action: onImproveLighting)
                         quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
                         quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
                                     credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
@@ -95,12 +97,14 @@ struct EditColorPanel: View {
         }
     }
 
-    /// E24.27: compacte één-tik-actie-chip met optionele Pro-badge of credit-chip.
+    /// E24.27/24.28: compacte één-tik-actie-chip met optionele Pro-badge/credit
+    /// en — voor toggle-acties — een duidelijke active-state (lime fill + check).
     private func quickAction(_ label: String, icon: String, pro: Bool = false,
-                             credit: String? = nil, action: @escaping () -> Void) -> some View {
+                             credit: String? = nil, isOn: Bool = false,
+                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: icon).font(.system(size: 12, weight: .medium))
+                Image(systemName: isOn ? "checkmark" : icon).font(.system(size: 12, weight: .medium))
                 Text(label).dsTextStyle(.labelSmall)
                 if pro {
                     DSProChip()
@@ -108,10 +112,11 @@ struct EditColorPanel: View {
                     DSProChip(credit)
                 }
             }
-            .foregroundStyle(DSColor.Foreground.primary)
+            // E24.28: lime fill + onAction-tekst als de toggle AAN staat.
+            .foregroundStyle(isOn ? DSColor.Action.onAction : DSColor.Foreground.primary)
             .padding(.horizontal, DSSpacing.gap2)
             .frame(height: 32)
-            .background(DSColor.Background.neutral, in: Capsule())
+            .background(isOn ? DSColor.Action.primary : DSColor.Background.neutral, in: Capsule())
         }
         .buttonStyle(.plain)
         .dsHoverScale()
