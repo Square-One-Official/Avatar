@@ -35,8 +35,28 @@ fit-fallback). Part A geldt centraal voor alle 4 de bottom-panelen; Part B is fr
 of een decoratieve buitenrand-fade gewenst is (nu volledig verwijderd).
 
 ## 24.17 — Canvas-audit (nieuwe indeling)
-- status: ready (na 24.18) — visuele audit van de canvas na de E24-revisie (toolbar/panelen/frame/
-  zoom/handles) in beide frame-vormen + beide themes; losse fixes loggen.
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result (audit):** visuele pass over de canvas na de E24-revisie in beide frame-vormen + beide
+themes. Geverifieerd GOED (screenshots /tmp/audit_dark_circle.png, /tmp/audit_light_circle.png +
+de 24.18-shots): canvas-toolbar (Frame/Background/Adjust/AI, caret-loze dropdowns 24.12),
+bottom-panelen zonder content-clipping (24.18), frame-ademruimte rond het onderwerp (24.18,
+circle+square), zoom-HUD + selectie-handles (24.8), en de theming (24.E23) — surfaces/tekst flippen
+correct in light én dark, geen onleesbare combinaties.
+
+**Bevindingen (geen triviale code-fix → design-beslissing/Figma-TODO):**
+1. **Light: canvas-kaart nauwelijks afgescheiden** — `Background.app` (#FAFAF9) en `Background.card`
+   (#FFFFFF) liggen te dicht bij elkaar; de kaart "zweeft" zonder zichtbare rand tegen de app-bg.
+   Richting: óf light-app iets grijzer, óf een hairline-kaartrand (raakt DSCanvasCard in beide
+   themes) → Figma-beslissing, niet gokken op nóg een placeholder.
+2. **Selectie-handles + kader altijd zichtbaar in rust** (24.8-default) — kan visueel druk zijn;
+   bevestigen of ze alleen bij hover/selectie moeten tonen (hangt aan de 24.8-keuzes in
+   DECISIONS-PENDING).
+3. Geen functionele/lay-out-bugs gevonden; geen code-wijziging in deze story.
+
+**Figma-TODO:** light-surface-contrast (app vs card) bevestigen; handle-zichtbaarheid (altijd vs
+hover) bevestigen.
 
 ## 24.5 — Sidebar-toggle uiterst rechts in de app-bar
 - status: done
