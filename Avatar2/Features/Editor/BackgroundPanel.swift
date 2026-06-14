@@ -12,6 +12,8 @@ import SwiftUI
 struct BackgroundPanel: View {
     let portrait: Portrait2?
     @State private var brand = BrandColorKit.shared
+    // E24.24: persistente custom-achtergrond-uploads (herbruikbare swatches).
+    @State private var customImages = BackgroundImageKit.shared
 
     private let swatch: CGFloat = 36
 
@@ -75,6 +77,25 @@ struct BackgroundPanel: View {
             }
             .buttonStyle(.plain)
             .dsHoverScale()
+
+            // E24.24: persistente custom-uploads als herbruikbare swatches.
+            ForEach(customImages.imageIDs, id: \.self) { id in
+                if let image = customImages.image(for: id) {
+                    Button { selectCustomImage(id) } label: {
+                        RoundedRectangle(cornerRadius: DSRadius.lg)
+                            .fill(DSColor.Background.neutral)
+                            .frame(width: swatch, height: swatch)
+                            .overlay {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                    }
+                    .buttonStyle(.plain)
+                    .dsHoverScale()
+                }
+            }
 
             ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
                 Button { selectGradient(colors) } label: {
@@ -153,6 +174,17 @@ struct BackgroundPanel: View {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url,
               let data = try? Data(contentsOf: url) else { return }
+        // E24.24: persistent opslaan als herbruikbare swatch (+ downscale, 24.23);
+        // de teruggegeven PNG wordt meteen de achtergrond.
+        let stored = customImages.add(data) ?? data
+        portrait.backgroundImageData = stored
+        portrait.backgroundColorHex = nil
+        portrait.touch()
+    }
+
+    /// E24.24: kies een eerder geüploade (persistente) achtergrond-swatch.
+    private func selectCustomImage(_ id: String) {
+        guard let portrait, let data = customImages.data(for: id) else { return }
         portrait.backgroundImageData = data
         portrait.backgroundColorHex = nil
         portrait.touch()

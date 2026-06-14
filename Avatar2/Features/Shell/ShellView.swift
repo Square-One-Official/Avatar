@@ -112,6 +112,10 @@ struct ShellView: View {
             }
             // E24.21: open de rename-modal voor de smoke.
             if args.contains("--show-rename") { model.isShowingRename = true }
+            // E24.24: simuleer een persistente upload (kit + achtergrond).
+            if let i = args.firstIndex(of: "--upload-bg"), args.indices.contains(i + 1) {
+                model.debugUploadBackground(path: args[i + 1])
+            }
             // E08.2: `--export-png <pad> [pro]` schrijft de export-PNG van het
             // huidige portret weg voor visuele verificatie (free = watermerk).
             if let i = args.firstIndex(of: "--export-png"), args.indices.contains(i + 1),
