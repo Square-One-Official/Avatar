@@ -5,6 +5,27 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.23 — Bug: custom background-upload zoomt de UI in
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Diagnose (gereproduceerd):** een grote upload (4000×3000) liet het hele canvas — en daarmee de UI —
+onherstelbaar inzoomen. Oorzaak was NIET de view-zoom/transform-state, maar de layout: `backgroundLayer`
+gebruikte `Image(...).resizable().scaledToFill().frame(maxWidth:.infinity,maxHeight:.infinity)`, waarbij
+de INTRINSIEKE pixelmaat van de afbeelding via `scaledToFill` de layout in lekte → de canvas-ZStack
+rapporteerde een enorme maat → alles geschaald.
+
+**Fix:** `backgroundLayer` vult nu een neutraal-grote `Color.clear`-container via een overlay
+(`Color.clear.overlay { Image(...).resizable().scaledToFill() }.clipped()`). De Color.clear neemt de
+aangeboden (begrensde) maat; het beeld is puur overlay en beïnvloedt de layout niet. Upload raakt zo
+alléén `backgroundImageData` (zoals bedoeld), niet de zoom/transform.
+
+**DoD/Verificatie:** beide targets + tests groen. Smoke (`--seed-bg <pad>`): vóór de fix zoomde de
+grote afbeelding de UI vol-scherm in (/tmp/bug_bglarge_2423.png); ná de fix is de UI normaal bij zowel
+de grote (/tmp/fix_bglarge_2423.png) als de kleine afbeelding (/tmp/fix_bgsmall_2423.png).
+**Restpunt:** uploads worden nog op volle resolutie als blob bewaard — downscalen (bv. max 2048) is
+efficiënter; eigen opruim-story.
+
 ## 24.18 — Panel-fade weg (alle menu's) + frame-ademruimte
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

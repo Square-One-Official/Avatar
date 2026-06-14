@@ -175,10 +175,14 @@ struct EditorView: View {
     @ViewBuilder
     private var backgroundLayer: some View {
         if let data = portraitModel?.backgroundImageData, let image = NSImage(data: data) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // E24.23-fix: vul een NEUTRAAL-GROOT (Color.clear) container via een
+            // overlay i.p.v. `scaledToFill().frame(maxWidth:.infinity)`. Bij dat
+            // laatste lekte de INTRINSIEKE pixelmaat van een grote upload de
+            // layout in → het hele canvas (en zo de UI) zoomde onherstelbaar in.
+            // Color.clear neemt de aangeboden (begrensde) maat; het beeld is puur
+            // een overlay en beïnvloedt de layout niet. clipped() snijdt overvul.
+            Color.clear
+                .overlay { Image(nsImage: image).resizable().scaledToFill() }
                 .clipped()
         } else if let hex = portraitModel?.backgroundColorHex, let color = Color(hexRGB: hex) {
             color
