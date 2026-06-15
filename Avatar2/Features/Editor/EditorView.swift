@@ -180,9 +180,17 @@ struct EditorView: View {
         portraitModel.touch()
     }
 
-    /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit).
+    /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit). E24.31:
+    /// "Original" toont een vol beeld → ook dan geen dot-grid.
     private var hasBackground: Bool {
-        portraitModel?.backgroundColorHex != nil || portraitModel?.backgroundImageData != nil
+        portraitModel?.backgroundColorHex != nil
+            || portraitModel?.backgroundImageData != nil
+            || portraitModel?.useOriginalBackground == true
+    }
+
+    /// E24.31: toont de canvas de ORIGINELE importfoto vol (Original-modus)?
+    private var showsOriginal: Bool {
+        portraitModel?.useOriginalBackground == true && originalImage != nil
     }
 
     @ViewBuilder
@@ -320,6 +328,16 @@ struct EditorView: View {
                          dotGridDimmed: canvasSubjectSelected,
                          surfaceClip: cardSurfaceClip) {
                 ZStack {
+                    // E24.31: Original-modus — toon de ORIGINELE importfoto vol
+                    // (geen cutout/transform), geclipt tot de frame-vorm. De
+                    // Color.clear-overlay houdt de intrinsieke pixelmaat uit de
+                    // layout (zelfde 24.23-fix als backgroundLayer).
+                    if showsOriginal, let original = originalImage {
+                        Color.clear
+                            .overlay { Image(nsImage: original).resizable().scaledToFill() }
+                            .clipped()
+                            .clipShape(frameClipShape)
+                    } else {
                     // E07.1: gekozen achtergrond achter de cutout (preview;
                     // exportkwaliteit-compositing volgt in E07.2).
                     // E24.16: clip de achtergrond tot de frame-vorm (cirkel =
@@ -347,6 +365,7 @@ struct EditorView: View {
                             frameShape: portraitModel?.frameShape ?? .circle
                         )
                     }
+                    } // E24.31: einde Original-else
                 }
             }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot

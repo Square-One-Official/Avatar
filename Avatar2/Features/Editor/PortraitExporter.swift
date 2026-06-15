@@ -53,7 +53,14 @@ enum PortraitExporter {
         )
 
         var composited: CGImage
-        if let data = portrait.backgroundImageData,
+        if portrait.useOriginalBackground,
+           let original = portrait.originalData.flatMap({
+               NSImage(data: $0)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+           }) {
+            // E24.31: Original-modus — exporteer de originele foto vol
+            // (aspect-fill, geen cutout/Adjust), zodat de export het canvas volgt.
+            composited = filledToSide(original, side: side) ?? cutout
+        } else if let data = portrait.backgroundImageData,
            let bg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             composited = (try? BackgroundCompositor.composite(
                 cutout: cutout, over: .image(bg), placement: placement, outputSize: side
@@ -72,6 +79,23 @@ enum PortraitExporter {
 
         let final = watermark ? applyWatermark(to: composited, shape: shape) : composited
         return png(from: final)
+    }
+
+    /// E24.31: teken een beeld aspect-fill, gecentreerd, in een side×side canvas
+    /// (Original-modus export; spiegelt de canvas-`scaledToFill`).
+    private static func filledToSide(_ image: CGImage, side: Int) -> CGImage? {
+        let s = CGFloat(side)
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.clear(CGRect(x: 0, y: 0, width: s, height: s))
+        let iw = CGFloat(image.width), ih = CGFloat(image.height)
+        guard iw > 0, ih > 0 else { return nil }
+        let scale = max(s / iw, s / ih)
+        let dw = iw * scale, dh = ih * scale
+        ctx.draw(image, in: CGRect(x: (s - dw) / 2, y: (s - dh) / 2, width: dw, height: dh))
+        return ctx.makeImage()
     }
 
     /// E19.1: maskeer de output tot een cirkel (transparant eromheen).

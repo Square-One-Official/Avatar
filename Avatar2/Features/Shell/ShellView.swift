@@ -115,6 +115,9 @@ struct ShellView: View {
             if args.contains("--frame-square") { model.debugSetFrameShape(.square) }
             if args.contains("--frame-circle") { model.debugSetFrameShape(.circle) }
             if args.contains("--clear-bg") { model.debugClearBackground() }
+            // E24.31: forceer de Original- of Transparent-achtergrondmodus.
+            if args.contains("--bg-original") { model.debugSetOriginalBackground(true) }
+            if args.contains("--bg-transparent") { model.debugSetOriginalBackground(false) }
             // E24.18: reset transform → padded fit-fallback (frame-ademruimte).
             if args.contains("--reset-transform") { model.debugResetTransform() }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
