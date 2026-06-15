@@ -10,12 +10,19 @@ Spelregels strikt: claim → Plan → bouwen → DoD (beide targets groen) → M
 merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-TODO:".
 
 ## 28.1 — Selectiemodel (één bron van waarheid) [FEAT]
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent)
 - blockedBy: —
 Eén "geselecteerd portret" als single source of truth. Bij openen is standaard het portret
 geselecteerd (toolbars meteen zichtbaar — duidelijk voor first-time users). Klikken op lege canvas
 (buiten het portret) = deselecteren. Portret wisselen (library) = opnieuw geselecteerd (re-target).
+
+**Result:** `EditorView.canvasSubjectSelected` is de single source of truth van de editor-selectie
+en defaultt nu op **true** (bij openen is het portret geselecteerd → handles + toolbars meteen
+zichtbaar). Bij een portret-wissel (`persistentModelID`-change) wordt opnieuw geselecteerd
+(re-target). De deselect op lege-canvas-klik leunt op de bestaande tap + ESC; de betrouwbaarheids-fix
+zit in 28.4. DoD: beide targets + tests groen (`build-v2.sh`); smoke: portret opent geselecteerd —
+handles + canvas-/bottom-toolbar zichtbaar (/tmp/s28_1.png).
 
 ## 28.2 — Canvas-toolbar zweeft boven het geselecteerde portret [DS/FEAT]
 - status: backlog
