@@ -19,7 +19,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | ID | Story | Team | Status | Branch |
 |----|-------|------|--------|--------|
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
-| 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | backlog (na 27.1) | `v2/E27-27.2` |
+| 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | backlog (na 27.1) | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
 
@@ -99,8 +99,9 @@ Zoom-range + grenzen (bv. 25%–400%), soepel rond de cursor in/uitzoomen.
    blijft los van VIEW-zoom; 24.32-deselect werkt nog op elk zoomniveau. Screenshots per zoomniveau.
 
 ## 27.2 — Zoom-HUD + sneltoetsen  · DS/FEAT
-- status: backlog
-- blockedBy: 27.1
+- status: in_progress
+- owner: DS/FEAT (AI-agent)
+- blockedBy: 27.1 (done)
 
 Zwevende zoom-HUD (−/slider/+ en fit) met het huidige zoom-%. Sneltoetsen: ⌘0 = fit, ⌘1 = 100%,
 ⌘+/⌘−. Consistent met de DS-stijl.
