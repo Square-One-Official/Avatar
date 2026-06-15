@@ -44,6 +44,18 @@ struct BoardView: View {
     /// Marquee-rechthoek (board-space) tijdens een sleep op de lege board.
     @State private var marquee: CGRect?
 
+    // E29.2: batch-toolbar (open dropdown) + de geselecteerde portretten.
+    @State private var batchMenu: BatchMenu?
+    private enum BatchMenu: Hashable { case background, adjust }
+
+    /// E29.2: batch-achtergrond-presets (Transparent + een paar kleuren).
+    private static let batchBackgrounds: [String?] =
+        [nil, "FFFFFF", "111111", "D5F466", "8B5CF6", "F472B6", "38BDF8"]
+
+    private var selectedPortraits: [Portrait2] {
+        portraits.filter { selection.contains($0.persistentModelID) }
+    }
+
     // Node-/cel-maten (board-space).
     private let cardSide: CGFloat = 200
     private let labelHeight: CGFloat = 38
@@ -92,6 +104,15 @@ struct BoardView: View {
                 hud
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            // E29.2: batch-toolbar bovenaan zodra er ≥1 geselecteerd is. Als
+            // top-overlay (deterministisch) + padding om onder de app-topbar te
+            // blijven.
+            .overlay(alignment: .top) {
+                if !selection.isEmpty {
+                    boardBatchBar
+                        .padding(.top, 70)
+                }
+            }
             .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
             .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
@@ -241,6 +262,11 @@ struct BoardView: View {
             : AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
         ZStack {
             DSColor.Background.card
+            // E29.2: de gekozen achtergrondkleur achter de cutout → batch-
+            // Background is meteen zichtbaar op de board (WYSIWYG voor kleur).
+            if let hex = portrait.backgroundColorHex, let c = Color(hexRGB: hex) {
+                c
+            }
             // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame).
             if let image = thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
                 Image(nsImage: image)
@@ -293,6 +319,11 @@ struct BoardView: View {
         guard let i = args.firstIndex(of: "--board-select"), args.indices.contains(i + 1),
               let n = Int(args[i + 1]) else { return }
         selection = Set(portraits.prefix(n).map { $0.persistentModelID })
+        // E29.2 smoke: pas een batch-achtergrond toe op de selectie ("none" = wissen).
+        if let j = args.firstIndex(of: "--board-batch-bg"), args.indices.contains(j + 1) {
+            let v = args[j + 1]
+            applyBackgroundToAll(v == "none" ? nil : v)
+        }
         #endif
     }
 
@@ -359,6 +390,101 @@ struct BoardView: View {
 
     private func fit() {
         withAnimation(.spring(duration: 0.3)) { camera.fitToContent(contentSize: boardSize, in: viewport) }
+    }
+
+    // MARK: - E29.2 batch-toolbar
+
+    /// Zwevende batch-toolbar: past dezelfde Background/Adjust toe op ALLE
+    /// geselecteerde portretten. Toont de batch-context ("N selected").
+    private var boardBatchBar: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            Text("\(selection.count) selected")
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.primary)
+
+            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+            // Background: Transparent + presets, toegepast op alle geselecteerde.
+            Text("Background")
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+            ForEach(Self.batchBackgrounds.indices, id: \.self) { i in
+                backgroundSwatch(Self.batchBackgrounds[i])
+            }
+
+            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+            // Adjust: dezelfde kleurcorrectie op alle geselecteerde (dropdown).
+            Button { batchMenu = (batchMenu == .adjust) ? nil : .adjust } label: {
+                HStack(spacing: DSSpacing.gap1) {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 12))
+                    Text("Adjust").dsTextStyle(.labelSmall)
+                }
+                .foregroundStyle(DSColor.Foreground.primary)
+                .padding(.horizontal, DSSpacing.gap2)
+                .frame(height: 28)
+                .background(batchMenu == .adjust ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+                .dsHoverHighlight(cornerRadius: 14)
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                if batchMenu == .adjust, let first = selectedPortraits.first,
+                   let img = NSImage(data: first.cutoutData) {
+                    EditColorPanel(
+                        source: img,
+                        initial: first.adjust,
+                        onCommit: { _, after in applyAdjustToAll(after); batchMenu = nil }
+                    )
+                    .padding(DSSpacing.gap4)
+                    .frame(width: 360)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .dsPanelSurface(cornerRadius: DSRadius.xl)
+                    .offset(y: 40)
+                    .zIndex(10)
+                }
+            }
+        }
+        .padding(.horizontal, DSSpacing.gap3)
+        .padding(.vertical, DSSpacing.gap1)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+    }
+
+    private func backgroundSwatch(_ hex: String?) -> some View {
+        Button { applyBackgroundToAll(hex) } label: {
+            ZStack {
+                if let hex, let c = Color(hexRGB: hex) {
+                    Circle().fill(c)
+                } else {
+                    // Transparent = dot-grid-achtige indicatie.
+                    Circle().fill(DSColor.Background.neutralStronger)
+                    Image(systemName: "circle.dotted").font(.system(size: 12))
+                        .foregroundStyle(DSColor.Foreground.muted)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .overlay(Circle().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        }
+        .buttonStyle(.plain)
+        .help(hex == nil ? "Transparent" : "#\(hex!)")
+    }
+
+    /// E29.2: pas dezelfde achtergrond toe op alle geselecteerde portretten.
+    private func applyBackgroundToAll(_ hex: String?) {
+        for p in selectedPortraits {
+            p.useOriginalBackground = false
+            p.backgroundImageData = nil
+            p.backgroundColorHex = hex
+            p.touch()
+        }
+    }
+
+    /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
+    private func applyAdjustToAll(_ adjust: PortraitAdjust) {
+        for p in selectedPortraits {
+            p.adjust = adjust
+            p.touch()
+        }
     }
 
     private var hud: some View {
