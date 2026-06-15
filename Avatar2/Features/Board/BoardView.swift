@@ -9,6 +9,7 @@
 // De productie-editor-flow blijft ongemoeid; de board is een aparte modus.
 
 import AppKit
+import AvatarKit
 import AvatarUI
 import SwiftData
 import SwiftUI
@@ -46,6 +47,8 @@ struct BoardView: View {
 
     // E29.2: batch-toolbar (open dropdown) + de geselecteerde portretten.
     @State private var batchMenu: BatchMenu?
+    // E29.3: loopt tijdens de "Match lighting"-normalisatie over de selectie.
+    @State private var isMatchingLight = false
     private enum BatchMenu: Hashable { case background, adjust }
 
     /// E29.2: batch-achtergrond-presets (Transparent + een paar kleuren).
@@ -324,6 +327,8 @@ struct BoardView: View {
             let v = args[j + 1]
             applyBackgroundToAll(v == "none" ? nil : v)
         }
+        // E29.3 smoke: match lighting over de selectie.
+        if args.contains("--board-match-light") { matchLightingSelection() }
         #endif
     }
 
@@ -414,6 +419,26 @@ struct BoardView: View {
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
 
+            // E29.3: Match lighting over de selectie (≥2). Normaliseert de
+            // belichting van alle geselecteerde naar de eerste als referentie.
+            if selection.count >= 2 {
+                Button { matchLightingSelection() } label: {
+                    HStack(spacing: DSSpacing.gap1) {
+                        Image(systemName: isMatchingLight ? "circle.dotted" : "sun.max")
+                            .font(.system(size: 12))
+                        Text(isMatchingLight ? "Matching…" : "Match lighting").dsTextStyle(.labelSmall)
+                    }
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .padding(.horizontal, DSSpacing.gap2)
+                    .frame(height: 28)
+                    .dsHoverHighlight(cornerRadius: 14)
+                }
+                .buttonStyle(.plain)
+                .disabled(isMatchingLight)
+
+                Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+            }
+
             // Adjust: dezelfde kleurcorrectie op alle geselecteerde (dropdown).
             Button { batchMenu = (batchMenu == .adjust) ? nil : .adjust } label: {
                 HStack(spacing: DSSpacing.gap1) {
@@ -487,6 +512,42 @@ struct BoardView: View {
         }
     }
 
+    /// E29.3: "Match lighting" over de selectie — trekt de belichting/kleurbalans
+    /// van alle geselecteerde portretten naar de eerste als referentie (zelfde
+    /// `SetLightingNormalizer` als E12.2, nu vanuit de board-multi-select). Eén
+    /// undo-groep; de board-thumbnails worden geïnvalideerd zodat de nieuwe
+    /// cutouts opnieuw decoderen.
+    private func matchLightingSelection() {
+        guard !isMatchingLight else { return }
+        let targets = selectedPortraits
+        guard targets.count >= 2, let reference = targets.first,
+              let refCG = NSImage(data: reference.cutoutData)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let refStats = SetLightingNormalizer.referenceStats(of: refCG) else { return }
+        isMatchingLight = true
+        Task { @MainActor in
+            defer { isMatchingLight = false }
+            var items: [(Portrait2, Data, Data)] = []
+            for p in targets where p.persistentModelID != reference.persistentModelID {
+                guard let cg = NSImage(data: p.cutoutData)?
+                        .cgImage(forProposedRect: nil, context: nil, hints: nil),
+                      let outCG = SetLightingNormalizer.match(cg, to: refStats),
+                      let png = NSBitmapImageRep(cgImage: outCG).representation(using: .png, properties: [:])
+                else { continue }
+                items.append((p, p.cutoutData, png))
+            }
+            undoManager?.beginUndoGrouping()
+            undoManager?.setActionName("Match Lighting")
+            for (p, before, after) in items {
+                p.cutoutData = after
+                p.touch()
+                CutoutDataUndo.register(undoManager, portrait: p, undoTo: before, redoTo: after, actionName: "Match Lighting")
+                thumbs.invalidate(p)
+            }
+            undoManager?.endUndoGrouping()
+        }
+    }
+
     private var hud: some View {
         VStack {
             Spacer()
@@ -533,6 +594,12 @@ final class BoardThumbnailCache {
         }
         #endif
         return thumb
+    }
+
+    /// E29.3: vergeet de cache voor één portret (na een cutout-wijziging zoals
+    /// Match lighting) → de board decodeert de nieuwe cutout opnieuw.
+    func invalidate(_ portrait: Portrait2) {
+        cache[portrait.persistentModelID] = nil
     }
 
     /// Teken de bron in een kleiner NSImage (aspect behouden); ≥ bronmaat → bron.

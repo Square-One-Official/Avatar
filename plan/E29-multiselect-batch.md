@@ -58,9 +58,26 @@ adjust is daar niet zichtbaar — code-geverifieerd. **Figma-TODO:** batch-bar-s
 de Adjust-dropdown tegen Figma leggen.
 
 ## 29.3 — "Match lighting" over de selectie [AI/FEAT]
-- status: backlog
+- status: done
+- owner: AI/FEAT (AI-agent)
 - blockedBy: 29.1
 Met meerdere geselecteerd → "zorg dat ze dezelfde belichting hebben alsof in dezelfde studio
 gefotografeerd". Normaliseer licht/kleur over de selectie naar een consistente look. Bouwt voort op
 E12.2 (set-brede lighting-normalisatie) maar nu vanuit de board-multi-select. Kwaliteitsoordeel +
 voor/na in de Result.
+
+**Result:** een **"Match lighting"-knop** in de batch-toolbar (verschijnt bij ≥2 geselecteerd). Hij
+hergebruikt de E12.2-`SetLightingNormalizer`: de eerste geselecteerde dient als referentie
+(`referenceStats`), de overige worden ernaartoe genormaliseerd (`match`), in één `Match Lighting`-
+undo-groep (`CutoutDataUndo`); de board-thumbnails worden geïnvalideerd zodat de nieuwe cutouts
+opnieuw decoderen → de relit-versie is op de board zichtbaar. Dit is exact het E12.2-pad, nu vanuit
+de board-multi-select i.p.v. de sidebar.
+
+**DoD/Verificatie:** beide targets + tests groen (`build-v2.sh`). Smoke (`--board-select 8
+--board-match-light`): de bar toont "8 selected … ☀ Match lighting"; de normalisatie draait zonder
+fout over de selectie en de thumbnails verversen (/tmp/s29_3.png).
+**Kwaliteitsoordeel:** de meeste test-portretten zijn duplicaten van hetzelfde beeld, dus het
+zichtbare voor/na-verschil is klein (referentie ≈ doel → gain ≈ 1). Op een echt gemengde set
+(verschillende belichting) trekt de normalisatie de set naar één consistente studio-look — dat is de
+geteste E12.2-engine; de meerwaarde hier is de board-multi-select-instap. **Figma-TODO:** knop-styling
++ een referentie-keuze (welke node is de "studio"-referentie) tegen Figma/Thierry leggen.
