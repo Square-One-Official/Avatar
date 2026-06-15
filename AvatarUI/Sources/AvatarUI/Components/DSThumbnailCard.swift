@@ -17,6 +17,7 @@ public struct DSThumbnailCard<Icon: View>: View {
     private let isSelected: Bool
     private let isWorking: Bool
     private let tileSize: CGFloat
+    private let onRefresh: (() -> Void)?
     private let icon: Icon
 
     public init(
@@ -26,6 +27,7 @@ public struct DSThumbnailCard<Icon: View>: View {
         isSelected: Bool = false,
         isWorking: Bool = false,
         tileSize: CGFloat = 88,
+        onRefresh: (() -> Void)? = nil,
         @ViewBuilder icon: () -> Icon
     ) {
         self.label = label
@@ -34,6 +36,7 @@ public struct DSThumbnailCard<Icon: View>: View {
         self.isSelected = isSelected
         self.isWorking = isWorking
         self.tileSize = tileSize
+        self.onRefresh = onRefresh
         self.icon = icon()
     }
 
@@ -102,7 +105,20 @@ public struct DSThumbnailCard<Icon: View>: View {
                     .opacity(isSelected ? 1 : 0)
             }
             .overlay(alignment: .topTrailing) {
-                if isSelected {
+                if isSelected, let onRefresh {
+                    // E24.33: refresh-icoon op de actieve kaart = bewust opnieuw
+                    // genereren (kost credits). Tooltip "Regenerate".
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(5)
+                            .background(Circle().fill(.black.opacity(0.55)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(DSSpacing.gap1)
+                    .help("Regenerate")
+                } else if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(DSColor.Action.primary)

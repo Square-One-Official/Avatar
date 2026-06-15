@@ -68,6 +68,28 @@ final class Portrait2 {
     var boardOrder: Int = 0
     var boardPlaced: Bool = false
 
+    /// E24.33: Effects-cache op het portret. `effectBaseData` = de cutout van
+    /// vóór er een effect werd toegepast ("None"/origineel voor de Effects-
+    /// feature, eenmalig vastgelegd). `effectActiveRaw` = het actieve effect
+    /// (StylizeStyle.rawValue), nil = None. `effectCacheData` = JSON van
+    /// [rawValue: PNG-Data] met de al gegenereerde resultaten → schakelen tussen
+    /// None/effecten is INSTANT en kost geen nieuwe credits (alleen het refresh-
+    /// icoon hergenereert bewust). Lichtgewicht migratie via de defaults.
+    @Attribute(.externalStorage) var effectBaseData: Data?
+    var effectActiveRaw: String?
+    @Attribute(.externalStorage) var effectCacheData: Data?
+
+    /// E24.33: de effect-cache als [rawValue: PNG-Data] (JSON in `effectCacheData`).
+    var effectCache: [String: Data] {
+        get {
+            guard let effectCacheData,
+                  let decoded = try? JSONDecoder().decode([String: Data].self, from: effectCacheData)
+            else { return [:] }
+            return decoded
+        }
+        set { effectCacheData = try? JSONEncoder().encode(newValue) }
+    }
+
     /// E24.31: "Original"-achtergrond — toon de ORIGINELE importfoto (mét eigen
     /// achtergrond) i.p.v. de cutout + gekozen achtergrond. Cutout blijft de
     /// default (false); de Background-menu-keuze is omkeerbaar (Original ↔
