@@ -18,7 +18,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 
 | ID | Story | Team | Status | Branch |
 |----|-------|------|--------|--------|
-| 27.1 | Canvas-camera: zoom + pan | FEAT | ready (plan vastgelegd) | `v2/E27-27.1` |
+| 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | backlog (na 27.1) | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | backlog (na 27.1) | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
@@ -26,10 +26,49 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 ---
 
 ## 27.1 — Canvas-camera: zoom + pan  · FEAT
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent)
 - blockedBy: —
 - DoD: beide targets groen + gemerged + Result + screenshot
+
+**Result:** de canvas is nu een echte viewport met één `CanvasCamera`
+(`scale` 0.25–4× geclampt + `offset`), als VIEW-transform op de DSCanvasCard
+(`.scaleEffect(anchor: .center).offset()`) BUITEN `EditorCanvasView` — de hele
+scène (kaart + achtergrond + onderwerp) transformeert mee. De mislukte
+per-onderwerp `viewZoom` uit 24.8/24.17 is volledig verwijderd (binding +
+`scaleEffect` op het beeld + `magnifyGesture`/`applyViewZoom` weg, de
+handle-positie-math terug naar 1× → handles zitten direct op het onderwerp).
+- **Zoom:** pinch (`MagnificationGesture`) zoomt om het midden; verborgen
+  `keyboardShortcut`-knoppen leveren ⌘+/⌘= (in), ⌘− (uit), ⌘0 (fit = reset),
+  ⌘1 (100% = 1× om het midden, pan behouden). `.clipped()` houdt de ingezoomde
+  scène binnen de canvas-slot (lekt niet over panelen/toolbar). Camera reset bij
+  portret-wissel.
+- **Pan/zoom-events:** `CanvasInteractionCatcher` (NSViewRepresentable) installeert
+  een lokale `NSEvent`-monitor — scroll/two-finger = pan, ⌘-scroll = zoom rond de
+  cursor, spatie-drag = pan. De catcher-NSView geeft via `hitTest → nil` álle
+  muis-clicks door, en de monitor consumeert alléén scroll/⌘-scroll/spatie-drag
+  (leftMouseDragged wordt enkel bij ingedrukte spatie gepakt) → de subject-drag
+  (24.32) en de deselect-tap (`Color.clear`) blijven ongemoeid.
+- **Camera ≠ onderwerp:** VIEW-zoom (camera) staat los van de ONDERWERP-schaal
+  (selectie-handles, `Portrait2.scale`, E24) — die laatste werkt onveranderd.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen
+(`build-v2.sh` → "alles groen"). Visuele smoke per camera-zoomniveau (square
+frame, `--cam-zoom`): 50% (/tmp/cam_050.png — hele kaart verkleind, toolbar vast),
+100%/fit (/tmp/cam_100.png), 200% (/tmp/cam_200.png — ingezoomd om midden, binnen
+de slot geclipt), 400%/max (/tmp/cam_400.png — clamp op 4×). Regressie:
+24.31 Original-modus rendert correct onder 200% camera (/tmp/cam_original_200.png);
+24.32 selectie-handles + selectiekader exact op het onderwerp bij fit
+(/tmp/cam_handles_circle.png) en de alignment-gids onder 150% zoom
+(/tmp/cam_handles_150.png) — selectie/deselect/ESC zijn structureel ongewijzigd
+(deselect-tap + ESC-knop intact; runtime-klikgedrag is zoals in 24.32
+niet-screenshotbaar). Window-capture via CGWindowID (terminal-overlap omzeild).
+
+**Figma-TODO:** een zwevende zoom-HUD met het zoom-% + fit-knop (27.2) ontbreekt
+nog; ⌘1 "100%" is in dit camera-model gelijk aan 1× (een pixel-echte 100% vraagt
+de bron-pixelmaat → 27.2/27.3). Handles/guides/popovers correct in screen-space
+houden onder de camera = 27.3. Sign/zoomgevoeligheid van scroll-pan en
+spatie-drag tegen de Figma-/gevoels-referentie leggen.
 
 Eén camera-transform (scale + offset) op de hele canvas-scène. Pinch-to-zoom, scroll/⌘-scroll en
 ⌘+/⌘− zoomen de VIEW; spatie-drag of two-finger-pan verschuift. NIET de afbeelding-in-frame schalen.

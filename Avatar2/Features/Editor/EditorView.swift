@@ -95,11 +95,12 @@ struct EditorView: View {
     /// E24.12: open canvas-toolbar-dropdown (caret-loze DS-kaart). Hier zodat
     /// een klik op de canvas 'm sluit — net als de bottom-panelen.
     @State private var canvasMenu: CanvasToolbarMenu?
-    /// E24.8: efemere VIEW-zoom (1×–maxViewZoom). Hier zodat de zoom-HUD búiten
-    /// de frame-clip (24.16) rendert; de canvas zelf gebruikt 'm voor scaleEffect
-    /// + pinch/scroll.
-    @State private var canvasViewZoom: Double = 1
-    private let canvasMaxViewZoom: Double = 4
+    /// E27.1: de canvas-camera (VIEW-zoom + pan over de HELE scène). Vervangt de
+    /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
+    /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
+    @State private var camera = CanvasCamera()
+    /// Pinch-accumulatie (MagnificationGesture geeft een cumulatieve waarde).
+    @State private var lastMagnification: CGFloat = 1
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
     @State private var canvasGridEnabled = false
     /// E24.29: onderwerp geselecteerd (gelift uit EditorCanvasView) zodat het
@@ -318,6 +319,40 @@ struct EditorView: View {
         )
     }
 
+    // E27.1: pinch = VIEW-zoom om het midden. MagnificationGesture levert een
+    // cumulatieve waarde; we zetten 'm om naar een delta-factor per frame.
+    private var cameraPinchGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                let delta = value / max(0.0001, lastMagnification)
+                lastMagnification = value
+                camera.zoomCentered(by: delta)
+            }
+            .onEnded { _ in lastMagnification = 1 }
+    }
+
+    // E27.1: verborgen sneltoets-knoppen voor ⌘+/⌘−/⌘0(fit)/⌘1(100%). ⌘= vangt
+    // de toets zonder shift; alles animeert soepel. Geen UI, geen hit-test.
+    @ViewBuilder
+    private var cameraShortcutButtons: some View {
+        Group {
+            Button("") { zoomCamera(by: 1.25) }.keyboardShortcut("+", modifiers: .command)
+            Button("") { zoomCamera(by: 1.25) }.keyboardShortcut("=", modifiers: .command)
+            Button("") { zoomCamera(by: 0.8) }.keyboardShortcut("-", modifiers: .command)
+            Button("") { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
+                .keyboardShortcut("0", modifiers: .command)
+            Button("") { withAnimation(.spring(duration: 0.3)) { camera.resetToActualSize() } }
+                .keyboardShortcut("1", modifiers: .command)
+        }
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func zoomCamera(by factor: CGFloat) {
+        withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
+    }
+
     private var editorBody: some View {
         DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
@@ -352,14 +387,15 @@ struct EditorView: View {
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        // E06.4: pan/zoom/snap-canvas i.p.v. statische fill.
-                        // E24.8: view-zoom (binding) + subject-schaal via handles.
+                        // E06.4: pan/snap-canvas + subject-schaal via handles.
+                        // E27.1: de VIEW-zoom zit niet meer hier maar als camera
+                        // op de DSCanvasCard (scène-niveau). Deze view doet alleen
+                        // nog onderwerp-transform + selectie.
                         // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
                         // de frame-vorm, zodat de selectie-handles eromheen niet
                         // mee-geclipt worden.
                         EditorCanvasView(
                             image: portrait, portrait: portraitModel,
-                            viewZoom: $canvasViewZoom, maxViewZoom: canvasMaxViewZoom,
                             gridEnabled: canvasGridEnabled,
                             isSelected: $canvasSubjectSelected,
                             frameShape: portraitModel?.frameShape ?? .circle
@@ -368,12 +404,28 @@ struct EditorView: View {
                     } // E24.31: einde Original-else
                 }
             }
+            // E27.1: de camera (VIEW-zoom + pan) op de HELE scène — render-only
+            // (scaleEffect/offset beïnvloeden de layout niet, dus de toolbar-
+            // overlay + tap-dismiss blijven in screen-space staan; guides/handles
+            // correct onder de camera = 27.3). Pinch zoomt om het midden.
+            .scaleEffect(camera.scale, anchor: .center)
+            .offset(camera.offset)
+            .simultaneousGesture(cameraPinchGesture)
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
             // en geopend paneel; de 3.16-garantie houdt paneel en toolbar
             // buiten schot. 456 was de Figma-maat bij 1000×700, geen cap.
             .aspectRatio(1, contentMode: .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // E27.1: ingezoomde scène binnen de canvas-slot houden (niet over de
+            // panelen/toolbar lekken). De catcher + ⌘-knoppen hangen erachter:
+            // de catcher vangt scroll/⌘-scroll/spatie-drag (clicks vallen door),
+            // de knoppen leveren ⌘+/⌘−/⌘0(fit)/⌘1(100%).
+            .clipped()
+            .background {
+                CanvasInteractionCatcher(camera: $camera)
+                cameraShortcutButtons
+            }
             .padding(.top, DSSpacing.gap8)
             // E18.17: staat er een paneel/sidebar open, dan sluit een klik
             // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
@@ -408,10 +460,8 @@ struct EditorView: View {
                 )
                 .padding(.top, DSSpacing.gap4)
             }
-            // E24.17: de losse −/+ zoom-HUD is verwijderd (overbodig). View-zoom
-            // gaat nu alléén via pinch (+ dubbelklik = terug naar fit/1×).
-            // E24.8: een vers portret opent op 1× view-zoom.
-            .onChange(of: portraitModel?.persistentModelID) { _, _ in canvasViewZoom = 1 }
+            // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
+            .onChange(of: portraitModel?.persistentModelID) { _, _ in camera.reset() }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
@@ -488,11 +538,14 @@ struct EditorView: View {
             }
             // E24.26: smoke-haak — grid-toggle aan.
             if ProcessInfo.processInfo.arguments.contains("--grid-on") { canvasGridEnabled = true }
-            // E24.8: smoke-haak — forceer een view-zoom-niveau.
-            if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "--seed-viewzoom"),
-               ProcessInfo.processInfo.arguments.indices.contains(i + 1),
-               let z = Double(ProcessInfo.processInfo.arguments[i + 1]) {
-                canvasViewZoom = min(canvasMaxViewZoom, max(1, z))
+            // E27.1: smoke-haken — forceer een camera-zoomniveau (om het midden)
+            // of de fit-camera, zodat de zoomniveaus te screenshotten zijn.
+            let args = ProcessInfo.processInfo.arguments
+            if args.contains("--cam-fit") { camera.reset() }
+            if let i = args.firstIndex(of: "--cam-zoom"),
+               args.indices.contains(i + 1),
+               let z = Double(args[i + 1]) {
+                camera.scale = CanvasCamera.clampScale(CGFloat(z))
             }
         }
         #endif
