@@ -5,6 +5,25 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.33 — Effects: None-optie, toggle-off, cache + refresh  · FEAT/DS
+- status: in_progress
+- owner: FEAT/DS (AI-agent)
+
+REGRESSIE: de None-kaart ontbreekt en een effect uitzetten + weer aanzetten genereert OPNIEUW (lange
+load, nieuwe credits). Fix: (a) "None"-kaart helemaal links (terug naar origineel); (b) actieve kaart
+nogmaals tikken = uit (None); (c) CACHE per effect op het portret → None ↔ effect ↔ ander effect is
+INSTANT, nooit opnieuw genereren, geen nieuwe credits; (d) refresh-icoon rechtsboven in de actieve
+thumbnail = bewuste her-generatie (kost credits), tooltip "Regenerate". DoD: beide targets groen +
+merge + Result + screenshot.
+
+## 24.35 — Uitlijn-gids = gezichtsvorm met ogen (geen lijnen)  · DS/FEAT
+- status: ready
+- owner: —
+
+Vervang de rule-of-thirds-lijnen door een subtiele GEZICHT-silhouet-overlay met oog-markers als
+uitlijndoel (herkenbaar hoofd/ogen, geen lijnenwirwar). Boven de frame-clip renderen (24.19). DoD:
+beide targets groen + merge + Result + screenshot.
+
 ## 24.32 — Deselect betrouwbaar (outside-click + ESC), ook ná een drag
 - status: done
 - owner: FEAT (AI-agent)
