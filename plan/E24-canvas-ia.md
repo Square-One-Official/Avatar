@@ -44,12 +44,26 @@ sparkles-placeholders nog.
 had — geen backend-regen, geen credits.
 
 ## 24.35 — Uitlijn-gids = gezichtsvorm met ogen (geen lijnen)  · DS/FEAT
-- status: ready
-- owner: —
+- status: done
+- owner: DS/FEAT (AI-agent)
 
 Vervang de rule-of-thirds-lijnen door een subtiele GEZICHT-silhouet-overlay met oog-markers als
 uitlijndoel (herkenbaar hoofd/ogen, geen lijnenwirwar). Boven de frame-clip renderen (24.19). DoD:
 beide targets groen + merge + Result + screenshot.
+
+**Result:** `AlignmentGuideOverlay2` toont nu een **hoofd-ovaal (gezicht-silhouet)
++ twee oog-markers** i.p.v. de rule-of-thirds-lijnen. Posities komen uit
+`FramingConstants` (ogen op `targetEyeCenterY` 0.37, interoog `targetInterEyeRatio`,
+hoofd op `targetFaceCenterY`/`targetFaceHeightRatio`) — dezelfde constants als de
+auto-align, dus de afbeelding lijnt logisch op de vorm uit. Lime, subtiel; de
+VORM zoomt mee met het frame, lijn-dikte + marker-maat ÷camera (E27.3) zodat ze
+op elk zoomniveau dun/leesbaar blijven. Boven de frame-clip (24.19), volle canvas.
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (`build-v2.sh`).
+Screenshot (`--show-guide --frame-circle`): rustig lime hoofd-ovaal + twee
+oog-markers op de ooglijn; het hoofd van het portret lijnt er logisch op uit
+(/tmp/guide_face.png). **Figma-TODO:** exacte silhouet-vorm (ovaal vs. echt
+hoofd-pad), opacity/dikte en marker-grootte tegen een Figma-referentie leggen.
 
 ## 24.32 — Deselect betrouwbaar (outside-click + ESC), ook ná een drag
 - status: done
