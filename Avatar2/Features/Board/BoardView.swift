@@ -21,6 +21,11 @@ struct BoardView: View {
 
     @Environment(\.undoManager) private var undoManager
 
+    /// E27.5: gedecodeerde + verkleinde thumbnails, één keer per portret-id
+    /// gedecodeerd (geen re-decode bij elke pan/zoom-frame). Referentietype zodat
+    /// het over body-evaluaties heen blijft leven.
+    @State private var thumbs = BoardThumbnailCache()
+
     // Camera met een lagere min-zoom dan de editor, zodat een grote set in beeld past.
     @State private var camera = CanvasCamera(minScale: 0.1)
     @State private var lastMagnification: CGFloat = 1
@@ -98,12 +103,40 @@ struct BoardView: View {
             // hierop absoluut; lege ruimte = geen hit → camera-pan blijft werken).
             Color.clear
 
-            ForEach(Array(portraits.enumerated()), id: \.element.persistentModelID) { index, portrait in
-                let c = center(of: portrait, index: index)
-                node(portrait)
-                    .position(x: c.x, y: c.y)
+            // E27.5: virtualisatie — alleen nodes die in (of net buiten) de
+            // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
+            // zoom op een grote set.
+            ForEach(visibleNodes(), id: \.portrait.persistentModelID) { item in
+                node(item.portrait)
+                    .position(x: item.center.x, y: item.center.y)
             }
         }
+    }
+
+    /// E27.5: de nodes waarvan het midden binnen de (met een cel-marge verruimde)
+    /// zichtbare board-rect valt. Vóór de eerste layout (viewport 0) → alles.
+    private func visibleNodes() -> [(portrait: Portrait2, center: CGPoint)] {
+        let all = portraits.enumerated().map { (portrait: $1, center: center(of: $1, index: $0)) }
+        guard viewport.width > 0, viewport.height > 0, camera.scale > 0 else { return all }
+        let rect = visibleBoardRect().insetBy(dx: -(cardSide + gap), dy: -(cellHeight + gap))
+        return all.filter { rect.contains($0.center) }
+    }
+
+    /// De zichtbare board-rect (board-space) gegeven de camera + viewport.
+    /// scherm = vpMidden + scale·(p − boardMidden) + offset  ⇒  p = boardMidden +
+    /// (scherm − vpMidden − offset)/scale.
+    private func visibleBoardRect() -> CGRect {
+        let vpC = CGPoint(x: viewport.width / 2, y: viewport.height / 2)
+        let boardC = CGPoint(x: boardSize.width / 2, y: boardSize.height / 2)
+        func boardPoint(_ s: CGPoint) -> CGPoint {
+            CGPoint(
+                x: boardC.x + (s.x - vpC.x - camera.offset.width) / camera.scale,
+                y: boardC.y + (s.y - vpC.y - camera.offset.height) / camera.scale
+            )
+        }
+        let tl = boardPoint(.zero)
+        let br = boardPoint(CGPoint(x: viewport.width, y: viewport.height))
+        return CGRect(x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y)
     }
 
     private func node(_ portrait: Portrait2) -> some View {
@@ -141,7 +174,8 @@ struct BoardView: View {
             : AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
         ZStack {
             DSColor.Background.card
-            if let image = NSImage(data: portrait.cutoutData) {
+            // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame).
+            if let image = thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -269,6 +303,50 @@ struct BoardView: View {
             }
             .padding(DSSpacing.gap4)
         }
+    }
+}
+
+/// E27.5: thumbnail-cache voor de board — decodeert + verkleint elke cutout één
+/// keer (per portret-id) en bewaart het resultaat, zodat pan/zoom geen volledige
+/// re-decode + draw van de bron-pixels meer triggert. `decodeCount` is een
+/// meet-haak (voor/na in de Result).
+@MainActor
+final class BoardThumbnailCache {
+    private var cache: [PersistentIdentifier: NSImage] = [:]
+    private(set) var decodeCount = 0
+
+    func thumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+        let id = portrait.persistentModelID
+        if let cached = cache[id] { return cached }
+        guard let full = NSImage(data: portrait.cutoutData) else { return nil }
+        let thumb = Self.downscaled(full, maxDimension: maxDimension)
+        cache[id] = thumb
+        decodeCount += 1
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--board-perf") {
+            NSLog("BOARD thumb decode #\(decodeCount) id=\(id)")
+        }
+        #endif
+        return thumb
+    }
+
+    /// Teken de bron in een kleiner NSImage (aspect behouden); ≥ bronmaat → bron.
+    private static func downscaled(_ image: NSImage, maxDimension: CGFloat) -> NSImage {
+        let size = image.size
+        guard size.width > 0, size.height > 0 else { return image }
+        let factor = min(1, maxDimension / max(size.width, size.height))
+        guard factor < 1 else { return image }
+        let target = NSSize(width: (size.width * factor).rounded(), height: (size.height * factor).rounded())
+        let out = NSImage(size: target)
+        out.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        image.draw(
+            in: NSRect(origin: .zero, size: target),
+            from: NSRect(origin: .zero, size: size),
+            operation: .copy, fraction: 1
+        )
+        out.unlockFocus()
+        return out
     }
 }
 

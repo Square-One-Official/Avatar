@@ -22,8 +22,43 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | fase 2 done (toggle+drag+fit); fase 2b (inline-edit) backlog | `v2/E27-27.4` |
+| 27.5 | Board-performance: virtualisatie + thumbnail-cache | FEAT | in_progress | `v2/E27-27.5` |
 
 ---
+
+## 27.5 — Board-performance (virtualisatie + thumbnail-cache)  · FEAT
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: 27.4
+
+Board-modus scroll/zoom is traag met alle portretten. Oorzaak: elke node decodeert de volledige
+cutout (`NSImage(data:)`) bij ELKE body-evaluatie (dus elke pan/zoom-frame), én álle nodes worden
+altijd gerenderd. Fix: (a) gedecodeerde + verkleinde thumbnails cachen per portret-id (één keer
+decoderen); (b) virtualiseren — alleen nodes renderen die in de zichtbare viewport vallen; (c) geen
+re-decode bij scroll/zoom/pan. Voor/na meten in de Result.
+
+**Result:** drie fixes in `BoardView`:
+1. **`BoardThumbnailCache`** (referentietype in `@State`): decodeert elke cutout
+   één keer per portret-id én **verkleint** 'm (max ~2× de kaartmaat) i.p.v. de
+   volledige cutout (vaak 1024px+) elke frame te decoderen + tekenen.
+   `cardSurface` leest nu uit de cache.
+2. **Virtualisatie**: `visibleNodes()` rendert alleen de nodes waarvan het midden
+   binnen de (met een cel-marge verruimde) zichtbare board-rect valt — afgeleid
+   uit camera + viewport. Off-screen nodes worden niet gebouwd.
+3. Daardoor **geen re-decode/-render-van-alles** meer bij pan/zoom/scroll.
+
+**Meting (voor/na, `--board-perf` decode-teller):** ná fit-on-open **18 decodes**
+(één per portret, alle zichtbaar); ná **12 zoom-operaties** (6× ⌘− + 6× ⌘=, elk
+met vele re-render-frames) **nog steeds 18 decodes** → 0 re-decodes. Vóór de fix
+riep `cardSurface` `NSImage(data:)` aan bij élke body-evaluatie → ~18 volledige
+decodes + full-res draws *per pan/zoom-frame* (de oorzaak van de traagheid).
+Beide targets + alle pakkettests groen (`build-v2.sh`); board rendert correct na
+de zoom-cyclus (/tmp/perf_board.png).
+
+**Figma-TODO:** n.v.t. (interne performance). **Nuance:** de cache is per
+board-sessie (id-gekeyd); een cutout-wijziging in de editor wordt opgepikt bij de
+volgende board-open (BoardView wordt dan opnieuw gemaakt). Een grotere set kan
+later een echte off-screen recycling/`NSCache`-limiet krijgen indien nodig.
 
 ## 27.1 — Canvas-camera: zoom + pan  · FEAT
 - status: done
