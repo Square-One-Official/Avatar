@@ -56,6 +56,18 @@ final class Portrait2 {
     /// Bestaande rijen (default "circle") krijgen dus de cirkel — bedoeld.
     var frameShapeRaw: String = ExportShape.circle.rawValue
 
+    /// E27.4: board-view-positie (scene-graph node), in board-space-punten (het
+    /// MIDDEN van de node). `boardPlaced` = false → nog niet geplaatst, de board
+    /// doet een auto-layout (grid) en schrijft dan echte coördinaten + zet de
+    /// vlag. Een aparte Bool i.p.v. een nan-sentinel omdat SwiftData's
+    /// lichtgewicht migratie nieuwe Double-kolommen met 0 (niet de Swift-default)
+    /// vult voor bestaande rijen — een Bool defaultt wél betrouwbaar naar false.
+    /// `boardOrder` bepaalt de auto-layout-volgorde + de z-stapeling.
+    var boardX: Double = 0
+    var boardY: Double = 0
+    var boardOrder: Int = 0
+    var boardPlaced: Bool = false
+
     /// E24.31: "Original"-achtergrond — toon de ORIGINELE importfoto (mét eigen
     /// achtergrond) i.p.v. de cutout + gekozen achtergrond. Cutout blijft de
     /// default (false); de Background-menu-keuze is omkeerbaar (Original ↔

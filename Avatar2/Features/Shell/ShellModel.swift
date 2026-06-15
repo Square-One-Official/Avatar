@@ -42,10 +42,12 @@ final class ShellModel {
     /// Name/Role-knop op het canvas (sidebar gebruikt z'n eigen renameTarget).
     var isShowingRename = false
 
-    /// E27.4 (spike): toont de board-view (alle portretten op één canvas) i.p.v.
-    /// de enkel-portret-editor. Default uit; alléén via de DEBUG-haak `--board`
-    /// aangezet — de volledige board-feature is fase 2 (zie plan E27.4).
-    var showBoardSpike = false
+    /// E27.4: board-modus — toont alle portretten op één canvas (BoardView)
+    /// i.p.v. de enkel-portret-editor. Toggle via de app-bar; klik een portret op
+    /// het board → editor (deze vlag weer uit).
+    var isBoardMode = false
+
+    func toggleBoard() { isBoardMode.toggle() }
 
     /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
     private(set) var selectedPortrait: Portrait2?

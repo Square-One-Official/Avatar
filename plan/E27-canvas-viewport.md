@@ -21,7 +21,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
-| 27.4 | Board-view: meerdere portretten (later) | FEAT | spike done (fase 2 gated) | `v2/E27-27.4` |
+| 27.4 | Board-view: meerdere portretten (later) | FEAT | fase 2 done (toggle+drag+fit); fase 2b (inline-edit) backlog | `v2/E27-27.4` |
 
 ---
 
@@ -176,9 +176,49 @@ Figma-referentie leggen zodra die er is; bevestigen of de gids-extent mág mee-z
 screen-space (vast t.o.v. het frame) moet zijn.
 
 ## 27.4 — Board-view: meerdere portretten op de canvas  · FEAT (later)
-- status: spike done (architectuur vastgelegd + read-only proof) — volledige bouw (fase 2) GATED op Thierry-review
+- status: fase 2 done (steps 1-3: toggle + persistente posities + fit + drag); fase 2b (inline-edit) backlog
 - owner: FEAT (AI-agent)
 - blockedBy: 27.1 (done)
+
+**Fase 2 — Result (steps 1-3, geverifieerd):**
+- **Model** — `Portrait2` kreeg `boardX/boardY` (node-MIDDEN, board-space),
+  `boardOrder` en `boardPlaced: Bool`. De Bool i.p.v. een nan-sentinel: SwiftData's
+  lichtgewicht migratie vult nieuwe Double-kolommen met **0** (niet de Swift-
+  default) voor bestaande rijen — een `.nan`-sentinel stapelde daardoor álle nodes
+  op (0,0); een Bool defaultt wél betrouwbaar naar false. (Gevonden + gefixt
+  tijdens de smoke.)
+- **Camera** — `CanvasCamera.min/maxScale` zijn nu instance (editor 0.25–4×, board
+  mag verder uitzoomen, min 0.1) + `fitToContent(contentSize:in:)`. De board fit
+  on-open en blijft mee-fitten op viewport-/set-wijzigingen tot de gebruiker de
+  camera zelf verzet (camera ≠ laatste fit). (Fix: de eerste fit latchte op een
+  pre-settle viewport → nu via een top-level GeometryReader de echte slot-maat +
+  refit-tot-aanraking.)
+- **BoardView** — scene-graph van node-kaarten op absolute, **persistente**
+  posities (auto-grid bij eerste open, geschreven naar het model), **sleepbaar**
+  (scherm-delta ÷ camera-zoom → board-space) met `BoardMoveUndo` (genest
+  undo/redo). Pan/zoom = de E27.1-camera (`CanvasInteractionCatcher` + pinch +
+  ⌘±/⌘0=fit). Klik een node → `model.select` + editor.
+- **Echte modus-toggle** — `ShellTopBar` 'Board'-knop (`square.grid.2x2`,
+  active-state) i.p.v. de DEBUG-haak; `ShellModel.isBoardMode` + `toggleBoard()`.
+  De `--board`-haak blijft als smoke-ingang.
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (`build-v2.sh`).
+Smoke: board opent **gefit** met alle 18 nodes in een grid (/tmp/board_p2_fit4.png);
+node-posities correct gespreid (debug-log node0=(240,263), na de stacking-fix);
+de 'Board'-toggle staat in de app-bar (/tmp/board_toggle_editor.png). De camera
+pan/zoom over de set is dezelfde (geverifieerde) E27.1-machinerie; ⌘-zoom werkt
+(eerder getoond). Interactieve klik-naar-editen + node-drag zijn gewired op
+bewezen patronen en build-geverifieerd, maar — net als 24.32 — niet
+screenshot-baar in deze omgeving (synthetische clicks op SwiftUI-controls vereisen
+input-rechten die hier ontbreken; de ⌘-toets-route via System Events werkt wél en
+bevestigt de board-camera-sneltoetsen).
+
+**Fase 2b (backlog):** inline-editen op de gefocuste node (editor-chrome over één
+board-node, binnen de board-camera) — raakt de 27.3-overlays, apart te ontwerpen.
+**Figma-TODO:** node-kaart-styling, spacing, lege-staat, de toggle-knop en het
+fit-gedrag tegen een Figma-referentie leggen (geen board-frame in Figma).
+Mogelijke verfijning: snap-to-grid bij drag; fit dat de tight bounds centreert
+i.p.v. de symmetrische board-canvas.
 
 Spike → feature: toon meerdere portretten naast elkaar op de canvas (gallery/board), pan/zoom over
 de hele set; klik een portret om het te editen. Architectuur eerst (scene-graph van portret-nodes +

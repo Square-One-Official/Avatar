@@ -14,11 +14,12 @@ import SwiftUI
 struct CanvasCamera: Equatable {
     var scale: CGFloat = 1
     var offset: CGSize = .zero
+    /// Zoomgrenzen — instance zodat de editor (0.25–4×) en de board (E27.4, mag
+    /// verder uitzoomen om de hele set te tonen) hun eigen band kunnen kiezen.
+    var minScale: CGFloat = 0.25
+    var maxScale: CGFloat = 4
 
-    static let minScale: CGFloat = 0.25
-    static let maxScale: CGFloat = 4
-
-    static func clampScale(_ s: CGFloat) -> CGFloat {
+    func clampScale(_ s: CGFloat) -> CGFloat {
         min(maxScale, max(minScale, s))
     }
 
@@ -30,12 +31,24 @@ struct CanvasCamera: Equatable {
         offset = .zero
     }
 
+    /// E27.4: fit-to-content — past de zoom zo aan dat een gecentreerde inhoud
+    /// van `contentSize` binnen `viewport` past (met marge), en centreert (offset
+    /// 0, want de board-grid is al door `.frame(maxWidth/Height:.infinity)`
+    /// gecentreerd). Geclampt aan de zoomband.
+    mutating func fitToContent(contentSize: CGSize, in viewport: CGSize, padding: CGFloat = 0.9) {
+        guard contentSize.width > 0, contentSize.height > 0,
+              viewport.width > 0, viewport.height > 0 else { reset(); return }
+        let raw = min(viewport.width / contentSize.width, viewport.height / contentSize.height) * padding
+        scale = clampScale(raw)
+        offset = .zero
+    }
+
     /// Zoom rond een vast PUNT (cursorlocatie in viewport-punten) zodat het punt
     /// onder de cursor stil blijft staan. Gebruikt door ⌘-scroll/magnify in de
     /// NSEvent-catcher. Afleiding: met scherm = midden + scale·(p−midden) + offset
     /// volgt offset₁ = v·(1−r) + r·offset₀ met v = punt − midden, r = scale₁/scale₀.
     mutating func zoom(by factor: CGFloat, around point: CGPoint, in size: CGSize) {
-        let newScale = Self.clampScale(scale * factor)
+        let newScale = clampScale(scale * factor)
         guard size.width > 0, size.height > 0, newScale != scale else {
             scale = newScale
             return
@@ -51,7 +64,7 @@ struct CanvasCamera: Equatable {
     /// Zoom rond het MIDDEN van de viewport (pinch, ⌘+/⌘−, en ⌘1 → 100%). Het
     /// middenpunt blijft vast: offset schaalt mee met de zoomverhouding.
     mutating func zoomCentered(by factor: CGFloat) {
-        let newScale = Self.clampScale(scale * factor)
+        let newScale = clampScale(scale * factor)
         guard newScale != scale else { return }
         let r = newScale / scale
         offset.width *= r

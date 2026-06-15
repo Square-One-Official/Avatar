@@ -17,6 +17,10 @@ struct ShellTopBar: View {
     /// E08.2: export/share. Verborgen tot er een portret op het canvas staat.
     var canExport: Bool = false
     var onExport: () -> Void = {}
+    /// E27.4: board-modus-toggle (alle portretten op één canvas).
+    var canToggleBoard: Bool = false
+    var isBoardActive: Bool = false
+    var onToggleBoard: () -> Void = {}
     /// E22.1: bibliotheek/sidebar-toggle, verhuisd uit de bottom-toolbar.
     var canToggleSidebar: Bool = false
     var isSidebarActive: Bool = false
@@ -57,6 +61,17 @@ struct ShellTopBar: View {
                     tooltipEdge: .bottom
                 ) {
                     onToggleSettings()
+                }
+                if canToggleBoard {
+                    // E27.4: board-modus (alle portretten op één canvas).
+                    DSToolButton(
+                        Image(systemName: "square.grid.2x2"),
+                        label: "Board",
+                        isActive: isBoardActive,
+                        tooltipEdge: .bottom
+                    ) {
+                        onToggleBoard()
+                    }
                 }
                 if canToggleSidebar {
                     // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
