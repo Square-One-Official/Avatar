@@ -21,7 +21,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
-| 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
+| 27.4 | Board-view: meerdere portretten (later) | FEAT | in_progress (spike) | `v2/E27-27.4` |
 
 ---
 
@@ -176,8 +176,9 @@ Figma-referentie leggen zodra die er is; bevestigen of de gids-extent mág mee-z
 screen-space (vast t.o.v. het frame) moet zijn.
 
 ## 27.4 — Board-view: meerdere portretten op de canvas  · FEAT (later)
-- status: backlog
-- blockedBy: 27.1
+- status: in_progress (spike — architectuur + read-only proof)
+- owner: FEAT (AI-agent)
+- blockedBy: 27.1 (done)
 
 Spike → feature: toon meerdere portretten naast elkaar op de canvas (gallery/board), pan/zoom over
 de hele set; klik een portret om het te editen. Architectuur eerst (scene-graph van portret-nodes +
