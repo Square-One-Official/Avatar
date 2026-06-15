@@ -384,7 +384,14 @@ struct EditorView: View {
     }
 
     private var editorBody: some View {
-        DSEditPanelContainer(tools: Self.toolbarItems, activeTool: toolSelection) {
+        // E28.3: de bottom-toolbar (Effects/Face/Clothing/Hair) volgt de selectie —
+        // verschijnt alléén met een geselecteerd portret. De sidebar-/Images-modus
+        // houdt de toolbar wél (de sidebar IS een tool-keuze, geen canvas-deselect).
+        DSEditPanelContainer(
+            tools: Self.toolbarItems,
+            activeTool: toolSelection,
+            showsToolbar: canvasSubjectSelected || isSidebarVisible
+        ) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
@@ -516,11 +523,31 @@ struct EditorView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            // E28.2: bij deselect een eventueel open canvas-dropdown sluiten.
+            // E28.2/28.3: bij deselect een open canvas-dropdown + bottom-paneel
+            // sluiten (de hele editen-chrome hoort bij het geselecteerde portret).
             .onChange(of: canvasSubjectSelected) { _, selected in
-                if !selected { canvasMenu = nil }
+                if !selected {
+                    canvasMenu = nil
+                    if !isSidebarVisible { activeTool = nil }
+                }
             }
             .animation(.easeOut(duration: 0.18), value: canvasSubjectSelected)
+            // E28.3: minimale affordance bij geen selectie — klik het portret om te
+            // bewerken (beide toolbars zijn dan weg).
+            .overlay(alignment: .bottom) {
+                if !canvasSubjectSelected && !isSidebarVisible {
+                    Text("Click the portrait to edit")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .padding(.horizontal, DSSpacing.gap3)
+                        .frame(height: 30)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+                        .padding(.bottom, DSSpacing.gap4)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
             // E28.1: een nieuw/ander portret is meteen geselecteerd (re-target →
             // toolbars zichtbaar voor het nieuwe portret).

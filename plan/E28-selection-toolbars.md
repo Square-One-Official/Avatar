@@ -37,12 +37,21 @@ DoD: beide targets + tests groen. Smoke: geselecteerd = toolbar bovenaan zichtba
 na ESC-deselect = toolbar weg (/tmp/s28_2_deselected.png). De bottom-toolbar volgt in 28.3.
 
 ## 28.3 — Onderste tool-buttons → toolbar-layout, targetend [DS/FEAT]
-- status: in_progress
+- status: done
 - owner: DS/FEAT (AI-agent)
 - blockedBy: 28.1
 De onderste icon-buttons (Effects/Face/Clothing/Hair) volgen óók de selectie: niks geselecteerd →
 ook deze verdwijnen (besluit Thierry: beide toolbars weg bij geen selectie). Overweeg een minimale
 "voeg portret toe/klik om te bewerken"-affordance; leg de keuze vast in Result.
+
+**Result:** `DSEditPanelContainer` kreeg `showsToolbar` (default true) — `false` verbergt de
+`DSBottomToolbar` én een eventueel open paneel (met transitie). `EditorView` geeft
+`showsToolbar: canvasSubjectSelected || isSidebarVisible` (de Images/sidebar-modus is een tool-keuze,
+geen canvas-deselect). Bij deselect sluit ook het bottom-paneel (`activeTool = nil`). Affordance-keuze:
+een **minimale "Click the portrait to edit"-pill** onderaan bij geen selectie (geen "voeg portret
+toe" — dat hoort op de board/E29). DoD: beide targets + tests groen. Smoke: na ESC-deselect zijn
+BEIDE toolbars weg + de hint-pill verschijnt (/tmp/s28_3_deselected.png). De zoom-HUD/undo-redo
+blijven (app-/canvas-chrome, geen portret-toolbar).
 
 ## 28.4 — Deselect op lege-canvas-klik werkt ALTIJD [FEAT]
 - status: ready

@@ -100,17 +100,22 @@ public struct DSEditPanel<Content: View>: View {
 public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: View {
     private let tools: [DSToolbarItem<Tool>]
     @Binding private var activeTool: Tool?
+    /// E28.3: de bottom-toolbar (+ actief paneel) volgt de selectie — `false`
+    /// (niets geselecteerd) verbergt beide. Default `true` (backward-compatible).
+    private let showsToolbar: Bool
     private let photo: Photo
     private let panel: (Tool) -> Panel
 
     public init(
         tools: [DSToolbarItem<Tool>],
         activeTool: Binding<Tool?>,
+        showsToolbar: Bool = true,
         @ViewBuilder photo: () -> Photo,
         @ViewBuilder panel: @escaping (Tool) -> Panel
     ) {
         self.tools = tools
         self._activeTool = activeTool
+        self.showsToolbar = showsToolbar
         self.photo = photo()
         self.panel = panel
     }
@@ -129,7 +134,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id("editorPhoto")
 
-                if let tool = activeTool {
+                if showsToolbar, let tool = activeTool {
                     panel(tool)
                         .padding(.bottom, DSSpacing.gap2)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -138,10 +143,16 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
             // Clip zodat het paneel netjes vanaf de onderrand in schuift.
             .clipped()
 
-            DSBottomToolbar(items: tools, selection: $activeTool)
-                .fixedSize()
+            // E28.3: de bottom-toolbar verdwijnt bij geen selectie (samen met de
+            // canvas-toolbar 28.2) — de editen-chrome hoort bij het portret.
+            if showsToolbar {
+                DSBottomToolbar(items: tools, selection: $activeTool)
+                    .fixedSize()
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
         // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
         .animation(.spring(duration: 0.35), value: activeTool)
+        .animation(.easeOut(duration: 0.18), value: showsToolbar)
     }
 }
