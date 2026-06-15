@@ -5,6 +5,32 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.31 — Cutout optioneel ("Original"-achtergrond)
+- status: done
+- owner: FEAT (AI-agent)
+
+**Result:** de cutout is nu omkeerbaar zonder opnieuw te importeren. `Portrait2` kreeg een
+`useOriginalBackground: Bool` (default false, lichtgewicht migratie). Het Background-menu heeft een
+nieuwe **"Background"-sectie bovenaan** met twee swatches: **Original** (thumbnail van de originele
+foto, alleen als `originalData` bestaat) en **Transparent** (`circle.dotted`-swatch = de vrijstaande
+cutout, default). Original toont de ORIGINELE importfoto vol (aspect-fill, geclipt tot de frame-vorm)
+i.p.v. cutout+achtergrond — bewust een aparte modus (cutout-over-origineel zou door de padded-fit
+(0.85, 24.18) subject-doubling geven). Elke andere keuze (Transparent/kleur/afbeelding/gradient/
+upload/custom) zet `useOriginalBackground` weer op false → Original ↔ Transparent ↔ kleur/afbeelding
+volledig omkeerbaar. `originalData` werd al bij import bewaard (E06.2), dus geen migratie nodig.
+WYSIWYG: canvas (`EditorView`, Color.clear-overlay-fill zoals 24.23) én export
+(`PortraitExporter.makePNG` `filledToSide` + bestaande circle-mask/watermark) volgen elkaar; dot-grid
+uit in Original-modus.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (`build-v2.sh`, 53 Avatar2-tests).
+Visuele smoke (`--bg-original --frame-square`, #if DEBUG): de canvas toont de originele foto **vol mét
+eigen achtergrond** in het vierkante frame (/tmp/c31_original.png) — geen transparante cutout. De
+Transparent-modus is de pre-existing default (cutout over dot-grid, eerder getoond in 24.29).
+Window-capture nog gedegradeerd (terminal-overlap rechts), maar de canvas is eenduidig.
+**Figma-TODO:** de "Background"-sectie + de Original/Transparent-swatch-styling (thumbnail vs.
+`circle.dotted`-icoon, labels?) tegen de Figma-referenties leggen; volgorde Original-vóór-Transparent
+bevestigen.
+
 ## 24.30 — Effects behouden de cutout (vrijstaand blijft vrijstaand)
 - status: done
 - owner: FEAT (AI-agent)

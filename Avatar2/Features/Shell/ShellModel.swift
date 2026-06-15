@@ -347,6 +347,15 @@ final class ShellModel {
         selectedPortrait?.touch()
     }
 
+    /// E24.31 smoke-haak: zet de Original-achtergrondmodus (toont de originele
+    /// foto vol) of terug naar transparant (vrijstaande cutout).
+    func debugSetOriginalBackground(_ on: Bool) {
+        guard let p = selectedPortrait else { return }
+        p.useOriginalBackground = on
+        if on { p.backgroundColorHex = nil; p.backgroundImageData = nil }
+        p.touch()
+    }
+
     /// E24.18 smoke-haak: reset de canvas-transform naar "geen transform"
     /// (scale 0) zodat de padded fit-fallback (frame-ademruimte) zichtbaar is —
     /// de staat van een vers geïmporteerd portret.

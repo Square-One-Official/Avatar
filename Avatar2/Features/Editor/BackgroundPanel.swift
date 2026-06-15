@@ -25,10 +25,70 @@ struct BackgroundPanel: View {
         // (zoals de Adjust-popover), niet in een tweede DSEditPanel-kaart —
         // de popover ís de kaart. Rijen scrollen met rand-inset + fade.
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+            section("Background") { backgroundModeRow }
             section("Image") { imageRow }
             section("Color") { colorRow }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Background-modus — Original (bovenaan) + Transparent (E24.31)
+
+    private var originalImage: NSImage? {
+        guard let data = portrait?.originalData else { return nil }
+        return NSImage(data: data)
+    }
+
+    /// Transparant geselecteerd = cutout zonder achtergrond (geen Original,
+    /// geen kleur/afbeelding).
+    private var isTransparentSelected: Bool {
+        guard let portrait else { return false }
+        return !portrait.useOriginalBackground
+            && portrait.backgroundColorHex == nil
+            && portrait.backgroundImageData == nil
+    }
+
+    private var backgroundModeRow: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            // "Original" — alleen als de originele foto bewaard is.
+            if let original = originalImage {
+                modeSwatch(isSelected: portrait?.useOriginalBackground == true,
+                           help: "Original background") {
+                    Image(nsImage: original).resizable().scaledToFill()
+                } action: { selectOriginal() }
+            }
+            // "Transparent" — de vrijstaande cutout (default).
+            modeSwatch(isSelected: isTransparentSelected, help: "Transparent (cut-out)") {
+                ZStack {
+                    DSColor.Background.neutral
+                    Image(systemName: "circle.dotted")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                }
+            } action: { selectTransparent() }
+        }
+        .padding(.vertical, DSSpacing.gap2)
+        .padding(.leading, DSSpacing.gap1)
+    }
+
+    private func modeSwatch(
+        isSelected: Bool, help: String,
+        @ViewBuilder content: () -> some View, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            RoundedRectangle(cornerRadius: DSRadius.lg)
+                .fill(DSColor.Background.neutral)
+                .frame(width: swatch, height: swatch)
+                .overlay { content() }
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                .overlay {
+                    RoundedRectangle(cornerRadius: DSRadius.lg)
+                        .strokeBorder(DSColor.Foreground.primary, lineWidth: isSelected ? 2 : 0)
+                }
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
+        .help(help)
     }
 
     /// E24-fix: rechter-rand-fade als scroll-affordance + trailing-inset zodat
@@ -175,8 +235,27 @@ struct BackgroundPanel: View {
 
     // MARK: Acties
 
+    /// E24.31: toon de originele foto vol (omkeerbaar).
+    private func selectOriginal() {
+        guard let portrait, portrait.originalData != nil else { return }
+        portrait.useOriginalBackground = true
+        portrait.backgroundColorHex = nil
+        portrait.backgroundImageData = nil
+        portrait.touch()
+    }
+
+    /// E24.31: terug naar de vrijstaande cutout zonder achtergrond.
+    private func selectTransparent() {
+        guard let portrait else { return }
+        portrait.useOriginalBackground = false
+        portrait.backgroundColorHex = nil
+        portrait.backgroundImageData = nil
+        portrait.touch()
+    }
+
     private func selectColor(_ hex: String) {
         guard let portrait else { return }
+        portrait.useOriginalBackground = false
         portrait.backgroundColorHex = hex
         portrait.backgroundImageData = nil
         portrait.touch()
@@ -184,6 +263,7 @@ struct BackgroundPanel: View {
 
     private func selectGradient(_ colors: [Color]) {
         guard let portrait, let png = BackgroundKit.renderGradientPNG(colors) else { return }
+        portrait.useOriginalBackground = false
         portrait.backgroundImageData = png
         portrait.backgroundColorHex = nil
         portrait.touch()
@@ -199,6 +279,7 @@ struct BackgroundPanel: View {
         // E24.24: persistent opslaan als herbruikbare swatch (+ downscale, 24.23);
         // de teruggegeven PNG wordt meteen de achtergrond.
         let stored = customImages.add(data) ?? data
+        portrait.useOriginalBackground = false
         portrait.backgroundImageData = stored
         portrait.backgroundColorHex = nil
         portrait.touch()
@@ -207,6 +288,7 @@ struct BackgroundPanel: View {
     /// E24.24: kies een eerder geüploade (persistente) achtergrond-swatch.
     private func selectCustomImage(_ id: String) {
         guard let portrait, let data = customImages.data(for: id) else { return }
+        portrait.useOriginalBackground = false
         portrait.backgroundImageData = data
         portrait.backgroundColorHex = nil
         portrait.touch()

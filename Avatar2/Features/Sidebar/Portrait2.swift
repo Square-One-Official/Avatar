@@ -56,6 +56,14 @@ final class Portrait2 {
     /// Bestaande rijen (default "circle") krijgen dus de cirkel — bedoeld.
     var frameShapeRaw: String = ExportShape.circle.rawValue
 
+    /// E24.31: "Original"-achtergrond — toon de ORIGINELE importfoto (mét eigen
+    /// achtergrond) i.p.v. de cutout + gekozen achtergrond. Cutout blijft de
+    /// default (false); de Background-menu-keuze is omkeerbaar (Original ↔
+    /// Transparent ↔ kleur/afbeelding) zonder opnieuw te importeren. Vereist
+    /// `originalData`. Lichtgewicht migratie via de default. Een kleur/-
+    /// afbeeldingskeuze of "Transparent" zet dit weer op false.
+    var useOriginalBackground: Bool = false
+
     init(
         name: String = "",
         role: String = "",
