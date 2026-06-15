@@ -58,7 +58,8 @@ adjust is daar niet zichtbaar — code-geverifieerd. **Figma-TODO:** batch-bar-s
 de Adjust-dropdown tegen Figma leggen.
 
 ## 29.3 — "Match lighting" over de selectie [AI/FEAT]
-- status: backlog
+- status: in_progress
+- owner: AI/FEAT (AI-agent)
 - blockedBy: 29.1
 Met meerdere geselecteerd → "zorg dat ze dezelfde belichting hebben alsof in dezelfde studio
 gefotografeerd". Normaliseer licht/kleur over de selectie naar een consistente look. Bouwt voort op
