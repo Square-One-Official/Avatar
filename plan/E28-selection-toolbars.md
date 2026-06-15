@@ -54,7 +54,8 @@ BEIDE toolbars weg + de hint-pill verschijnt (/tmp/s28_3_deselected.png). De zoo
 blijven (app-/canvas-chrome, geen portret-toolbar).
 
 ## 28.4 — Deselect op lege-canvas-klik werkt ALTIJD [FEAT]
-- status: ready
+- status: in_progress
+- owner: FEAT (AI-agent)
 - blockedBy: —
 Aanhoudende bug: ESC deselecteert wel, maar BUITEN het portret op de canvas klikken laat de transform
 staan. Klikken op lege canvas moet altijd deselecteren (transform + toolbars weg). Supersedes 24.32
