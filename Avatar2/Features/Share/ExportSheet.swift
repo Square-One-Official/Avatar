@@ -15,6 +15,11 @@ struct ExportSheet: View {
 
     @State private var shape: ExportShape
     @State private var size: Int = PortraitExporter.exportSide
+    /// Audit-cleanup: de 256px-preview wordt nu één keer per vorm-wissel
+    /// gerenderd (`.task(id: shape)`) i.p.v. bij ELKE body-evaluatie (de oude
+    /// computed `preview` draaide `makePNG` ook bij een maat-wissel of een
+    /// willekeurige re-render).
+    @State private var previewImage: NSImage?
 
     init(portrait: Portrait2, isPro: Bool = false) {
         self.portrait = portrait
@@ -67,19 +72,26 @@ struct ExportSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
+        // Render de preview alléén (her)bij een vorm-wissel, niet elke body-pass.
+        .task(id: shape) {
+            let data = PortraitExporter.makePNG(for: portrait, watermark: watermark, side: 256, shape: shape)
+            previewImage = data.flatMap { NSImage(data: $0) }
+        }
     }
 
     @ViewBuilder
     private var preview: some View {
-        if let data = PortraitExporter.makePNG(for: portrait, watermark: watermark, side: 256, shape: shape),
-           let image = NSImage(data: data) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .frame(height: 220)
-                .background(DSColor.Background.inset, in: RoundedRectangle(cornerRadius: DSRadius.xl))
-        }
+        RoundedRectangle(cornerRadius: DSRadius.xl)
+            .fill(DSColor.Background.inset)
+            .frame(height: 220)
+            .overlay {
+                if let previewImage {
+                    Image(nsImage: previewImage)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(DSSpacing.gap2)
+                }
+            }
     }
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
