@@ -5,6 +5,43 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.30 — Effects behouden de cutout (vrijstaand blijft vrijstaand)
+- status: done
+- owner: FEAT (AI-agent)
+
+**Result:** `ShellModel.applyEffectResult` her-isoleert nu het onderwerp wanneer een generatieve
+stylize een vrijstaand portret een dichte achtergrond zou geven. Gating via de nieuwe pure functie
+`hasTransparentCorners` (4-hoeken-alpha-scan): is de **bron** vrijstaand (transparante hoeken) én
+heeft het **resultaat** een achtergrond (opake hoeken) → `reIsolateSubject` draait de lokale
+`router.cutout` (Vision/ORMBG, zelfde voorkeur als import, géén cloud-credits) en zet de transparante
+cutout terug als `cutoutData`. Niet-genererende ops (flip/enhance/boost) houden hun alpha → resultaat
+al transparant → geen her-isolatie (skip, geen onnodige her-cut). Async her-isolatie loopt in een
+`Task { @MainActor }` zodat de canvas pas de transparante versie toont (geen flits van de
+achtergrond-versie). De gekozen Background/transparant blijft los eronder gelden (compositing staat
+buiten `cutoutData`). Centraal punt → geldt meteen voor Hair/Clothes zodra die de achtergrond raken.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (`build-v2.sh`), incl. 3 nieuwe
+`EffectCutoutTests` op de gating-heuristiek (transparant→vrijstaand, opaak→niet, nil→false).
+**Smoke-beperking (eerlijk):** de end-to-end visuele smoke (echt portret → echte Effect → transparant
+resultaat) vergt een **cloud-stylize** (auth + credits) en er is geen test-portret in de repo, dus
+niet headless reproduceerbaar — net als eerdere cloud-stories in dit epic (bv. 24.15). De
+beslislogica (de bug-oorzaak) is via unit-tests gedekt; de her-isolatie zelf gebruikt de al in
+AvatarKit geteste `router.cutout`.
+**Figma-TODO:** n.v.t. (gedrag/bugfix, geen visuele afwijking).
+
+**Bug:** een vrijstaand portret krijgt ná een Effect (nano-banana-stylize) een AI-gegenereerde
+achtergrond mee; de alpha gaat verloren. Oorzaak: `/v1/stylize` (E09.2) levert een VOL beeld met
+achtergrond, en `ShellModel.applyEffectResult` zet dat direct als `cutoutData`.
+
+**Plan (gekozen aanpak):** centraal in `ShellModel.applyEffectResult` — dat is het ene punt waar
+álle generatieve stylize-routes doorheen gaan (Effects nu; Hair/Clothes later). Detecteer of de
+**bron** vrijstaand was (transparante hoeken op de huidige `cutoutData`) én of het **resultaat** een
+dichte achtergrond heeft (opake hoeken). Alleen dan: isoleer het onderwerp opnieuw met de lokale
+`router` (Vision/ORMBG, zelfde voorkeur als import — geen cloud-credits) zodat de transparantie
+terugkomt. Niet-genererende ops (flip/enhance/boost) behouden hun alpha → resultaat al transparant →
+geen her-isolatie (skip). nano-banana bewaart pose/identity (E09.1), dus opnieuw cutten is veilig.
+De gekozen Background/transparant blijft eronder gelden (compositing los van `cutoutData`).
+
 ## 24.29 — Uitlijn-gids + handles opschonen (gids-laag was te druk)
 - status: done
 - owner: FEAT (AI-agent, marathon 2)

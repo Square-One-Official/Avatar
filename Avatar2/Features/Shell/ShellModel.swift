@@ -189,13 +189,71 @@ final class ShellModel {
     /// E24.14: destructieve ops bewerken de RAUWE cutout; de Adjust-laag blijft
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
     func applyEffectResult(_ image: NSImage) {
-        if let png = pngData(from: image), let portrait = selectedPortrait {
+        guard let portrait = selectedPortrait else {
+            canvas = .result(image)
+            return
+        }
+        // E24.30: een generatieve stylize (nano-banana) levert een VOL beeld
+        // mét achtergrond → de alpha is weg. Was de bron vrijstaand (transparante
+        // hoeken op de huidige cutout) én heeft het resultaat een dichte
+        // achtergrond (opake hoeken) → isoleer het onderwerp opnieuw zodat de
+        // transparantie terugkomt. Niet-genererende ops (flip/enhance/boost)
+        // behouden hun alpha → resultaat al transparant → geen her-isolatie.
+        let sourceFreestanding = Self.hasTransparentCorners(NSImage(data: portrait.cutoutData))
+        let resultHasBackground = !Self.hasTransparentCorners(image)
+        if sourceFreestanding && resultHasBackground {
+            Task { @MainActor in
+                let restored = (try? await self.reIsolateSubject(image)) ?? image
+                self.storeEffectResult(restored, on: portrait)
+            }
+        } else {
+            storeEffectResult(image, on: portrait)
+        }
+    }
+
+    /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
+    /// her-render het canvas met de niet-destructieve Adjust-laag erbovenop.
+    private func storeEffectResult(_ image: NSImage, on portrait: Portrait2) {
+        if let png = pngData(from: image) {
             portrait.cutoutData = png
             portrait.touch()
-            canvas = .result(adjustedImage(image, portrait.adjust))
-        } else {
-            canvas = .result(image)
         }
+        canvas = .result(adjustedImage(image, portrait.adjust))
+    }
+
+    /// E24.30: her-isoleer het onderwerp uit een styled (vol) beeld met de
+    /// lokale router (zelfde engine-voorkeur als import) → transparantie terug.
+    private func reIsolateSubject(_ image: NSImage) async throws -> NSImage {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return image
+        }
+        let preferred: CutoutEngineKind =
+            PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
+        let cut = try await router.cutout(cg, preferring: preferred)
+        return nsImage(from: cut)
+    }
+
+    /// E24.30: heuristiek "is dit beeld vrijstaand?" — sample de 4 hoeken; een
+    /// cutout heeft (vrijwel) transparante hoeken, een vol beeld opake.
+    nonisolated static func hasTransparentCorners(_ image: NSImage?) -> Bool {
+        guard let image,
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return false
+        }
+        let w = cg.width, h = cg.height
+        guard w > 0, h > 0 else { return false }
+        let bytesPerRow = w * 4
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * h)
+        guard let ctx = CGContext(
+            data: &buffer, width: w, height: h, bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        func alpha(_ x: Int, _ y: Int) -> UInt8 { buffer[y * bytesPerRow + x * 4 + 3] }
+        let corners = [alpha(0, 0), alpha(w - 1, 0), alpha(0, h - 1), alpha(w - 1, h - 1)]
+        // vrijstaand als minstens 3 van de 4 hoeken (bijna) transparant zijn
+        return corners.filter { $0 < 16 }.count >= 3
     }
 
     /// E22.3: goedkope live-preview voor de color-sliders — alléén het canvas,
