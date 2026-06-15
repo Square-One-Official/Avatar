@@ -25,7 +25,8 @@ enum TransformUndo {
     }
 
     /// Registreert een undo die naar `before` terugzet en een redo naar
-    /// `after`. Niets te doen als er niets veranderde.
+    /// `after`. Niets te doen als er niets veranderde. Recursieve undo/redo-
+    /// motor: de gedeelde `ReversibleChange`.
     @MainActor
     static func register(
         _ undoManager: UndoManager?,
@@ -34,14 +35,11 @@ enum TransformUndo {
         redoTo after: Snapshot,
         actionName: String
     ) {
-        guard let undoManager, before != after else { return }
-        undoManager.registerUndo(withTarget: portrait) { target in
-            apply(before, to: target)
-            // We zitten nu in een undo → deze registratie belandt op de
-            // redo-stack en zet straks `after` terug (met before/after
-            // omgewisseld zodat de keten heen-en-weer blijft werken).
-            register(undoManager, portrait: target, undoTo: after, redoTo: before, actionName: actionName)
+        guard before != after else { return }
+        ReversibleChange.register(
+            undoManager, target: portrait, from: before, to: after, actionName: actionName
+        ) { target, snapshot in
+            apply(snapshot, to: target)
         }
-        undoManager.setActionName(actionName)
     }
 }
