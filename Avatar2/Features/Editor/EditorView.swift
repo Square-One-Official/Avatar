@@ -252,6 +252,8 @@ struct EditorView: View {
             // Tot die landt staan ze als glass-cirkels rechtsonder, op één
             // lijn met de toolbar — gedocumenteerde tijdelijke plaatsing.
             .overlay(alignment: .bottomTrailing) { editorControls }
+            // E27.2: de zoom-HUD zweeft linksonder (tegenover undo/redo rechts).
+            .overlay(alignment: .bottomLeading) { zoomHUD }
             // UndoManager publiceert geen state → luister op de
             // change-notificaties en bump de tick zodat de knoppen
             // enable/disablen.
@@ -351,6 +353,28 @@ struct EditorView: View {
 
     private func zoomCamera(by factor: CGFloat) {
         withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
+    }
+
+    /// E27.2: zet de camera op een absolute zoom-schaal (om het midden) — de
+    /// HUD-slider gebruikt dit. Direct (geen spring) zodat het slepen op de
+    /// vinger blijft.
+    private func setCameraScale(_ target: CGFloat) {
+        camera.zoomCentered(by: target / max(0.0001, camera.scale))
+    }
+
+    // E27.2: de zwevende zoom-HUD (− / slider / + / fit-met-%) op de camera.
+    private var zoomHUD: some View {
+        DSZoomHUD(
+            scale: camera.scale,
+            minScale: CanvasCamera.minScale,
+            maxScale: CanvasCamera.maxScale,
+            onSetScale: { setCameraScale($0) },
+            onZoomIn: { zoomCamera(by: 1.25) },
+            onZoomOut: { zoomCamera(by: 0.8) },
+            onFit: { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
+        )
+        .padding(.leading, DSSpacing.gap3)
+        .padding(.bottom, DSSpacing.gap4)
     }
 
     private var editorBody: some View {
