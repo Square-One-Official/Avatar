@@ -21,7 +21,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
-| 27.4 | Board-view: meerdere portretten (later) | FEAT | in_progress (spike) | `v2/E27-27.4` |
+| 27.4 | Board-view: meerdere portretten (later) | FEAT | spike done (fase 2 gated) | `v2/E27-27.4` |
 
 ---
 
@@ -176,10 +176,61 @@ Figma-referentie leggen zodra die er is; bevestigen of de gids-extent mág mee-z
 screen-space (vast t.o.v. het frame) moet zijn.
 
 ## 27.4 — Board-view: meerdere portretten op de canvas  · FEAT (later)
-- status: in_progress (spike — architectuur + read-only proof)
+- status: spike done (architectuur vastgelegd + read-only proof) — volledige bouw (fase 2) GATED op Thierry-review
 - owner: FEAT (AI-agent)
 - blockedBy: 27.1 (done)
 
 Spike → feature: toon meerdere portretten naast elkaar op de canvas (gallery/board), pan/zoom over
 de hele set; klik een portret om het te editen. Architectuur eerst (scene-graph van portret-nodes +
 de camera uit 27.1); leg de aanpak vast in de Result vóór de volledige bouw.
+
+**Spike-result (geverifieerd):** `BoardView` (`Avatar2/Features/Board/`) toont de hele portret-set —
+dezelfde `@Query(sort:\Portrait2.updatedAt)` als de sidebar — als een scene-graph van kaart-nodes
+(cutout geclipt tot `frameShape` + naam/rol) op één board, met de camera uit E27.1 (`scale`+`offset`,
+`CanvasInteractionCatcher` + pinch + ⌘±/⌘0) eroverheen. Pan/zoom over de héle set werkt; klik een
+node → `model.select` + terug naar de editor. Geïsoleerd achter de DEBUG-haak `--board`
+(`ShellModel.showBoardSpike`), productie-editor-flow ongemoeid. Smoke: board op 1× (/tmp/board_fit.png)
+en volledig in beeld na ⌘− (/tmp/board_zoomout.png — 18 nodes, mix circle/square). Beide targets +
+tests groen. **Conclusie: de "nodes + camera"-aanpak klopt en is bouwrijp.**
+
+### Vastgelegde architectuur (fase 2)
+
+**Model — scene-graph van nodes.** Eén `Portrait2` = één node. Board-positie + z-volgorde als
+nieuwe lichtgewicht velden op `Portrait2` (defaults → migratie-vrij, net als 24.16/24.31):
+`boardX: Double = .nan`, `boardY: Double = .nan` (`.nan` = "nog niet geplaatst" → auto-layout vult
+bij eerste board-open), `boardOrder: Int = 0`. Géén aparte board-entiteit: de set ís de scene-graph,
+de sidebar-`@Query` is de single source of truth. (Alternatief — een `Board`-entiteit met node-refs —
+afgewogen en verworpen: overkill voor één impliciete board; voegt join + migratie toe zonder
+meerdere-boards-eis.)
+
+**Camera = E27.1, ongewijzigd hergebruikt.** Dezelfde `CanvasCamera` + `CanvasInteractionCatcher`
++ pinch + ⌘-sneltoetsen + (27.2) `DSZoomHUD`. Eén verschil met de editor: de board moet kunnen
+**uitzoomen tot < min** of een echte **fit-to-content** doen → camera-`minScale` voor de board lager
+of een `fitToContent(bounds:)`-helper op `CanvasCamera` (rekent scale+offset zodat alle nodes passen;
+gebruikt door ⌘0/"Fit" op de board i.p.v. `reset()` naar 1×).
+
+**Interactie.** Pan/zoom = camera (klaar). Node-drag = een `DragGesture` per node die `boardX/Y`
+schrijft (delta ÷ `camera.scale` → board-space), met snap-to-grid + `TransformUndo`-achtige undo
+(nieuw `BoardMoveUndo`). Klik (zonder drag) = focus: anim de camera naar de node (`fitToContent` op
+diens rect) en open de editor-overlay, of — fase 2b — **inline editen** zonder de board te verlaten
+(de editor-chrome zweeft over de gefocuste node). Selectie/multi-select kan de sidebar-`selectedForBulk`
+hergebruiken.
+
+**Compositie in de Shell.** `ShellView.canvas` schakelt tussen `editorCanvas` (huidig) en `BoardView`
+op een echte modus-toggle (app-bar-knop, niet de DEBUG-haak) — bv. `ShellModel.canvasMode: .editor |
+.board`. De board is een aparte top-level view → geen regressie-druk op de editor. De zoom-HUD +
+sneltoetsen zijn al modus-agnostisch (camera-gebaseerd).
+
+**Fasering (fase 2).**
+1. Model-velden + `fitToContent` op `CanvasCamera` + board-open op echte fit. (laag risico)
+2. Node-drag + snap + undo + persistente posities. (kern)
+3. Echte modus-toggle in de app-bar (board ⇆ editor) + DS-styling van de node-kaart (Figma).
+4. Klik-naar-focus/inline-edit (de editor-chrome op de gefocuste node) — de zwaarste; apart te scopen.
+
+**Risico's / open.** (a) Veel nodes × grote cutouts = geheugen → thumbnails cachen (gedeelde
+thumbnail-renderer met de sidebar). (b) Node-drag mag de camera-pan (spatie-drag/scroll, screen-space
+in `CanvasInteractionCatcher`) niet stelen — node-`DragGesture` op de kaart, camera-pan op lege
+board-ruimte (zelfde arbitrage als 24.32 subject vs. canvas). (c) Inline-edit-architectuur (de editor
+op één node binnen de board-camera) raakt 27.3-overlays → apart ontwerp. **Figma-TODO:** er is geen
+board-frame in Figma — node-kaart, spacing, lege-staat, modus-toggle en fit-gedrag tegen een
+Figma-referentie leggen vóór fase 3.
