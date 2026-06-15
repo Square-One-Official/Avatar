@@ -557,8 +557,9 @@ struct EditorView: View {
                 // /v1/stylize (nano-banana instruction-edit).
                 ClothesPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change clothes"))
             } else if tool == .effects, let entitlement {
-                // E09.2: stijl-kaarten op het productie-/v1/stylize.
-                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Apply effect"))
+                // E09.2: stijl-kaarten op het productie-/v1/stylize. E24.33: het
+                // portret levert de effect-cache (instant schakelen, geen regen).
+                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, portrait: portraitModel, onApply: undoableApply("Apply effect"))
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
                 // /v1/stylize (nano-banana instruction-edit, E11.1-route).

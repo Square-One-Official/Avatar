@@ -1,10 +1,11 @@
-// Effects-paneel (E09.2, Figma App / Effects): vier stijl-kaarten (clay,
-// wood, 3d, scribble). Géén Original-kaart — de gekozen stijl is de active
-// state, nogmaals tikken deselecteert (terug naar het basisbeeld). De
-// previews zijn placeholders (echte stijl-previews volgen later, zie
-// ASSETS.md); de generatie loopt via het productie-`/v1/stylize` (E09.2,
-// nano-banana default), credit-gegated (generatief standaard = 4 credits),
-// 402 → paywall-toast.
+// Effects-paneel (E09.2, Figma App / Effects): een "None"-kaart (terug naar
+// origineel) + vier stijl-kaarten (clay, wood, 3d, scribble). E24.33: de gekozen
+// stijl is de active state; nogmaals tikken = None. Resultaten worden per effect
+// op het portret GECACHET → None ↔ effect ↔ ander effect is INSTANT en kost geen
+// nieuwe credits; alleen het refresh-icoon in de actieve thumbnail hergenereert
+// bewust (kost dan wel credits). De previews zijn placeholders (echte
+// stijl-previews volgen later, zie ASSETS.md); generatie via productie-
+// `/v1/stylize` (nano-banana default), credit-gegated, 402 → paywall-toast.
 
 import AppKit
 import AvatarKit
@@ -12,9 +13,9 @@ import AvatarUI
 import SwiftUI
 
 /// Stuurt de stijl-generatie aan en reikt het resultaat omhoog naar de
-/// ShellModel (die canvas + opgeslagen cutout vervangt). Het basisbeeld is
-/// het portret zoals het bij het openen van het paneel op de kaart staat;
-/// deselecteren herstelt dat lokaal (geen extra call/credits).
+/// ShellModel (die canvas + opgeslagen cutout vervangt). De Effects-staat
+/// (basisbeeld, actief effect, cache) persisteert op het portret (E24.33) zodat
+/// schakelen instant + gratis is en het paneel heropenen de cache behoudt.
 @MainActor
 @Observable
 final class EffectsModel {
@@ -25,40 +26,93 @@ final class EffectsModel {
     }
 
     private(set) var phase: Phase = .idle
-    /// De toegepaste stijl (active state), nil = basisbeeld.
+    /// Het toegepaste effect (active state), nil = None (basisbeeld).
     private(set) var selected: StylizeStyle?
 
     private let entitlement: EntitlementModel
-    private let baseImage: NSImage
     private let onApply: (NSImage) -> Void
+    private let portrait: Portrait2?
+    /// Het "None"/origineel-beeld waarop effecten worden gegenereerd.
+    private(set) var base: NSImage
+    /// Sessie-cache (gehydrateerd uit het portret) — rawValue → beeld.
+    private var cache: [String: NSImage]
 
-    init(entitlement: EntitlementModel, baseImage: NSImage, onApply: @escaping (NSImage) -> Void) {
+    init(
+        entitlement: EntitlementModel,
+        baseImage: NSImage,
+        portrait: Portrait2?,
+        onApply: @escaping (NSImage) -> Void
+    ) {
         self.entitlement = entitlement
-        self.baseImage = baseImage
         self.onApply = onApply
+        self.portrait = portrait
+
+        // Hydrateer uit het portret (E24.33). Met een actief effect is `baseImage`
+        // (de huidige cutout) het effect-beeld; de echte basis staat dan in
+        // `effectBaseData`. Zonder actief effect ÍS de huidige cutout de basis.
+        let active = portrait?.effectActiveRaw.flatMap { StylizeStyle(rawValue: $0) }
+        self.selected = active
+        if active != nil, let data = portrait?.effectBaseData, let img = NSImage(data: data) {
+            self.base = img
+        } else {
+            self.base = baseImage
+        }
+        var hydrated: [String: NSImage] = [:]
+        for (raw, data) in portrait?.effectCache ?? [:] {
+            if let img = NSImage(data: data) { hydrated[raw] = img }
+        }
+        // Het actieve effect-beeld is de huidige cutout, ook als de cache nog leeg
+        // is (bv. gegenereerd vóór deze cache bestond).
+        if let active, hydrated[active.rawValue] == nil {
+            hydrated[active.rawValue] = baseImage
+        }
+        self.cache = hydrated
     }
 
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
 
     var isBusy: Bool { if case .working = phase { return true } else { return false } }
 
-    /// Tik op een kaart: actieve stijl → deselecteer (herstel basis); andere
-    /// stijl → genereer. Tijdens een lopende generatie negeren we tikken.
+    func isCached(_ style: StylizeStyle) -> Bool { cache[style.rawValue] != nil }
+
+    /// None-kaart: terug naar het basisbeeld (instant, geen credits).
+    func selectNone() {
+        guard !isBusy, selected != nil else { return }
+        selected = nil
+        phase = .idle
+        onApply(base)
+        persist()
+    }
+
+    /// Tik op een effect-kaart: actief → None; gecachet → instant uit cache;
+    /// anders → genereren. Tijdens een lopende generatie negeren we tikken.
     func toggle(_ style: StylizeStyle) {
         guard !isBusy else { return }
         if selected == style {
-            selected = nil
-            phase = .idle
-            onApply(baseImage)
+            selectNone()
             return
         }
-        Task { await apply(style) }
+        if let cached = cache[style.rawValue] {
+            // Cache-hit: INSTANT, geen backend-call, geen credits (E24.33).
+            selected = style
+            phase = .idle
+            onApply(cached)
+            persist()
+            return
+        }
+        Task { await generate(style) }
     }
 
-    private func apply(_ style: StylizeStyle) async {
+    /// Refresh-icoon op de actieve kaart: bewust opnieuw genereren (kost credits).
+    func regenerate(_ style: StylizeStyle) {
+        guard !isBusy else { return }
+        Task { await generate(style) }
+    }
+
+    private func generate(_ style: StylizeStyle) async {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        guard let png = Self.pngData(from: baseImage) else {
+        guard let png = Self.pngData(from: base) else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
@@ -70,9 +124,11 @@ final class EffectsModel {
                 entitlement.presentError("The styled image came back unreadable.")
                 return
             }
+            cache[style.rawValue] = image
             selected = style
             phase = .idle
             onApply(image)
+            persist()
             // Saldo bijwerken zodat de topbar-quota klopt na de aftrek.
             await entitlement.refresh()
         } catch BackendError.noCredits {
@@ -85,6 +141,16 @@ final class EffectsModel {
         }
     }
 
+    /// Persisteer de Effects-staat op het portret (E24.33).
+    private func persist() {
+        guard let portrait else { return }
+        if portrait.effectBaseData == nil {
+            portrait.effectBaseData = Self.pngData(from: base)
+        }
+        portrait.effectActiveRaw = selected?.rawValue
+        portrait.effectCache = cache.compactMapValues { Self.pngData(from: $0) }
+    }
+
     private static func pngData(from image: NSImage) -> Data? {
         guard let tiff = image.tiffRepresentation,
               let rep = NSBitmapImageRep(data: tiff) else { return nil }
@@ -95,15 +161,24 @@ final class EffectsModel {
 struct EffectsPanel: View {
     let baseImage: NSImage
     let entitlement: EntitlementModel
+    var portrait: Portrait2?
     var onApply: (NSImage) -> Void = { _ in }
 
     @State private var model: EffectsModel
 
-    init(baseImage: NSImage, entitlement: EntitlementModel, onApply: @escaping (NSImage) -> Void = { _ in }) {
+    init(
+        baseImage: NSImage,
+        entitlement: EntitlementModel,
+        portrait: Portrait2? = nil,
+        onApply: @escaping (NSImage) -> Void = { _ in }
+    ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
+        self.portrait = portrait
         self.onApply = onApply
-        _model = State(initialValue: EffectsModel(entitlement: entitlement, baseImage: baseImage, onApply: onApply))
+        _model = State(initialValue: EffectsModel(
+            entitlement: entitlement, baseImage: baseImage, portrait: portrait, onApply: onApply
+        ))
     }
 
     var body: some View {
@@ -128,6 +203,7 @@ struct EffectsPanel: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap3) {
+                        noneCard
                         ForEach(StylizeStyle.allCases) { style in
                             styleCard(style)
                         }
@@ -142,16 +218,41 @@ struct EffectsPanel: View {
         }
     }
 
+    /// E24.33: "None"-kaart helemaal links — terug naar het origineel (basis).
+    private var noneCard: some View {
+        Button {
+            model.selectNone()
+        } label: {
+            DSThumbnailCard(label: "None", isSelected: model.selected == nil, tileSize: 84) {
+                Image(nsImage: model.base)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: 84, height: 84)
+                    .clipped()
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isBusy)
+        .opacity(model.isBusy ? 0.5 : 1)
+    }
+
     private func styleCard(_ style: StylizeStyle) -> some View {
         let isSelected = model.selected == style
         let isWorking = model.phase == .working(style)
         // E24.15: gedeelde DSThumbnailCard (placeholder-icoon tot echte
-        // stijl-thumbnails landen — ASSETS.md). Geen per-kaart credits: de
-        // kost staat al in de panel-header.
+        // stijl-thumbnails landen — ASSETS.md). E24.33: het refresh-icoon
+        // verschijnt alleen op de actieve kaart (bewuste her-generatie).
         return Button {
             model.toggle(style)
         } label: {
-            DSThumbnailCard(label: style.label, isSelected: isSelected, isWorking: isWorking, tileSize: 84) {
+            DSThumbnailCard(
+                label: style.label,
+                isSelected: isSelected,
+                isWorking: isWorking,
+                tileSize: 84,
+                onRefresh: isSelected ? { model.regenerate(style) } : nil
+            ) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 22, weight: .regular))
             }
