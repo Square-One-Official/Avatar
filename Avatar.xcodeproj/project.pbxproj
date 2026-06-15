@@ -46,6 +46,7 @@
 		2BF00FB85FDB9DB07C4F8B93 /* AnnouncementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */; };
 		2CC00BB877BB10A664982FB7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
+		3197AE4B5A4D58A48431FC55 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957551E62840A0AAD27DF491 /* BoardView.swift */; };
 		31DAF9F07220B9D4B393328C /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
 		31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BF6F54BCF4084CCFDFFFBC /* TransformUndo.swift */; };
 		32028D20901C7C13C4B668E4 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9319A21481EA22D57BC2DA /* EditorView.swift */; };
@@ -302,6 +303,7 @@
 		8DF6691A4EAE77341E894EDB /* Avatar2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Avatar2App.swift; sourceTree = "<group>"; };
 		9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellTopBar.swift; sourceTree = "<group>"; };
 		947924202C732493D553BD14 /* Mesh 03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 03.png"; sourceTree = "<group>"; };
+		957551E62840A0AAD27DF491 /* BoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
 		9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectCutoutTests.swift; sourceTree = "<group>"; };
@@ -395,6 +397,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		002C0FE5C86856423AC62497 /* Board */ = {
+			isa = PBXGroup;
+			children = (
+				957551E62840A0AAD27DF491 /* BoardView.swift */,
+			);
+			path = Board;
+			sourceTree = "<group>";
+		};
 		10AB5FACCD9A81D2DBFDCB68 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
@@ -455,6 +465,7 @@
 		4C7A26FDF118B7356C525C3D /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				002C0FE5C86856423AC62497 /* Board */,
 				321B2081449B5D7591ADF91C /* Editor */,
 				F40AC840E6BA00CF7D839DF1 /* Onboarding */,
 				58511F81207E7EAACF6AF911 /* Paywall */,
@@ -955,6 +966,7 @@
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
 				C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */,
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
+				3197AE4B5A4D58A48431FC55 /* BoardView.swift in Sources */,
 				EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */,
 				104F1209A40B98F024BE93C0 /* CanvasCamera.swift in Sources */,
 				9E422036F5B5DDF8C2134D5B /* CanvasInteractionCatcher.swift in Sources */,

@@ -42,6 +42,11 @@ final class ShellModel {
     /// Name/Role-knop op het canvas (sidebar gebruikt z'n eigen renameTarget).
     var isShowingRename = false
 
+    /// E27.4 (spike): toont de board-view (alle portretten op één canvas) i.p.v.
+    /// de enkel-portret-editor. Default uit; alléén via de DEBUG-haak `--board`
+    /// aangezet — de volledige board-feature is fase 2 (zie plan E27.4).
+    var showBoardSpike = false
+
     /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
     private(set) var selectedPortrait: Portrait2?
     /// ModelContext komt uit de environment (ShellView .task) — SwiftData
