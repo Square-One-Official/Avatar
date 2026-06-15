@@ -25,7 +25,8 @@ zit in 28.4. DoD: beide targets + tests groen (`build-v2.sh`); smoke: portret op
 handles + canvas-/bottom-toolbar zichtbaar (/tmp/s28_1.png).
 
 ## 28.2 — Canvas-toolbar zweeft boven het geselecteerde portret [DS/FEAT]
-- status: backlog
+- status: in_progress
+- owner: DS/FEAT (AI-agent)
 - blockedBy: 28.1
 De canvas-toolbar (Frame/Background/Adjust/AI) is alléén zichtbaar bij selectie en zweeft boven het
 geselecteerde portret; niks geselecteerd → toolbar verdwijnt.
