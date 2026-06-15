@@ -5,6 +5,31 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.29 — Uitlijn-gids + handles opschonen (gids-laag was te druk)
+- status: done
+- owner: FEAT (AI-agent, marathon 2)
+
+**Result:** de drukke gids-laag (24.19/24.26) is teruggebracht tot het noodzakelijke.
+(1) **`AlignmentGuideOverlay2`** verloor de oogmarkers én het impliciete hoofd-ovaal: nu enkel een
+DUNNE rule-of-thirds (`Foreground.primary` @12%, 0.5pt — pure compositie-hint) + ÉÉN duidelijk
+geaccentueerde uitlijnlijn op de ooglijn (`Action.primary`, 1.5pt, geen dash) → meteen het focuspunt
+i.p.v. een wirwar. (2) **Selectie-handles** subtieler: kader van 0.7→0.45 opacity, hoek-dots
+14→10pt (1.5pt rand). (3) **Dot-grid dimt tijdens transform:** `isSelected` is uit `EditorCanvasView`
+gelift naar een `@Binding` (→ `EditorView.canvasSubjectSelected`); `DSCanvasCard` kreeg een
+`dotGridDimmed`-parameter die `DSDotGrid` naar 0.35 opacity animeert (easeInOut 0.15s) zodra het
+onderwerp geselecteerd is. Zo springen gids + handles eruit en oogt de canvas rustig; in rust staat
+het grid weer vol.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (build-v2.sh: Avatar v1 + Avatar2 +
+Avatar2-unit + AvatarKit + 27 AvatarUI). Screenshot (`--select-subject --show-guide --frame-circle`):
+opgeschoonde gids = dunne thirds + één lime ooglijn, géén oogmarkers/ovaal, subtieler kader + kleinere
+hoek-handles (/tmp/c29_dim_guide.png, via full-screen capture — window-capture-omgeving nog
+gedegradeerd zoals in 24.28). Dot-grid-dimming is build-/code-geverifieerd (`dotGridDimmed:
+canvasSubjectSelected` gewired); niet in de shot zichtbaar omdat het seed-portret een achtergrond heeft
+(grid alleen bij `!hasBackground`).
+**Figma-TODO:** definitieve gids-stijl (thirds-opacity, ooglijn-kleur/dikte) + handle-maat/-kleur en de
+dim-factor (0.35) tegen de referenties leggen.
+
 ## 24.28 — Toggle-acties tonen een duidelijke active-state
 - status: done
 - owner: FEAT (AI-agent, marathon 2)
@@ -62,7 +87,7 @@ afbeelding deselecteert → grid + handles weg. Toggle uit = nooit grid.
 **DoD/Verificatie:** beide targets + tests groen. Screenshots: circle+geen-bg met 4 ZWARTE hoeken
 (/tmp/c26_corners.png); grid-toggle aan + selectie = thirds+ooglijn+handles (/tmp/c26_grid_on.png),
 toggle uit = geen grid. Smoke-haken (#if DEBUG): `--clear-bg`, `--grid-on`.
-**Figma-TODO:** grid-icoon-keuze; de gids-laag is nog druk → opgeschoond in 24.29.
+**Figma-TODO:** grid-icoon-keuze. (De gids-laag was nog druk → opgeschoond in 24.29: done.)
 
 ## 24.22 — Sidebar rechtermuis → DS-menu (i.p.v. native)
 - status: done

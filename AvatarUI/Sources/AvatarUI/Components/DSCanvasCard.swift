@@ -14,12 +14,16 @@ public struct DSCanvasCard<Content: View>: View {
     private let surfaceClip: AnyShape
     private let content: Content
 
+    private let dotGridDimmed: Bool
+
     public init(
         showsDotGrid: Bool = false,
+        dotGridDimmed: Bool = false,
         surfaceClip: AnyShape = AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4)),
         @ViewBuilder content: () -> Content
     ) {
         self.showsDotGrid = showsDotGrid
+        self.dotGridDimmed = dotGridDimmed
         self.surfaceClip = surfaceClip
         self.content = content()
     }
@@ -33,7 +37,12 @@ public struct DSCanvasCard<Content: View>: View {
             ZStack {
                 DSColor.Background.card
                 if showsDotGrid {
+                    // E24.29: tijdens transformeren (onderwerp geselecteerd) dimt
+                    // het dot-grid zodat de uitlijn-gids + handles eruit springen en
+                    // de canvas minder druk oogt. In rust staat het op vol.
                     DSDotGrid()
+                        .opacity(dotGridDimmed ? 0.35 : 1)
+                        .animation(.easeInOut(duration: 0.15), value: dotGridDimmed)
                 }
             }
             .clipShape(surfaceClip)

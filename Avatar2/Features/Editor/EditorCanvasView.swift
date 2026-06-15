@@ -27,6 +27,10 @@ struct EditorCanvasView: View {
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle). De gids verschijnt
     /// alléén als dit aan staat én er actief geselecteerd/getransformeerd wordt.
     var gridEnabled: Bool = false
+    // E24.17: onderwerp geselecteerd → transform-handles zichtbaar (klik op de
+    // afbeelding selecteert, klik erbuiten deselecteert). E24.29: binding zodat
+    // EditorView het dot-grid kan dimmen tijdens transform.
+    @Binding var isSelected: Bool
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
@@ -38,9 +42,6 @@ struct EditorCanvasView: View {
     @State private var lastHapticTickX: Double = 0
     @State private var lastHapticTickY: Double = 0
     @State private var lastMagnification: Double = 1
-    // E24.17: onderwerp geselecteerd → transform-handles zichtbaar (klik op de
-    // afbeelding selecteert, klik erbuiten deselecteert).
-    @State private var isSelected = false
     // E24.19 smoke-haak: forceer de (vaste) uitlijn-gids zichtbaar.
     @State private var debugShowGuide = false
 
@@ -352,8 +353,9 @@ struct EditorCanvasView: View {
                 CGPoint(x: centerS.x + halfW, y: centerS.y + halfH),
             ]
             ZStack {
+                // E24.29: subtieler selectiekader (minder druk naast de gids).
                 Rectangle()
-                    .strokeBorder(DSColor.Action.primary.opacity(0.7), lineWidth: 1)
+                    .strokeBorder(DSColor.Action.primary.opacity(0.45), lineWidth: 1)
                     .frame(width: halfW * 2, height: halfH * 2)
                     .position(centerS)
                     .allowsHitTesting(false)
@@ -368,11 +370,12 @@ struct EditorCanvasView: View {
     }
 
     private func handleDot(at pos: CGPoint, imageCenterOnScreen: CGPoint) -> some View {
+        // E24.29: kleiner/subtieler (10pt i.p.v. 14).
         Circle()
             .fill(.white)
-            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 2))
-            .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
-            .frame(width: 14, height: 14)
+            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+            .frame(width: 10, height: 10)
             .position(pos)
             .gesture(
                 DragGesture(coordinateSpace: .named(Self.canvasSpace))
@@ -436,12 +439,10 @@ struct AlignmentGuideOverlay2: View {
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let ied = FramingConstants.targetInterEyeRatio * side
-            let eyeCX = FramingConstants.targetEyeCenterX * side
             let eyeCY = FramingConstants.targetEyeCenterY * side
 
             ZStack {
-                // Rule-of-thirds-grid over de VOLLE canvas (compositie-aid).
+                // E24.29: DUNNE, subtiele rule-of-thirds (alleen compositie-hint).
                 Path { p in
                     for f in [1.0 / 3.0, 2.0 / 3.0] {
                         p.move(to: CGPoint(x: side * f, y: 0))
@@ -450,19 +451,16 @@ struct AlignmentGuideOverlay2: View {
                         p.addLine(to: CGPoint(x: side, y: side * f))
                     }
                 }
-                .stroke(DSColor.Action.primary.opacity(0.22), lineWidth: 0.75)
+                .stroke(DSColor.Foreground.primary.opacity(0.12), lineWidth: 0.5)
 
-                // Doel-ooglijn (volle breedte, nadruk) — ogen op de bovenste
-                // derde; dit is waar auto-align de ogen plaatst.
+                // E24.29: ÉÉN duidelijk geaccentueerde uitlijnlijn (hoofd/ogen) —
+                // feller lime, dikker → meteen het focuspunt. De oogmarkers +
+                // het hoofd-ovaal zijn weg (te druk).
                 Path { p in
                     p.move(to: CGPoint(x: 0, y: eyeCY))
                     p.addLine(to: CGPoint(x: side, y: eyeCY))
                 }
-                .stroke(DSColor.Action.primary.opacity(0.55),
-                        style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-
-                eyeMarker(at: CGPoint(x: eyeCX - ied / 2, y: eyeCY), size: ied * 0.30)
-                eyeMarker(at: CGPoint(x: eyeCX + ied / 2, y: eyeCY), size: ied * 0.30)
+                .stroke(DSColor.Action.primary, lineWidth: 1.5)
             }
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 1)
@@ -470,18 +468,5 @@ struct AlignmentGuideOverlay2: View {
             .animation(.easeOut(duration: 0.15), value: isVisible)
         }
         .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func eyeMarker(at center: CGPoint, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .stroke(DSColor.Action.primary.opacity(0.55), lineWidth: 1.5)
-                .frame(width: size, height: size)
-            Circle()
-                .fill(DSColor.Action.primary.opacity(0.45))
-                .frame(width: size * 0.35, height: size * 0.35)
-        }
-        .position(center)
     }
 }

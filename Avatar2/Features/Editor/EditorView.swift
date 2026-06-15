@@ -102,6 +102,9 @@ struct EditorView: View {
     private let canvasMaxViewZoom: Double = 4
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
     @State private var canvasGridEnabled = false
+    /// E24.29: onderwerp geselecteerd (gelift uit EditorCanvasView) zodat het
+    /// dot-grid tijdens transform gedimd kan worden.
+    @State private var canvasSubjectSelected = false
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
@@ -313,7 +316,9 @@ struct EditorView: View {
             // dot-grid eronder zolang er geen achtergrond is ingesteld
             // (E07 zet showsDotGrid uit zodra een achtergrond actief is) —
             // transparante delen tonen het raster: achtergrond verwijderd.
-            DSCanvasCard(showsDotGrid: !hasBackground, surfaceClip: cardSurfaceClip) {
+            DSCanvasCard(showsDotGrid: !hasBackground,
+                         dotGridDimmed: canvasSubjectSelected,
+                         surfaceClip: cardSurfaceClip) {
                 ZStack {
                     // E07.1: gekozen achtergrond achter de cutout (preview;
                     // exportkwaliteit-compositing volgt in E07.2).
@@ -338,6 +343,7 @@ struct EditorView: View {
                             image: portrait, portrait: portraitModel,
                             viewZoom: $canvasViewZoom, maxViewZoom: canvasMaxViewZoom,
                             gridEnabled: canvasGridEnabled,
+                            isSelected: $canvasSubjectSelected,
                             frameShape: portraitModel?.frameShape ?? .circle
                         )
                     }
