@@ -367,10 +367,10 @@ struct BoardView: View {
     // MARK: - Camera (E27.1)
 
     private var pinch: some Gesture {
-        MagnificationGesture()
+        MagnifyGesture()
             .onChanged { value in
-                let delta = value / max(0.0001, lastMagnification)
-                lastMagnification = value
+                let delta = value.magnification / max(0.0001, lastMagnification)
+                lastMagnification = value.magnification
                 camera.zoomCentered(by: delta)
             }
             .onEnded { _ in lastMagnification = 1 }

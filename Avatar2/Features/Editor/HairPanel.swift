@@ -41,7 +41,7 @@ final class HairModel {
         guard !isBusy else { return }
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        guard let png = Self.pngData(from: base) else {
+        guard let png = base.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
@@ -65,11 +65,6 @@ final class HairModel {
         }
     }
 
-    private static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
 }
 
 struct HairPanel: View {

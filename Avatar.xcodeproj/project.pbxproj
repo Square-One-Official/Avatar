@@ -36,6 +36,7 @@
 		1E2B5F5EB2EECFD9C067FBDD /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3181E7327476F43F448EA102 /* LibraryImportSheet.swift */; };
 		20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */; };
+		21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */; };
 		22F331DA021385FF381B6BEA /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
 		248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3A383A9104F04C87490DC691 /* AvatarKit */; };
 		280A11648DAEFCF19F5E82C9 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
@@ -252,6 +253,7 @@
 		347ADAFAC02950562F82CBF4 /* URLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLSchemeHandler.swift; sourceTree = "<group>"; };
 		349CA2BF8E0D0316D4C6EC9F /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		355D09CA2450C106801EAD77 /* ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManager.swift; sourceTree = "<group>"; };
+		3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+PNG.swift"; sourceTree = "<group>"; };
 		363170BAE87D782CD9CDDB50 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		390524875FAE18DD4A1A916F /* ShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellView.swift; sourceTree = "<group>"; };
 		3DB5F24C632ED79CFC435879 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
@@ -447,6 +449,7 @@
 				193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */,
 				48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */,
 				EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */,
+				3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */,
 				9C2B6957003039CB34DD8610 /* PortraitExporter.swift */,
 				B8BF6F54BCF4084CCFDFFFBC /* TransformUndo.swift */,
 			);
@@ -988,6 +991,7 @@
 				491B02E74B243F21C30E93AC /* HairPanel.swift in Sources */,
 				98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */,
 				44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */,
+				21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */,
 				D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */,
 				286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */,
 				85461649DB9BB1202DDCE7E4 /* OnboardingFlow.swift in Sources */,

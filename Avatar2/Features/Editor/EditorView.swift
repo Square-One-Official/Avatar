@@ -99,7 +99,7 @@ struct EditorView: View {
     /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
     /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
     @State private var camera = CanvasCamera()
-    /// Pinch-accumulatie (MagnificationGesture geeft een cumulatieve waarde).
+    /// Pinch-accumulatie (MagnifyGesture geeft een cumulatieve magnification).
     @State private var lastMagnification: CGFloat = 1
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
     @State private var canvasGridEnabled = false
@@ -327,13 +327,13 @@ struct EditorView: View {
         )
     }
 
-    // E27.1: pinch = VIEW-zoom om het midden. MagnificationGesture levert een
-    // cumulatieve waarde; we zetten 'm om naar een delta-factor per frame.
+    // E27.1: pinch = VIEW-zoom om het midden. MagnifyGesture levert een
+    // cumulatieve magnification; we zetten 'm om naar een delta-factor per frame.
     private var cameraPinchGesture: some Gesture {
-        MagnificationGesture()
+        MagnifyGesture()
             .onChanged { value in
-                let delta = value / max(0.0001, lastMagnification)
-                lastMagnification = value
+                let delta = value.magnification / max(0.0001, lastMagnification)
+                lastMagnification = value.magnification
                 camera.zoomCentered(by: delta)
             }
             .onEnded { _ in lastMagnification = 1 }
@@ -752,7 +752,7 @@ struct EditorView: View {
     /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
     private func runBoostResolution() {
         guard !isBoosting, let entitlement, let portraitModel,
-              let png = Self.pngData(from: rawCutout) else { return }
+              let png = rawCutout.pngData() else { return }
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         let before = rawCutout
@@ -777,9 +777,4 @@ struct EditorView: View {
         }
     }
 
-    private static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
 }
