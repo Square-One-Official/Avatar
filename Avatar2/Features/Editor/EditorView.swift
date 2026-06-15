@@ -104,8 +104,11 @@ struct EditorView: View {
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
     @State private var canvasGridEnabled = false
     /// E24.29: onderwerp geselecteerd (gelift uit EditorCanvasView) zodat het
-    /// dot-grid tijdens transform gedimd kan worden.
-    @State private var canvasSubjectSelected = false
+    /// dot-grid tijdens transform gedimd kan worden. E28.1: dit is de single
+    /// source of truth van de editor-selectie — standaard TRUE (bij openen is het
+    /// portret geselecteerd zodat de toolbars meteen zichtbaar zijn) en het
+    /// stuurt de zichtbaarheid van beide toolbars (28.2/28.3).
+    @State private var canvasSubjectSelected = true
     /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
     /// transform-overlay de handles tijdens het pannen even verbergt.
     @State private var canvasSubjectPanning = false
@@ -510,7 +513,12 @@ struct EditorView: View {
                 .padding(.top, DSSpacing.gap4)
             }
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
-            .onChange(of: portraitModel?.persistentModelID) { _, _ in camera.reset() }
+            // E28.1: een nieuw/ander portret is meteen geselecteerd (re-target →
+            // toolbars zichtbaar voor het nieuwe portret).
+            .onChange(of: portraitModel?.persistentModelID) { _, _ in
+                camera.reset()
+                canvasSubjectSelected = true
+            }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
