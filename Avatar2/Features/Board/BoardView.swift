@@ -39,6 +39,11 @@ struct BoardView: View {
     // Drag-state (board-space).
     @State private var dragStart: CGPoint?
 
+    // E29.1: multi-select op de board.
+    @State private var selection: Set<PersistentIdentifier> = []
+    /// Marquee-rechthoek (board-space) tijdens een sleep op de lege board.
+    @State private var marquee: CGRect?
+
     // Node-/cel-maten (board-space).
     private let cardSide: CGFloat = 200
     private let labelHeight: CGFloat = 38
@@ -87,7 +92,7 @@ struct BoardView: View {
                 hud
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded() }
+            .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
             .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
             // is; `didInitialFit` latcht pas bij een niet-lege set.
@@ -100,8 +105,11 @@ struct BoardView: View {
     private var boardCanvas: some View {
         ZStack(alignment: .topLeading) {
             // Onzichtbaar vlak dat de board-maat bepaalt (de nodes positioneren
-            // hierop absoluut; lege ruimte = geen hit → camera-pan blijft werken).
+            // hierop absoluut). E29.1: sleep = marquee-selectie, tik = deselect-all.
             Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { selection.removeAll() }
+                .gesture(marqueeGesture)
 
             // E27.5: virtualisatie — alleen nodes die in (of net buiten) de
             // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
@@ -110,7 +118,44 @@ struct BoardView: View {
                 node(item.portrait)
                     .position(x: item.center.x, y: item.center.y)
             }
+
+            // E29.1: marquee-rechthoek (board-space; lijn ÷camera = constant dun).
+            if let marquee {
+                Rectangle()
+                    .fill(DSColor.Action.primary.opacity(0.12))
+                    .overlay(Rectangle().strokeBorder(DSColor.Action.primary, lineWidth: 1 / camera.scale))
+                    .frame(width: marquee.width, height: marquee.height)
+                    .position(x: marquee.midX, y: marquee.midY)
+                    .allowsHitTesting(false)
+            }
         }
+    }
+
+    /// E29.1: marquee — sleep op de lege board spant een selectie-rechthoek;
+    /// nodes waarvan het midden erin valt worden geselecteerd (cmd/shift =
+    /// toevoegen aan de bestaande selectie).
+    private var marqueeGesture: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                marquee = CGRect(
+                    x: min(value.startLocation.x, value.location.x),
+                    y: min(value.startLocation.y, value.location.y),
+                    width: abs(value.location.x - value.startLocation.x),
+                    height: abs(value.location.y - value.startLocation.y)
+                )
+            }
+            .onEnded { _ in
+                guard let rect = marquee else { return }
+                let hits = Set(
+                    portraits.enumerated()
+                        .filter { rect.contains(center(of: $1, index: $0)) }
+                        .map { $1.persistentModelID }
+                )
+                let additive = NSEvent.modifierFlags.contains(.command)
+                    || NSEvent.modifierFlags.contains(.shift)
+                selection = additive ? selection.union(hits) : hits
+                marquee = nil
+            }
     }
 
     /// E27.5: de nodes waarvan het midden binnen de (met een cel-marge verruimde)
@@ -140,13 +185,22 @@ struct BoardView: View {
     }
 
     private func node(_ portrait: Portrait2) -> some View {
-        VStack(spacing: labelGap) {
+        let isSelected = selection.contains(portrait.persistentModelID)
+        return VStack(spacing: labelGap) {
             cardSurface(portrait)
                 .frame(width: cardSide, height: cardSide)
+                // E29.1: selectie-ring (lime) om de geselecteerde nodes.
+                .overlay {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: DSRadius.xl4)
+                            .strokeBorder(DSColor.Action.primary, lineWidth: 3)
+                            .padding(-4)
+                    }
+                }
             VStack(spacing: 2) {
                 Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
                     .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
+                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.primary)
                     .lineLimit(1)
                 if !portrait.role.isEmpty {
                     Text(portrait.role)
@@ -160,9 +214,22 @@ struct BoardView: View {
         .frame(width: cardSide, height: cellHeight)
         .contentShape(Rectangle())
         .dsHoverHighlight(cornerRadius: DSRadius.xl4)
-        // Klik (kleine beweging) opent; grotere beweging = node verslepen.
-        .onTapGesture { onOpen(portrait) }
+        // E29.1: dubbelklik = openen in de editor; enkelklik = selecteren
+        // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
+        .onTapGesture(count: 2) { onOpen(portrait) }
+        .onTapGesture { tapNode(portrait) }
         .gesture(dragGesture(for: portrait))
+    }
+
+    /// E29.1: enkelklik op een node — cmd/shift togglet 'm in/uit de selectie;
+    /// anders selecteer alléén deze node.
+    private func tapNode(_ portrait: Portrait2) {
+        let id = portrait.persistentModelID
+        if NSEvent.modifierFlags.contains(.command) || NSEvent.modifierFlags.contains(.shift) {
+            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        } else {
+            selection = [id]
+        }
     }
 
     /// Kaart-surface met het cutout-beeld, geclipt tot de frame-vorm (mini-
@@ -217,6 +284,16 @@ struct BoardView: View {
             portrait.boardOrder = index
             portrait.boardPlaced = true
         }
+    }
+
+    /// E29.1 smoke-haak: `--board-select <n>` selecteert de eerste n portretten.
+    private func debugSeedSelection() {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: "--board-select"), args.indices.contains(i + 1),
+              let n = Int(args[i + 1]) else { return }
+        selection = Set(portraits.prefix(n).map { $0.persistentModelID })
+        #endif
     }
 
     private func fitIfNeeded() {
@@ -288,9 +365,11 @@ struct BoardView: View {
         VStack {
             Spacer()
             HStack {
-                Text("\(portraits.count) portraits — drag to arrange, click to edit")
+                Text(selection.isEmpty
+                     ? "\(portraits.count) portraits — click to select, double-click to edit"
+                     : "\(selection.count) selected")
                     .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(selection.isEmpty ? DSColor.Foreground.muted : DSColor.Foreground.primary)
                 Spacer()
                 Button("Fit", action: fit)
                     .buttonStyle(.plain)
