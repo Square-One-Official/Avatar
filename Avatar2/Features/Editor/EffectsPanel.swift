@@ -112,7 +112,7 @@ final class EffectsModel {
     private func generate(_ style: StylizeStyle) async {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        guard let png = Self.pngData(from: base) else {
+        guard let png = base.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
@@ -145,17 +145,12 @@ final class EffectsModel {
     private func persist() {
         guard let portrait else { return }
         if portrait.effectBaseData == nil {
-            portrait.effectBaseData = Self.pngData(from: base)
+            portrait.effectBaseData = base.pngData()
         }
         portrait.effectActiveRaw = selected?.rawValue
-        portrait.effectCache = cache.compactMapValues { Self.pngData(from: $0) }
+        portrait.effectCache = cache.compactMapValues { $0.pngData() }
     }
 
-    private static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
 }
 
 struct EffectsPanel: View {
