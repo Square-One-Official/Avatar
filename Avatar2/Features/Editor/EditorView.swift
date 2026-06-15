@@ -106,6 +106,9 @@ struct EditorView: View {
     /// E24.29: onderwerp geselecteerd (gelift uit EditorCanvasView) zodat het
     /// dot-grid tijdens transform gedimd kan worden.
     @State private var canvasSubjectSelected = false
+    /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
+    /// transform-overlay de handles tijdens het pannen even verbergt.
+    @State private var canvasSubjectPanning = false
     /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
@@ -422,7 +425,10 @@ struct EditorView: View {
                             image: portrait, portrait: portraitModel,
                             gridEnabled: canvasGridEnabled,
                             isSelected: $canvasSubjectSelected,
-                            frameShape: portraitModel?.frameShape ?? .circle
+                            isPanning: $canvasSubjectPanning,
+                            frameShape: portraitModel?.frameShape ?? .circle,
+                            // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
+                            cameraScale: camera.scale
                         )
                     }
                     } // E24.31: einde Original-else
@@ -430,11 +436,30 @@ struct EditorView: View {
             }
             // E27.1: de camera (VIEW-zoom + pan) op de HELE scène — render-only
             // (scaleEffect/offset beïnvloeden de layout niet, dus de toolbar-
-            // overlay + tap-dismiss blijven in screen-space staan; guides/handles
-            // correct onder de camera = 27.3). Pinch zoomt om het midden.
+            // overlay + tap-dismiss blijven in screen-space staan). Pinch zoomt
+            // om het midden.
             .scaleEffect(camera.scale, anchor: .center)
             .offset(camera.offset)
             .simultaneousGesture(cameraPinchGesture)
+            // E27.3: de selectie-handles + kader als SCREEN-SPACE overlay op de
+            // (camera-getransformeerde) kaart — vaste schermgrootte, en doordat ze
+            // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
+            // door uit te zoomen. Posities volgen onderwerp-transform + camera.
+            .overlay {
+                if canvasSubjectSelected, !showsOriginal, !isComparing, let portraitModel {
+                    GeometryReader { geo in
+                        CanvasTransformOverlay(
+                            side: min(geo.size.width, geo.size.height),
+                            image: portrait,
+                            portrait: portraitModel,
+                            camera: camera,
+                            isPanning: canvasSubjectPanning,
+                            isSelected: $canvasSubjectSelected,
+                            undoManager: undoManager
+                        )
+                    }
+                }
+            }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
             // en geopend paneel; de 3.16-garantie houdt paneel en toolbar

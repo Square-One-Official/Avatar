@@ -365,6 +365,22 @@ final class ShellModel {
         p.touch()
     }
 
+    /// E27.3 smoke-haak: schaal het ONDERWERP groot (factor × de fit-schaal,
+    /// gecentreerd) zodat de transform-hoeken buiten het frame vallen — om te
+    /// tonen dat je via de camera kunt uitzoomen om ze weer te zien.
+    func debugScaleSubject(factor: Double) {
+        guard let p = selectedPortrait, let img = NSImage(data: p.cutoutData) else { return }
+        let canvas = FramingConstants.editCanvas
+        guard img.size.width > 0, img.size.height > 0 else { return }
+        let fit = min(canvas.width / img.size.width, canvas.height / img.size.height)
+            * FramingConstants.frameFitPadding
+        let scale = fit * factor
+        p.offsetX = (canvas.width - img.size.width * scale) / 2
+        p.offsetY = (canvas.height - img.size.height * scale) / 2
+        p.scale = scale
+        p.touch()
+    }
+
     /// E24.23 smoke-haak: zet een achtergrond-afbeelding vanaf een pad (zoals
     /// uploadCustom, maar zonder de NSOpenPanel) om de upload-bug te reproduceren
     /// + de fix te verifiëren met grote/kleine afbeeldingen.

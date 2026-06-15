@@ -87,6 +87,7 @@
 		5E96E9D5C829847AECCFF1C6 /* Mesh 04.png in Resources */ = {isa = PBXBuildFile; fileRef = ECB59382EAC176D9739FE9C7 /* Mesh 04.png */; };
 		5ED90F39E1CD5FCAF05C6AE8 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5127F7FAC6DD92487E178E76 /* AppState.swift */; };
 		605465E10F824BC86E259CC6 /* ImportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313E53EBD6AC732524D4690 /* ImportFlow.swift */; };
+		60848B6E2D75BC44DC1F1922 /* CanvasTransformOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */; };
 		61A3B5EC8D7F69DCD0D6DB6F /* Mesh 01.png in Resources */ = {isa = PBXBuildFile; fileRef = 7457F57817461EFCE4333729 /* Mesh 01.png */; };
 		63D3C276D65FABD820D76F76 /* Mesh 06.png in Resources */ = {isa = PBXBuildFile; fileRef = 0F7453266932AB3B263A665E /* Mesh 06.png */; };
 		64648D9B5A8DECE691F6A435 /* ImportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313E53EBD6AC732524D4690 /* ImportFlow.swift */; };
@@ -257,6 +258,7 @@
 		42425F916AF8200C81E49949 /* EntitlementModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModel.swift; sourceTree = "<group>"; };
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
 		48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairPanel.swift; sourceTree = "<group>"; };
+		48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformOverlay.swift; sourceTree = "<group>"; };
 		48EF633AE84A1D2EF9412998 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolTests.swift; sourceTree = "<group>"; };
 		5127F7FAC6DD92487E178E76 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -423,6 +425,7 @@
 				5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */,
 				139D1EAC44083E60510A9644 /* CanvasCamera.swift */,
 				7477A0B1A2FE5E7ABBFFCDC4 /* CanvasInteractionCatcher.swift */,
+				48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */,
 				C1658094DC9377C3D97B55BF /* ClothesPanel.swift */,
 				E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */,
 				F3EDECE3F97F32FC434FC3BE /* EditorActionList.swift */,
@@ -955,6 +958,7 @@
 				EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */,
 				104F1209A40B98F024BE93C0 /* CanvasCamera.swift in Sources */,
 				9E422036F5B5DDF8C2134D5B /* CanvasInteractionCatcher.swift in Sources */,
+				60848B6E2D75BC44DC1F1922 /* CanvasTransformOverlay.swift in Sources */,
 				890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */,
 				583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */,
 				B64A1678796BB93D290579D2 /* EditColorPanel.swift in Sources */,
