@@ -126,6 +126,8 @@ struct ShellView: View {
                let f = Double(args[i + 1]) {
                 model.debugScaleSubject(factor: f)
             }
+            // E27.4 (spike): open de board-view (alle portretten op één canvas).
+            if args.contains("--board") { model.showBoardSpike = true }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])
@@ -255,6 +257,20 @@ struct ShellView: View {
 
     @ViewBuilder
     private var canvas: some View {
+        // E27.4 (spike): de board-view vervangt de enkel-portret-canvas wanneer
+        // aangezet (alleen via --board). Klik een portret → terug naar de editor.
+        if model.showBoardSpike {
+            BoardView(onOpen: { portrait in
+                model.select(portrait)
+                model.showBoardSpike = false
+            })
+        } else {
+            editorCanvas
+        }
+    }
+
+    @ViewBuilder
+    private var editorCanvas: some View {
         switch model.canvas {
         case .empty:
             // Tijdens een drag verdwijnt de first-use-inhoud en blijft
