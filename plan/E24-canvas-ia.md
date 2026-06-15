@@ -44,8 +44,8 @@ sparkles-placeholders nog.
 had — geen backend-regen, geen credits.
 
 ## 24.35 — Uitlijn-gids = gezichtsvorm met ogen (geen lijnen)  · DS/FEAT
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS/FEAT (AI-agent)
 
 Vervang de rule-of-thirds-lijnen door een subtiele GEZICHT-silhouet-overlay met oog-markers als
 uitlijndoel (herkenbaar hoofd/ogen, geen lijnenwirwar). Boven de frame-clip renderen (24.19). DoD:
