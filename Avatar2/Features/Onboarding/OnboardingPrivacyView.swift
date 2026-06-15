@@ -12,7 +12,7 @@ import SwiftUI
 
 struct OnboardingPrivacyView: View {
     @Bindable var model: OnboardingModel
-    @State private var prefs = PrivacyPreferences2.shared
+    private let prefs = PrivacyPreferences2.shared
 
     var body: some View {
         VStack(spacing: 0) {

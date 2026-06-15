@@ -18,7 +18,7 @@ import SwiftUI
 struct OnboardingDownloadView: View {
     @Bindable var model: OnboardingModel
     @State private var download = HighFidelityModelState()
-    @State private var prefs = PrivacyPreferences2.shared
+    private let prefs = PrivacyPreferences2.shared
 
     private static let totalMB = 78
 
