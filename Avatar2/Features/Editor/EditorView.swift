@@ -493,25 +493,34 @@ struct EditorView: View {
             }
             // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret —
             // vervangt de losse rechter-cluster. Boven de tap-dismiss zodat de
-            // knoppen/popovers klikbaar blijven.
+            // knoppen/popovers klikbaar blijven. E28.2: alléén zichtbaar bij
+            // selectie (zweeft boven het geselecteerde portret; weg bij deselect).
             .overlay(alignment: .top) {
-                CanvasActionToolbar(
-                    onAutoFrame: runAutomaticFraming,
-                    onFlip: flipHorizontally,
-                    frameShape: portraitModel?.frameShape ?? .circle,
-                    onSetFrameShape: setFrameShape,
-                    onRestoreBody: { _ = entitlement?.allowCloudFeature() },
-                    onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-                    onColorise: { _ = entitlement?.allowCloudFeature() },
-                    onBoost: runBoostResolution,
-                    isPro: entitlement?.isProActive ?? false,
-                    activeMenu: $canvasMenu,
-                    gridEnabled: $canvasGridEnabled,
-                    adjust: { editColorPanel },
-                    background: { BackgroundPanel(portrait: portraitModel) }
-                )
-                .padding(.top, DSSpacing.gap4)
+                if canvasSubjectSelected {
+                    CanvasActionToolbar(
+                        onAutoFrame: runAutomaticFraming,
+                        onFlip: flipHorizontally,
+                        frameShape: portraitModel?.frameShape ?? .circle,
+                        onSetFrameShape: setFrameShape,
+                        onRestoreBody: { _ = entitlement?.allowCloudFeature() },
+                        onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+                        onColorise: { _ = entitlement?.allowCloudFeature() },
+                        onBoost: runBoostResolution,
+                        isPro: entitlement?.isProActive ?? false,
+                        activeMenu: $canvasMenu,
+                        gridEnabled: $canvasGridEnabled,
+                        adjust: { editColorPanel },
+                        background: { BackgroundPanel(portrait: portraitModel) }
+                    )
+                    .padding(.top, DSSpacing.gap4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
+            // E28.2: bij deselect een eventueel open canvas-dropdown sluiten.
+            .onChange(of: canvasSubjectSelected) { _, selected in
+                if !selected { canvasMenu = nil }
+            }
+            .animation(.easeOut(duration: 0.18), value: canvasSubjectSelected)
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
             // E28.1: een nieuw/ander portret is meteen geselecteerd (re-target →
             // toolbars zichtbaar voor het nieuwe portret).

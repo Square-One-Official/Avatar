@@ -25,10 +25,16 @@ zit in 28.4. DoD: beide targets + tests groen (`build-v2.sh`); smoke: portret op
 handles + canvas-/bottom-toolbar zichtbaar (/tmp/s28_1.png).
 
 ## 28.2 — Canvas-toolbar zweeft boven het geselecteerde portret [DS/FEAT]
-- status: backlog
+- status: done
+- owner: DS/FEAT (AI-agent)
 - blockedBy: 28.1
 De canvas-toolbar (Frame/Background/Adjust/AI) is alléén zichtbaar bij selectie en zweeft boven het
 geselecteerde portret; niks geselecteerd → toolbar verdwijnt.
+
+**Result:** de `CanvasActionToolbar`-overlay rendert nu binnen `if canvasSubjectSelected` (28.1),
+met een opacity+move-transitie; bij deselect sluit ook een open canvas-dropdown (`canvasMenu = nil`).
+DoD: beide targets + tests groen. Smoke: geselecteerd = toolbar bovenaan zichtbaar (/tmp/s28_1.png);
+na ESC-deselect = toolbar weg (/tmp/s28_2_deselected.png). De bottom-toolbar volgt in 28.3.
 
 ## 28.3 — Onderste tool-buttons → toolbar-layout, targetend [DS/FEAT]
 - status: backlog
