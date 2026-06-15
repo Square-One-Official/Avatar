@@ -369,8 +369,8 @@ struct EditorView: View {
     private var zoomHUD: some View {
         DSZoomHUD(
             scale: camera.scale,
-            minScale: CanvasCamera.minScale,
-            maxScale: CanvasCamera.maxScale,
+            minScale: camera.minScale,
+            maxScale: camera.maxScale,
             onSetScale: { setCameraScale($0) },
             onZoomIn: { zoomCamera(by: 1.25) },
             onZoomOut: { zoomCamera(by: 0.8) },
@@ -594,7 +594,7 @@ struct EditorView: View {
             if let i = args.firstIndex(of: "--cam-zoom"),
                args.indices.contains(i + 1),
                let z = Double(args[i + 1]) {
-                camera.scale = CanvasCamera.clampScale(CGFloat(z))
+                camera.scale = camera.clampScale(CGFloat(z))
             }
         }
         #endif

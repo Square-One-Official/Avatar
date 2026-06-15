@@ -126,8 +126,8 @@ struct ShellView: View {
                let f = Double(args[i + 1]) {
                 model.debugScaleSubject(factor: f)
             }
-            // E27.4 (spike): open de board-view (alle portretten op één canvas).
-            if args.contains("--board") { model.showBoardSpike = true }
+            // E27.4: open de board-view (alle portretten op één canvas).
+            if args.contains("--board") { model.isBoardMode = true }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])
@@ -210,6 +210,10 @@ struct ShellView: View {
                 onToggleSettings: { model.isShowingSettings.toggle() },
                 canExport: model.canExport && !model.isShowingSettings,
                 onExport: { model.exportCurrentPortrait() },
+                // E27.4: board-modus-toggle (alle portretten op één canvas).
+                canToggleBoard: model.canExport && !model.isShowingSettings,
+                isBoardActive: model.isBoardMode,
+                onToggleBoard: { model.toggleBoard() },
                 // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
                 canToggleSidebar: model.canExport && !model.isShowingSettings,
                 isSidebarActive: model.isSidebarVisible,
@@ -257,12 +261,12 @@ struct ShellView: View {
 
     @ViewBuilder
     private var canvas: some View {
-        // E27.4 (spike): de board-view vervangt de enkel-portret-canvas wanneer
-        // aangezet (alleen via --board). Klik een portret → terug naar de editor.
-        if model.showBoardSpike {
+        // E27.4: de board-view (alle portretten) vervangt de enkel-portret-canvas
+        // in board-modus. Klik een portret → selecteren + terug naar de editor.
+        if model.isBoardMode {
             BoardView(onOpen: { portrait in
                 model.select(portrait)
-                model.showBoardSpike = false
+                model.isBoardMode = false
             })
         } else {
             editorCanvas
