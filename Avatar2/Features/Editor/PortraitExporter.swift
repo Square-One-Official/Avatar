@@ -145,11 +145,15 @@ enum PortraitExporter {
             offY = CGFloat(placement.offsetY) * factor
         } else {
             // E24.18: fit-met-marge (i.p.v. FILL) zodat de export de canvas-
-            // ademruimte volgt (WYSIWYG). Zelfde padding als FramingConstants.
-            let fit = min(CGFloat(unit) / cw, CGFloat(unit) / ch) * FramingConstants.frameFitPadding
-            drawScale = fit * factor
-            offX = (s - cw * drawScale) / 2
-            offY = (s - ch * drawScale) / 2
+            // ademruimte volgt (WYSIWYG). Canonieke padded-fit in unit-space
+            // (gedeeld met EditorCanvasView/-Overlay) × factor → pixel-space.
+            let unitFit = AutoFramer.fitTransform(
+                cutoutSize: CGSize(width: cw, height: ch),
+                canvas: CGSize(width: CGFloat(unit), height: CGFloat(unit))
+            )
+            drawScale = unitFit.scale * factor
+            offX = unitFit.offset.width * factor
+            offY = unitFit.offset.height * factor
         }
         let drawW = cw * drawScale, drawH = ch * drawScale
         // top-left offsetY → CG bottom-left.
