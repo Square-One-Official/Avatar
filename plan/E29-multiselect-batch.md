@@ -31,7 +31,8 @@ klik-/gesture-paden gebouwd (CGEvent-clicks registreren, zie 28.4); de selectie-
 seed-haak geverifieerd. **Figma-TODO:** ring-styling + marquee-vulling/-rand tegen Figma.
 
 ## 29.2 — Batch toepassen via de toolbar [FEAT/DS]
-- status: backlog
+- status: in_progress
+- owner: FEAT/DS (AI-agent)
 - blockedBy: 29.1
 Met meerdere geselecteerd past de toolbar acties toe op ALLE geselecteerde portretten tegelijk:
 dezelfde Background, en dezelfde Adjust/kleurcorrecties. Toolbar toont de batch-context ("N
