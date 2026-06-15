@@ -120,6 +120,12 @@ struct ShellView: View {
             if args.contains("--bg-transparent") { model.debugSetOriginalBackground(false) }
             // E24.18: reset transform → padded fit-fallback (frame-ademruimte).
             if args.contains("--reset-transform") { model.debugResetTransform() }
+            // E27.3: schaal het onderwerp groot (hoeken buiten het frame) om de
+            // "uitzoomen om de hoeken te zien"-flow te tonen.
+            if let i = args.firstIndex(of: "--scale-subject"), args.indices.contains(i + 1),
+               let f = Double(args[i + 1]) {
+                model.debugScaleSubject(factor: f)
+            }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])

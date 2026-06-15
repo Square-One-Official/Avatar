@@ -26,9 +26,19 @@ struct EditorCanvasView: View {
     // afbeelding selecteert, klik erbuiten deselecteert). E24.29: binding zodat
     // EditorView het dot-grid kan dimmen tijdens transform.
     @Binding var isSelected: Bool
+    /// E27.3: pan-drag bezig → EditorView dimt de (screen-space) handles weg.
+    @Binding var isPanning: Bool
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
+    /// E27.3: de huidige camera-VIEW-zoom (E27.1). De handles + uitlijn-gids
+    /// zitten ín de scène en schalen dus mee met de camera; we delen hun
+    /// pixel-maten (dot/lijn-dikte) door deze factor zodat ze op élk zoomniveau
+    /// dezelfde grootte op het scherm houden (niet onleesbaar/onbruikbaar) —
+    /// visueel gelijk aan een screen-space-overlay, mét behoud van de
+    /// 24.8/24.32-positionerings- en drag-logica. Posities (op het onderwerp)
+    /// schalen wél mee, zodat ze op de hoeken blijven plakken.
+    var cameraScale: CGFloat = 1
 
     @State private var dragStart: CGSize?
     @State private var isDragging = false
@@ -39,11 +49,6 @@ struct EditorCanvasView: View {
     // E24.19 smoke-haak: forceer de (vaste) uitlijn-gids zichtbaar.
     @State private var debugShowGuide = false
 
-    // E24.8: hoek-handle-drag schaalt het onderwerp (Portrait2.scale).
-    @State private var handleStartScale: Double?
-    @State private var handleStartDist: CGFloat = 0
-    @State private var handleBefore: TransformUndo.Snapshot?
-
     // E06.2: before-snapshots zodat een afgerond gebaar één undo-stap is.
     @State private var dragBefore: TransformUndo.Snapshot?
     @Environment(\.undoManager) private var undoManager
@@ -53,6 +58,11 @@ struct EditorCanvasView: View {
     @State private var localTransform = CanvasTransform(offsetX: 0, offsetY: 0, scale: 0)
 
     private let haptics = NSHapticFeedbackManager.defaultPerformer
+
+    /// E27.3: tegen-schaal voor handles/gids zodat hun pixel-maten constant op
+    /// het scherm blijven onder de camera-zoom (de scène scaleEffect't ×camera,
+    /// dus we tekenen ×1/camera).
+    private var inverseCameraScale: CGFloat { 1 / max(0.0001, cameraScale) }
 
     // v1-constanten (EditorView ~57/78/79).
     private let hapticStep: Double = 24
@@ -112,22 +122,20 @@ struct EditorCanvasView: View {
                 // frame-vorm afgekapt (volle canvas). De afbeelding lijnt
                 // hiernaartoe uit (auto-align mikt op dezelfde FramingConstants).
                 // Zichtbaar tijdens positioneren (selectie of drag).
-                AlignmentGuideOverlay2(isVisible: (gridEnabled && (isSelected || isDragging)) || debugShowGuide)
+                AlignmentGuideOverlay2(
+                    isVisible: (gridEnabled && (isSelected || isDragging)) || debugShowGuide,
+                    inverseCameraScale: inverseCameraScale
+                )
                     .frame(width: side, height: side)
                     .allowsHitTesting(false)
 
-                // E24.8/24.17: selectie-handles — alléén zichtbaar als geselecteerd.
-                if isSelected {
-                    handleLayer(side: side, imgW: imgW, imgH: imgH, center: imgCenter)
-                    // E24.32: ESC deselecteert altijd (window-brede cancelAction op
-                    // een verborgen knop, zelfde patroon als de Settings-ESC). Geldt
-                    // ook direct ná een drag — staat los van de gesture-state.
-                    Button("") { isSelected = false }
-                        .keyboardShortcut(.cancelAction)
-                        .opacity(0)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
+                // E27.3: de selectie-handles + het kader + de ESC-deselect zijn
+                // verhuisd naar een SCREEN-SPACE overlay (CanvasTransformOverlay,
+                // in EditorView) — buiten de camera-transform én buiten deze
+                // canvas-clip, zodat ze op élk zoomniveau even groot blijven en
+                // (bij een groot-geschaald onderwerp) zichtbaar/grijpbaar worden
+                // door uit te zoomen. Deze view houdt alleen het onderwerp + de
+                // deselect-tap + de pan-/dubbelklik-gestures (E24.32 intact).
             }
             // E27.1: pinch/scroll-VIEW-zoom is verhuisd naar de camera (op de
             // hele scène, EditorView). De pan-drag zit op het onderwerp (E24.32);
@@ -135,7 +143,6 @@ struct EditorCanvasView: View {
             .onTapGesture(count: 2) {
                 resetToFit()
             }
-            .coordinateSpace(name: Self.canvasSpace)
             .clipped()
             #if DEBUG
             // E24.17/24.19 smoke-haken: forceer de geselecteerde staat resp. de
@@ -218,6 +225,7 @@ struct EditorCanvasView: View {
                     dragStart = CGSize(width: t.offsetX, height: t.offsetY)
                     if let portrait { dragBefore = TransformUndo.snapshot(of: portrait) }
                     isDragging = true
+                    isPanning = true
                     lastHapticTickX = t.offsetX
                     lastHapticTickY = t.offsetY
                 }
@@ -296,6 +304,7 @@ struct EditorCanvasView: View {
                 dragStart = nil
                 dragBefore = nil
                 isDragging = false
+                isPanning = false
                 snappedX = false
                 snappedY = false
             }
@@ -312,99 +321,6 @@ struct EditorCanvasView: View {
         )
     }
 
-    // MARK: - Selectie-handles (E24.8) — onderwerp schalen via de hoeken
-
-    static let canvasSpace = "editorCanvas"
-
-    /// Vier hoek-handles + selectiekader op het onderwerp. DEFAULT-gedrag:
-    /// aspect-locked, schaalt om het onderwerp-midden, op `Portrait2.scale`.
-    /// E27.1: de handles zitten in canvas-space (1×) direct op het onderwerp; de
-    /// VIEW-zoom is een camera op de hele scène (de handles schalen mee als deel
-    /// van de scène). Correct-onder-de-camera (screen-space-overlay) = 27.3.
-    @ViewBuilder
-    private func handleLayer(side: CGFloat, imgW: CGFloat, imgH: CGFloat, center: CGPoint) -> some View {
-        if portrait != nil {
-            let centerS = center
-            let halfW = imgW / 2
-            let halfH = imgH / 2
-            let corners = [
-                CGPoint(x: centerS.x - halfW, y: centerS.y - halfH),
-                CGPoint(x: centerS.x + halfW, y: centerS.y - halfH),
-                CGPoint(x: centerS.x - halfW, y: centerS.y + halfH),
-                CGPoint(x: centerS.x + halfW, y: centerS.y + halfH),
-            ]
-            ZStack {
-                // E24.29: subtieler selectiekader (minder druk naast de gids).
-                Rectangle()
-                    .strokeBorder(DSColor.Action.primary.opacity(0.45), lineWidth: 1)
-                    .frame(width: halfW * 2, height: halfH * 2)
-                    .position(centerS)
-                    .allowsHitTesting(false)
-                ForEach(0..<corners.count, id: \.self) { i in
-                    handleDot(at: corners[i], imageCenterOnScreen: centerS)
-                }
-            }
-            // Alléén tonen in rust (niet tijdens pannen) zodat ze niet storen.
-            .opacity(isDragging ? 0 : 1)
-            .animation(.easeOut(duration: 0.12), value: isDragging)
-        }
-    }
-
-    private func handleDot(at pos: CGPoint, imageCenterOnScreen: CGPoint) -> some View {
-        // E24.29: kleiner/subtieler (10pt i.p.v. 14).
-        Circle()
-            .fill(.white)
-            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 1.5))
-            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
-            .frame(width: 10, height: 10)
-            .position(pos)
-            .gesture(
-                DragGesture(coordinateSpace: .named(Self.canvasSpace))
-                    .onChanged { value in
-                        if handleStartScale == nil {
-                            handleStartScale = resolvedTransform().scale
-                            handleStartDist = max(1, distance(value.startLocation, imageCenterOnScreen))
-                            if let portrait { handleBefore = TransformUndo.snapshot(of: portrait) }
-                        }
-                        guard let startScale = handleStartScale else { return }
-                        // De afstand-verhouding bepaalt de nieuwe onderwerp-schaal
-                        // (een eventuele camera-zoom schaalt beide afstanden gelijk
-                        // mee en valt zo uit de verhouding).
-                        let ratio = distance(value.location, imageCenterOnScreen) / handleStartDist
-                        applySubjectScale(to: startScale * ratio)
-                    }
-                    .onEnded { _ in
-                        if portrait != nil {
-                            writeTransform(resolvedTransform(), touch: true)
-                            registerUndo(from: handleBefore, actionName: "Scale")
-                        }
-                        handleStartScale = nil
-                        handleBefore = nil
-                    }
-            )
-    }
-
-    /// Schaalt het onderwerp om zijn eigen midden (blijft staan), geclampt aan
-    /// de fill-fit-grenzen (zelfde band als de oude pinch-zoom).
-    private func applySubjectScale(to newScale: Double) {
-        var t = resolvedTransform()
-        let baseline = fitTransform().scale
-        let clamped = min(
-            baseline * FramingConstants.maxZoomFactor,
-            max(baseline * FramingConstants.minZoomFactor, newScale)
-        )
-        guard clamped != t.scale else { return }
-        let cxU = t.offsetX + image.size.width * t.scale / 2
-        let cyU = t.offsetY + image.size.height * t.scale / 2
-        t.offsetX = cxU - image.size.width * clamped / 2
-        t.offsetY = cyU - image.size.height * clamped / 2
-        t.scale = clamped
-        writeTransform(t, touch: false)
-    }
-
-    private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
-        hypot(a.x - b.x, a.y - b.y)
-    }
 }
 
 // MARK: - Uitlijn-gids (E24.19 — rule-of-thirds + ooglijn-doel, DS-stijl)
@@ -417,11 +333,16 @@ struct EditorCanvasView: View {
 /// breken niet af op de cirkel-/frame-rand. Fade 0,15 s.
 struct AlignmentGuideOverlay2: View {
     let isVisible: Bool
+    /// E27.3: 1/camera-zoom (E27.1) — de gids zit ín de scène en schaalt mee,
+    /// dus de lijn-diktes worden hierdoor gedeeld zodat ze op élk zoomniveau even
+    /// dun/leesbaar blijven (de líjnen volgen wel de frame-derde, die mee-zoomt).
+    var inverseCameraScale: CGFloat = 1
 
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
             let eyeCY = FramingConstants.targetEyeCenterY * side
+            let inv = inverseCameraScale
 
             ZStack {
                 // E24.29: DUNNE, subtiele rule-of-thirds (alleen compositie-hint).
@@ -433,7 +354,7 @@ struct AlignmentGuideOverlay2: View {
                         p.addLine(to: CGPoint(x: side, y: side * f))
                     }
                 }
-                .stroke(DSColor.Foreground.primary.opacity(0.12), lineWidth: 0.5)
+                .stroke(DSColor.Foreground.primary.opacity(0.12), lineWidth: 0.5 * inv)
 
                 // E24.29: ÉÉN duidelijk geaccentueerde uitlijnlijn (hoofd/ogen) —
                 // feller lime, dikker → meteen het focuspunt. De oogmarkers +
@@ -442,10 +363,10 @@ struct AlignmentGuideOverlay2: View {
                     p.move(to: CGPoint(x: 0, y: eyeCY))
                     p.addLine(to: CGPoint(x: side, y: eyeCY))
                 }
-                .stroke(DSColor.Action.primary, lineWidth: 1.5)
+                .stroke(DSColor.Action.primary, lineWidth: 1.5 * inv)
             }
             .compositingGroup()
-            .shadow(color: .black.opacity(0.25), radius: 1)
+            .shadow(color: .black.opacity(0.25), radius: 1 * inv)
             .opacity(isVisible ? 1 : 0)
             .animation(.easeOut(duration: 0.15), value: isVisible)
         }

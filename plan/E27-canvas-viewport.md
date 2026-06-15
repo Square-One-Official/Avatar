@@ -20,7 +20,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 |----|-------|------|--------|--------|
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
-| 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | backlog (na 27.1) | `v2/E27-27.3` |
+| 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
 
 ---
@@ -136,12 +136,44 @@ action-getint) en de exacte iconen (−/+ SF Symbols) tegen een Figma-referentie
 leggen zodra die er is. ⌘1 "100%" = 1× in dit camera-model (zie 27.1).
 
 ## 27.3 — Transform/guides/popovers correct onder de camera  · FEAT/DS
-- status: backlog
-- blockedBy: 27.1
+- status: done
+- owner: FEAT/DS (AI-agent)
+- blockedBy: 27.1 (done)
 
 Handles, thirds-guides en toolbar-popovers blijven correct gepositioneerd én klikbaar op elk
 zoomniveau (overlay in screen-space, niet mee-schalend tot onleesbaar/onbruikbaar). Dit lost meteen
 het "transform-hoeken niet zichtbaar"-probleem op: je kunt uitzoomen om ze te zien.
+
+**Result:**
+- **Handles + selectiekader + ESC → screen-space overlay** (`CanvasTransformOverlay`, FEAT). Ze staan
+  nu BUITEN de camera-transform (E27.1) én buiten de canvas-clip, getekend als `.overlay` op de
+  (camera-getransformeerde) DSCanvasCard in `EditorView`. Gevolg: (a) vaste schermgrootte op élk
+  zoomniveau (10pt-dots, 1pt-kader — niet meer mee-schalend); (b) een groot-geschaald onderwerp
+  waarvan de hoeken buiten het frame vallen wordt weer zichtbaar én grijpbaar door met de camera uit
+  te zoomen — precies het "transform-hoeken niet zichtbaar"-probleem opgelost. Posities worden uit de
+  onderwerp-transform berekend en via de camera (`scale`·(p−midden)+`offset`) naar het scherm gemapt;
+  de drag-ratio is invariant onder camera-zoom, en de clamp + `TransformUndo` zijn 1-op-1 die van
+  E24.8. `EditorCanvasView` houdt enkel nog het onderwerp + de deselect-tap + de pan-/dubbelklik-
+  gestures (E24.32 intact); `isPanning` is gelift zodat de overlay de handles tijdens het pannen even
+  verbergt (E24.29-gedrag).
+- **Uitlijn-gids** blijft in-scène (markeert de frame-derde, zoomt dus mee), maar de lijn-diktes
+  worden door de camera-zoom gedeeld (`inverseCameraScale`) → constant dun/leesbaar op elk niveau.
+- **Toolbar-popovers** zaten al in screen-space (de `CanvasActionToolbar` hangt als overlay BUITEN de
+  camera-transform) → geverifieerd correct gepositioneerd + klikbaar onder zoom; geen wijziging nodig.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (`build-v2.sh` → "alles groen").
+Visuele smoke: handles op het onderwerp bij fit (/tmp/t3_handles_100.png) en — even groot — onder 50%
+camera (/tmp/t3_handles_050.png); het kernbewijs: onderwerp ×2.5 geschaald valt bij fit buiten beeld
+(hoeken weg, /tmp/t3_big_fit.png) maar wordt na uitzoomen naar 45% volledig zichtbaar mét grijpbare
+hoek-handles bùiten het frame (/tmp/t3_big_zoomout.png); Frame▾-popover correct + leesbaar onder 200%
+(/tmp/t3_popover_200.png); uitlijn-gids dun/constant onder 200% (/tmp/t3_guide_200.png). Deselect
+(klik-buiten) + ESC zijn structureel ongewijzigd (deselect-tap in EditorCanvasView, ESC-knop in de
+overlay) — runtime-klikgedrag zoals in 24.32 niet-screenshotbaar. Window-capture via CGWindowID.
+Smoke-haak `--scale-subject <factor>` (#if DEBUG) toegevoegd voor de uitzoom-flow.
+
+**Figma-TODO:** handle-/kader-styling (10pt-dot, 1pt-lime-kader) en de gids-diktes tegen een
+Figma-referentie leggen zodra die er is; bevestigen of de gids-extent mág mee-zoomen of óók
+screen-space (vast t.o.v. het frame) moet zijn.
 
 ## 27.4 — Board-view: meerdere portretten op de canvas  · FEAT (later)
 - status: backlog
