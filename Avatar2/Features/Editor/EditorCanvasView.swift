@@ -19,11 +19,6 @@ import SwiftUI
 struct EditorCanvasView: View {
     let image: NSImage
     let portrait: Portrait2?
-    /// E24.8: VIEW-zoom (efemere viewport-zoom, 1×–maxViewZoom). Leeft in
-    /// EditorView zodat de zoom-HUD búiten de frame-clip (24.16) kan renderen.
-    /// Losgekoppeld van de SUBJECT-schaal (Portrait2.scale, via de handles).
-    @Binding var viewZoom: Double
-    let maxViewZoom: Double
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle). De gids verschijnt
     /// alléén als dit aan staat én er actief geselecteerd/getransformeerd wordt.
     var gridEnabled: Bool = false
@@ -41,7 +36,6 @@ struct EditorCanvasView: View {
     @State private var snappedY = false
     @State private var lastHapticTickX: Double = 0
     @State private var lastHapticTickY: Double = 0
-    @State private var lastMagnification: Double = 1
     // E24.19 smoke-haak: forceer de (vaste) uitlijn-gids zichtbaar.
     @State private var debugShowGuide = false
 
@@ -91,15 +85,15 @@ struct EditorCanvasView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { isSelected = false }
 
-                // Onderwerp, ónder de VIEW-zoom (scaleEffect om het
-                // canvasmidden) — los van de SUBJECT-schaal. Tot de frame-vorm
-                // geclipt (cirkel = transparante hoeken).
+                // Onderwerp op SUBJECT-schaal (Portrait2.scale via de handles).
+                // E27.1: de VIEW-zoom zit niet meer hier maar als camera op de
+                // hele scène (EditorView). Tot de frame-vorm geclipt (cirkel =
+                // transparante hoeken).
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: imgW, height: imgH)
                     .position(x: imgCenter.x, y: imgCenter.y)
-                    .scaleEffect(viewZoom, anchor: .center)
                     .frame(width: side, height: side)
                     .clipShape(clip)
                     // E24.17: klik OP de afbeelding (binnen de vorm) = selecteren
@@ -135,13 +129,11 @@ struct EditorCanvasView: View {
                         .accessibilityHidden(true)
                 }
             }
-            // E24.17: pinch = canvas-VIEW-zoom (Figma/Preview). Trackpad/scroll
-            // schaalt niets meer (scroll-monitor verwijderd). De pan-drag zit nu
-            // op het onderwerp (E24.32), niet meer op de hele box.
-            .simultaneousGesture(magnifyGesture)
+            // E27.1: pinch/scroll-VIEW-zoom is verhuisd naar de camera (op de
+            // hele scène, EditorView). De pan-drag zit op het onderwerp (E24.32);
+            // dubbelklik = auto-frame/fit van het ONDERWERP (los van de camera).
             .onTapGesture(count: 2) {
                 resetToFit()
-                withAnimation(.spring(duration: 0.3)) { viewZoom = 1 }
             }
             .coordinateSpace(name: Self.canvasSpace)
             .clipped()
@@ -320,45 +312,21 @@ struct EditorCanvasView: View {
         )
     }
 
-    // MARK: - View-zoom (alléén pinch), 1×–maxViewZoom om het midden
-
-    // E24.17: pinch = canvas-VIEW-zoom (efemeer, Figma/Preview-gedrag). Scroll
-    // schaalt bewust NIETS meer (de scroll-monitor is verwijderd); het onderwerp
-    // schalen gaat via de selectie-handles.
-    private var magnifyGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                let delta = Double(value) / max(0.0001, lastMagnification)
-                lastMagnification = Double(value)
-                applyViewZoom(delta: delta)
-            }
-            .onEnded { _ in lastMagnification = 1 }
-    }
-
-    /// E24.8: efemere viewport-zoom (1×–maxViewZoom). Geen persist, geen undo.
-    private func applyViewZoom(delta: Double) {
-        viewZoom = min(maxViewZoom, max(1, viewZoom * delta))
-    }
-
     // MARK: - Selectie-handles (E24.8) — onderwerp schalen via de hoeken
 
     static let canvasSpace = "editorCanvas"
 
-    /// Vier hoek-handles + selectiekader op het onderwerp; positie volgt de
-    /// view-zoom (geschaald om het canvasmidden). DEFAULT-gedrag: aspect-locked,
-    /// schaalt om het onderwerp-midden, op `Portrait2.scale`. De open keuzes
-    /// (welke handles / aspect-lock / scale-bron / meerdere lagen) staan in
-    /// DECISIONS-PENDING voor Thierry.
+    /// Vier hoek-handles + selectiekader op het onderwerp. DEFAULT-gedrag:
+    /// aspect-locked, schaalt om het onderwerp-midden, op `Portrait2.scale`.
+    /// E27.1: de handles zitten in canvas-space (1×) direct op het onderwerp; de
+    /// VIEW-zoom is een camera op de hele scène (de handles schalen mee als deel
+    /// van de scène). Correct-onder-de-camera (screen-space-overlay) = 27.3.
     @ViewBuilder
     private func handleLayer(side: CGFloat, imgW: CGFloat, imgH: CGFloat, center: CGPoint) -> some View {
         if portrait != nil {
-            let canvasCenter = CGPoint(x: side / 2, y: side / 2)
-            let centerS = CGPoint(
-                x: canvasCenter.x + (center.x - canvasCenter.x) * viewZoom,
-                y: canvasCenter.y + (center.y - canvasCenter.y) * viewZoom
-            )
-            let halfW = imgW / 2 * viewZoom
-            let halfH = imgH / 2 * viewZoom
+            let centerS = center
+            let halfW = imgW / 2
+            let halfH = imgH / 2
             let corners = [
                 CGPoint(x: centerS.x - halfW, y: centerS.y - halfH),
                 CGPoint(x: centerS.x + halfW, y: centerS.y - halfH),
@@ -399,8 +367,9 @@ struct EditorCanvasView: View {
                             if let portrait { handleBefore = TransformUndo.snapshot(of: portrait) }
                         }
                         guard let startScale = handleStartScale else { return }
-                        // viewZoom valt uit de verhouding (beide afstanden zijn
-                        // even hard meegeschaald rond het onderwerp-midden).
+                        // De afstand-verhouding bepaalt de nieuwe onderwerp-schaal
+                        // (een eventuele camera-zoom schaalt beide afstanden gelijk
+                        // mee en valt zo uit de verhouding).
                         let ratio = distance(value.location, imageCenterOnScreen) / handleStartDist
                         applySubjectScale(to: startScale * ratio)
                     }
