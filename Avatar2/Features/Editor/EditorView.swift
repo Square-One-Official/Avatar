@@ -555,6 +555,23 @@ struct EditorView: View {
                 camera.reset()
                 canvasSubjectSelected = true
             }
+            // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
+            // oorzaak: de enige klik-deselect (EditorCanvasView's Color.clear) dekt
+            // alleen het canvas-VIERKANT, niet de marge eromheen — en de camera-
+            // catcher/overlays zitten nu in die ruimte. Deze laag ligt áchter de
+            // kaart (de catcher laat clicks door via hitTest→nil), vult de hele
+            // foto-slot en deselecteert elke klik die niet op het onderwerp,
+            // de handles of een toolbar landt. Onderwerp-tap (selecteren) en
+            // EditorCanvasView's eigen deselect liggen erbóven → ongemoeid.
+            .background {
+                if canvasSubjectSelected {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.18)) { canvasSubjectSelected = false }
+                        }
+                }
+            }
         } panel: { tool in
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.

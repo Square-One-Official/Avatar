@@ -54,9 +54,22 @@ BEIDE toolbars weg + de hint-pill verschijnt (/tmp/s28_3_deselected.png). De zoo
 blijven (app-/canvas-chrome, geen portret-toolbar).
 
 ## 28.4 — Deselect op lege-canvas-klik werkt ALTIJD [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (AI-agent)
 - blockedBy: —
 Aanhoudende bug: ESC deselecteert wel, maar BUITEN het portret op de canvas klikken laat de transform
 staan. Klikken op lege canvas moet altijd deselecteren (transform + toolbars weg). Supersedes 24.32
 voor het lege-canvas-geval; diagnose waarom de canvas-tap niet doorkomt (overlay/hit-test?) en fix.
 Smoke: selecteer → versleep → klik op lege canvas = deselect; klik op het portret = re-select.
+
+**Diagnose:** de enige klik-deselect (`EditorCanvasView`'s `Color.clear`) dekte alléén het canvas-
+VIERKANT (en bij een cirkel-frame de hoeken); de **marge rondom de kaart** was niet gedekt, en de
+camera-catcher + screen-space-overlays (E27) zitten nu in die ruimte → een klik daar bereikte geen
+deselect-handler.
+**Fix:** een full-slot deselect-laag als `.background` áchter de kaart (de catcher laat clicks door
+via `hitTest→nil`), die elke klik buiten onderwerp/handles/toolbars deselecteert. Onderwerp-tap
+(selecteren) en de bestaande binnen-vierkant-deselect liggen erbóven → ongemoeid. Alléén actief
+wanneer er iets geselecteerd is.
+**DoD/Verificatie:** beide targets + tests groen. Behavioral smoke (echte clicks via CGEvent):
+klik op lege marge → **deselect** (beide toolbars weg + hint, /tmp/s28_4_click.png); klik op het
+portret → **re-select** (toolbars terug, /tmp/s28_4_b_reselect.png). ESC blijft ook deselecteren.
