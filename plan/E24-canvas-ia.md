@@ -5,6 +5,34 @@ Team: **FEAT**. Autonome shift 2026-06-14. **Herziet E22** (geen dubbele structu
 Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-toolbar (midden) =
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
+## 24.32 — Deselect betrouwbaar (outside-click + ESC), ook ná een drag
+- status: done
+- owner: FEAT (AI-agent)
+
+**Diagnose (oorzaak):** de pan-`DragGesture` (default minimumDistance 10pt) hing op de **hele
+canvas-ZStack**, terwijl de deselect-tap (`Color.clear.onTapGesture { isSelected = false }`) eronder
+ligt. Ná een afgeronde drag won de container-gesture de arbitrage en slokte de eerstvolgende tap op
+de marge/hoeken op → "klik-buiten reageert niet altijd". En er was **geen ESC-handler** (geen
+first-responder voor `.cancelAction`). De gesture-state zelf reset wél netjes (`dragStart`/`isDragging`
+op `.onEnded`) — het was de arbitrage, niet stale state.
+
+**Fix:** (a) de pan-drag hangt nu op het **onderwerp** (de `Image`, `contentShape(clip)`) i.p.v. de
+hele box — precies de story-regel "overlay hit-test alleen op handles + onderwerp". Een klik in de
+marge/hoeken bereikt zo altijd de `Color.clear`-deselect-tap, ook direct ná een drag (geen
+container-gesture meer die 'm opslokt). (b) ESC deselecteert altijd via een verborgen
+`Button { isSelected = false }.keyboardShortcut(.cancelAction)` (window-breed, zelfde patroon als de
+Settings-ESC), alleen aanwezig wanneer geselecteerd → staat los van de gesture-state. (c) drag-reset
+was al correct (`.onEnded` nuleert `dragStart`/`dragBefore`/`isDragging`/snap-flags). Pinch-zoom +
+dubbeltik-fit blijven op de container (canvas-breed).
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (`build-v2.sh`). Het *gedrag*
+(klik-buiten-ná-drag deselecteert; ESC deselecteert) is runtime-interactie en niet statisch te
+screenshotten; de fix is structureel (drag verplaatst + ESC-knop) en code+build-geverifieerd. De
+render-staten (geselecteerd = handles, gedeselecteerd = geen) zijn al vastgelegd (24.17/24.29).
+**Figma-TODO:** bevestig of bij een SQUARE-frame "klik buiten" óók binnen het canvas (op de marge
+binnen het vierkant) moet deselecteren, of alleen buiten het frame — en of ESC ook andere
+canvas-popovers moet sluiten.
+
 ## 24.31 — Cutout optioneel ("Original"-achtergrond)
 - status: done
 - owner: FEAT (AI-agent)
