@@ -349,18 +349,13 @@ final class ShellModel {
     /// E24.26 smoke-haak: wis de achtergrond (→ dot-grid actief) om te checken
     /// dat card-surface + dot-grid naar de frame-vorm clippen (hoeken zwart).
     func debugClearBackground() {
-        selectedPortrait?.backgroundColorHex = nil
-        selectedPortrait?.backgroundImageData = nil
-        selectedPortrait?.touch()
+        selectedPortrait?.setBackground(.transparent)
     }
 
     /// E24.31 smoke-haak: zet de Original-achtergrondmodus (toont de originele
     /// foto vol) of terug naar transparant (vrijstaande cutout).
     func debugSetOriginalBackground(_ on: Bool) {
-        guard let p = selectedPortrait else { return }
-        p.useOriginalBackground = on
-        if on { p.backgroundColorHex = nil; p.backgroundImageData = nil }
-        p.touch()
+        selectedPortrait?.setBackground(on ? .original : .transparent)
     }
 
     /// E24.18 smoke-haak: reset de canvas-transform naar "geen transform"
@@ -394,9 +389,7 @@ final class ShellModel {
     func debugSetBackgroundImage(path: String) {
         guard let p = selectedPortrait,
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
-        p.backgroundImageData = data
-        p.backgroundColorHex = nil
-        p.touch()
+        p.setBackground(.image(data))
     }
 
     /// E24.24 smoke-haak: simuleer uploadCustom via de persistente kit (zonder
@@ -405,9 +398,7 @@ final class ShellModel {
         guard let p = selectedPortrait,
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return }
         let stored = BackgroundImageKit.shared.add(data) ?? data
-        p.backgroundImageData = stored
-        p.backgroundColorHex = nil
-        p.touch()
+        p.setBackground(.image(stored))
     }
 
     /// Smoke-run-haak (E05.7): zorg voor ≥2 portretten door het geselecteerde
