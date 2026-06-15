@@ -497,10 +497,7 @@ struct BoardView: View {
     /// E29.2: pas dezelfde achtergrond toe op alle geselecteerde portretten.
     private func applyBackgroundToAll(_ hex: String?) {
         for p in selectedPortraits {
-            p.useOriginalBackground = false
-            p.backgroundImageData = nil
-            p.backgroundColorHex = hex
-            p.touch()
+            p.setBackground(hex.map(PortraitBackground.color) ?? .transparent)
         }
     }
 

@@ -238,35 +238,21 @@ struct BackgroundPanel: View {
     /// E24.31: toon de originele foto vol (omkeerbaar).
     private func selectOriginal() {
         guard let portrait, portrait.originalData != nil else { return }
-        portrait.useOriginalBackground = true
-        portrait.backgroundColorHex = nil
-        portrait.backgroundImageData = nil
-        portrait.touch()
+        portrait.setBackground(.original)
     }
 
     /// E24.31: terug naar de vrijstaande cutout zonder achtergrond.
     private func selectTransparent() {
-        guard let portrait else { return }
-        portrait.useOriginalBackground = false
-        portrait.backgroundColorHex = nil
-        portrait.backgroundImageData = nil
-        portrait.touch()
+        portrait?.setBackground(.transparent)
     }
 
     private func selectColor(_ hex: String) {
-        guard let portrait else { return }
-        portrait.useOriginalBackground = false
-        portrait.backgroundColorHex = hex
-        portrait.backgroundImageData = nil
-        portrait.touch()
+        portrait?.setBackground(.color(hex))
     }
 
     private func selectGradient(_ colors: [Color]) {
         guard let portrait, let png = BackgroundKit.renderGradientPNG(colors) else { return }
-        portrait.useOriginalBackground = false
-        portrait.backgroundImageData = png
-        portrait.backgroundColorHex = nil
-        portrait.touch()
+        portrait.setBackground(.image(png))
     }
 
     private func uploadCustom() {
@@ -279,19 +265,13 @@ struct BackgroundPanel: View {
         // E24.24: persistent opslaan als herbruikbare swatch (+ downscale, 24.23);
         // de teruggegeven PNG wordt meteen de achtergrond.
         let stored = customImages.add(data) ?? data
-        portrait.useOriginalBackground = false
-        portrait.backgroundImageData = stored
-        portrait.backgroundColorHex = nil
-        portrait.touch()
+        portrait.setBackground(.image(stored))
     }
 
     /// E24.24: kies een eerder geüploade (persistente) achtergrond-swatch.
     private func selectCustomImage(_ id: String) {
         guard let portrait, let data = customImages.data(for: id) else { return }
-        portrait.useOriginalBackground = false
-        portrait.backgroundImageData = data
-        portrait.backgroundColorHex = nil
-        portrait.touch()
+        portrait.setBackground(.image(data))
     }
 
 }

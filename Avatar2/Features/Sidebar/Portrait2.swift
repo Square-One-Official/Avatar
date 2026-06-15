@@ -141,6 +141,42 @@ final class Portrait2 {
         get { ExportShape(rawValue: frameShapeRaw) ?? .circle }
         set { frameShapeRaw = newValue.rawValue }
     }
+
+    /// Audit-cleanup (DDD): de achtergrond-keuze als ÉÉN waarde-object i.p.v.
+    /// de drie losse velden (`useOriginalBackground`/`backgroundColorHex`/
+    /// `backgroundImageData`). De "precies één modus"-invariant woont nu in de
+    /// entity i.p.v. handmatig herhaald in BackgroundPanel/board-batch/export.
+    var background: PortraitBackground {
+        if useOriginalBackground { return .original }
+        if let backgroundColorHex { return .color(backgroundColorHex) }
+        if let backgroundImageData { return .image(backgroundImageData) }
+        return .transparent
+    }
+
+    /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`.
+    func setBackground(_ background: PortraitBackground) {
+        switch background {
+        case .transparent:
+            useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = nil
+        case .original:
+            useOriginalBackground = true; backgroundColorHex = nil; backgroundImageData = nil
+        case .color(let hex):
+            useOriginalBackground = false; backgroundColorHex = hex; backgroundImageData = nil
+        case .image(let data):
+            useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = data
+        }
+        touch()
+    }
+}
+
+/// Audit-cleanup (DDD): de achtergrond-modus van een portret. Precies één van:
+/// transparant (vrijstaande cutout), origineel (importfoto vol), kleur (hex) of
+/// afbeelding (preset/gradient/upload — als PNG-bytes).
+enum PortraitBackground: Equatable {
+    case transparent
+    case original
+    case color(String)
+    case image(Data)
 }
 
 /// E24.14: niet-destructieve Adjust-laag (brightness/contrast/saturation/
