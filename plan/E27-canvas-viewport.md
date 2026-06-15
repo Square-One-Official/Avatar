@@ -18,7 +18,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 
 | ID | Story | Team | Status | Branch |
 |----|-------|------|--------|--------|
-| 27.1 | Canvas-camera: zoom + pan | FEAT | ready (plan vastgelegd) | `v2/E27-27.1` |
+| 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | backlog (na 27.1) | `v2/E27-27.2` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | backlog (na 27.1) | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
@@ -26,8 +26,8 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 ---
 
 ## 27.1 — Canvas-camera: zoom + pan  · FEAT
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent)
 - blockedBy: —
 - DoD: beide targets groen + gemerged + Result + screenshot
 
