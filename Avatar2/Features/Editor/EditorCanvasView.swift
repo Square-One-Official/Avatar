@@ -187,19 +187,10 @@ struct EditorCanvasView: View {
     }
 
     private func fitTransform() -> CanvasTransform {
-        let canvas = FramingConstants.editCanvas
-        guard image.size.width > 0, image.size.height > 0 else {
-            return CanvasTransform(offsetX: 0, offsetY: 0, scale: 1)
-        }
-        // E24.18: padded FIT i.p.v. FILL → het onderwerp raakt de framerand niet
-        // (marge in circle én square). Zelfde padding-constante als AutoFramer.
-        let scale = min(canvas.width / image.size.width, canvas.height / image.size.height)
-            * FramingConstants.frameFitPadding
-        return CanvasTransform(
-            offsetX: (canvas.width - image.size.width * scale) / 2,
-            offsetY: (canvas.height - image.size.height * scale) / 2,
-            scale: scale
-        )
+        // E24.18: padded FIT (marge in circle én square). Canonieke berekening:
+        // AutoFramer.fitTransform (gedeeld; voorheen hier 1-op-1 gedupliceerd).
+        let t = AutoFramer.fitTransform(cutoutSize: image.size)
+        return CanvasTransform(offsetX: t.offset.width, offsetY: t.offset.height, scale: t.scale)
     }
 
     private func resetToFit() {

@@ -127,15 +127,10 @@ struct CanvasTransformOverlay: View {
     }
 
     private func fitTransform() -> (offsetX: Double, offsetY: Double, scale: Double) {
-        let canvas = FramingConstants.editCanvas
-        guard image.size.width > 0, image.size.height > 0 else { return (0, 0, 1) }
-        let scale = min(canvas.width / image.size.width, canvas.height / image.size.height)
-            * FramingConstants.frameFitPadding
-        return (
-            (canvas.width - image.size.width * scale) / 2,
-            (canvas.height - image.size.height * scale) / 2,
-            scale
-        )
+        // Canonieke padded-fit: AutoFramer.fitTransform (gedeeld met
+        // EditorCanvasView — voorheen hier 1-op-1 gedupliceerd).
+        let t = AutoFramer.fitTransform(cutoutSize: image.size)
+        return (t.offset.width, t.offset.height, t.scale)
     }
 
     /// Schaalt het onderwerp om zijn eigen midden, geclampt aan de fit-band.
