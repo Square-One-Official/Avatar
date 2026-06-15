@@ -20,7 +20,7 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 |----|-------|------|--------|--------|
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
 | 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
-| 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | backlog (na 27.1) | `v2/E27-27.3` |
+| 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | backlog (na 27.1) | `v2/E27-27.4` |
 
 ---
@@ -136,8 +136,9 @@ action-getint) en de exacte iconen (−/+ SF Symbols) tegen een Figma-referentie
 leggen zodra die er is. ⌘1 "100%" = 1× in dit camera-model (zie 27.1).
 
 ## 27.3 — Transform/guides/popovers correct onder de camera  · FEAT/DS
-- status: backlog
-- blockedBy: 27.1
+- status: in_progress
+- owner: FEAT/DS (AI-agent)
+- blockedBy: 27.1 (done)
 
 Handles, thirds-guides en toolbar-popovers blijven correct gepositioneerd én klikbaar op elk
 zoomniveau (overlay in screen-space, niet mee-schalend tot onleesbaar/onbruikbaar). Dit lost meteen
