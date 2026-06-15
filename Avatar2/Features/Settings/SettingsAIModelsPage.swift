@@ -19,7 +19,7 @@ struct SettingsAIModelsPage: View {
     /// E15.5: dev-detectie voor de Advanced-sectie.
     var entitlement: EntitlementModel?
 
-    @State private var prefs = PrivacyPreferences2.shared
+    private let prefs = PrivacyPreferences2.shared
     @State private var model = HighFidelityModelState()
     /// E15.5: tick om de pickers te laten herrenderen na een keuze.
     @State private var overridesTick = 0
