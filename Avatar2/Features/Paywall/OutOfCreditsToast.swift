@@ -10,21 +10,23 @@ struct OutOfCreditsToastView: View {
     let model: EntitlementModel
 
     private static let duration: TimeInterval = 6
-    @State private var appearedAt = Date.now
+    // Audit-cleanup: één lineair geanimeerde waarde (1→0) i.p.v. een
+    // TimelineView die de hele toast 30×/sec herbouwt voor de balk.
+    @State private var progress: Double = 1
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-            let elapsed = context.date.timeIntervalSince(appearedAt)
-            DSToast(
-                title: "You're out of credits",
-                description: "Top up to keep editing — tap for options.",
-                progress: max(0, 1 - elapsed / Self.duration),
-                onClose: { model.dismissOutOfCreditsToast() }
-            )
-        }
+        DSToast(
+            title: "You're out of credits",
+            description: "Top up to keep editing — tap for options.",
+            progress: progress,
+            onClose: { model.dismissOutOfCreditsToast() }
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             model.requestUpgrade()
+        }
+        .onAppear {
+            withAnimation(.linear(duration: Self.duration)) { progress = 0 }
         }
         .task {
             try? await Task.sleep(for: .seconds(Self.duration))
