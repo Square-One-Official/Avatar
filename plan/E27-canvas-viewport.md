@@ -99,12 +99,41 @@ Zoom-range + grenzen (bv. 25%–400%), soepel rond de cursor in/uitzoomen.
    blijft los van VIEW-zoom; 24.32-deselect werkt nog op elk zoomniveau. Screenshots per zoomniveau.
 
 ## 27.2 — Zoom-HUD + sneltoetsen  · DS/FEAT
-- status: in_progress
+- status: done
 - owner: DS/FEAT (AI-agent)
 - blockedBy: 27.1 (done)
 
 Zwevende zoom-HUD (−/slider/+ en fit) met het huidige zoom-%. Sneltoetsen: ⌘0 = fit, ⌘1 = 100%,
 ⌘+/⌘−. Consistent met de DS-stijl.
+
+**Result:** nieuwe DS-component `DSZoomHUD` (`AvatarUI`) — één capsule in DS-stijl
+(`.ultraThinMaterial` + `Foreground.divider`-rand, identiek aan de
+CanvasActionToolbar) met **− / slider / +** en een **fit-knop die tegelijk het
+huidige zoom-%** toont (klik = fit/⌘0). De slider loopt **logaritmisch** tussen
+`min`/`max` (0.25–4×) zodat gelijke stappen gelijke zoom-verhoudingen geven en
+100% (= de fit-schaal) in het midden valt: 50%/100%/200%/400% staan op 1/4, 1/2,
+3/4, 1/1. De − dimt/disabled op min, de + op max. Puur presentational: schaal in,
+callbacks uit (camera-math blijft in `CanvasCamera`/`EditorView`, FEAT).
+`EditorView` plaatst de HUD linksonder (tegenover undo/redo rechtsonder) en wired
+'m op de camera: slider → `setCameraScale` (absolute schaal om het midden), −/+ →
+`zoomCentered`, fit/% → `camera.reset()`. De sneltoetsen ⌘0(fit)/⌘1(100%)/⌘+/⌘−
+zijn al in 27.1 gelegd (verborgen `keyboardShortcut`-knoppen) en blijven gelden;
+de HUD-tooltips noemen ze.
+
+**DoD/Verificatie:** beide targets bouwen + alle pakkettests groen (`build-v2.sh`
+→ "alles groen"). Visuele smoke per zoomniveau (`--cam-zoom`): 50%
+(/tmp/hud_050.png — slider op 1/4, "50%"), 100%/fit (/tmp/hud_100.png — slider
+gecentreerd, "100%"), 200% (/tmp/hud_200.png — slider op 3/4, "200%"). De HUD
+staat vrij van de bottom-toolbar (midden) en de undo/redo-cluster (rechts).
+Slider→camera en knop-acties zijn dezelfde camera-paden als de
+(werkende) sneltoetsen; de % + slider-positie volgen `camera.scale` correct op
+elk geseed niveau. Window-capture via CGWindowID.
+
+**Figma-TODO:** er is (nog) geen Figma-frame voor de zoom-HUD — gebouwd in de
+geest van de DS-stijl (capsule/material/divider zoals de CanvasActionToolbar);
+plaatsing (linksonder), de fit-knop-als-%-readout, de slider-styling (native,
+action-getint) en de exacte iconen (−/+ SF Symbols) tegen een Figma-referentie
+leggen zodra die er is. ⌘1 "100%" = 1× in dit camera-model (zie 27.1).
 
 ## 27.3 — Transform/guides/popovers correct onder de camera  · FEAT/DS
 - status: backlog
