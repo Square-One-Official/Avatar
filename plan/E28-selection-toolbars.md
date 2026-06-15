@@ -37,7 +37,8 @@ DoD: beide targets + tests groen. Smoke: geselecteerd = toolbar bovenaan zichtba
 na ESC-deselect = toolbar weg (/tmp/s28_2_deselected.png). De bottom-toolbar volgt in 28.3.
 
 ## 28.3 — Onderste tool-buttons → toolbar-layout, targetend [DS/FEAT]
-- status: backlog
+- status: in_progress
+- owner: DS/FEAT (AI-agent)
 - blockedBy: 28.1
 De onderste icon-buttons (Effects/Face/Clothing/Hair) volgen óók de selectie: niks geselecteerd →
 ook deze verdwijnen (besluit Thierry: beide toolbars weg bij geen selectie). Overweeg een minimale
