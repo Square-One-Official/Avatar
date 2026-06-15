@@ -106,6 +106,11 @@ struct EditorCanvasView: View {
                     // → transform-handles verschijnen.
                     .contentShape(clip)
                     .onTapGesture { isSelected = true }
+                    // E24.32: de pan-drag hangt nu op het ONDERWERP (niet de hele
+                    // box), zodat een klik in de marge/hoeken altijd de
+                    // deselect-tap (Color.clear, onder) bereikt — ook direct ná
+                    // een drag (geen container-gesture die de tap opslokt).
+                    .gesture(dragGesture(canvasSide: side))
 
                 // E24.19: uitlijn-gids als VAST doel-overlay — buiten de
                 // scaleEffect/clip en op canvasmaat, dus hij schaalt/beweegt NIET
@@ -120,11 +125,19 @@ struct EditorCanvasView: View {
                 // E24.8/24.17: selectie-handles — alléén zichtbaar als geselecteerd.
                 if isSelected {
                     handleLayer(side: side, imgW: imgW, imgH: imgH, center: imgCenter)
+                    // E24.32: ESC deselecteert altijd (window-brede cancelAction op
+                    // een verborgen knop, zelfde patroon als de Settings-ESC). Geldt
+                    // ook direct ná een drag — staat los van de gesture-state.
+                    Button("") { isSelected = false }
+                        .keyboardShortcut(.cancelAction)
+                        .opacity(0)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
             // E24.17: pinch = canvas-VIEW-zoom (Figma/Preview). Trackpad/scroll
-            // schaalt niets meer (scroll-monitor verwijderd). Pan blijft op drag.
-            .gesture(dragGesture(canvasSide: side))
+            // schaalt niets meer (scroll-monitor verwijderd). De pan-drag zit nu
+            // op het onderwerp (E24.32), niet meer op de hele box.
             .simultaneousGesture(magnifyGesture)
             .onTapGesture(count: 2) {
                 resetToFit()
