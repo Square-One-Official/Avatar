@@ -15,12 +15,12 @@ enum CutoutDataUndo {
         redoTo after: Data,
         actionName: String
     ) {
-        guard let undoManager, before != after else { return }
-        undoManager.registerUndo(withTarget: portrait) { target in
-            target.cutoutData = before
+        guard before != after else { return }
+        ReversibleChange.register(
+            undoManager, target: portrait, from: before, to: after, actionName: actionName
+        ) { target, data in
+            target.cutoutData = data
             target.touch()
-            register(undoManager, portrait: target, undoTo: after, redoTo: before, actionName: actionName)
         }
-        undoManager.setActionName(actionName)
     }
 }

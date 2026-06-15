@@ -21,11 +21,11 @@ enum AdjustUndo {
         redoTo after: PortraitAdjust,
         actionName: String
     ) {
-        guard let undoManager, before != after else { return }
-        undoManager.registerUndo(withTarget: target) { target in
-            apply(before)
-            register(undoManager, target: target, apply: apply, undoTo: after, redoTo: before, actionName: actionName)
+        guard before != after else { return }
+        ReversibleChange.register(
+            undoManager, target: target, from: before, to: after, actionName: actionName
+        ) { _, adjust in
+            apply(adjust)
         }
-        undoManager.setActionName(actionName)
     }
 }

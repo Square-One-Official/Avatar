@@ -626,14 +626,14 @@ final class BoardThumbnailCache {
 /// patroon als TransformUndo: de undo herstelt de oude positie én registreert de
 /// redo).
 enum BoardMoveUndo {
+    @MainActor
     static func register(_ undoManager: UndoManager?, portrait: Portrait2, from old: CGPoint, to new: CGPoint) {
-        guard let undoManager, old != new else { return }
-        undoManager.registerUndo(withTarget: portrait) { target in
-            let current = CGPoint(x: target.boardX, y: target.boardY)
-            target.boardX = old.x
-            target.boardY = old.y
-            register(undoManager, portrait: target, from: current, to: old)
+        guard old != new else { return }
+        ReversibleChange.register(
+            undoManager, target: portrait, from: old, to: new, actionName: "Move portrait"
+        ) { target, point in
+            target.boardX = point.x
+            target.boardY = point.y
         }
-        undoManager.setActionName("Move portrait")
     }
 }
