@@ -323,47 +323,50 @@ struct EditorCanvasView: View {
 
 }
 
-// MARK: - Uitlijn-gids (E24.19 — rule-of-thirds + ooglijn-doel, DS-stijl)
+// MARK: - Uitlijn-gids (E24.35 — gezichtsvorm + oog-markers, DS-stijl)
 
-/// VASTE doel-overlay: een rule-of-thirds-grid over de VOLLE canvas + een
-/// nadruk-ooglijn op de standaard-positie (FramingConstants, ogen op de
-/// bovenste derde) met oogmarkers. Action-lime. De afbeelding lijnt hiernaartoe
-/// uit (auto-align mikt op dezelfde constants). Wordt BOVEN de frame-clip
-/// gerenderd en op canvasmaat geframed → de lijnen beslaan de hele canvas en
-/// breken niet af op de cirkel-/frame-rand. Fade 0,15 s.
+/// VASTE doel-overlay: een rustige GEZICHT-silhouet (hoofd-ovaal) met twee
+/// oog-markers op de standaard-positie (FramingConstants). Géén rule-of-thirds-
+/// lijnen meer (24.35) — de gebruiker ziet meteen waar het hoofd/de ogen horen
+/// te landen; de afbeelding lijnt hiernaartoe uit (auto-align mikt op dezelfde
+/// constants). Action-lime, subtiel. Wordt BOVEN de frame-clip gerenderd en op
+/// canvasmaat geframed → niet afgekapt op de cirkel-/frame-rand. Fade 0,15 s.
 struct AlignmentGuideOverlay2: View {
     let isVisible: Bool
-    /// E27.3: 1/camera-zoom (E27.1) — de gids zit ín de scène en schaalt mee,
-    /// dus de lijn-diktes worden hierdoor gedeeld zodat ze op élk zoomniveau even
-    /// dun/leesbaar blijven (de líjnen volgen wel de frame-derde, die mee-zoomt).
+    /// E27.3: 1/camera-zoom (E27.1) — de gids zit ín de scène en schaalt mee. De
+    /// silhouet-VORM volgt de frame-positie (zoomt mee), maar lijn-diktes/marker-
+    /// maten worden door deze factor gedeeld zodat ze op élk zoomniveau even
+    /// dun/groot op het scherm blijven.
     var inverseCameraScale: CGFloat = 1
 
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let eyeCY = FramingConstants.targetEyeCenterY * side
             let inv = inverseCameraScale
 
-            ZStack {
-                // E24.29: DUNNE, subtiele rule-of-thirds (alleen compositie-hint).
-                Path { p in
-                    for f in [1.0 / 3.0, 2.0 / 3.0] {
-                        p.move(to: CGPoint(x: side * f, y: 0))
-                        p.addLine(to: CGPoint(x: side * f, y: side))
-                        p.move(to: CGPoint(x: 0, y: side * f))
-                        p.addLine(to: CGPoint(x: side, y: side * f))
-                    }
-                }
-                .stroke(DSColor.Foreground.primary.opacity(0.12), lineWidth: 0.5 * inv)
+            // Doel-posities uit FramingConstants (ogen op de bovenste derde).
+            let centerX = FramingConstants.targetEyeCenterX * side
+            let eyeY = FramingConstants.targetEyeCenterY * side
+            let headCenterY = FramingConstants.targetFaceCenterY * side
+            let headHeight = FramingConstants.targetFaceHeightRatio * side
+            let headWidth = headHeight * 0.74
+            let interEye = FramingConstants.targetInterEyeRatio * side
+            let eyeDiameter = max(3, side * 0.022) * inv
 
-                // E24.29: ÉÉN duidelijk geaccentueerde uitlijnlijn (hoofd/ogen) —
-                // feller lime, dikker → meteen het focuspunt. De oogmarkers +
-                // het hoofd-ovaal zijn weg (te druk).
-                Path { p in
-                    p.move(to: CGPoint(x: 0, y: eyeCY))
-                    p.addLine(to: CGPoint(x: side, y: eyeCY))
+            ZStack {
+                // Hoofd/gezicht-silhouet — een rustig ovaal als doelvorm.
+                Ellipse()
+                    .stroke(DSColor.Action.primary.opacity(0.8), lineWidth: 1.5 * inv)
+                    .frame(width: headWidth, height: headHeight)
+                    .position(x: centerX, y: headCenterY)
+
+                // Twee oog-markers op de ooglijn (interoog-afstand uit constants).
+                ForEach([-1.0, 1.0], id: \.self) { sign in
+                    Circle()
+                        .fill(DSColor.Action.primary)
+                        .frame(width: eyeDiameter, height: eyeDiameter)
+                        .position(x: centerX + CGFloat(sign) * interEye / 2, y: eyeY)
                 }
-                .stroke(DSColor.Action.primary, lineWidth: 1.5 * inv)
             }
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 1 * inv)
