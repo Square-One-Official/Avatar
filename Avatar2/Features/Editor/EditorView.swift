@@ -615,16 +615,21 @@ struct EditorView: View {
                 BackgroundPanel(portrait: portraitModel)
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
-                // /v1/stylize (nano-banana instruction-edit).
+                // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
+                // de panel-view-models seeden hun basisbeeld eenmalig via @State —
+                // bij een portret-wissel moet het paneel herbouwen (anders stale).
                 ClothesPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change clothes"))
+                    .id(portraitModel?.persistentModelID)
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize. E24.33: het
                 // portret levert de effect-cache (instant schakelen, geen regen).
                 EffectsPanel(baseImage: rawCutout, entitlement: entitlement, portrait: portraitModel, onApply: undoableApply("Apply effect"))
+                    .id(portraitModel?.persistentModelID)
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
                 // /v1/stylize (nano-banana instruction-edit, E11.1-route).
                 HairPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change hair"))
+                    .id(portraitModel?.persistentModelID)
             } else {
                 DSEditPanel(title: tool.label) {
                     Text("\(tool.label) tools land here (\(tool.pendingStory)).")
