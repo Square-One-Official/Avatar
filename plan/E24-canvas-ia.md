@@ -6,7 +6,7 @@ Model: canvas-toolbar = scène/beeld (tekst+icoon, op het portret) · bottom-too
 alleen de persoon (Effects/Face/Clothing/Hair) · top-right = app-chrome.
 
 ## 24.33 — Effects: None-optie, toggle-off, cache + refresh  · FEAT/DS
-- status: in_progress
+- status: done
 - owner: FEAT/DS (AI-agent)
 
 REGRESSIE: de None-kaart ontbreekt en een effect uitzetten + weer aanzetten genereert OPNIEUW (lange
@@ -15,6 +15,33 @@ nogmaals tikken = uit (None); (c) CACHE per effect op het portret → None ↔ e
 INSTANT, nooit opnieuw genereren, geen nieuwe credits; (d) refresh-icoon rechtsboven in de actieve
 thumbnail = bewuste her-generatie (kost credits), tooltip "Regenerate". DoD: beide targets groen +
 merge + Result + screenshot.
+
+**Result:** `EffectsModel` is herschreven rond een **cache op het portret**.
+`Portrait2` kreeg `effectBaseData` (het origineel/None-beeld, eenmalig vastgelegd),
+`effectActiveRaw` (actief effect, nil = None) en `effectCache` (JSON
+[rawValue: PNG], externalStorage). De model hydrateert hieruit bij openen →
+reopen behoudt cache + active-state. Schakelen:
+- **None** (kaart links, toont het origineel-preview): `onApply(base)`, geen call.
+- **effect met cache-hit**: `onApply(cache[style])` — géén `allowCloudFeature`,
+  géén backend-stylize, géén credits, géén `entitlement.refresh()`. INSTANT.
+- **effect zonder cache**: genereert één keer (credits), cachet, persisteert.
+- **toggle actief effect** → None.
+- **refresh-icoon** (alleen op de actieve effect-kaart, via de nieuwe
+  `DSThumbnailCard.onRefresh`, tooltip "Regenerate"): bewuste her-generatie (kost
+  dan wél credits).
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (`build-v2.sh`).
+Screenshot van het paneel: de **None-kaart staat helemaal links** met het echte
+portret-preview + active-check; daarna Clay/Wood/3D/Scribble (/tmp/fx_panel.png).
+De cache-paden (instant, geen credits) zijn code-geverifieerd — het schakelen
+roept geen backend/credit-pad aan; een echte generatie vereist online+credits en
+is hier niet headless te smoken (zoals eerdere cloud-stories). **Figma-TODO:**
+None-kaart-styling (eigen icoon vs. origineel-preview) + refresh-icoon-plaatsing/
+grootte tegen Figma leggen; echte stijl-thumbnails (ASSETS.md) vervangen de
+sparkles-placeholders nog.
+**Nuance:** de cache bewaart de stylize-output; bij herstel her-isoleert
+`applyEffectResult` lokaal (gratis, sub-seconde) als die output een achtergrond
+had — geen backend-regen, geen credits.
 
 ## 24.35 — Uitlijn-gids = gezichtsvorm met ogen (geen lijnen)  · DS/FEAT
 - status: ready
