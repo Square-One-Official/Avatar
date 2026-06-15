@@ -31,12 +31,31 @@ klik-/gesture-paden gebouwd (CGEvent-clicks registreren, zie 28.4); de selectie-
 seed-haak geverifieerd. **Figma-TODO:** ring-styling + marquee-vulling/-rand tegen Figma.
 
 ## 29.2 — Batch toepassen via de toolbar [FEAT/DS]
-- status: in_progress
+- status: done
 - owner: FEAT/DS (AI-agent)
 - blockedBy: 29.1
 Met meerdere geselecteerd past de toolbar acties toe op ALLE geselecteerde portretten tegelijk:
 dezelfde Background, en dezelfde Adjust/kleurcorrecties. Toolbar toont de batch-context ("N
 geselecteerd"). Per-portret cache/transparantie (24.30/24.33) gerespecteerd.
+
+**Result:** een zwevende **batch-toolbar** (`boardBatchBar`, top-overlay) verschijnt zodra er ≥1
+geselecteerd is: "N selected" + **Background** (Transparent + presets) + **Adjust** (dropdown met de
+bestaande `EditColorPanel`). Beide werken op de hele selectie:
+- `applyBackgroundToAll(hex)` zet dezelfde achtergrond op elk geselecteerd portret (kleur of
+  Transparent; useOriginalBackground/imageData gewist). De board-node toont de gekozen kleur achter
+  de cutout → batch-Background is meteen zichtbaar.
+- `applyAdjustToAll(after)` zet dezelfde `PortraitAdjust` op elk geselecteerd portret (op commit van
+  de EditColorPanel).
+Per-portret cache/transparantie (24.30/24.33) blijft intact (we raken alleen de background-/adjust-
+velden, niet `cutoutData`/`effectCache`).
+
+**DoD/Verificatie:** beide targets + tests groen (`build-v2.sh`). Smoke (`--board-select 3
+--board-batch-bg 8B5CF6`): de batch-bar toont "3 selected" + Background/Adjust, en exact de 3
+geselecteerde nodes krijgen de paarse achtergrond; de rest ongemoeid (/tmp/s29_2_clean.png). De
+test-achtergronden zijn daarna weer gewist (store schoon). **Nuance:** batch-Adjust schrijft naar
+`portrait.adjust` (zichtbaar in de editor/export); de board-thumbnail toont de rauwe cutout, dus
+adjust is daar niet zichtbaar — code-geverifieerd. **Figma-TODO:** batch-bar-styling, swatch-set en
+de Adjust-dropdown tegen Figma leggen.
 
 ## 29.3 — "Match lighting" over de selectie [AI/FEAT]
 - status: backlog
