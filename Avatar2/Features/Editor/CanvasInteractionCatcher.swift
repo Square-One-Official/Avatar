@@ -15,6 +15,11 @@ import SwiftUI
 
 struct CanvasInteractionCatcher: NSViewRepresentable {
     @Binding var camera: CanvasCamera
+    /// True wanneer de cursor boven open chrome (menu/paneel) staat dat zelf moet
+    /// scrollen — dan laat de catcher scroll/pinch/spatie-drag dóór i.p.v. de
+    /// canvas te bewegen. Default: nooit (bv. de board kent geen overlappende
+    /// menu's).
+    var chromeHovered: Bool = false
 
     func makeCoordinator() -> Coordinator { Coordinator(camera: $camera) }
 
@@ -26,6 +31,7 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.camera = $camera
+        context.coordinator.chromeHovered = chromeHovered
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -41,6 +47,7 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
 
     final class Coordinator {
         var camera: Binding<CanvasCamera>
+        var chromeHovered = false
         private weak var view: NSView?
         private var monitor: Any?
         private var spaceDown = false
@@ -54,7 +61,7 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
         func attach(to view: NSView) {
             self.view = view
             monitor = NSEvent.addLocalMonitorForEvents(
-                matching: [.scrollWheel, .keyDown, .keyUp, .leftMouseDragged]
+                matching: [.scrollWheel, .magnify, .keyDown, .keyUp, .leftMouseDragged]
             ) { [weak self] event in
                 self?.handle(event) ?? event
             }
@@ -67,6 +74,12 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
 
         /// `nil` = consumeren (camera), anders = doorlaten.
         private func handle(_ event: NSEvent) -> NSEvent? {
+            // Cursor boven een open menu/paneel → laat scroll/pinch/spatie-drag
+            // dóór zodat dat element scrollt i.p.v. de canvas.
+            if chromeHovered,
+               event.type == .scrollWheel || event.type == .magnify || event.type == .leftMouseDragged {
+                return event
+            }
             switch event.type {
             case .keyDown where event.keyCode == spaceKeyCode:
                 // Spatie = pan-modus aan; doorlaten (geen tekstveld in de editor).
@@ -96,6 +109,15 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
                     cam.offset.width += event.scrollingDeltaX
                     cam.offset.height += event.scrollingDeltaY
                 }
+                camera.wrappedValue = cam
+                return nil
+            case .magnify:
+                // Trackpad-pinch = zoom rond de cursor. Op NSEvent-niveau (i.p.v.
+                // een SwiftUI MagnifyGesture) → werkt óók als het onderwerp
+                // geselecteerd is (de handle-overlay zit er dan bovenop).
+                guard let point = pointInCanvas(for: event) else { return event }
+                var cam = camera.wrappedValue
+                cam.zoom(by: 1 + event.magnification, around: point, in: viewBoundsSize())
                 camera.wrappedValue = cam
                 return nil
             default:
