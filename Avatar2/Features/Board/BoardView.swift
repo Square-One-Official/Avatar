@@ -29,7 +29,6 @@ struct BoardView: View {
 
     // Camera met een lagere min-zoom dan de editor, zodat een grote set in beeld past.
     @State private var camera = CanvasCamera(minScale: 0.1)
-    @State private var lastMagnification: CGFloat = 1
     @State private var viewport: CGSize = .zero
     /// De laatst auto-gefitte camera. Zolang de camera hieraan gelijk is (de
     /// gebruiker heeft 'm niet aangeraakt) blijft de board mee-fitten op
@@ -101,7 +100,6 @@ struct BoardView: View {
                             CanvasInteractionCatcher(camera: $camera)
                             boardShortcutButtons
                         }
-                        .simultaneousGesture(pinch)
                 }
 
                 hud
@@ -365,16 +363,8 @@ struct BoardView: View {
     }
 
     // MARK: - Camera (E27.1)
-
-    private var pinch: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let delta = value.magnification / max(0.0001, lastMagnification)
-                lastMagnification = value.magnification
-                camera.zoomCentered(by: delta)
-            }
-            .onEnded { _ in lastMagnification = 1 }
-    }
+    // Pinch-zoom wordt afgehandeld door CanvasInteractionCatcher (NSEvent
+    // .magnify), zodat het ook werkt als er iets geselecteerd is.
 
     @ViewBuilder
     private var boardShortcutButtons: some View {

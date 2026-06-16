@@ -99,16 +99,21 @@ struct EditorView: View {
     /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
     /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
     @State private var camera = CanvasCamera()
-    /// Pinch-accumulatie (MagnifyGesture geeft een cumulatieve magnification).
-    @State private var lastMagnification: CGFloat = 1
+    /// E-fix: cursor staat boven een open menu/paneel → de canvas-catcher laat
+    /// scroll/pinch dóór (anders scrollt het canvas i.p.v. het menu).
+    @State private var pointerOverChrome = false
     /// E24.26: grid/thirds-overlay aan/uit (toolbar-toggle).
     @State private var canvasGridEnabled = false
     /// E24.29: onderwerp geselecteerd (gelift uit EditorCanvasView) zodat het
     /// dot-grid tijdens transform gedimd kan worden. E28.1: dit is de single
     /// source of truth van de editor-selectie — standaard TRUE (bij openen is het
     /// portret geselecteerd zodat de toolbars meteen zichtbaar zijn) en het
-    /// stuurt de zichtbaarheid van beide toolbars (28.2/28.3).
-    @State private var canvasSubjectSelected = true
+    /// E28.5: in de enkel-portret-editor is het portret altijd "het actieve
+    /// canvas" → de toolbars zijn ALTIJD zichtbaar (selectie-gestuurd verbergen
+    /// hoort bij meerdere canvassen, de board). Deze vlag stuurt nu enkel nog de
+    /// transform-HANDLES (klik op het onderwerp → handles; klik op lege canvas /
+    /// ESC → handles weg). Default false (geen handles tot je het onderwerp kiest).
+    @State private var canvasSubjectSelected = false
     /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
     /// transform-overlay de handles tijdens het pannen even verbergt.
     @State private var canvasSubjectPanning = false
@@ -327,18 +332,6 @@ struct EditorView: View {
         )
     }
 
-    // E27.1: pinch = VIEW-zoom om het midden. MagnifyGesture levert een
-    // cumulatieve magnification; we zetten 'm om naar een delta-factor per frame.
-    private var cameraPinchGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let delta = value.magnification / max(0.0001, lastMagnification)
-                lastMagnification = value.magnification
-                camera.zoomCentered(by: delta)
-            }
-            .onEnded { _ in lastMagnification = 1 }
-    }
-
     // E27.1: verborgen sneltoets-knoppen voor ⌘+/⌘−/⌘0(fit)/⌘1(100%). ⌘= vangt
     // de toets zonder shift; alles animeert soepel. Geen UI, geen hit-test.
     @ViewBuilder
@@ -384,13 +377,11 @@ struct EditorView: View {
     }
 
     private var editorBody: some View {
-        // E28.3: de bottom-toolbar (Effects/Face/Clothing/Hair) volgt de selectie —
-        // verschijnt alléén met een geselecteerd portret. De sidebar-/Images-modus
-        // houdt de toolbar wél (de sidebar IS een tool-keuze, geen canvas-deselect).
+        // E28.5: de toolbars zijn altijd zichtbaar in de editor (één portret =
+        // altijd het actieve canvas).
         DSEditPanelContainer(
             tools: Self.toolbarItems,
-            activeTool: toolSelection,
-            showsToolbar: canvasSubjectSelected || isSidebarVisible
+            activeTool: toolSelection
         ) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
@@ -450,7 +441,6 @@ struct EditorView: View {
             // om het midden.
             .scaleEffect(camera.scale, anchor: .center)
             .offset(camera.offset)
-            .simultaneousGesture(cameraPinchGesture)
             // E27.3: de selectie-handles + kader als SCREEN-SPACE overlay op de
             // (camera-getransformeerde) kaart — vaste schermgrootte, en doordat ze
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
@@ -482,7 +472,12 @@ struct EditorView: View {
             // de knoppen leveren ⌘+/⌘−/⌘0(fit)/⌘1(100%).
             .clipped()
             .background {
-                CanvasInteractionCatcher(camera: $camera)
+                // chromeHovered telt alléén als er ook echt een menu/paneel open
+                // is → een stale hover-true kan canvas-scroll nooit blokkeren.
+                CanvasInteractionCatcher(
+                    camera: $camera,
+                    chromeHovered: pointerOverChrome && (canvasMenu != nil || activeTool != nil)
+                )
                 cameraShortcutButtons
             }
             .padding(.top, DSSpacing.gap8)
@@ -498,62 +493,34 @@ struct EditorView: View {
                         }
                 }
             }
-            // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret —
-            // vervangt de losse rechter-cluster. Boven de tap-dismiss zodat de
-            // knoppen/popovers klikbaar blijven. E28.2: alléén zichtbaar bij
-            // selectie (zweeft boven het geselecteerde portret; weg bij deselect).
+            // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret.
+            // E28.5: ALTIJD zichtbaar in de editor (één portret = altijd actief);
+            // selectie-gestuurd verbergen hoort bij de board (meerdere canvassen).
+            // `.onHover` op de dropdown-content laat de catcher scroll dóór zodat
+            // het menu scrollt i.p.v. de canvas.
             .overlay(alignment: .top) {
-                if canvasSubjectSelected {
-                    CanvasActionToolbar(
-                        onAutoFrame: runAutomaticFraming,
-                        onFlip: flipHorizontally,
-                        frameShape: portraitModel?.frameShape ?? .circle,
-                        onSetFrameShape: setFrameShape,
-                        onRestoreBody: { _ = entitlement?.allowCloudFeature() },
-                        onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-                        onColorise: { _ = entitlement?.allowCloudFeature() },
-                        onBoost: runBoostResolution,
-                        isPro: entitlement?.isProActive ?? false,
-                        activeMenu: $canvasMenu,
-                        gridEnabled: $canvasGridEnabled,
-                        adjust: { editColorPanel },
-                        background: { BackgroundPanel(portrait: portraitModel) }
-                    )
-                    .padding(.top, DSSpacing.gap4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-            // E28.2/28.3: bij deselect een open canvas-dropdown + bottom-paneel
-            // sluiten (de hele editen-chrome hoort bij het geselecteerde portret).
-            .onChange(of: canvasSubjectSelected) { _, selected in
-                if !selected {
-                    canvasMenu = nil
-                    if !isSidebarVisible { activeTool = nil }
-                }
-            }
-            .animation(.easeOut(duration: 0.18), value: canvasSubjectSelected)
-            // E28.3: minimale affordance bij geen selectie — klik het portret om te
-            // bewerken (beide toolbars zijn dan weg).
-            .overlay(alignment: .bottom) {
-                if !canvasSubjectSelected && !isSidebarVisible {
-                    Text("Click the portrait to edit")
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .padding(.horizontal, DSSpacing.gap3)
-                        .frame(height: 30)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
-                        .padding(.bottom, DSSpacing.gap4)
-                        .transition(.opacity)
-                        .allowsHitTesting(false)
-                }
+                CanvasActionToolbar(
+                    onAutoFrame: runAutomaticFraming,
+                    onFlip: flipHorizontally,
+                    frameShape: portraitModel?.frameShape ?? .circle,
+                    onSetFrameShape: setFrameShape,
+                    onRestoreBody: { _ = entitlement?.allowCloudFeature() },
+                    onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
+                    onColorise: { _ = entitlement?.allowCloudFeature() },
+                    onBoost: runBoostResolution,
+                    isPro: entitlement?.isProActive ?? false,
+                    activeMenu: $canvasMenu,
+                    gridEnabled: $canvasGridEnabled,
+                    adjust: { editColorPanel.onHover { pointerOverChrome = $0 } },
+                    background: { BackgroundPanel(portrait: portraitModel).onHover { pointerOverChrome = $0 } }
+                )
+                .padding(.top, DSSpacing.gap4)
             }
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
-            // E28.1: een nieuw/ander portret is meteen geselecteerd (re-target →
-            // toolbars zichtbaar voor het nieuwe portret).
+            // E28.5: een ander portret start gedeselecteerd (handles weg).
             .onChange(of: portraitModel?.persistentModelID) { _, _ in
                 camera.reset()
-                canvasSubjectSelected = true
+                canvasSubjectSelected = false
             }
             // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
             // oorzaak: de enige klik-deselect (EditorCanvasView's Color.clear) dekt
@@ -573,6 +540,9 @@ struct EditorView: View {
                 }
             }
         } panel: { tool in
+            // E-fix: cursor boven het bottom-paneel → de catcher laat scroll dóór
+            // (het paneel scrollt i.p.v. de canvas).
+            Group {
             if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
@@ -638,6 +608,8 @@ struct EditorView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            }
+            .onHover { pointerOverChrome = $0 }
         }
         .padding(.horizontal, DSSpacing.gap3)
         .padding(.bottom, DSSpacing.gap2)
