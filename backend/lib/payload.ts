@@ -13,6 +13,28 @@
 const PAYLOAD_API_URL = process.env.PAYLOAD_API_URL ?? "";
 const PAYLOAD_API_KEY = process.env.PAYLOAD_API_KEY ?? "";
 
+/**
+ * Normalize `PAYLOAD_API_URL` into a valid http(s) base, or `null` when it is
+ * missing/malformed. A bare host without a scheme (e.g. `admin.aaavatar.nl`)
+ * is the misconfig that made `fetch` throw `TypeError: fetch failed` /
+ * "unknown scheme" — `new URL` then parses the host as the scheme. We prepend
+ * `https://` so a scheme-less value still works, and validate the result so
+ * genuine garbage disables the CMS gracefully (return `[]`/`false`) instead of
+ * throwing on every call.
+ */
+function payloadBase(): string | null {
+  let u = PAYLOAD_API_URL.trim().replace(/\/+$/, "");
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
 /** What the backend needs from one Payload announcement document. */
 export type PayloadAnnouncement = {
   slug: string;
@@ -55,16 +77,17 @@ export async function fetchPublishedAnnouncements(): Promise<PayloadAnnouncement
     return cache.payload;
   }
 
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    // Misconfigured → return empty so the macOS app never sees a 500 on a
-    // path that's only loosely critical.
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — announcements disabled");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    // Misconfigured (missing/invalid URL or key) → return empty so the macOS
+    // app never sees a 500 on a path that's only loosely critical.
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — announcements disabled");
     return [];
   }
 
   // Fetch published, non-expired announcements. Payload uses the `where`
   // querystring with bracketed operators.
-  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/announcements`);
+  const url = new URL(`${base}/announcements`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("depth", "1");
   url.searchParams.set("where[publishedAt][exists]", "true");
@@ -246,12 +269,13 @@ export async function recordNewsletterUnsubscribe(
   email: string,
   source: "one_click" | "list_unsubscribe_post" | "manual" = "one_click",
 ): Promise<boolean> {
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — unsubscribe NOT recorded");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — unsubscribe NOT recorded");
     return false;
   }
 
-  const url = `${PAYLOAD_API_URL.replace(/\/$/, "")}/newsletter-unsubscribes`;
+  const url = `${base}/newsletter-unsubscribes`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -312,12 +336,13 @@ export async function fetchPublishedMessages(): Promise<PayloadMessage[]> {
   if (messageCache && messageCache.expiresAt > now) {
     return messageCache.payload;
   }
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — messages disabled");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — messages disabled");
     return [];
   }
 
-  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/messages`);
+  const url = new URL(`${base}/messages`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("depth", "1");
   // publishedAt leeft onder de schedule-group → dot-notation in de where.
