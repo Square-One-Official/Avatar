@@ -118,6 +118,10 @@ final class BackgroundImageKit {
     private(set) var imageIDs: [String]
 
     @ObservationIgnored private let defaults: UserDefaults
+    /// Audit-cleanup: gedecodeerde swatches cachen (id → NSImage). Swatch-ids
+    /// zijn immutable UUID's (één keer geschreven), dus dit kan niet stale raken;
+    /// het scheelt een file-read + decode per render in de swatch-rij.
+    @ObservationIgnored private var imageCache: [String: NSImage] = [:]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -135,7 +139,12 @@ final class BackgroundImageKit {
 
     func data(for id: String) -> Data? { url(id).flatMap { try? Data(contentsOf: $0) } }
 
-    func image(for id: String) -> NSImage? { data(for: id).flatMap { NSImage(data: $0) } }
+    func image(for id: String) -> NSImage? {
+        if let cached = imageCache[id] { return cached }
+        guard let img = data(for: id).flatMap({ NSImage(data: $0) }) else { return nil }
+        imageCache[id] = img
+        return img
+    }
 
     /// Slaat een upload (downscaled) persistent op + voegt 'm als swatch toe.
     /// Geeft de opgeslagen (downscaled) PNG terug voor direct gebruik als
