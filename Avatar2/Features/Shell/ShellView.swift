@@ -264,10 +264,14 @@ struct ShellView: View {
         // E27.4: de board-view (alle portretten) vervangt de enkel-portret-canvas
         // in board-modus. Klik een portret → selecteren + terug naar de editor.
         if model.isBoardMode {
-            BoardView(onOpen: { portrait in
-                model.select(portrait)
-                model.isBoardMode = false
-            })
+            BoardView(
+                model: model,
+                entitlement: entitlement,
+                onOpen: { portrait in
+                    model.select(portrait)
+                    model.isBoardMode = false
+                }
+            )
         } else {
             editorCanvas
         }

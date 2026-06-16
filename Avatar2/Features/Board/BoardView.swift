@@ -17,10 +17,26 @@ import SwiftUI
 struct BoardView: View {
     /// Dezelfde bron als de sidebar (E05.4): alle portretten, jongste eerst.
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
-    /// Klik op een node → openen (selecteren) in de editor.
+    /// E30.1: dezelfde edit-pipeline als de editor — bij één-selectie zetten we
+    /// `model.selectedPortrait` op de node en hergebruiken we model.applyEffectResult
+    /// (cloud-re-isolatie!) / commitAdjust i.p.v. die logica te dupliceren.
+    let model: ShellModel
+    let entitlement: EntitlementModel
+    /// Dubbelklik op een node → openen (selecteren) in de editor.
     let onOpen: (Portrait2) -> Void
 
     @Environment(\.undoManager) private var undoManager
+
+    // E30.1: actief bottom-tool/dropdown bij ÉÉN geselecteerde node (in-place
+    // editen op de board, zelfde panelen als de editor).
+    @State private var editTool: EditTool?
+    private enum EditTool: Hashable { case background, adjust, effects, face, clothing, hair }
+
+    /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
+    private var selectedNode: Portrait2? {
+        guard selection.count == 1, let id = selection.first else { return nil }
+        return portraits.first { $0.persistentModelID == id }
+    }
 
     /// E27.5: gedecodeerde + verkleinde thumbnails, één keer per portret-id
     /// gedecodeerd (geen re-decode bij elke pan/zoom-frame). Referentietype zodat
@@ -109,9 +125,24 @@ struct BoardView: View {
             // top-overlay (deterministisch) + padding om onder de app-topbar te
             // blijven.
             .overlay(alignment: .top) {
-                if !selection.isEmpty {
-                    boardBatchBar
-                        .padding(.top, 70)
+                // E30.1: ≥2 geselecteerd → batch-toolbar (Match lighting hoort
+                // bij meerdere). Precies 1 → de NORMALE editor-toolbar (Frame/
+                // Background/Adjust/Flip) op de node, niet de batch-framing.
+                Group {
+                    if selection.count >= 2 {
+                        boardBatchBar
+                    } else if let node = selectedNode {
+                        singleEditTopBar(node)
+                    }
+                }
+                .padding(.top, 70)
+            }
+            // E30.1: bij één-selectie de editor-bottom-tools (Effects/Face/
+            // Clothing/Hair) op de node — zodat in-place editen op de board kan.
+            .overlay(alignment: .bottom) {
+                if let node = selectedNode {
+                    singleEditBottomBar(node)
+                        .padding(.bottom, 64)
                 }
             }
             .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
@@ -119,6 +150,16 @@ struct BoardView: View {
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
             // is; `didInitialFit` latcht pas bij een niet-lege set.
             .onChange(of: portraits.count) { _, _ in assignInitialLayout(); fitIfNeeded() }
+            // E30.1: één-selectie → richt de gedeelde edit-pipeline op die node;
+            // bij 0 of ≥2 sluit het bottom-tool-paneel.
+            .onChange(of: selection) { _, sel in
+                if sel.count == 1, let id = sel.first,
+                   let node = portraits.first(where: { $0.persistentModelID == id }) {
+                    model.select(node)
+                } else {
+                    editTool = nil
+                }
+            }
         }
     }
 
@@ -269,7 +310,13 @@ struct BoardView: View {
                 c
             }
             // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame).
-            if let image = thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
+            // E30.1: de node die je nú in-place bewerkt decodeert VERS (cache
+            // omzeild) zodat een Effect/Flip/Hair-edit meteen op de node verschijnt
+            // — applyEffectResult re-isoleert async, dus een cache-snapshot zou
+            // achterlopen. Eén verse decode per render voor die ene node is prima.
+            if let image = (portrait.persistentModelID == selection.first && selection.count == 1)
+                ? NSImage(data: portrait.cutoutData)
+                : thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -575,6 +622,174 @@ struct BoardView: View {
             }
             undoManager?.endUndoGrouping()
         }
+    }
+
+    // MARK: - E30.1 in-place editen op één node
+
+    /// Top-toolbar bij precies één selectie: de normale editor-acties op de node
+    /// (Background-presets · Adjust · Flip) — géén batch-framing/Match lighting.
+    private func singleEditTopBar(_ node: Portrait2) -> some View {
+        HStack(spacing: DSSpacing.gap2) {
+            Text(node.name.isEmpty ? "Untitled" : node.name)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.primary)
+                .lineLimit(1)
+
+            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+            // Background: dezelfde presets als batch (toegepast op deze ene node;
+            // applyBackgroundToAll werkt op `selectedPortraits` = [node]).
+            Text("Background")
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+            ForEach(Self.batchBackgrounds.indices, id: \.self) { i in
+                backgroundSwatch(Self.batchBackgrounds[i])
+            }
+
+            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+            // Flip — spiegelt de cutout (zichtbaar op de node).
+            Button { flipNode(node) } label: {
+                Image(systemName: "arrow.left.and.right")
+                    .font(.system(size: 12))
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .frame(width: 28, height: 28)
+                    .dsHoverHighlight(cornerRadius: 14)
+            }
+            .buttonStyle(.plain)
+            .help("Flip horizontally")
+
+            // Adjust — dezelfde kleurcorrectie als batch (op deze node).
+            Button { editTool = (editTool == .adjust) ? nil : .adjust } label: {
+                HStack(spacing: DSSpacing.gap1) {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 12))
+                    Text("Adjust").dsTextStyle(.labelSmall)
+                }
+                .foregroundStyle(DSColor.Foreground.primary)
+                .padding(.horizontal, DSSpacing.gap2)
+                .frame(height: 28)
+                .background(editTool == .adjust ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+                .dsHoverHighlight(cornerRadius: 14)
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                if editTool == .adjust, let img = NSImage(data: node.cutoutData) {
+                    EditColorPanel(
+                        source: img,
+                        initial: node.adjust,
+                        onCommit: { _, after in applyAdjustToAll(after); editTool = nil }
+                    )
+                    .padding(DSSpacing.gap4)
+                    .frame(width: 360)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .dsPanelSurface(cornerRadius: DSRadius.xl)
+                    .offset(y: 40)
+                    .zIndex(10)
+                }
+            }
+        }
+        .padding(.horizontal, DSSpacing.gap3)
+        .padding(.vertical, DSSpacing.gap1)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+    }
+
+    /// Bottom-toolbar bij precies één selectie: de cloud-edit-tools van de editor
+    /// (Effects/Face/Clothing/Hair), met het paneel als zwevende dropdown erboven.
+    private func singleEditBottomBar(_ node: Portrait2) -> some View {
+        VStack(spacing: DSSpacing.gap2) {
+            // Actief paneel boven de balk.
+            if let base = NSImage(data: node.cutoutData) {
+                Group {
+                    switch editTool {
+                    case .effects:
+                        EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
+                                     onApply: { applyToNode($0, node) })
+                            .id(node.persistentModelID)
+                    case .clothing:
+                        ClothesPanel(baseImage: base, entitlement: entitlement,
+                                     onApply: { applyToNode($0, node) })
+                            .id(node.persistentModelID)
+                    case .hair:
+                        HairPanel(baseImage: base, entitlement: entitlement,
+                                  onApply: { applyToNode($0, node) })
+                            .id(node.persistentModelID)
+                    case .face:
+                        FaceActionsPanel(
+                            onRetouch: { retouchNode(node) },
+                            onProFeature: { _ = entitlement.allowCloudFeature() },
+                            isPro: entitlement.isProActive,
+                            activeToggles: []
+                        )
+                    default:
+                        EmptyView()
+                    }
+                }
+                .frame(width: 420)
+                .fixedSize(horizontal: false, vertical: true)
+                .dsPanelSurface(cornerRadius: DSRadius.xl)
+            }
+
+            HStack(spacing: DSSpacing.gap1) {
+                bottomToolButton("Effects", "wand.and.stars", .effects)
+                bottomToolButton("Face", "face.smiling", .face)
+                bottomToolButton("Clothing", "tshirt", .clothing)
+                bottomToolButton("Hair", "comb", .hair)
+            }
+            .padding(.horizontal, DSSpacing.gap2)
+            .padding(.vertical, DSSpacing.gap1)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        }
+    }
+
+    private func bottomToolButton(_ label: String, _ icon: String, _ tool: EditTool) -> some View {
+        Button { editTool = (editTool == tool) ? nil : tool } label: {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: icon).font(.system(size: 12))
+                Text(label).dsTextStyle(.labelSmall)
+            }
+            .foregroundStyle(DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap3)
+            .frame(height: 30)
+            .background(editTool == tool ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+            .dsHoverHighlight(cornerRadius: 15)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// E30.1: een cloud/flip-resultaat op de node toepassen via dezelfde pipeline
+    /// als de editor (re-isolatie bij volle achtergrond) → cutoutData + thumbnail.
+    private func applyToNode(_ image: NSImage, _ node: Portrait2) {
+        model.select(node)
+        model.applyEffectResult(image)
+        thumbs.invalidate(node)
+        editTool = nil
+    }
+
+    /// Spiegelt de cutout van de node horizontaal (zelfde transform als editor).
+    private func flipNode(_ node: Portrait2) {
+        let base = NSImage(data: node.cutoutData) ?? NSImage()
+        guard let cg = base.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(
+                data: nil, width: cg.width, height: cg.height,
+                bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return }
+        ctx.translateBy(x: CGFloat(cg.width), y: 0)
+        ctx.scaleBy(x: -1, y: 1)
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        guard let out = ctx.makeImage() else { return }
+        applyToNode(NSImage(cgImage: out, size: base.size), node)
+    }
+
+    /// One-click retouch op de node (lokaal, zelfde enhancer als de editor).
+    private func retouchNode(_ node: Portrait2) {
+        guard let cg = NSImage(data: node.cutoutData)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let out = PortraitEnhancer.magicRetouch(cg) else { return }
+        applyToNode(NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)), node)
     }
 
     private var hud: some View {
