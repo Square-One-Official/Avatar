@@ -71,6 +71,14 @@ struct Avatar2App: App {
             #endif
             // E17.5: getargete berichten ophalen bij app-start (faalt stil).
             .task { await messaging.refresh() }
+            // Account-fix: de Supabase-sessie (bearer-token) wordt ASYNC hersteld
+            // via authStateChanges ná launch. De vroege refresh (ShellTopBar) haalt
+            // dan nog het ANONIEME account op (geen Pro, 0 credits) → alle pro-
+            // features vielen in de paywall. Her-fetch het account zodra het token
+            // er is (isSignedIn flipt) zodat Pro/credits kloppen.
+            .onChange(of: entitlement.isSignedIn) { _, signedIn in
+                if signedIn { Task { await entitlement.refresh() } }
+            }
             // E17.5: in-app bericht-sheet (overlay → geen layoutshift).
             .overlay { messageOverlay }
             .animation(.easeOut(duration: 0.18), value: messaging.current)
