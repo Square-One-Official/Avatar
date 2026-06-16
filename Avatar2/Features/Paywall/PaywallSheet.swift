@@ -13,7 +13,13 @@ struct PaywallSheet: View {
 
     var body: some View {
         Group {
-            if model.showsTopup {
+            if model.account == nil {
+                // Fix: tot het account geladen is NIET gokken tussen subscribe en
+                // top-up — anders flitst de paywall "Upgrade to Pro" voor een
+                // actieve Pro/credit-houder en springt 'ie ná de refresh-on-appear
+                // naar "Top up credits". Even laden i.p.v. de verkeerde variant.
+                loadingPlaceholder
+            } else if model.showsTopup {
                 // Top-up (actieve Pro) — barebones, smal (ongewijzigd).
                 VStack(alignment: .leading, spacing: DSSpacing.gap5) {
                     header
@@ -33,6 +39,23 @@ struct PaywallSheet: View {
         .background(DSColor.Background.card)
         .preferredColorScheme(.dark)
         .task { await model.refresh() }
+    }
+
+    private var loadingPlaceholder: some View {
+        VStack(spacing: DSSpacing.gap4) {
+            HStack {
+                Spacer(minLength: 0)
+                DSIconButton(Image(systemName: "xmark"), size: .small) {
+                    model.isPaywallPresented = false
+                }
+            }
+            ProgressView()
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DSSpacing.gap8)
+        }
+        .padding(DSSpacing.gap6)
+        .frame(width: 440)
     }
 
     @ViewBuilder
