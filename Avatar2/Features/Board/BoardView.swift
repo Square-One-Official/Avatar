@@ -309,13 +309,14 @@ struct BoardView: View {
             if let hex = portrait.backgroundColorHex, let c = Color(hexRGB: hex) {
                 c
             }
-            // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame).
+            // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
+            // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG).
             // E30.1: de node die je nú in-place bewerkt decodeert VERS (cache
             // omzeild) zodat een Effect/Flip/Hair-edit meteen op de node verschijnt
             // — applyEffectResult re-isoleert async, dus een cache-snapshot zou
             // achterlopen. Eén verse decode per render voor die ene node is prima.
             if let image = (portrait.persistentModelID == selection.first && selection.count == 1)
-                ? NSImage(data: portrait.cutoutData)
+                ? thumbs.freshThumbnail(for: portrait, maxDimension: cardSide * 2)
                 : thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
                 Image(nsImage: image)
                     .resizable()
@@ -823,9 +824,29 @@ struct BoardView: View {
 @MainActor
 final class BoardThumbnailCache {
     private var cache: [PersistentIdentifier: NSImage] = [:]
+    /// E30.2: de adjusted thumbnail, gecachet per (id, adjust-stand) — zodat de
+    /// niet-destructieve Adjust-laag ook op de board-node zichtbaar is (WYSIWYG)
+    /// zonder elke frame te her-renderen.
+    private var adjustedCache: [PersistentIdentifier: (adjust: PortraitAdjust, image: NSImage)] = [:]
     private(set) var decodeCount = 0
 
+    /// Gecachete, verkleinde thumbnail MÉT de Adjust-laag (voor niet-bewerkte nodes).
     func thumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+        guard let raw = rawThumbnail(for: portrait, maxDimension: maxDimension) else { return nil }
+        return adjusted(raw, portrait: portrait)
+    }
+
+    /// E30.2: verse (ongecachete) adjusted thumbnail — voor de node die je nú
+    /// in-place bewerkt: cutoutData verandert async (re-isolatie), dus altijd
+    /// opnieuw decoderen i.p.v. een snapshot.
+    func freshThumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+        guard let full = NSImage(data: portrait.cutoutData) else { return nil }
+        let thumb = Self.downscaled(full, maxDimension: maxDimension)
+        return portrait.adjust.isNeutral ? thumb : (Self.applyAdjust(thumb, portrait.adjust) ?? thumb)
+    }
+
+    /// De rauwe (ongeadjustede) downscaled thumbnail, één keer per id gedecodeerd.
+    private func rawThumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
         let id = portrait.persistentModelID
         if let cached = cache[id] { return cached }
         guard let full = NSImage(data: portrait.cutoutData) else { return nil }
@@ -840,10 +861,32 @@ final class BoardThumbnailCache {
         return thumb
     }
 
+    /// Pas de Adjust-laag toe op een rauwe thumbnail, gecachet per adjust-stand.
+    /// Neutraal → de rauwe thumb ongewijzigd (geen render).
+    private func adjusted(_ raw: NSImage, portrait: Portrait2) -> NSImage {
+        let adjust = portrait.adjust
+        guard !adjust.isNeutral else { return raw }
+        let id = portrait.persistentModelID
+        if let cached = adjustedCache[id], cached.adjust == adjust { return cached.image }
+        let out = Self.applyAdjust(raw, adjust) ?? raw
+        adjustedCache[id] = (adjust, out)
+        return out
+    }
+
+    private static func applyAdjust(_ image: NSImage, _ adjust: PortraitAdjust) -> NSImage? {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let out = PortraitEnhancer.colorAdjust(
+                cg, brightness: adjust.brightness, contrast: adjust.contrast,
+                saturation: adjust.saturation, temperatureShift: adjust.temperature
+              ) else { return nil }
+        return NSImage(cgImage: out, size: image.size)
+    }
+
     /// E29.3: vergeet de cache voor één portret (na een cutout-wijziging zoals
     /// Match lighting) → de board decodeert de nieuwe cutout opnieuw.
     func invalidate(_ portrait: Portrait2) {
         cache[portrait.persistentModelID] = nil
+        adjustedCache[portrait.persistentModelID] = nil
     }
 
     /// Teken de bron in een kleiner NSImage (aspect behouden); ≥ bronmaat → bron.
