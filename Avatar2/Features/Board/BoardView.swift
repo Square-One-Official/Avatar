@@ -300,17 +300,55 @@ struct BoardView: View {
         )
     }
 
-    /// Eenmalig: nog niet-geplaatste nodes krijgen hun auto-grid-positie
-    /// persistent (zodat ze daarna sleepbaar/stabiel zijn). Wijzigt geen
-    /// `updatedAt` (board-layout ≠ "bewerkt").
+    /// Nog niet-geplaatste nodes een board-positie geven (persistent, zodat ze
+    /// daarna sleepbaar/stabiel zijn). Wijzigt geen `updatedAt`.
+    /// - Eerste keer (niets geplaatst): auto-grid.
+    /// - Nieuwe import terwijl er al nodes staan: NIET autoCenter(index) — dat
+    ///   botste met de al-vastgepinde node op die grid-cel (en de nieuwste rendert
+    ///   onderaan de ZStack → onzichtbaar erachter). Plaats 'm in een verse rij
+    ///   ONDER de bestaande content, selecteer 'm en centreer de camera erop zodat
+    ///   de net-geïmporteerde foto meteen in beeld + gemarkeerd staat.
     private func assignInitialLayout() {
-        for (index, portrait) in portraits.enumerated() where !portrait.boardPlaced {
-            let c = autoCenter(order: index)
-            portrait.boardX = c.x
-            portrait.boardY = c.y
-            portrait.boardOrder = index
-            portrait.boardPlaced = true
+        let unplaced = portraits.filter { !$0.boardPlaced }
+        guard !unplaced.isEmpty else { return }
+        let placed = portraits.filter { $0.boardPlaced }
+
+        if placed.isEmpty {
+            for (index, portrait) in portraits.enumerated() where !portrait.boardPlaced {
+                let c = autoCenter(order: index)
+                portrait.boardX = c.x; portrait.boardY = c.y
+                portrait.boardOrder = index; portrait.boardPlaced = true
+            }
+            return
         }
+
+        // Verse rij onder de laagste bestaande node (gegarandeerd vrij).
+        let rowY = (placed.map(\.boardY).max() ?? margin) + cellHeight + gap
+        var x = margin + cardSide / 2
+        var order = (placed.map(\.boardOrder).max() ?? 0) + 1
+        var newest: Portrait2?
+        for portrait in unplaced {
+            portrait.boardX = x; portrait.boardY = rowY
+            portrait.boardOrder = order; portrait.boardPlaced = true
+            x += cardSide + gap; order += 1
+            newest = portrait
+        }
+        if let newest {
+            selection = [newest.persistentModelID]
+            centerCamera(on: CGPoint(x: newest.boardX, y: newest.boardY))
+        }
+    }
+
+    /// Centreer de camera op een board-punt (zodat het in de viewport valt).
+    /// scherm = vpMidden + scale·(p − boardMidden) + offset = vpMidden ⇒
+    /// offset = −scale·(p − boardMidden).
+    private func centerCamera(on p: CGPoint) {
+        let boardC = CGPoint(x: boardSize.width / 2, y: boardSize.height / 2)
+        camera.offset = CGSize(
+            width: -camera.scale * (p.x - boardC.x),
+            height: -camera.scale * (p.y - boardC.y)
+        )
+        lastFit = camera  // gericht gecentreerd → auto-fit niet laten overschrijven
     }
 
     /// E29.1 smoke-haak: `--board-select <n>` selecteert de eerste n portretten.
@@ -341,7 +379,11 @@ struct BoardView: View {
     // MARK: - Drag (node verplaatsen)
 
     private func dragGesture(for portrait: Portrait2) -> some Gesture {
-        DragGesture(minimumDistance: 5)
+        // .global = scherm-space: de node zit ín de camera-scaleEffect, dus de
+        // default .local-translatie is al board-space — daar nóg eens door
+        // camera.scale delen liet de node ver wegschieten (erger bij uitzoomen).
+        // In scherm-space is ÷camera.scale de enige (juiste) correctie.
+        DragGesture(minimumDistance: 5, coordinateSpace: .global)
             .onChanged { value in
                 if dragStart == nil {
                     dragStart = CGPoint(x: portrait.boardX, y: portrait.boardY)
