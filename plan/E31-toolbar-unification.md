@@ -192,8 +192,8 @@ bouwen Debug groen, alle suites groen. (De bottom-panel-builder houdt een ongebr
 tak; onschadelijk — Background wordt nu alleen via de frame-toolbar-dropdown geopend.)
 
 ## 31.6 — Face = eigen capsule-knop [FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.1
 
 Besluit gevallen (Thierry): Face krijgt een eigen top-level knop in de onderste capsule, tussen
