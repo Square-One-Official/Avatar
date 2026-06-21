@@ -94,8 +94,8 @@ scherm ontgrendeld) 1-op-1 tegen `4114:903` — zie /tmp/aaashots/e31-strip.png.
   **31.5** haalt Background uit de overflow (→ frame-toolbar).
 
 ## 31.2 — Adjust → onderste toolbar als "Enhance" [FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.1
 
 Verplaats het Light & color / Adjust-paneel (E24.27, sliders + één-tik-acties) van de zwevende
