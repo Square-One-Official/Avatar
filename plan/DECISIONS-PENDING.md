@@ -76,3 +76,22 @@
   ook zijkanten?, (b) aspect-lock altijd aan (default) of vrij?, (c) scale op `Portrait2.scale`
   (default) of een aparte selectie-transform?, (d) gedrag bij meerdere lagen later, (e) moet de
   view-zoom pannen wanneer ingezoomd? Pas ik aan zodra Thierry kiest.
+
+### E31 Toolbar-unificatie — geblokkeerd: Figma-bestand niet open (2026-06-21)
+- **Status:** ALLE 6 ready-stories (31.1–31.6) geblokkeerd. Geen andere `ready` stories op het board
+  (de rest is `done`/`blocked`/`backlog`/`todo`). De marathon-loop stopt hierop.
+- **Probleem:** E31.1 (onderste toolbar = Figma-capsule) is een expliciete **1-op-1 Figma-build** —
+  DoD eist "screenshot tegen `4114:903`". De rest van E31 chaint hierop (31.2→31.1, 31.3→31.2,
+  31.6→31.1; 31.4/31.5 horen narratief ná 31.2/31.3/31.5-besluit). De lokale Figma-MCP
+  (localhost:3845) is bereikbaar en geïnitialiseerd, maar **de Aaavatar-file is niet de actieve tab**:
+  `get_metadata` faalt op `151:1409` (Stories-pagina, CLAUDE.md), `4114:903` én `4114:978` met
+  "No node could be found … Make sure the Figma desktop app is open and the document containing the
+  node is the active tab." Conform CLAUDE.md ("meld het aan Thierry i.p.v. op een ander bestand door
+  te bouwen") bouw ik 31.1 niet blind.
+- **Wat Thierry moet doen om te deblokkeren:** open het Figma-bestand **"Aaavatar"** (key
+  NtX3dQvGU29gwYQKEcOkSy) in de Figma desktop-app en maak de pagina **Stories** (`151:1409`) de
+  actieve tab, zodat de capsule-nodes `4114:903` (App/Hair-scherm) en `4114:978` (floatingToolbar)
+  voor de MCP bereikbaar zijn. Daarna kan de loop E31.1 1-op-1 bouwen.
+- **NB:** 31.4 zegt formeel `blockedBy: —` en "GEEN Figma-referentie" (placeholder-bouw), maar de
+  inhoud ("alléén nog frame/scène-controls") is de **eindstaat ná 31.2/31.3** (Adjust/AI eruit) en
+  ná 31.5 (Background erin) → in de praktijk niet vóór 31.1–31.3/31.5 te bouwen zonder rework.
