@@ -19,13 +19,24 @@ public struct DSToolbarItem<ID: Hashable>: Identifiable {
     }
 }
 
-public struct DSBottomToolbar<ID: Hashable>: View {
+// E03.19: trailing accessoire-slot. Niet-selecteerbare knoppen (undo/redo,
+// hold-to-compare) horen volgens frame App / Edit (4008:7340) ín de
+// toolbar-strip op dezelfde 56-pitch (cirkels op x344/x400 = +56), niet als
+// losse overlay ernaast. De `accessory`-builder hangt rechts achter de tools
+// op precies die pitch (48-cirkel + gap2=8 = 56); vul 'm met DSToolButtons.
+public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
     private let items: [DSToolbarItem<ID>]
     @Binding private var selection: ID?
+    private let accessory: Accessory
 
-    public init(items: [DSToolbarItem<ID>], selection: Binding<ID?>) {
+    public init(
+        items: [DSToolbarItem<ID>],
+        selection: Binding<ID?>,
+        @ViewBuilder accessory: () -> Accessory
+    ) {
         self.items = items
         self._selection = selection
+        self.accessory = accessory()
     }
 
     public var body: some View {
@@ -39,7 +50,18 @@ public struct DSBottomToolbar<ID: Hashable>: View {
                     action: { selection = selection == item.id ? nil : item.id }
                 )
             }
+            // Accessoires delen de strip op dezelfde gap2-pitch als de tools,
+            // dus undo/redo lijnen op 56 uit zonder eigen container.
+            accessory
         }
         .padding(DSSpacing.gap2)
+    }
+}
+
+// Bestaande call sites (alleen tools, geen accessoires) blijven werken via een
+// EmptyView-accessory; geen verplichte trailing closure.
+extension DSBottomToolbar where Accessory == EmptyView {
+    public init(items: [DSToolbarItem<ID>], selection: Binding<ID?>) {
+        self.init(items: items, selection: selection, accessory: { EmptyView() })
     }
 }

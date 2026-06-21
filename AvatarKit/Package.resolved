@@ -1,15 +1,6 @@
 {
-  "originHash" : "cf17c2ffb0d31694c71345b808a0f46e12fe3335ed2d4531bb804c5a171397d4",
+  "originHash" : "d642e356e61ff2ef7405c7b3df8c2f8a9e0fb96be7f18f5c79b57acbeb93c25c",
   "pins" : [
-    {
-      "identity" : "sparkle",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sparkle-project/Sparkle",
-      "state" : {
-        "revision" : "d46d456107feacc80711b21847b82b07bd9fb46e",
-        "version" : "2.9.3"
-      }
-    },
     {
       "identity" : "supabase-swift",
       "kind" : "remoteSourceControl",
@@ -17,15 +8,6 @@
       "state" : {
         "revision" : "a4e684d979f4a5fa017ebd9d5f635a4bc03830fb",
         "version" : "2.47.0"
-      }
-    },
-    {
-      "identity" : "swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/phosphor-icons/swift",
-      "state" : {
-        "revision" : "9a9467181782bbe319ad4935d0993c77cd8a5fbc",
-        "version" : "2.1.0"
       }
     },
     {

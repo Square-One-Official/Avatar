@@ -97,22 +97,27 @@ public struct DSEditPanel<Content: View>: View {
 /// E06): foto bovenin, actief paneel daaronder, toolbar onderaan. De foto
 /// krijgt minder hoogte zodra een paneel verschijnt (centrale animatie);
 /// panelen hoeven hier niets voor te doen.
-public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: View {
+public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Accessory: View>: View {
     private let tools: [DSToolbarItem<Tool>]
     @Binding private var activeTool: Tool?
     private let photo: Photo
     private let panel: (Tool) -> Panel
+    // E03.19: trailing accessoires (undo/redo/compare) die FEAT in de
+    // toolbar-strip hangt i.p.v. als losse overlay ernaast.
+    private let toolbarAccessory: Accessory
 
     public init(
         tools: [DSToolbarItem<Tool>],
         activeTool: Binding<Tool?>,
         @ViewBuilder photo: () -> Photo,
-        @ViewBuilder panel: @escaping (Tool) -> Panel
+        @ViewBuilder panel: @escaping (Tool) -> Panel,
+        @ViewBuilder toolbarAccessory: () -> Accessory
     ) {
         self.tools = tools
         self._activeTool = activeTool
         self.photo = photo()
         self.panel = panel
+        self.toolbarAccessory = toolbarAccessory()
     }
 
     public var body: some View {
@@ -138,10 +143,30 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View>: Vi
             // Clip zodat het paneel netjes vanaf de onderrand in schuift.
             .clipped()
 
-            DSBottomToolbar(items: tools, selection: $activeTool)
+            DSBottomToolbar(items: tools, selection: $activeTool) {
+                toolbarAccessory
+            }
                 .fixedSize()
         }
         // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
         .animation(.spring(duration: 0.35), value: activeTool)
+    }
+}
+
+// Bestaande call sites zonder accessoires blijven werken (EmptyView-slot).
+extension DSEditPanelContainer where Accessory == EmptyView {
+    public init(
+        tools: [DSToolbarItem<Tool>],
+        activeTool: Binding<Tool?>,
+        @ViewBuilder photo: () -> Photo,
+        @ViewBuilder panel: @escaping (Tool) -> Panel
+    ) {
+        self.init(
+            tools: tools,
+            activeTool: activeTool,
+            photo: photo,
+            panel: panel,
+            toolbarAccessory: { EmptyView() }
+        )
     }
 }
