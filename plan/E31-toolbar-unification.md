@@ -192,14 +192,23 @@ bouwen Debug groen, alle suites groen. (De bottom-panel-builder houdt een ongebr
 tak; onschadelijk — Background wordt nu alleen via de frame-toolbar-dropdown geopend.)
 
 ## 31.6 — Face = eigen capsule-knop [FEAT]
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.1
 
 Besluit gevallen (Thierry): Face krijgt een eigen top-level knop in de onderste capsule, tussen
 `Effects` en `Hair` → **Enhance · Effects · Face · Hair · Shirt · ⋯**. Bewuste afwijking van Figma
 (geen top-level Face) — documenteren in [[DECISIONS-PENDING.md|plan/DECISIONS-PENDING.md]]. DoD: beide
 targets + tests groen + merge + Result + screenshot.
+
+**Result:** Face zit als eigen top-level capsule-knop (`DSToolbarItem(id: .face, label: "Face")`)
+tussen Effects en Hair — geïmplementeerd in 31.1, hier bevestigd. Onderste set =
+**Enhance · Effects · Face · Hair · Shirt** (de `⋯` verviel in 31.5). De knop opent de
+`FaceActionsPanel` (One click retouch · Whiten teeth · Apply make-up · Reduce wrinkles, met
+credit-badges) onderaan. Bewuste Figma-afwijking (geen top-level Face in 4114:978) vastgelegd in
+[[DECISIONS-PENDING.md|plan/DECISIONS-PENDING.md]] (E31-blok). Geen code-wijziging nodig in deze
+story. Visuele smoke (`--seed-adjust --open-panel face`, scherm ontgrendeld): Face-pil lime-actief,
+Face-paneel open — zie /tmp/aaashots/e31-6.png. Beide targets bouwen Debug groen, alle suites groen.
 
 ---
 
