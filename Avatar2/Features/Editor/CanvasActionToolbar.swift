@@ -4,6 +4,13 @@
 //   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background.
 // E31.2: Adjust → onderste capsule-knop "Enhance". E31.3: AI ▾ (Restore body
 // e.a.) is hier weg → de Enhance-paneel-acties (E24.27 + Restore body).
+//
+// E31.4: deze frame-lokale toolbar bevat nu PUUR frame/scène/compositie-controls
+// (Frame-vorm · Background · grid · Flip · Auto-frame/Crop/Fix). FIGMA-TODO:
+// hier is GÉÉN Figma-referentie voor (de capsule 4114:978 toont 'm niet — het is
+// een team-vondst); dit is een PLACEHOLDER-DESIGN in de geest van het hoofd-
+// design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
+// later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
 // `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
 // aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
