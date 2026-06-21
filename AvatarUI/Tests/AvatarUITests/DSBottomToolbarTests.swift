@@ -28,6 +28,19 @@ final class DSBottomToolbarTests: XCTestCase {
     }
 
     @MainActor
+    func testRendertCapsuleMetOverflow() {
+        // E31.1: gelabelde pillen + overflow `⋯` + accessoires.
+        let view = DSBottomToolbar(
+            items: items(),
+            selection: .constant(0),
+            overflow: [DSToolbarItem(id: 9, icon: Image(systemName: "photo"), label: "Background")]
+        ) {
+            DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo") {}
+        }
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
+
+    @MainActor
     func testContainerForwardtAccessoireSlot() {
         let view = DSEditPanelContainer(
             tools: items(),

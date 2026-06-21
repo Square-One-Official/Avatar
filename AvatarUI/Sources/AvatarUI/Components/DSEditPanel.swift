@@ -99,6 +99,8 @@ public struct DSEditPanel<Content: View>: View {
 /// panelen hoeven hier niets voor te doen.
 public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Accessory: View>: View {
     private let tools: [DSToolbarItem<Tool>]
+    // E31.1: secundaire tools in de capsule-overflow (`⋯`).
+    private let overflowTools: [DSToolbarItem<Tool>]
     @Binding private var activeTool: Tool?
     private let photo: Photo
     private let panel: (Tool) -> Panel
@@ -109,11 +111,13 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
     public init(
         tools: [DSToolbarItem<Tool>],
         activeTool: Binding<Tool?>,
+        overflowTools: [DSToolbarItem<Tool>] = [],
         @ViewBuilder photo: () -> Photo,
         @ViewBuilder panel: @escaping (Tool) -> Panel,
         @ViewBuilder toolbarAccessory: () -> Accessory
     ) {
         self.tools = tools
+        self.overflowTools = overflowTools
         self._activeTool = activeTool
         self.photo = photo()
         self.panel = panel
@@ -143,7 +147,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
             // Clip zodat het paneel netjes vanaf de onderrand in schuift.
             .clipped()
 
-            DSBottomToolbar(items: tools, selection: $activeTool) {
+            DSBottomToolbar(items: tools, selection: $activeTool, overflow: overflowTools) {
                 toolbarAccessory
             }
                 .fixedSize()
@@ -158,12 +162,14 @@ extension DSEditPanelContainer where Accessory == EmptyView {
     public init(
         tools: [DSToolbarItem<Tool>],
         activeTool: Binding<Tool?>,
+        overflowTools: [DSToolbarItem<Tool>] = [],
         @ViewBuilder photo: () -> Photo,
         @ViewBuilder panel: @escaping (Tool) -> Panel
     ) {
         self.init(
             tools: tools,
             activeTool: activeTool,
+            overflowTools: overflowTools,
             photo: photo,
             panel: panel,
             toolbarAccessory: { EmptyView() }
