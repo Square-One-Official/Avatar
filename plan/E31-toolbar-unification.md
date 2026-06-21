@@ -59,7 +59,7 @@ zijn stale — zie [[project_figma_mcp_workarounds]]):
 ---
 
 ## 31.1 — Onderste toolbar = Figma-capsule (persistent) [DS/FEAT]
-- status: in_progress
+- status: done
 - owner: DS+FEAT (AI-agent, marathon)
 - blockedBy: —
 
@@ -69,6 +69,29 @@ toevoeging t.o.v. Figma — besluit 31.6.) **Persistent**
 (herziet E28.3: niet verbergen bij deselect; de "Click the portrait to edit"-pill vervalt of wordt een
 disabled-state — bevestig in Result). Knoppen tonen icoon+label zoals in `floatingToolbar` (`4114:978`).
 DoD: beide targets + tests groen + merge + Result + screenshot tegen `4114:903`.
+
+**Result:** `DSBottomToolbar` is herbouwd als de Figma-capsule (geverifieerd via MCP op `4114:978` +
+`get_variable_defs`): Card-fill (#1c1917) r-full container, gelabelde **icoon+label-pillen**
+(`DSCapsuleToolButton`: pil = background/neutral wit@5%, label = `UI/Labels/Base` SF Pro Semibold 14.2,
+hoogte 40, gap-2 padding) + een **overflow `⋯`-knop** (`DSToolbarOverflowButton`, 40-cirkel, vertikale
+dots, opent een `Menu`). Active = lime icoon+label + lime ring (E03.3). FEAT: de capsule-set is
+**Enhance(`.edit`) · Effects · Face · Hair · Shirt(`.clothing`)** met eigen labels (Enhance/Shirt) +
+overflow **Background**(`.background`) conform Figma; alle vijf + Background hebben al werkende panelen
+(de panel-builder dekt `.edit/.face/.background` al). `DSEditPanelContainer` kreeg een `overflowTools:`-
+doorgeefparameter (EmptyView/`[]`-defaults houden bestaande call sites werkend). **Persistentie:** al
+geleverd door E28.5 (toolbars altijd zichtbaar in de editor); de "Click the portrait to edit"-pill
+bestond niet meer — niets te verwijderen, bevestigd. 1 nieuwe DS-test (capsule + overflow + accessoire),
+AvatarUI 31/31 groen; beide targets bouwen Debug groen via build-v2.sh. Visuele smoke (`--seed-adjust`,
+scherm ontgrendeld) 1-op-1 tegen `4114:903` — zie /tmp/aaashots/e31-strip.png.
+- **Figma-TODO:** Figma's capsule-frame toont géén undo/redo; ze blijven (E06.6) als losse
+  `DSToolButton`-cirkels **náást** (buiten) de Card-capsule in dezelfde strip. Definitieve plaatsing
+  tegen een referentie zodra Thierry die levert.
+- **Iconen:** de pil-iconen zijn de bestaande semantische SF-Symbols per tool (palette/sparkles/
+  smiley/comb/tshirt); Figma's capsule-iconen zijn placeholder-sparkles (stale, zie
+  [[project_figma_mcp_workarounds]]) → bewust niet 1-op-1 overgenomen.
+- **Tijdelijke dubbeling:** Adjust(`.edit`) en Background staan nu zowel in de capsule/overflow als nog
+  in de frame-toolbar (E24). Dat is de bedoelde tussenstand: **31.2** haalt Adjust uit de frame-toolbar,
+  **31.5** haalt Background uit de overflow (→ frame-toolbar).
 
 ## 31.2 — Adjust → onderste toolbar als "Enhance" [FEAT]
 - status: ready

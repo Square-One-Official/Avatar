@@ -222,13 +222,25 @@ struct EditorView: View {
         }
     }
 
-    // E24.4: de bottom-toolbar is puur de PERSOON (Effects/Face/Clothing/Hair).
-    // Images → app-bar (E22.1); Edit (kleur) → Adjust-popover + AI-dropdown in
-    // de canvas-toolbar; Background → canvas-toolbar (E24.1).
-    private static let toolbarItems: [DSToolbarItem<EditorTool>] =
-        EditorTool.allCases
-            .filter { ![.images, .edit, .background].contains($0) }
-            .map { DSToolbarItem(id: $0, icon: $0.icon, label: $0.label) }
+    // E31.1: de onderste toolbar is de Figma-capsule (4114:978) — gelabelde
+    // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt + een
+    // overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
+    // "Enhance" (31.2 verhuist het Adjust/Light-paneel hierheen) en `.clothing`
+    // heet "Shirt" (Figma-capsule). Face is een bewuste toevoeging t.o.v. Figma
+    // (besluit 31.6). Images → app-bar (E22.1).
+    private static let toolbarItems: [DSToolbarItem<EditorTool>] = [
+        DSToolbarItem(id: .edit, icon: EditorTool.edit.icon, label: "Enhance"),
+        DSToolbarItem(id: .effects, icon: EditorTool.effects.icon, label: "Effects"),
+        DSToolbarItem(id: .face, icon: EditorTool.face.icon, label: "Face"),
+        DSToolbarItem(id: .hair, icon: EditorTool.hair.icon, label: "Hair"),
+        DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Shirt"),
+    ]
+
+    // E31.1: secundaire tools in de overflow `⋯`. Figma zet Background hier;
+    // 31.5 verplaatst 'm (bewust afwijkend) naar de frame-lokale toolbar.
+    private static let overflowItems: [DSToolbarItem<EditorTool>] = [
+        DSToolbarItem(id: .background, icon: EditorTool.background.icon, label: "Background"),
+    ]
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
     /// sidebar en openen hun paneel. E18.20: GEEN eigen withAnimation meer —
@@ -379,7 +391,8 @@ struct EditorView: View {
         // altijd het actieve canvas).
         DSEditPanelContainer(
             tools: Self.toolbarItems,
-            activeTool: toolSelection
+            activeTool: toolSelection,
+            overflowTools: Self.overflowItems
         ) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
