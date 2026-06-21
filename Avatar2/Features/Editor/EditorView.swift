@@ -522,7 +522,7 @@ struct EditorView: View {
                     isPro: entitlement?.isProActive ?? false,
                     activeMenu: $canvasMenu,
                     gridEnabled: $canvasGridEnabled,
-                    adjust: { editColorPanel.onHover { pointerOverChrome = $0 } },
+                    // E31.2: Adjust is uit de frame-toolbar — nu de capsule-knop "Enhance".
                     background: { BackgroundPanel(portrait: portraitModel).onHover { pointerOverChrome = $0 } }
                 )
                 .padding(.top, DSSpacing.gap4)
@@ -558,28 +558,13 @@ struct EditorView: View {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
             } else if tool == .edit {
-                // E06.3: volledige actielijst (zakelijk boven beauty); de
-                // auto-frame-actie (E06.5) is "Auto-crop & center".
-                DSEditPanel(title: tool.label, maxContentHeight: editPanelMaxHeight) {
-                    // E22.3: live color-sliders + Auto-enhance-dropdown.
-                    EditColorPanel(
-                        source: rawCutout,
-                        initial: portraitModel?.adjust ?? .neutral,
-                        onPreview: onPreview,
-                        onCommit: { before, after in
-                            onCommitAdjust(after)
-                            if let portraitModel {
-                                AdjustUndo.register(
-                                    undoManager, target: portraitModel, apply: onCommitAdjust,
-                                    undoTo: before, redoTo: after, actionName: "Adjust"
-                                )
-                            }
-                        },
-                        onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-                        onColorise: { _ = entitlement?.allowCloudFeature() },
-                        onBoost: runBoostResolution,
-                        isPro: entitlement?.isProActive ?? false
-                    )
+                // E31.2: de capsule-knop "Enhance" opent het volledige Light &
+                // color / Adjust-paneel (E24.27: sliders + Auto-enhance-acties),
+                // functioneel ongewijzigd verhuisd uit de frame-toolbar. Gebruikt
+                // `editColorPanel` (showAutoEnhance + improveLightingOn-state) i.p.v.
+                // een uitgeklede inline-variant.
+                DSEditPanel(title: "Enhance", maxContentHeight: editPanelMaxHeight) {
+                    editColorPanel
                 }
             } else if tool == .face {
                 // E21.1: beauty-acties, gesplitst uit Edit.

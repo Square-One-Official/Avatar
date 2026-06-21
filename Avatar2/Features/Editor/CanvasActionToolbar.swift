@@ -1,8 +1,9 @@
 // Canvas action-toolbar (E24.1–24.4, verslankt in E24.9, popover-stijl E24.12)
-// — scène/beeld-acties bovenaan het portret. Vier top-level items, secundaire
+// — scène/beeld-acties bovenaan het portret. Top-level items, secundaire
 // acties in dropdowns:
 //   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background ·
-//   Adjust · AI ▾ (Improve lighting/Colorise/Boost/Restore body).
+//   AI ▾ (Restore body).
+// E31.2: Adjust is hier weg → onderste capsule-knop "Enhance" (E24.27-paneel).
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
 // `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
 // aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
@@ -18,10 +19,11 @@ import SwiftUI
 
 /// E24.12: de vier canvas-toolbar-dropdowns (open-staat gedeeld met EditorView).
 enum CanvasToolbarMenu: Hashable {
-    case frame, background, adjust, ai
+    // E31.2: `adjust` verhuisd naar de onderste capsule ("Enhance").
+    case frame, background, ai
 }
 
-struct CanvasActionToolbar<Adjust: View, Background: View>: View {
+struct CanvasActionToolbar<Background: View>: View {
     var onCrop: (() -> Void)?
     var onAutoFrame: () -> Void = {}
     var onFixAngle: (() -> Void)?
@@ -39,7 +41,6 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
     @Binding var activeMenu: CanvasToolbarMenu?
     /// E24.26: grid/thirds-overlay aan/uit (toggle in de toolbar).
     @Binding var gridEnabled: Bool
-    @ViewBuilder var adjust: () -> Adjust
     @ViewBuilder var background: () -> Background
 
     var body: some View {
@@ -49,9 +50,6 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             }
             toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
                 background()
-            }
-            toolbarItem(.adjust, "Adjust", icon: .slidersHorizontal, chevron: false, width: 360, padding: DSSpacing.gap5) {
-                adjust()
             }
             toolbarItem(.ai, "AI", icon: .sparkle, chevron: true, width: 240, padding: DSSpacing.gap2) {
                 aiMenu
@@ -81,7 +79,6 @@ struct CanvasActionToolbar<Adjust: View, Background: View>: View {
             if args.contains("--show-bg-popover") { activeMenu = .background }
             if args.contains("--show-ai-popover") { activeMenu = .ai }
             if args.contains("--show-frame-popover") { activeMenu = .frame }
-            if args.contains("--show-adjust-popover") { activeMenu = .adjust }
         }
         #endif
     }
