@@ -170,8 +170,8 @@ alle suites groen. NB: Background staat nu nog óók in de capsule-overflow (31.
 **31.5** haalt 'm daar weg (blijft hier).
 
 ## 31.5 — Background → frame-lokale toolbar [FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.4
 
 Besluit gevallen (Thierry, 2026-06-19): Background is canvas-gerelateerd → in de **frame-lokale
