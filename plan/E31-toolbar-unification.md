@@ -59,8 +59,8 @@ zijn stale — zie [[project_figma_mcp_workarounds]]):
 ---
 
 ## 31.1 — Onderste toolbar = Figma-capsule (persistent) [DS/FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS+FEAT (AI-agent, marathon)
 - blockedBy: —
 
 De `DSBottomToolbar` volgt de Figma-capsule (zwevend, gecentreerd onderaan), met gelabelde knoppen

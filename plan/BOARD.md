@@ -35,4 +35,4 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready (14.1, 14.3, 14.6) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
-| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **geblokkeerd** — 31.1 vereist Figma-capsule (`4114:903`/`4114:978`); Aaavatar-file niet open in Figma-desktop (zie DECISIONS-PENDING 2026-06-21) |
+| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | ready (31.1 in_progress) — Figma weer open; capsule-referentie bereikbaar |
