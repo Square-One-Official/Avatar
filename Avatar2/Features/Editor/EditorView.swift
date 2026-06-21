@@ -257,13 +257,11 @@ struct EditorView: View {
 
     var body: some View {
         editorBody
-            // E06.2: undo/redo + hold-to-compare. Frame App / Edit zet undo/
-            // redo ín de toolbar-strip (x344/x400) en de compare-thumb
-            // top-right; integratie in DSBottomToolbar is DS-werk (E03.19).
-            // Tot die landt staan ze als glass-cirkels rechtsonder, op één
-            // lijn met de toolbar — gedocumenteerde tijdelijke plaatsing.
-            .overlay(alignment: .bottomTrailing) { editorControls }
-            // E27.2: de zoom-HUD zweeft linksonder (tegenover undo/redo rechts).
+            // E06.6: undo/redo + hold-to-compare hangen nu ín de toolbar-strip
+            // (DSBottomToolbar-accessoireslot, E03.19) op de 56-pitch zoals
+            // frame App / Edit 4008:7340 — zie `toolbarAccessories`. De
+            // tijdelijke bottomTrailing-overlay is hiermee weg.
+            // E27.2: de zoom-HUD zweeft linksonder.
             .overlay(alignment: .bottomLeading) { zoomHUD }
             // UndoManager publiceert geen state → luister op de
             // change-notificaties en bump de tick zodat de knoppen
@@ -278,29 +276,29 @@ struct EditorView: View {
             }
     }
 
+    /// E06.6: undo/redo + hold-to-compare als trailing accessoires ín de
+    /// DSBottomToolbar-strip (geen eigen HStack/padding — de container plaatst
+    /// ze op de gap2/56-pitch achter de tools). Gedrag ongewijzigd t.o.v. de
+    /// oude bottomTrailing-overlay.
     @ViewBuilder
-    private var editorControls: some View {
-        HStack(spacing: DSSpacing.gap2) {
-            DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo") {
-                undoManager?.undo()
-            }
-            .disabled(undoManager?.canUndo != true)
-            DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo") {
-                undoManager?.redo()
-            }
-            .disabled(undoManager?.canRedo != true)
-            if originalImage != nil {
-                DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing) {}
-                    .opacity(isComparing ? 0.85 : 1)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in isComparing = true }
-                            .onEnded { _ in isComparing = false }
-                    )
-            }
+    private var toolbarAccessories: some View {
+        DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo") {
+            undoManager?.undo()
         }
-        .padding(.trailing, DSSpacing.gap3)
-        .padding(.bottom, DSSpacing.gap4)
+        .disabled(undoManager?.canUndo != true)
+        DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo") {
+            undoManager?.redo()
+        }
+        .disabled(undoManager?.canRedo != true)
+        if originalImage != nil {
+            DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing) {}
+                .opacity(isComparing ? 0.85 : 1)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in isComparing = true }
+                        .onEnded { _ in isComparing = false }
+                )
+        }
     }
 
     /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
@@ -610,6 +608,10 @@ struct EditorView: View {
             }
             }
             .onHover { pointerOverChrome = $0 }
+        } toolbarAccessory: {
+            // E06.6: undo/redo + compare hangen in de toolbar-strip i.p.v. een
+            // losse bottomTrailing-overlay.
+            toolbarAccessories
         }
         .padding(.horizontal, DSSpacing.gap3)
         .padding(.bottom, DSSpacing.gap2)
