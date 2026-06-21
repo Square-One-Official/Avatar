@@ -142,7 +142,7 @@ frame-toolbar zonder AI — zie /tmp/aaashots/e31-3.png. Beide targets bouwen De
 groen. **Figma-TODO** blijft staan (Enhance vs. overflow-groepering zodra er een referentie is).
 
 ## 31.4 — Frame-lokale zwevende toolbar = puur frame/scène [DS/FEAT]
-- status: in_progress
+- status: done
 - owner: DS+FEAT (AI-agent, marathon)
 - blockedBy: —
 
@@ -154,6 +154,20 @@ zweeft bij het frame. **Geen Figma-referentie** → bouwen in de geest van het h
 duidelijk gemarkeerde **placeholder**; registreer in [[ASSETS.md|plan/ASSETS.md]] (wat, Figma-frame
 = n.v.t./nieuw, formaat) + `Figma-TODO` zodat Thierry later het echte design levert. DoD: beide
 targets + tests groen + merge + Result + screenshot (frame-toolbar = alléén frame-controls).
+
+**Result:** De inhoud was al gestript door 31.2 (Adjust eruit) en 31.3 (AI ▾ eruit) — de
+`CanvasActionToolbar` bevat nu uitsluitend frame/scène/compositie-controls: **Frame ▾**
+(Auto-frame & center · Crop[stub] · Fix camera angle[stub] · Flip horizontal · Shape Circle/Square)
+· **Background** · **grid-toggle**. Selectie-gebonden-gedrag ongewijzigd (E28.2 op de board; E28.5
+houdt 'm altijd zichtbaar in de single-portrait-editor). **Placeholder-markering:** er is geen
+Figma-referentie (capsule 4114:978 toont deze toolbar niet — team-vondst), dus geregistreerd als
+placeholder-design in [[ASSETS.md|plan/ASSETS.md]] #5 + een `FIGMA-TODO`-blok in de
+`CanvasActionToolbar`-header zodat Thierry het echte design later levert. Geen verdere code-
+herstructurering nodig (de dropdown-structuur is in de geest van het hoofddesign). Visuele smoke
+(`--seed-adjust --show-frame-popover`, scherm ontgrendeld): Frame ▾ open toont enkel de frame-acties,
+toolbar = Frame ▾ · Background · grid — zie /tmp/aaashots/e31-4.png. Beide targets bouwen Debug groen,
+alle suites groen. NB: Background staat nu nog óók in de capsule-overflow (31.1, Figma-faithful);
+**31.5** haalt 'm daar weg (blijft hier).
 
 ## 31.5 — Background → frame-lokale toolbar [FEAT]
 - status: ready
