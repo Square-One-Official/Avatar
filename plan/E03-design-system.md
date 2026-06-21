@@ -223,10 +223,10 @@ Beide targets bouwen groen, alle tests groen (3 nieuwe unit-tests: delegate-rout
 **Result:** Per punt: (22) DSSidebarRow heeft nu een component-eigen hover-state: Inset-kleurvlak op r-2xl met 100ms easeOut-fade; selectie is één tint sterker (Inset + neutral-laag erbovenop) zodat de actieve rij herkenbaar blijft terwijl je elders hovert. (23) Sidebar-binnenpadding van gap-3 (12) naar gap-4 (16) rond zoekveld, lijst en add-knop — bewuste afwijking van het Figma-frame op besluit Thierry 2026-06-13, binnen de DSLayout-schaal. (24a) DSInlineEditLabel-hoverachtergrond van neutral naar neutral-stronger. (24b) Alle drie de staten delen exact hetzelfde kader: breedte/hoogte uit de meetfunctie (caret-marge óók in rust gereserveerd), leading-alignment, vaste regelhoogte — alleen achtergrond en rand wisselen, de tekst beweegt geen pixel; de 10×-snelkliktest is de handmatige eindcheck. Beide targets bouwen groen, alle tests groen.
 
 ## 3.19 — DSBottomToolbar: accessoire-slots (undo/redo)
-- status: in_progress
+- status: done
 - owner: DS (AI-agent, marathon)
 - blockedBy: 3.3
 - DoD: beide targets bouwen, tests groen
 - Context: aangevraagd vanuit E06.2 (frame App / Edit 4008:7340: undo/redo als cirkels ín de toolbar-strip, x344/x400). FEAT plaatst ze tijdelijk als losse DSToolButtons naast de container-toolbar; dit DS-slot integreert ze in DSBottomToolbar (trailing accessoires, zelfde 56-pitch), waarna FEAT de tijdelijke plaatsing verwijdert.
 
-**Result:** _(invullen bij done)_
+**Result:** `DSBottomToolbar` kreeg een optionele trailing `accessory`-slot (`@ViewBuilder`, generiek `Accessory: View`) die in dezelfde HStack op de gap2-pitch (48-cirkel + 8 = 56) achter de tools hangt — undo/redo/compare lijnen zo op de Figma-x344/x400-pitch uit zonder eigen container. Bestaande tools-only call sites blijven werken via een `where Accessory == EmptyView`-extensie-init (geen verplichte closure). `DSEditPanelContainer` forwardt de slot als `toolbarAccessory`-builder (zelfde EmptyView-default), zodat de FEAT-rewire alléén EditorView raakt. 3 nieuwe render-tests (tools-only, met accessoires, container-forward), AvatarUI 30/30 groen; beide targets bouwen Debug groen via build-v2.sh, alle suites groen. De feitelijke verplaatsing van de tijdelijke `editorControls`-overlay naar de slot is FEAT-werk → story E06.6 (ready).
