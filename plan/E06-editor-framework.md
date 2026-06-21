@@ -136,10 +136,10 @@ percentage van de canvasbreedte; geanimeerde overgang.
 **Result:** AutoFramer (Features/Editor/) — v1 AutoAligner-math 1-op-1 (eye-based ooglijn 0.37 / interoog 0.12, face-rect-fallback 0.38/0.42, body-overshoot 0.03) + Vision-detectie (pupil-centroids, body-pose, alpha-scan-fallback). "Automatic framing"-knop in het Edit-paneel én dubbelklik op het canvas (E06.4) roepen hem aan; geanimeerde overgang via withAnimation op de Portrait2-transform; undo-stap geregistreerd. 4 unit-tests op de pure math (groen). Smoke-run (ontgrendeld): knop aanwezig in Edit-paneel, transform animeert. Beide targets bouwen groen, volledige suite groen (de keychain-testfaal was scherm-lock, nu groen).
 
 ## 6.6 — Undo/redo + compare → DSBottomToolbar-accessoireslot
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 3.19 (done)
 - DoD: beide targets bouwen, tests groen, visuele smoke (undo/redo/compare in de toolbar-strip op 56-pitch, niet meer als losse overlay)
 - Context: opvolger van E03.19. De DS-slot (`DSEditPanelContainer.toolbarAccessory` → `DSBottomToolbar`-trailing) bestaat nu; deze story verwijdert de tijdelijke `editorControls`-overlay (bottomTrailing) uit EditorView en hangt undo/redo + hold-to-compare in de `toolbarAccessory`-builder. Gedrag (canUndo/canRedo-disable via undoTick, hold-to-compare-gesture) ongewijzigd overnemen; alleen de plaatsing verhuist. Frame App / Edit 4008:7340 (undo x344, redo x400 — +56).
 
-**Result:** _(invullen bij done)_
+**Result:** De tijdelijke `.overlay(alignment: .bottomTrailing) { editorControls }` is weg uit EditorView; undo/redo + hold-to-compare hangen nu via `DSEditPanelContainer(... toolbarAccessory:)` (E03.19-slot) ín de DSBottomToolbar-strip. `editorControls` (HStack + eigen trailing/bottom-padding) is vervangen door een padding-loze `@ViewBuilder toolbarAccessories` die de 3 knoppen als losse siblings aanlevert → de container plaatst ze op de gap2/56-pitch achter de tools (Effects·Face·Clothes·Hair·**Undo·Redo**). Gedrag ongewijzigd: canUndo/canRedo-disable via undoTick-onReceive, hold-to-compare-DragGesture; compare verschijnt alleen bij `originalImage != nil`. zoom-HUD blijft bottomLeading. Visuele smoke (`--seed-adjust`, scherm ontgrendeld): strip gecentreerd met undo/redo inline op de pitch, beide disabled bij lege historie, compare correct verborgen (geseed portret zonder origineel) — zie /tmp/aaashots/e06-6-strip.png. Beide targets bouwen Debug groen via build-v2.sh, alle suites groen.
