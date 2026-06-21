@@ -119,8 +119,8 @@ NB (tussenstand): de AI ▾-dropdown (alleen nog "Restore body" na E24.27) blijf
 tot **31.3** 'm eruit haalt.
 
 ## 31.3 — AI één-tik-acties → Enhance/onderaan (AI ▾ uit de frame-toolbar) [FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.2
 
 De AI-appearance-acties (Improve lighting · Colorise · Boost · Restore body, E24.9) bewerken de
