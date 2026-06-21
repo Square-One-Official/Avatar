@@ -94,7 +94,7 @@ scherm ontgrendeld) 1-op-1 tegen `4114:903` — zie /tmp/aaashots/e31-strip.png.
   **31.5** haalt Background uit de overflow (→ frame-toolbar).
 
 ## 31.2 — Adjust → onderste toolbar als "Enhance" [FEAT]
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.1
 
@@ -103,6 +103,20 @@ frame-toolbar naar de onderste toolbar onder de knop **Enhance** (eerste capsule
 Het Adjust-paneel zelf (orthogonale niet-destructieve laag, E24.14) blijft functioneel ongewijzigd —
 alléén de ingang verhuist. Verwijder Adjust uit de frame-toolbar. DoD: beide targets + tests groen +
 merge + Result + screenshot (Enhance-paneel onderaan).
+
+**Result:** De capsule-knop **Enhance** (`.edit`) opent nu het **volledige** `editColorPanel`
+(E24.27: sliders Brightness/Contrast/Saturation/Temperature + Auto-enhance-acties Improve lighting/
+Colorise/Boost, incl. `improveLightingOn`-state) — de uitgeklede inline-EditColorPanel in de
+panel-builder is vervangen door `editColorPanel`, paneeltitel "Enhance". Het Adjust-paneel is dus
+functioneel ongewijzigd, alleen de ingang verhuisde. **Adjust verwijderd uit de frame-toolbar:**
+`CanvasActionToolbar` verloor de `.adjust`-enumcase, de generic `Adjust: View` + `adjust`-builder,
+het `toolbarItem(.adjust,…)`-blok en de `--show-adjust-popover`-debughaak; het call-site liet de
+`adjust:`-arg vallen. De frame-toolbar is nu **Frame ▾ · Background · AI ▾** (+ grid-toggle).
+Visuele smoke (`--seed-adjust --open-panel edit`, scherm ontgrendeld): Enhance-pil lime-actief, het
+Enhance-paneel onderaan met one-tap-rij + 4 sliders, en de frame-toolbar zónder Adjust — zie
+/tmp/aaashots/e31-2c.png. Beide targets bouwen Debug groen via build-v2.sh, alle suites groen.
+NB (tussenstand): de AI ▾-dropdown (alleen nog "Restore body" na E24.27) blijft in de frame-toolbar
+tot **31.3** 'm eruit haalt.
 
 ## 31.3 — AI één-tik-acties → Enhance/onderaan (AI ▾ uit de frame-toolbar) [FEAT]
 - status: ready
