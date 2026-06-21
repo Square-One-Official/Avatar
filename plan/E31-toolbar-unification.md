@@ -170,7 +170,7 @@ alle suites groen. NB: Background staat nu nog óók in de capsule-overflow (31.
 **31.5** haalt 'm daar weg (blijft hier).
 
 ## 31.5 — Background → frame-lokale toolbar [FEAT]
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.4
 
@@ -179,6 +179,17 @@ Besluit gevallen (Thierry, 2026-06-19): Background is canvas-gerelateerd → in 
 ongewijzigd in functie) naar de frame-toolbar; verwijder 'm uit de onderste set/overflow. Bewuste
 afwijking van Figma — documenteren in [[DECISIONS-PENDING.md|plan/DECISIONS-PENDING.md]]. DoD: beide
 targets + tests groen + merge + Result + screenshot.
+
+**Result:** Background staat (sinds altijd) in de frame-lokale `CanvasActionToolbar` en is nu uit de
+**capsule-overflow** gehaald: `EditorView.overflowItems` = `[]` (was `[Background]` uit 31.1). Gevolg:
+de overflow is leeg → de **`⋯`-knop verschijnt niet meer** (DSBottomToolbar toont 'm alleen met
+inhoud; keert automatisch terug zodra er overflow-tools komen). Background-functie (E24.4/E24.31
+swatches + upload) ongewijzigd. Bewuste Figma-afwijking vastgelegd in
+[[DECISIONS-PENDING.md|plan/DECISIONS-PENDING.md]] (E31-blok). Visuele smoke (`--seed-adjust`, scherm
+ontgrendeld): onderste capsule = **Enhance · Effects · Face · Hair · Shirt** (geen `⋯`), frame-toolbar
+= **Frame ▾ · Background · grid** — zie /tmp/aaashots/e31-5-strip.png + e31-5-full.png. Beide targets
+bouwen Debug groen, alle suites groen. (De bottom-panel-builder houdt een ongebruikte `.background`-
+tak; onschadelijk — Background wordt nu alleen via de frame-toolbar-dropdown geopend.)
 
 ## 31.6 — Face = eigen capsule-knop [FEAT]
 - status: ready

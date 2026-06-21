@@ -236,11 +236,12 @@ struct EditorView: View {
         DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Shirt"),
     ]
 
-    // E31.1: secundaire tools in de overflow `⋯`. Figma zet Background hier;
-    // 31.5 verplaatst 'm (bewust afwijkend) naar de frame-lokale toolbar.
-    private static let overflowItems: [DSToolbarItem<EditorTool>] = [
-        DSToolbarItem(id: .background, icon: EditorTool.background.icon, label: "Background"),
-    ]
+    // E31.5: de capsule-overflow `⋯` is leeg. Background (dat Figma in deze
+    // overflow zette) verhuisde — bewuste afwijking, besluit Thierry — naar de
+    // frame-lokale toolbar (canvas-gerelateerd). Geen andere secundaire tools →
+    // de `⋯`-knop verschijnt niet (DSBottomToolbar toont 'm alleen bij inhoud).
+    // Zodra er wél overflow-tools komen, keert de `⋯` automatisch terug.
+    private static let overflowItems: [DSToolbarItem<EditorTool>] = []
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
     /// sidebar en openen hun paneel. E18.20: GEEN eigen withAnimation meer —
