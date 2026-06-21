@@ -95,3 +95,15 @@
 - **NB:** 31.4 zegt formeel `blockedBy: —` en "GEEN Figma-referentie" (placeholder-bouw), maar de
   inhoud ("alléén nog frame/scène-controls") is de **eindstaat ná 31.2/31.3** (Adjust/AI eruit) en
   ná 31.5 (Background erin) → in de praktijk niet vóór 31.1–31.3/31.5 te bouwen zonder rework.
+
+### E31 — bewuste Figma-afwijkingen in de toolbar-unificatie (besloten, gedocumenteerd 2026-06-21)
+Geen open vraag — Thierry's besluiten vastgelegd voor het register (CLAUDE.md: afwijkingen van
+Figma alleen met expliciet besluit + documentatie):
+- **31.5 — Background → frame-lokale toolbar.** Figma zet Background in de onderste capsule-overflow
+  (`⋯`, 4114:978). Besluit Thierry (2026-06-19): Background is canvas-gerelateerd → hoort bij de
+  frame-lokale (boven)toolbar, niet onderaan. Gevolg: de capsule-overflow is leeg → de **`⋯`-knop
+  wordt niet getoond** (keert automatisch terug zodra er wél overflow-tools komen). Background-
+  functie (swatches + upload) ongewijzigd; blijft in `CanvasActionToolbar`.
+- **31.6 — Face = eigen top-level capsule-knop.** Figma heeft geen top-level Face in de capsule
+  (4114:978 = Enhance·Effects·Hair·Shirt·⋯). Besluit Thierry: Face krijgt een eigen knop tussen
+  Effects en Hair → onderste set = **Enhance · Effects · Face · Hair · Shirt**.
