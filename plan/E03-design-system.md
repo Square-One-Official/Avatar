@@ -223,8 +223,8 @@ Beide targets bouwen groen, alle tests groen (3 nieuwe unit-tests: delegate-rout
 **Result:** Per punt: (22) DSSidebarRow heeft nu een component-eigen hover-state: Inset-kleurvlak op r-2xl met 100ms easeOut-fade; selectie is één tint sterker (Inset + neutral-laag erbovenop) zodat de actieve rij herkenbaar blijft terwijl je elders hovert. (23) Sidebar-binnenpadding van gap-3 (12) naar gap-4 (16) rond zoekveld, lijst en add-knop — bewuste afwijking van het Figma-frame op besluit Thierry 2026-06-13, binnen de DSLayout-schaal. (24a) DSInlineEditLabel-hoverachtergrond van neutral naar neutral-stronger. (24b) Alle drie de staten delen exact hetzelfde kader: breedte/hoogte uit de meetfunctie (caret-marge óók in rust gereserveerd), leading-alignment, vaste regelhoogte — alleen achtergrond en rand wisselen, de tekst beweegt geen pixel; de 10×-snelkliktest is de handmatige eindcheck. Beide targets bouwen groen, alle tests groen.
 
 ## 3.19 — DSBottomToolbar: accessoire-slots (undo/redo)
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS (AI-agent, marathon)
 - blockedBy: 3.3
 - DoD: beide targets bouwen, tests groen
 - Context: aangevraagd vanuit E06.2 (frame App / Edit 4008:7340: undo/redo als cirkels ín de toolbar-strip, x344/x400). FEAT plaatst ze tijdelijk als losse DSToolButtons naast de container-toolbar; dit DS-slot integreert ze in DSBottomToolbar (trailing accessoires, zelfde 56-pitch), waarna FEAT de tijdelijke plaatsing verwijdert.
