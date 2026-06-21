@@ -334,6 +334,8 @@ struct EditorView: View {
             onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
             onColorise: { _ = entitlement?.allowCloudFeature() },
             onBoost: runBoostResolution,
+            // E31.3: Restore body verhuisde uit de frame-toolbar-AI-dropdown hierheen.
+            onRestoreBody: { _ = entitlement?.allowCloudFeature() },
             isPro: entitlement?.isProActive ?? false,
             // E24.28: toon de active-state van de Improve lighting-toggle.
             improveLightingOn: localToggleBaselines["Improve lighting"] != nil,
@@ -515,14 +517,10 @@ struct EditorView: View {
                     onFlip: flipHorizontally,
                     frameShape: portraitModel?.frameShape ?? .circle,
                     onSetFrameShape: setFrameShape,
-                    onRestoreBody: { _ = entitlement?.allowCloudFeature() },
-                    onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-                    onColorise: { _ = entitlement?.allowCloudFeature() },
-                    onBoost: runBoostResolution,
-                    isPro: entitlement?.isProActive ?? false,
                     activeMenu: $canvasMenu,
                     gridEnabled: $canvasGridEnabled,
-                    // E31.2: Adjust is uit de frame-toolbar — nu de capsule-knop "Enhance".
+                    // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
+                    // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
                     background: { BackgroundPanel(portrait: portraitModel).onHover { pointerOverChrome = $0 } }
                 )
                 .padding(.top, DSSpacing.gap4)
