@@ -142,8 +142,8 @@ frame-toolbar zonder AI — zie /tmp/aaashots/e31-3.png. Beide targets bouwen De
 groen. **Figma-TODO** blijft staan (Enhance vs. overflow-groepering zodra er een referentie is).
 
 ## 31.4 — Frame-lokale zwevende toolbar = puur frame/scène [DS/FEAT]
-- status: ready
-- owner: —
+- status: in_progress
+- owner: DS+FEAT (AI-agent, marathon)
 - blockedBy: —
 
 Na 31.2/31.3 bevat de zwevende toolbar bij het portret alléén nog **frame/scène/compositie**-controls:
