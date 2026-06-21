@@ -25,6 +25,8 @@ struct EditColorPanel: View {
     var onImproveLighting: () -> Void = {}
     var onColorise: () -> Void = {}
     var onBoost: () -> Void = {}
+    // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
+    var onRestoreBody: () -> Void = {}
     var isPro: Bool = false
     /// E24.28: of de lokale "Improve lighting"-toggle momenteel AAN staat.
     var improveLightingOn: Bool = false
@@ -68,6 +70,8 @@ struct EditColorPanel: View {
                         quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
                         quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
                                     credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                        // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
+                        quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
                     }
                     .padding(.vertical, DSSpacing.gap1)
                 }

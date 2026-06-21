@@ -1,9 +1,9 @@
 // Canvas action-toolbar (E24.1–24.4, verslankt in E24.9, popover-stijl E24.12)
 // — scène/beeld-acties bovenaan het portret. Top-level items, secundaire
 // acties in dropdowns:
-//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background ·
-//   AI ▾ (Restore body).
-// E31.2: Adjust is hier weg → onderste capsule-knop "Enhance" (E24.27-paneel).
+//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background.
+// E31.2: Adjust → onderste capsule-knop "Enhance". E31.3: AI ▾ (Restore body
+// e.a.) is hier weg → de Enhance-paneel-acties (E24.27 + Restore body).
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
 // `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
 // aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
@@ -19,8 +19,8 @@ import SwiftUI
 
 /// E24.12: de vier canvas-toolbar-dropdowns (open-staat gedeeld met EditorView).
 enum CanvasToolbarMenu: Hashable {
-    // E31.2: `adjust` verhuisd naar de onderste capsule ("Enhance").
-    case frame, background, ai
+    // E31.2: `adjust` → onderste capsule ("Enhance"). E31.3: `ai` → Enhance-paneel.
+    case frame, background
 }
 
 struct CanvasActionToolbar<Background: View>: View {
@@ -31,11 +31,6 @@ struct CanvasActionToolbar<Background: View>: View {
     /// E24.16: huidige frame-vorm + setter (Circle/Square-keuze in Frame ▾).
     var frameShape: ExportShape = .circle
     var onSetFrameShape: (ExportShape) -> Void = { _ in }
-    var onRestoreBody: () -> Void = {}
-    var onImproveLighting: () -> Void = {}
-    var onColorise: () -> Void = {}
-    var onBoost: () -> Void = {}
-    var isPro: Bool = false
     /// E24.12: welke dropdown open is (nil = geen). Binding zodat de
     /// canvas-tap-dismiss in EditorView 'm ook sluit.
     @Binding var activeMenu: CanvasToolbarMenu?
@@ -51,10 +46,6 @@ struct CanvasActionToolbar<Background: View>: View {
             toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
                 background()
             }
-            toolbarItem(.ai, "AI", icon: .sparkle, chevron: true, width: 240, padding: DSSpacing.gap2) {
-                aiMenu
-            }
-
             // E24.26: grid/thirds-toggle.
             Button { gridEnabled.toggle() } label: {
                 Ph.gridNine.regular
@@ -77,7 +68,6 @@ struct CanvasActionToolbar<Background: View>: View {
         .onAppear {
             let args = ProcessInfo.processInfo.arguments
             if args.contains("--show-bg-popover") { activeMenu = .background }
-            if args.contains("--show-ai-popover") { activeMenu = .ai }
             if args.contains("--show-frame-popover") { activeMenu = .frame }
         }
         #endif
@@ -155,15 +145,6 @@ struct CanvasActionToolbar<Background: View>: View {
             .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
-    }
-
-    private var aiMenu: some View {
-        // E24.27: Improve lighting/Colorise/Boost zijn verhuisd naar het
-        // Light & color-paneel (Adjust). De AI-dropdown houdt de generatieve
-        // Restore body.
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            menuRow("Restore body", icon: .userRectangle, pro: !isPro, action: onRestoreBody)
-        }
     }
 
     /// Een dropdown-rij; `action == nil` = nog-niet-gebouwde stub (gedimd).

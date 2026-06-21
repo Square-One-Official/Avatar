@@ -119,7 +119,7 @@ NB (tussenstand): de AI ▾-dropdown (alleen nog "Restore body" na E24.27) blijf
 tot **31.3** 'm eruit haalt.
 
 ## 31.3 — AI één-tik-acties → Enhance/onderaan (AI ▾ uit de frame-toolbar) [FEAT]
-- status: in_progress
+- status: done
 - owner: FEAT (AI-agent, marathon)
 - blockedBy: 31.2
 
@@ -128,6 +128,18 @@ De AI-appearance-acties (Improve lighting · Colorise · Boost · Restore body, 
 één-tik-acties) of de `⋯`-overflow; verwijder de `AI ▾`-dropdown uit de frame-toolbar. Pro-/credit-
 badges behouden. DoD: beide targets + tests groen + merge + Result + screenshot. **Figma-TODO:** exacte
 groepering van de AI-acties binnen Enhance vs. overflow tegen referenties zodra die er zijn.
+
+**Result:** Improve lighting/Colorise/Boost zaten al in het Enhance-paneel (E24.27); **Restore body**
+is nu de 4e chip in dezelfde Auto-enhance-rij (`EditColorPanel` kreeg `onRestoreBody`, chip met
+`pro: !isPro`-badge; `editColorPanel` wired op `entitlement?.allowCloudFeature()`). De **AI ▾-dropdown
+is volledig uit de frame-toolbar:** `CanvasActionToolbar` verloor de `.ai`-enumcase, het
+`toolbarItem(.ai,…)`-blok, de `aiMenu`-view, de `--show-ai-popover`-haak en de daarmee dode params
+(`onRestoreBody/onImproveLighting/onColorise/onBoost/isPro` — de drie midden waren al dood sinds
+E24.27). Het call-site liet die args vallen. De frame-toolbar is nu **Frame ▾ · Background** (+ grid-
+toggle). Pro-/credit-badges behouden (Boost = "1 credit"; Colorise/Restore body = Pro-chip buiten Pro).
+Visuele smoke (`--seed-adjust --open-panel edit`, scherm ontgrendeld): vier chips incl. Restore body,
+frame-toolbar zonder AI — zie /tmp/aaashots/e31-3.png. Beide targets bouwen Debug groen, alle suites
+groen. **Figma-TODO** blijft staan (Enhance vs. overflow-groepering zodra er een referentie is).
 
 ## 31.4 — Frame-lokale zwevende toolbar = puur frame/scène [DS/FEAT]
 - status: ready
