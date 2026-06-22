@@ -41,10 +41,12 @@ struct BoardView: View {
         return portraits.first { $0.persistentModelID == id }
     }
 
-    /// E27.5: gedecodeerde + verkleinde thumbnails, één keer per portret-id
-    /// gedecodeerd (geen re-decode bij elke pan/zoom-frame). Referentietype zodat
-    /// het over body-evaluaties heen blijft leven.
-    @State private var thumbs = BoardThumbnailCache()
+    /// E27.6 (Tier 3): off-main thumbnail-store — decodeert elke cutout één keer
+    /// per (id, updatedAt, maat) op een achtergrond-Task (geen main-thread-hitch),
+    /// (id, updatedAt)-gekeyd zodat edits vanzelf verversen, met FIFO-eviction tegen
+    /// onbegrensd geheugen bij honderden nodes. Referentietype zodat het over
+    /// body-evaluaties heen leeft.
+    @State private var thumbs = ThumbnailStore()
 
     // Camera met een lagere min-zoom dan de editor, zodat een grote set in beeld past.
     @State private var camera = CanvasCamera(minScale: 0.1)
@@ -189,8 +191,35 @@ struct BoardView: View {
             // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
             // zoom op een grote set.
             ForEach(visibleNodes(), id: \.portrait.persistentModelID) { item in
-                node(item.portrait)
-                    .position(x: item.center.x, y: item.center.y)
+                let p = item.portrait
+                // E27.6 (Tier 1): de node-visuals zitten in een losse, `Equatable`
+                // view → een pan/zoom-only change laat 'm `==` blijven en SwiftUI
+                // slaat z'n body over. Gestures + hover hangen BUITEN `.equatable()`
+                // (verse closures zouden de skip anders breken); de camera-
+                // afhankelijke drag-math blijft in `BoardView`.
+                BoardNodeView(
+                    thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
+                    isSelected: selection.contains(p.persistentModelID),
+                    frameShape: p.frameShape,
+                    name: p.name,
+                    role: p.role,
+                    backgroundColorHex: p.backgroundColorHex,
+                    backgroundImageData: p.backgroundImageData,
+                    contentVersion: p.updatedAt,
+                    cardSide: cardSide,
+                    labelGap: labelGap,
+                    labelHeight: labelHeight,
+                    cellHeight: cellHeight
+                )
+                .equatable()
+                .contentShape(Rectangle())
+                .dsHoverHighlight(cornerRadius: DSRadius.xl4)
+                // E29.1: dubbelklik = openen in de editor; enkelklik = selecteren
+                // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
+                .onTapGesture(count: 2) { onOpen(p) }
+                .onTapGesture { tapNode(p) }
+                .gesture(dragGesture(for: p))
+                .position(x: item.center.x, y: item.center.y)
             }
 
             // E29.1: marquee-rechthoek (board-space; lijn ÷camera = constant dun).
@@ -234,11 +263,21 @@ struct BoardView: View {
 
     /// E27.5: de nodes waarvan het midden binnen de (met een cel-marge verruimde)
     /// zichtbare board-rect valt. Vóór de eerste layout (viewport 0) → alles.
+    /// E27.6 (Tier 2): één `compactMap` die ALLEEN de zichtbare tuples alloceert —
+    /// geen tussen-array van álle portretten meer per camera-frame. `center(of:)` is
+    /// goedkoop (leest boardX/boardY of de auto-grid-plek) en blijft live, dus
+    /// node-drag + `BoardMoveUndo` verschuiven direct, zonder een aparte cache te
+    /// syncen. (Bij echte duizenden: een grid-bucket-index i.p.v. de O(n)-scan — pas
+    /// als profiling het vraagt.)
     private func visibleNodes() -> [(portrait: Portrait2, center: CGPoint)] {
-        let all = portraits.enumerated().map { (portrait: $1, center: center(of: $1, index: $0)) }
-        guard viewport.width > 0, viewport.height > 0, camera.scale > 0 else { return all }
+        guard viewport.width > 0, viewport.height > 0, camera.scale > 0 else {
+            return portraits.enumerated().map { (portrait: $1, center: center(of: $1, index: $0)) }
+        }
         let rect = visibleBoardRect().insetBy(dx: -(cardSide + gap), dy: -(cellHeight + gap))
-        return all.filter { rect.contains($0.center) }
+        return portraits.enumerated().compactMap { index, p in
+            let c = center(of: p, index: index)
+            return rect.contains(c) ? (portrait: p, center: c) : nil
+        }
     }
 
     /// De zichtbare board-rect (board-space) gegeven de camera + viewport.
@@ -258,43 +297,6 @@ struct BoardView: View {
         return CGRect(x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y)
     }
 
-    private func node(_ portrait: Portrait2) -> some View {
-        let isSelected = selection.contains(portrait.persistentModelID)
-        return VStack(spacing: labelGap) {
-            cardSurface(portrait)
-                .frame(width: cardSide, height: cardSide)
-                // E29.1: selectie-ring (lime) om de geselecteerde nodes.
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: DSRadius.xl4)
-                            .strokeBorder(DSColor.Action.primary, lineWidth: 3)
-                            .padding(-4)
-                    }
-                }
-            VStack(spacing: 2) {
-                Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.primary)
-                    .lineLimit(1)
-                if !portrait.role.isEmpty {
-                    Text(portrait.role)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .lineLimit(1)
-                }
-            }
-            .frame(height: labelHeight)
-        }
-        .frame(width: cardSide, height: cellHeight)
-        .contentShape(Rectangle())
-        .dsHoverHighlight(cornerRadius: DSRadius.xl4)
-        // E29.1: dubbelklik = openen in de editor; enkelklik = selecteren
-        // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
-        .onTapGesture(count: 2) { onOpen(portrait) }
-        .onTapGesture { tapNode(portrait) }
-        .gesture(dragGesture(for: portrait))
-    }
-
     /// E29.1: enkelklik op een node — cmd/shift togglet 'm in/uit de selectie;
     /// anders selecteer alléén deze node.
     private func tapNode(_ portrait: Portrait2) {
@@ -304,49 +306,6 @@ struct BoardView: View {
         } else {
             selection = [id]
         }
-    }
-
-    /// Kaart-surface met het cutout-beeld, geclipt tot de frame-vorm (mini-
-    /// DSCanvasCard, zonder de transform-machinerie).
-    @ViewBuilder
-    private func cardSurface(_ portrait: Portrait2) -> some View {
-        let clip: AnyShape = portrait.frameShape == .circle
-            ? AnyShape(Circle())
-            : AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
-        ZStack {
-            DSColor.Background.card
-            // E29.2: de gekozen achtergrondkleur achter de cutout → batch-
-            // Background is meteen zichtbaar op de board (WYSIWYG voor kleur).
-            if let hex = portrait.backgroundColorHex, let c = Color(hexRGB: hex) {
-                c
-            }
-            // E29.2: ook de gekozen achtergrondafbeelding achter de cutout, zodat
-            // een batch-Image-Background meteen WYSIWYG op de board verschijnt
-            // (spiegelt EditorView.backgroundLayer; Color.clear voorkomt dat de
-            // intrinsieke uploadmaat de kaartlayout in lekt).
-            if let data = portrait.backgroundImageData, let image = NSImage(data: data) {
-                Color.clear
-                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
-                    .clipped()
-            }
-            // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
-            // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG).
-            // E30.1: de node die je nú in-place bewerkt decodeert VERS (cache
-            // omzeild) zodat een Effect/Flip/Hair-edit meteen op de node verschijnt
-            // — applyEffectResult re-isoleert async, dus een cache-snapshot zou
-            // achterlopen. Eén verse decode per render voor die ene node is prima.
-            if let image = (portrait.persistentModelID == selection.first && selection.count == 1)
-                ? thumbs.freshThumbnail(for: portrait, maxDimension: cardSide * 2)
-                : thumbs.thumbnail(for: portrait, maxDimension: cardSide * 2) {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .padding(cardSide * 0.08)
-            }
-        }
-        .clipShape(clip)
-        .overlay(clip.stroke(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
     }
 
     // MARK: - Layout / posities
@@ -520,37 +479,28 @@ struct BoardView: View {
 
             // E29.3: Match lighting over de selectie (≥2). Normaliseert de
             // belichting van alle geselecteerde naar de eerste als referentie.
+            // E32.1: gedeelde compacte pil (SF-Symbol-init) i.p.v. de inline-knop.
             if selection.count >= 2 {
-                Button { matchLightingSelection() } label: {
-                    HStack(spacing: DSSpacing.gap1) {
-                        Image(systemName: isMatchingLight ? "circle.dotted" : "sun.max")
-                            .font(.system(size: 12))
-                        Text(isMatchingLight ? "Matching…" : "Match lighting").dsTextStyle(.labelSmall)
-                    }
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .padding(.horizontal, DSSpacing.gap2)
-                    .frame(height: 28)
-                    .dsHoverHighlight(cornerRadius: 14)
-                }
-                .buttonStyle(.plain)
+                DSCapsuleToolButton(
+                    Image(systemName: isMatchingLight ? "circle.dotted" : "sun.max"),
+                    label: isMatchingLight ? "Matching…" : "Match lighting",
+                    size: .compact,
+                    action: { matchLightingSelection() }
+                )
                 .disabled(isMatchingLight)
 
                 Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
             }
 
             // Adjust: dezelfde kleurcorrectie op alle geselecteerde (dropdown).
-            Button { batchMenu = (batchMenu == .adjust) ? nil : .adjust } label: {
-                HStack(spacing: DSSpacing.gap1) {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 12))
-                    Text("Adjust").dsTextStyle(.labelSmall)
-                }
-                .foregroundStyle(DSColor.Foreground.primary)
-                .padding(.horizontal, DSSpacing.gap2)
-                .frame(height: 28)
-                .background(batchMenu == .adjust ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-                .dsHoverHighlight(cornerRadius: 14)
-            }
-            .buttonStyle(.plain)
+            // E32.1: gedeelde compacte pil — active (menu open) = lime-ring.
+            DSCapsuleToolButton(
+                Image(systemName: "slider.horizontal.3"),
+                label: "Adjust",
+                isActive: batchMenu == .adjust,
+                size: .compact,
+                action: { batchMenu = (batchMenu == .adjust) ? nil : .adjust }
+            )
             .overlay(alignment: .top) {
                 if batchMenu == .adjust, let first = selectedPortraits.first,
                    let img = NSImage(data: first.cutoutData) {
@@ -562,16 +512,18 @@ struct BoardView: View {
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
                     .fixedSize(horizontal: false, vertical: true)
-                    .dsPanelSurface(cornerRadius: DSRadius.xl)
-                    .offset(y: 40)
+                    // E32.1: zelfde paneel-radius (xl4) als de rest.
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    .offset(y: DSToolbarSize.compact.height
+                              + DSToolbarSize.compact.containerPadding
+                              + DSSpacing.gap2)
                     .zIndex(10)
                 }
             }
         }
-        .padding(.horizontal, DSSpacing.gap3)
-        .padding(.vertical, DSSpacing.gap1)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        // E32.1: zelfde solide Card-capsule als de single-editor toolbars
+        // (geen glas/rand), compacte maat.
+        .dsToolbarCapsule(size: .compact)
     }
 
     /// E31.7: gedeelde "Background"-knop met de volledige `BackgroundPanel` als
@@ -581,26 +533,25 @@ struct BoardView: View {
     private func backgroundMenuButton(
         isOpen: Bool, toggle: @escaping () -> Void, display: Portrait2?
     ) -> some View {
-        Button(action: toggle) {
-            HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: "photo").font(.system(size: 12))
-                Text("Background").dsTextStyle(.labelSmall)
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 28)
-            .background(isOpen ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-            .dsHoverHighlight(cornerRadius: 14)
-        }
-        .buttonStyle(.plain)
+        // E32.1: gedeelde compacte pil (SF-Symbol-init); active (open) = lime-ring.
+        DSCapsuleToolButton(
+            Image(systemName: "photo"),
+            label: "Background",
+            isActive: isOpen,
+            size: .compact,
+            action: toggle
+        )
         .overlay(alignment: .top) {
             if isOpen {
                 BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) })
                     .padding(DSSpacing.gap4)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
-                    .dsPanelSurface(cornerRadius: DSRadius.xl)
-                    .offset(y: 40)
+                    // E32.1: zelfde paneel-radius (xl4) als de rest.
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    .offset(y: DSToolbarSize.compact.height
+                              + DSToolbarSize.compact.containerPadding
+                              + DSSpacing.gap2)
                     .zIndex(10)
             }
         }
@@ -859,95 +810,112 @@ struct BoardView: View {
     }
 }
 
-/// E27.5: thumbnail-cache voor de board — decodeert + verkleint elke cutout één
-/// keer (per portret-id) en bewaart het resultaat, zodat pan/zoom geen volledige
-/// re-decode + draw van de bron-pixels meer triggert. `decodeCount` is een
-/// meet-haak (voor/na in de Result).
-@MainActor
-final class BoardThumbnailCache {
-    private var cache: [PersistentIdentifier: NSImage] = [:]
-    /// E30.2: de adjusted thumbnail, gecachet per (id, adjust-stand) — zodat de
-    /// niet-destructieve Adjust-laag ook op de board-node zichtbaar is (WYSIWYG)
-    /// zonder elke frame te her-renderen.
-    private var adjustedCache: [PersistentIdentifier: (adjust: PortraitAdjust, image: NSImage)] = [:]
-    private(set) var decodeCount = 0
+/// E27.6 (Tier 1): één board-node als losse, `Equatable` view. De camera-transform
+/// staat op de container (`boardCanvas`), niet hier — dus bij een pan/zoom-only
+/// change blijft een node `==` aan z'n vorige zelf en slaat SwiftUI z'n body over
+/// (de SwiftUI-tegenhanger van "Figma verandert alleen de camera-matrix, niet de
+/// node-texture"). Gestures/hover hangen BUITEN deze view (in `BoardView`) zodat hun
+/// verse closures de equatable-skip niet breken.
+private struct BoardNodeView: View, Equatable {
+    let thumbnail: NSImage?
+    let isSelected: Bool
+    let frameShape: ExportShape
+    let name: String
+    let role: String
+    let backgroundColorHex: String?
+    let backgroundImageData: Data?
+    /// `Portrait2.updatedAt` — O(1) wijzigings-token voor de (dure) bg-image-`Data`:
+    /// `setBackground` bumpt 'm, dus we hoeven nooit de bytes te vergelijken.
+    let contentVersion: Date
+    let cardSide: CGFloat
+    let labelGap: CGFloat
+    let labelHeight: CGFloat
+    let cellHeight: CGFloat
 
-    /// Gecachete, verkleinde thumbnail MÉT de Adjust-laag (voor niet-bewerkte nodes).
-    func thumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
-        guard let raw = rawThumbnail(for: portrait, maxDimension: maxDimension) else { return nil }
-        return adjusted(raw, portrait: portrait)
+    /// Goedkope, O(1) gelijkheid — `==` draait O(zichtbaar)× per camera-frame, dus
+    /// GEEN byte-vergelijking van `backgroundImageData` (dat rijdt op `contentVersion`)
+    /// en de thumbnail vergelijken we op identiteit (de cache geeft instance-stabiliteit).
+    static func == (lhs: BoardNodeView, rhs: BoardNodeView) -> Bool {
+        lhs.isSelected == rhs.isSelected
+            && lhs.thumbnail === rhs.thumbnail
+            && lhs.frameShape == rhs.frameShape
+            && lhs.name == rhs.name
+            && lhs.role == rhs.role
+            && lhs.backgroundColorHex == rhs.backgroundColorHex
+            && lhs.contentVersion == rhs.contentVersion
     }
 
-    /// E30.2: verse (ongecachete) adjusted thumbnail — voor de node die je nú
-    /// in-place bewerkt: cutoutData verandert async (re-isolatie), dus altijd
-    /// opnieuw decoderen i.p.v. een snapshot.
-    func freshThumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
-        guard let full = NSImage(data: portrait.cutoutData) else { return nil }
-        let thumb = Self.downscaled(full, maxDimension: maxDimension)
-        return portrait.adjust.isNeutral ? thumb : (Self.applyAdjust(thumb, portrait.adjust) ?? thumb)
+    private var clip: AnyShape {
+        frameShape == .circle
+            ? AnyShape(Circle())
+            : AnyShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
     }
 
-    /// De rauwe (ongeadjustede) downscaled thumbnail, één keer per id gedecodeerd.
-    private func rawThumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
-        let id = portrait.persistentModelID
-        if let cached = cache[id] { return cached }
-        guard let full = NSImage(data: portrait.cutoutData) else { return nil }
-        let thumb = Self.downscaled(full, maxDimension: maxDimension)
-        cache[id] = thumb
-        decodeCount += 1
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--board-perf") {
-            NSLog("BOARD thumb decode #\(decodeCount) id=\(id)")
+    var body: some View {
+        VStack(spacing: labelGap) {
+            cardSurface
+                .frame(width: cardSide, height: cardSide)
+                // E29.1: selectie-ring (lime) om de geselecteerde nodes.
+                .overlay {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: DSRadius.xl4)
+                            .strokeBorder(DSColor.Action.primary, lineWidth: 3)
+                            .padding(-4)
+                    }
+                }
+            VStack(spacing: 2) {
+                Text(name.isEmpty ? "Untitled" : name)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.primary)
+                    .lineLimit(1)
+                if !role.isEmpty {
+                    Text(role)
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .lineLimit(1)
+                }
+            }
+            .frame(height: labelHeight)
         }
-        #endif
-        return thumb
+        .frame(width: cardSide, height: cellHeight)
     }
 
-    /// Pas de Adjust-laag toe op een rauwe thumbnail, gecachet per adjust-stand.
-    /// Neutraal → de rauwe thumb ongewijzigd (geen render).
-    private func adjusted(_ raw: NSImage, portrait: Portrait2) -> NSImage {
-        let adjust = portrait.adjust
-        guard !adjust.isNeutral else { return raw }
-        let id = portrait.persistentModelID
-        if let cached = adjustedCache[id], cached.adjust == adjust { return cached.image }
-        let out = Self.applyAdjust(raw, adjust) ?? raw
-        adjustedCache[id] = (adjust, out)
-        return out
-    }
-
-    private static func applyAdjust(_ image: NSImage, _ adjust: PortraitAdjust) -> NSImage? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let out = PortraitEnhancer.colorAdjust(
-                cg, brightness: adjust.brightness, contrast: adjust.contrast,
-                saturation: adjust.saturation, temperatureShift: adjust.temperature
-              ) else { return nil }
-        return NSImage(cgImage: out, size: image.size)
-    }
-
-    /// E29.3: vergeet de cache voor één portret (na een cutout-wijziging zoals
-    /// Match lighting) → de board decodeert de nieuwe cutout opnieuw.
-    func invalidate(_ portrait: Portrait2) {
-        cache[portrait.persistentModelID] = nil
-        adjustedCache[portrait.persistentModelID] = nil
-    }
-
-    /// Teken de bron in een kleiner NSImage (aspect behouden); ≥ bronmaat → bron.
-    private static func downscaled(_ image: NSImage, maxDimension: CGFloat) -> NSImage {
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return image }
-        let factor = min(1, maxDimension / max(size.width, size.height))
-        guard factor < 1 else { return image }
-        let target = NSSize(width: (size.width * factor).rounded(), height: (size.height * factor).rounded())
-        let out = NSImage(size: target)
-        out.lockFocus()
-        NSGraphicsContext.current?.imageInterpolation = .high
-        image.draw(
-            in: NSRect(origin: .zero, size: target),
-            from: NSRect(origin: .zero, size: size),
-            operation: .copy, fraction: 1
-        )
-        out.unlockFocus()
-        return out
+    /// Kaart-surface met het cutout-beeld, geclipt tot de frame-vorm (mini-
+    /// DSCanvasCard, zonder de transform-machinerie).
+    @ViewBuilder
+    private var cardSurface: some View {
+        ZStack {
+            DSColor.Background.card
+            // E29.2: de gekozen achtergrondkleur achter de cutout → batch-
+            // Background is meteen zichtbaar op de board (WYSIWYG voor kleur).
+            if let hex = backgroundColorHex, let c = Color(hexRGB: hex) {
+                c
+            }
+            // E29.2: ook de gekozen achtergrondafbeelding achter de cutout, zodat
+            // een batch-Image-Background meteen WYSIWYG op de board verschijnt
+            // (spiegelt EditorView.backgroundLayer; Color.clear voorkomt dat de
+            // intrinsieke uploadmaat de kaartlayout in lekt).
+            if let data = backgroundImageData, let image = NSImage(data: data) {
+                Color.clear
+                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                    .clipped()
+            }
+            // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
+            // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG). De cache is
+            // (id, updatedAt)-gekeyd (E27.6 Tier 0), dus in-place-edits verversen vanzelf.
+            if let thumbnail {
+                // E27.6 (Tier 4): `.medium` i.p.v. `.high` — de thumb is al klein
+                // (~2× kaartmaat) dus op kaartmaat onzichtbaar verschil, maar de GPU
+                // hersamplet 'm goedkoper terwijl de camera in-/uitzoomt.
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .padding(cardSide * 0.08)
+            }
+        }
+        .clipShape(clip)
+        .overlay(clip.stroke(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
     }
 }
 
