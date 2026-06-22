@@ -19,6 +19,12 @@
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
 // bottom-toolbar en de app-bar blijven SF Symbols (besluit Thierry).
+//
+// E32: deze toolbar deelt nu exact dezelfde DS-componenten als de onderste
+// toolbar (`DSCapsuleToolButton` + `.dsToolbarCapsule`), alleen op `.compact`-
+// maat. De Phosphor-menu-iconen renderen via de generieke icon-init (Phosphor
+// blijft Phosphor); de chevron is een gedeelde SF `chevron.down`. De dropdowns
+// delen de paneel-radius (xl4) met de onderste DSEditPanel.
 
 import PhosphorSwift
 import AvatarUI
@@ -62,23 +68,24 @@ struct CanvasActionToolbar<Background: View>: View {
             // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen
             // alignment-overlay op statische nodes).
             if showGrid {
-                Button { gridEnabled.toggle() } label: {
+                // E32: icon-only compact pil — `label: nil`. Active (grid aan) krijgt
+                // nu dezelfde lime-ring + lime-tint als een actieve onderste pil.
+                DSCapsuleToolButton(
+                    isActive: gridEnabled,
+                    size: .compact,
+                    action: { gridEnabled.toggle() }
+                ) {
                     Ph.gridNine.regular
                         .scaledToFit()
-                        .frame(width: 15, height: 15)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                        .padding(.horizontal, DSSpacing.gap2)
-                        .frame(height: 32)
-                        .background(gridEnabled ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-                        .dsHoverHighlight(cornerRadius: 16)
+                        .frame(width: DSToolbarSize.compact.iconPointSize,
+                               height: DSToolbarSize.compact.iconPointSize)
                 }
-                .buttonStyle(.plain)
                 .help("Toggle alignment grid")
             }
         }
-        .padding(DSSpacing.gap1)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        // E32: zelfde solide Card-capsule als de onderste toolbar (geen glas/rand),
+        // alleen compacter (`.compact`).
+        .dsToolbarCapsule(size: .compact)
         .animation(.easeOut(duration: 0.14), value: activeMenu)
         #if DEBUG
         .onAppear {
@@ -98,8 +105,20 @@ struct CanvasActionToolbar<Background: View>: View {
         chevron: Bool, width: CGFloat, padding: CGFloat,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        menuButton(title, icon: icon, isActive: activeMenu == menu, chevron: chevron) {
-            activeMenu = (activeMenu == menu) ? nil : menu
+        // E32: gedeelde compact-pil i.p.v. de inline `menuButton`. De Phosphor-
+        // menu-iconen blijven Phosphor (generieke icon-init); de chevron is een
+        // gedeelde SF `chevron.down`. Active (menu open) krijgt nu de lime-ring.
+        DSCapsuleToolButton(
+            label: title,
+            showChevron: chevron,
+            isActive: activeMenu == menu,
+            size: .compact,
+            action: { activeMenu = (activeMenu == menu) ? nil : menu }
+        ) {
+            icon.regular
+                .scaledToFit()
+                .frame(width: DSToolbarSize.compact.iconPointSize,
+                       height: DSToolbarSize.compact.iconPointSize)
         }
         .overlay(alignment: .top) {
             if activeMenu == menu {
@@ -107,9 +126,12 @@ struct CanvasActionToolbar<Background: View>: View {
                     .padding(padding)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    .dsPanelSurface(cornerRadius: DSRadius.xl)
-                    // Onder de capsule (knop 32 + capsule-padding + lucht).
-                    .offset(y: 44)
+                    // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
+                    .offset(y: DSToolbarSize.compact.height
+                              + DSToolbarSize.compact.containerPadding
+                              + DSSpacing.gap2)
                     .zIndex(10)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
@@ -191,19 +213,4 @@ struct CanvasActionToolbar<Background: View>: View {
         .disabled(action == nil)
     }
 
-    private func menuButton(_ title: String, icon: Ph, isActive: Bool, chevron: Bool = true, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: DSSpacing.gap1) {
-                icon.regular.scaledToFit().frame(width: 15, height: 15)
-                Text(title).dsTextStyle(.labelSmall)
-                if chevron { Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold)) }
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .background(isActive ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-            .dsHoverHighlight(cornerRadius: 16)
-        }
-        .buttonStyle(.plain)
-    }
 }

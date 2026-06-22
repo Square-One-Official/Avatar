@@ -117,26 +117,40 @@ final class EffectsModel {
             return
         }
         phase = .working(style)
+        entitlement.presentWorking(
+            title: "Applying style",
+            messages: [
+                "Mixing the palette…",
+                "Laying on the texture…",
+                "Tweaking the shadows…",
+                "This one's going to look good…",
+                "Adding the finishing touches…",
+                "Almost there…",
+            ]
+        )
         do {
             let (data, _) = try await entitlement.backend.stylize(imagePNG: png, style: style)
             guard let image = NSImage(data: data) else {
                 phase = .idle
+                entitlement.dismissWorkingToast()
                 entitlement.presentError("The styled image came back unreadable.")
                 return
             }
             cache[style.rawValue] = image
             selected = style
             phase = .idle
+            entitlement.dismissWorkingToast()
             onApply(image)
             persist()
             // Saldo bijwerken zodat de topbar-quota klopt na de aftrek.
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
         } catch {
-            // E18.3: fout als toast i.p.v. inline tekst onder de menutitel.
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't apply that style. Please try again.")
         }
     }
@@ -188,12 +202,6 @@ struct EffectsPanel: View {
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.subtle)
                         .labelStyle(.titleAndIcon)
-                }
-
-                if case .failed(let message) = model.phase {
-                    Text(message)
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {

@@ -12,6 +12,50 @@
 
 import SwiftUI
 
+/// E32: gedeelde maatvariant voor de capsule-toolbar + pillen. `.regular` is de
+/// onderste toolbar (Figma floatingToolbar); `.compact` is de bovenste canvas-
+/// toolbar (Frame/Background/grid) — exact dezelfde componenten, kleinere maten.
+public enum DSToolbarSize: Sendable {
+    case regular
+    case compact
+
+    /// Pil-hoogte (knop).
+    public var height: CGFloat { self == .regular ? 40 : 32 }
+    /// Icoongrootte: SF Symbol `.font`-punt én Phosphor frame-zijde.
+    public var iconPointSize: CGFloat { self == .regular ? 18 : 15 }
+    /// Labelstijl in de pil.
+    public var textStyle: DSTextStyle { self == .regular ? .labelBase : .labelSmall }
+    /// Horizontale padding binnen de pil.
+    public var horizontalPadding: CGFloat { self == .regular ? DSSpacing.gap3 : DSSpacing.gap2 }
+    /// Ruimte tussen icoon/label/chevron én tussen pillen onderling.
+    public var itemSpacing: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    /// Inset van de capsule rondom de pillen.
+    public var containerPadding: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    /// Schaal op pressed (identiek voor beide maten).
+    public var pressScale: CGFloat { 0.97 }
+}
+
+public extension View {
+    /// E32: solide Card-fill capsule met maat-afhankelijke inset (geen rand).
+    /// Vervangt de inline-achtergrond van zowel de onderste toolbar als de
+    /// bovenste canvas-toolbar zodat beide identiek ogen.
+    func dsToolbarCapsule(size: DSToolbarSize = .regular) -> some View {
+        padding(size.containerPadding)
+            .background(DSColor.Background.card, in: Capsule())
+    }
+}
+
+/// E32: wikkelt een SF Symbol-`Image` in de juiste `.font`-grootte zodat de
+/// SF-pijler door dezelfde generieke pil loopt als de Phosphor-iconen.
+/// Underscore-prefix: niet rechtstreeks aanroepen — gebruik de convenience-init.
+public struct _DSFontSizedIcon: View {
+    let image: Image
+    let pointSize: CGFloat
+    public var body: some View {
+        image.font(.system(size: pointSize, weight: .medium))
+    }
+}
+
 public struct DSToolbarItem<ID: Hashable>: Identifiable {
     public let id: ID
     public let icon: Image
@@ -24,9 +68,27 @@ public struct DSToolbarItem<ID: Hashable>: Identifiable {
     }
 }
 
+/// Een losse actie in de capsule-overflow (`⋯`) — geen eigen paneel/tool, maar
+/// een directe handeling (bijv. "Restore to original"). Verschijnt in hetzelfde
+/// `⋯`-menu als de overflow-tools.
+public struct DSToolbarAction: Identifiable {
+    public let id: String
+    public let icon: Image
+    public let label: String
+    public let action: () -> Void
+
+    public init(id: String, icon: Image, label: String, action: @escaping () -> Void) {
+        self.id = id
+        self.icon = icon
+        self.label = label
+        self.action = action
+    }
+}
+
 public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
     private let items: [DSToolbarItem<ID>]
     private let overflow: [DSToolbarItem<ID>]
+    private let overflowActions: [DSToolbarAction]
     @Binding private var selection: ID?
     private let accessory: Accessory
 
@@ -34,10 +96,12 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
         items: [DSToolbarItem<ID>],
         selection: Binding<ID?>,
         overflow: [DSToolbarItem<ID>] = [],
+        overflowActions: [DSToolbarAction] = [],
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.items = items
         self.overflow = overflow
+        self.overflowActions = overflowActions
         self._selection = selection
         self.accessory = accessory()
     }
@@ -54,12 +118,11 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
                         action: { selection = selection == item.id ? nil : item.id }
                     )
                 }
-                if !overflow.isEmpty {
-                    DSToolbarOverflowButton(items: overflow, selection: $selection)
+                if !overflow.isEmpty || !overflowActions.isEmpty {
+                    DSToolbarOverflowButton(items: overflow, actions: overflowActions, selection: $selection)
                 }
             }
-            .padding(DSSpacing.gap2)
-            .background(DSColor.Background.card, in: Capsule())
+            .dsToolbarCapsule(size: .regular)
 
             // Accessoires (undo/redo/compare) blijven buiten de Card-capsule.
             accessory
@@ -73,55 +136,146 @@ extension DSBottomToolbar where Accessory == EmptyView {
     public init(
         items: [DSToolbarItem<ID>],
         selection: Binding<ID?>,
-        overflow: [DSToolbarItem<ID>] = []
+        overflow: [DSToolbarItem<ID>] = [],
+        overflowActions: [DSToolbarAction] = []
     ) {
-        self.init(items: items, selection: selection, overflow: overflow, accessory: { EmptyView() })
+        self.init(
+            items: items, selection: selection,
+            overflow: overflow, overflowActions: overflowActions,
+            accessory: { EmptyView() }
+        )
     }
 }
 
-/// E31.1: gelabelde capsule-pil (icoon + label) uit `floatingToolbar` (4114:978).
-/// Pil = background/neutral op de Card-capsule, label = UI/Labels/Base, active =
-/// lime icoon+label + lime ring (E03.3). Hoogte 40, r-full.
-struct DSCapsuleToolButton: View {
-    private let icon: Image
-    private let label: String
+/// E31.1 + E32: gelabelde capsule-pil (icoon + optioneel label + optionele
+/// chevron) uit `floatingToolbar` (4114:978). Gedeeld door de onderste toolbar
+/// (`.regular`) én de bovenste canvas-toolbar (`.compact`) — generiek over de
+/// icoon-view zodat zowel SF Symbols (via `.font`, convenience-init) als Phosphor
+/// (via frame, generieke init) erin passen. De chevron is altijd een SF
+/// `chevron.down` (structurele affordance, géén "menu-icoon").
+/// Active = lime icoon+label + lime ring (E03.3). **Besluit Thierry (2026-06-22):**
+/// de pil-fill is transparant in rust en verschijnt pas op hover (neutral-stronger)
+/// of bij active/pressed (neutral-strongest). Wijkt bewust af van Figma.
+public struct DSCapsuleToolButton<Icon: View>: View {
+    private let icon: Icon
+    private let label: String?
+    private let showChevron: Bool
     private let isActive: Bool
+    private let size: DSToolbarSize
     private let action: () -> Void
 
-    init(_ icon: Image, label: String, isActive: Bool = false, action: @escaping () -> Void) {
-        self.icon = icon
+    /// Generieke init: de caller levert een kant-en-klare icoon-view (Phosphor-pad).
+    public init(
+        label: String? = nil,
+        showChevron: Bool = false,
+        isActive: Bool = false,
+        size: DSToolbarSize = .regular,
+        action: @escaping () -> Void,
+        @ViewBuilder icon: () -> Icon
+    ) {
         self.label = label
+        self.showChevron = showChevron
         self.isActive = isActive
+        self.size = size
         self.action = action
+        self.icon = icon()
     }
 
-    var body: some View {
+    public var body: some View {
         Button(action: action) {
-            HStack(spacing: DSSpacing.gap2) {
-                icon.font(.system(size: 18, weight: .medium))
-                Text(label).dsTextStyle(.labelBase)
+            HStack(spacing: size.itemSpacing) {
+                icon
+                if let label {
+                    Text(label).dsTextStyle(size.textStyle)
+                }
+                if showChevron {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                }
             }
-            .foregroundStyle(isActive ? DSColor.Action.primary : DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap3)
-            .frame(height: 40)
-            .background { Capsule().fill(DSColor.Background.neutral) }
-            .overlay {
-                Capsule()
-                    .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
-                    .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
-            }
-            .animation(.easeOut(duration: 0.15), value: isActive)
+            .padding(.horizontal, size.horizontalPadding)
+            .frame(height: size.height)
         }
-        .buttonStyle(DSStateOpacityButtonStyle())
-        .accessibilityLabel(Text(label))
+        .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, pressScale: size.pressScale))
+        .accessibilityLabel(Text(label ?? ""))
+    }
+}
+
+/// E31.1: SF Symbol-convenience — behoudt de `.font`-grootte en de bestaande
+/// call-shape `DSCapsuleToolButton(item.icon, label: …)`.
+public extension DSCapsuleToolButton where Icon == _DSFontSizedIcon {
+    init(
+        _ image: Image,
+        label: String? = nil,
+        showChevron: Bool = false,
+        isActive: Bool = false,
+        size: DSToolbarSize = .regular,
+        action: @escaping () -> Void
+    ) {
+        self.init(
+            label: label, showChevron: showChevron, isActive: isActive,
+            size: size, action: action
+        ) {
+            _DSFontSizedIcon(image: image, pointSize: size.iconPointSize)
+        }
+    }
+}
+
+/// Hover/press/active-surface voor de capsule-pil — zelfde opzet als `ToolSurface`
+/// in `DSToolButton`: ghost in rust, fill op hover/active.
+public struct CapsuleSurfaceStyle: ButtonStyle {
+    let isActive: Bool
+    let pressScale: CGFloat
+
+    public init(isActive: Bool, pressScale: CGFloat = 0.97) {
+        self.isActive = isActive
+        self.pressScale = pressScale
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        CapsuleSurface(isActive: isActive, pressScale: pressScale, configuration: configuration)
+    }
+
+    private struct CapsuleSurface: View {
+        let isActive: Bool
+        let pressScale: CGFloat
+        let configuration: ButtonStyle.Configuration
+        @State private var isHovering = false
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(isActive ? DSColor.Action.primary : DSColor.Foreground.primary)
+                .background(backgroundColor, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                        .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
+                }
+                .scaleEffect(configuration.isPressed ? pressScale : 1.0)
+                .onHover { isHovering = $0 }
+                .animation(.easeOut(duration: 0.15), value: isActive)
+                .animation(.easeOut(duration: 0.1), value: isHovering)
+                .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+        }
+
+        private var backgroundColor: Color {
+            if isActive || configuration.isPressed { return DSColor.Background.neutralStrongest }
+            if isHovering { return DSColor.Background.neutralStronger }
+            return .clear
+        }
     }
 }
 
 /// E31.1: overflow `⋯`-icoonknop (Icon-Only Button 4114:983, 40×40) die de
 /// secundaire tools in een menu toont. Vertikale dots conform de Figma-render.
+/// Besluit Thierry (2026-06-22): fill transparant in rust, verschijnt op hover
+/// (neutral-stronger). De menu-open-state is op een `Menu`-label niet eenvoudig
+/// beschikbaar; hover-reveal volstaat en is consistent met de pillen.
 struct DSToolbarOverflowButton<ID: Hashable>: View {
     let items: [DSToolbarItem<ID>]
+    var actions: [DSToolbarAction] = []
     @Binding var selection: ID?
+    @State private var isHovering = false
 
     var body: some View {
         Menu {
@@ -130,18 +284,31 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                     Label { Text(item.label) } icon: { item.icon }
                 }
             }
+            if !items.isEmpty && !actions.isEmpty { Divider() }
+            ForEach(actions) { action in
+                Button { action.action() } label: {
+                    Label { Text(action.label) } icon: { action.icon }
+                }
+            }
         } label: {
+            // E-fix: padding 1-op-1 op "Icon-Only Button · Size=Default" — 20px-
+            // icoon + 10px (gap2.5) rondpadding → 40×40 (zelfde opbouw als
+            // DSIconButton), i.p.v. een font-glyph in een vaste 40-frame.
             Image(systemName: "ellipsis")
-                .font(.system(size: 18, weight: .medium))
+                .resizable()
+                .scaledToFit()
                 .rotationEffect(.degrees(90))
                 .foregroundStyle(DSColor.Foreground.primary)
-                .frame(width: 40, height: 40)
-                .background { Circle().fill(DSColor.Background.neutral) }
+                .frame(width: 20, height: 20)
+                .padding(DSSpacing.gap2_5)
+                .background(isHovering ? DSColor.Background.neutralStronger : .clear, in: Circle())
                 .contentShape(Circle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.1), value: isHovering)
         .accessibilityLabel(Text("More tools"))
     }
 }

@@ -77,8 +77,10 @@ public struct DSIconButton: View {
                 .padding(size.padding)
                 .background(backgroundColor, in: Circle())
                 .opacity(currentOpacity)
+                .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
                 .onHover { isHovering = $0 }
                 .animation(.easeOut(duration: 0.1), value: isHovering)
+                .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
         }
 
         private var isHighlighted: Bool {

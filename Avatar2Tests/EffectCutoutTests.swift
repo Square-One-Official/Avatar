@@ -42,4 +42,33 @@ final class EffectCutoutTests: XCTestCase {
     func testNilGeeftFalse() {
         XCTAssertFalse(ShellModel.hasTransparentCorners(nil))
     }
+
+    // E24.36 — resize-naar-origineel houdt een generatief resultaat (gelijke
+    // ratio, andere pixelmaat) op de oude afmetingen zodat de opgeslagen
+    // canvas-transform geldig blijft (geen positie-sprong na clothes/hair/effects).
+
+    private func cgImage(w: Int, h: Int) -> CGImage {
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 255, count: bpr * h)
+        let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8,
+            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        return ctx.makeImage()!
+    }
+
+    func testResizedNaarExacteAfmetingen() {
+        // Een 832×1248-resultaat (Gemini ~1 MP) terug naar de cutout-maat 800×1200.
+        let result = cgImage(w: 832, h: 1248)
+        let resized = ShellModel.resized(result, to: CGSize(width: 800, height: 1200))
+        XCTAssertNotNil(resized)
+        // De pixelmaat moet exact gelijk zijn aan de oude cutout.
+        XCTAssertEqual(resized?.cgImage(forProposedRect: nil, context: nil, hints: nil)?.width, 800)
+        XCTAssertEqual(resized?.cgImage(forProposedRect: nil, context: nil, hints: nil)?.height, 1200)
+    }
+
+    func testResizedNulMaatGeeftNil() {
+        XCTAssertNil(ShellModel.resized(cgImage(w: 10, h: 10), to: .zero))
+    }
 }

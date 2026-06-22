@@ -1,16 +1,23 @@
-// 48-cirkel-toolknop (E03.11; Figma Components → Icon-Only Button en de
-// toolbar/gear in App / Edit). De cirkels zijn in het design geen vlakke
-// fill maar een glazige donkere material met subtiele rand/highlight —
-// Figma exposeert dat effect niet als variabele, dus: ultraThinMaterial
-// + background/neutral + dunne rim die van boven licht oploopt (geijkt op
-// de frames). Active = lime ring b-medium + lime icoon (E03.3-gedrag).
+// 48-cirkel-toolknop (Figma Stories → Bottom toolbar).
+// Surface-varianten:
+// - .filled (default, window-top-bar): vlakke cirkel DSColor.Background.neutral
+//   (rgba wit@5%) in rust → hover neutralStronger, pressed neutralStrongest.
+// - .ghost (onderste editor-toolbar, besluit Thierry 2026-06-22): transparant in
+//   rust → fill verschijnt pas op hover/active/pressed (gelijk aan de pillen).
+// Beide: scale(0.94) op pressed, active = lime ring b-medium + lime icoon.
 
 import SwiftUI
 
 public struct DSToolButton: View {
+    public enum Surface: Sendable {
+        case filled
+        case ghost
+    }
+
     private let icon: Image
     private let label: String
     private let isActive: Bool
+    private let surface: Surface
     private let action: () -> Void
 
     /// E18.10: aan welke kant de tooltip verschijnt. Top-bar-knoppen (gear/
@@ -25,44 +32,36 @@ public struct DSToolButton: View {
         _ icon: Image,
         label: String,
         isActive: Bool = false,
+        surface: Surface = .filled,
         tooltipEdge: VerticalEdge = .top,
         action: @escaping () -> Void
     ) {
         self.icon = icon
         self.label = label
         self.isActive = isActive
+        self.surface = surface
         self.tooltipEdge = tooltipEdge
         self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
-            icon
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(isActive ? DSColor.Action.primary : DSColor.Foreground.primary)
-                .frame(width: 48, height: 48)
-                .background { DSGlassCircle() }
-                // Ring altijd onderdeel van de button-view en alleen via
-                // opacity geschakeld (E03.15, bevinding 16): een
-                // conditionele insert hertekent buiten de lopende
-                // layout-animatie om en doet de ring verspringen bij de
-                // canvas-verschuiving; zo animeert hij gewoon mee.
-                .overlay {
-                    Circle()
-                        .strokeBorder(
-                            DSColor.Action.primary,
-                            lineWidth: DSBorderWidth.medium
-                        )
-                        .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
-                }
-                .animation(.easeOut(duration: 0.15), value: isActive)
+            // E… active-state: kruisvervaag twee vaste-kleur iconen op opacity
+            // i.p.v. een foregroundStyle-kleurtween. Een kleurtween loopt door
+            // vuile tussentinten en wordt door een ouder-spring (sidebar-slide)
+            // hortend; een opacity-crossfade van twee schone kleuren blijft
+            // crisp onder elke overgenomen curve. De ring is al opacity-based.
+            ZStack {
+                styledIcon(DSColor.Foreground.primary)
+                    .opacity(isActive ? 0 : 1)
+                styledIcon(DSColor.Action.primary)
+                    .opacity(isActive ? 1 : 0)
+            }
+            .frame(width: 48, height: 48)
         }
-        .buttonStyle(DSStateOpacityButtonStyle())
+        .buttonStyle(ToolSurfaceStyle(isActive: isActive, surface: surface))
         .accessibilityLabel(Text(label))
-        // E18.10: eigen tooltip (Figma Tooltip-component) i.p.v. native .help
-        // (die plaatste 'm willekeurig en oogde te subtiel). Gecentreerd bóven
-        // (of, voor topbar-knoppen tegen de rand, ónder) het icoon, met de
-        // caret 4px van de knop, na ~1,2s hover.
+        // Tooltip-hover los van de surface-hover: aparte @State voor de delay-logica.
         .onHover { isHovering = $0 }
         .task(id: isHovering) {
             guard isHovering else { showTooltip = false; return }
@@ -70,9 +69,7 @@ public struct DSToolButton: View {
             guard !Task.isCancelled else { return }
             showTooltip = true
         }
-        // E18.10v4: plaats de tooltip volledig BÓVEN (of ónder) de 48-knop —
-        // gemeten hoogte + 4px gap als offset, gecentreerd. (alignmentGuide
-        // bleek 'm midden op het icoon te zetten.)
+        // E18.10v4: tooltip gecentreerd boven/onder de 48-knop.
         .overlay(alignment: tooltipEdge == .top ? .top : .bottom) {
             if showTooltip {
                 DSTooltip(label, caretEdge: tooltipEdge == .top ? .bottom : .top)
@@ -93,38 +90,59 @@ public struct DSToolButton: View {
         }
         .animation(.easeOut(duration: 0.12), value: showTooltip)
     }
+
+    private func styledIcon(_ color: Color) -> some View {
+        icon
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(color)
+    }
 }
 
-/// De glass-surface van de toolcirkels (E03.14, bevinding 10) — in lagen
-/// zoals Figma: (a) NSVisualEffectView met withinWindow-blending zodat
-/// onderliggende content (de foto) met blur doorschemert — SwiftUI's
-/// Material bleek op zwart vlak te renderen; (b) neutral-tint; (c)
-/// gradient-rim: licht bovenaan, donker onderaan; (d) inner-highlight
-/// bovenin de cirkel.
-struct DSGlassCircle: View {
+private struct ToolSurfaceStyle: ButtonStyle {
+    let isActive: Bool
+    let surface: DSToolButton.Surface
+
+    func makeBody(configuration: Configuration) -> some View {
+        ToolSurface(isActive: isActive, surface: surface, configuration: configuration)
+    }
+}
+
+private struct ToolSurface: View {
+    let isActive: Bool
+    let surface: DSToolButton.Surface
+    let configuration: ButtonStyle.Configuration
+    @State private var isHovering = false
+
     var body: some View {
-        ZStack {
-            WithinWindowBlur()
-                .clipShape(Circle())
-            Circle().fill(DSColor.Background.neutral)
-            Circle().fill(
-                LinearGradient(
-                    colors: [DSColor.Foreground.primary.opacity(0.10), .clear],
-                    startPoint: .top,
-                    endPoint: .center
-                )
-            )
-            Circle().strokeBorder(
-                LinearGradient(
-                    colors: [
-                        DSColor.Foreground.primary.opacity(0.25),
-                        Color.black.opacity(0.35)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: DSBorderWidth.thin
-            )
+        configuration.label
+            .background(backgroundColor, in: Circle())
+            // E03.15: ring altijd aanwezig, geschakeld via opacity zodat hij
+            // mee-animeert bij canvas-verschuivingen zonder layout-herberekening.
+            .overlay {
+                Circle()
+                    .strokeBorder(
+                        DSColor.Action.primary,
+                        lineWidth: DSBorderWidth.medium
+                    )
+                    .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
+            }
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .onHover { isHovering = $0 }
+            .animation(.easeOut(duration: 0.15), value: isActive)
+            .animation(.easeOut(duration: 0.1), value: isHovering)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+
+    private var backgroundColor: Color {
+        switch surface {
+        case .filled:
+            if configuration.isPressed { return DSColor.Background.neutralStrongest }
+            if isHovering { return DSColor.Background.neutralStronger }
+            return DSColor.Background.neutral
+        case .ghost:
+            if isActive || configuration.isPressed { return DSColor.Background.neutralStrongest }
+            if isHovering { return DSColor.Background.neutralStronger }
+            return .clear
         }
     }
 }
@@ -137,10 +155,9 @@ private struct DSToolButtonTipHeightKey: PreferenceKey {
     }
 }
 
-/// In-window-blur: NSVisualEffectView die de content erónder in hetzelfde
-/// venster vervaagt (SwiftUI's .ultraThinMaterial blendt op macOS achter
-/// het venster en oogt vlak op een zwart vlak). E18.22: ook gebruikt voor de
-/// glas-panelen, instelbaar materiaal.
+/// In-window-blur voor glas-panelen (DSPanelSurface, e.a.) — SwiftUI's
+/// .ultraThinMaterial blendt op macOS achter het venster en oogt vlak op
+/// een donker vlak; withinWindow blendt de content eronder.
 struct WithinWindowBlur: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .hudWindow
 

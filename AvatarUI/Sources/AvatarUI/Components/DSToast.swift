@@ -12,17 +12,21 @@ public struct DSToast: View {
     private let description: String?
     /// Resterend deel van de timer, 1...0; nil verbergt de track.
     private let progress: Double?
+    /// Toont een kleine spinner links van de titel (voor lopende acties).
+    private let isLoading: Bool
     private let onClose: () -> Void
 
     public init(
         title: String,
         description: String? = nil,
         progress: Double? = nil,
+        isLoading: Bool = false,
         onClose: @escaping () -> Void
     ) {
         self.title = title
         self.description = description
         self.progress = progress
+        self.isLoading = isLoading
         self.onClose = onClose
     }
 
@@ -30,6 +34,12 @@ public struct DSToast: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                 HStack(alignment: .top, spacing: 0) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.trailing, DSSpacing.gap2)
+                            .padding(.top, 1)
+                    }
                     Text(title)
                         .dsTextStyle(.labelLarge)
                         .foregroundStyle(DSColor.Foreground.primary)
