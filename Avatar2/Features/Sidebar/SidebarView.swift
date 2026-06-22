@@ -46,6 +46,12 @@ struct SidebarView: View {
     @State private var isAligning = false
     /// E12.2: loopt tijdens de set-brede lichtnormalisatie.
     @State private var isMatchingLight = false
+    /// E27.6: de gedeelde off-main thumbnail-store (zelfde type als de board, eigen
+    /// instance). Decodeert + downscalet elke rij-thumb op een achtergrond-Task →
+    /// geen full-res-decode op de main-thread meer bij hover/scroll (de reden dat
+    /// de oude `SidebarThumbnailCache` bestond), en (id, updatedAt)-gekeyd zodat een
+    /// bewerkt portret vanzelf ververst.
+    @State private var thumbs = ThumbnailStore()
 
     private var filtered: [Portrait2] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
@@ -270,8 +276,11 @@ struct SidebarView: View {
 
     @ViewBuilder
     private func thumbnail(for portrait: Portrait2) -> some View {
-        // E19.6: gecachte, gedownscalede thumb i.p.v. full-res decode per render.
-        if let image = SidebarThumbnailCache.thumbnail(for: portrait) {
+        // E19.6/E27.6: gedownscalede thumb (96px = 2× de 48pt-slot) uit de gedeelde
+        // off-main store i.p.v. een full-res decode per render. `adjusted: false` =
+        // de rauwe cutout, zoals de sidebar 'm altijd toonde. Mist (nog aan het
+        // decoderen) → de placeholder hieronder.
+        if let image = thumbs.thumbnail(for: portrait, maxDimension: 96, adjusted: false) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFill()

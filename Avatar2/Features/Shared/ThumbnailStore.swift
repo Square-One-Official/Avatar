@@ -29,18 +29,21 @@ final class ThumbnailStore {
 
     init(maxCount: Int = 256) { self.maxCount = maxCount }
 
-    /// Gecachete, verkleinde thumbnail MÉT de Adjust-laag, of `nil` zolang 'ie nog
-    /// decodeert (placeholder; de thumb volgt async). Side-effect-in-body is bewust:
+    /// Gecachete, verkleinde thumbnail, of `nil` zolang 'ie nog decodeert
+    /// (placeholder; de thumb volgt async). `adjusted` = pas de niet-destructieve
+    /// Adjust-laag toe (board = WYSIWYG, default); de sidebar toont bewust de RAUWE
+    /// cutout (`adjusted: false`) zoals voorheen. Side-effect-in-body is bewust:
     /// `inFlight` maakt 'm idempotent (één decode per (id, versie, maat)).
-    func thumbnail(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+    func thumbnail(for portrait: Portrait2, maxDimension: CGFloat, adjusted: Bool = true) -> NSImage? {
         let key = Self.key(portrait, maxDimension)
         if let image = images[key] { return image }
         guard !inFlight.contains(key) else { return nil }
         inFlight.insert(key)
         // Alleen Sendable-waarden de Task in (Data/Int/PortraitAdjust) — nooit het
-        // niet-Sendable `Portrait2`/`NSImage`.
+        // niet-Sendable `Portrait2`/`NSImage`. Eén instance = één modus (board óf
+        // sidebar), dus de adjust-keuze hoeft niet in de key.
         let data = portrait.cutoutData
-        let adjust = portrait.adjust
+        let adjust = adjusted ? portrait.adjust : .neutral
         let maxPixelSize = Int(maxDimension.rounded())
         Task { [weak self] in
             let boxed = await Self.decode(data: data, maxPixelSize: maxPixelSize, adjust: adjust)
