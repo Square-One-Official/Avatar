@@ -8,7 +8,8 @@ import {
   UnknownModelOverrideError,
 } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { flattenOnGrey, MAX_DECODED_IMAGE_BYTES } from "../../lib/image.js";
+import { flattenOnGrey } from "../../lib/image.js";
+import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
 
 export const config = {
@@ -102,7 +103,8 @@ const CLOTHES_FREE_TEMPLATE = (desc: string) =>
  * POST /v1/stylize — Effects (E09.2; productie sinds de promotie van het
  * dev-only E09.1-bakeoff-endpoint).
  *
- * Body:    { image: <base64 PNG — cutout of vlak portret>,
+ * Body:    { image?: <base64 PNG — cutout of vlak portret>,    // legacy inline
+ *            storage_key?: "<userId>/<uuid>.png",            // upload-bypass (groot beeld)
  *            style?: "clay" | "wood" | "3d" | "scribble",   // productieroute
  *            prompt?: <vrije instructie ≤2000 tekens>,       // ALLEEN dev
  *            model_override?: <whitelist-key uit MODEL_REGISTRY.stylize> }   // ALLEEN dev
@@ -131,12 +133,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!(await checkRateLimit(user.id))) {
     res.status(429).json({ error: "rate_limited" });
-    return;
-  }
-
-  const base64 = (req.body?.image ?? "") as string;
-  if (!base64 || typeof base64 !== "string") {
-    res.status(400).json({ error: "missing_image" });
     return;
   }
 
@@ -200,18 +196,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const cleaned = base64.replace(/^data:image\/[a-z]+;base64,/i, "");
-  let inputBytes: Buffer;
-  try {
-    inputBytes = Buffer.from(cleaned, "base64");
-  } catch {
-    res.status(400).json({ error: "invalid_base64" });
-    return;
-  }
-  if (inputBytes.length === 0 || inputBytes.length > MAX_DECODED_IMAGE_BYTES) {
-    res.status(400).json({ error: "image_size_out_of_range" });
-    return;
-  }
+  // Input image: inline base64 (legacy) of een Storage-upload (storage_key,
+  // omzeilt de 4.5 MB body-cap). Ná de intent-validatie zodat een ongeldige
+  // intent de upload niet verbruikt.
+  const inputBytes = await resolveImageInput(req, res, user.id);
+  if (!inputBytes) return;
 
   // Modelkeuze, in volgorde van precedentie:
   //   1. E01.10 dev-only `model_override` (hele whitelist) — wint altijd;
