@@ -154,7 +154,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       credits_remaining: creditsRemaining,
     });
   } catch (err) {
-    console.error("/v1/fill-body error", err);
+    // Log the message only — the Replicate SDK embeds the auth header in the
+    // full error object, so logging `err` whole leaks REPLICATE_API_TOKEN.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("/v1/fill-body error:", errMsg);
     if (err instanceof ReplicateTimeoutError) {
       res.status(504).json({ error: "model_timeout" });
       return;

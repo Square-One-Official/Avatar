@@ -125,7 +125,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       resultUrl = await magicCutout({ imageDataUrl: signed.signedUrl, model: modelRef });
     } catch (e) {
-      console.error("[/v1/cutout] replicate error", e);
+      // Message only — the Replicate SDK embeds the auth header in the full
+      // error object, so logging `e` whole leaks REPLICATE_API_TOKEN.
+      console.error("[/v1/cutout] replicate error:", e instanceof Error ? e.message : String(e));
       // Audit MEDIUM #17: distinguish a timeout from a model error so the
       // client can show a friendlier "model is taking longer than usual"
       // banner instead of "cutout failed".
@@ -177,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       credits_remaining: creditsRemaining,
     });
   } catch (err) {
-    console.error("/v1/cutout error", err);
+    console.error("/v1/cutout error:", err instanceof Error ? err.message : String(err));
     res.status(500).json({ error: "cutout_failed" });
   }
 }

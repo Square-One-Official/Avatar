@@ -266,12 +266,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       model: modelRef ?? MODEL_REGISTRY.stylize.defaultModel,
     });
   } catch (err) {
-    console.error("/v1/stylize error", err);
+    // Log the message only — the Replicate SDK embeds the auth header in the
+    // full error object, so logging `err` whole leaks REPLICATE_API_TOKEN.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("/v1/stylize error:", msg);
     if (err instanceof ReplicateTimeoutError) {
       res.status(504).json({ error: "model_timeout" });
       return;
     }
-    const msg = err instanceof Error ? err.message : String(err);
     if (
       msg.includes("status 429") ||
       msg.includes("Too Many Requests") ||
