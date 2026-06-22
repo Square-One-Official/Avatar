@@ -145,7 +145,9 @@ afvinken. UI-fixes met visuele smoke.
       **Result:** build-v2.sh groen (beide targets + Avatar2-unit + AvatarKit + AvatarUI 31/31);
       backend `tsc --noEmit` groen. Runtime-bewijs (echte cloud-call) vergt een preview-deploy +
       credits → niet headless smokebaar; de bypass is code-/typecheck-geverifieerd en spiegelt het
-      werkende `/v1/cutout`-pad. **Nog te doen vóór productie-effect:** backend porten naar `main`.
+      werkende `/v1/cutout`-pad. **Productie:** backend geport naar `main` (`c096446`) + gedeployed
+      2026-06-22 — alle 4 endpoints live (probe geeft 401 i.p.v. 404/500). Backward-compatible, dus
+      huidige app-builds blijven werken; de client-fix (storage_key) landt in de volgende Avatar2-build.
       **Oorzaak:** de client stuurde de full-res cutout-PNG inline als base64 in de JSON-body naar
       `/v1/stylize` (Hair/Shirt/Effects), `/v1/colorize`, `/v1/fill-body`, `/v1/upscale`. Een ~5 MB
       cutout (~6.7 MB base64) overschrijdt Vercel's **platform-cap van ~4.5 MB request-body** — het
