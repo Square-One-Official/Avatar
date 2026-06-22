@@ -6,7 +6,8 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { MAX_DECODED_IMAGE_BYTES, padForOutpaint } from "../../lib/image.js";
+import { padForOutpaint } from "../../lib/image.js";
+import { resolveImageInput } from "../../lib/uploads.js";
 import { magicCutout, outpaintPortrait, ReplicateTimeoutError } from "../../lib/replicate.js";
 
 export const config = {
@@ -18,7 +19,8 @@ export const config = {
 /**
  * POST /v1/fill-body
  *
- * Body:    { image: <base64 PNG with alpha — the current cutout> }
+ * Body:    { image?: <base64 PNG with alpha>,        // legacy inline
+ *            storage_key?: "<userId>/<uuid>.png" }   // upload-bypass (groot beeld)
  * Returns: 200 success
  *            { cutout: <base64 PNG>, credits_remaining: int }
  *          402 insufficient_credits
@@ -52,24 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const base64 = (req.body?.image ?? "") as string;
-  if (!base64 || typeof base64 !== "string") {
-    res.status(400).json({ error: "missing_image" });
-    return;
-  }
-
-  const cleaned = base64.replace(/^data:image\/[a-z]+;base64,/i, "");
-  let inputBytes: Buffer;
-  try {
-    inputBytes = Buffer.from(cleaned, "base64");
-  } catch {
-    res.status(400).json({ error: "invalid_base64" });
-    return;
-  }
-  if (inputBytes.length === 0 || inputBytes.length > MAX_DECODED_IMAGE_BYTES) {
-    res.status(400).json({ error: "image_size_out_of_range" });
-    return;
-  }
+  // Input: inline base64 (legacy) of een Storage-upload (storage_key,
+  // omzeilt de 4.5 MB body-cap).
+  const inputBytes = await resolveImageInput(req, res, user.id);
+  if (!inputBytes) return;
 
   // Optional face bbox from the client (Apple Vision on the pre-fill
   // cutout). Normalised 0..1, top-left origin. Drives the strict
