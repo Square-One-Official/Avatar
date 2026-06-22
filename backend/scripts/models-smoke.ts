@@ -24,6 +24,9 @@ assert.equal(resolveModelOverride("stylize", "nano-banana", true), "google/nano-
 assert.equal(resolveModelOverride("stylize", "flux-2-pro", true), "black-forest-labs/flux-2-pro");
 assert.equal(resolveModelOverride("stylize", "gpt-image-1.5", true), "openai/gpt-image-1.5");
 assert.equal(resolveModelOverride("stylize", "gpt-image-1.5", false), null);
+// E32.1: de Seedream face-bakeoff-arm is whitelisted voor dev-overrides
+assert.equal(resolveModelOverride("stylize", "seedream", true), "bytedance/seedream-4");
+assert.equal(resolveModelOverride("stylize", "seedream", false), null);
 assert.ok(
   (Object.keys(MODEL_REGISTRY) as Array<keyof typeof MODEL_REGISTRY>).every((f) => {
     const r = MODEL_REGISTRY[f];
