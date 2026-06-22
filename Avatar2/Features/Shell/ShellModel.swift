@@ -27,6 +27,29 @@ final class ShellModel {
     private(set) var canvas: CanvasState = .empty
     var isDropTargeted = false
 
+    /// E27.7: generatie-token voor het canvas. Élke nieuwe canvas-intentie
+    /// (select/import/edit) bumpt 'm via `setCanvas`; een lopende async select-load
+    /// (`decodeCanvas`) past z'n resultaat alléén toe als z'n generatie nog actueel
+    /// is. Zo kan een trage decode geen nieuwere staat (een edit, een nieuwe selectie,
+    /// een import) overschrijven.
+    @ObservationIgnored private var canvasGeneration = 0
+    /// De lopende off-main select-decode; bij een nieuwe selectie geannuleerd.
+    @ObservationIgnored private var selectionLoadTask: Task<Void, Never>?
+
+    /// Enige schrijf-pad naar `canvas` (op één na: `applyCanvasIfCurrent`): bumpt de
+    /// generatie zodat een verouderde async load z'n resultaat niet meer toepast.
+    private func setCanvas(_ state: CanvasState) {
+        canvasGeneration += 1
+        canvas = state
+    }
+
+    /// Past het resultaat van een async select-load toe, maar alléén als er geen
+    /// nieuwere canvas-intentie tussendoor kwam.
+    private func applyCanvasIfCurrent(_ state: CanvasState, generation: Int) {
+        guard canvasGeneration == generation else { return }
+        setCanvas(state)
+    }
+
     /// Sidebar/set (E05.4): Images-tool of avatar-toggle opent het paneel.
     var isSidebarVisible = false
 
@@ -113,7 +136,7 @@ final class ShellModel {
     func importImage(from url: URL) async {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            canvas = .failed("That file doesn't look like an image we can read.")
+            setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
         await runCutout(on: cgImage)
@@ -122,7 +145,7 @@ final class ShellModel {
     func importImage(data: Data) async {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            canvas = .failed("That file doesn't look like an image we can read.")
+            setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
         await runCutout(on: cgImage)
@@ -133,7 +156,7 @@ final class ShellModel {
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport() else { return }
         let original = nsImage(from: cgImage)
-        canvas = .processing(original)
+        setCanvas(.processing(original))
         do {
             let preferred: CutoutEngineKind =
                 PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
@@ -141,11 +164,11 @@ final class ShellModel {
             let cutout = nsImage(from: cutoutCG)
             // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
             // animeert, het model wacht dezelfde duur en stapt dan door.
-            canvas = .revealing(original: original, cutout: cutout)
+            setCanvas(.revealing(original: original, cutout: cutout))
             try? await Task.sleep(
                 for: .seconds(IsolatingTiming.backgroundFade + IsolatingTiming.settle)
             )
-            canvas = .result(cutout)
+            setCanvas(.result(cutout))
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
             persist(cutout: cutout, original: original)
@@ -153,7 +176,7 @@ final class ShellModel {
             // hifi-model nog niet binnen is.
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
         } catch {
-            canvas = .failed("Couldn't find a person in that photo. Try another portrait.")
+            setCanvas(.failed("Couldn't find a person in that photo. Try another portrait."))
         }
     }
 
@@ -172,16 +195,28 @@ final class ShellModel {
     /// De selectie wordt onthouden (punt 13c) zodat een herstart hem kan
     /// herstellen.
     func select(_ portrait: Portrait2) {
+        // E27.7: de canvas-onafhankelijke selectie-state zet meteen → de sidebar-/
+        // board-highlight + de naam/rol-header reageren DIRECT. De zware full-res
+        // decode + Adjust-laag draait OFF-MAIN (decodeCanvas), zodat de main-thread
+        // niet ~1s blokkeert; het canvas volgt async (generatie-getoetst).
         selectedPortrait = portrait
         portraitName = portrait.name
         portraitRole = portrait.role
-        if let raw = NSImage(data: portrait.cutoutData) {
-            // E24.14: canvas toont de rauwe cutout mét de niet-destructieve
-            // Adjust-laag erbovenop (WYSIWYG).
-            canvas = .result(adjustedImage(raw, portrait.adjust))
-        }
         if let data = try? JSONEncoder().encode(portrait.persistentModelID) {
             UserDefaults.standard.set(data, forKey: Self.lastSelectedKey)
+        }
+
+        canvasGeneration += 1
+        let generation = canvasGeneration
+        let data = portrait.cutoutData
+        let adjust = portrait.adjust
+        selectionLoadTask?.cancel()
+        selectionLoadTask = Task { [weak self] in
+            let boxed = await Self.decodeCanvas(data: data, adjust: adjust)
+            guard !Task.isCancelled, let self, let image = boxed?.image else { return }
+            // E24.14: canvas toont de rauwe cutout mét de niet-destructieve
+            // Adjust-laag erbovenop (WYSIWYG).
+            self.applyCanvasIfCurrent(.result(image), generation: generation)
         }
     }
 
@@ -197,7 +232,7 @@ final class ShellModel {
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
     func applyEffectResult(_ image: NSImage) {
         guard let portrait = selectedPortrait else {
-            canvas = .result(image)
+            setCanvas(.result(image))
             return
         }
         // E24.30: een generatieve stylize (nano-banana) levert een VOL beeld
@@ -251,7 +286,7 @@ final class ShellModel {
             portrait.cutoutData = png
             portrait.touch()
         }
-        canvas = .result(adjustedImage(stored, portrait.adjust))
+        setCanvas(.result(Self.adjustedImage(stored, portrait.adjust)))
         // Alleen her-kadreren bij een echte ratio-wijziging (transform gereset);
         // het resize-pad behoudt bewust de handmatige positie. Stille correctie,
         // geen undo-stap. (Randgeval: een undo ná de reset-tak her-kadreert i.p.v.
@@ -321,7 +356,7 @@ final class ShellModel {
     /// `commitAdjust` (+ undo). Het paneel levert hier al de geadjusteerde
     /// NSImage aan.
     func previewCanvas(_ image: NSImage) {
-        canvas = .result(image)
+        setCanvas(.result(image))
     }
 
     /// E24.14: commit de Adjust-laag op het geselecteerde portret (niet-
@@ -332,7 +367,7 @@ final class ShellModel {
         portrait.adjust = adjust
         portrait.touch()
         if let raw = NSImage(data: portrait.cutoutData) {
-            canvas = .result(adjustedImage(raw, adjust))
+            setCanvas(.result(Self.adjustedImage(raw, adjust)))
         }
     }
 
@@ -346,12 +381,14 @@ final class ShellModel {
         guard case .result = canvas,
               let portrait = selectedPortrait,
               let raw = NSImage(data: portrait.cutoutData) else { return }
-        canvas = .result(adjustedImage(raw, portrait.adjust))
+        setCanvas(.result(Self.adjustedImage(raw, portrait.adjust)))
     }
 
     /// E24.14: pas de niet-destructieve Adjust-laag toe op een rauwe cutout.
-    /// Neutraal → het origineel ongewijzigd (geen render-overhead).
-    private func adjustedImage(_ raw: NSImage, _ adjust: PortraitAdjust) -> NSImage {
+    /// Neutraal → het origineel ongewijzigd (geen render-overhead). `nonisolated
+    /// static` (pure functie) zodat zowel de main-actor-paden als de off-main
+    /// `decodeCanvas` 'm kunnen aanroepen.
+    nonisolated static func adjustedImage(_ raw: NSImage, _ adjust: PortraitAdjust) -> NSImage {
         guard !adjust.isNeutral,
               let cg = raw.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let out = PortraitEnhancer.colorAdjust(
@@ -359,6 +396,14 @@ final class ShellModel {
                 saturation: adjust.saturation, temperatureShift: adjust.temperature
               ) else { return raw }
         return NSImage(cgImage: out, size: raw.size)
+    }
+
+    /// E27.7: off-main full-res decode + Adjust-laag voor het select-canvas. Draait
+    /// op de coöperatieve pool (`nonisolated async`), niet op de main-thread.
+    /// Behoudt exact de oude semantiek: `NSImage(data:)` (zelfde maat) + `adjustedImage`.
+    private nonisolated static func decodeCanvas(data: Data, adjust: PortraitAdjust) async -> SendableNSImage? {
+        guard let raw = NSImage(data: data) else { return nil }
+        return SendableNSImage(image: adjustedImage(raw, adjust))
     }
 
     // MARK: - Hifi-haar-nudge (E05.6)
@@ -539,4 +584,11 @@ final class ShellModel {
     private func nsImage(from cgImage: CGImage) -> NSImage {
         NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
+}
+
+/// E27.7: `NSImage` is niet Sendable. `decodeCanvas` maakt 'm OFF-MAIN en reikt 'm
+/// via deze box terug; daarna wordt 'ie alléén op de main-actor gelezen (geen
+/// gedeelde mutatie) → veilig over de actor-grens onder `targeted` strict-concurrency.
+private struct SendableNSImage: @unchecked Sendable {
+    let image: NSImage
 }
