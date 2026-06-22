@@ -11,6 +11,11 @@ import SwiftUI
 
 struct BackgroundPanel: View {
     let portrait: Portrait2?
+    /// E31.7: optionele apply-target. Default schrijft op `portrait` (single
+    /// editor + board single-select). De board-batch geeft hier een closure die
+    /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
+    /// `portrait` blijft de bron voor display/selectie-state (Original/custom).
+    var onApply: ((PortraitBackground) -> Void)? = nil
     @State private var brand = BrandColorKit.shared
     // E24.24: persistente custom-achtergrond-uploads (herbruikbare swatches).
     @State private var customImages = BackgroundImageKit.shared
@@ -235,28 +240,32 @@ struct BackgroundPanel: View {
 
     // MARK: Acties
 
+    /// E31.7: één apply-punt — naar de injected closure (batch) of het portret.
+    private func apply(_ background: PortraitBackground) {
+        if let onApply { onApply(background) } else { portrait?.setBackground(background) }
+    }
+
     /// E24.31: toon de originele foto vol (omkeerbaar).
     private func selectOriginal() {
-        guard let portrait, portrait.originalData != nil else { return }
-        portrait.setBackground(.original)
+        guard portrait?.originalData != nil else { return }
+        apply(.original)
     }
 
     /// E24.31: terug naar de vrijstaande cutout zonder achtergrond.
     private func selectTransparent() {
-        portrait?.setBackground(.transparent)
+        apply(.transparent)
     }
 
     private func selectColor(_ hex: String) {
-        portrait?.setBackground(.color(hex))
+        apply(.color(hex))
     }
 
     private func selectGradient(_ colors: [Color]) {
-        guard let portrait, let png = BackgroundKit.renderGradientPNG(colors) else { return }
-        portrait.setBackground(.image(png))
+        guard let png = BackgroundKit.renderGradientPNG(colors) else { return }
+        apply(.image(png))
     }
 
     private func uploadCustom() {
-        guard let portrait else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
@@ -265,13 +274,13 @@ struct BackgroundPanel: View {
         // E24.24: persistent opslaan als herbruikbare swatch (+ downscale, 24.23);
         // de teruggegeven PNG wordt meteen de achtergrond.
         let stored = customImages.add(data) ?? data
-        portrait.setBackground(.image(stored))
+        apply(.image(stored))
     }
 
     /// E24.24: kies een eerder geüploade (persistente) achtergrond-swatch.
     private func selectCustomImage(_ id: String) {
-        guard let portrait, let data = customImages.data(for: id) else { return }
-        portrait.setBackground(.image(data))
+        guard let data = customImages.data(for: id) else { return }
+        apply(.image(data))
     }
 
 }

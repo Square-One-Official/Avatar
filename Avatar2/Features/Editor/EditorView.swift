@@ -228,12 +228,15 @@ struct EditorView: View {
     // "Enhance" (31.2 verhuist het Adjust/Light-paneel hierheen) en `.clothing`
     // heet "Shirt" (Figma-capsule). Face is een bewuste toevoeging t.o.v. Figma
     // (besluit 31.6). Images → app-bar (E22.1).
-    private static let toolbarItems: [DSToolbarItem<EditorTool>] = [
+    // E31.7: gedeeld met de board (BoardView) zodat single-editor én board
+    // dezelfde capsule-items tonen. Label "Clothing" (besluit Thierry: canoniek
+    // voor beide views — verving "Shirt").
+    static let toolbarItems: [DSToolbarItem<EditorTool>] = [
         DSToolbarItem(id: .edit, icon: EditorTool.edit.icon, label: "Enhance"),
         DSToolbarItem(id: .effects, icon: EditorTool.effects.icon, label: "Effects"),
         DSToolbarItem(id: .face, icon: EditorTool.face.icon, label: "Face"),
         DSToolbarItem(id: .hair, icon: EditorTool.hair.icon, label: "Hair"),
-        DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Shirt"),
+        DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Clothing"),
     ]
 
     // E31.5: de capsule-overflow `⋯` is leeg. Background (dat Figma in deze

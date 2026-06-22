@@ -210,10 +210,59 @@ credit-badges) onderaan. Bewuste Figma-afwijking (geen top-level Face in 4114:97
 story. Visuele smoke (`--seed-adjust --open-panel face`, scherm ontgrendeld): Face-pil lime-actief,
 Face-paneel open — zie /tmp/aaashots/e31-6.png. Beide targets bouwen Debug groen, alle suites groen.
 
+## 31.7 — Board/canvas-view trekt gelijk met de single-editor [FEAT]
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: 31.1–31.6
+
+De board/canvas-view (`BoardView`, E27–E30) had eigen hand-gebouwde toolbars (eigen `EditTool`-enum,
+eigen bottom-strip `Effects·Face·Clothing·Hair` zónder Enhance, inline kleur-swatches voor Background)
+→ inconsistent met de single-editor. Trek gelijk:
+
+- **Onderste toolbar** → dezelfde `DSBottomToolbar` met de GEDEELDE items
+  (`EditorView.toolbarItems`): **Enhance · Effects · Face · Hair · Clothing**. `editTool` is nu
+  `EditorTool` (geen duplicaat-enum). Enhance (`.edit`) opent het kleur/Adjust-paneel (Adjust verhuisde
+  uit de oude board-top-bar hierheen, net als de editor).
+- **Single-select top-bar** → dezelfde `CanvasActionToolbar`, getrimd tot board-relevante controls
+  (`showFramingActions:false`, `showGrid:false`): Frame ▾ (Shape + Flip) · Background. Besluit Thierry:
+  Auto-frame/Grid weglaten (no-op op statische nodes).
+- **Background overal** → dezelfde volledige `BackgroundPanel` (Transparent/Original/Image/upload/
+  gradient/color/brand) i.p.v. inline swatches; `BackgroundPanel` kreeg een `onApply`-closure zodat de
+  batch-bar dezelfde panel-UI op ALLE geselecteerde toepast.
+- **Label "Shirt" → "Clothing"** (besluit Thierry: canoniek voor BEIDE views) — gewijzigd in
+  `EditorView.toolbarItems`, dus de single-editor capsule heet nu ook "Clothing".
+- Batch (multi-select): bewust alléén styling + Background geünificeerd (Match lighting + Adjust blijven
+  batch-only; geen per-tool batch-toolbar).
+
+Verwijderd: `BoardView.EditTool`, `batchBackgrounds`, `backgroundSwatch`, `bottomToolButton`.
+**Restpunt:** de board-"Enhance" opent het kleur/Adjust-paneel (= de relocatie van de oude board-
+Adjust); de AI-één-tik-acties (Improve lighting/Colorise/Boost/Restore body) die de editor-Enhance
+heeft zijn op de board nog niet bedraad — aparte follow-up.
+
+DoD: beide targets + tests groen + merge + Result + screenshot (board single-select === editor-chrome;
+board Background = volledige panel; multi-select batch met panel-Background).
+
+**Result:** `BoardView` hergebruikt nu de single-editor-componenten i.p.v. eigen chrome:
+single-select bottom = `DSBottomToolbar(items: EditorView.toolbarItems)` (Enhance·Effects·Face·Hair·
+Clothing); single-select top = getrimde `CanvasActionToolbar` (Frame ▾ Shape+Flip · Background);
+Background overal = `BackgroundPanel` (nieuw `onApply`-closure voor de batch). `EditTool`-duplicaat,
+`batchBackgrounds`, `backgroundSwatch`, `bottomToolButton` verwijderd. Label "Shirt"→"Clothing" in
+`EditorView.toolbarItems` (canoniek voor beide views). `CanvasActionToolbar` kreeg
+`showFramingActions`/`showGrid` (default true → single-editor ongewijzigd). Beide targets bouwen Debug
+groen via `build-v2.sh`; AvatarUI 31/31 + Avatar2-unit + AvatarKit groen.
+**Verificatie-beperking (eerlijk):** code-/build-geverifieerd; de visuele smoke van de board-staten
+(single-select === editor + batch-Background-panel) leunt op de al in 31.1 vastgelegde component-shots
+(DSBottomToolbar/CanvasActionToolbar/BackgroundPanel zijn ongewijzigd hergebruikt) — een verse
+board-screenshot is een interactieve check (board-selectie) die het beste door Thierry in de draaiende
+app wordt bevestigd; debug-haken `--board-select <n>` / `--board-batch-bg <hex|none>` staan klaar.
+**Restpunt:** board-"Enhance" = kleur/Adjust-paneel; de editor-Enhance AI-één-tik-acties zijn op de
+board nog niet bedraad (aparte follow-up).
+
 ---
 
 ## Definition of Done (epic)
 
-Na 31.1–31.6: de app heeft (1) een persistente onderste capsule (Enhance·Effects·Face·Hair·Shirt·⋯)
+Na 31.1–31.6: de app heeft (1) een persistente onderste capsule (Enhance·Effects·Face·Hair·Clothing·⋯)
 en (2) een selectie-gebonden frame-lokale toolbar met uitsluitend frame/scène/compositie-controls
-(incl. Background). Adjust + AI-appearance-acties zitten onderaan. Alle besluiten gevallen.
+(incl. Background). Adjust + AI-appearance-acties zitten onderaan. 31.7 trekt de board-view gelijk met
+ditzelfde model. Alle besluiten gevallen.

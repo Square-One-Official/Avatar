@@ -27,10 +27,13 @@ struct BoardView: View {
 
     @Environment(\.undoManager) private var undoManager
 
-    // E30.1: actief bottom-tool/dropdown bij ÉÉN geselecteerde node (in-place
-    // editen op de board, zelfde panelen als de editor).
-    @State private var editTool: EditTool?
-    private enum EditTool: Hashable { case background, adjust, effects, face, clothing, hair }
+    // E30.1 / E31.7: actief bottom-tool bij ÉÉN geselecteerde node (in-place
+    // editen op de board). Dezelfde `EditorTool` als de single-editor zodat de
+    // board exact dezelfde capsule-items/labels/iconen toont.
+    @State private var editTool: EditorTool?
+    // E31.7: stuurt de Frame/Background-dropdowns van de gedeelde
+    // `CanvasActionToolbar` in de board single-select top-bar.
+    @State private var canvasMenu: CanvasToolbarMenu?
 
     /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
     private var selectedNode: Portrait2? {
@@ -65,10 +68,6 @@ struct BoardView: View {
     // E29.3: loopt tijdens de "Match lighting"-normalisatie over de selectie.
     @State private var isMatchingLight = false
     private enum BatchMenu: Hashable { case background, adjust }
-
-    /// E29.2: batch-achtergrond-presets (Transparent + een paar kleuren).
-    private static let batchBackgrounds: [String?] =
-        [nil, "FFFFFF", "111111", "D5F466", "8B5CF6", "F472B6", "38BDF8"]
 
     private var selectedPortraits: [Portrait2] {
         portraits.filter { selection.contains($0.persistentModelID) }
@@ -409,7 +408,7 @@ struct BoardView: View {
         // E29.2 smoke: pas een batch-achtergrond toe op de selectie ("none" = wissen).
         if let j = args.firstIndex(of: "--board-batch-bg"), args.indices.contains(j + 1) {
             let v = args[j + 1]
-            applyBackgroundToAll(v == "none" ? nil : v)
+            applyBackgroundToAll(v == "none" ? .transparent : .color(v))
         }
         // E29.3 smoke: match lighting over de selectie.
         if args.contains("--board-match-light") { matchLightingSelection() }
@@ -489,13 +488,12 @@ struct BoardView: View {
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
 
-            // Background: Transparent + presets, toegepast op alle geselecteerde.
-            Text("Background")
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-            ForEach(Self.batchBackgrounds.indices, id: \.self) { i in
-                backgroundSwatch(Self.batchBackgrounds[i])
-            }
+            // E31.7: Background = dezelfde volledige BackgroundPanel als de
+            // single-editor (besluit Thierry: geen aparte inline-swatches),
+            // toegepast op ALLE geselecteerde.
+            backgroundMenuButton(isOpen: batchMenu == .background,
+                                  toggle: { batchMenu = (batchMenu == .background) ? nil : .background },
+                                  display: selectedPortraits.first)
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
 
@@ -555,30 +553,41 @@ struct BoardView: View {
         .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
     }
 
-    private func backgroundSwatch(_ hex: String?) -> some View {
-        Button { applyBackgroundToAll(hex) } label: {
-            ZStack {
-                if let hex, let c = Color(hexRGB: hex) {
-                    Circle().fill(c)
-                } else {
-                    // Transparent = dot-grid-achtige indicatie.
-                    Circle().fill(DSColor.Background.neutralStronger)
-                    Image(systemName: "circle.dotted").font(.system(size: 12))
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
+    /// E31.7: gedeelde "Background"-knop met de volledige `BackgroundPanel` als
+    /// zwevende dropdown — dezelfde panel-UI als de single-editor. `display`
+    /// levert de selectie-state + Original/custom-bron; de apply gaat via
+    /// `onApply` naar ALLE geselecteerde portretten.
+    private func backgroundMenuButton(
+        isOpen: Bool, toggle: @escaping () -> Void, display: Portrait2?
+    ) -> some View {
+        Button(action: toggle) {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: "photo").font(.system(size: 12))
+                Text("Background").dsTextStyle(.labelSmall)
             }
-            .frame(width: 20, height: 20)
-            .overlay(Circle().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+            .foregroundStyle(DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 28)
+            .background(isOpen ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+            .dsHoverHighlight(cornerRadius: 14)
         }
         .buttonStyle(.plain)
-        .help(hex == nil ? "Transparent" : "#\(hex!)")
+        .overlay(alignment: .top) {
+            if isOpen {
+                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) })
+                    .padding(DSSpacing.gap4)
+                    .frame(width: 320)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .dsPanelSurface(cornerRadius: DSRadius.xl)
+                    .offset(y: 40)
+                    .zIndex(10)
+            }
+        }
     }
 
-    /// E29.2: pas dezelfde achtergrond toe op alle geselecteerde portretten.
-    private func applyBackgroundToAll(_ hex: String?) {
-        for p in selectedPortraits {
-            p.setBackground(hex.map(PortraitBackground.color) ?? .transparent)
-        }
+    /// E29.2/E31.7: pas dezelfde achtergrond toe op alle geselecteerde portretten.
+    private func applyBackgroundToAll(_ background: PortraitBackground) {
+        for p in selectedPortraits { p.setBackground(background) }
     }
 
     /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
@@ -627,82 +636,47 @@ struct BoardView: View {
 
     // MARK: - E30.1 in-place editen op één node
 
-    /// Top-toolbar bij precies één selectie: de normale editor-acties op de node
-    /// (Background-presets · Adjust · Flip) — géén batch-framing/Match lighting.
+    /// E31.7: top-toolbar bij precies één selectie = dezelfde frame-lokale
+    /// `CanvasActionToolbar` als de single-editor, getrimd tot board-relevante
+    /// controls (Frame ▾ met Shape + Flip · Background-panel). Auto-frame/Grid
+    /// (editor-only transform/overlay) zijn verborgen. Adjust zit nu onder
+    /// "Enhance" in de bottom-capsule — net als de editor.
     private func singleEditTopBar(_ node: Portrait2) -> some View {
-        HStack(spacing: DSSpacing.gap2) {
-            Text(node.name.isEmpty ? "Untitled" : node.name)
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(DSColor.Foreground.primary)
-                .lineLimit(1)
-
-            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
-
-            // Background: dezelfde presets als batch (toegepast op deze ene node;
-            // applyBackgroundToAll werkt op `selectedPortraits` = [node]).
-            Text("Background")
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-            ForEach(Self.batchBackgrounds.indices, id: \.self) { i in
-                backgroundSwatch(Self.batchBackgrounds[i])
-            }
-
-            Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
-
-            // Flip — spiegelt de cutout (zichtbaar op de node).
-            Button { flipNode(node) } label: {
-                Image(systemName: "arrow.left.and.right")
-                    .font(.system(size: 12))
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .frame(width: 28, height: 28)
-                    .dsHoverHighlight(cornerRadius: 14)
-            }
-            .buttonStyle(.plain)
-            .help("Flip horizontally")
-
-            // Adjust — dezelfde kleurcorrectie als batch (op deze node).
-            Button { editTool = (editTool == .adjust) ? nil : .adjust } label: {
-                HStack(spacing: DSSpacing.gap1) {
-                    Image(systemName: "slider.horizontal.3").font(.system(size: 12))
-                    Text("Adjust").dsTextStyle(.labelSmall)
-                }
-                .foregroundStyle(DSColor.Foreground.primary)
-                .padding(.horizontal, DSSpacing.gap2)
-                .frame(height: 28)
-                .background(editTool == .adjust ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-                .dsHoverHighlight(cornerRadius: 14)
-            }
-            .buttonStyle(.plain)
-            .overlay(alignment: .top) {
-                if editTool == .adjust, let img = NSImage(data: node.cutoutData) {
-                    EditColorPanel(
-                        source: img,
-                        initial: node.adjust,
-                        onCommit: { _, after in applyAdjustToAll(after); editTool = nil }
-                    )
-                    .padding(DSSpacing.gap4)
-                    .frame(width: 360)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .dsPanelSurface(cornerRadius: DSRadius.xl)
-                    .offset(y: 40)
-                    .zIndex(10)
-                }
-            }
-        }
-        .padding(.horizontal, DSSpacing.gap3)
-        .padding(.vertical, DSSpacing.gap1)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        CanvasActionToolbar(
+            onFlip: { flipNode(node) },
+            frameShape: node.frameShape,
+            onSetFrameShape: { setNodeFrameShape($0, node) },
+            activeMenu: $canvasMenu,
+            gridEnabled: .constant(false),
+            showFramingActions: false,
+            showGrid: false,
+            background: { BackgroundPanel(portrait: node) }
+        )
     }
 
-    /// Bottom-toolbar bij precies één selectie: de cloud-edit-tools van de editor
-    /// (Effects/Face/Clothing/Hair), met het paneel als zwevende dropdown erboven.
+    /// E31.7: zet de frame-vorm van één board-node (zelfde als EditorView).
+    private func setNodeFrameShape(_ shape: ExportShape, _ node: Portrait2) {
+        withAnimation(.spring(duration: 0.3)) { node.frameShape = shape }
+        node.touch()
+    }
+
+    /// E31.7: bottom-toolbar bij precies één selectie = dezelfde `DSBottomToolbar`-
+    /// capsule als de single-editor, met de GEDEELDE items (Enhance · Effects ·
+    /// Face · Hair · Clothing). Het actieve paneel zweeft als dropdown erboven.
+    /// "Enhance" (.edit) opent het kleur/Adjust-paneel — Adjust verhuisde hierheen
+    /// uit de oude top-bar.
     private func singleEditBottomBar(_ node: Portrait2) -> some View {
         VStack(spacing: DSSpacing.gap2) {
             // Actief paneel boven de balk.
             if let base = NSImage(data: node.cutoutData) {
                 Group {
                     switch editTool {
+                    case .edit:
+                        EditColorPanel(
+                            source: base,
+                            initial: node.adjust,
+                            onCommit: { _, after in applyAdjustToAll(after) }
+                        )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
                                      onApply: { applyToNode($0, node) })
@@ -731,32 +705,8 @@ struct BoardView: View {
                 .dsPanelSurface(cornerRadius: DSRadius.xl)
             }
 
-            HStack(spacing: DSSpacing.gap1) {
-                bottomToolButton("Effects", "wand.and.stars", .effects)
-                bottomToolButton("Face", "face.smiling", .face)
-                bottomToolButton("Clothing", "tshirt", .clothing)
-                bottomToolButton("Hair", "comb", .hair)
-            }
-            .padding(.horizontal, DSSpacing.gap2)
-            .padding(.vertical, DSSpacing.gap1)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+            DSBottomToolbar(items: EditorView.toolbarItems, selection: $editTool)
         }
-    }
-
-    private func bottomToolButton(_ label: String, _ icon: String, _ tool: EditTool) -> some View {
-        Button { editTool = (editTool == tool) ? nil : tool } label: {
-            HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: icon).font(.system(size: 12))
-                Text(label).dsTextStyle(.labelSmall)
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap3)
-            .frame(height: 30)
-            .background(editTool == tool ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-            .dsHoverHighlight(cornerRadius: 15)
-        }
-        .buttonStyle(.plain)
     }
 
     /// E30.1: een cloud/flip-resultaat op de node toepassen via dezelfde pipeline
