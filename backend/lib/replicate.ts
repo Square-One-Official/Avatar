@@ -289,6 +289,19 @@ function stylizeInputFor(
       output_format: "png",
     };
   }
+  if (ref.startsWith("bytedance/seedream")) {
+    // E32.1 face-bakeoff-arm. Seedream 4 = unified generate/edit; reference-
+    // beelden gaan via `image_input` (zoals nano-banana), met
+    // `aspect_ratio: "match_input_image"` zodat het kader niet herkadert.
+    // Schema controleren vóór de eerste bakeoff-run (replicate.com/bytedance/
+    // seedream-4); bij een veld-mismatch faalt de dev-only call zichtbaar.
+    return {
+      prompt: input.prompt,
+      image_input: [input.imageDataUrl],
+      aspect_ratio: "match_input_image",
+      size: "2K",
+    };
+  }
   if (ref.startsWith("black-forest-labs/flux-2")) {
     return {
       prompt: input.prompt,

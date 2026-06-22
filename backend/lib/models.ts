@@ -113,6 +113,14 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
         ref: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
       },
+      // E32.1 face-bakeoff-arm (dev-only). ByteDance Seedream 4 — unified
+      // generate/edit, accepteert reference-images voor instruction-edit.
+      // Adapter in stylizeInputFor (lib/replicate.ts). Unversioned officiële
+      // slug; pin een hash bij een 404 via replicate.com/bytedance/seedream-4.
+      seedream: {
+        ref: "bytedance/seedream-4",
+        label: "Seedream 4",
+      },
     },
     // E14.3: generatief standaardtarief (4); premium-features (7) krijgen
     // bij dat besluit hun eigen registratie.
