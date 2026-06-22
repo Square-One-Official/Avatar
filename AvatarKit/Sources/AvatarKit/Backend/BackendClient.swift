@@ -144,7 +144,13 @@ public final class BackendClient {
         let creditsRemaining: Int         // decoded from `credits_remaining`
     }
 
-    public func cutout(imagePNG: Data) async throws -> (Data, Int) {
+    /// Uploads a PNG to the `cutout-uploads` Storage bucket via a short-lived
+    /// signed PUT URL and returns the resulting object key. Used as the
+    /// `storage_key` for every image-processing endpoint (cutout, stylize,
+    /// colorize, fill-body, upscale) so their request bodies stay tiny and
+    /// Vercel's 4.5 MB serverless body cap never applies. Throws
+    /// `payloadTooLarge` for inputs over `cutoutInputLimitBytes` before any I/O.
+    private func uploadInputPNG(_ imagePNG: Data) async throws -> String {
         guard imagePNG.count <= Self.cutoutInputLimitBytes else {
             throw BackendError.payloadTooLarge(
                 bytes: imagePNG.count,
@@ -181,8 +187,13 @@ public final class BackendClient {
         guard (200...299).contains(putHTTP.statusCode) else {
             throw BackendError.server(putHTTP.statusCode, "storage upload failed")
         }
+        return upload.key
+    }
 
-        // 3. Tell the backend the bytes have landed; receive the cutout.
+    public func cutout(imagePNG: Data) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
+
+        // Tell the backend the bytes have landed; receive the cutout.
         struct Body: Encodable {
             let storageKey: String
             let modelOverride: String?
@@ -194,7 +205,7 @@ public final class BackendClient {
             }
         }
         let body = try JSONEncoder().encode(
-            Body(storageKey: upload.key, modelOverride: DevModelOverrides.shared.override(for: .cutout))
+            Body(storageKey: storageKey, modelOverride: DevModelOverrides.shared.override(for: .cutout))
         )
         let resp: CutoutResponse = try await request(
             "/v1/cutout", method: "POST", body: body
@@ -237,17 +248,19 @@ public final class BackendClient {
         }
     }
     public func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let face: FaceBox?
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image, face
+                case storageKey = "storage_key"
+                case face
                 case modelOverride = "model_override"
             }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(), face: faceBox,
+            Body(storageKey: storageKey, face: faceBox,
                  modelOverride: DevModelOverrides.shared.override(for: .fillBody))
         )
         let resp: FillBodyResponse = try await request("/v1/fill-body", method: "POST", body: body)
@@ -271,16 +284,17 @@ public final class BackendClient {
         let creditsRemaining: Int
     }
     public func colorize(imagePNG: Data) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image
+                case storageKey = "storage_key"
                 case modelOverride = "model_override"
             }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(),
+            Body(storageKey: storageKey,
                  modelOverride: DevModelOverrides.shared.override(for: .colorize))
         )
         let resp: ColorizeResponse = try await request("/v1/colorize", method: "POST", body: body)
@@ -305,19 +319,21 @@ public final class BackendClient {
         let creditsRemaining: Int          // decoded from `credits_remaining`
     }
     public func stylize(imagePNG: Data, style: StylizeStyle) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let style: String
             let generationModel: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image, style
+                case storageKey = "storage_key"
+                case style
                 case generationModel = "generation_model"
                 case modelOverride = "model_override"
             }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(), style: style.rawValue,
+            Body(storageKey: storageKey, style: style.rawValue,
                  generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
@@ -338,17 +354,18 @@ public final class BackendClient {
         let creditsRemaining: Int
     }
     public func upscale(imagePNG: Data) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image
+                case storageKey = "storage_key"
                 case modelOverride = "model_override"
             }
         }
         // Geen dev-override-UI voor upscale → altijd het registry-default-model.
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(), modelOverride: nil)
+            Body(storageKey: storageKey, modelOverride: nil)
         )
         let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {
@@ -365,14 +382,15 @@ public final class BackendClient {
     /// geen rauwe instructie). Resultaat = opaque PNG + bijgewerkt saldo;
     /// 402 → `BackendError.noCredits` (paywall).
     public func editHair(imagePNG: Data, preset: HairStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let hairPreset: String?
             let hairPrompt: String?
             let generationModel: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image
+                case storageKey = "storage_key"
                 case hairPreset = "hair_preset"
                 case hairPrompt = "hair_prompt"
                 case generationModel = "generation_model"
@@ -380,7 +398,7 @@ public final class BackendClient {
             }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(),
+            Body(storageKey: storageKey,
                  hairPreset: preset?.rawValue,
                  hairPrompt: freeText,
                  generationModel: GenerationModelStore.shared.current.rawValue,
@@ -400,14 +418,15 @@ public final class BackendClient {
     /// het harde acceptatiecriterium (gezicht/haar/pose/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
     public func editClothes(imagePNG: Data, preset: ClothesStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
-            let image: String
+            let storageKey: String
             let clothesPreset: String?
             let clothesPrompt: String?
             let generationModel: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
-                case image
+                case storageKey = "storage_key"
                 case clothesPreset = "clothes_preset"
                 case clothesPrompt = "clothes_prompt"
                 case generationModel = "generation_model"
@@ -415,7 +434,7 @@ public final class BackendClient {
             }
         }
         let body = try JSONEncoder().encode(
-            Body(image: imagePNG.base64EncodedString(),
+            Body(storageKey: storageKey,
                  clothesPreset: preset?.rawValue,
                  clothesPrompt: freeText,
                  generationModel: GenerationModelStore.shared.current.rawValue,

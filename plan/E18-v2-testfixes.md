@@ -139,6 +139,29 @@ afvinken. UI-fixes met visuele smoke.
       dan ligt het **serverzijde** (Supabase) — zie DECISIONS-PENDING (e-mailtemplate magic-link-
       prefetch / OTP-expiry). De ruwe Supabase-fout staat nu in de toast → bevestigt de oorzaak.
 
+## Backend / cloud
+- [x] **18.25 Hair/Shirt (+ alle cloud-edits) faalden met 413 FUNCTION_PAYLOAD_TOO_LARGE** —
+      DONE (v2-main); owner INFRA (AI-agent). Branch `v2/E18-stylize-upload-bypass`.
+      **Result:** build-v2.sh groen (beide targets + Avatar2-unit + AvatarKit + AvatarUI 31/31);
+      backend `tsc --noEmit` groen. Runtime-bewijs (echte cloud-call) vergt een preview-deploy +
+      credits → niet headless smokebaar; de bypass is code-/typecheck-geverifieerd en spiegelt het
+      werkende `/v1/cutout`-pad. **Nog te doen vóór productie-effect:** backend porten naar `main`.
+      **Oorzaak:** de client stuurde de full-res cutout-PNG inline als base64 in de JSON-body naar
+      `/v1/stylize` (Hair/Shirt/Effects), `/v1/colorize`, `/v1/fill-body`, `/v1/upscale`. Een ~5 MB
+      cutout (~6.7 MB base64) overschrijdt Vercel's **platform-cap van ~4.5 MB request-body** — het
+      edge weigert vóór de functie draait (de `bodyParser: 15mb`-config helpt dus niet). Zie memory
+      `project_vercel_body_cap`.
+      **Fix:** de bewezen Magic-Cutout-bypass uitgebreid naar alle vier endpoints. Gedeelde backend-
+      helper `resolveImageInput` (`backend/lib/uploads.ts`) accepteert náást het legacy `image`-veld
+      een `storage_key`: signt een READ-URL op `cutout-uploads`, downloadt de bytes server-side
+      (Vercel→Supabase, niet aan de body-cap gebonden), ruimt het object op. Client: gedeelde
+      `BackendClient.uploadInputPNG(_:)` (geëxtraheerd uit `cutout()`) uploadt via signed PUT en de zes
+      cloud-methodes sturen nu `storage_key` i.p.v. inline `image`. Backward-compatible (oude builds met
+      `image` blijven werken voor kleine beelden). Bucket hergebruikt (`cutout-uploads`); naam-cleanup
+      = future. **Deploy:** backend porten naar `main` (productie, E13.4-patroon) vóór de client-build.
+      **Restpunt:** een upscale-*resultaat* kan zélf de response-cap naderen — apart opvolgen als het
+      reproduceert (zie plan).
+
 ## DB-migraties
 - [x] **013 + 014** — DONE door Thierry (in Supabase SQL-editor, 2026-06-14). newsletter_cohorts-
       grants ingetrokken + newsletter_optins-tabel aangemaakt.
