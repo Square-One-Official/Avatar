@@ -120,7 +120,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       credits_remaining: creditsRemaining,
     });
   } catch (err) {
-    console.error("/v1/colorize error", err);
+    // Log the message only — the Replicate SDK embeds the auth header in the
+    // full error object, so logging `err` whole leaks REPLICATE_API_TOKEN.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("/v1/colorize error:", msg);
     if (err instanceof ReplicateTimeoutError) {
       res.status(504).json({ error: "model_timeout" });
       return;
@@ -128,7 +131,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Replicate rate-limits (low balance, burst exceeded) bubble up as
     // 429s. Propagate so the client surfaces the friendly throttle copy
     // instead of "colorize_failed".
-    const msg = err instanceof Error ? err.message : String(err);
     if (
       msg.includes("status 429") ||
       msg.includes("Too Many Requests") ||

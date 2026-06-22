@@ -41,6 +41,50 @@ async function runWithTimeout<T>(
 }
 
 /**
+ * Transient upstream gateway statuses — Replicate sits behind Cloudflare, so
+ * a brief blip surfaces as a 502/503/504 (or a Cloudflare 52x) *before* a
+ * prediction is created. These are safe to retry: no prediction was started,
+ * so there's no double-billing. A persistent outage still fails after the
+ * retries are exhausted.
+ */
+const TRANSIENT_UPSTREAM_STATUS = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+
+function isTransientUpstream(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } } | null)?.response?.status;
+  return typeof status === "number" && TRANSIENT_UPSTREAM_STATUS.has(status);
+}
+
+/**
+ * Run a Replicate call with our hard timeout plus a small retry on transient
+ * upstream gateway errors (audit MEDIUM #17 follow-up). Takes a THUNK (not a
+ * started promise) so each attempt is a fresh request. Never retries our own
+ * timeout (no budget left under the function's maxDuration) or a real model
+ * error — only the fast gateway 5xx that come back before any work is done.
+ */
+async function runWithRetry<T>(
+  model: string,
+  thunk: () => Promise<T>,
+  timeoutMs: number = REPLICATE_TIMEOUT_MS,
+  maxAttempts = 2,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await runWithTimeout(model, thunk(), timeoutMs);
+    } catch (err) {
+      if (
+        attempt >= maxAttempts ||
+        err instanceof ReplicateTimeoutError ||
+        !isTransientUpstream(err)
+      ) {
+        throw err;
+      }
+      console.warn(`[replicate] ${model} transient upstream error, retry ${attempt}/${maxAttempts - 1}`);
+      await new Promise((r) => setTimeout(r, 700 * attempt));
+    }
+  }
+}
+
+/**
  * Magic Cutout — runs a background-removal model on the input portrait.
  * Returns the URL of the resulting transparent-PNG. The caller downloads it
  * and re-encodes for the client.
@@ -57,9 +101,9 @@ export async function magicCutout(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
-  const output = (await runWithTimeout(
+  const output = (await runWithRetry(
     "magicCutout",
-    replicate.run((input.model ?? defaultModelRef("cutout")) as `${string}/${string}`, {
+    () => replicate.run((input.model ?? defaultModelRef("cutout")) as `${string}/${string}`, {
       input: {
         image: input.imageDataUrl,
         // 2048x2048 is the practical upper bound — BiRefNet runs at this on a
@@ -117,9 +161,9 @@ export async function outpaintPortrait(input: {
     "do not invent, redraw, or extend facial features. " +
     "Photographic, soft natural lighting, single subject.";
 
-  const output = (await runWithTimeout(
+  const output = (await runWithRetry(
     "outpaintPortrait",
-    replicate.run((input.model ?? defaultModelRef("fill_body")) as `${string}/${string}`, {
+    () => replicate.run((input.model ?? defaultModelRef("fill_body")) as `${string}/${string}`, {
       input: {
         image: input.imageDataUrl,
         mask: input.maskDataUrl,
@@ -158,9 +202,9 @@ export async function colorize(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
-  const output = (await runWithTimeout(
+  const output = (await runWithRetry(
     "colorize",
-    replicate.run((input.model ?? defaultModelRef("colorize")) as `${string}/${string}`, {
+    () => replicate.run((input.model ?? defaultModelRef("colorize")) as `${string}/${string}`, {
       input: {
         input_image: input.imageDataUrl,
         model_name: "Artistic",
@@ -182,9 +226,9 @@ export async function upscale(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
-  const output = (await runWithTimeout(
+  const output = (await runWithRetry(
     "upscale",
-    replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
+    () => replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
       input: {
         image: input.imageDataUrl,
         scale: 2,
@@ -224,9 +268,9 @@ export async function stylizeEdit(input: {
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
-  const output = (await runWithTimeout(
+  const output = (await runWithRetry(
     "stylizeEdit",
-    replicate.run(ref as `${string}/${string}`, { input: payload }),
+    () => replicate.run(ref as `${string}/${string}`, { input: payload }),
     STYLIZE_TIMEOUT_MS,
   )) as unknown;
 
