@@ -43,6 +43,12 @@ struct CanvasActionToolbar<Background: View>: View {
     @Binding var activeMenu: CanvasToolbarMenu?
     /// E24.26: grid/thirds-overlay aan/uit (toggle in de toolbar).
     @Binding var gridEnabled: Bool
+    /// E31.7: de board hergebruikt deze toolbar maar zonder de editor-only
+    /// transform-acties (Auto-frame/Crop/Fix-angle) en zonder de grid-toggle —
+    /// die hebben geen effect op een statische board-node. Default true →
+    /// single-editor ongewijzigd.
+    var showFramingActions: Bool = true
+    var showGrid: Bool = true
     @ViewBuilder var background: () -> Background
 
     var body: some View {
@@ -53,19 +59,22 @@ struct CanvasActionToolbar<Background: View>: View {
             toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
                 background()
             }
-            // E24.26: grid/thirds-toggle.
-            Button { gridEnabled.toggle() } label: {
-                Ph.gridNine.regular
-                    .scaledToFit()
-                    .frame(width: 15, height: 15)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .padding(.horizontal, DSSpacing.gap2)
-                    .frame(height: 32)
-                    .background(gridEnabled ? DSColor.Background.neutralStronger : .clear, in: Capsule())
-                    .dsHoverHighlight(cornerRadius: 16)
+            // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen
+            // alignment-overlay op statische nodes).
+            if showGrid {
+                Button { gridEnabled.toggle() } label: {
+                    Ph.gridNine.regular
+                        .scaledToFit()
+                        .frame(width: 15, height: 15)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                        .padding(.horizontal, DSSpacing.gap2)
+                        .frame(height: 32)
+                        .background(gridEnabled ? DSColor.Background.neutralStronger : .clear, in: Capsule())
+                        .dsHoverHighlight(cornerRadius: 16)
+                }
+                .buttonStyle(.plain)
+                .help("Toggle alignment grid")
             }
-            .buttonStyle(.plain)
-            .help("Toggle alignment grid")
         }
         .padding(DSSpacing.gap1)
         .background(.ultraThinMaterial, in: Capsule())
@@ -111,9 +120,13 @@ struct CanvasActionToolbar<Background: View>: View {
 
     private var frameMenu: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            menuRow("Auto-frame & center", icon: .cornersOut, action: onAutoFrame)
-            menuRow("Crop", icon: .crop, action: onCrop)
-            menuRow("Fix camera angle", icon: .perspective, action: onFixAngle)
+            // E31.7: de transform-acties bestaan alleen in de single-editor
+            // (live transform-state); op de board tonen we enkel Flip + Shape.
+            if showFramingActions {
+                menuRow("Auto-frame & center", icon: .cornersOut, action: onAutoFrame)
+                menuRow("Crop", icon: .crop, action: onCrop)
+                menuRow("Fix camera angle", icon: .perspective, action: onFixAngle)
+            }
             menuRow("Flip horizontal", icon: .flipHorizontal, action: onFlip)
 
             // E24.16: frame-vorm-keuze. Cirkel = merkvorm (default), vierkant
