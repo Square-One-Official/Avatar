@@ -33,7 +33,9 @@ struct ShellTopBar: View {
         // hangt). Counter links (ná de traffic-lights), iconen rechts.
         HStack(alignment: .center, spacing: 0) {
             // E24.13: quota-badge alléén in de editor — NIET in Settings.
-            if model.hasCompletedFirstCutout && !isSettingsActive {
+            // Kruisvervaag op opacity (i.p.v. wegnemen) zodat de linkerkant
+            // niet wegklapt tijdens de Settings-toggle.
+            if model.hasCompletedFirstCutout {
                 HStack(spacing: DSSpacing.gap2) {
                     Text(quotaLabel)
                         .dsTextStyle(.labelSmall)
@@ -44,49 +46,67 @@ struct ShellTopBar: View {
                 }
                 // Voorbij de window-controls (traffic-lights) i.p.v. eronder.
                 .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
+                .opacity(isSettingsActive ? 0 : 1)
+                .allowsHitTesting(!isSettingsActive)
             }
 
             Spacer(minLength: DSSpacing.gap2)
 
-            HStack(spacing: DSSpacing.gap2) {
-                if canExport {
-                    DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
-                        onExport()
+            // Punt 14-vervolg: de editor-cluster en de Close-knop liggen in een
+            // trailing-uitgelijnde ZStack en kruisvervagen op `isSettingsActive`.
+            // Zo verspringt er niets bij het openen van Settings — een tandwiel
+            // opent, een ✕ sluit (geen dubbelzinnige "actieve gear").
+            ZStack(alignment: .trailing) {
+                HStack(spacing: DSSpacing.gap2) {
+                    if canExport {
+                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
+                            onExport()
+                        }
+                    }
+                    DSToolButton(
+                        Image(systemName: "gearshape.fill"),
+                        label: "Settings",
+                        tooltipEdge: .bottom
+                    ) {
+                        onToggleSettings()
+                    }
+                    if canToggleBoard {
+                        // E27.4: board-modus (alle portretten op één canvas).
+                        DSToolButton(
+                            Image(systemName: "square.grid.2x2"),
+                            label: "Board",
+                            isActive: isBoardActive,
+                            tooltipEdge: .bottom
+                        ) {
+                            onToggleBoard()
+                        }
+                    }
+                    if canToggleSidebar {
+                        // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
+                        DSToolButton(
+                            Image(systemName: "sidebar.right"),
+                            label: "Library",
+                            isActive: isSidebarActive,
+                            tooltipEdge: .bottom
+                        ) {
+                            onToggleSidebar()
+                        }
                     }
                 }
-                DSToolButton(
-                    Image(systemName: "gearshape.fill"),
-                    label: "Settings",
-                    isActive: isSettingsActive,
-                    tooltipEdge: .bottom
-                ) {
+                .opacity(isSettingsActive ? 0 : 1)
+                .allowsHitTesting(!isSettingsActive)
+
+                // Enige knop in Settings-modus: ✕ uiterst rechts (de hoek waar
+                // de Library-knop stond). `xmark` = het canonieke sluit-glyph.
+                DSToolButton(Image(systemName: "xmark"), label: "Close", tooltipEdge: .bottom) {
                     onToggleSettings()
                 }
-                if canToggleBoard {
-                    // E27.4: board-modus (alle portretten op één canvas).
-                    DSToolButton(
-                        Image(systemName: "square.grid.2x2"),
-                        label: "Board",
-                        isActive: isBoardActive,
-                        tooltipEdge: .bottom
-                    ) {
-                        onToggleBoard()
-                    }
-                }
-                if canToggleSidebar {
-                    // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
-                    DSToolButton(
-                        Image(systemName: "sidebar.right"),
-                        label: "Library",
-                        isActive: isSidebarActive,
-                        tooltipEdge: .bottom
-                    ) {
-                        onToggleSidebar()
-                    }
-                }
+                .opacity(isSettingsActive ? 1 : 0)
+                .allowsHitTesting(isSettingsActive)
             }
             .padding(.trailing, ShellMetrics.topBarInset)
         }
+        .animation(.easeOut(duration: 0.18), value: isSettingsActive)
         // De top-strook (h52) reserveert de hoogte van de traffic-lights; alles
         // op gap-3 vanaf de top zodat het met de Name/Role-kop uitlijnt.
         .padding(.top, DSSpacing.gap3)

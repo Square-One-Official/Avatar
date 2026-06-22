@@ -47,21 +47,36 @@ final class ClothesModel {
             return
         }
         phase = .working
+        entitlement.presentWorking(
+            title: "Changing clothing",
+            messages: [
+                "Picking the right fit…",
+                "Pressing the wrinkles out…",
+                "Checking the stitching…",
+                "Did someone say outfit change?",
+                "Looking sharp…",
+                "Almost dressed…",
+            ]
+        )
         do {
             let (data, _) = try await entitlement.backend.editClothes(imagePNG: png, preset: preset, freeText: freeText)
             guard let image = NSImage(data: data) else {
                 phase = .idle
+                entitlement.dismissWorkingToast()
                 entitlement.presentError("The result came back unreadable.")
                 return
             }
             phase = .idle
+            entitlement.dismissWorkingToast()
             onApply(image)
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
         } catch {
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't change the clothing. Please try again.")
         }
     }
@@ -86,18 +101,8 @@ struct ClothesPanel: View {
     var body: some View {
         DSEditPanel(title: "Change upper clothes") {
             VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack(spacing: DSSpacing.gap2) {
-                    if model.isBusy {
-                        ProgressView().controlSize(.small)
-                        Text("Changing clothing…")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    } else if case .failed(let message) = model.phase {
-                        Text(message)
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    Spacer(minLength: DSSpacing.gap4)
+                HStack {
+                    Spacer()
                     Label("\(model.creditCost)", systemImage: "bolt.fill")
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.subtle)

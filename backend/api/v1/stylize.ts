@@ -100,6 +100,42 @@ const CLOTHES_FREE_TEMPLATE = (desc: string) =>
   `Change the upper clothing to ${desc}. ` + CLOTHES_CLAUSE;
 
 /**
+ * Face beauty-intent (E32.1). Zelfde productie-`/v1/stylize` (nano-banana
+ * instruction-edit). De E09.1-bakeoff koos nano-banana voor `edit-teeth`/
+ * `edit-wrinkles` (subtielst, kader exact, "change nothing else" het best);
+ * `apply-makeup` is nieuw en volgt dezelfde clausule. De clausule is het harde
+ * acceptatiecriterium — alléén het gevraagde gezichtsdetail wijzigt, identiteit/
+ * pose/haar/kleding/achtergrond identiek. Server-gemapt via `face_preset`; geen
+ * vrij promptveld (productie blijft binnen deze whitelist).
+ *
+ * Teeth-fix uit de E09.1-bakeoff: de armen "tonen" tandenbleek soms door een
+ * gesloten mond te openen → de whiten-teeth-prompt verbiedt expliciet het
+ * openen van de mond / wijzigen van de expressie.
+ */
+const FACE_CLAUSE =
+  "Keep the person's identity, facial structure, expression, pose, hair, " +
+  "clothing and background exactly the same. Change only the requested facial " +
+  "detail and nothing else, keeping the result photorealistic and natural.";
+
+const FACE_PRESETS: Record<string, string> = {
+  "whiten-teeth":
+    "Subtly whiten and brighten the person's teeth for a natural, healthy " +
+    "smile, without making them unnaturally white. Do not open the mouth or " +
+    "change the expression; if the mouth is closed, leave it closed. " +
+    FACE_CLAUSE,
+  "apply-makeup":
+    "Apply tasteful, natural-looking make-up: subtle foundation for an even " +
+    "skin tone, soft blush, light eye make-up with mascara, and a natural " +
+    "lipstick shade. Keep it understated and realistic. " +
+    FACE_CLAUSE,
+  "reduce-wrinkles":
+    "Gently reduce fine lines and wrinkles on the face for a subtly refreshed " +
+    "look, while preserving the person's age, character and natural skin " +
+    "texture. Do not over-smooth the skin. " +
+    FACE_CLAUSE,
+};
+
+/**
  * POST /v1/stylize — Effects (E09.2; productie sinds de promotie van het
  * dev-only E09.1-bakeoff-endpoint).
  *
@@ -139,7 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const isDevUser = isDevUnlimitedUser(user.email);
 
   // Prompt-bepaling, in volgorde: een Effects-`style` (E09.2), een hair-intent
-  // (E11.2, `hair_preset`/`hair_prompt` — server-gemapt), of een vrij `prompt`
+  // (E11.2, `hair_preset`/`hair_prompt`), een clothes-intent (E10.4), een
+  // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
   // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
   const styleKey = (req.body?.style ?? "") as string;
@@ -147,6 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hairPrompt = (req.body?.hair_prompt ?? "") as string;
   const clothesPreset = (req.body?.clothes_preset ?? "") as string;
   const clothesPrompt = (req.body?.clothes_prompt ?? "") as string;
+  const facePreset = (req.body?.face_preset ?? "") as string;
   const freePrompt = (req.body?.prompt ?? "") as string;
   if (styleKey) {
     const mapped = STYLE_PROMPTS[styleKey];
@@ -184,6 +222,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     prompt = CLOTHES_FREE_TEMPLATE(clothesPrompt.trim());
+  } else if (facePreset) {
+    const mapped = FACE_PRESETS[facePreset];
+    if (!mapped) {
+      res.status(400).json({ error: "unknown_face_preset" });
+      return;
+    }
+    prompt = mapped;
   } else if (freePrompt && isDevUser) {
     if (typeof freePrompt !== "string" || freePrompt.length > 2000) {
       res.status(400).json({ error: "missing_or_oversized_prompt" });

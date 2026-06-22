@@ -22,6 +22,13 @@ final class EntitlementModel {
     /// Boost) i.p.v. inline tekst onder de menutitel.
     private(set) var errorToast: String?
 
+    /// Lopende cloud-actie-toast — statische titel + cycling copy per feature.
+    struct WorkingContext {
+        let title: String
+        let messages: [String]
+    }
+    private(set) var workingContext: WorkingContext?
+
     /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
     enum CloudGate: Equatable { case enableOnline, signIn }
     var cloudGate: CloudGate?
@@ -174,6 +181,14 @@ final class EntitlementModel {
 
     func dismissErrorToast() {
         errorToast = nil
+    }
+
+    func presentWorking(title: String, messages: [String]) {
+        workingContext = WorkingContext(title: title, messages: messages)
+    }
+
+    func dismissWorkingToast() {
+        workingContext = nil
     }
 
     // MARK: - E18.2 contextuele cloud-feature-gate

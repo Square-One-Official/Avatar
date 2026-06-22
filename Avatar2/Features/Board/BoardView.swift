@@ -112,7 +112,10 @@ struct BoardView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
                         .background {
-                            CanvasInteractionCatcher(camera: $camera)
+                            CanvasInteractionCatcher(
+                                camera: $camera,
+                                chromeHovered: batchMenu != nil || canvasMenu != nil
+                            )
                             boardShortcutButtons
                         }
                 }
@@ -132,6 +135,11 @@ struct BoardView: View {
                         boardBatchBar
                     } else if let node = selectedNode {
                         singleEditTopBar(node)
+                            // Horizontaal gecentreerd boven de geselecteerde node.
+                            // Inverse van visibleBoardRect-transform: het overlay-nulpunt
+                            // ligt op vpMidden, dus offset = scale·(boardX−boardMidden)+cameraOffset.
+                            .offset(x: camera.scale * (node.boardX - boardSize.width / 2)
+                                + camera.offset.width)
                     }
                 }
                 .padding(.top, 70)
@@ -152,6 +160,10 @@ struct BoardView: View {
             // E30.1: één-selectie → richt de gedeelde edit-pipeline op die node;
             // bij 0 of ≥2 sluit het bottom-tool-paneel.
             .onChange(of: selection) { _, sel in
+                // Sluit altijd alle dropdowns bij selectie-wissel — anders
+                // heropen de batch-bar met een nog-open dropdown.
+                batchMenu = nil
+                canvasMenu = nil
                 if sel.count == 1, let id = sel.first,
                    let node = portraits.first(where: { $0.persistentModelID == id }) {
                     model.select(node)
@@ -307,6 +319,15 @@ struct BoardView: View {
             // Background is meteen zichtbaar op de board (WYSIWYG voor kleur).
             if let hex = portrait.backgroundColorHex, let c = Color(hexRGB: hex) {
                 c
+            }
+            // E29.2: ook de gekozen achtergrondafbeelding achter de cutout, zodat
+            // een batch-Image-Background meteen WYSIWYG op de board verschijnt
+            // (spiegelt EditorView.backgroundLayer; Color.clear voorkomt dat de
+            // intrinsieke uploadmaat de kaartlayout in lekt).
+            if let data = portrait.backgroundImageData, let image = NSImage(data: data) {
+                Color.clear
+                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                    .clipped()
             }
             // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
             // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG).
@@ -536,7 +557,7 @@ struct BoardView: View {
                     EditColorPanel(
                         source: img,
                         initial: first.adjust,
-                        onCommit: { _, after in applyAdjustToAll(after); batchMenu = nil }
+                        onCommit: { _, after in applyAdjustToAll(after) }
                     )
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
@@ -587,15 +608,63 @@ struct BoardView: View {
 
     /// E29.2/E31.7: pas dezelfde achtergrond toe op alle geselecteerde portretten.
     private func applyBackgroundToAll(_ background: PortraitBackground) {
-        for p in selectedPortraits { p.setBackground(background) }
+        let targets = selectedPortraits
+        let cache = thumbs
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName("Background")
+        for p in targets {
+            let before = p.background
+            guard before != background else { continue }
+            p.setBackground(background)
+            cache.invalidate(p)
+            ReversibleChange.register(
+                undoManager, target: p,
+                from: before, to: background, actionName: "Background"
+            ) { portrait, bg in
+                portrait.setBackground(bg)
+                cache.invalidate(portrait)
+            }
+        }
+        undoManager?.endUndoGrouping()
+    }
+
+    private func undoableSetBackground(_ background: PortraitBackground, on node: Portrait2) {
+        let before = node.background
+        guard before != background else { return }
+        node.setBackground(background)
+        thumbs.invalidate(node)
+        let cache = thumbs
+        ReversibleChange.register(
+            undoManager, target: node,
+            from: before, to: background, actionName: "Background"
+        ) { portrait, bg in
+            portrait.setBackground(bg)
+            cache.invalidate(portrait)
+        }
     }
 
     /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
     private func applyAdjustToAll(_ adjust: PortraitAdjust) {
-        for p in selectedPortraits {
+        let targets = selectedPortraits
+        let cache = thumbs
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName("Adjust")
+        for p in targets {
+            let before = p.adjust
             p.adjust = adjust
             p.touch()
+            cache.invalidate(p)
+            AdjustUndo.register(
+                undoManager, target: p,
+                apply: { [p, cache] adj in
+                    p.adjust = adj
+                    p.touch()
+                    cache.invalidate(p)
+                },
+                undoTo: before, redoTo: adjust, actionName: "Adjust"
+            )
         }
+        undoManager?.endUndoGrouping()
     }
 
     /// E29.3: "Match lighting" over de selectie — trekt de belichting/kleurbalans
@@ -650,7 +719,7 @@ struct BoardView: View {
             gridEnabled: .constant(false),
             showFramingActions: false,
             showGrid: false,
-            background: { BackgroundPanel(portrait: node) }
+            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }) }
         )
     }
 
@@ -679,23 +748,26 @@ struct BoardView: View {
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
-                                     onApply: { applyToNode($0, node) })
+                                     onApply: { undoableApplyToNode($0, node, actionName: "Apply effect") })
                             .id(node.persistentModelID)
                     case .clothing:
                         ClothesPanel(baseImage: base, entitlement: entitlement,
-                                     onApply: { applyToNode($0, node) })
+                                     onApply: { undoableApplyToNode($0, node, actionName: "Change clothing") })
                             .id(node.persistentModelID)
                     case .hair:
                         HairPanel(baseImage: base, entitlement: entitlement,
-                                  onApply: { applyToNode($0, node) })
+                                  onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
                     case .face:
                         FaceActionsPanel(
+                            baseImage: base,
+                            entitlement: entitlement,
                             onRetouch: { retouchNode(node) },
-                            onProFeature: { _ = entitlement.allowCloudFeature() },
+                            onApply: { undoableApplyToNode($0, node, actionName: "Face edit") },
                             isPro: entitlement.isProActive,
                             activeToggles: []
                         )
+                        .id(node.persistentModelID)
                     default:
                         EmptyView()
                     }
@@ -718,6 +790,26 @@ struct BoardView: View {
         editTool = nil
     }
 
+    /// Zelfde als applyToNode maar registreert ook een undo/redo-entry zodat
+    /// Cmd+Z de bewerking terugdraait en Cmd+Shift+Z 'm hertoepast.
+    private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) {
+        guard let before = NSImage(data: node.cutoutData) else {
+            applyToNode(image, node)
+            return
+        }
+        applyToNode(image, node)
+        let cache = thumbs
+        ImageEnhanceUndo.register(
+            undoManager, target: node,
+            apply: { [model, cache] img in
+                model.select(node)
+                model.applyEffectResult(img)
+                cache.invalidate(node)
+            },
+            undoTo: before, redoTo: image, actionName: actionName
+        )
+    }
+
     /// Spiegelt de cutout van de node horizontaal (zelfde transform als editor).
     private func flipNode(_ node: Portrait2) {
         let base = NSImage(data: node.cutoutData) ?? NSImage()
@@ -732,7 +824,7 @@ struct BoardView: View {
         ctx.scaleBy(x: -1, y: 1)
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
         guard let out = ctx.makeImage() else { return }
-        applyToNode(NSImage(cgImage: out, size: base.size), node)
+        undoableApplyToNode(NSImage(cgImage: out, size: base.size), node, actionName: "Flip")
     }
 
     /// One-click retouch op de node (lokaal, zelfde enhancer als de editor).
@@ -740,7 +832,7 @@ struct BoardView: View {
         guard let cg = NSImage(data: node.cutoutData)?
                 .cgImage(forProposedRect: nil, context: nil, hints: nil),
               let out = PortraitEnhancer.magicRetouch(cg) else { return }
-        applyToNode(NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)), node)
+        undoableApplyToNode(NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)), node, actionName: "One click retouch")
     }
 
     private var hud: some View {

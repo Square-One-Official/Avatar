@@ -20,6 +20,9 @@ struct ShellView: View {
     }
 
     @Environment(\.modelContext) private var modelContext
+    // E31.x: de top-scrim is een dark-mode-affordance (donkere fade voor lichte
+    // chrome). In light-mode zou diezelfde zwarte fade een vuile veeg zijn.
+    @Environment(\.colorScheme) private var colorScheme
     /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
     @State private var setBusyMessage: String?
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
@@ -172,13 +175,10 @@ struct ShellView: View {
                             .accessibilityHidden(true)
                     )
             } else {
-                // Header in de flow, los bóven de kaart (bevinding 6).
-                // E18.5: top-uitgelijnd met de topbar-knoppen (gear/share/
-                // upgrade staan op gap-3) i.p.v. lager op gap-8.
-                if showsPortraitHeader {
-                    PortraitHeader(model: model)
-                        .padding(.top, DSSpacing.gap3)
-                }
+                // E31.x (besluit Thierry): de Name/Role-kop zweeft nu als overlay
+                // over het canvas (zie de top-overlays hieronder) i.p.v. in de
+                // flow — zo wint de foto de ~64pt terug die de kop-strook innam.
+                // Bewuste afwijking van de oude "nooit over de foto"-regel.
                 canvas
             }
         }
@@ -200,6 +200,21 @@ struct ShellView: View {
                     .allowsHitTesting(false)
             }
         }
+        // E31.x: zachte top-scrim i.p.v. een harde zwarte band — houdt de
+        // zwevende chrome (credits/iconen + Name/Role) leesbaar als de foto
+        // bovenaan komt. Zwart→clear van bovenaf (vgl. DSThumbnailCard).
+        .overlay(alignment: .top) {
+            if showsPortraitHeader && colorScheme == .dark {
+                LinearGradient(
+                    colors: [Color.black.opacity(0.35), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 80)
+                .frame(maxWidth: .infinity)
+                .allowsHitTesting(false)
+            }
+        }
         // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
         // de "top"-strook uit de App-frames. De gear toggelt de in-window
         // Settings (punt 14) en toont de active-state zolang die open is.
@@ -208,17 +223,29 @@ struct ShellView: View {
                 model: entitlement,
                 isSettingsActive: model.isShowingSettings,
                 onToggleSettings: { model.isShowingSettings.toggle() },
-                canExport: model.canExport && !model.isShowingSettings,
+                // Capabilities NIET meer gaten met `!isShowingSettings`: de
+                // editor-cluster blijft gemount zodat ShellTopBar 'm als geheel
+                // kan kruisvervagen naar de Close-knop (geen verspringen).
+                canExport: model.canExport,
                 onExport: { model.exportCurrentPortrait() },
                 // E27.4: board-modus-toggle (alle portretten op één canvas).
-                canToggleBoard: model.canExport && !model.isShowingSettings,
+                canToggleBoard: model.canExport,
                 isBoardActive: model.isBoardMode,
                 onToggleBoard: { model.toggleBoard() },
                 // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
-                canToggleSidebar: model.canExport && !model.isShowingSettings,
+                canToggleSidebar: model.canExport,
                 isSidebarActive: model.isSidebarVisible,
                 onToggleSidebar: { model.toggleSidebar() }
             )
+        }
+        // E31.x: Name/Role-kop zweeft gecentreerd in dezelfde topstrook als de
+        // credits (links) en iconen (rechts) — op gap-3 vanaf de top, bóven de
+        // scrim. Horizontaal centraal → geen overlap met de zijclusters.
+        .overlay(alignment: .top) {
+            if showsPortraitHeader {
+                PortraitHeader(model: model)
+                    .padding(.top, DSSpacing.gap3)
+            }
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,

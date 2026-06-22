@@ -4,8 +4,10 @@
 // placeholder "Describe a color or style"; comb-glyph i.p.v. schaar). De
 // generatie loopt via het productie-`/v1/stylize` (E09.2) met de hair-intent
 // (E11.2-backend), nano-banana instruction-edit (E11.1-route): alléén het
-// haar wijzigt, gezicht/expressie/kleding identiek. Credit-gegated
-// (generatief standaard = 4), 402 → paywall.
+// haar wijzigt, gezicht/expressie/kleding identiek. Net als Clothes vertrouwen
+// we op die model-instructie en re-isoleert ShellModel.applyEffectResult het
+// volle resultaat (geen lokale crown-mask). Credit-gegated (generatief
+// standaard = 4), 402 → paywall.
 
 import AppKit
 import AvatarKit
@@ -46,21 +48,41 @@ final class HairModel {
             return
         }
         phase = .working
+        entitlement.presentWorking(
+            title: "Changing hair",
+            messages: [
+                "Touching up the hair…",
+                "Trimming the flyaways…",
+                "Consulting with the stylist…",
+                "Every strand counts…",
+                "Having second thoughts…",
+                "Almost there, promise…",
+            ]
+        )
         do {
             let (data, _) = try await entitlement.backend.editHair(imagePNG: png, preset: preset, freeText: freeText)
             guard let image = NSImage(data: data) else {
                 phase = .idle
+                entitlement.dismissWorkingToast()
                 entitlement.presentError("The result came back unreadable.")
                 return
             }
+            // Zelfde route als Clothes (E10.4): het model wijzigt alléén het
+            // haar (instructie houdt gezicht/expressie/kleding identiek) en
+            // ShellModel.applyEffectResult re-isoleert het volle resultaat zodat
+            // de transparantie terugkomt. Geen lokale crown-mask meer — die
+            // plakte de grijze model-achtergrond als halo rond het haar.
             phase = .idle
+            entitlement.dismissWorkingToast()
             onApply(image)
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
         } catch {
             phase = .idle
+            entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't change the hair. Please try again.")
         }
     }
@@ -85,18 +107,8 @@ struct HairPanel: View {
     var body: some View {
         DSEditPanel(title: "Change hair") {
             VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack(spacing: DSSpacing.gap2) {
-                    if model.isBusy {
-                        ProgressView().controlSize(.small)
-                        Text("Changing hair…")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    } else if case .failed(let message) = model.phase {
-                        Text(message)
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    Spacer(minLength: DSSpacing.gap4)
+                HStack {
+                    Spacer()
                     Label("\(model.creditCost)", systemImage: "bolt.fill")
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.subtle)

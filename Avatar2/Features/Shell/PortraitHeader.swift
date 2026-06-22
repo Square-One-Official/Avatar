@@ -1,7 +1,8 @@
 // Name/Role-header (E05.5 → herzien E24.21). Eén knop (geen inline-inputs meer)
 // die de gedeelde rename-modal opent (Name + Role). Rust = pure tekst
-// (gecentreerd boven de canvas-kaart), hover = subtiele affordance. Naam =
-// Body/Medium primary, rol = Body/Small subtle. De modal schrijft door naar
+// (naam·rol op één regel, gecentreerd — zweeft over het canvas), hover =
+// subtiele affordance. Naam = Body/Medium primary, rol = Body/Small subtle.
+// De modal schrijft door naar
 // het geselecteerde Portrait2; deze view leest het portret direct zodat de
 // wijziging meteen zichtbaar is.
 
@@ -26,18 +27,23 @@ struct PortraitHeader: View {
         Button {
             model.isShowingRename = true
         } label: {
-            VStack(spacing: 0) {
+            HStack(spacing: DSSpacing.gap2) {
                 Text(name)
                     .dsTextStyle(.bodyMedium)
                     .foregroundStyle(hasName ? DSColor.Foreground.primary : DSColor.Foreground.muted)
                     .lineLimit(1)
+                Text("·")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
                 Text(role)
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(hasRole ? DSColor.Foreground.subtle : DSColor.Foreground.muted)
                     .lineLimit(1)
             }
-            // E03.17 criterium 3: vaste gereserveerde hoogte (28 + 24).
-            .frame(height: 52, alignment: .top)
+            // E31.x (besluit Thierry): naam·rol op één regel — de kop zweeft nu
+            // over het canvas i.p.v. een 2-regelige strook in de flow. Vaste
+            // gereserveerde hoogte van één tekstregel.
+            .frame(height: 28)
             .padding(.horizontal, DSSpacing.gap3)
             .contentShape(Rectangle())
         }

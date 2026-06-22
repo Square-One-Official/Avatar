@@ -98,6 +98,10 @@ struct Avatar2App: App {
                 Group {
                     if entitlement.isShowingOutOfCreditsToast {
                         OutOfCreditsToastView(model: entitlement)
+                    } else if let ctx = entitlement.workingContext {
+                        WorkingToastView(context: ctx) {
+                            entitlement.dismissWorkingToast()
+                        }
                     } else if let message = entitlement.errorToast {
                         // E18.3: cloud-fout als toast i.p.v. inline tekst.
                         DSToast(title: "Something went wrong", description: message) {
@@ -113,6 +117,7 @@ struct Avatar2App: App {
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
             .animation(.spring(duration: 0.3), value: entitlement.errorToast)
+            .animation(.spring(duration: 0.3), value: entitlement.workingContext != nil)
             .animation(.spring(duration: 0.3), value: entitlement.isShowingOutOfCreditsToast)
             // E18.2: contextuele cloud-feature-gate — online aanzetten.
             .alert(

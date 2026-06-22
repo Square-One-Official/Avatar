@@ -447,6 +447,39 @@ public final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/stylize (face-intent, E32.1)
+    /// Face beauty-edit via hetzelfde productie-`/v1/stylize` (nano-banana
+    /// instruction-edit; E09.1-bakeoff koos nano voor teeth/wrinkles). De
+    /// server mapt `face_preset` naar een gezicht-only edit-prompt met het
+    /// harde acceptatiecriterium (identiteit/pose/haar/kleding/achtergrond
+    /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
+    public func editFace(imagePNG: Data, preset: FaceEdit) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
+        struct Body: Encodable {
+            let storageKey: String
+            let facePreset: String
+            let generationModel: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case storageKey = "storage_key"
+                case facePreset = "face_preset"
+                case generationModel = "generation_model"
+                case modelOverride = "model_override"
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(storageKey: storageKey,
+                 facePreset: preset.rawValue,
+                 generationModel: GenerationModelStore.shared.current.rawValue,
+                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/checkout/subscribe-anonymous
     /// Start a subscription checkout WITHOUT requiring a signed-in user.
     /// Stripe collects the email during checkout; the webhook links that

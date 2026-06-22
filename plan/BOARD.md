@@ -36,3 +36,4 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
 | [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | done (31.1–31.7) — board trekt gelijk |
+| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | in_progress (32.1) — 32.0 bakeoff ready |

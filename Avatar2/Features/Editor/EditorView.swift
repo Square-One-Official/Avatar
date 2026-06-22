@@ -298,23 +298,50 @@ struct EditorView: View {
     /// oude bottomTrailing-overlay.
     @ViewBuilder
     private var toolbarAccessories: some View {
-        DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo") {
+        DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo", surface: .ghost) {
             undoManager?.undo()
         }
         .disabled(undoManager?.canUndo != true)
-        DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo") {
+        DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo", surface: .ghost) {
             undoManager?.redo()
         }
         .disabled(undoManager?.canRedo != true)
         if originalImage != nil {
-            DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing) {}
+            // E-fix: hold-to-compare hangt op een Button — de eigen tap-gesture
+            // van de Button won het van een gewone `.gesture`, dus de drag vuurde
+            // nooit. `.simultaneousGesture` laat de press-down/up wél door zodat
+            // ingedrukt-houden het origineel toont.
+            DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing, surface: .ghost) {}
                 .opacity(isComparing ? 0.85 : 1)
-                .gesture(
+                .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in isComparing = true }
                         .onEnded { _ in isComparing = false }
                 )
         }
+    }
+
+    /// E-fix: de capsule-overflow (`⋯`, Figma Bottom toolbar 4114:983) — acties
+    /// die geen eigen paneel hebben. "Restore to original" verschijnt zodra er een
+    /// origineel is opgeslagen.
+    private var overflowActions: [DSToolbarAction] {
+        guard originalImage != nil else { return [] }
+        return [
+            DSToolbarAction(
+                id: "restore-original",
+                icon: Image(systemName: "arrow.counterclockwise"),
+                label: "Restore to original",
+                action: restoreToOriginal
+            ),
+        ]
+    }
+
+    /// E-fix: herstel de huidige cutout naar de originele importfoto. Het beeld
+    /// heeft een achtergrond → `applyEffectResult` isoleert het onderwerp opnieuw
+    /// tot een schone cutout. Loopt via `undoableApply` zodat het undo'baar is.
+    private func restoreToOriginal() {
+        guard let original = originalImage else { return }
+        undoableApply("Restore to original")(original)
     }
 
     /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
@@ -398,7 +425,8 @@ struct EditorView: View {
         DSEditPanelContainer(
             tools: Self.toolbarItems,
             activeTool: toolSelection,
-            overflowTools: Self.overflowItems
+            overflowTools: Self.overflowItems,
+            overflowActions: overflowActions
         ) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
@@ -525,9 +553,12 @@ struct EditorView: View {
                     gridEnabled: $canvasGridEnabled,
                     // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
                     // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
-                    background: { BackgroundPanel(portrait: portraitModel).onHover { pointerOverChrome = $0 } }
+                    background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
                 )
-                .padding(.top, DSSpacing.gap4)
+                // E31.x: de Name/Role-kop zweeft nu over het canvas in de
+                // topstrook; de capsule zakt naar gap-12 zodat hij vrij onder
+                // die titel blijft (geen botsende chrome bovenaan-midden).
+                .padding(.top, DSSpacing.gap12)
             }
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
             // E28.5: een ander portret start gedeselecteerd (handles weg).
@@ -568,19 +599,25 @@ struct EditorView: View {
                 DSEditPanel(title: "Enhance", maxContentHeight: editPanelMaxHeight) {
                     editColorPanel
                 }
-            } else if tool == .face {
-                // E21.1: beauty-acties, gesplitst uit Edit.
+            } else if tool == .face, let entitlement {
+                // E21.1: beauty-acties, gesplitst uit Edit. E32.1: de Beauty-
+                // acties zijn gewired op de face-intent van /v1/stylize
+                // (nano-banana instruction-edit) i.p.v. een stub-gate. `.id` op
+                // het portret zodat het paneel-model herbouwt bij portret-wissel.
                 DSEditPanel(title: tool.label) {
                     FaceActionsPanel(
+                        baseImage: rawCutout,
+                        entitlement: entitlement,
                         onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
-                        onProFeature: { _ = entitlement?.allowCloudFeature() },
-                        isPro: entitlement?.isProActive ?? false,
+                        onApply: undoableApply("Face edit"),
+                        isPro: entitlement.isProActive,
                         activeToggles: Set(localToggleBaselines.keys)
                     )
+                    .id(portraitModel?.persistentModelID)
                 }
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
-                BackgroundPanel(portrait: portraitModel)
+                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground)
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
@@ -727,6 +764,17 @@ struct EditorView: View {
         }
     }
 
+    private func undoableSetBackground(_ background: PortraitBackground) {
+        guard let portraitModel else { return }
+        let before = portraitModel.background
+        guard before != background else { return }
+        portraitModel.setBackground(background)
+        ReversibleChange.register(
+            undoManager, target: portraitModel,
+            from: before, to: background, actionName: "Background"
+        ) { p, bg in p.setBackground(bg) }
+    }
+
     /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
     /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
     private func runBoostResolution() {
@@ -735,12 +783,26 @@ struct EditorView: View {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         let before = rawCutout
+        entitlement.presentWorking(
+            title: "Boosting resolution",
+            messages: [
+                "Upscaling the pixels…",
+                "Sharpening the details…",
+                "Counting every pixel…",
+                "Polishing the edges…",
+                "Almost crisp…",
+            ]
+        )
         Task {
             isBoosting = true
             defer { isBoosting = false }
             do {
                 let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
-                guard let after = NSImage(data: data) else { return }
+                guard let after = NSImage(data: data) else {
+                    entitlement.dismissWorkingToast()
+                    return
+                }
+                entitlement.dismissWorkingToast()
                 onApplyResult(after)
                 ImageEnhanceUndo.register(
                     undoManager, target: portraitModel, apply: onApplyResult,
@@ -748,9 +810,10 @@ struct EditorView: View {
                 )
                 await entitlement.refresh()
             } catch BackendError.noCredits {
+                entitlement.dismissWorkingToast()
                 entitlement.handleOutOfCredits()
             } catch {
-                // E18.3: fout als toast.
+                entitlement.dismissWorkingToast()
                 entitlement.presentError("Couldn't boost the resolution. Please try again.")
             }
         }
