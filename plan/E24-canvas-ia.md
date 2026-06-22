@@ -694,3 +694,32 @@ slepen). Smoke-haak (#if DEBUG): `--seed-viewzoom <n>`.
 
 **Figma-TODO:** handle-stijl (dot-grootte/kleur), HUD-stijl + fit-icoon, en of de view-zoom ook moet
 kunnen pannen wanneer ingezoomd — tegen de referenties leggen zodra die er zijn.
+
+## 24.36 — Positie-sprong na generatieve edit (clothes/hair/effects)  · FEAT
+- status: done
+- owner: FEAT (AI-agent)
+
+REGRESSIE (gemeld door Thierry): na een clothing-edit verspringt het portret in het canvas; idem voor
+hair/effects (gedeeld codepath). Oorzaak: het generatieve model (nano-banana via `/v1/stylize`) houdt
+wél de RATIO aan (`aspect_ratio: match_input_image`, backend `replicate.ts`) maar niet de exacte
+pixelmaat — Gemini rendert op ~1 MP, dus een 800×1200-cutout komt terug als bijv. 832×1248. De
+opgeslagen transform (`Portrait2.offsetX/offsetY/scale`) is in absolute bronpixels uitgedrukt
+(`EditorCanvasView`: `imgW = image.size.width * scale * factor`), dus zelfs bij gelijke ratio
+verspringt het beeld zodra de pixelmaat verandert. `storeEffectResult` verving wél de cutout maar liet
+de transform ongemoeid → mismatch. (Niet eerder gefixt in v2; het verwante E24.23 — background-upload
+zoomde de UI in — had een ander symptoom dat erop leek.)
+
+**Result:** `ShellModel.storeEffectResult` kreeg een HYBRIDE correctie (besluit Thierry): vergelijk de
+pixelafmetingen van het resultaat met de oude cutout (via `cgImage`, DPI-onafhankelijk). Ratio-drift
+< 2% → het resultaat terugschalen naar de exacte oude pixelmaat (nieuwe `nonisolated static resized(_:to:)`,
+CGContext met alpha-behoud) zodat de bestaande transform geldig blijft en de gebruiker zijn handmatige
+positie behoudt (normale pad, géén herkadrering). Echt andere ratio → transform resetten + `AutoFramer.apply`
+op het gezicht (zoals bij import), zeldzaam. Randgeval gedocumenteerd in de code: een undo ná het
+reset-pad her-kadreert i.p.v. de exacte pre-edit-transform te herstellen (de cutout zelf wordt wél
+correct teruggedraaid). 2 nieuwe unit-tests op `resized` (exacte-maat + nul-maat-guard) in
+`EffectCutoutTests`.
+
+**DoD/Verificatie:** beide targets + alle pakkettests groen (build-v2.sh). `EffectCutoutTests` 5/5
+groen incl. de nieuwe resize-tests (`testResizedNaarExacteAfmetingen` toetst 832×1248 → exact 800×1200;
+`testResizedNulMaatGeeftNil`). Live clothes/hair/effects-edit in de app niet synthetisch te triggeren
+(cloud + credits) — logisch geverifieerd via de unit-tests + de transform-math.

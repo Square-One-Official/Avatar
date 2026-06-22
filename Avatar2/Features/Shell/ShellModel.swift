@@ -221,11 +221,64 @@ final class ShellModel {
     /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
     /// her-render het canvas met de niet-destructieve Adjust-laag erbovenop.
     private func storeEffectResult(_ image: NSImage, on portrait: Portrait2) {
-        if let png = pngData(from: image) {
+        // E24.36: de opgeslagen transform (offsetX/offsetY/scale) is in absolute
+        // bronpixels uitgedrukt. Een generatieve edit (nano-banana) houdt wél de RATIO
+        // aan (aspect_ratio: match_input_image) maar niet de exacte pixelmaat
+        // (Gemini rendert op ~1 MP) → dezelfde transform op een ander formaat
+        // verspringt het beeld. Hybride correctie:
+        //   • ratio (vrijwel) gelijk → schaal terug naar de exacte oude pixelmaat;
+        //     de transform blijft geldig, de gebruiker behoudt zijn positie.
+        //   • model gaf een echt andere ratio → reset + her-kadreer op het gezicht.
+        let oldCG = NSImage(data: portrait.cutoutData)?
+            .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        var stored = image
+        var didReset = false
+        if let oldCG, let newCG, oldCG.width > 0, oldCG.height > 0,
+           oldCG.width != newCG.width || oldCG.height != newCG.height {
+            let oldRatio = Double(oldCG.width) / Double(oldCG.height)
+            let newRatio = Double(newCG.width) / Double(newCG.height)
+            let drift = abs(newRatio - oldRatio) / oldRatio
+            let oldSize = CGSize(width: oldCG.width, height: oldCG.height)
+            if drift < 0.02, let resized = Self.resized(newCG, to: oldSize) {
+                stored = resized
+            } else {
+                portrait.offsetX = 0; portrait.offsetY = 0; portrait.scale = 0
+                didReset = true
+            }
+        }
+        if let png = pngData(from: stored) {
             portrait.cutoutData = png
             portrait.touch()
         }
-        canvas = .result(adjustedImage(image, portrait.adjust))
+        canvas = .result(adjustedImage(stored, portrait.adjust))
+        // Alleen her-kadreren bij een echte ratio-wijziging (transform gereset);
+        // het resize-pad behoudt bewust de handmatige positie. Stille correctie,
+        // geen undo-stap. (Randgeval: een undo ná de reset-tak her-kadreert i.p.v.
+        // de exacte pre-edit-transform te herstellen — zeldzaam, de cutout zelf
+        // wordt wél correct teruggedraaid.)
+        if didReset, let cg = stored.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            let p = portrait
+            Task { await AutoFramer.apply(to: p, image: cg) }
+        }
+    }
+
+    /// Schaal een CGImage naar exacte pixelafmetingen (alpha behouden). Houdt een
+    /// generatief resultaat met dezelfde ratio maar andere pixelmaat op de oude
+    /// afmetingen, zodat de bestaande canvas-transform geldig blijft.
+    /// `nonisolated` (zoals `hasTransparentCorners`) → unit-testbaar buiten de actor.
+    nonisolated static func resized(_ cg: CGImage, to size: CGSize) -> NSImage? {
+        let w = Int(size.width.rounded()), h = Int(size.height.rounded())
+        guard w > 0, h > 0,
+              let ctx = CGContext(
+                data: nil, width: w, height: h, bitsPerComponent: 8,
+                bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let out = ctx.makeImage() else { return nil }
+        return NSImage(cgImage: out, size: NSSize(width: w, height: h))
     }
 
     /// E24.30: her-isoleer het onderwerp uit een styled (vol) beeld met de
