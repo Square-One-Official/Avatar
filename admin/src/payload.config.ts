@@ -10,6 +10,7 @@ import { Media } from "./collections/Media";
 import { Announcements } from "./collections/Announcements";
 import { BadgeComponents } from "./collections/BadgeComponents";
 import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
+import { Effects } from "./collections/Effects";
 import { AuditLog } from "./collections/AuditLog";
 import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 
@@ -24,7 +25,7 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, BadgeComponents, NewsletterUnsubscribes, AuditLog],
+  collections: [Users, Media, Announcements, BadgeComponents, Effects, NewsletterUnsubscribes, AuditLog],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {
