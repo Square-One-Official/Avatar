@@ -13,71 +13,61 @@ import SwiftUI
 public struct DSThumbnailCard<Icon: View>: View {
     private let label: String
     private let isPro: Bool
-    private let credits: String?
     private let isSelected: Bool
     private let isWorking: Bool
     private let tileSize: CGFloat
+    private let tileHeight: CGFloat
     private let onRefresh: (() -> Void)?
     private let icon: Icon
 
+    /// `tileHeight` defaults to `tileSize` (square). Pass an explicit height
+    /// for portrait-shaped cards (e.g. Effects: 112 × 152).
     public init(
         label: String,
         isPro: Bool = false,
-        credits: String? = nil,
         isSelected: Bool = false,
         isWorking: Bool = false,
         tileSize: CGFloat = 88,
+        tileHeight: CGFloat? = nil,
         onRefresh: (() -> Void)? = nil,
         @ViewBuilder icon: () -> Icon
     ) {
         self.label = label
         self.isPro = isPro
-        self.credits = credits
         self.isSelected = isSelected
         self.isWorking = isWorking
         self.tileSize = tileSize
+        self.tileHeight = tileHeight ?? tileSize
         self.onRefresh = onRefresh
         self.icon = icon()
     }
 
     public var body: some View {
-        VStack(spacing: DSSpacing.gap2) {
-            tile
-            Text(label)
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
-                .lineLimit(1)
-        }
-        .dsHoverScale()
+        tile
+            .dsHoverScale()
     }
 
     private var tile: some View {
         RoundedRectangle(cornerRadius: DSRadius.lg)
             .fill(DSColor.Background.neutral)
-            // Icoon/preview gecentreerd (placeholder-tinten tot echte
-            // thumbnails landen — zie ASSETS.md voor de Effects-tiles).
             .overlay {
                 icon
                     .foregroundStyle(DSColor.Foreground.muted)
             }
-            // Credit-kost onderin over een donkere fade (leesbaar op elke tint).
+            // Gradient + label altijd onderaan (tekst leesbaar op elke tint).
             .overlay(alignment: .bottom) {
-                if credits != nil {
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.55)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    .frame(height: tileSize * 0.55)
-                }
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.65)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(height: tileHeight * 0.45)
             }
             .overlay(alignment: .bottomLeading) {
-                if let credits {
-                    Text(credits)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, DSSpacing.gap1_5)
-                        .padding(.bottom, DSSpacing.gap1)
-                }
+                Text(label)
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, DSSpacing.gap2)
+                    .padding(.bottom, DSSpacing.gap2)
             }
             // Werk-spinner (Effects-stijl genereren).
             .overlay {
@@ -88,7 +78,7 @@ public struct DSThumbnailCard<Icon: View>: View {
                     }
                 }
             }
-            .frame(width: tileSize, height: tileSize)
+            .frame(width: tileSize, height: tileHeight)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
             // Pro-badge bovenin (boven de clip zodat 'm niet afsnijdt).
             .overlay(alignment: .topLeading) {
@@ -97,8 +87,7 @@ public struct DSThumbnailCard<Icon: View>: View {
                         .padding(DSSpacing.gap1)
                 }
             }
-            // Selectie-/active-ring + check-badge (E24.28: duidelijke
-            // active-state, gedeelde regel voor toggle-/selectie-acties).
+            // Selectie-/active-ring + check-badge.
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg)
                     .strokeBorder(DSColor.Action.primary, lineWidth: 2)
@@ -106,8 +95,6 @@ public struct DSThumbnailCard<Icon: View>: View {
             }
             .overlay(alignment: .topTrailing) {
                 if isSelected, let onRefresh {
-                    // E24.33: refresh-icoon op de actieve kaart = bewust opnieuw
-                    // genereren (kost credits). Tooltip "Regenerate".
                     Button(action: onRefresh) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 12, weight: .bold))

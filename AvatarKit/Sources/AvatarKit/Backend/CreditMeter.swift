@@ -45,16 +45,6 @@ public enum CreditMeter {
         }
     }
 
-    /// Alle huidige acties draaien in de cloud (voer voor de E03.7-glyph).
-    /// Apart gehouden zodat een toekomstige on-device-variant hier false
-    /// kan teruggeven zonder de call-sites te wijzigen.
-    public static func requiresCloud(for action: Action) -> Bool {
-        switch action {
-        case .magicCutout, .colorize, .upscale, .fillBody, .generativeStandard, .generativePremium:
-            return true
-        }
-    }
-
     /// Label voor de ProChip, bv. "1 credit" / "4 credits".
     public static func chipLabel(for action: Action) -> String {
         let n = credits(for: action)

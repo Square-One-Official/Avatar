@@ -5,6 +5,7 @@
 
 import AppKit
 import AvatarKit
+import CoreImage
 import Observation
 import SwiftData
 import UniformTypeIdentifiers
@@ -26,6 +27,21 @@ final class ShellModel {
 
     private(set) var canvas: CanvasState = .empty
     var isDropTargeted = false
+
+    /// E27.7-fix: bij launch staat `canvas` op `.empty` tot `restoreSelectionAtLaunch`
+    /// heeft bepaald wat te tonen, en een herstelde selectie decodeert daarna nog
+    /// OFF-MAIN (`decodeCanvas`, ~1s). In beide vensters is er een portret op komst —
+    /// geen first-use. Pas als de restore is geprobeerd én er geen (ladende) selectie
+    /// is, weten we zeker dat de store leeg is.
+    private(set) var didAttemptLaunchRestore = false
+
+    /// Toont de view de first-use-empty-state (cirkels + dropzone)? Alleen bij een
+    /// écht lege store — niet tijdens de launch-restore of een off-main select-decode,
+    /// die `canvas` weliswaar even `.empty` laten maar wél een portret op komst hebben.
+    var showsFirstUseEmptyState: Bool {
+        guard case .empty = canvas else { return false }
+        return didAttemptLaunchRestore && selectedPortrait == nil
+    }
 
     /// E27.7: generatie-token voor het canvas. Élke nieuwe canvas-intentie
     /// (select/import/edit) bumpt 'm via `setCanvas`; een lopende async select-load
@@ -185,8 +201,8 @@ final class ShellModel {
     /// Geslaagde cutout → nieuw portret in de set; wordt meteen de selectie.
     /// De originele importfoto gaat mee voor hold-to-compare (E06.2).
     private func persist(cutout: NSImage, original: NSImage) {
-        guard let modelContext, let png = pngData(from: cutout) else { return }
-        let portrait = Portrait2(cutoutData: png, originalData: pngData(from: original))
+        guard let modelContext, let png = cutout.pngData() else { return }
+        let portrait = Portrait2(cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
         select(portrait)
     }
@@ -230,7 +246,7 @@ final class ShellModel {
     /// het model — beide moeten dus mee, anders blijft de oude foto staan.
     /// E24.14: destructieve ops bewerken de RAUWE cutout; de Adjust-laag blijft
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
-    func applyEffectResult(_ image: NSImage) {
+    func applyEffectResult(_ image: NSImage, preserveSourceAlpha: Bool = false) {
         guard let portrait = selectedPortrait else {
             setCanvas(.result(image))
             return
@@ -245,12 +261,56 @@ final class ShellModel {
         let resultHasBackground = !Self.hasTransparentCorners(image)
         if sourceFreestanding && resultHasBackground {
             Task { @MainActor in
-                let restored = (try? await self.reIsolateSubject(image)) ?? image
+                let restored: NSImage
+                if preserveSourceAlpha,
+                   let cutout = NSImage(data: portrait.cutoutData),
+                   let masked = Self.applyAlphaMask(from: cutout, to: image) {
+                    // Effects/face-edits veranderen uiterlijk maar niet de vorm →
+                    // gebruik de huidige cutout-alpha als masker i.p.v. Vision
+                    // opnieuw te draaien op een geschilderd/artistiek beeld.
+                    restored = masked
+                } else {
+                    restored = (try? await self.reIsolateSubject(image)) ?? image
+                }
                 self.storeEffectResult(restored, on: portrait)
             }
         } else {
             storeEffectResult(image, on: portrait)
         }
+    }
+
+    /// Past de alpha-laag van een bestaande cutout toe op een opaque (vol-achtergrond)
+    /// beeld. Gebruikt door Effects/Face-edits zodat de lichaamsvorm bewaard blijft
+    /// zonder Vision opnieuw op een artistiek gestyled beeld te draaien.
+    nonisolated static func applyAlphaMask(from cutout: NSImage, to rgbImage: NSImage) -> NSImage? {
+        guard let cutoutCG = cutout.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let rgbCG = rgbImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        let cutoutCI = CIImage(cgImage: cutoutCG)
+        var rgbCI = CIImage(cgImage: rgbCG)
+
+        // Schaal het gestylede beeld naar de afmetingen van de cutout (backend
+        // rendert op ~1 MP, de cutout kan een andere resolutie hebben).
+        let sw = cutoutCI.extent.width / rgbCI.extent.width
+        let sh = cutoutCI.extent.height / rgbCI.extent.height
+        if abs(sw - 1) > 0.005 || abs(sh - 1) > 0.005 {
+            rgbCI = rgbCI.transformed(by: CGAffineTransform(scaleX: sw, y: sh))
+        }
+
+        // Pas de alpha van de cutout toe als masker op de gestylede RGB-pixels.
+        // CIBlendWithAlphaMask: inputImage * mask.alpha + background * (1 - mask.alpha)
+        let masked = rgbCI.applyingFilter("CIBlendWithAlphaMask", parameters: [
+            kCIInputBackgroundImageKey: CIImage.empty(),
+            "inputMaskImage": cutoutCI
+        ])
+
+        let ctx = CIContext(options: [.useSoftwareRenderer: false])
+        let size = CGSize(width: cutoutCG.width, height: cutoutCG.height)
+        guard let out = ctx.createCGImage(masked, from: CGRect(origin: .zero, size: size)) else {
+            return nil
+        }
+        return NSImage(cgImage: out, size: NSSize(width: size.width, height: size.height))
     }
 
     /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
@@ -282,7 +342,7 @@ final class ShellModel {
                 didReset = true
             }
         }
-        if let png = pngData(from: stored) {
+        if let png = stored.pngData() {
             portrait.cutoutData = png
             portrait.touch()
         }
@@ -337,16 +397,23 @@ final class ShellModel {
         }
         let w = cg.width, h = cg.height
         guard w > 0, h > 0 else { return false }
-        let bytesPerRow = w * 4
-        var buffer = [UInt8](repeating: 0, count: bytesPerRow * h)
-        guard let ctx = CGContext(
-            data: &buffer, width: w, height: h, bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return false }
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-        func alpha(_ x: Int, _ y: Int) -> UInt8 { buffer[y * bytesPerRow + x * 4 + 3] }
-        let corners = [alpha(0, 0), alpha(w - 1, 0), alpha(0, h - 1), alpha(w - 1, h - 1)]
+        // Perf: voorheen werd de héle bitmap uitgepakt (bytesPerRow×h, ~16MB bij
+        // 2048px) om 4 hoek-alpha's te lezen. Sample nu elke hoek via een
+        // 1×1-context (zelfde truc als isOpaqueAtNormalizedPoint) → constante tijd.
+        func cornerAlpha(_ x: Int, _ y: Int) -> UInt8 {
+            var pixel: [UInt8] = [0, 0, 0, 0]
+            guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+                  let ctx = CGContext(
+                    data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                    space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else { return 255 }
+            ctx.interpolationQuality = .none
+            // CG-origin = linksonder; rij y (van boven) ligt op CG-y = h-1-y.
+            ctx.draw(cg, in: CGRect(x: -x, y: -(h - 1 - y), width: w, height: h))
+            return pixel[3]
+        }
+        let corners = [cornerAlpha(0, 0), cornerAlpha(w - 1, 0),
+                       cornerAlpha(0, h - 1), cornerAlpha(w - 1, h - 1)]
         // vrijstaand als minstens 3 van de 4 hoeken (bijna) transparant zijn
         return corners.filter { $0 < 16 }.count >= 3
     }
@@ -555,6 +622,11 @@ final class ShellModel {
     /// .distantPast) krijgen hun createdAt — de bedoelde default, die
     /// SwiftData's lichtgewicht migratie niet zelf kan invullen.
     func restoreSelectionAtLaunch() {
+        // E27.7-fix: markeer de restore als geprobeerd → de view mag de first-use-
+        // empty-state pas tonen zodra hieruit blijkt dat de store leeg is. Vóór dit
+        // punt (en tijdens de off-main select-decode) toont de view een neutrale
+        // canvas-achtergrond i.p.v. de cirkels (zie `showsFirstUseEmptyState`).
+        didAttemptLaunchRestore = true
         guard case .empty = canvas, let modelContext else { return }
         let portraits = (try? modelContext.fetch(FetchDescriptor<Portrait2>())) ?? []
         guard !portraits.isEmpty else { return }
@@ -572,13 +644,6 @@ final class ShellModel {
         if let target = restored ?? fallback {
             select(target)
         }
-    }
-
-    private func pngData(from image: NSImage) -> Data? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return nil
-        }
-        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
     }
 
     private func nsImage(from cgImage: CGImage) -> NSImage {

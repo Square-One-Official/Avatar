@@ -1,10 +1,9 @@
-// Face-paneel (E21.1, herzien E24.15 + E24.15-rev) — ALLE face-acties in ÉÉN
-// horizontaal-scrollbare rij gedeelde thumbnail-kaarten (DSThumbnailCard,
-// dezelfde vorm als Effects). GEEN sectie-labels meer (Retouch/Beauty laten
-// vallen): One-click retouch (lokaal, aan/uit) + de generatieve Pro-acties
-// (Whiten teeth/Apply make-up/Reduce wrinkles, 4 credits) staan direct naast
-// elkaar, alles meteen zichtbaar. Restore body hoort hier NIET (→ AI-dropdown,
-// E24.9).
+// Face-paneel (E21.1, herzien E24.15 + E24.15-rev) — de generatieve Pro-acties
+// (Whiten teeth/Apply make-up/Reduce wrinkles, 4 credits) in ÉÉN horizontaal-
+// scrollbare rij gedeelde thumbnail-kaarten (DSThumbnailCard, dezelfde vorm als
+// Effects). One-click retouch verhuisde naar Enhance (Thierry, 2026-06-23) — een
+// lokale/gratis actie hoort bij de andere appearance-toggles. Restore body hoort
+// hier ook NIET (→ Enhance, E24.9/E31.3).
 //
 // E32.1: de drie Beauty-acties zijn nu ECHT gewired op de face-intent van
 // /v1/stylize (nano-banana instruction-edit) via FaceEffectsModel — daarvoor
@@ -109,30 +108,22 @@ final class FaceEffectsModel {
 struct FaceActionsPanel: View {
     let baseImage: NSImage
     let entitlement: EntitlementModel
-    /// E12.1: lokale Core Image-retouch (geen cloud/credits) — aan/uit.
-    var onRetouch: () -> Void = {}
     /// E32.1: resultaat van een generatieve face-edit toepassen (undo'baar).
     var onApply: (NSImage) -> Void = { _ in }
     var isPro: Bool = false
-    /// E18.12: titels van lokale enhances die momenteel "aan" staan.
-    var activeToggles: Set<String> = []
 
     @State private var model: FaceEffectsModel
 
     init(
         baseImage: NSImage,
         entitlement: EntitlementModel,
-        onRetouch: @escaping () -> Void = {},
         onApply: @escaping (NSImage) -> Void = { _ in },
-        isPro: Bool = false,
-        activeToggles: Set<String> = []
+        isPro: Bool = false
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
-        self.onRetouch = onRetouch
         self.onApply = onApply
         self.isPro = isPro
-        self.activeToggles = activeToggles
         _model = State(initialValue: FaceEffectsModel(
             entitlement: entitlement, baseImage: baseImage, onApply: onApply
         ))
@@ -142,44 +133,43 @@ struct FaceActionsPanel: View {
         let id = UUID()
         let title: String
         let icon: Ph
-        var credits: String? = nil
         var isCloud: Bool = false
         var isOn: Bool = false
         let handler: () -> Void
     }
 
     private var cards: [Card] {
-        let beautyCredits = CreditMeter.chipLabel(for: .generativeStandard)
-        return [
-            Card(title: "One click retouch", icon: .magicWand,
-                 isOn: activeToggles.contains("One click retouch"), handler: onRetouch),
-            Card(title: FaceEdit.whitenTeeth.label, icon: .tooth, credits: beautyCredits, isCloud: true,
+        [
+            Card(title: FaceEdit.whitenTeeth.label, icon: .tooth, isCloud: true,
                  handler: { model.apply(.whitenTeeth) }),
-            Card(title: FaceEdit.applyMakeup.label, icon: .palette, credits: beautyCredits, isCloud: true,
+            Card(title: FaceEdit.applyMakeup.label, icon: .palette, isCloud: true,
                  handler: { model.apply(.applyMakeup) }),
-            Card(title: FaceEdit.reduceWrinkles.label, icon: .smiley, credits: beautyCredits, isCloud: true,
+            Card(title: FaceEdit.reduceWrinkles.label, icon: .smiley, isCloud: true,
                  handler: { model.apply(.reduceWrinkles) }),
         ]
     }
 
+    private let cardWidth: CGFloat = 112
+    private let cardHeight: CGFloat = 152
+
     var body: some View {
-        // E24.15-rev: één doorlopende rij, geen secties, alles direct zichtbaar.
         let workingTitle = model.workingTitle
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DSSpacing.gap3) {
+            HStack(spacing: DSSpacing.gap2) {
                 ForEach(cards) { card in
                     let isWorking = workingTitle == card.title
                     Button(action: card.handler) {
                         DSThumbnailCard(
                             label: card.title,
                             isPro: card.isCloud && !isPro,
-                            credits: card.credits,
                             isSelected: card.isOn,
-                            isWorking: isWorking
+                            isWorking: isWorking,
+                            tileSize: cardWidth,
+                            tileHeight: cardHeight
                         ) {
                             card.icon.regular
                                 .scaledToFit()
-                                .frame(width: 26, height: 26)
+                                .frame(width: 36, height: 36)
                         }
                     }
                     .buttonStyle(.plain)
@@ -187,10 +177,11 @@ struct FaceActionsPanel: View {
                     .opacity(workingTitle != nil && !isWorking ? 0.5 : 1)
                 }
             }
-            // Ruimte voor de hover-scale + de top-leading Pro-badge.
-            .padding(.vertical, DSSpacing.gap1)
-            .padding(.horizontal, DSSpacing.gap1)
+            .padding(.vertical, DSSpacing.gap2)
+            .padding(.leading, DSSpacing.gap1_5)
+            .scrollRowTrailingInset()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .horizontalScrollEdgeFade()
     }
 }

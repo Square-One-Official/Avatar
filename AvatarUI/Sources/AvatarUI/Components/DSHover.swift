@@ -24,7 +24,7 @@ private struct DSHoverHighlight: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                hovering ? DSColor.Background.neutralStronger : Color.clear,
+                DSColor.neutralSurface(pressed: false, hovering: hovering),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .onHover { hovering = $0 }

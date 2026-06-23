@@ -55,15 +55,15 @@ final class AuthSessionStorageTests: XCTestCase {
         ))
     }
 
-    func testPlaintextMigratie() throws {
+    func testPlaintextWordtGeweigerd() throws {
+        // 2.0 doet geen plaintext-migratie meer: een niet-versleuteld bestand
+        // (bijv. door een aanvaller geplant) wordt geweigerd en opgeruimd i.p.v.
+        // als geldige sessie geaccepteerd.
         let url = directory.appendingPathComponent("k.bin")
         let plaintext = Data(#"{"access_token":"legacy"}"#.utf8)
         try plaintext.write(to: url)
-        let back = try storage.retrieve(key: "k")
-        XCTAssertEqual(back, plaintext)
-        // Na de read is het bestand her-versleuteld.
-        let raw = try Data(contentsOf: url)
-        XCTAssertEqual(raw.first, AuthSessionEncryption.magic)
+        XCTAssertNil(try storage.retrieve(key: "k"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
     func testKeyEscaping() throws {

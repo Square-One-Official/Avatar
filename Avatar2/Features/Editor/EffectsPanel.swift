@@ -1,11 +1,15 @@
 // Effects-paneel (E09.2, Figma App / Effects): een "None"-kaart (terug naar
-// origineel) + vier stijl-kaarten (clay, wood, 3d, scribble). E24.33: de gekozen
-// stijl is de active state; nogmaals tikken = None. Resultaten worden per effect
-// op het portret GECACHET → None ↔ effect ↔ ander effect is INSTANT en kost geen
-// nieuwe credits; alleen het refresh-icoon in de actieve thumbnail hergenereert
-// bewust (kost dan wel credits). De previews zijn placeholders (echte
-// stijl-previews volgen later, zie ASSETS.md); generatie via productie-
-// `/v1/stylize` (nano-banana default), credit-gegated, 402 → paywall-toast.
+// origineel) + de stijl-kaarten. E24.33: de gekozen stijl is de active state;
+// nogmaals tikken = None. Resultaten worden per effect op het portret GECACHET
+// → None ↔ effect ↔ ander effect is INSTANT en kost geen nieuwe credits; alleen
+// het refresh-icoon in de actieve thumbnail hergenereert bewust (kost dan wel
+// credits). Generatie via productie-`/v1/stylize` (nano-banana default),
+// credit-gegated, 402 → paywall-toast.
+//
+// E33: de stijl-lijst is CMS-gestuurd. De kaarten + thumbnails + keys komen uit
+// Payload (`backend.effects()`); een nieuw effect verschijnt zonder app-release.
+// Tot de fetch landt (of bij offline) draait het paneel op `RemoteEffect.fallback`
+// (de vier launch-keys, zonder thumbnail).
 
 import AppKit
 import AvatarKit
@@ -21,21 +25,27 @@ import SwiftUI
 final class EffectsModel {
     enum Phase: Equatable {
         case idle
-        case working(StylizeStyle)
+        case working(RemoteEffect)
         case failed(String)
     }
 
     private(set) var phase: Phase = .idle
     /// Het toegepaste effect (active state), nil = None (basisbeeld).
-    private(set) var selected: StylizeStyle?
+    private(set) var selected: RemoteEffect?
+    /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de fallback zodat het
+    /// paneel nooit leeg opent; `loadEffects()` vervangt 'm met de CMS-lijst.
+    private(set) var remoteEffects: [RemoteEffect] = RemoteEffect.fallback
 
     private let entitlement: EntitlementModel
     private let onApply: (NSImage) -> Void
     private let portrait: Portrait2?
     /// Het "None"/origineel-beeld waarop effecten worden gegenereerd.
     private(set) var base: NSImage
-    /// Sessie-cache (gehydrateerd uit het portret) — rawValue → beeld.
+    /// Sessie-cache (gehydrateerd uit het portret) — key → beeld.
     private var cache: [String: NSImage]
+    /// PNG-encodes parallel aan `cache`, één keer ge-encodeerd per effect, zodat
+    /// `persist()` alleen kopieert i.p.v. élke toggle de hele cache te her-encoden.
+    private var pngCache: [String: Data]
 
     init(
         entitlement: EntitlementModel,
@@ -47,33 +57,59 @@ final class EffectsModel {
         self.onApply = onApply
         self.portrait = portrait
 
-        // Hydrateer uit het portret (E24.33). Met een actief effect is `baseImage`
-        // (de huidige cutout) het effect-beeld; de echte basis staat dan in
-        // `effectBaseData`. Zonder actief effect ÍS de huidige cutout de basis.
-        let active = portrait?.effectActiveRaw.flatMap { StylizeStyle(rawValue: $0) }
-        self.selected = active
-        if active != nil, let data = portrait?.effectBaseData, let img = NSImage(data: data) {
+        // Hydrateer uit het portret (E24.33). Cache + basis zijn key-gestuurd
+        // (string), LOS van de CMS-lijst: zo blijft de hydratie correct ook als
+        // het actieve effect (nog) niet in de geladen lijst zit (offline /
+        // CMS-only effect vóór de fetch landt). Met een actief effect is
+        // `baseImage` (de huidige cutout) het effect-beeld; de echte basis staat
+        // dan in `effectBaseData`. Zonder actief effect ÍS de cutout de basis.
+        let activeKey = portrait?.effectActiveRaw
+        if activeKey != nil, let data = portrait?.effectBaseData, let img = NSImage(data: data) {
             self.base = img
         } else {
             self.base = baseImage
         }
         var hydrated: [String: NSImage] = [:]
-        for (raw, data) in portrait?.effectCache ?? [:] {
-            if let img = NSImage(data: data) { hydrated[raw] = img }
+        var hydratedPNG: [String: Data] = [:]
+        for (key, data) in portrait?.effectCache ?? [:] {
+            if let img = NSImage(data: data) {
+                hydrated[key] = img
+                hydratedPNG[key] = data
+            }
         }
         // Het actieve effect-beeld is de huidige cutout, ook als de cache nog leeg
         // is (bv. gegenereerd vóór deze cache bestond).
-        if let active, hydrated[active.rawValue] == nil {
-            hydrated[active.rawValue] = baseImage
+        if let activeKey, hydrated[activeKey] == nil {
+            hydrated[activeKey] = baseImage
+            if let png = baseImage.pngData() { hydratedPNG[activeKey] = png }
         }
         self.cache = hydrated
+        self.pngCache = hydratedPNG
+
+        // Resolveer de selectie tegen de (fallback-)lijst; `loadEffects()`
+        // herresolveert zodra de CMS-lijst binnen is.
+        self.selected = activeKey.flatMap { k in remoteEffects.first { $0.key == k } }
     }
 
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
 
     var isBusy: Bool { if case .working = phase { return true } else { return false } }
 
-    func isCached(_ style: StylizeStyle) -> Bool { cache[style.rawValue] != nil }
+    func isCached(_ effect: RemoteEffect) -> Bool { cache[effect.key] != nil }
+
+    /// Haal de CMS-stijllijst op (E33). Soft-fail: bij een lege/gefaalde fetch
+    /// houden we de fallback zodat het paneel bruikbaar blijft. Na succes
+    /// herresolveren we de actieve selectie tegen de verse lijst zodat de
+    /// selectie-ring naar dezelfde waarde wijst als de kaart (Equatable).
+    func loadEffects() async {
+        let fetched = (try? await entitlement.backend.effects()) ?? []
+        guard !fetched.isEmpty else { return }
+        remoteEffects = fetched
+        let activeKey = selected?.key ?? portrait?.effectActiveRaw
+        if let activeKey {
+            selected = fetched.first { $0.key == activeKey } ?? selected
+        }
+    }
 
     /// None-kaart: terug naar het basisbeeld (instant, geen credits).
     func selectNone() {
@@ -86,37 +122,37 @@ final class EffectsModel {
 
     /// Tik op een effect-kaart: actief → None; gecachet → instant uit cache;
     /// anders → genereren. Tijdens een lopende generatie negeren we tikken.
-    func toggle(_ style: StylizeStyle) {
+    func toggle(_ effect: RemoteEffect) {
         guard !isBusy else { return }
-        if selected == style {
+        if selected == effect {
             selectNone()
             return
         }
-        if let cached = cache[style.rawValue] {
+        if let cached = cache[effect.key] {
             // Cache-hit: INSTANT, geen backend-call, geen credits (E24.33).
-            selected = style
+            selected = effect
             phase = .idle
             onApply(cached)
             persist()
             return
         }
-        Task { await generate(style) }
+        Task { await generate(effect) }
     }
 
     /// Refresh-icoon op de actieve kaart: bewust opnieuw genereren (kost credits).
-    func regenerate(_ style: StylizeStyle) {
+    func regenerate(_ effect: RemoteEffect) {
         guard !isBusy else { return }
-        Task { await generate(style) }
+        Task { await generate(effect) }
     }
 
-    private func generate(_ style: StylizeStyle) async {
+    private func generate(_ effect: RemoteEffect) async {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         guard let png = base.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
-        phase = .working(style)
+        phase = .working(effect)
         entitlement.presentWorking(
             title: "Applying style",
             messages: [
@@ -129,15 +165,16 @@ final class EffectsModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.stylize(imagePNG: png, style: style)
+            let (data, _) = try await entitlement.backend.stylize(imagePNG: png, styleKey: effect.key)
             guard let image = NSImage(data: data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("The styled image came back unreadable.")
                 return
             }
-            cache[style.rawValue] = image
-            selected = style
+            cache[effect.key] = image
+            if let png = image.pngData() { pngCache[effect.key] = png }
+            selected = effect
             phase = .idle
             entitlement.dismissWorkingToast()
             onApply(image)
@@ -161,8 +198,10 @@ final class EffectsModel {
         if portrait.effectBaseData == nil {
             portrait.effectBaseData = base.pngData()
         }
-        portrait.effectActiveRaw = selected?.rawValue
-        portrait.effectCache = cache.compactMapValues { $0.pngData() }
+        portrait.effectActiveRaw = selected?.key
+        // pngCache is al ge-encodeerd (één keer per effect) — alleen kopiëren,
+        // geen her-encode van de hele cache per toggle (perf).
+        portrait.effectCache = pngCache
     }
 
 }
@@ -190,35 +229,27 @@ struct EffectsPanel: View {
         ))
     }
 
-    var body: some View {
-        DSEditPanel(title: "Effects") {
-            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack(spacing: DSSpacing.gap2) {
-                    Text("Apply a style")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                    Spacer(minLength: DSSpacing.gap4)
-                    Label("\(model.creditCost)", systemImage: "bolt.fill")
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                        .labelStyle(.titleAndIcon)
-                }
+    private let cardWidth: CGFloat = 112
+    private let cardHeight: CGFloat = 152
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DSSpacing.gap3) {
-                        noneCard
-                        ForEach(StylizeStyle.allCases) { style in
-                            styleCard(style)
-                        }
+    var body: some View {
+        DSEditPanel(title: "Effects", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DSSpacing.gap2) {
+                    noneCard
+                    ForEach(model.remoteEffects) { effect in
+                        styleCard(effect)
                     }
-                    // E24.15: ruimte zodat de hover-scale niet tegen de scroll-
-                    // grens clipt (zoals de background-swatch-fix 24.10).
-                    .padding(.vertical, DSSpacing.gap1)
-                    .padding(.horizontal, DSSpacing.gap1)
                 }
+                .padding(.vertical, DSSpacing.gap2)
+                .padding(.leading, DSSpacing.gap1_5)
+                .scrollRowTrailingInset()
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .horizontalScrollEdgeFade()
         }
+        // E33: CMS-lijst ophalen bij openen. Soft-fail houdt de fallback.
+        .task { await model.loadEffects() }
     }
 
     /// E24.33: "None"-kaart helemaal links — terug naar het origineel (basis).
@@ -226,12 +257,17 @@ struct EffectsPanel: View {
         Button {
             model.selectNone()
         } label: {
-            DSThumbnailCard(label: "None", isSelected: model.selected == nil, tileSize: 84) {
+            DSThumbnailCard(
+                label: "None",
+                isSelected: model.selected == nil,
+                tileSize: cardWidth,
+                tileHeight: cardHeight
+            ) {
                 Image(nsImage: model.base)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
-                    .frame(width: 84, height: 84)
+                    .frame(width: cardWidth, height: cardHeight)
                     .clipped()
             }
         }
@@ -240,28 +276,50 @@ struct EffectsPanel: View {
         .opacity(model.isBusy ? 0.5 : 1)
     }
 
-    private func styleCard(_ style: StylizeStyle) -> some View {
-        let isSelected = model.selected == style
-        let isWorking = model.phase == .working(style)
-        // E24.15: gedeelde DSThumbnailCard (placeholder-icoon tot echte
-        // stijl-thumbnails landen — ASSETS.md). E24.33: het refresh-icoon
-        // verschijnt alleen op de actieve kaart (bewuste her-generatie).
+    private func styleCard(_ effect: RemoteEffect) -> some View {
+        let isSelected = model.selected == effect
+        let isWorking = model.phase == .working(effect)
         return Button {
-            model.toggle(style)
+            model.toggle(effect)
         } label: {
             DSThumbnailCard(
-                label: style.label,
+                label: effect.label,
                 isSelected: isSelected,
                 isWorking: isWorking,
-                tileSize: 84,
-                onRefresh: isSelected ? { model.regenerate(style) } : nil
+                tileSize: cardWidth,
+                tileHeight: cardHeight,
+                onRefresh: isSelected ? { model.regenerate(effect) } : nil
             ) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 22, weight: .regular))
+                thumbnail(for: effect)
             }
         }
         .buttonStyle(.plain)
         .disabled(model.isBusy)
         .opacity(model.isBusy && !isWorking ? 0.5 : 1)
+    }
+
+    /// CMS-thumbnail (E33) die de tile vult; valt terug op het sparkles-icoon
+    /// terwijl 'ie laadt of als het effect geen thumbnail heeft.
+    @ViewBuilder
+    private func thumbnail(for effect: RemoteEffect) -> some View {
+        if let url = effect.thumbnailUrl {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: cardWidth, height: cardHeight)
+                    .clipped()
+            } placeholder: {
+                placeholderIcon
+            }
+        } else {
+            placeholderIcon
+        }
+    }
+
+    private var placeholderIcon: some View {
+        Image(systemName: "sparkles")
+            .font(.system(size: 28, weight: .regular))
     }
 }

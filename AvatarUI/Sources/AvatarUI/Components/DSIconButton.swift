@@ -101,9 +101,9 @@ public struct DSIconButton: View {
             case .fillBrand:
                 return DSColor.Background.action
             case .ghostNeutral:
-                if isActive || configuration.isPressed { return DSColor.Background.neutralStrongest }
-                if isHovering { return DSColor.Background.neutralStronger }
-                return .clear
+                return DSColor.neutralSurface(
+                    pressed: isActive || configuration.isPressed, hovering: isHovering
+                )
             }
         }
 

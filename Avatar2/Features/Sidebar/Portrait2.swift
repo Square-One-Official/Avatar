@@ -71,15 +71,15 @@ final class Portrait2 {
     /// E24.33: Effects-cache op het portret. `effectBaseData` = de cutout van
     /// vóór er een effect werd toegepast ("None"/origineel voor de Effects-
     /// feature, eenmalig vastgelegd). `effectActiveRaw` = het actieve effect
-    /// (StylizeStyle.rawValue), nil = None. `effectCacheData` = JSON van
-    /// [rawValue: PNG-Data] met de al gegenereerde resultaten → schakelen tussen
+    /// (RemoteEffect.key), nil = None. `effectCacheData` = JSON van
+    /// [key: PNG-Data] met de al gegenereerde resultaten → schakelen tussen
     /// None/effecten is INSTANT en kost geen nieuwe credits (alleen het refresh-
     /// icoon hergenereert bewust). Lichtgewicht migratie via de defaults.
     @Attribute(.externalStorage) var effectBaseData: Data?
     var effectActiveRaw: String?
     @Attribute(.externalStorage) var effectCacheData: Data?
 
-    /// E24.33: de effect-cache als [rawValue: PNG-Data] (JSON in `effectCacheData`).
+    /// E24.33: de effect-cache als [key: PNG-Data] (JSON in `effectCacheData`).
     var effectCache: [String: Data] {
         get {
             guard let effectCacheData,
@@ -90,13 +90,21 @@ final class Portrait2 {
         set { effectCacheData = try? JSONEncoder().encode(newValue) }
     }
 
-    /// E24.31: "Original"-achtergrond — toon de ORIGINELE importfoto (mét eigen
-    /// achtergrond) i.p.v. de cutout + gekozen achtergrond. Cutout blijft de
-    /// default (false); de Background-menu-keuze is omkeerbaar (Original ↔
+    /// E24.31: "Original"-achtergrond. Sinds 2026-06-23 (Thierry) = gebruik de
+    /// ORIGINELE importfoto als achtergrondLAAG met het (scherpe, bewerkte)
+    /// onderwerp eroverheen — i.p.v. de hele originele foto vol te tonen. Zo kan
+    /// Portrait de echte achtergrond vervagen en volgen onderwerp-edits mee.
+    /// Cutout-default (false); de Background-keuze is omkeerbaar (Original ↔
     /// Transparent ↔ kleur/afbeelding) zonder opnieuw te importeren. Vereist
-    /// `originalData`. Lichtgewicht migratie via de default. Een kleur/-
-    /// afbeeldingskeuze of "Transparent" zet dit weer op false.
+    /// `originalData`. Lichtgewicht migratie via de default.
     var useOriginalBackground: Bool = false
+
+    /// Portrait-modus (Thierry 2026-06-23; "Portrait"-chip in Enhance) — vervaagt
+    /// de achtergrondLAAG (origineel óf custom afbeelding) terwijl het onderwerp
+    /// scherp blijft, zoals de macOS-webcam-Portrait. Niet-destructief, per
+    /// portret, undo'baar. Zonder gekozen achtergrond valt het render-time terug
+    /// op de originele foto. Lichtgewicht migratie via de default (false).
+    var portraitBlur: Bool = false
 
     init(
         name: String = "",

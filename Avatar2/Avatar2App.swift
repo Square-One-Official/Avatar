@@ -13,6 +13,12 @@ struct Avatar2App: App {
     @State private var messaging: MessagingService
 
     init() {
+        // Eén venster, geen tabs: zonder dit injecteert AppKit een eigen
+        // "View"-menu (Show Tab Bar / Show All Tabs) náást SwiftUI's View-menu →
+        // twee "View"-items in de menubalk. Uitzetten laat alleen ons View-menu
+        // (Enter Full Screen + de zoom-acties) over.
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         let auth = AuthService()
         let entitlement = EntitlementModel(auth: auth)
         _auth = State(initialValue: auth)
@@ -142,6 +148,18 @@ struct Avatar2App: App {
             // E15.1: persistente Theme-voorkeur (Preferences > Appearance).
             .appliedAppearancePreference()
         }
+        // Zoom-bediening leeft in de menubalk (View-menu) i.p.v. een zwevende
+        // HUD op de canvas. De items werken op de focused scene value die de
+        // actieve EditorView publiceert; geen canvas → uitgegrijsd.
+        // We hángen aan het systeem-View-menu (`.sidebar`-plaatsing) i.p.v. een
+        // eigen `CommandMenu("View")` — dat laatste maakte een TWEEDE menu met
+        // dezelfde titel naast het AppKit-View-menu (Enter Full Screen/tabs).
+        .commands {
+            CommandGroup(after: .sidebar) {
+                Divider()
+                CanvasZoomCommands()
+            }
+        }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         .modelContainer(for: Portrait2.self)
         // Bevinding 1 (E04.5): Figma kent geen aparte titelbalk — één zwart
@@ -175,7 +193,11 @@ struct Avatar2App: App {
                     imageURL: message.imageUrl,
                     ctaLabel: message.cta?.label,
                     onCTA: {
-                        if let url = message.cta?.url { NSWorkspace.shared.open(url) }
+                        // E17.5: alleen web-/eigen schema's openen — een CMS-bericht
+                        // mag geen willekeurig URL-schema (file://, andere apps) starten.
+                        if let url = message.cta?.url, url.isAllowedExternalScheme {
+                            NSWorkspace.shared.open(url)
+                        }
                         messaging.acknowledge(message)
                     },
                     onDismiss: { messaging.dismiss(message) }

@@ -54,16 +54,6 @@ enum AuthSessionEncryption {
         return try AES.GCM.open(box, using: key)
     }
 
-    /// True when the bytes look like a plaintext Supabase JSON session blob.
-    static func looksLikePlaintextSession(_ data: Data) -> Bool {
-        var bytes = data
-        if bytes.starts(with: [0xEF, 0xBB, 0xBF]) {
-            bytes = bytes.dropFirst(3)
-        }
-        guard let first = bytes.first else { return false }
-        return first == UInt8(ascii: "{") || first == UInt8(ascii: "[")
-    }
-
     // MARK: Keychain key management
 
     private static func loadOrCreateKey() throws -> SymmetricKey {

@@ -21,6 +21,7 @@ private struct DSPanelContentHeightKey: PreferenceKey {
 
 public struct DSEditPanel<Content: View>: View {
     private let title: String
+    private let credits: String?
     private let content: Content
     private let maxWidth: CGFloat
     private let maxContentHeight: CGFloat
@@ -32,21 +33,31 @@ public struct DSEditPanel<Content: View>: View {
     /// i.p.v. het paneel op te rekken.
     public init(
         title: String,
+        credits: String? = nil,
         maxWidth: CGFloat = 600,
         maxContentHeight: CGFloat = 280,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.credits = credits
         self.maxWidth = maxWidth
         self.maxContentHeight = maxContentHeight
         self.content = content()
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text(title)
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.primary)
+        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+            HStack {
+                Text(title)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                if let credits {
+                    Spacer()
+                    Text(credits)
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                }
+            }
             // E18.15/18.18: één scrollbare kolom die de inhoud hugt — de
             // ScrollView krijgt exact de inhoudshoogte (gemeten) tot de cap;
             // daarboven scrollt hij. Géén lege ruimte bij korte panelen.
@@ -80,10 +91,9 @@ public struct DSEditPanel<Content: View>: View {
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
         .frame(maxWidth: maxWidth)
-        // E24.12: gedeeld paneel-oppervlak (glas + rand + radius + schaduw),
-        // identiek aan de canvas-toolbar-dropdowns. Voorheen inline (zonder
-        // rand) en niet deelbaar met de systeem-`.popover`.
-        .dsPanelSurface(cornerRadius: DSRadius.xl4)
+        // Solid achtergrond (geen glas): edit-panelen liggen over de foto
+        // en moeten massief zijn zodat de inhoud niet door het portret scheemert.
+        .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
     }
 
     /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet

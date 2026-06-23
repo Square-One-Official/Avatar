@@ -305,10 +305,11 @@ public final class BackendClient {
     }
 
     // MARK: POST /v1/stylize
-    /// Effects (E09.2) — stuurt het huidige portret + een vaste stijl-key naar
-    /// het productie-`/v1/stylize`. De server mapt de key naar de stijlprompt
-    /// (incl. identity-clausule uit de E09.1-bakeoff); een vrij prompt-veld is
-    /// dev-only en hier bewust niet bereikbaar. nano-banana is de default;
+    /// Effects (E09.2; CMS-gestuurd sinds E33) — stuurt het huidige portret + een
+    /// stijl-key naar het productie-`/v1/stylize`. De `styleKey` komt uit de
+    /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
+    /// identity-clausule); een vrij prompt-veld is dev-only en hier bewust niet
+    /// bereikbaar. nano-banana is de default;
     /// `model_override` (dev) gaat mee als de DevModelOverrides-store een keuze
     /// heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
     ///
@@ -318,7 +319,7 @@ public final class BackendClient {
         let image: String
         let creditsRemaining: Int          // decoded from `credits_remaining`
     }
-    public func stylize(imagePNG: Data, style: StylizeStyle) async throws -> (Data, Int) {
+    public func stylize(imagePNG: Data, styleKey: String) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -333,7 +334,7 @@ public final class BackendClient {
             }
         }
         let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey, style: style.rawValue,
+            Body(storageKey: storageKey, style: styleKey,
                  generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
@@ -595,6 +596,20 @@ public final class BackendClient {
     public func fetchBadges() async throws -> [AnnouncementBadge] {
         let resp: BadgesResponse = try await requestAllowingAnonymous("/v1/badges", method: "GET")
         return resp.badges
+    }
+
+    // MARK: GET /v1/effects (CMS-gestuurd, E33)
+    /// De Effects-stijlen (kaart + thumbnail + key) uit Payload. Vervangt de
+    /// hardgecodeerde `StylizeStyle`-enum zodat een nieuw effect zonder app-
+    /// release verschijnt. Anoniem-vriendelijk (de lijst is niet-geheim), net als
+    /// `/v1/badges`; de prompt blijft server-side en zit bewust niet in de
+    /// respons. Het paneel valt terug op `RemoteEffect.fallback` als dit faalt.
+    private struct EffectsResponse: Decodable {
+        let effects: [RemoteEffect]
+    }
+    public func effects() async throws -> [RemoteEffect] {
+        let resp: EffectsResponse = try await requestAllowingAnonymous("/v1/effects", method: "GET")
+        return resp.effects
     }
 
     // MARK: GET /v1/messages (E17.3)

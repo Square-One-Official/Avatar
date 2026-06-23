@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 import Security
 
 /// Certificate pinning for `api.aaavatar.nl` (audit CRITICAL #4). Before
@@ -112,9 +113,12 @@ public final class TLSPinningDelegate: NSObject, URLSessionDelegate {
         if pinMatches(serverTrust: serverTrust) {
             completionHandler(.useCredential, URLCredential(trust: serverTrust))
         } else {
-            // Loud log so an unintended cert rotation surfaces in
-            // production diagnostics before the user-facing banner.
-            print("[TLSPinning] no pin match for \(host) — rejecting connection")
+            // Loud log so an unintended cert rotation surfaces in production
+            // diagnostics before the user-facing banner. os.Logger routes to the
+            // unified log (visible in Console) instead of stdout, which is invisible
+            // for a shipped .app.
+            Logger(subsystem: "nl.squareone.AvatarKit", category: "TLSPinning")
+                .error("no pin match for \(host, privacy: .public) — rejecting connection")
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
     }

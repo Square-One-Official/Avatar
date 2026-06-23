@@ -90,7 +90,3 @@ public struct DSToast: View {
         )
     }
 }
-
-private extension Double {
-    var clamped01: Double { Swift.min(1, Swift.max(0, self)) }
-}

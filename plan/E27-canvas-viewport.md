@@ -19,12 +19,144 @@ merge. Elke UI-story visuele smoke + screenshot. Figma-afwijkingen onder "Figma-
 | ID | Story | Team | Status | Branch |
 |----|-------|------|--------|--------|
 | 27.1 | Canvas-camera: zoom + pan | FEAT | in_progress | `v2/E27-27.1` |
-| 27.2 | Zoom-HUD + sneltoetsen | DS/FEAT | in_progress | `v2/E27-27.2` |
+| 27.2 | Zoom-HUD + sneltoetsen → vervangen door View-menu (zie 27.2a) | DS/FEAT | superseded | `v2/E27-27.2` |
+| 27.2a | Zoom naar de macOS-menubalk (View-menu); HUD verwijderd | FEAT/INFRA | done | `v2-main` |
 | 27.3 | Transform/guides/popovers correct onder de camera | FEAT/DS | in_progress | `v2/E27-27.3` |
 | 27.4 | Board-view: meerdere portretten (later) | FEAT | fase 2 done (toggle+drag+fit); fase 2b (inline-edit) backlog | `v2/E27-27.4` |
 | 27.5 | Board-performance: virtualisatie + thumbnail-cache | FEAT | in_progress | `v2/E27-27.5` |
+| 27.6 | Board/sidebar-performance: snappy pan/zoom + off-main thumbnails | FEAT | done | `v2-main` |
+| 27.7 | Snappy selectie: off-main canvas-load (geen ~1s-hang) | FEAT | done | `v2-main` |
+| 27.8 | Snappy frame-selectie: O(1) alpha-hit-test (geen full-bitmap) | FEAT | done | `v2-main` |
 
 ---
+
+## 27.8 — Snappy frame-selectie: O(1) alpha-hit-test  · FEAT
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: 27.7
+
+Ná 27.7 (snappy portret-selectie) bleef het SELECTEREN van het frame/onderwerp op
+de canvas (klik om te selecteren, als 't nog niet actief is) ~1s hangen. Oorzaak:
+de alpha-bewuste hit-test `NSImage.isOpaqueAtNormalizedPoint`
+(`EditorCanvasView.swift`) bepaalt subject-vs-frame door één pixel-alpha te lezen —
+maar deed dat via `NSBitmapImageRep(cgImage:).colorAt(x:y:)` op de FULL-RES cutout.
+Dat materialiseert het hele bitmap (~16MB bij 2048px) + doet per call een
+colorspace-conversie, synchroon in de tik-handler. Pre-bestond 27.7; werd pas nu de
+zichtbaarste hang.
+
+**Result:** de hit-test sampelt nu ALLEEN de doelpixel via een 1×1-`CGContext`. Het
+CGImage wordt verschoven getekend zodat doelpixel (px,py) op de enige output-pixel
+valt; CG clipt naar 1 pixel → **constante tijd, ongeacht de beeldmaat** (`.none`-
+interpolatie = nearest sample). De genormaliseerde-punt-contract (u,v ∈ [0,1],
+ORIGIN LINKSBOVEN, veilige `true` buiten range) blijft 1-op-1; de extensie is
+`internal` gemaakt zodat de y-flip-geometrie getoetst wordt.
+
+**DoD/Verificatie:** `build-v2.sh` → **alles groen** (beide targets; 53 Avatar2,
+31 AvatarUI). Nieuwe `AlphaHitTestTests` (4): verticale + horizontale oriëntatie
+(vangt een verkeerde y-flip), kwadrant (x+y samen), out-of-range = veilig `true`.
+Interactieve tik-latentie niet meetbaar in deze omgeving; de O(1)-eigenschap +
+geometrie-tests dekken het.
+
+## 27.7 — Snappy selectie: off-main canvas-load  · FEAT
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: 27.6
+
+Een portret selecteren (sidebar-rij of board-node → editor) duurde ~1s vóór de UI
+reageerde. Oorzaak: `ShellModel.select` deed álles synchroon op de main-thread —
+een full-res `NSImage(data: cutoutData)`-decode (élke selectie) + een full-res
+Core Image-`colorAdjust` (bij niet-neutrale Adjust). De selectie-state (highlight/
+header) werd wel eerst gezet, maar omdat de functie synchroon doorliep tot de decode
+klaar was, kon SwiftUI pas ná die ~1s herschilderen → de klik "landde" laat.
+
+**Result:** `select()` ontkoppelt de selectie-state van de beeld-load.
+- De canvas-onafhankelijke state (`selectedPortrait`/naam/rol) zet meteen → de
+  highlight + de naam/rol-header reageren DIRECT (<16ms).
+- De zware full-res decode + Adjust draait OFF-MAIN via `decodeCanvas`
+  (`nonisolated async`, coöperatieve pool), met exact dezelfde semantiek als
+  voorheen (`NSImage(data:)` → `adjustedImage`, zelfde maat → geen transform-sprong).
+  `NSImage` reist via een `@unchecked Sendable`-box terug (off-main gemaakt, daarna
+  alléén op de main-actor gelezen).
+- **Generatie-token + cancel:** élke nieuwe canvas-intentie loopt nu via één
+  `setCanvas(_:)` die `canvasGeneration` bumpt; een lopende select-load past z'n
+  resultaat alléén toe als z'n generatie nog actueel is (`applyCanvasIfCurrent`), en
+  de vorige load wordt bij een nieuwe selectie geannuleerd. Zo kan een trage decode
+  geen nieuwere staat overschrijven — incl. de board-flow `select(node)` →
+  `applyEffectResult` (de async re-isolatie bumpt de generatie, dus de select-load
+  klapt er niet overheen). Alle 11 `canvas =`-schrijfplekken lopen nu via `setCanvas`.
+
+Resultaat: klik → highlight/header instant; het canvas-beeld volgt ~100ms later
+zonder de main-thread te blokkeren → snappy.
+
+**DoD/Verificatie:** `build-v2.sh` → **alles groen** (beide targets + alle
+pakkettests; 53 Avatar2, 31 AvatarUI). Launch-smoke: app draait de restore-on-launch
+async-select zonder crash/deadlock/fatal (≥4s alive). `exportCurrentPortrait`
+(`select()` → export) leest enkel `selectedPortrait` (sync gezet), dus ongemoeid. Een
+interactieve klik-latentie-meting bleef buiten beeld (synthetische input ontbreekt
+in deze omgeving); de structurele ontkoppeling + groene gate dekken het.
+
+**Nuance / opvolger:** dezelfde synchrone-decode-pattern zit nog in `commitAdjust`
+en `refreshCanvasFromSelection` (full-res decode + adjust op de main-thread bij een
+Adjust-commit / na undo-redo) — minder vaak geraakt dan selectie, kandidaat voor een
+vervolg met dezelfde `decodeCanvas`-aanpak. Een nóg snellere selectie zou op
+display-maat kunnen decoderen (ImageIO-thumbnail) i.p.v. full-res, mits edit/export
+de full-res rechtstreeks uit `cutoutData` halen (te verifiëren).
+
+## 27.6 — Board/sidebar-performance: snappy pan/zoom + off-main thumbnails  · FEAT
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: 27.5
+
+Na 27.5 (thumbnail-cache + virtualisatie) bleef de board-modus traag bij pan/zoom,
+terwijl 27.5 mat "0 re-decodes na zoom". Bewijs dat de resterende kost NIET het
+per-frame decoderen van statische nodes was, maar het feit dat élke scroll/pinch
+(60–120 Hz) de `@State camera` muteert en de **hele** `BoardView.body` herbouwt +
+diff't — plus twee hotspots: de geselecteerde node her-decodeerde z'n volledige
+cutout elke frame, en `visibleNodes()` alloceerde elke frame een array over álle
+portretten. Aanpak = Figma's principe ("alleen de camera-matrix verandert; node-
+textures zijn gecachet") vertaald naar SwiftUI.
+
+**Result (board, commit `e079e12`), vijf tiers:**
+1. **Tier 0** — `BoardThumbnailCache` gekeyd op `(id, updatedAt)` (zoals
+   `SidebarThumbnailCache`); `freshThumbnail` verwijderd. Élk pixel-/adjust-pad roept
+   al `touch()` aan (geverifieerd: `storeEffectResult`/`commitAdjust`/`CutoutDataUndo`
+   + de board-undo-closures), dus de selectie-node her-decodeert niet meer elke frame.
+2. **Tier 1** — `node()` → losse `BoardNodeView: View, Equatable` met `.equatable()`;
+   gestures/hover hangen BUITEN de equatable-grens. Camera-only changes slaan
+   ongewijzigde node-bodies over. `==` is O(1) (`updatedAt`-token voor de dure
+   bg-image-`Data`, thumbnail op identiteit) → goedkoop bij O(zichtbaar)/frame.
+3. **Tier 2** — `visibleNodes()` → één `compactMap` (alleen zichtbare tuples), geen
+   per-frame all-element-allocatie; `center(of:)` blijft live → drag/`BoardMoveUndo`
+   correct zonder cache te syncen.
+4. **Tier 3** — nieuwe `Avatar2/Features/Shared/ThumbnailRenderer` (ImageIO
+   `CGImageSourceCreateThumbnailAtIndex`, decodeert OFF-MAIN direct op doelmaat) +
+   `@Observable ThumbnailStore` (async decode, `(id,updatedAt,size)`-key, FIFO-cap).
+   Geen main-thread-hitch bij open/scroll; begrensd geheugen bij honderden nodes.
+5. **Tier 4** — `AnyShape` gehoist (computed in `BoardNodeView`); thumbnail
+   `.interpolation(.high)` → `.medium` (goedkopere GPU-resampling tijdens zoom).
+   (Tier 5 — Figma-stijl `Canvas`/Metal-rewrite — bewust verworpen: zou alle
+   SwiftUI-gestures/overlays + de E30.1 in-place-edit-chrome verliezen.)
+
+**Result (sidebar, commit `4978ef2`):** `SidebarThumbnailCache` (synchrone main-
+thread-decode) vervangen door dezelfde gedeelde `ThumbnailStore` (eigen instance,
+96px, `adjusted: false` → rauwe cutout zoals voorheen, geen visuele wijziging). De
+hover/scroll-main-thread-decode waarvoor die cache ooit bestond is daarmee weg.
+`SidebarThumbnailCache.swift` verwijderd; `DSSidebarRow` (DS) ongemoeid.
+
+**Meting / verificatie:** `--board-perf`-teller op board-open = **18 decodes** (één
+per node), en blijft op 18 in idle/met-selectie (was ~1 per frame voor de selectie-
+node) → de per-frame full-res-decode is structureel weg (keys veranderen niet bij
+camera-bewegingen). Headless `ThumbnailRendererTests` (downscale-naar-maat,
+alpha-behoud, adjust-tak, invalid-data). `build-v2.sh` → **alles groen** (beide
+targets + alle pakkettests; 53 Avatar2, 31 AvatarUI). Een interactieve pan-drive
+via synthetische input bleef buiten beeld (dezelfde omgevingslimiet als 24.32/27.4);
+de teller + structurele garantie dekken het.
+
+**Nuance / Figma-TODO:** thumbnails verschijnen nu async — bij board-open heel even
+de kaart-achtergrond vóór de thumb inpopt (zoals Figma/Photos), in ruil voor een
+niet-blokkerende main-thread. **Opvolger:** het ~1s-ophangen bij het SELECTEREN van
+een portret (synchrone full-res-decode + adjust in `ShellModel.select`) is opgelost
+in **27.7** (off-main canvas-load).
 
 ## 27.5 — Board-performance (virtualisatie + thumbnail-cache)  · FEAT
 - status: done
@@ -134,9 +266,14 @@ Zoom-range + grenzen (bv. 25%–400%), soepel rond de cursor in/uitzoomen.
    blijft los van VIEW-zoom; 24.32-deselect werkt nog op elk zoomniveau. Screenshots per zoomniveau.
 
 ## 27.2 — Zoom-HUD + sneltoetsen  · DS/FEAT
-- status: done
+- status: superseded door 27.2a (HUD verwijderd)
 - owner: DS/FEAT (AI-agent)
 - blockedBy: 27.1 (done)
+
+> **Superseded (besluit Thierry):** de zwevende zoom-HUD is van de canvas
+> verwijderd; zoom zit nu in het **View-menu** in de macOS-menubalk (27.2a).
+> De DS-component `DSZoomHUD` is verwijderd uit `AvatarUI`. De
+> oorspronkelijke 27.2-beschrijving hieronder is historisch.
 
 Zwevende zoom-HUD (−/slider/+ en fit) met het huidige zoom-%. Sneltoetsen: ⌘0 = fit, ⌘1 = 100%,
 ⌘+/⌘−. Consistent met de DS-stijl.
@@ -169,6 +306,40 @@ geest van de DS-stijl (capsule/material/divider zoals de CanvasActionToolbar);
 plaatsing (linksonder), de fit-knop-als-%-readout, de slider-styling (native,
 action-getint) en de exacte iconen (−/+ SF Symbols) tegen een Figma-referentie
 leggen zodra die er is. ⌘1 "100%" = 1× in dit camera-model (zie 27.1).
+
+## 27.2a — Zoom naar de macOS-menubalk (View-menu)  · FEAT/INFRA
+- status: done
+- owner: FEAT/INFRA (AI-agent)
+- blockedBy: 27.2 (superseded)
+
+Besluit Thierry: de zwevende zoom-HUD weg van de canvas, de zoom-opties als
+**View-menu** in de macOS-menubalk.
+
+**Result:** de `DSZoomHUD`-overlay + de verborgen ⌘-sneltoetsknoppen
+(`cameraShortcutButtons`) zijn uit `EditorView` verwijderd, en de DS-component
+`DSZoomHUD` is uit `AvatarUI` geschrapt. Nieuw bestand
+`Avatar2/Features/Editor/CanvasZoomCommands.swift`: een `canvasZoom`
+**focused-scene-value** (brug tussen de camera-`@State` in `EditorView` en het
+menu op app-niveau) + `CanvasZoomCommands` (de menu-inhoud). `EditorView`
+publiceert zijn camera-acties via `.focusedSceneValue(\.canvasZoom, …)`;
+`Avatar2App` hangt `CommandMenu("View") { CanvasZoomCommands() }` aan de scene.
+Items: **Zoom In** (⌘+), **Zoom Out** (⌘−), **Zoom to 100%** (⌘0,
+`resetToActualSize`), **Zoom to Fit** (⇧⌘1, `reset`). **Update (besluit
+Thierry):** ⌘0 (100%) recentreert nu óók de scène (pan → 0), i.p.v. de pan te
+behouden. In dit camera-model is 1× tegelijk de fit-schaal, dus 100% en Fit zijn
+sindsdien functioneel gelijk (beide 1× + gecentreerd); beide items blijven in het
+menu staan. Geen actieve canvas (board/
+settings/onboarding) → `canvasZoom == nil` → items grijzen uit en de sneltoetsen
+doen niets. De sneltoetsen hangen nu native aan de menu-items i.p.v. de verborgen
+knoppen.
+
+**Afwijking t.o.v. referentie-screenshot:** Thierry's voorbeeld toonde "Zoom to
+Fit" op een shift-only `⇧1`. Bewust `⇧⌘1` gemaakt — een shortcut zónder ⌘ zou
+"!" in tekstvelden (hernoemen/zoeken/e-mail/OTP) onderscheppen.
+
+**DoD/Verificatie:** Avatar2-target bouwt (xcodegen + `xcodebuild … BUILD
+SUCCEEDED`). Smoke-run: View-menu in de menubalk toont de vier items; HUD weg van
+de canvas.
 
 ## 27.3 — Transform/guides/popovers correct onder de camera  · FEAT/DS
 - status: done

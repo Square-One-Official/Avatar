@@ -59,7 +59,9 @@ final class ThumbnailStore {
     func invalidate(_ portrait: Portrait2) {}
 
     private static func key(_ portrait: Portrait2, _ maxDimension: CGFloat) -> String {
-        "\(portrait.persistentModelID.hashValue)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension.rounded()))"
+        // De volledige identifier i.p.v. z'n 64-bit `hashValue` — even stabiel
+        // binnen de sessie, maar zonder de (theoretische) hash-collisie tussen nodes.
+        "\(portrait.persistentModelID)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension.rounded()))"
     }
 
     /// Decodeer buiten de main-actor: `nonisolated async` draait op de coöperatieve

@@ -18,12 +18,6 @@ final class CreditMeterTests: XCTestCase {
         XCTAssertEqual(CreditMeter.chipLabel(for: .generativeStandard), "4 credits")
     }
 
-    func testAllActionsRequireCloud() {
-        for action in CreditMeter.Action.allCases {
-            XCTAssertTrue(CreditMeter.requiresCloud(for: action))
-        }
-    }
-
     func testCanAfford() {
         XCTAssertTrue(CreditMeter.canAfford(.generativeStandard, creditsRemaining: 4))
         XCTAssertFalse(CreditMeter.canAfford(.generativeStandard, creditsRemaining: 3))

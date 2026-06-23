@@ -105,18 +105,10 @@ struct BackgroundPanel: View {
             HStack(spacing: DSSpacing.gap2) { content() }
                 .padding(.vertical, DSSpacing.gap2)
                 .padding(.leading, DSSpacing.gap1)
-                .padding(.trailing, DSSpacing.gap4)
+                .scrollRowTrailingInset()
         }
-        .mask(
-            LinearGradient(
-                stops: [
-                    .init(color: .black, location: 0),
-                    .init(color: .black, location: 0.88),
-                    .init(color: .clear, location: 1),
-                ],
-                startPoint: .leading, endPoint: .trailing
-            )
-        )
+        // Gedeeld met de andere editor-panelen (zie ScrollRowEdgeFade).
+        .horizontalScrollEdgeFade()
     }
 
     @ViewBuilder

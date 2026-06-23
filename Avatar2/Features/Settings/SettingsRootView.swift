@@ -170,19 +170,3 @@ struct SettingsRow<Control: View>: View {
         .frame(maxWidth: 560, alignment: .leading)
     }
 }
-
-/// Placeholder tot de eigen story (15.2/15.3/15.4) de pagina invult.
-struct SettingsPlaceholderPage: View {
-    let title: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .dsTextStyle(.h1)
-                .foregroundStyle(DSColor.Foreground.primary)
-            Spacer()
-        }
-        .padding(.top, 76)
-        .padding(.leading, DSSpacing.gap6)
-    }
-}

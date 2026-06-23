@@ -128,7 +128,16 @@ private struct ToolSurface: View {
             }
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .onHover { isHovering = $0 }
-            .animation(.easeOut(duration: 0.15), value: isActive)
+            // Active-state (ring + icoon-crossfade) MOET zijn eigen schone curve
+            // rijden, ook als de knop tegelijk meeschuift met de sidebar. Een
+            // gewone `.animation(value: isActive)` verliest het van de ouder-
+            // `.animation(.spring, value: isSidebarVisible)` wanneer beide states
+            // in dezelfde transactie wijzigen → de ring/tint kreeg de spring
+            // (overshoot/wobble) i.p.v. de bedoelde easeOut. Een `.transaction`
+            // override op dezelfde trigger is lokaal en wint wél van de ouder.
+            .transaction(value: isActive) { txn in
+                txn.animation = .easeOut(duration: 0.15)
+            }
             .animation(.easeOut(duration: 0.1), value: isHovering)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
@@ -136,13 +145,14 @@ private struct ToolSurface: View {
     private var backgroundColor: Color {
         switch surface {
         case .filled:
-            if configuration.isPressed { return DSColor.Background.neutralStrongest }
-            if isHovering { return DSColor.Background.neutralStronger }
-            return DSColor.Background.neutral
+            return DSColor.neutralSurface(
+                pressed: configuration.isPressed, hovering: isHovering,
+                base: DSColor.Background.neutral
+            )
         case .ghost:
-            if isActive || configuration.isPressed { return DSColor.Background.neutralStrongest }
-            if isHovering { return DSColor.Background.neutralStronger }
-            return .clear
+            return DSColor.neutralSurface(
+                pressed: isActive || configuration.isPressed, hovering: isHovering
+            )
         }
     }
 }

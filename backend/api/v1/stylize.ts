@@ -8,6 +8,7 @@ import {
   UnknownModelOverrideError,
 } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
+import { fetchActiveEffects } from "../../lib/payload.js";
 import { flattenOnGrey } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
@@ -187,7 +188,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const facePreset = (req.body?.face_preset ?? "") as string;
   const freePrompt = (req.body?.prompt ?? "") as string;
   if (styleKey) {
-    const mapped = STYLE_PROMPTS[styleKey];
+    // E33: Effects-stijlen zijn CMS-gestuurd. Zoek de key eerst in Payload op;
+    // val terug op de hardgecodeerde STYLE_PROMPTS zodat de vier launch-keys
+    // blijven werken tijdens het seed-venster (en als de CMS even onbereikbaar
+    // is). STYLE_PROMPTS verdwijnt zodra de effecten in de CMS bevestigd zijn.
+    const effects = await fetchActiveEffects();
+    const mapped = effects.find((e) => e.key === styleKey)?.prompt ?? STYLE_PROMPTS[styleKey];
     if (!mapped) {
       res.status(400).json({ error: "unknown_style" });
       return;

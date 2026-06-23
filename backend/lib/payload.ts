@@ -302,6 +302,69 @@ export async function recordNewsletterUnsubscribe(
 }
 
 // ---------------------------------------------------------------------------
+// E33 — Effects (CMS-gestuurde stijlen, slug "effects"). Spiegelt
+// admin/src/collections/Effects.ts: key + label + thumbnail + prompt + order.
+// Vervangt de hardgecodeerde StylizeStyle/STYLE_PROMPTS zodat een nieuw effect
+// zonder app- of backend-deploy kan worden toegevoegd. De `prompt` blijft
+// server-side (alleen /v1/stylize gebruikt 'm); /v1/effects laat 'm weg.
+// ---------------------------------------------------------------------------
+
+export type PayloadEffect = {
+  key: string;
+  label: string;
+  prompt: string;
+  thumbnailUrl: string | null;
+  order: number;
+};
+
+let effectCache: { expiresAt: number; payload: PayloadEffect[] } | null = null;
+
+export async function fetchActiveEffects(): Promise<PayloadEffect[]> {
+  const now = Date.now();
+  if (effectCache && effectCache.expiresAt > now) {
+    return effectCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — effects disabled");
+    return [];
+  }
+
+  const url = new URL(`${base}/effects`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "1"); // resolve the thumbnail upload → { url }
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "order");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload effects fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const effects = docs.map(normalizeEffect).filter((e): e is PayloadEffect => e !== null);
+  effectCache = { expiresAt: now + CACHE_TTL_MS, payload: effects };
+  return effects;
+}
+
+function normalizeEffect(raw: unknown): PayloadEffect | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const prompt = typeof r.prompt === "string" ? r.prompt.trim() : null;
+  // Onbruikbaar zonder key + prompt (de stijl kan dan niet renderen) → skip.
+  if (!key || !prompt) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, prompt, thumbnailUrl, order };
+}
+
+// ---------------------------------------------------------------------------
 // E17.2 — Messages (verenigd model, slug "messages"). Naast de announcement-
 // functies hierboven; niet-destructief. Spiegelt admin/src/collections/
 // Messages.ts: kanaal + targeting-group + schedule-group + body/image/cta.
