@@ -104,7 +104,7 @@ export interface FaceBox {
 export async function padForOutpaint(
   cutoutPng: Buffer,
   options?: { face?: FaceBox }
-): Promise<{ padded: Buffer; mask: Buffer }> {
+): Promise<{ padded: Buffer; mask: Buffer; personLayer: Buffer }> {
   const src = sharp(cutoutPng).ensureAlpha();
   const meta = await src.metadata();
   if (!meta.width || !meta.height) {
@@ -161,6 +161,24 @@ export async function padForOutpaint(
   })
     .composite([{ input: resized, left, top }])
     .flatten({ background: GREY })
+    .png()
+    .toBuffer();
+
+  // The person on a *transparent* canvas at the exact same placement, with
+  // its clean (soft) alpha intact. The fill pipeline re-mattes the whole
+  // canvas after FLUX, which re-contaminates the hair edges (they were
+  // flattened onto grey above) into a light halo. `restoreOriginalSubject`
+  // composites this clean layer back over the re-matted result so the person
+  // round-trips unchanged and only the freshly-painted body keeps the new matte.
+  const personLayer = await sharp({
+    create: {
+      width: CANVAS_W,
+      height: CANVAS_H,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: resized, left, top }])
     .png()
     .toBuffer();
 
@@ -245,7 +263,63 @@ export async function padForOutpaint(
     .png()
     .toBuffer();
 
-  return { padded, mask };
+  return { padded, mask, personLayer };
+}
+
+/**
+ * Composite the fill pipeline's re-matted result with the *original* clean
+ * person, eliminating the light hair halo.
+ *
+ * Why this is needed: padForOutpaint flattens the cutout onto mid-grey so
+ * FLUX gets an RGB photo, then `magicCutout` (BiRefNet) re-extracts alpha over
+ * the whole canvas. The person's semi-transparent hair edges — now hair·α +
+ * grey·(1-α) — get re-matted into a visible grey/white fringe. FLUX only
+ * legitimately paints the masked margin, so the person should round-trip
+ * unchanged. We hard-knock-out the re-matted person region (any meaningful
+ * alpha → erased, so even wispy strands fully suppress the contaminated
+ * pixels) and lay the original clean RGBA back on top, keeping the freshly
+ * painted body only where the original had no alpha.
+ *
+ * `personLayer` is the CANVAS_W×CANVAS_H clean person from padForOutpaint;
+ * `filledCutout` is BiRefNet's output (normalised to the canvas grid here).
+ */
+export async function restoreOriginalSubject(
+  filledCutout: Buffer,
+  personLayer: Buffer,
+): Promise<Buffer> {
+  const base = await sharp(filledCutout)
+    .ensureAlpha()
+    .resize(CANVAS_W, CANVAS_H, { fit: "fill" })
+    .png()
+    .toBuffer();
+
+  // Build a binary knockout layer (rgb=0, alpha carries the mask) from the
+  // person's alpha. Thresholded rather than soft: a soft knockout would let
+  // the re-matted grey survive at exactly the wispy edges we want to clean.
+  const a = await sharp(personLayer)
+    .ensureAlpha()
+    .extractChannel("alpha")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const knock = Buffer.alloc(a.data.length * 4);
+  for (let i = 0; i < a.data.length; i++) {
+    knock[i * 4 + 3] = a.data[i]! >= 8 ? 255 : 0;
+  }
+  const knockoutPng = await sharp(knock, {
+    raw: { width: a.info.width, height: a.info.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+
+  return sharp(base)
+    .composite([
+      // dest-out erases the re-matted person pixels (result = dest·(1-src.α)).
+      { input: knockoutPng, blend: "dest-out" },
+      // Lay the original clean person back with its soft alpha intact.
+      { input: personLayer, blend: "over" },
+    ])
+    .png()
+    .toBuffer();
 }
 
 /**

@@ -6,7 +6,7 @@ import {
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
-import { padForOutpaint } from "../../lib/image.js";
+import { padForOutpaint, restoreOriginalSubject } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { magicCutout, outpaintPortrait, ReplicateTimeoutError } from "../../lib/replicate.js";
 
@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Step 1: build the outpaint inputs. Pure server-side image work,
     // no Replicate calls — safe to do before the credit gate.
-    const { padded, mask } = await padForOutpaint(inputBytes, { face: faceBox });
+    const { padded, mask, personLayer } = await padForOutpaint(inputBytes, { face: faceBox });
     const paddedDataUrl = `data:image/png;base64,${padded.toString("base64")}`;
     const maskDataUrl = `data:image/png;base64,${mask.toString("base64")}`;
 
@@ -139,6 +139,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const cutoutBytes = Buffer.from(await cutoutDownload.arrayBuffer());
 
+    // Step 4b: restore the original clean person over the re-matted result.
+    // BiRefNet re-extracts alpha across the whole canvas, which re-contaminates
+    // the hair edges (flattened onto grey in step 1) into a light halo. The
+    // person should round-trip unchanged — only the newly painted body needs
+    // the fresh matte. This composites the clean person back and drops the halo.
+    const finalCutout = await restoreOriginalSubject(cutoutBytes, personLayer);
+
     if (!isDevUser) {
       await logCredit({
         userId: user.id,
@@ -150,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
     res.status(200).json({
-      cutout: cutoutBytes.toString("base64"),
+      cutout: finalCutout.toString("base64"),
       credits_remaining: creditsRemaining,
     });
   } catch (err) {
