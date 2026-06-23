@@ -29,20 +29,10 @@ public struct DSGhostButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: size.contentGap) {
-                if let icon {
-                    icon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: size.iconSize, height: size.iconSize)
-                }
-                Text(title)
-                    .dsTextStyle(size.textStyle)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: fullWidth ? .infinity : nil)
-            .padding(.horizontal, size.horizontalPadding)
-            .padding(.vertical, size.verticalPadding)
+            DSButtonLabel(title: title, icon: icon, size: size)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
+                .padding(.horizontal, size.horizontalPadding)
+                .padding(.vertical, size.verticalPadding)
         }
         .buttonStyle(GhostSurfaceStyle(size: size))
     }

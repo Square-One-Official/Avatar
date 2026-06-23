@@ -75,8 +75,8 @@ public struct DSColorPicker: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { v in
-                    sat = clamp01(v.location.x / max(1, w))
-                    val = clamp01(1 - v.location.y / max(1, h))
+                    sat = (v.location.x / max(1, w)).clamped01
+                    val = (1 - v.location.y / max(1, h)).clamped01
                 }
             )
         }
@@ -92,7 +92,7 @@ public struct DSColorPicker: View {
                 startPoint: .leading, endPoint: .trailing
             ),
             position: hue,
-            set: { hue = clamp01($0) }
+            set: { hue = $0.clamped01 }
         )
     }
 
@@ -103,7 +103,7 @@ public struct DSColorPicker: View {
                 LinearGradient(colors: [current.opacity(0), current.opacity(1)], startPoint: .leading, endPoint: .trailing)
             },
             position: alpha,
-            set: { alpha = clamp01($0) }
+            set: { alpha = $0.clamped01 }
         )
     }
 
@@ -222,8 +222,6 @@ public struct DSColorPicker: View {
                       Int((ns.greenComponent * 255).rounded()),
                       Int((ns.blueComponent * 255).rounded()))
     }
-
-    private func clamp01(_ x: Double) -> Double { min(1, max(0, x)) }
 }
 
 /// Dambord-achtergrond voor de alpha-slider (transparantie zichtbaar maken).

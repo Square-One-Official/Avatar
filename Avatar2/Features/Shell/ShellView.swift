@@ -20,9 +20,6 @@ struct ShellView: View {
     }
 
     @Environment(\.modelContext) private var modelContext
-    // E31.x: de top-scrim is een dark-mode-affordance (donkere fade voor lichte
-    // chrome). In light-mode zou diezelfde zwarte fade een vuile veeg zijn.
-    @Environment(\.colorScheme) private var colorScheme
     /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
     @State private var setBusyMessage: String?
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
@@ -175,11 +172,13 @@ struct ShellView: View {
                             .accessibilityHidden(true)
                     )
             } else {
-                // E31.x (besluit Thierry): de Name/Role-kop zweeft nu als overlay
-                // over het canvas (zie de top-overlays hieronder) i.p.v. in de
-                // flow — zo wint de foto de ~64pt terug die de kop-strook innam.
-                // Bewuste afwijking van de oude "nooit over de foto"-regel.
+                // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
+                // de topstrook (zie de overlays hieronder). Het canvas houdt een
+                // SLANKE top-inset (gap-8 i.p.v. de oude ~64pt kopstrook) zodat de
+                // foto NETJES ónder de titel valt — titel op zwart, foto eronder,
+                // geen donkere band waar de (donkere) fototop onder de chrome kruipt.
                 canvas
+                    .padding(.top, DSSpacing.gap8)
             }
         }
         // Punt 19: top-uitlijning — de VStack centreerde verticaal,
@@ -198,21 +197,6 @@ struct ShellView: View {
             if model.isDropTargeted && !model.isShowingSettings {
                 DropzoneOverlay()
                     .allowsHitTesting(false)
-            }
-        }
-        // E31.x: zachte top-scrim i.p.v. een harde zwarte band — houdt de
-        // zwevende chrome (credits/iconen + Name/Role) leesbaar als de foto
-        // bovenaan komt. Zwart→clear van bovenaf (vgl. DSThumbnailCard).
-        .overlay(alignment: .top) {
-            if showsPortraitHeader && colorScheme == .dark {
-                LinearGradient(
-                    colors: [Color.black.opacity(0.35), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 80)
-                .frame(maxWidth: .infinity)
-                .allowsHitTesting(false)
             }
         }
         // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
@@ -238,15 +222,6 @@ struct ShellView: View {
                 onToggleSidebar: { model.toggleSidebar() }
             )
         }
-        // E31.x: Name/Role-kop zweeft gecentreerd in dezelfde topstrook als de
-        // credits (links) en iconen (rechts) — op gap-3 vanaf de top, bóven de
-        // scrim. Horizontaal centraal → geen overlap met de zijclusters.
-        .overlay(alignment: .top) {
-            if showsPortraitHeader {
-                PortraitHeader(model: model)
-                    .padding(.top, DSSpacing.gap3)
-            }
-        }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
         // Image added 4017:1849), niet aan de foto geplakt.
@@ -269,13 +244,6 @@ struct ShellView: View {
         }
         .animation(.spring(duration: 0.3), value: model.showHairNudge)
         .animation(.easeOut(duration: 0.15), value: model.isDropTargeted)
-    }
-
-    private var showsPortraitHeader: Bool {
-        switch model.canvas {
-        case .processing, .revealing, .result: true
-        case .empty, .failed: false
-        }
     }
 
     private var isolatingStatusLabel: String? {
@@ -312,10 +280,15 @@ struct ShellView: View {
             // alleen de dropzone over (bevinding 2).
             if model.isDropTargeted {
                 DSColor.Background.app
-            } else {
+            } else if model.showsFirstUseEmptyState {
                 FirstUseEmptyState {
                     model.presentOpenPanel()
                 }
+            } else {
+                // E27.7-fix: launch-restore loopt nog, of een herstelde selectie
+                // decodeert off-main (~1s) → neutrale canvas-achtergrond i.p.v. de
+                // first-use-cirkels, die een lege store zouden suggereren.
+                DSColor.Background.app
             }
         case .processing(let original):
             IsolatingCanvas(original: original, cutout: nil)
@@ -330,8 +303,10 @@ struct ShellView: View {
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
                 onApplyResult: { model.applyEffectResult($0) },
+                onApplyAlphaPreserving: { model.applyEffectResult($0, preserveSourceAlpha: true) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
+                onRename: { model.isShowingRename = true },
                 isSidebarVisible: $model.isSidebarVisible
             )
         case .failed(let message):
@@ -367,13 +342,6 @@ struct ShellView: View {
             }
             .frame(width: 465, height: 456)
         }
-    }
-
-    private func portrait(_ image: NSImage) -> some View {
-        Image(nsImage: image)
-            .resizable()
-            .scaledToFit()
-            .padding(DSSpacing.gap8)
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

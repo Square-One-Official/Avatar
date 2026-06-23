@@ -28,22 +28,12 @@ public struct DSNeutralButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: size.contentGap) {
-                if let icon {
-                    icon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: size.iconSize, height: size.iconSize)
-                }
-                Text(title)
-                    .dsTextStyle(size.textStyle)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .frame(maxWidth: fullWidth ? .infinity : nil)
-            .padding(.horizontal, size.horizontalPadding)
-            .padding(.vertical, size.verticalPadding)
-            .background(DSColor.Background.neutral, in: Capsule())
+            DSButtonLabel(title: title, icon: icon, size: size)
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
+                .padding(.horizontal, size.horizontalPadding)
+                .padding(.vertical, size.verticalPadding)
+                .background(DSColor.Background.neutral, in: Capsule())
         }
         .buttonStyle(DSStateOpacityButtonStyle())
     }

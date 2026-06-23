@@ -26,6 +26,8 @@ struct BoardView: View {
     let onOpen: (Portrait2) -> Void
 
     @Environment(\.undoManager) private var undoManager
+    /// Delete-actie van het rechtermuis-menu (zelfde modelContext-pad als de sidebar).
+    @Environment(\.modelContext) private var modelContext
 
     // E30.1 / E31.7: actief bottom-tool bij ÉÉN geselecteerde node (in-place
     // editen op de board). Dezelfde `EditorTool` als de single-editor zodat de
@@ -64,6 +66,20 @@ struct BoardView: View {
     @State private var selection: Set<PersistentIdentifier> = []
     /// Marquee-rechthoek (board-space) tijdens een sleep op de lege board.
     @State private var marquee: CGRect?
+    /// Basis-selectie vastgelegd bij de start van een marquee-sleep, zodat
+    /// cmd/shift (additief) tegen een vaste set rekent i.p.v. de live-groeiende.
+    @State private var marqueeBase: Set<PersistentIdentifier> = []
+
+    // Rechtermuis-context-menu op een node — pariteit met het sidebar-menu
+    // (E24.22: Rename · Export… · Delete). Geen native `.contextMenu`; we tekenen
+    // ons eigen DS-menu (zie de overlay onder in `body`), gepositioneerd onder de
+    // aangeklikte node. Bij een multi-selectie (≥2) werken Rename/Export/Delete op
+    // de hele selectie — vandaar lijsten i.p.v. één target.
+    @State private var menuTarget: Portrait2?
+    @State private var renameTargets: [Portrait2] = []
+    @State private var deleteTargets: [Portrait2] = []
+    /// Bulk-export-status (board heeft geen shell-toast) → getoond in de HUD.
+    @State private var exportStatus: String?
 
     // E29.2: batch-toolbar (open dropdown) + de geselecteerde portretten.
     @State private var batchMenu: BatchMenu?
@@ -154,6 +170,42 @@ struct BoardView: View {
                         .padding(.bottom, 64)
                 }
             }
+            // Rechtermuis-menu — gepositioneerd onder de aangeklikte node; een
+            // transparante scrim eronder sluit bij een klik buiten het menu.
+            .overlay {
+                if let target = menuTarget {
+                    contextMenuOverlay(target)
+                }
+            }
+            // Rename-modal (gedeelde RenameSheet) — bij ≥2 targets zet Save dezelfde
+            // naam + rol op álle geselecteerde portretten.
+            .sheet(isPresented: Binding(
+                get: { !renameTargets.isEmpty },
+                set: { if !$0 { renameTargets = [] } }
+            )) {
+                if !renameTargets.isEmpty { RenameSheet(portraits: renameTargets) }
+            }
+            // Delete met bevestiging (zelfde modelContext-pad als de sidebar);
+            // bij ≥2 targets verwijdert het de hele selectie.
+            .confirmationDialog(
+                deleteTargets.count >= 2 ? "Delete \(deleteTargets.count) portraits?" : "Delete this portrait?",
+                isPresented: Binding(
+                    get: { !deleteTargets.isEmpty },
+                    set: { if !$0 { deleteTargets = [] } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    for target in deleteTargets {
+                        selection.remove(target.persistentModelID)
+                        modelContext.delete(target)
+                    }
+                    deleteTargets = []
+                }
+                Button("Cancel", role: .cancel) { deleteTargets = [] }
+            } message: {
+                Text("This can't be undone.")
+            }
             .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
             .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
@@ -205,6 +257,7 @@ struct BoardView: View {
                     role: p.role,
                     backgroundColorHex: p.backgroundColorHex,
                     backgroundImageData: p.backgroundImageData,
+                    portraitBlur: p.portraitBlur,
                     contentVersion: p.updatedAt,
                     cardSide: cardSide,
                     labelGap: labelGap,
@@ -218,6 +271,14 @@ struct BoardView: View {
                 // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
                 .onTapGesture(count: 2) { onOpen(p) }
                 .onTapGesture { tapNode(p) }
+                // Rechtermuis → hetzelfde DS-menu als de sidebar. Selecteert de
+                // node eerst als 'ie nog niet in de selectie zit (Finder-gedrag),
+                // zodat "Export N portraits…" alleen verschijnt bij een echte
+                // multi-selectie; binnen een bestaande ≥2-selectie blijft die staan.
+                .onRightClick {
+                    if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
+                    menuTarget = p
+                }
                 .gesture(dragGesture(for: p))
                 .position(x: item.center.x, y: item.center.y)
             }
@@ -236,27 +297,33 @@ struct BoardView: View {
 
     /// E29.1: marquee — sleep op de lege board spant een selectie-rechthoek;
     /// nodes waarvan het midden erin valt worden geselecteerd (cmd/shift =
-    /// toevoegen aan de bestaande selectie).
+    /// toevoegen aan de bestaande selectie). De selectie loopt live mee tijdens
+    /// de sleep (niet pas bij loslaten): bij het eerste frame leggen we de
+    /// basis vast (additief → huidige selectie, anders leeg) en elke frame
+    /// rekenen we de hits opnieuw tegen die vaste basis.
     private var marqueeGesture: some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
-                marquee = CGRect(
+                if marquee == nil {
+                    let additive = NSEvent.modifierFlags.contains(.command)
+                        || NSEvent.modifierFlags.contains(.shift)
+                    marqueeBase = additive ? selection : []
+                }
+                let rect = CGRect(
                     x: min(value.startLocation.x, value.location.x),
                     y: min(value.startLocation.y, value.location.y),
                     width: abs(value.location.x - value.startLocation.x),
                     height: abs(value.location.y - value.startLocation.y)
                 )
-            }
-            .onEnded { _ in
-                guard let rect = marquee else { return }
+                marquee = rect
                 let hits = Set(
                     portraits.enumerated()
                         .filter { rect.contains(center(of: $1, index: $0)) }
                         .map { $1.persistentModelID }
                 )
-                let additive = NSEvent.modifierFlags.contains(.command)
-                    || NSEvent.modifierFlags.contains(.shift)
-                selection = additive ? selection.union(hits) : hits
+                selection = marqueeBase.union(hits)
+            }
+            .onEnded { _ in
                 marquee = nil
             }
     }
@@ -305,6 +372,137 @@ struct BoardView: View {
             if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
         } else {
             selection = [id]
+        }
+    }
+
+    // MARK: - Rechtermuis-context-menu (pariteit met de sidebar, E24.22)
+
+    /// Het zwevende DS-menu + de dismiss-scrim, gepositioneerd onder de node.
+    @ViewBuilder
+    private func contextMenuOverlay(_ target: Portrait2) -> some View {
+        let anchor = menuAnchor(for: target)
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { menuTarget = nil }
+            nodeContextMenu(for: target)
+                .fixedSize()
+                .offset(x: anchor.x, y: anchor.y)
+        }
+    }
+
+    /// Rij-opties zoals het sidebar-menu. Bij een multi-selectie (≥2) werken alle
+    /// acties op de hele selectie (count-gelabeld); bij één node op die node. De
+    /// rechtermuis-handler zorgt dat de aangeklikte node altijd in de selectie zit,
+    /// dus `selection.count` is hier de juiste maat.
+    @ViewBuilder
+    private func nodeContextMenu(for portrait: Portrait2) -> some View {
+        let bulk = selection.count >= 2
+        let n = selection.count
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            if bulk {
+                menuRow("Rename \(n) portraits", icon: "pencil") {
+                    menuTarget = nil; renameTargets = selectedPortraits
+                }
+                menuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
+                    menuTarget = nil; bulkExport()
+                }
+                Divider().padding(.vertical, 2)
+                menuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
+                    menuTarget = nil; deleteTargets = selectedPortraits
+                }
+            } else {
+                menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTargets = [portrait] }
+                menuRow("Export…", icon: "square.and.arrow.up") {
+                    menuTarget = nil; model.select(portrait); model.exportCurrentPortrait()
+                }
+                Divider().padding(.vertical, 2)
+                menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
+            }
+        }
+        .padding(DSSpacing.gap1)
+        // Past zich aan de inhoud aan (de bulk-labels zijn langer), met een vloer
+        // van 190 zodat het enkel-menu niet te smal wordt. `.fixedSize()` in
+        // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
+        // precies, zonder vaste overbreedte.
+        .frame(minWidth: 190, alignment: .leading)
+        .dsPanelSurface(cornerRadius: DSRadius.lg)
+    }
+
+    private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap2) {
+                Image(systemName: icon).font(.system(size: 12, weight: .medium)).frame(width: 16)
+                Text(title).dsTextStyle(.labelBase)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Top-leading van het menu (viewport-space), net onder de node-kaart en
+    /// links uitgelijnd — geklemd binnen de viewport zodat het altijd zichtbaar
+    /// blijft. Schatting van de menuhoogte (200) volstaat voor het klemmen.
+    private func menuAnchor(for portrait: Portrait2) -> CGPoint {
+        let c = nodeCenter(portrait)
+        // De kaart vult de bovenste `cardSide` van de cel; pak de onder-leading hoek.
+        let leadingBottom = CGPoint(x: c.x - cardSide / 2, y: c.y - cellHeight / 2 + cardSide)
+        let s = screenPoint(leadingBottom)
+        // Klem op de breedste realistische variant (content-fit bulk ≈ 210) zodat
+        // het menu altijd in beeld blijft.
+        let menuW: CGFloat = 210
+        let menuH: CGFloat = 200
+        let pad = DSSpacing.gap2
+        let x = min(max(s.x, pad), max(pad, viewport.width - menuW - pad))
+        let y = min(max(s.y + pad, pad), max(pad, viewport.height - menuH - pad))
+        return CGPoint(x: x, y: y)
+    }
+
+    /// Board-punt → viewport-punt (inverse van de camera-transform; zie
+    /// `visibleBoardRect`): scherm = vpMidden + scale·(p − boardMidden) + offset.
+    private func screenPoint(_ p: CGPoint) -> CGPoint {
+        CGPoint(
+            x: viewport.width / 2 + camera.scale * (p.x - boardSize.width / 2) + camera.offset.width,
+            y: viewport.height / 2 + camera.scale * (p.y - boardSize.height / 2) + camera.offset.height
+        )
+    }
+
+    /// Board-midden van een node, los van de virtualisatie-index (placed → de
+    /// persistente plek; anders de auto-grid-plek op z'n lijst-index).
+    private func nodeCenter(_ portrait: Portrait2) -> CGPoint {
+        if portrait.boardPlaced { return CGPoint(x: portrait.boardX, y: portrait.boardY) }
+        let i = portraits.firstIndex { $0.persistentModelID == portrait.persistentModelID } ?? 0
+        return autoCenter(order: i)
+    }
+
+    /// Bulk-export van de selectie (≥2) naar een gekozen map — spiegelt de
+    /// sidebar (E19.4): watermerk voor free, status in de HUD.
+    private func bulkExport() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Export"
+        panel.message = "Choose a folder to export the selected portraits"
+        guard panel.runModal() == .OK, let dir = panel.url else { return }
+        let targets = selectedPortraits
+        guard !targets.isEmpty else { return }
+        let watermark = !entitlement.isProActive
+        exportStatus = "Exporting \(targets.count) portraits…"
+        Task { @MainActor in
+            for (i, p) in targets.enumerated() {
+                guard let data = PortraitExporter.makePNG(for: p, watermark: watermark, shape: p.frameShape) else { continue }
+                let base = p.name.trimmingCharacters(in: .whitespaces)
+                let name = (base.isEmpty ? "portrait-\(i + 1)" : base.replacingOccurrences(of: "/", with: "-")) + ".png"
+                try? data.write(to: dir.appendingPathComponent(name))
+            }
+            exportStatus = nil
         }
     }
 
@@ -379,19 +577,23 @@ struct BoardView: View {
     }
 
     /// E29.1 smoke-haak: `--board-select <n>` selecteert de eerste n portretten.
+    /// `--show-board-menu` forceert daarnaast het rechtermuis-menu (positie/render).
     private func debugSeedSelection() {
         #if DEBUG
         let args = ProcessInfo.processInfo.arguments
-        guard let i = args.firstIndex(of: "--board-select"), args.indices.contains(i + 1),
-              let n = Int(args[i + 1]) else { return }
-        selection = Set(portraits.prefix(n).map { $0.persistentModelID })
-        // E29.2 smoke: pas een batch-achtergrond toe op de selectie ("none" = wissen).
-        if let j = args.firstIndex(of: "--board-batch-bg"), args.indices.contains(j + 1) {
-            let v = args[j + 1]
-            applyBackgroundToAll(v == "none" ? .transparent : .color(v))
+        if let i = args.firstIndex(of: "--board-select"), args.indices.contains(i + 1),
+           let n = Int(args[i + 1]) {
+            selection = Set(portraits.prefix(n).map { $0.persistentModelID })
+            // E29.2 smoke: pas een batch-achtergrond toe op de selectie ("none" = wissen).
+            if let j = args.firstIndex(of: "--board-batch-bg"), args.indices.contains(j + 1) {
+                let v = args[j + 1]
+                applyBackgroundToAll(v == "none" ? .transparent : .color(v))
+            }
+            // E29.3 smoke: match lighting over de selectie.
+            if args.contains("--board-match-light") { matchLightingSelection() }
         }
-        // E29.3 smoke: match lighting over de selectie.
-        if args.contains("--board-match-light") { matchLightingSelection() }
+        // Smoke: forceer het rechtermuis-menu op de eerste node (los van --board-select).
+        if args.contains("--show-board-menu") { menuTarget = menuTarget ?? portraits.first }
         #endif
     }
 
@@ -465,6 +667,10 @@ struct BoardView: View {
             Text("\(selection.count) selected")
                 .dsTextStyle(.labelSmall)
                 .foregroundStyle(DSColor.Foreground.primary)
+                // E32.1: het label heeft geen eigen pil-padding zoals de knoppen,
+                // dus extra leading zodat het niet tegen de capsule-rand plakt en
+                // in lijn ligt met het horizontale ritme van de pillen.
+                .padding(.leading, DSSpacing.gap2)
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
 
@@ -521,6 +727,10 @@ struct BoardView: View {
                 }
             }
         }
+        // E32.1: trailing-tegenhanger van de label-leading, zodat de hover-/
+        // active-fill van de laatste pil net zo ver (≈12pt) van de capsule-rand
+        // klaart als het leidende label — symmetrisch inclusief hover-state.
+        .padding(.trailing, DSSpacing.gap2)
         // E32.1: zelfde solide Card-capsule als de single-editor toolbars
         // (geen glas/rand), compacte maat.
         .dsToolbarCapsule(size: .compact)
@@ -695,11 +905,13 @@ struct BoardView: View {
                         EditColorPanel(
                             source: base,
                             initial: node.adjust,
-                            onCommit: { _, after in applyAdjustToAll(after) }
+                            onCommit: { _, after in applyAdjustToAll(after) },
+                            onRetouch: { retouchNode(node) },
+                            showRetouch: true
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
-                                     onApply: { undoableApplyToNode($0, node, actionName: "Apply effect") })
+                                     onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Apply effect") })
                             .id(node.persistentModelID)
                     case .clothing:
                         ClothesPanel(baseImage: base, entitlement: entitlement,
@@ -713,10 +925,8 @@ struct BoardView: View {
                         FaceActionsPanel(
                             baseImage: base,
                             entitlement: entitlement,
-                            onRetouch: { retouchNode(node) },
-                            onApply: { undoableApplyToNode($0, node, actionName: "Face edit") },
-                            isPro: entitlement.isProActive,
-                            activeToggles: []
+                            onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
+                            isPro: entitlement.isProActive
                         )
                         .id(node.persistentModelID)
                     default:
@@ -741,6 +951,15 @@ struct BoardView: View {
         editTool = nil
     }
 
+    /// Effects/face-edits: bewaart de cutout-alpha als masker i.p.v. Vision
+    /// opnieuw te draaien op een artistiek gestyled beeld.
+    private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) {
+        model.select(node)
+        model.applyEffectResult(image, preserveSourceAlpha: true)
+        thumbs.invalidate(node)
+        editTool = nil
+    }
+
     /// Zelfde als applyToNode maar registreert ook een undo/redo-entry zodat
     /// Cmd+Z de bewerking terugdraait en Cmd+Shift+Z 'm hertoepast.
     private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) {
@@ -755,6 +974,24 @@ struct BoardView: View {
             apply: { [model, cache] img in
                 model.select(node)
                 model.applyEffectResult(img)
+                cache.invalidate(node)
+            },
+            undoTo: before, redoTo: image, actionName: actionName
+        )
+    }
+
+    private func undoableApplyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2, actionName: String) {
+        guard let before = NSImage(data: node.cutoutData) else {
+            applyToNodePreservingAlpha(image, node)
+            return
+        }
+        applyToNodePreservingAlpha(image, node)
+        let cache = thumbs
+        ImageEnhanceUndo.register(
+            undoManager, target: node,
+            apply: { [model, cache] img in
+                model.select(node)
+                model.applyEffectResult(img, preserveSourceAlpha: true)
                 cache.invalidate(node)
             },
             undoTo: before, redoTo: image, actionName: actionName
@@ -790,11 +1027,12 @@ struct BoardView: View {
         VStack {
             Spacer()
             HStack {
-                Text(selection.isEmpty
+                Text(exportStatus ?? (selection.isEmpty
                      ? "\(portraits.count) portraits — click to select, double-click to edit"
-                     : "\(selection.count) selected")
+                     : "\(selection.count) selected"))
                     .dsTextStyle(.labelSmall)
-                    .foregroundStyle(selection.isEmpty ? DSColor.Foreground.muted : DSColor.Foreground.primary)
+                    .foregroundStyle(selection.isEmpty && exportStatus == nil
+                                     ? DSColor.Foreground.muted : DSColor.Foreground.primary)
                 Spacer()
                 Button("Fit", action: fit)
                     .buttonStyle(.plain)
@@ -824,6 +1062,8 @@ private struct BoardNodeView: View, Equatable {
     let role: String
     let backgroundColorHex: String?
     let backgroundImageData: Data?
+    /// Portrait-modus (achtergrond-blur) — vervaagt de custom-achtergrond op de board.
+    let portraitBlur: Bool
     /// `Portrait2.updatedAt` — O(1) wijzigings-token voor de (dure) bg-image-`Data`:
     /// `setBackground` bumpt 'm, dus we hoeven nooit de bytes te vergelijken.
     let contentVersion: Date
@@ -842,6 +1082,7 @@ private struct BoardNodeView: View, Equatable {
             && lhs.name == rhs.name
             && lhs.role == rhs.role
             && lhs.backgroundColorHex == rhs.backgroundColorHex
+            && lhs.portraitBlur == rhs.portraitBlur
             && lhs.contentVersion == rhs.contentVersion
     }
 
@@ -899,6 +1140,8 @@ private struct BoardNodeView: View, Equatable {
                 Color.clear
                     .overlay { Image(nsImage: image).resizable().scaledToFill() }
                     .clipped()
+                    // Portrait: vervaag de custom-achtergrond (de onderwerp-thumb erboven blijft scherp).
+                    .blur(radius: portraitBlur ? BackgroundBlur.canvasRadius(side: cardSide) : 0)
             }
             // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
             // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG). De cache is

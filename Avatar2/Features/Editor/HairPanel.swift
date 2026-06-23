@@ -105,15 +105,8 @@ struct HairPanel: View {
     }
 
     var body: some View {
-        DSEditPanel(title: "Change hair") {
-            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack {
-                    Spacer()
-                    Label("\(model.creditCost)", systemImage: "bolt.fill")
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                        .labelStyle(.titleAndIcon)
-                }
+        DSEditPanel(title: "Change hair", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
 
                 // Kapsel-presets.
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -124,7 +117,9 @@ struct HairPanel: View {
                             }
                         }
                     }
+                    .scrollRowTrailingInset()
                 }
+                .horizontalScrollEdgeFade()
 
                 // Vrije beschrijving + send.
                 HStack(spacing: DSSpacing.gap2) {

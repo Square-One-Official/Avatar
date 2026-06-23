@@ -58,7 +58,6 @@ enum AppearancePreference: String, CaseIterable, Identifiable {
 
 enum SettingsDefaults {
     static let appearanceKey = "settings2.appearance"
-    static let updateNotificationsKey = "settings2.updateNotifications"
 }
 
 /// Past de persistente Theme-voorkeur toe op een scene-root. System = nil

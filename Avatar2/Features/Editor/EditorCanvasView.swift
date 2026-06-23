@@ -28,6 +28,11 @@ struct EditorCanvasView: View {
     @Binding var isSelected: Bool
     /// E27.3: pan-drag bezig → EditorView dimt de (screen-space) handles weg.
     @Binding var isPanning: Bool
+    /// E33: frame-selectie (FigJam) — apart van onderwerp-selectie. Een klik op
+    /// de lege canvas-ruimte óf op het onderwerp houdt/zet het frame geselecteerd
+    /// (top-toolbar + ring + chip-highlight in EditorView); alléén een klik
+    /// búíten het frame (EditorView's deselect-laag) zet het weer uit.
+    @Binding var frameSelected: Bool
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
@@ -90,10 +95,12 @@ struct EditorCanvasView: View {
             let clip: AnyShape = frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
             ZStack {
                 // E24.17: klik BUITEN het onderwerp (de hoeken bij een cirkel,
-                // of de marge) = deselecteren → handles weg.
+                // of de marge) = onderwerp deselecteren → handles weg. E33: deze
+                // klik valt nog ín het frame, dus het frame blijft/wordt
+                // geselecteerd (toolbar + ring blijven).
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture { isSelected = false }
+                    .onTapGesture { isSelected = false; frameSelected = true }
 
                 // Onderwerp op SUBJECT-schaal (Portrait2.scale via de handles).
                 // E27.1: de VIEW-zoom zit niet meer hier maar als camera op de
@@ -101,15 +108,32 @@ struct EditorCanvasView: View {
                 // transparante hoeken).
                 Image(nsImage: image)
                     .resizable()
-                    .interpolation(.high)
+                    // Perf: .medium i.p.v. .high — bij camera-pan/zoom wordt het
+                    // beeld elke frame opnieuw geresampled; .medium is op een
+                    // foto-cutout op edit-zoom vrijwel niet te onderscheiden en
+                    // veel goedkoper (zelfde keuze als de board, E27.6).
+                    .interpolation(.medium)
                     .frame(width: imgW, height: imgH)
                     .position(x: imgCenter.x, y: imgCenter.y)
                     .frame(width: side, height: side)
                     .clipShape(clip)
-                    // E24.17: klik OP de afbeelding (binnen de vorm) = selecteren
-                    // → transform-handles verschijnen.
+                    // E33/R2: alpha-bewuste hit-test. Een tik op een OPAQUE
+                    // (persoon)pixel selecteert het ONDERWERP → handles. Een tik op
+                    // een TRANSPARANTE pixel binnen de vorm (lege achtergrond) houdt
+                    // enkel het FRAME geselecteerd (geen handles). De clip blijft het
+                    // hit-gebied; alpha beslist onderwerp vs. frame. `location` zit in
+                    // de lokale `side × side`-ruimte — dezelfde ruimte als imgCenter,
+                    // dus geen drift met de imgW/imgH/imgCenter-layoutmath.
                     .contentShape(clip)
-                    .onTapGesture { isSelected = true }
+                    .onTapGesture(count: 1, coordinateSpace: .local) { location in
+                        selectFromTap(
+                            at: location,
+                            imageRect: CGRect(
+                                x: imgCenter.x - imgW / 2, y: imgCenter.y - imgH / 2,
+                                width: imgW, height: imgH
+                            )
+                        )
+                    }
                     // E24.32: de pan-drag hangt nu op het ONDERWERP (niet de hele
                     // box), zodat een klik in de marge/hoeken altijd de
                     // deselect-tap (Color.clear, onder) bereikt — ook direct ná
@@ -121,9 +145,10 @@ struct EditorCanvasView: View {
                 // mee met de afbeelding of de view-zoom én wordt NIET door de
                 // frame-vorm afgekapt (volle canvas). De afbeelding lijnt
                 // hiernaartoe uit (auto-align mikt op dezelfde FramingConstants).
-                // Zichtbaar tijdens positioneren (selectie of drag).
+                // Zichtbaar zodra de grid-toggle aan staat — ook als de
+                // afbeelding niet geselecteerd is.
                 AlignmentGuideOverlay2(
-                    isVisible: (gridEnabled && (isSelected || isDragging)) || debugShowGuide,
+                    isVisible: gridEnabled || debugShowGuide,
                     inverseCameraScale: inverseCameraScale
                 )
                     .frame(width: side, height: side)
@@ -312,6 +337,64 @@ struct EditorCanvasView: View {
         )
     }
 
+    /// E33/R2: routeer een tik op het cutout via alpha (FigJam-model).
+    /// `location` zit in de lokale `side × side`-ruimte; `imageRect` is het getoonde
+    /// beeld-rect in diezelfde ruimte (imgW/imgH rond imgCenter). Opaque persoon-
+    /// pixel → onderwerp selecteren (handles). Transparante pixel (of buiten het
+    /// beeld-rect, dus per definitie leeg) → enkel het frame geselecteerd houden.
+    private func selectFromTap(at location: CGPoint, imageRect: CGRect) {
+        guard imageRect.width > 0, imageRect.height > 0, imageRect.contains(location) else {
+            isSelected = false      // binnen de vorm maar buiten het beeld → leeg
+            frameSelected = true
+            return
+        }
+        let u = (location.x - imageRect.minX) / imageRect.width
+        let v = (location.y - imageRect.minY) / imageRect.height
+        if image.isOpaqueAtNormalizedPoint(u: u, v: v) {
+            isSelected = true       // persoon-pixel → onderwerp + handles
+            frameSelected = true
+        } else {
+            isSelected = false      // transparante achtergrond ín het frame
+            frameSelected = true
+        }
+    }
+
+}
+
+// MARK: - Alpha-bewuste hit-test (R2 / E33)
+
+// `internal` (geen `private`) zodat de genormaliseerde-punt-geometrie (de
+// y-flip in E27.8) in Avatar2Tests getoetst kan worden.
+extension NSImage {
+    /// Is het cutout OPAQUE (= persoon aanwezig) op een genormaliseerd punt?
+    /// `u`,`v` in [0,1], ORIGIN LINKSBOVEN (v groeit naar beneden — gelijk aan de
+    /// SwiftUI-tik én de imgW/imgH/imgCenter-layoutmath). E27.8: sampelt ALLEEN de
+    /// doelpixel via een 1×1-context (O(1), ongeacht de beeldmaat) i.p.v. het hele
+    /// bitmap te materialiseren. Faalt VEILIG: elk nil-pad geeft `true` (= behandel
+    /// als onderwerp) → behoudt het oude "klik = onderwerp"-gedrag.
+    func isOpaqueAtNormalizedPoint(u: CGFloat, v: CGFloat, alphaThreshold: CGFloat = 0.06) -> Bool {
+        guard u >= 0, u <= 1, v >= 0, v <= 1,
+              let cg = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return true }
+        let w = cg.width, h = cg.height
+        guard w > 0, h > 0 else { return true }
+        let px = min(w - 1, max(0, Int((u * CGFloat(w - 1)).rounded())))
+        let py = min(h - 1, max(0, Int((v * CGFloat(h - 1)).rounded())))
+        // E27.8: `NSBitmapImageRep(cgImage:).colorAt` op een full-res cutout (≈2048px →
+        // ~16MB bitmap-unpack + per-call colorspace-conversie) hing de tik-handler ~1s
+        // op. Hier tekenen we het CGImage verschoven in een 1×1-context zodat doelpixel
+        // (px,py) op de enige output-pixel valt; CG clipt naar 1 pixel → constante tijd.
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(
+                data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return true }
+        ctx.interpolationQuality = .none
+        // CGContext-origin = linksONDER; rij py (origin linksboven) ligt op CG-y =
+        // h-1-py. Verschuif het beeld zo dat die pixel op de output-pixel (0,0) valt.
+        ctx.draw(cg, in: CGRect(x: -px, y: -(h - 1 - py), width: w, height: h))
+        return CGFloat(pixel[3]) / 255 > alphaThreshold
+    }
 }
 
 // MARK: - Uitlijn-gids (E24.35 — gezichtsvorm + oog-markers, DS-stijl)

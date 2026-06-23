@@ -7,7 +7,6 @@
 // Vervangt de mislukte per-onderwerp `viewZoom` uit E24.8/24.17.
 
 import CoreGraphics
-import SwiftUI
 
 /// De viewport-transform. `scale` is geclampt op 0.25×–4×; `offset` verschuift
 /// de scène (in viewport-punten, top-left origin = SwiftUI-conventie).
@@ -22,8 +21,6 @@ struct CanvasCamera: Equatable {
     func clampScale(_ s: CGFloat) -> CGFloat {
         min(maxScale, max(minScale, s))
     }
-
-    var isIdentity: Bool { scale == 1 && offset == .zero }
 
     /// ⌘0 (fit): terug naar de basislayout (scène vult de kaart, geen pan).
     mutating func reset() {
@@ -72,11 +69,12 @@ struct CanvasCamera: Equatable {
         scale = newScale
     }
 
-    /// ⌘1 (100%): zet de zoom terug op 1× rond het midden, mét behoud van de
-    /// huidige pan-positie (in dit camera-model is 1× tegelijk de fit-schaal —
-    /// een pixel-echte 100% vraagt de bron-pixelmaat en hoort bij 27.2/27.3).
+    /// ⌘0 (100%): zet de zoom terug op 1× én centreert de scène (pan = 0). In
+    /// dit camera-model is 1× tegelijk de fit-schaal — een pixel-echte 100%
+    /// vraagt de bron-pixelmaat en hoort bij 27.2/27.3. Recenteren is een
+    /// expliciete wens (anders blijft een verschoven canvas off-center staan).
     mutating func resetToActualSize() {
-        guard scale != 1 else { return }
-        zoomCentered(by: 1 / scale)
+        scale = 1
+        offset = .zero
     }
 }

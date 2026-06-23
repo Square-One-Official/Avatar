@@ -57,12 +57,11 @@ public struct AuthSessionFileStorage: AuthLocalStorage {
             }
         }
 
-        // Plaintext blob (zou in 2.0 niet moeten voorkomen, maar dezelfde
-        // migratie als v1 is goedkoop): her-versleutel in place.
-        if AuthSessionEncryption.looksLikePlaintextSession(onDisk) {
-            try? store(key: key, value: onDisk)
-            return onDisk
-        }
+        // 2.0 schrijft sessies altijd versleuteld in een eigen "Aaavatar2"-
+        // submap, dus een niet-`magic` bestand hoort hier niet thuis — geen
+        // plaintext-migratie meer. Anders zou een aanvaller met container-
+        // schrijftoegang een sessie-JSON kunnen planten. Behandel als ongeldig:
+        // opruimen en geen sessie melden.
         try? FileManager.default.removeItem(at: url)
         return nil
     }

@@ -259,9 +259,9 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
         }
 
         private var backgroundColor: Color {
-            if isActive || configuration.isPressed { return DSColor.Background.neutralStrongest }
-            if isHovering { return DSColor.Background.neutralStronger }
-            return .clear
+            DSColor.neutralSurface(
+                pressed: isActive || configuration.isPressed, hovering: isHovering
+            )
         }
     }
 }
@@ -306,7 +306,7 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                 .rotationEffect(.degrees(90))
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(width: size.height, height: size.height)
-                .background(isHovering ? DSColor.Background.neutralStronger : .clear, in: Circle())
+                .background(DSColor.neutralSurface(pressed: false, hovering: isHovering), in: Circle())
                 .contentShape(Circle())
         }
         .menuStyle(.borderlessButton)

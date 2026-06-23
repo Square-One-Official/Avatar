@@ -27,8 +27,6 @@ public enum ProTier: String, Codable, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
-    public var displayName: String { "Pro" }
-
     /// Monthly credit grant, mirrored server-side. Magic Cutout costs 1
     /// credit per image.
     public var monthlyCredits: Int { 200 }

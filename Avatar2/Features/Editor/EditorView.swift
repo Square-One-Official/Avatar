@@ -83,11 +83,18 @@ struct EditorView: View {
     /// E09.2: een bewerkt portret-beeld terug naar de ShellModel (canvas +
     /// opgeslagen cutout vervangen).
     var onApplyResult: (NSImage) -> Void = { _ in }
+    /// Effects/face-edits: zelfde als onApplyResult maar bewaart de bestaande
+    /// cutout-alpha als masker i.p.v. Vision opnieuw te draaien op een
+    /// artistiek gestyled beeld (→ ShellModel.applyEffectResult preserveSourceAlpha).
+    var onApplyAlphaPreserving: (NSImage) -> Void = { _ in }
     /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
     var onPreview: (NSImage) -> Void = { _ in }
     /// E24.14: commit van de niet-destructieve Adjust-laag (params persisteren
     /// op het portret + canvas hercomputeren). Undo loopt via dezelfde closure.
     var onCommitAdjust: (PortraitAdjust) -> Void = { _ in }
+    /// E33: dubbelklik op de naam-chip opent de rename-modal (ShellView levert de
+    /// closure die `model.isShowingRename` zet — zoals de oude PortraitHeader-knop).
+    var onRename: () -> Void = {}
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -95,6 +102,11 @@ struct EditorView: View {
     /// E24.12: open canvas-toolbar-dropdown (caret-loze DS-kaart). Hier zodat
     /// een klik op de canvas 'm sluit — net als de bottom-panelen.
     @State private var canvasMenu: CanvasToolbarMenu?
+    // Perf (P2): cutout/original/achtergrond één keer gedecodeerd per edit
+    // (gekeyd op updatedAt + id) i.p.v. bij élke body-pass — zie refreshDecodedImages().
+    @State private var decodedCutout: NSImage?
+    @State private var decodedOriginal: NSImage?
+    @State private var decodedBackground: NSImage?
     /// E27.1: de canvas-camera (VIEW-zoom + pan over de HELE scène). Vervangt de
     /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
     /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
@@ -114,6 +126,12 @@ struct EditorView: View {
     /// transform-HANDLES (klik op het onderwerp → handles; klik op lege canvas /
     /// ESC → handles weg). Default false (geen handles tot je het onderwerp kiest).
     @State private var canvasSubjectSelected = false
+    /// E33: frame-selectie (FigJam) — APART van de onderwerp-selectie. Default
+    /// TRUE: het frame opent geselecteerd → top-toolbar zichtbaar + zachte ring
+    /// rond de kaart + active-stijl van de naam-chip. Een klik op het onderwerp
+    /// of de lege canvas houdt 'm aan; alléén een klik búíten het frame (of de
+    /// chip→reselect) schakelt 'm. Onderwerp-handles volgen `canvasSubjectSelected`.
+    @State private var canvasFrameSelected = true
     /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
     /// transform-overlay de handles tijdens het pannen even verbergt.
     @State private var canvasSubjectPanning = false
@@ -121,8 +139,10 @@ struct EditorView: View {
     @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
     @State private var isBoosting = false
+    /// Loopt tijdens de cloud-colourisatie ("Colorise"). Voorkomt dubbele calls.
+    @State private var isColorising = false
     /// E18.12: lokale (gratis, omkeerbare) enhances zijn aan/uit-knoppen —
-    /// One-click retouch + Improve lighting. Key = actietitel; waarde = de foto
+    /// One-click retouch + Studio Light. Key = actietitel; waarde = de foto
     /// van vóór het toepassen (om naar terug te keren). Aanwezig = aan. 2e klik
     /// herstelt i.p.v. stapelen. Cloud/generatief en uitlijnen blijven gewone
     /// "pas toe"-acties (toggle-logica is daar niet logisch: kosten credits /
@@ -153,18 +173,23 @@ struct EditorView: View {
     }
 
     /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
-    private var originalImage: NSImage? {
-        guard let data = portraitModel?.originalData else { return nil }
-        return NSImage(data: data)
-    }
+    /// Perf (P2): gememoïseerd (originalData is na import onveranderlijk).
+    private var originalImage: NSImage? { decodedOriginal }
 
     /// E24.14: de RAUWE cutout (zonder Adjust-laag). `portrait` is het
     /// canvasbeeld (mét Adjust); destructieve ops + de Adjust-sliders moeten op
     /// de rauwe pixels werken, zodat de Adjust-laag orthogonaal blijft en niet
     /// dubbel telt. Zonder model is er geen Adjust → het canvasbeeld is rauw.
-    private var rawCutout: NSImage {
-        if let portraitModel, let raw = NSImage(data: portraitModel.cutoutData) { return raw }
-        return portrait
+    private var rawCutout: NSImage { decodedCutout ?? portrait }
+
+    /// Perf (P2): decodeer cutout/original/achtergrond één keer per edit i.p.v.
+    /// bij élke body-pass (pan/zoom/hover/selectie). Invalidatie via updatedAt +
+    /// id — dezelfde aanname als ThumbnailStore (alle edit-paden roepen `touch()`;
+    /// `originalData` is na import onveranderlijk).
+    private func refreshDecodedImages() {
+        decodedCutout = portraitModel.flatMap { NSImage(data: $0.cutoutData) }
+        decodedOriginal = portraitModel?.originalData.flatMap { NSImage(data: $0) }
+        decodedBackground = portraitModel?.backgroundImageData.flatMap { NSImage(data: $0) }
     }
 
     /// E24.16: de clip-vorm voor het canvas, volgend op `Portrait2.frameShape`
@@ -192,31 +217,60 @@ struct EditorView: View {
         portraitModel.touch()
     }
 
-    /// E07.1: is er een achtergrond ingesteld (dan dot-grid uit). E24.31:
-    /// "Original" toont een vol beeld → ook dan geen dot-grid.
-    private var hasBackground: Bool {
-        portraitModel?.backgroundColorHex != nil
-            || portraitModel?.backgroundImageData != nil
-            || portraitModel?.useOriginalBackground == true
+    /// E33/R4: neutraal-grijze frame-selectiekleur (macOS-stijl), gedeeld door de
+    /// OUTER ring en de naam-chip-actiefrand. Vast grijs → appearance-stabiel.
+    /// CanvasFrameChip gebruikt dezelfde waarde (houd ze gelijk).
+    static let frameSelectionGrey = Color(white: 0.6)
+
+    /// E33: selecteer alléén het frame (toolbar + ring terug) en laat het
+    /// onderwerp los (handles weg) — gebruikt door de naam-chip en als
+    /// gemeenschappelijke ingang voor "klik op de lege canvas".
+    private func selectFrameOnly() {
+        DSMotion.animate(DSMotion.base) {
+            canvasFrameSelected = true
+            canvasSubjectSelected = false
+        }
     }
 
-    /// E24.31: toont de canvas de ORIGINELE importfoto vol (Original-modus)?
-    private var showsOriginal: Bool {
-        portraitModel?.useOriginalBackground == true && originalImage != nil
+    /// E07.1: is er een achtergrond-laag (dan dot-grid uit)? Origineel, custom
+    /// afbeelding, kleur, óf Portrait-op-transparant (valt op origineel terug).
+    private var hasBackground: Bool {
+        backgroundLayerImage != nil || portraitModel?.backgroundColorHex != nil
+    }
+
+    /// Portrait-modus (achtergrond-blur) actief op dit portret.
+    private var portraitBlurOn: Bool { portraitModel?.portraitBlur == true }
+
+    /// Het beeld dat als achtergrondLAAG achter het scherpe onderwerp tekent:
+    /// custom upload, óf de originele foto (Original-modus, of Portrait zonder
+    /// expliciete achtergrond). nil = vlakke kleur of geen achtergrond.
+    private var backgroundLayerImage: NSImage? {
+        if let custom = decodedBackground { return custom }                     // .image
+        if portraitModel?.backgroundColorHex != nil { return nil }              // .color → geen beeld-laag
+        if portraitModel?.useOriginalBackground == true { return originalImage } // .original
+        if portraitBlurOn { return originalImage }                             // .transparent + Portrait → origineel
+        return nil                                                              // .transparent
     }
 
     @ViewBuilder
     private var backgroundLayer: some View {
-        if let data = portraitModel?.backgroundImageData, let image = NSImage(data: data) {
+        if let image = backgroundLayerImage {
             // E24.23-fix: vul een NEUTRAAL-GROOT (Color.clear) container via een
             // overlay i.p.v. `scaledToFill().frame(maxWidth:.infinity)`. Bij dat
             // laatste lekte de INTRINSIEKE pixelmaat van een grote upload de
             // layout in → het hele canvas (en zo de UI) zoomde onherstelbaar in.
             // Color.clear neemt de aangeboden (begrensde) maat; het beeld is puur
             // een overlay en beïnvloedt de layout niet. clipped() snijdt overvul.
-            Color.clear
-                .overlay { Image(nsImage: image).resizable().scaledToFill() }
-                .clipped()
+            // Portrait: vervaag de achtergrond-laag (fractie van de zijde, zodat de
+            // preview de export-blur volgt); het onderwerp erboven blijft scherp.
+            GeometryReader { geo in
+                Color.clear
+                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                    .clipped()
+                    .blur(radius: portraitBlurOn
+                          ? BackgroundBlur.canvasRadius(side: min(geo.size.width, geo.size.height))
+                          : 0)
+            }
         } else if let hex = portraitModel?.backgroundColorHex, let color = Color(hexRGB: hex) {
             color
         }
@@ -277,8 +331,15 @@ struct EditorView: View {
             // (DSBottomToolbar-accessoireslot, E03.19) op de 56-pitch zoals
             // frame App / Edit 4008:7340 — zie `toolbarAccessories`. De
             // tijdelijke bottomTrailing-overlay is hiermee weg.
-            // E27.2: de zoom-HUD zweeft linksonder.
-            .overlay(alignment: .bottomLeading) { zoomHUD }
+            // Zoom-bediening zit nu in het View-menu (macOS-menubalk) i.p.v. een
+            // zwevende HUD op de canvas — publiceer de acties als focused scene
+            // value zodat de menu-items werken zolang deze editor in beeld is.
+            .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
+                zoomIn: { zoomCamera(by: 1.25) },
+                zoomOut: { zoomCamera(by: 0.8) },
+                zoomTo100: { withAnimation(.spring(duration: 0.3)) { camera.resetToActualSize() } },
+                zoomToFit: { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
+            ))
             // UndoManager publiceert geen state → luister op de
             // change-notificaties en bump de tick zodat de knoppen
             // enable/disablen.
@@ -362,14 +423,27 @@ struct EditorView: View {
                     )
                 }
             },
-            onImproveLighting: { toggleLocalEnhance("Improve lighting") { PortraitEnhancer.improveLighting($0) } },
-            onColorise: { _ = entitlement?.allowCloudFeature() },
+            onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
+            onStudioLight: { toggleLocalEnhance("Studio Light") { PortraitEnhancer.improveLighting($0) } },
+            onPortrait: { togglePortraitBlur() },
+            onColorise: runColorise,
             onBoost: runBoostResolution,
-            // E31.3: Restore body verhuisde uit de frame-toolbar-AI-dropdown hierheen.
-            onRestoreBody: { _ = entitlement?.allowCloudFeature() },
+            // E31.3: Restore body → re-isoleert het onderwerp vanuit de originele
+            // importfoto (Vision), zodat afgekapte lichaamsdelen terugkomen.
+            onRestoreBody: {
+                guard entitlement?.allowCloudFeature() == true else { return }
+                guard originalImage != nil else {
+                    entitlement?.presentError("No original photo available for this portrait.")
+                    return
+                }
+                restoreToOriginal()
+            },
             isPro: entitlement?.isProActive ?? false,
-            // E24.28: toon de active-state van de Improve lighting-toggle.
-            improveLightingOn: localToggleBaselines["Improve lighting"] != nil,
+            // E24.28: toon de active-state van de lokale toggles.
+            studioLightOn: localToggleBaselines["Studio Light"] != nil,
+            portraitOn: portraitModel?.portraitBlur == true,
+            retouchOn: localToggleBaselines["One click retouch"] != nil,
+            showRetouch: true,
             // E24.27: AI-één-tik-acties zitten nu IN het Light & color-paneel.
             showAutoEnhance: true
         )
@@ -377,46 +451,8 @@ struct EditorView: View {
 
     // E27.1: verborgen sneltoets-knoppen voor ⌘+/⌘−/⌘0(fit)/⌘1(100%). ⌘= vangt
     // de toets zonder shift; alles animeert soepel. Geen UI, geen hit-test.
-    @ViewBuilder
-    private var cameraShortcutButtons: some View {
-        Group {
-            Button("") { zoomCamera(by: 1.25) }.keyboardShortcut("+", modifiers: .command)
-            Button("") { zoomCamera(by: 1.25) }.keyboardShortcut("=", modifiers: .command)
-            Button("") { zoomCamera(by: 0.8) }.keyboardShortcut("-", modifiers: .command)
-            Button("") { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
-                .keyboardShortcut("0", modifiers: .command)
-            Button("") { withAnimation(.spring(duration: 0.3)) { camera.resetToActualSize() } }
-                .keyboardShortcut("1", modifiers: .command)
-        }
-        .opacity(0)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
     private func zoomCamera(by factor: CGFloat) {
         withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
-    }
-
-    /// E27.2: zet de camera op een absolute zoom-schaal (om het midden) — de
-    /// HUD-slider gebruikt dit. Direct (geen spring) zodat het slepen op de
-    /// vinger blijft.
-    private func setCameraScale(_ target: CGFloat) {
-        camera.zoomCentered(by: target / max(0.0001, camera.scale))
-    }
-
-    // E27.2: de zwevende zoom-HUD (− / slider / + / fit-met-%) op de camera.
-    private var zoomHUD: some View {
-        DSZoomHUD(
-            scale: camera.scale,
-            minScale: camera.minScale,
-            maxScale: camera.maxScale,
-            onSetScale: { setCameraScale($0) },
-            onZoomIn: { zoomCamera(by: 1.25) },
-            onZoomOut: { zoomCamera(by: 0.8) },
-            onFit: { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
-        )
-        .padding(.leading, DSSpacing.gap3)
-        .padding(.bottom, DSSpacing.gap4)
     }
 
     private var editorBody: some View {
@@ -436,20 +472,12 @@ struct EditorView: View {
                          dotGridDimmed: canvasSubjectSelected,
                          surfaceClip: cardSurfaceClip) {
                 ZStack {
-                    // E24.31: Original-modus — toon de ORIGINELE importfoto vol
-                    // (geen cutout/transform), geclipt tot de frame-vorm. De
-                    // Color.clear-overlay houdt de intrinsieke pixelmaat uit de
-                    // layout (zelfde 24.23-fix als backgroundLayer).
-                    if showsOriginal, let original = originalImage {
-                        Color.clear
-                            .overlay { Image(nsImage: original).resizable().scaledToFill() }
-                            .clipped()
-                            .clipShape(frameClipShape)
-                    } else {
-                    // E07.1: gekozen achtergrond achter de cutout (preview;
-                    // exportkwaliteit-compositing volgt in E07.2).
-                    // E24.16: clip de achtergrond tot de frame-vorm (cirkel =
-                    // transparante hoeken die het dot-grid eronder tonen).
+                    // Achtergrond-laag achter het onderwerp: gekozen achtergrond,
+                    // origineel (Original-modus), of Portrait-blur — zie backgroundLayer.
+                    // Sinds 2026-06-23 tekent het scherpe onderwerp ALTIJD bovenop (ook
+                    // in Original-modus), zodat Portrait de echte achtergrond kan
+                    // vervagen. E24.16: clip tot de frame-vorm (cirkel = transparante
+                    // hoeken die het dot-grid eronder tonen).
                     backgroundLayer
                         .clipShape(frameClipShape)
                     // E06.2: hold-to-compare toont de originele importfoto
@@ -472,14 +500,17 @@ struct EditorView: View {
                             gridEnabled: canvasGridEnabled,
                             isSelected: $canvasSubjectSelected,
                             isPanning: $canvasSubjectPanning,
+                            frameSelected: $canvasFrameSelected,
                             frameShape: portraitModel?.frameShape ?? .circle,
                             // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
                             cameraScale: camera.scale
                         )
                     }
-                    } // E24.31: einde Original-else
                 }
             }
+            // (E33: de frame-selectie-ring is verhuisd naar de SCREEN-SPACE chrome-
+            // overlay hieronder — vóór de scaleEffect kromp hij mee met de camera-
+            // zoom; nu blijft hij 2pt en plakt aan de zichtbare kaart.)
             // E27.1: de camera (VIEW-zoom + pan) op de HELE scène — render-only
             // (scaleEffect/offset beïnvloeden de layout niet, dus de toolbar-
             // overlay + tap-dismiss blijven in screen-space staan). Pinch zoomt
@@ -491,7 +522,7 @@ struct EditorView: View {
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
             // door uit te zoomen. Posities volgen onderwerp-transform + camera.
             .overlay {
-                if canvasSubjectSelected, !showsOriginal, !isComparing, let portraitModel {
+                if canvasSubjectSelected, !isComparing, let portraitModel {
                     GeometryReader { geo in
                         CanvasTransformOverlay(
                             side: min(geo.size.width, geo.size.height),
@@ -505,16 +536,96 @@ struct EditorView: View {
                     }
                 }
             }
+            // E33: frame-chrome (selectie-RING + naam-CHIP + frame-TOOLBAR) als
+            // SCREEN-SPACE overlay — exact het CanvasTransformOverlay-recept: posities
+            // via de camera-mapping (scherm = midden + scale·(p−midden) + offset) maar
+            // met VASTE schermmaten. Zo PLAKKEN ze aan de (camera-gezoomde) zichtbare
+            // kaart i.p.v. op de niet-gezoomde layout-hoek te blijven hangen, én blijft
+            // de ring 2pt dik op élk zoomniveau (i.p.v. mee te krimpen). `side` = de
+            // (inset-verkleinde) kaartzijde; `s`/`offset` = de camera.
+            .overlay {
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    let s = camera.scale
+                    let cx = side / 2 + camera.offset.width        // zichtbaar kaartmidden
+                    let cy = side / 2 + camera.offset.height
+                    let vis = side * s                             // zichtbare kaartzijde
+                    let visTop = cy - vis / 2
+                    let visLeft = cx - vis / 2
+                    ZStack(alignment: .topLeading) {
+                        // E-fix: klik-buiten-sluit voor de frame-dropdown. Ligt ÓNDER
+                        // de toolbar (laatste ZStack-kind) zodat klikken op het menu de
+                        // menu-knoppen bereiken; klikken elders op de kaart sluiten 'm.
+                        // Vervangt de blanket-overlay die het menu afdekte.
+                        if canvasMenu != nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .frame(width: side, height: side)
+                                .onTapGesture { canvasMenu = nil }
+                        }
+
+                        // OUTER grijze ring op de zichtbare kaartrand — vaste 2pt,
+                        // radius = kaartradius·zoom + 2 (concentrisch met de xl4-hoek).
+                        RoundedRectangle(cornerRadius: DSRadius.xl4 * s + 2, style: .continuous)
+                            .stroke(Self.frameSelectionGrey, lineWidth: 2)
+                            .frame(width: vis + 4, height: vis + 4)
+                            .position(x: cx, y: cy)
+                            .opacity(canvasFrameSelected ? 1 : 0)
+                            .allowsHitTesting(false)
+
+                        // Naam-chip: links uitgelijnd op de kaart-linkerrand, net
+                        // erboven (FigJam-label dat aan het frame plakt). Single =
+                        // frame selecteren, dubbelklik = hernoemen.
+                        CanvasFrameChip(
+                            name: portraitModel?.name,
+                            isActive: canvasFrameSelected,
+                            onSelect: { selectFrameOnly() },
+                            onRename: onRename
+                        )
+                        .fixedSize()
+                        // 28pt chip-hoogte + ~10pt lucht boven de kaartrand.
+                        .offset(x: visLeft, y: visTop - 38)
+
+                        // Frame-toolbar: gecentreerd op de kaart, NET BINNEN de
+                        // bovenrand (over de portret-top). Tracking → blijft ín het
+                        // frame op élk zoomniveau (i.p.v. erboven te zweven).
+                        if canvasFrameSelected {
+                            CanvasActionToolbar(
+                                onAutoFrame: runAutomaticFraming,
+                                onFlip: flipHorizontally,
+                                frameShape: portraitModel?.frameShape ?? .circle,
+                                onSetFrameShape: setFrameShape,
+                                activeMenu: $canvasMenu,
+                                gridEnabled: $canvasGridEnabled,
+                                // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
+                                // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
+                                background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
+                            )
+                            .fixedSize()
+                            .position(x: cx, y: visTop + DSSpacing.gap6)
+                            // Emil: nooit vanaf scale(0); scale-vanuit-0.96 + opacity, origin top.
+                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                        }
+                    }
+                    .frame(width: side, height: side)
+                }
+            }
             // E04.7: altijd 1:1 en responsief — de kaart vult de foto-slot
             // (aspect-fit, dus nooit clippen) en groeit/krimpt met venster
             // en geopend paneel; de 3.16-garantie houdt paneel en toolbar
             // buiten schot. 456 was de Figma-maat bij 1000×700, geen cap.
             .aspectRatio(1, contentMode: .fit)
+            // E33/R3: licht uitgezoomde default — een ECHTE layout-marge rond de
+            // kaart zodat het naam-label er bij camera=1 nét boven past (de chrome-
+            // overlay tilt 'm 38pt op → marge ≥ 38 voorkomt afkappen door `.clipped()`)
+            // en de OUTER ring vrij van de slotrand blijft. Zoomt de gebruiker verder
+            // uit, dan volgt de chrome de camera (zie de screen-space overlay).
+            .padding(DSSpacing.gap8 + DSSpacing.gap3)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // E27.1: ingezoomde scène binnen de canvas-slot houden (niet over de
-            // panelen/toolbar lekken). De catcher + ⌘-knoppen hangen erachter:
-            // de catcher vangt scroll/⌘-scroll/spatie-drag (clicks vallen door),
-            // de knoppen leveren ⌘+/⌘−/⌘0(fit)/⌘1(100%).
+            // panelen/toolbar lekken). De catcher vangt scroll/⌘-scroll/spatie-
+            // drag (clicks vallen door); de zoom-shortcuts (⌘+/⌘−/⌘0/⇧1) komen
+            // nu uit het View-menu in de menubalk.
             .clipped()
             .background {
                 // chromeHovered telt alléén als er ook echt een menu/paneel open
@@ -523,13 +634,16 @@ struct EditorView: View {
                     camera: $camera,
                     chromeHovered: pointerOverChrome && (canvasMenu != nil || activeTool != nil)
                 )
-                cameraShortcutButtons
             }
             .padding(.top, DSSpacing.gap8)
             // E18.17: staat er een paneel/sidebar open, dan sluit een klik
             // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
             .overlay {
-                if activeTool != nil || isSidebarVisible || canvasMenu != nil {
+                // E-fix: het frame-menu (canvasMenu) sluit nu via een catcher die
+                // ÓNDER het menu ligt (in de frame-chrome-overlay hieronder) — deze
+                // blanket-overlay lag eróver en at de menu-klikken op. Hier nog
+                // alléén het bottom-paneel/sidebar (die buiten deze overlay leven).
+                if activeTool != nil || isSidebarVisible {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -538,34 +652,25 @@ struct EditorView: View {
                         }
                 }
             }
-            // E24.1: canvas action-toolbar (scène/beeld) bovenaan het portret.
-            // E28.5: ALTIJD zichtbaar in de editor (één portret = altijd actief);
-            // selectie-gestuurd verbergen hoort bij de board (meerdere canvassen).
-            // `.onHover` op de dropdown-content laat de catcher scroll dóór zodat
-            // het menu scrollt i.p.v. de canvas.
-            .overlay(alignment: .top) {
-                CanvasActionToolbar(
-                    onAutoFrame: runAutomaticFraming,
-                    onFlip: flipHorizontally,
-                    frameShape: portraitModel?.frameShape ?? .circle,
-                    onSetFrameShape: setFrameShape,
-                    activeMenu: $canvasMenu,
-                    gridEnabled: $canvasGridEnabled,
-                    // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
-                    // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
-                    background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
-                )
-                // E31.x: de Name/Role-kop zweeft nu over het canvas in de
-                // topstrook; de capsule zakt naar gap-12 zodat hij vrij onder
-                // die titel blijft (geen botsende chrome bovenaan-midden).
-                .padding(.top, DSSpacing.gap12)
-            }
+            // (E33/R1: de frame-toolbar is verhuisd naar card-space hierboven —
+            // plakt nu aan de kaart-bovenrand i.p.v. in de slot-band te zweven.)
+            // E33: ring-fade + toolbar enter/exit samen animeren (reduced-motion-
+            // bewust). Eén bron i.p.v. losse withAnimation-sites; de initiële
+            // `true` ziet geen change → geen intro-animatie.
+            .dsMotion(DSMotion.base, value: canvasFrameSelected)
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
-            // E28.5: een ander portret start gedeselecteerd (handles weg).
+            // E33: een ander portret opent frame-geselecteerd (toolbar/ring terug),
+            // onderwerp gedeselecteerd (handles weg).
             .onChange(of: portraitModel?.persistentModelID) { _, _ in
                 camera.reset()
+                canvasFrameSelected = true
                 canvasSubjectSelected = false
+                refreshDecodedImages()
             }
+            // Perf (P2): her-decodeer bij een edit (cutout/achtergrond bumpen
+            // `updatedAt`) en bij eerste verschijnen; pan/zoom/hover raken het niet.
+            .onChange(of: portraitModel?.updatedAt) { _, _ in refreshDecodedImages() }
+            .onAppear { refreshDecodedImages() }
             // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
             // oorzaak: de enige klik-deselect (EditorCanvasView's Color.clear) dekt
             // alleen het canvas-VIERKANT, niet de marge eromheen — en de camera-
@@ -574,12 +679,18 @@ struct EditorView: View {
             // foto-slot en deselecteert elke klik die niet op het onderwerp,
             // de handles of een toolbar landt. Onderwerp-tap (selecteren) en
             // EditorCanvasView's eigen deselect liggen erbóven → ongemoeid.
+            // E33: deze klik valt búíten het frame → deselecteert BEIDE (frame +
+            // onderwerp): toolbar + ring + handles weg. Altijd actief zolang er
+            // iets geselecteerd is (frame is default geselecteerd).
             .background {
-                if canvasSubjectSelected {
+                if canvasFrameSelected || canvasSubjectSelected {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.easeOut(duration: 0.18)) { canvasSubjectSelected = false }
+                            DSMotion.animate(DSMotion.base) {
+                                canvasFrameSelected = false
+                                canvasSubjectSelected = false
+                            }
                         }
                 }
             }
@@ -594,7 +705,7 @@ struct EditorView: View {
                 // E31.2: de capsule-knop "Enhance" opent het volledige Light &
                 // color / Adjust-paneel (E24.27: sliders + Auto-enhance-acties),
                 // functioneel ongewijzigd verhuisd uit de frame-toolbar. Gebruikt
-                // `editColorPanel` (showAutoEnhance + improveLightingOn-state) i.p.v.
+                // `editColorPanel` (showAutoEnhance + studioLightOn-state) i.p.v.
                 // een uitgeklede inline-variant.
                 DSEditPanel(title: "Enhance", maxContentHeight: editPanelMaxHeight) {
                     editColorPanel
@@ -604,14 +715,12 @@ struct EditorView: View {
                 // acties zijn gewired op de face-intent van /v1/stylize
                 // (nano-banana instruction-edit) i.p.v. een stub-gate. `.id` op
                 // het portret zodat het paneel-model herbouwt bij portret-wissel.
-                DSEditPanel(title: tool.label) {
+                DSEditPanel(title: tool.label, credits: CreditMeter.chipLabel(for: .generativeStandard)) {
                     FaceActionsPanel(
                         baseImage: rawCutout,
                         entitlement: entitlement,
-                        onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
-                        onApply: undoableApply("Face edit"),
-                        isPro: entitlement.isProActive,
-                        activeToggles: Set(localToggleBaselines.keys)
+                        onApply: undoableApplyPreservingAlpha("Face edit"),
+                        isPro: entitlement.isProActive
                     )
                     .id(portraitModel?.persistentModelID)
                 }
@@ -628,7 +737,7 @@ struct EditorView: View {
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize. E24.33: het
                 // portret levert de effect-cache (instant schakelen, geen regen).
-                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, portrait: portraitModel, onApply: undoableApply("Apply effect"))
+                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, portrait: portraitModel, onApply: undoableApplyPreservingAlpha("Apply effect"))
                     .id(portraitModel?.persistentModelID)
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
@@ -661,7 +770,13 @@ struct EditorView: View {
             // E18.12: smoke-haak — toon de aan-staat van de lokale toggles.
             if ProcessInfo.processInfo.arguments.contains("--retouch-on") {
                 localToggleBaselines["One click retouch"] = portrait
-                localToggleBaselines["Improve lighting"] = portrait
+                localToggleBaselines["Studio Light"] = portrait
+            }
+            // Portrait-smoke-haak: zet de originele achtergrond + Portrait-blur aan,
+            // zodat de blur (scherp onderwerp over vervaagde achtergrond) zichtbaar is.
+            if ProcessInfo.processInfo.arguments.contains("--portrait-on") {
+                portraitModel?.useOriginalBackground = true
+                portraitModel?.portraitBlur = true
             }
             // E24.26: smoke-haak — grid-toggle aan.
             if ProcessInfo.processInfo.arguments.contains("--grid-on") { canvasGridEnabled = true }
@@ -728,6 +843,24 @@ struct EditorView: View {
         }
     }
 
+    /// Portrait-modus (achtergrond-blur) aan/uit. Niet-destructief: zet alléén de
+    /// `portraitBlur`-vlag op het portret (canvas/export/board hercomputeren de
+    /// achtergrond-laag), undo'baar via de gedeelde ReversibleChange-motor — net
+    /// als de Adjust-laag, niet via toggleLocalEnhance (dat cutout-bytes vervangt).
+    private func togglePortraitBlur() {
+        guard let portraitModel else { return }
+        let before = portraitModel.portraitBlur
+        let after = !before
+        portraitModel.portraitBlur = after
+        portraitModel.touch()
+        ReversibleChange.register(
+            undoManager, target: portraitModel, from: before, to: after, actionName: "Portrait"
+        ) { model, value in
+            model.portraitBlur = value
+            model.touch()
+        }
+    }
+
     /// E22.2: spiegel het portret horizontaal (undo'baar via onApplyResult).
     private func flipHorizontally() {
         let base = rawCutout
@@ -759,6 +892,23 @@ struct EditorView: View {
             onApplyResult(newImage)
             ImageEnhanceUndo.register(
                 undoManager, target: portraitModel, apply: onApplyResult,
+                undoTo: before, redoTo: newImage, actionName: name
+            )
+        }
+    }
+
+    /// Zelfde als `undoableApply` maar via `onApplyAlphaPreserving` — voor
+    /// Effects en Face-edits die de lichaamsvorm moeten bewaren.
+    private func undoableApplyPreservingAlpha(_ name: String) -> (NSImage) -> Void {
+        { newImage in
+            guard let portraitModel,
+                  let before = NSImage(data: portraitModel.cutoutData) else {
+                onApplyAlphaPreserving(newImage)
+                return
+            }
+            onApplyAlphaPreserving(newImage)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel, apply: onApplyAlphaPreserving,
                 undoTo: before, redoTo: newImage, actionName: name
             )
         }
@@ -815,6 +965,51 @@ struct EditorView: View {
             } catch {
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("Couldn't boost the resolution. Please try again.")
+            }
+        }
+    }
+
+    /// Cloud-colourisatie van het huidige portret (DeOldify, 1 credit). Vervangt
+    /// canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall. Spiegelt
+    /// `runBoostResolution`.
+    private func runColorise() {
+        guard !isColorising, let entitlement, let portraitModel,
+              let png = rawCutout.pngData() else { return }
+        // E18.2: contextuele gate (online uit → login → upgrade).
+        guard entitlement.allowCloudFeature() else { return }
+        let before = rawCutout
+        entitlement.presentWorking(
+            title: "Colorising",
+            messages: [
+                "Bringing back the colour…",
+                "Mixing the palette…",
+                "Painting in the details…",
+                "Warming up the tones…",
+                "Almost vivid…",
+            ]
+        )
+        Task {
+            isColorising = true
+            defer { isColorising = false }
+            do {
+                let (data, _) = try await entitlement.backend.colorize(imagePNG: png)
+                guard let after = NSImage(data: data) else {
+                    entitlement.dismissWorkingToast()
+                    return
+                }
+                entitlement.dismissWorkingToast()
+                onApplyResult(after)
+                ImageEnhanceUndo.register(
+                    undoManager, target: portraitModel, apply: onApplyResult,
+                    undoTo: before, redoTo: after, actionName: "Colorise"
+                )
+                await entitlement.refresh()
+            } catch BackendError.noCredits {
+                entitlement.dismissWorkingToast()
+                entitlement.handleOutOfCredits()
+            } catch {
+                entitlement.dismissWorkingToast()
+                entitlement.presentError("Couldn't colorise this portrait. Please try again.")
             }
         }
     }

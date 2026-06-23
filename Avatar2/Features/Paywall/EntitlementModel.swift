@@ -148,7 +148,7 @@ final class EntitlementModel {
     /// Stripe Customer Portal in de browser ("Manage subscription").
     func openManageSubscription() {
         Task {
-            if let url = try? await backend.openPortal() {
+            if let url = try? await backend.openPortal(), url.isAllowedExternalScheme {
                 NSWorkspace.shared.open(url)
             }
         }
@@ -301,7 +301,9 @@ final class EntitlementModel {
         switch result {
         case .web(let url):
             // Stripe Checkout in de browser; terugkeer via aaavatar://
-            // stripe-return (URL-scheme staat al op het Avatar2-target).
+            // stripe-return (URL-scheme staat al op het Avatar2-target). Guard
+            // het scheme zodat alleen web-/eigen-scheme-URL's geopend worden.
+            guard url.isAllowedExternalScheme else { throw BackendError.decode }
             NSWorkspace.shared.open(url)
             isPaywallPresented = false
         case .storeKit:

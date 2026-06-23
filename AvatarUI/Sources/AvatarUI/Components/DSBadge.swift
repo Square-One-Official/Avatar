@@ -23,11 +23,13 @@ public struct DSBadge: View {
     private let label: String
     private let icon: Image?
     private let type: BadgeType
+    private let compact: Bool
 
-    public init(_ label: String, icon: Image? = nil, type: BadgeType = .neutral) {
+    public init(_ label: String, icon: Image? = nil, type: BadgeType = .neutral, compact: Bool = false) {
         self.label = label
         self.icon = icon
         self.type = type
+        self.compact = compact
     }
 
     public var body: some View {
@@ -43,7 +45,7 @@ public struct DSBadge: View {
                 .lineLimit(1)
         }
         .foregroundStyle(type.foreground)
-        .padding(.horizontal, DSSpacing.gap2)
+        .padding(.horizontal, compact ? DSSpacing.gap1 : DSSpacing.gap2)
         .padding(.vertical, DSSpacing.gap1)
         .background(type.background, in: RoundedRectangle(cornerRadius: DSRadius.md))
     }

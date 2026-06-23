@@ -43,22 +43,12 @@ public struct DSPrimaryButton: View {
 
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: size.contentGap) {
-                if let icon {
-                    icon
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: size.iconSize, height: size.iconSize)
-                }
-                Text(title)
-                    .dsTextStyle(size.textStyle)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isEnabled ? DSColor.Action.onAction : DSColor.Foreground.muted)
-            .frame(maxWidth: fullWidth ? .infinity : nil)
-            .padding(.horizontal, size.horizontalPadding)
-            .padding(.vertical, size.verticalPadding)
-            .background(isEnabled ? DSColor.Background.action : DSColor.Background.neutralStronger, in: Capsule())
+            DSButtonLabel(title: title, icon: icon, size: size)
+                .foregroundStyle(isEnabled ? DSColor.Action.onAction : DSColor.Foreground.muted)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
+                .padding(.horizontal, size.horizontalPadding)
+                .padding(.vertical, size.verticalPadding)
+                .background(isEnabled ? DSColor.Background.action : DSColor.Background.neutralStronger, in: Capsule())
         }
         .buttonStyle(DSStateOpacityButtonStyle())
     }

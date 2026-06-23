@@ -99,15 +99,8 @@ struct ClothesPanel: View {
     }
 
     var body: some View {
-        DSEditPanel(title: "Change upper clothes") {
-            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack {
-                    Spacer()
-                    Label("\(model.creditCost)", systemImage: "bolt.fill")
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                        .labelStyle(.titleAndIcon)
-                }
+        DSEditPanel(title: "Change upper clothes", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
 
                 // Outfit-presets.
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -118,7 +111,9 @@ struct ClothesPanel: View {
                             }
                         }
                     }
+                    .scrollRowTrailingInset()
                 }
+                .horizontalScrollEdgeFade()
 
                 // Vrije beschrijving + send.
                 HStack(spacing: DSSpacing.gap2) {

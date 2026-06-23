@@ -3,7 +3,7 @@ import Foundation
 /// Face beauty-presets voor het Face-paneel (E32.1). De `rawValue` is exact de
 /// server-side key uit `/v1/stylize` (FACE_PRESETS) — de prompt + de "verander
 /// alleen het gevraagde gezichtsdetail"-clausule leven op de server. Net als
-/// StylizeStyle/HairStyle: geen vrij promptveld, productie blijft binnen deze
+/// HairStyle/RemoteEffect: geen vrij promptveld, productie blijft binnen deze
 /// whitelist.
 public enum FaceEdit: String, CaseIterable, Sendable, Identifiable {
     case whitenTeeth = "whiten-teeth"

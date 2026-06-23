@@ -1,14 +1,12 @@
 // Preferences-pagina (E15.1) — Figma 4019:762: H1-header "Preferences" op
-// y76, daaronder (gap-8) twee Settings-secties met 4pt tussenruimte:
-// Appearance (Theme-rij met System/Light/Dark-dropdown) en Notifications
-// (icoonrij met DSToggle).
+// y76, daaronder (gap-8) de Appearance-sectie (Theme-rij met System/Light/
+// Dark-dropdown).
 //
-// Copy-afwijking, gedocumenteerd: de Notifications-rij in het frame draagt
-// nog transcribe-app-copy ("Recording reminder … record your meeting" —
-// zelfde template-bug als in figma-design-review.md). Vorm 1-op-1
-// overgenomen; copy in de geest van Aaavatar: update-meldingen. De
-// voorkeur is persistent (settings2.updateNotifications) en wordt door
-// 15.4 (About/Updates, Sparkle) geconsumeerd.
+// De Figma-frame toont hier ook een "Notifications"-toggle, maar die bleek
+// inert (niets las settings2.updateNotifications) én een duplicaat van de
+// werkende "Automatic updates"-toggle in About/Updates (live op Sparkle).
+// Besluit Thierry (2026-06-23, cleanup-audit): rij verwijderd → update-
+// voorkeuren leven uitsluitend in About, één bron van waarheid.
 
 import AvatarUI
 import SwiftUI
@@ -17,9 +15,6 @@ struct SettingsPreferencesPage: View {
     // E23: default = Dark (zie AppearancePreferenceModifier).
     @AppStorage(SettingsDefaults.appearanceKey)
     private var appearanceRaw: String = AppearancePreference.dark.rawValue
-
-    @AppStorage(SettingsDefaults.updateNotificationsKey)
-    private var updateNotifications: Bool = true
 
     private var appearance: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .dark
@@ -38,15 +33,6 @@ struct SettingsPreferencesPage: View {
                         subtitle: "Match the system, or pin Aaavatar to light or dark mode"
                     ) {
                         themeMenu
-                    }
-                }
-                SettingsSectionCard(title: "Notifications") {
-                    SettingsRow(
-                        icon: "bell",
-                        title: "Update notifications",
-                        subtitle: "Let Aaavatar tell you when a new version is ready"
-                    ) {
-                        DSToggle(isOn: $updateNotifications)
                     }
                 }
             }
