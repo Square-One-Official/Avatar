@@ -56,6 +56,9 @@ export default buildConfig({
         process.env.DATABASE_URL ??
         process.env.POSTGRES_URL_NON_POOLING ??
         "",
+      // Cap connections per Vercel instance so multiple concurrent cold
+      // starts don't exceed Supabase session-mode pooler's pool_size: 15.
+      max: 5,
     },
     // Confine Payload's tables to a dedicated `payload` schema so they
     // never collide with the existing `public.users`, `public.subscriptions`
@@ -63,7 +66,9 @@ export default buildConfig({
     // connection string is ignored by node-postgres; this option is
     // honoured by the adapter and prefixes every DDL/query.
     schemaName: "payload",
-    push: true,
+    // Schema is managed manually (SQL migrations in backend/sql/) because
+    // push: true times out on Vercel cold starts and exhausts connections.
+    push: false,
   }),
   plugins: [
     // Supabase Storage exposes an S3-compatible endpoint; the same
