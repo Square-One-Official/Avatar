@@ -13,6 +13,28 @@
 const PAYLOAD_API_URL = process.env.PAYLOAD_API_URL ?? "";
 const PAYLOAD_API_KEY = process.env.PAYLOAD_API_KEY ?? "";
 
+/**
+ * Normalize `PAYLOAD_API_URL` into a valid http(s) base, or `null` when it is
+ * missing/malformed. A bare host without a scheme (e.g. `admin.aaavatar.nl`)
+ * is the misconfig that made `fetch` throw `TypeError: fetch failed` /
+ * "unknown scheme" — `new URL` then parses the host as the scheme. We prepend
+ * `https://` so a scheme-less value still works, and validate the result so
+ * genuine garbage disables the CMS gracefully (return `[]`/`false`) instead of
+ * throwing on every call.
+ */
+function payloadBase(): string | null {
+  let u = PAYLOAD_API_URL.trim().replace(/\/+$/, "");
+  if (!u) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
 /** What the backend needs from one Payload announcement document. */
 export type PayloadAnnouncement = {
   slug: string;
