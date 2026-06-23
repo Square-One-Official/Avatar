@@ -19,21 +19,21 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 
 | Epic | Team | Status |
 |------|------|--------|
-| [E01 Fundament](E01-fundament.md) | INFRA | ready |
-| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | ready (na E01.2) |
-| [E03 Design system](E03-design-system.md) | DS | done (3.1–3.18) |
-| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | ready (4.3, 4.6) — 4.5 done |
-| [E05 Main app shell](E05-main-shell.md) | FEAT | done op 5.6 na (blocked op E15.2) |
-| [E06 Editor-framework](E06-editor-framework.md) | FEAT | ready (6.2, 6.3) — 6.1 done |
-| [E07 Background](E07-background.md) | FEAT | ready (7.1) |
-| [E08 Barebones-flows](E08-barebones.md) | FEAT | blocked |
-| [E09 Effects](E09-effects.md) | FEAT+AI | ready (9.1) |
-| [E10 Clothes](E10-clothes.md) | FEAT+AI | ready (10.2) |
-| [E11 Hair](E11-hair.md) | FEAT+AI | blocked |
-| [E12 Light & Retouch](E12-light-retouch.md) | FEAT | blocked |
-| [E13 Release-voorbereiding](E13-release.md) | INFRA | ready (13.0) |
-| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | ready (14.1, 14.3, 14.6) |
-| [E15 Settings volledig](E15-settings.md) | FEAT | ready — vervangt E08.1 |
+| [E01 Fundament](E01-fundament.md) | INFRA | **done** (1.1–1.15) |
+| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.3) |
+| [E03 Design system](E03-design-system.md) | DS | **done** (3.1–3.19) |
+| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.7) |
+| [E05 Main app shell](E05-main-shell.md) | FEAT | **done** (5.1–5.8) |
+| [E06 Editor-framework](E06-editor-framework.md) | FEAT | **done** (6.1–6.6) |
+| [E07 Background](E07-background.md) | FEAT | **done** (7.1–7.2) |
+| [E08 Barebones-flows](E08-barebones.md) | FEAT | **done** (8.1 → E15, 8.2–8.3) |
+| [E09 Effects](E09-effects.md) | FEAT+AI | **done** (9.1–9.2) |
+| [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
+| [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
+| [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
+| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4 done — **13.1–13.3 backlog** (nu gedeblokkeerd) |
+| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.6) |
+| [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.6) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
-| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | done (31.1–31.7) — board trekt gelijk |
-| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | in_progress (32.1) — 32.0 bakeoff ready |
+| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.7) |
+| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
