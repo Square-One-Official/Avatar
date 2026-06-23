@@ -300,13 +300,12 @@ export async function fetchActiveEffects(): Promise<PayloadEffect[]> {
   if (effectCache && effectCache.expiresAt > now) {
     return effectCache.payload;
   }
-  const base = payloadBase();
-  if (!base || !PAYLOAD_API_KEY) {
-    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — effects disabled");
+  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — effects disabled");
     return [];
   }
 
-  const url = new URL(`${base}/effects`);
+  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/effects`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("depth", "1"); // resolve the thumbnail upload → { url }
   url.searchParams.set("where[active][equals]", "true");
