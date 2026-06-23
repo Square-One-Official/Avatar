@@ -861,12 +861,59 @@ enum Loc {
         ]
     }
 
+    /// Status messages shown during Stylize / Effects / Hair / Clothes.
+    /// Generic enough to cover all three intents — the actual prompt the
+    /// backend ran is hidden from the user.
+    static var stylizeProcessingStatuses: [String] {
+        en ? [
+            "Reading the portrait…",
+            "Sketching the new look…",
+            "Holding the face steady…",
+            "Letting the model think…",
+            "Refining the detail…",
+            "Matching the lighting…",
+            "Cleaning the edges…",
+            "Final pass…",
+            "Polishing the result…",
+            "Almost there, promise…",
+        ] : [
+            "Het portret lezen…",
+            "De nieuwe look schetsen…",
+            "Het gezicht vasthouden…",
+            "Het model laat denken…",
+            "De details bijwerken…",
+            "Belichting matchen…",
+            "Randen opschonen…",
+            "Laatste check…",
+            "Het resultaat polijsten…",
+            "Bijna klaar, echt waar…",
+        ]
+    }
+
+    /// Status messages shown during Upscale. Short list — the call is
+    /// faster than the generative steps.
+    static var upscaleProcessingStatuses: [String] {
+        en ? [
+            "Boosting resolution…",
+            "Sharpening the detail…",
+            "Re-attaching the alpha…",
+            "Polishing the result…",
+        ] : [
+            "Resolutie verhogen…",
+            "Details verscherpen…",
+            "Alpha terugzetten…",
+            "Het resultaat polijsten…",
+        ]
+    }
+
     /// Returns the message rotation that fits the current processing kind.
     static func processingStatuses(for kind: ProcessingKind) -> [String] {
         switch kind {
         case .cutout:   return processingStatuses
         case .fillBody: return fillBodyProcessingStatuses
         case .colorize: return colorizeProcessingStatuses
+        case .stylize:  return stylizeProcessingStatuses
+        case .upscale:  return upscaleProcessingStatuses
         }
     }
 

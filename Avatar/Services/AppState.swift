@@ -76,6 +76,14 @@ enum ProcessingKind {
     case cutout
     case fillBody
     case colorize
+    /// Effects / hair / clothes edits via `/v1/stylize` (nano-banana
+    /// instruction-edit by default; gpt-image-1.5 alternate arm). Long
+    /// dwell time — the model is slower than colorise.
+    case stylize
+    /// Real-ESRGAN 2× resolution boost via `/v1/upscale`. Quick and
+    /// quiet — the result is just a higher-res cutout, no narrative
+    /// transformation.
+    case upscale
 }
 
 @MainActor

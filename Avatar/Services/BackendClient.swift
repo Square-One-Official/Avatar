@@ -268,6 +268,107 @@ final class BackendClient {
         return resp.email
     }
 
+    // MARK: POST /v1/stylize
+    /// Effects / Hair / Clothes edit — runs nano-banana instruction-edit
+    /// by default, optionally gpt-image-1.5. Server-side prompt mapping
+    /// for every user-visible intent, so the client never sends raw
+    /// instructions on someone else's Replicate account.
+    ///
+    /// Server contract (see backend/api/v1/stylize.ts):
+    ///   - exactly one of: style / hair_preset / hair_prompt /
+    ///     clothes_preset / clothes_prompt.
+    ///   - generation_model optional ("nano-banana" | "gpt-image-1.5").
+    ///   - 4 credits per call (MODEL_REGISTRY.stylize.credits).
+    enum StylizeIntent {
+        /// Effects gallery: one of `clay`, `wood`, `3d`, `scribble`.
+        case style(String)
+        /// Pre-cooked hair recipe: `trim-flyaways`, `curly`, `straight`, `short`, `updo`.
+        case hairPreset(String)
+        /// User-typed hairstyle description (≤200 chars). Server wraps
+        /// it in a fixed hair-only template — not a raw prompt slot.
+        case hairPrompt(String)
+        /// Pre-cooked upper-clothing swap: `tshirt`, `polo`, `blazer`, `hoody`, `sweater`.
+        case clothesPreset(String)
+        /// User-typed clothing description (≤200 chars). Same template
+        /// guard as hairPrompt.
+        case clothesPrompt(String)
+        /// Face beauty-intent (E32.1): `whiten-teeth`, `apply-makeup`,
+        /// `reduce-wrinkles`. Server-mapped; no free-prompt counterpart
+        /// in production.
+        case facePreset(String)
+    }
+    /// E15.6 user-selectable model arm. Server defaults to nano-banana
+    /// when this is nil.
+    enum StylizeModel: String {
+        case nanoBanana = "nano-banana"
+        case gptImage = "gpt-image-1.5"
+    }
+    private struct StylizeResponse: Decodable {
+        let image: String
+        let creditsRemaining: Int
+        let model: String?
+    }
+    func stylize(
+        imagePNG: Data,
+        intent: StylizeIntent,
+        generationModel: StylizeModel? = nil
+    ) async throws -> (Data, Int) {
+        struct Body: Encodable {
+            let image: String
+            var style: String?
+            var hairPreset: String?
+            var hairPrompt: String?
+            var clothesPreset: String?
+            var clothesPrompt: String?
+            var facePreset: String?
+            var generationModel: String?
+            enum CodingKeys: String, CodingKey {
+                case image
+                case style
+                case hairPreset = "hair_preset"
+                case hairPrompt = "hair_prompt"
+                case clothesPreset = "clothes_preset"
+                case clothesPrompt = "clothes_prompt"
+                case facePreset = "face_preset"
+                case generationModel = "generation_model"
+            }
+        }
+        var body = Body(image: imagePNG.base64EncodedString())
+        switch intent {
+        case .style(let key):           body.style = key
+        case .hairPreset(let key):      body.hairPreset = key
+        case .hairPrompt(let text):     body.hairPrompt = text
+        case .clothesPreset(let key):   body.clothesPreset = key
+        case .clothesPrompt(let text):  body.clothesPrompt = text
+        case .facePreset(let key):      body.facePreset = key
+        }
+        body.generationModel = generationModel?.rawValue
+        let bodyData = try JSONEncoder().encode(body)
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: bodyData)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
+    // MARK: POST /v1/upscale
+    /// Real-ESRGAN 2× resolution boost. Input is a transparent cutout
+    /// PNG, output is the same cutout at 2× the pixel dimensions with
+    /// alpha re-attached server-side. 1 credit per call.
+    private struct UpscaleResponse: Decodable {
+        let cutout: String
+        let creditsRemaining: Int
+    }
+    func upscale(imagePNG: Data) async throws -> (Data, Int) {
+        struct Body: Encodable { let image: String }
+        let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
+        let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.cutout) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/auth/send-recovery-email
     /// "Already paid? Restore Pro on this Mac" affordance. Posts an
     /// email address the user typed in, and the backend emails a magic
