@@ -277,6 +277,10 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
     @Binding var selection: ID?
     @State private var isHovering = false
 
+    // De `⋯` hangt in de onderste (`.regular`) capsule → deel exact die maat
+    // (icoon-punt + knophoogte) zodat 'm naast de pillen consistent oogt.
+    private let size: DSToolbarSize = .regular
+
     var body: some View {
         Menu {
             ForEach(items) { item in
@@ -291,16 +295,17 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                 }
             }
         } label: {
-            // E-fix: padding 1-op-1 op "Icon-Only Button · Size=Default" — 20px-
-            // icoon + 10px (gap2.5) rondpadding → 40×40 (zelfde opbouw als
-            // DSIconButton), i.p.v. een font-glyph in een vaste 40-frame.
+            // E-fix (2026-06-23): consistent met de pillen i.p.v. een eigen maat.
+            // Icoon = `iconPointSize`/medium (gelijk aan de pil-iconen; was een
+            // dikkere 20px-resizable die uit de rij sprong). Knop = vierkant op
+            // pil-hoogte → icon-only cirkel, afgeleid van de maat-token i.p.v.
+            // een magische gap2.5-padding. Hover-fill = neutral-stronger in een
+            // Circle, identiek aan de pil-hover.
             Image(systemName: "ellipsis")
-                .resizable()
-                .scaledToFit()
+                .font(.system(size: size.iconPointSize, weight: .medium))
                 .rotationEffect(.degrees(90))
                 .foregroundStyle(DSColor.Foreground.primary)
-                .frame(width: 20, height: 20)
-                .padding(DSSpacing.gap2_5)
+                .frame(width: size.height, height: size.height)
                 .background(isHovering ? DSColor.Background.neutralStronger : .clear, in: Circle())
                 .contentShape(Circle())
         }
