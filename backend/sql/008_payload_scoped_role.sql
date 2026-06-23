@@ -125,6 +125,14 @@ begin
   end loop;
 end $$;
 
+-- Types loop: enums, domains, and *standalone* composite types only.
+-- Every table in Postgres has an implicit row composite type (same name,
+-- typrelid pointing to the table's pg_class row). Postgres rejects
+-- `ALTER TYPE ... OWNER TO` on those with
+-- `42809: <name> is a table's row type. HINT: Use ALTER TABLE instead.`
+-- They were already moved by the table loop above. A free-standing
+-- composite (CREATE TYPE ... AS (...)) has typrelid pointing to a
+-- pg_class entry with relkind='c' — we keep those.
 do $$
 declare
   rec record;
@@ -135,6 +143,13 @@ begin
     join pg_namespace n on n.oid = t.typnamespace
     where n.nspname = 'payload'
       and t.typtype in ('e','c','d')
+      and (
+        t.typrelid = 0
+        or exists (
+          select 1 from pg_class c
+          where c.oid = t.typrelid and c.relkind = 'c'
+        )
+      )
   loop
     execute format('alter type %s owner to payload_app', rec.typname);
   end loop;
