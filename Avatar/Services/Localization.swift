@@ -150,6 +150,17 @@ enum Loc {
         en ? "Couldn't colorise the photo. Please try again."
            : "Kon de foto niet inkleuren. Probeer het opnieuw."
     }
+    static var colorizeAlreadyColourTitle: String {
+        en ? "This photo already looks like colour"
+           : "Deze foto lijkt al in kleur"
+    }
+    static var colorizeAlreadyColourMessage: String {
+        en ? "Colorise is meant for black-and-white photos. This one already looks like it's in colour, so the result will barely change — but it still uses 1 credit. Colorise anyway?"
+           : "Inkleuren is bedoeld voor zwart-witfoto's. Deze lijkt al in kleur, dus het resultaat verandert nauwelijks — maar het kost wel 1 credit. Toch inkleuren?"
+    }
+    static var colorizeUseOneCredit: String {
+        en ? "Use 1 credit" : "1 credit gebruiken"
+    }
 
     // MARK: Settings – Library back-up (export / import)
     static var librarySectionTitle: String {

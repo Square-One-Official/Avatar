@@ -16,8 +16,15 @@ enum ShellMetrics {
     /// chrome" zit.
     static let topBarInset: CGFloat = DSSpacing.gap3
 
-    /// X-positie waar topbar-content links begint: de OS-window-controls
-    /// bij hiddenTitleBar (~60 pt) + de gedeelde topbar-inset. De traffic
-    /// lights zijn van macOS, dus links kan niet helemaal tegen de rand.
-    static let topBarLeadingAfterWindowControls: CGFloat = 60 + topBarInset
+    /// Links-marge van de quota-teller. De OS-traffic-lights eindigen rond
+    /// x67; we zetten de teller op ~88 zodat er duidelijke ademruimte ná de
+    /// groene knop staat (feedback Thierry: 72 plakte tegen de knop → cramped).
+    static let topBarLeadingAfterWindowControls: CGFloat = 88
+
+    /// Hoogte van de band waarin de quota-teller verticaal centreert zodat
+    /// hij op het hart van de traffic-lights valt. Empirisch bepaald: de
+    /// traffic-light-middellijn zit op ~15,75 pt vanaf de venstertop, dus de
+    /// band is 32 pt (midden ≈ 16 pt). 28 pt zette de teller ~2 pt te hoog
+    /// (top-uitgelijnd i.p.v. gecentreerd → "touching the top", feedback Thierry).
+    static let windowControlsRowHeight: CGFloat = 32
 }

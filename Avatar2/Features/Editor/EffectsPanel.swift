@@ -32,6 +32,9 @@ final class EffectsModel {
     private(set) var phase: Phase = .idle
     /// Het toegepaste effect (active state), nil = None (basisbeeld).
     private(set) var selected: RemoteEffect?
+    /// Ingesteld door EffectsPanel via de SwiftUI-omgeving zodat selectie-wijzigingen
+    /// in hetzelfde undo-groepje als de bijbehorende beeld-swap landen.
+    var undoManager: UndoManager?
     /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de fallback zodat het
     /// paneel nooit leeg opent; `loadEffects()` vervangt 'm met de CMS-lijst.
     private(set) var remoteEffects: [RemoteEffect] = RemoteEffect.fallback
@@ -114,9 +117,11 @@ final class EffectsModel {
     /// None-kaart: terug naar het basisbeeld (instant, geen credits).
     func selectNone() {
         guard !isBusy, selected != nil else { return }
+        let prevSelected = selected
         selected = nil
         phase = .idle
         onApply(base)
+        registerSelectionUndo(from: prevSelected, to: nil)
         persist()
     }
 
@@ -130,9 +135,11 @@ final class EffectsModel {
         }
         if let cached = cache[effect.key] {
             // Cache-hit: INSTANT, geen backend-call, geen credits (E24.33).
+            let prevSelected = selected
             selected = effect
             phase = .idle
             onApply(cached)
+            registerSelectionUndo(from: prevSelected, to: effect)
             persist()
             return
         }
@@ -174,10 +181,12 @@ final class EffectsModel {
             }
             cache[effect.key] = image
             if let png = image.pngData() { pngCache[effect.key] = png }
+            let prevSelected = selected
             selected = effect
             phase = .idle
             entitlement.dismissWorkingToast()
             onApply(image)
+            registerSelectionUndo(from: prevSelected, to: effect)
             persist()
             // Saldo bijwerken zodat de topbar-quota klopt na de aftrek.
             await entitlement.refresh()
@@ -189,6 +198,20 @@ final class EffectsModel {
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't apply that style. Please try again.")
+        }
+    }
+
+    /// Registreert selectie-undo naast de beeld-swap zodat Cmd+Z de badge én
+    /// het canvas in één keer terugzet. Beide registraties vallen in hetzelfde
+    /// NSUndoManager-auto-groepje (zelfde run-loop cyclus) → één Cmd+Z.
+    private func registerSelectionUndo(from previous: RemoteEffect?, to next: RemoteEffect?) {
+        ReversibleChange.register(
+            undoManager, target: self,
+            from: previous, to: next,
+            actionName: "Apply effect"
+        ) { model, sel in
+            model.selected = sel
+            model.portrait?.effectActiveRaw = sel?.key
         }
     }
 
@@ -213,6 +236,7 @@ struct EffectsPanel: View {
     var onApply: (NSImage) -> Void = { _ in }
 
     @State private var model: EffectsModel
+    @Environment(\.undoManager) private var undoManager
 
     init(
         baseImage: NSImage,
@@ -250,6 +274,7 @@ struct EffectsPanel: View {
         }
         // E33: CMS-lijst ophalen bij openen. Soft-fail houdt de fallback.
         .task { await model.loadEffects() }
+        .onAppear { model.undoManager = undoManager }
     }
 
     /// E24.33: "None"-kaart helemaal links — terug naar het origineel (basis).

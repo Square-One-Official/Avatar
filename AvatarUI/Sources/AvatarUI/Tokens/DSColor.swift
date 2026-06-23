@@ -36,6 +36,11 @@ public enum DSColor {
         public static let shadow = Color(hex: 0x190B08, alpha: 0x59)
         /// `background/tooltip` — donkere chip in beide themes (#000 / #1c1917)
         public static let tooltip = Color(lightHex: 0x1C1917, darkHex: 0x000000)
+        /// `background/canvas-isolated` — donkerder dan card maar lichter dan app;
+        /// gebruikt als canvas-achtergrond bij geïsoleerd portret zonder ingestelde
+        /// achtergrond, zodat de card-kleurige toolbar-capsule zichtbaar wordt.
+        /// dark #111111 · light #ECEAE6
+        public static let canvasIsolated = Color(lightHex: 0xECEAE6, darkHex: 0x111111)
     }
 
     /// `foreground/default/*`

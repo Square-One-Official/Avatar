@@ -376,6 +376,12 @@ final class ShellModel {
         return NSImage(cgImage: out, size: NSSize(width: w, height: h))
     }
 
+    /// Restore-body path: explicit re-isolation without fallback — throws on failure
+    /// so callers can surface an error instead of silently applying the background.
+    func isolateSubject(_ image: NSImage) async throws -> NSImage {
+        try await reIsolateSubject(image)
+    }
+
     /// E24.30: her-isoleer het onderwerp uit een styled (vol) beeld met de
     /// lokale router (zelfde engine-voorkeur als import) → transparantie terug.
     private func reIsolateSubject(_ image: NSImage) async throws -> NSImage {

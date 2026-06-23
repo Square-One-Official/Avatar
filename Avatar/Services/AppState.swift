@@ -67,6 +67,16 @@ struct BatchConfirmRequest {
     let onCancel: () -> Void
 }
 
+/// A pending Colorise confirmation, surfaced when the chosen photo already
+/// looks like colour. Colorise always costs 1 credit, so we ask before
+/// burning one on a near-no-op. No `count`/`credits` fields — the cost is
+/// fixed and spelled out in the dialog copy.
+@MainActor
+struct ColorizeConfirmRequest {
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+}
+
 /// What kind of work the processing overlay is currently displaying.
 /// Drives the loader's rotating status copy: a cutout/import call sees
 /// scissors-and-hair messages, a Fill in Body call sees body-reframing
@@ -290,6 +300,11 @@ final class AppState {
     /// Cutout (which would each cost 1 credit). Set by `PortraitDropHandler`
     /// when the drop count exceeds `BatchConfirmRequest.threshold`.
     var batchConfirm: BatchConfirmRequest?
+    /// Pending Colorise confirmation. Non-nil → MainWindow shows a confirm
+    /// dialog warning the photo already looks like colour and that colorising
+    /// will still cost 1 credit. Set by `ImportFlow.colorize` when the cutout
+    /// passes `ImageProcessor.isLikelyColour`.
+    var colorizeConfirm: ColorizeConfirmRequest?
     /// Transient Pro toast. Distinct from `lastError` so it can be styled
     /// as a soft upsell (with an Upgrade CTA) or a Pro-only info notice
     /// (no CTA), instead of a destructive error chip. Auto-dismisses a few

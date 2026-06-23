@@ -73,6 +73,30 @@ enum EditorTool: String, CaseIterable, Identifiable {
 }
 
 struct EditorView: View {
+    /// E-fix (bug: een nieuwe foto verving het hele scherm): tijdens een
+    /// VERVANGENDE import (er staat al een portret op het canvas) blijft de
+    /// editor-scaffold (toolbar + naam-frame) staan en speelt de isolating-reveal
+    /// ÍN het frame i.p.v. het hele scherm te vervangen. nil = normale
+    /// result-modus (cutout klaar). De `original`/`cutout` komen rechtstreeks uit
+    /// de ShellModel-canvasstaat, niet uit het (nog) geselecteerde portret.
+    enum IsolatingPhase {
+        case processing(NSImage)
+        case revealing(original: NSImage, cutout: NSImage)
+
+        var original: NSImage {
+            switch self {
+            case .processing(let original): original
+            case .revealing(let original, _): original
+            }
+        }
+        var cutout: NSImage? {
+            switch self {
+            case .processing: nil
+            case .revealing(_, let cutout): cutout
+            }
+        }
+    }
+
     let portrait: NSImage
     /// Model-referentie voor de persistente canvas-transform (E06.4);
     /// nil = transform alleen in-memory (komt in de praktijk niet voor).
@@ -87,6 +111,9 @@ struct EditorView: View {
     /// cutout-alpha als masker i.p.v. Vision opnieuw te draaien op een
     /// artistiek gestyled beeld (→ ShellModel.applyEffectResult preserveSourceAlpha).
     var onApplyAlphaPreserving: (NSImage) -> Void = { _ in }
+    /// Restore body: re-run cutout engine on the original photo; throws so the
+    /// caller can show an error rather than silently leaking the background.
+    var onIsolateSubject: (NSImage) async throws -> NSImage = { $0 }
     /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
     var onPreview: (NSImage) -> Void = { _ in }
     /// E24.14: commit van de niet-destructieve Adjust-laag (params persisteren
@@ -95,6 +122,9 @@ struct EditorView: View {
     /// E33: dubbelklik op de naam-chip opent de rename-modal (ShellView levert de
     /// closure die `model.isShowingRename` zet — zoals de oude PortraitHeader-knop).
     var onRename: () -> Void = {}
+    /// E-fix: niet-nil → render de isolating-reveal ín het frame en zet de
+    /// onderwerp-afhankelijke bediening (feature-tools, frame-acties) inert.
+    var isolating: IsolatingPhase? = nil
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
@@ -141,6 +171,8 @@ struct EditorView: View {
     @State private var isBoosting = false
     /// Loopt tijdens de cloud-colourisatie ("Colorise"). Voorkomt dubbele calls.
     @State private var isColorising = false
+    /// Loopt tijdens Fill in Body (FLUX.1). Voorkomt dubbele calls.
+    @State private var isFillingBody = false
     /// E18.12: lokale (gratis, omkeerbare) enhances zijn aan/uit-knoppen —
     /// One-click retouch + Studio Light. Key = actietitel; waarde = de foto
     /// van vóór het toepassen (om naar terug te keren). Aanwezig = aan. 2e klik
@@ -149,10 +181,9 @@ struct EditorView: View {
     /// niet zuiver omkeerbaar).
     @State private var localToggleBaselines: [String: NSImage] = [:]
     @Environment(\.undoManager) private var undoManager
-    /// UndoManager is niet observable; deze tick (gebumpt op undo-
-    /// notificaties) forceert her-evaluatie van de enabled-state.
-    @State private var undoTick = 0
-
+    /// E-fix: reduced-motion valt de blur-fade tussen isolating-laag en
+    /// result-canvas terug op een pure opacity-crossfade (geen blur/scale).
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if DEBUG
     /// Smoke-run-haak (--open-panel <tool>): direct uit de proces-argumenten
     /// gelezen (geen race met een setter); één keer geconsumeerd in onAppear.
@@ -252,24 +283,70 @@ struct EditorView: View {
         return nil                                                              // .transparent
     }
 
+    /// E24.31-fix (2026-06-23): de achtergrondlaag-afbeelding ÍS de originele foto
+    /// (Original-modus, of Portrait-blur zonder eigen achtergrond) — géén custom
+    /// upload/gradient/kleur. Dan tekent de originele foto op DEZELFDE cutout-
+    /// transform (gelijk gekadreerd), niet aspect-fill over het hele frame; anders
+    /// verschijnt het onderwerp dubbel (origineel groot achter de uitgelijnde cutout).
+    /// Spiegelt de precedentie van `backgroundLayerImage` (custom upload wint).
+    private var backgroundIsAlignedOriginal: Bool {
+        if decodedBackground != nil { return false }                  // .image → aspect-fill
+        if portraitModel?.backgroundColorHex != nil { return false }  // .color → geen beeld-laag
+        if portraitModel?.useOriginalBackground == true { return true }
+        if portraitBlurOn { return true }                             // .transparent + Portrait → origineel
+        return false
+    }
+
     @ViewBuilder
     private var backgroundLayer: some View {
         if let image = backgroundLayerImage {
-            // E24.23-fix: vul een NEUTRAAL-GROOT (Color.clear) container via een
-            // overlay i.p.v. `scaledToFill().frame(maxWidth:.infinity)`. Bij dat
-            // laatste lekte de INTRINSIEKE pixelmaat van een grote upload de
-            // layout in → het hele canvas (en zo de UI) zoomde onherstelbaar in.
-            // Color.clear neemt de aangeboden (begrensde) maat; het beeld is puur
-            // een overlay en beïnvloedt de layout niet. clipped() snijdt overvul.
-            // Portrait: vervaag de achtergrond-laag (fractie van de zijde, zodat de
-            // preview de export-blur volgt); het onderwerp erboven blijft scherp.
-            GeometryReader { geo in
-                Color.clear
-                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
-                    .clipped()
-                    .blur(radius: portraitBlurOn
-                          ? BackgroundBlur.canvasRadius(side: min(geo.size.width, geo.size.height))
-                          : 0)
+            if backgroundIsAlignedOriginal {
+                // De originele foto als achtergrondLAAG, EXACT op de cutout-transform
+                // (zelfde plaatsing als EditorCanvasView): het originele onderwerp valt
+                // achter het scherpe cutout-onderwerp → niet dubbel; de echte achtergrond
+                // vult eromheen (en wordt door Portrait vervaagd). De rect komt uit de
+                // CUTOUT-maat (`portrait.size`) + de gedeelde resolver, dus het origineel
+                // registreert ook bij een licht afwijkende pixelmaat (`.frame` dwingt het
+                // in dezelfde rect; cutout en origineel delen de aspect-ratio).
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    let t = AutoFramer.resolvedTransform(
+                        offsetX: portraitModel?.offsetX ?? 0,
+                        offsetY: portraitModel?.offsetY ?? 0,
+                        scale: portraitModel?.scale ?? 0,
+                        cutoutSize: portrait.size
+                    )
+                    let factor = side / FramingConstants.editCanvas.width
+                    let imgW = portrait.size.width * t.scale * factor
+                    let imgH = portrait.size.height * t.scale * factor
+                    Image(nsImage: image)
+                        .resizable()
+                        .interpolation(.medium)
+                        .frame(width: imgW, height: imgH)
+                        .position(
+                            x: (t.offsetX + portrait.size.width * t.scale / 2) * factor,
+                            y: (t.offsetY + portrait.size.height * t.scale / 2) * factor
+                        )
+                        .frame(width: side, height: side)
+                        .blur(radius: portraitBlurOn ? BackgroundBlur.canvasRadius(side: side) : 0)
+                }
+            } else {
+                // E24.23-fix: custom upload/gradient als echte backdrop — aspect-fill via
+                // een NEUTRAAL-GROOT (Color.clear) container i.p.v.
+                // `scaledToFill().frame(maxWidth:.infinity)`. Bij dat laatste lekte de
+                // INTRINSIEKE pixelmaat van een grote upload de layout in → het hele canvas
+                // (en zo de UI) zoomde onherstelbaar in. Color.clear neemt de aangeboden
+                // (begrensde) maat; het beeld is puur een overlay en beïnvloedt de layout
+                // niet. clipped() snijdt overvul. Portrait: vervaag de achtergrond-laag
+                // (fractie van de zijde, zodat de preview de export-blur volgt).
+                GeometryReader { geo in
+                    Color.clear
+                        .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                        .clipped()
+                        .blur(radius: portraitBlurOn
+                              ? BackgroundBlur.canvasRadius(side: min(geo.size.width, geo.size.height))
+                              : 0)
+                }
             }
         } else if let hex = portraitModel?.backgroundColorHex, let color = Color(hexRGB: hex) {
             color
@@ -340,12 +417,6 @@ struct EditorView: View {
                 zoomTo100: { withAnimation(.spring(duration: 0.3)) { camera.resetToActualSize() } },
                 zoomToFit: { withAnimation(.spring(duration: 0.3)) { camera.reset() } }
             ))
-            // UndoManager publiceert geen state → luister op de
-            // change-notificaties en bump de tick zodat de knoppen
-            // enable/disablen.
-            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidCloseUndoGroup)) { _ in undoTick += 1 }
-            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in undoTick += 1 }
-            .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in undoTick += 1 }
             // E22.1: de sidebar (nu via de app-bar) en een open paneel sluiten
             // elkaar uit — opent de sidebar, dan klapt het paneel dicht.
             .onChange(of: isSidebarVisible) { _, visible in
@@ -353,20 +424,8 @@ struct EditorView: View {
             }
     }
 
-    /// E06.6: undo/redo + hold-to-compare als trailing accessoires ín de
-    /// DSBottomToolbar-strip (geen eigen HStack/padding — de container plaatst
-    /// ze op de gap2/56-pitch achter de tools). Gedrag ongewijzigd t.o.v. de
-    /// oude bottomTrailing-overlay.
     @ViewBuilder
     private var toolbarAccessories: some View {
-        DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo", surface: .ghost) {
-            undoManager?.undo()
-        }
-        .disabled(undoManager?.canUndo != true)
-        DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo", surface: .ghost) {
-            undoManager?.redo()
-        }
-        .disabled(undoManager?.canRedo != true)
         if originalImage != nil {
             // E-fix: hold-to-compare hangt op een Button — de eigen tap-gesture
             // van de Button won het van een gewone `.gesture`, dus de drag vuurde
@@ -397,12 +456,27 @@ struct EditorView: View {
         ]
     }
 
-    /// E-fix: herstel de huidige cutout naar de originele importfoto. Het beeld
-    /// heeft een achtergrond → `applyEffectResult` isoleert het onderwerp opnieuw
-    /// tot een schone cutout. Loopt via `undoableApply` zodat het undo'baar is.
+    /// Restore body: re-run cutout engine on the original photo so that body parts
+    /// clipped during initial segmentation are recovered. Uses a dedicated async path
+    /// (onIsolateSubject) instead of routing through applyEffectResult, which has a
+    /// silent ?? fallback that would leak the original background on failure.
     private func restoreToOriginal() {
-        guard let original = originalImage else { return }
-        undoableApply("Restore to original")(original)
+        guard let original = originalImage, let portraitModel else { return }
+        let before = NSImage(data: portraitModel.cutoutData)
+        Task { @MainActor in
+            do {
+                let restored = try await onIsolateSubject(original)
+                onApplyResult(restored)
+                if let before {
+                    ImageEnhanceUndo.register(
+                        undoManager, target: portraitModel, apply: onApplyResult,
+                        undoTo: before, redoTo: restored, actionName: "Restore body"
+                    )
+                }
+            } catch {
+                entitlement?.presentError("Could not restore body — subject isolation failed.")
+            }
+        }
     }
 
     /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
@@ -428,16 +502,9 @@ struct EditorView: View {
             onPortrait: { togglePortraitBlur() },
             onColorise: runColorise,
             onBoost: runBoostResolution,
-            // E31.3: Restore body → re-isoleert het onderwerp vanuit de originele
-            // importfoto (Vision), zodat afgekapte lichaamsdelen terugkomen.
-            onRestoreBody: {
-                guard entitlement?.allowCloudFeature() == true else { return }
-                guard originalImage != nil else {
-                    entitlement?.presentError("No original photo available for this portrait.")
-                    return
-                }
-                restoreToOriginal()
-            },
+            // E31.3: Restore body → FLUX.1 Fill Pro outpaints missing body parts
+            // (arms, shoulders) into the current cutout; BiRefNet re-extracts alpha.
+            onRestoreBody: runFillBody,
             isPro: entitlement?.isProActive ?? false,
             // E24.28: toon de active-state van de lokale toggles.
             studioLightOn: localToggleBaselines["Studio Light"] != nil,
@@ -462,7 +529,10 @@ struct EditorView: View {
             tools: Self.toolbarItems,
             activeTool: toolSelection,
             overflowTools: Self.overflowItems,
-            overflowActions: overflowActions
+            overflowActions: overflowActions,
+            // E-fix: de feature-tools werken op de afgewerkte cutout — tijdens de
+            // isolating-fase is die er nog niet, dus dim ze tot het resultaat staat.
+            toolsEnabled: isolating == nil
         ) {
             // Canvas-kaart (bevinding 6/7): cutout gevuld op de kaart, met
             // dot-grid eronder zolang er geen achtergrond is ingesteld
@@ -470,43 +540,64 @@ struct EditorView: View {
             // transparante delen tonen het raster: achtergrond verwijderd.
             DSCanvasCard(showsDotGrid: !hasBackground,
                          dotGridDimmed: canvasSubjectSelected,
+                         backgroundColor: hasBackground ? DSColor.Background.card : DSColor.Background.canvasIsolated,
                          surfaceClip: cardSurfaceClip) {
                 ZStack {
-                    // Achtergrond-laag achter het onderwerp: gekozen achtergrond,
-                    // origineel (Original-modus), of Portrait-blur — zie backgroundLayer.
-                    // Sinds 2026-06-23 tekent het scherpe onderwerp ALTIJD bovenop (ook
-                    // in Original-modus), zodat Portrait de echte achtergrond kan
-                    // vervagen. E24.16: clip tot de frame-vorm (cirkel = transparante
-                    // hoeken die het dot-grid eronder tonen).
-                    backgroundLayer
-                        .clipShape(frameClipShape)
-                    // E06.2: hold-to-compare toont de originele importfoto
-                    // (aspect-fit, geen transform) bovenop het cutout-canvas.
-                    if isComparing, let original = originalImage {
-                        Image(nsImage: original)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        // E06.4: pan/snap-canvas + subject-schaal via handles.
-                        // E27.1: de VIEW-zoom zit niet meer hier maar als camera
-                        // op de DSCanvasCard (scène-niveau). Deze view doet alleen
-                        // nog onderwerp-transform + selectie.
-                        // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
-                        // de frame-vorm, zodat de selectie-handles eromheen niet
-                        // mee-geclipt worden.
-                        EditorCanvasView(
-                            image: portrait, portrait: portraitModel,
-                            gridEnabled: canvasGridEnabled,
-                            isSelected: $canvasSubjectSelected,
-                            isPanning: $canvasSubjectPanning,
-                            frameSelected: $canvasFrameSelected,
-                            frameShape: portraitModel?.frameShape ?? .circle,
-                            // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
-                            cameraScale: camera.scale
+                    if let isolating {
+                        // E-fix: bij een vervangende import speelt de isolating-reveal
+                        // ÍN het frame — de scaffold (toolbar + naam-frame) blijft staan
+                        // i.p.v. plaats te maken voor een full-screen IsolatingCanvas.
+                        // De reveal clipt naar de frame-vorm; de eindovergang naar het
+                        // result-canvas is een blur-fade (zie .transition + .animation).
+                        IsolatingFrameLayer(
+                            original: isolating.original,
+                            cutout: isolating.cutout,
+                            clipShape: frameClipShape
                         )
+                        .transition(reduceMotion ? .opacity : .blurFade)
+                    } else {
+                        // Achtergrond-laag achter het onderwerp: gekozen achtergrond,
+                        // origineel (Original-modus), of Portrait-blur — zie backgroundLayer.
+                        // Sinds 2026-06-23 tekent het scherpe onderwerp ALTIJD bovenop (ook
+                        // in Original-modus), zodat Portrait de echte achtergrond kan
+                        // vervagen. E24.16: clip tot de frame-vorm (cirkel = transparante
+                        // hoeken die het dot-grid eronder tonen).
+                        backgroundLayer
+                            .clipShape(frameClipShape)
+                        // E06.2: hold-to-compare toont de originele importfoto
+                        // (aspect-fit, geen transform) bovenop het cutout-canvas.
+                        if isComparing, let original = originalImage {
+                            Image(nsImage: original)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // E06.4: pan/snap-canvas + subject-schaal via handles.
+                            // E27.1: de VIEW-zoom zit niet meer hier maar als camera
+                            // op de DSCanvasCard (scène-niveau). Deze view doet alleen
+                            // nog onderwerp-transform + selectie.
+                            // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
+                            // de frame-vorm, zodat de selectie-handles eromheen niet
+                            // mee-geclipt worden.
+                            EditorCanvasView(
+                                image: portrait, portrait: portraitModel,
+                                gridEnabled: canvasGridEnabled,
+                                isSelected: $canvasSubjectSelected,
+                                isPanning: $canvasSubjectPanning,
+                                frameSelected: $canvasFrameSelected,
+                                frameShape: portraitModel?.frameShape ?? .circle,
+                                // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
+                                cameraScale: camera.scale
+                            )
+                            .transition(reduceMotion ? .opacity : .blurFade)
+                        }
                     }
                 }
+                // E-fix: animeer de overstap isolating ↔ result-canvas (snappy
+                // easeOut ~220ms — het systeem antwoordt; de trage reveal-fade
+                // zit al ín IsolatingFrameLayer). De blur in .blurFade maskeert de
+                // vorm/positie-sprong tussen gevuld origineel en gekadreerde cutout.
+                .animation(.easeOut(duration: 0.22), value: isolating == nil)
             }
             // (E33: de frame-selectie-ring is verhuisd naar de SCREEN-SPACE chrome-
             // overlay hieronder — vóór de scaleEffect kromp hij mee met de camera-
@@ -605,6 +696,11 @@ struct EditorView: View {
                             .position(x: cx, y: visTop + DSSpacing.gap6)
                             // Emil: nooit vanaf scale(0); scale-vanuit-0.96 + opacity, origin top.
                             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                            // E-fix: auto-frame/flip/frame-vorm/achtergrond werken op
+                            // de cutout — inert (zichtbaar voor continuïteit) tijdens
+                            // de isolating-fase. De naam-chip (hernoemen) en de
+                            // camera-pan/-zoom blijven wél actief.
+                            .disabled(isolating != nil)
                         }
                     }
                     .frame(width: side, height: side)
@@ -671,6 +767,16 @@ struct EditorView: View {
             // `updatedAt`) en bij eerste verschijnen; pan/zoom/hover raken het niet.
             .onChange(of: portraitModel?.updatedAt) { _, _ in refreshDecodedImages() }
             .onAppear { refreshDecodedImages() }
+            // E-fix: zodra de isolating-fase begint, klap een open bottom-paneel in
+            // en laat het onderwerp los (handles weg) — er valt niets te bewerken
+            // tot de cutout staat. Het frame blijft geselecteerd (ring + naam-chip).
+            .onChange(of: isolating != nil) { _, active in
+                if active {
+                    activeTool = nil
+                    canvasSubjectSelected = false
+                    canvasFrameSelected = true
+                }
+            }
             // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
             // oorzaak: de enige klik-deselect (EditorCanvasView's Color.clear) dekt
             // alleen het canvas-VIERKANT, niet de marge eromheen — en de camera-
@@ -1014,4 +1120,70 @@ struct EditorView: View {
         }
     }
 
+    /// Fill in Body — FLUX.1 Fill Pro outpaints missing body parts (arms, shoulders)
+    /// into the current cutout; BiRefNet re-extracts alpha. 2 credits per call.
+    private func runFillBody() {
+        guard !isFillingBody, let entitlement, let portraitModel,
+              let png = rawCutout.pngData() else { return }
+        guard entitlement.allowCloudFeature() else { return }
+        let before = rawCutout
+        entitlement.presentWorking(
+            title: "Filling in body",
+            messages: [
+                "Extending the shoulders…",
+                "Sketching in the arms…",
+                "Filling in the details…",
+                "Touching up the edges…",
+                "Almost there…",
+            ]
+        )
+        Task {
+            isFillingBody = true
+            defer { isFillingBody = false }
+            do {
+                let (data, _) = try await entitlement.backend.fillBody(imagePNG: png)
+                guard let after = NSImage(data: data) else {
+                    entitlement.dismissWorkingToast()
+                    return
+                }
+                entitlement.dismissWorkingToast()
+                onApplyResult(after)
+                ImageEnhanceUndo.register(
+                    undoManager, target: portraitModel, apply: onApplyResult,
+                    undoTo: before, redoTo: after, actionName: "Fill body"
+                )
+                await entitlement.refresh()
+            } catch BackendError.noCredits {
+                entitlement.dismissWorkingToast()
+                entitlement.handleOutOfCredits()
+            } catch {
+                entitlement.dismissWorkingToast()
+                entitlement.presentError("Couldn't fill in the body. Please try again.")
+            }
+        }
+    }
+
+}
+
+// MARK: - Blur-fade transition (E-fix)
+
+/// Emil: een blur+opacity-crossfade maskeert de vorm/positie-sprong tussen de
+/// gevulde isolating-laag en het gekadreerde result-canvas — het oog ziet één
+/// transformatie i.p.v. twee overlappende beelden. Reduced-motion valt terug op
+/// pure opacity (geen blur). Blur ≤ 6pt → goedkoop op de GPU.
+private extension AnyTransition {
+    static var blurFade: AnyTransition {
+        .modifier(
+            active: BlurFadeModifier(radius: 6, opacity: 0),
+            identity: BlurFadeModifier(radius: 0, opacity: 1)
+        )
+    }
+}
+
+private struct BlurFadeModifier: ViewModifier {
+    let radius: CGFloat
+    let opacity: Double
+    func body(content: Content) -> some View {
+        content.blur(radius: radius).opacity(opacity)
+    }
 }

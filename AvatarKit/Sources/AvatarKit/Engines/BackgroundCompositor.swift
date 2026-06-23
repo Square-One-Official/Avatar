@@ -17,7 +17,12 @@ public enum BackgroundCompositor {
     /// Achtergrondbron.
     public enum Background: Sendable {
         case color(red: Double, green: Double, blue: Double)
+        /// Custom backdrop (upload/gradient): aspect-fill over het hele vierkant.
         case image(CGImage)
+        /// Original-modus: de originele foto op EXACT de cutout-plaatsing tekenen
+        /// (zelfde rect als het cutout) zodat het onderwerp registreert i.p.v.
+        /// dubbel te verschijnen. Cutout en origineel delen de aspect-ratio.
+        case alignedImage(CGImage)
     }
 
     /// Cutout-plaatsing in canvas-units (vierkant). `offset`/`scale` zijn
@@ -53,19 +58,10 @@ public enum BackgroundCompositor {
         let side = CGFloat(outputSize)
         let canvasRect = CGRect(x: 0, y: 0, width: side, height: side)
 
-        // Achtergrond als CIImage, schaal-gevuld over het hele vierkant.
-        let backgroundCI: CIImage
-        switch background {
-        case let .color(r, g, b):
-            backgroundCI = CIImage(color: CIColor(red: r, green: g, blue: b))
-                .cropped(to: canvasRect)
-        case let .image(image):
-            backgroundCI = aspectFill(CIImage(cgImage: image), into: canvasRect)
-        }
-
-        // Cutout-plaatsing: canvas-units → exportpixels. CoreImage heeft
-        // een bottom-left origin; de transform (en Portrait2) rekenen
-        // top-left, dus de Y wordt gespiegeld.
+        // Cutout-plaatsing: canvas-units → exportpixels. CoreImage heeft een
+        // bottom-left origin; de transform (en Portrait2) rekenen top-left, dus de
+        // Y wordt gespiegeld. EERST berekend (vóór de achtergrond) zodat een
+        // aligned-achtergrond (Original-modus) exact dezelfde rect kan delen.
         let unit = placement.canvasUnit > 0 ? placement.canvasUnit : 1024
         let factor = side / CGFloat(unit)
         let cutoutCI = CIImage(cgImage: cutout)
@@ -79,6 +75,32 @@ public enum BackgroundCompositor {
         let drawX = resolved.offsetX * factor
         // Top-left offsetY → bottom-left: y = side - (offsetY*factor + drawH).
         let drawY = side - (resolved.offsetY * factor + drawH)
+
+        // Achtergrond als CIImage.
+        let backgroundCI: CIImage
+        switch background {
+        case let .color(r, g, b):
+            backgroundCI = CIImage(color: CIColor(red: r, green: g, blue: b))
+                .cropped(to: canvasRect)
+        case let .image(image):
+            // Custom backdrop: schaal-gevuld over het hele vierkant.
+            backgroundCI = aspectFill(CIImage(cgImage: image), into: canvasRect)
+        case let .alignedImage(image):
+            // Original-modus: teken het origineel op EXACT de cutout-rect
+            // (drawX/drawY/drawW/drawH) zodat het originele onderwerp achter het
+            // cutout-onderwerp registreert (niet dubbel). sx≈sy (gedeelde ratio).
+            let bg = CIImage(cgImage: image)
+            let ext = bg.extent
+            if ext.width > 0, ext.height > 0 {
+                backgroundCI = bg
+                    .transformed(by: CGAffineTransform(scaleX: drawW / ext.width,
+                                                       y: drawH / ext.height))
+                    .transformed(by: CGAffineTransform(translationX: drawX, y: drawY))
+                    .cropped(to: canvasRect)
+            } else {
+                backgroundCI = CIImage.empty()
+            }
+        }
 
         let placed = cutoutCI
             .transformed(by: CGAffineTransform(scaleX: drawScale, y: drawScale))

@@ -193,7 +193,6 @@ struct BackgroundPanel: View {
             .help("Pick a colour")
             .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
                 DSColorPicker(color: $pickerColor, supportsAlpha: false)
-                    .padding(DSSpacing.gap3)
             }
 
             ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in

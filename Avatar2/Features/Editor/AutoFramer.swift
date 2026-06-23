@@ -81,6 +81,20 @@ enum AutoFramer {
         )
     }
 
+    /// Eén bron van waarheid voor de "resolved" canvas-transform: de persistente
+    /// transform (offsetX/offsetY/scale in 1024-units) als `scale > 0`, anders de
+    /// gedeelde padded fit-fallback. Zo krijgen het cutout (EditorCanvasView) én de
+    /// Original-achtergrondlaag (EditorView.backgroundLayer) EXACT dezelfde
+    /// plaatsing — geen drift, geen dubbel onderwerp.
+    static func resolvedTransform(
+        offsetX: Double, offsetY: Double, scale: Double,
+        cutoutSize: CGSize, canvas: CGSize = FramingConstants.editCanvas
+    ) -> (offsetX: Double, offsetY: Double, scale: Double) {
+        if scale > 0 { return (offsetX, offsetY, scale) }
+        let t = fitTransform(cutoutSize: cutoutSize, canvas: canvas)
+        return (Double(t.offset.width), Double(t.offset.height), Double(t.scale))
+    }
+
     /// Geen gezicht: cutout passend met marge, gecentreerd (v1-fallback).
     static func fitTransform(
         cutoutSize: CGSize,

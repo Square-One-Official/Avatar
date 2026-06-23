@@ -280,52 +280,95 @@ struct ShellView: View {
 
     @ViewBuilder
     private var editorCanvas: some View {
-        switch model.canvas {
-        case .empty:
-            // Drag-fade (first-use-inhoud weg, alleen dropzone over) wordt nu
-            // centraal door de `.opacity(isDropTargeted)` op de canvas geregeld,
-            // zodat álle states uniform faden i.p.v. alleen first-use.
-            if model.showsFirstUseEmptyState {
-                FirstUseEmptyState {
-                    model.presentOpenPanel()
-                }
-            } else {
-                // E27.7-fix: launch-restore loopt nog, of een herstelde selectie
-                // decodeert off-main (~1s) → neutrale canvas-achtergrond i.p.v. de
-                // first-use-cirkels, die een lege store zouden suggereren.
-                DSColor.Background.app
-            }
-        case .processing(let original):
-            IsolatingCanvas(original: original, cutout: nil)
-        case .revealing(let original, let cutout):
-            IsolatingCanvas(original: original, cutout: cutout)
-        case .result(let cutout):
-            // Editor-framework (E06.1): toolbar + panel-systeem rond het
-            // resultaat; foto-verkleining regelt de DS-container centraal.
-            // Images-tool toggelt de sidebar (E05.4).
+        // E-fix (bug: een nieuwe foto verving het hele scherm): zodra er een
+        // portret op het canvas hoort te staan (result, óf een VERVANGENDE import
+        // die nog isoleert), rendert ÉÉN persistente EditorView. Over de fasen
+        // heen dezelfde view-identiteit → z'n @State (camera, selectie) blijft
+        // bewaard en de scaffold (toolbar + naam-frame) breekt niet af/herbouwt;
+        // de isolating-reveal speelt ín het frame. Alleen de éérste import (lege
+        // store, geen selectie → editorContent == nil) valt terug op de
+        // full-screen IsolatingCanvas hieronder.
+        if let content = editorContent {
             EditorView(
-                portrait: cutout,
+                portrait: content.cutout,
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
                 onApplyResult: { model.applyEffectResult($0) },
                 onApplyAlphaPreserving: { model.applyEffectResult($0, preserveSourceAlpha: true) },
+                onIsolateSubject: { try await model.isolateSubject($0) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
                 onRename: { model.isShowingRename = true },
+                isolating: content.isolating,
                 isSidebarVisible: $model.isSidebarVisible
             )
-        case .failed(let message):
-            VStack(spacing: DSSpacing.gap4) {
-                Text(message)
-                    .dsTextStyle(.bodyMedium)
-                    .foregroundStyle(DSColor.Foreground.subtle)
-                    .multilineTextAlignment(.center)
-                DSNeutralButton("Choose another file…") {
-                    model.presentOpenPanel()
+        } else {
+            switch model.canvas {
+            case .empty:
+                // Drag-fade (first-use-inhoud weg, alleen dropzone over) wordt nu
+                // centraal door de `.opacity(isDropTargeted)` op de canvas geregeld,
+                // zodat álle states uniform faden i.p.v. alleen first-use.
+                if model.showsFirstUseEmptyState {
+                    FirstUseEmptyState {
+                        model.presentOpenPanel()
+                    }
+                } else {
+                    // E27.7-fix: launch-restore loopt nog, of een herstelde selectie
+                    // decodeert off-main (~1s) → neutrale canvas-achtergrond i.p.v. de
+                    // first-use-cirkels, die een lege store zouden suggereren.
+                    DSColor.Background.app
                 }
+            case .processing(let original):
+                // Éérste import (geen bestaand portret) → full-screen reveal.
+                IsolatingCanvas(original: original, cutout: nil)
+            case .revealing(let original, let cutout):
+                IsolatingCanvas(original: original, cutout: cutout)
+            case .result:
+                // Afgehandeld door `editorContent` hierboven.
+                EmptyView()
+            case .failed(let message):
+                VStack(spacing: DSSpacing.gap4) {
+                    Text(message)
+                        .dsTextStyle(.bodyMedium)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .multilineTextAlignment(.center)
+                    DSNeutralButton("Choose another file…") {
+                        model.presentOpenPanel()
+                    }
+                }
+                .padding(DSSpacing.gap8)
             }
-            .padding(DSSpacing.gap8)
         }
+    }
+
+    /// E-fix: het beeld + de isolating-fase die de persistente EditorView voedt.
+    /// Niet-nil zodra er een portret te tonen is:
+    ///   • `.result` → de cutout, geen isolating-fase (normale editor);
+    ///   • `.processing`/`.revealing` mét een al-geselecteerd portret (een
+    ///     VERVANGENDE import) → de vorige cutout als drager + de isolating-fase
+    ///     die ín het frame speelt.
+    /// Bij de éérste import is er nog geen selectie (`previousCutout == nil`) →
+    /// nil, zodat de full-screen IsolatingCanvas het overneemt ("alleen bij
+    /// vervangen", besluit Thierry).
+    private var editorContent: (cutout: NSImage, isolating: EditorView.IsolatingPhase?)? {
+        switch model.canvas {
+        case .result(let cutout):
+            return (cutout, nil)
+        case .processing(let original):
+            guard let previous = previousCutout else { return nil }
+            return (previous, .processing(original))
+        case .revealing(let original, let cutout):
+            guard let previous = previousCutout else { return nil }
+            return (previous, .revealing(original: original, cutout: cutout))
+        case .empty, .failed:
+            return nil
+        }
+    }
+
+    /// De cutout van het momenteel geselecteerde portret (de "vorige" foto tijdens
+    /// een vervangende import). nil = geen selectie → dit is een eerste import.
+    private var previousCutout: NSImage? {
+        model.selectedPortrait.flatMap { NSImage(data: $0.cutoutData) }
     }
 
     /// Figma App / Dropzone (4017:1622): Frame 11 465×456 gecentreerd,

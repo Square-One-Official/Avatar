@@ -206,9 +206,13 @@ struct EditorCanvasView: View {
     /// canvas, gecentreerd, met frame-ademruimte) — gelijkgetrokken met
     /// AutoFramer.fitTransform (E24.18). Voorheen FILL (edge-to-edge).
     private func resolvedTransform() -> CanvasTransform {
-        let current = currentTransform()
-        if current.scale > 0 { return current }
-        return fitTransform()
+        let c = currentTransform()
+        // Gedeelde resolver (AutoFramer) zodat de Original-achtergrondlaag in
+        // EditorView exact dezelfde plaatsing kan berekenen — geen drift.
+        let r = AutoFramer.resolvedTransform(
+            offsetX: c.offsetX, offsetY: c.offsetY, scale: c.scale, cutoutSize: image.size
+        )
+        return CanvasTransform(offsetX: r.offsetX, offsetY: r.offsetY, scale: r.scale)
     }
 
     private func fitTransform() -> CanvasTransform {

@@ -90,6 +90,10 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
     private let overflow: [DSToolbarItem<ID>]
     private let overflowActions: [DSToolbarAction]
     @Binding private var selection: ID?
+    // E-fix: de feature-pillen zijn uit te schakelen (en te dimmen) terwijl er
+    // niets is om op te werken — bv. tijdens een vervangende import waarin de
+    // cutout nog rekent. De accessoire-strip (undo/redo/compare) blijft actief.
+    private let toolsEnabled: Bool
     private let accessory: Accessory
 
     public init(
@@ -97,12 +101,14 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
         selection: Binding<ID?>,
         overflow: [DSToolbarItem<ID>] = [],
         overflowActions: [DSToolbarAction] = [],
+        toolsEnabled: Bool = true,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.items = items
         self.overflow = overflow
         self.overflowActions = overflowActions
         self._selection = selection
+        self.toolsEnabled = toolsEnabled
         self.accessory = accessory()
     }
 
@@ -123,6 +129,13 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
                 }
             }
             .dsToolbarCapsule(size: .regular)
+            // E-fix: alléén de feature-pillen dimmen/uitschakelen (de capsule);
+            // de press-/hover-stijl van de pillen heeft geen eigen disabled-look,
+            // dus de opacity maakt de inerte staat zichtbaar. easeOut zodat het
+            // re-enablen bij `.result` zacht terugkomt i.p.v. te poppen.
+            .disabled(!toolsEnabled)
+            .opacity(toolsEnabled ? DSOpacity.strong : DSOpacity.disabled)
+            .animation(.easeOut(duration: 0.2), value: toolsEnabled)
 
             // Accessoires (undo/redo/compare) blijven buiten de Card-capsule.
             accessory
@@ -137,11 +150,13 @@ extension DSBottomToolbar where Accessory == EmptyView {
         items: [DSToolbarItem<ID>],
         selection: Binding<ID?>,
         overflow: [DSToolbarItem<ID>] = [],
-        overflowActions: [DSToolbarAction] = []
+        overflowActions: [DSToolbarAction] = [],
+        toolsEnabled: Bool = true
     ) {
         self.init(
             items: items, selection: selection,
             overflow: overflow, overflowActions: overflowActions,
+            toolsEnabled: toolsEnabled,
             accessory: { EmptyView() }
         )
     }

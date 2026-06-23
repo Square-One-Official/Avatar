@@ -114,6 +114,9 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
     // E-fix: losse acties in de capsule-overflow (`⋯`) zonder eigen paneel.
     private let overflowActions: [DSToolbarAction]
     @Binding private var activeTool: Tool?
+    // E-fix: schakelt de feature-pillen uit (gedimd) terwijl er niets is om op te
+    // werken — bv. tijdens een vervangende import waarin de cutout nog rekent.
+    private let toolsEnabled: Bool
     private let photo: Photo
     private let panel: (Tool) -> Panel
     // E03.19: trailing accessoires (undo/redo/compare) die FEAT in de
@@ -125,6 +128,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
         activeTool: Binding<Tool?>,
         overflowTools: [DSToolbarItem<Tool>] = [],
         overflowActions: [DSToolbarAction] = [],
+        toolsEnabled: Bool = true,
         @ViewBuilder photo: () -> Photo,
         @ViewBuilder panel: @escaping (Tool) -> Panel,
         @ViewBuilder toolbarAccessory: () -> Accessory
@@ -133,6 +137,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
         self.overflowTools = overflowTools
         self.overflowActions = overflowActions
         self._activeTool = activeTool
+        self.toolsEnabled = toolsEnabled
         self.photo = photo()
         self.panel = panel
         self.toolbarAccessory = toolbarAccessory()
@@ -163,7 +168,8 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
 
             DSBottomToolbar(
                 items: tools, selection: $activeTool,
-                overflow: overflowTools, overflowActions: overflowActions
+                overflow: overflowTools, overflowActions: overflowActions,
+                toolsEnabled: toolsEnabled
             ) {
                 toolbarAccessory
             }
@@ -181,6 +187,7 @@ extension DSEditPanelContainer where Accessory == EmptyView {
         activeTool: Binding<Tool?>,
         overflowTools: [DSToolbarItem<Tool>] = [],
         overflowActions: [DSToolbarAction] = [],
+        toolsEnabled: Bool = true,
         @ViewBuilder photo: () -> Photo,
         @ViewBuilder panel: @escaping (Tool) -> Panel
     ) {
@@ -189,6 +196,7 @@ extension DSEditPanelContainer where Accessory == EmptyView {
             activeTool: activeTool,
             overflowTools: overflowTools,
             overflowActions: overflowActions,
+            toolsEnabled: toolsEnabled,
             photo: photo,
             panel: panel,
             toolbarAccessory: { EmptyView() }

@@ -67,4 +67,30 @@ struct AutoFramerTests {
         // Gecentreerd.
         #expect(abs((t.offset.width * 2 + 2048 * t.scale) - 1024) < 0.001)
     }
+
+    // MARK: resolvedTransform — gedeelde bron voor cutout + Original-achtergrondlaag
+
+    @Test func resolvedTransformKeepsPersistedWhenScalePositive() {
+        let r = AutoFramer.resolvedTransform(
+            offsetX: 120, offsetY: -30, scale: 0.7,
+            cutoutSize: CGSize(width: 800, height: 1000)
+        )
+        #expect(r.offsetX == 120)
+        #expect(r.offsetY == -30)
+        #expect(r.scale == 0.7)
+    }
+
+    @Test func resolvedTransformFallsBackToPaddedFitWhenScaleZero() {
+        let size = CGSize(width: 2048, height: 1024)
+        // scale == 0 → de meegegeven offsets worden genegeerd; de gedeelde
+        // padded-fit-fallback (zelfde als het cutout) wint.
+        let r = AutoFramer.resolvedTransform(
+            offsetX: 999, offsetY: 999, scale: 0, cutoutSize: size
+        )
+        let fit = AutoFramer.fitTransform(cutoutSize: size)
+        #expect(abs(r.scale - Double(fit.scale)) < 0.0001)
+        #expect(abs(r.offsetX - Double(fit.offset.width)) < 0.0001)
+        #expect(abs(r.offsetY - Double(fit.offset.height)) < 0.0001)
+        #expect(r.offsetX != 999)
+    }
 }

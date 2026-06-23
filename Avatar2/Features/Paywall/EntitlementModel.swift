@@ -105,6 +105,14 @@ final class EntitlementModel {
     #endif
 
     var creditsRemaining: Int { account?.creditsRemaining ?? 0 }
+    /// Maand-grant van het Pro-plan — het totaal voor de "X left of Y"-teller
+    /// in de topbar. Backend is bron; valt terug op de plan-default (200)
+    /// zowel vóór het laden als wanneer de backend 0 stuurt (anders zou de
+    /// teller terugvallen op de kale balans).
+    var monthlyQuota: Int {
+        let q = account?.monthlyQuota ?? 0
+        return q > 0 ? q : ProTier.pro.monthlyCredits
+    }
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
     var monthlyResetAt: Date? { account?.monthlyResetAt }
 

@@ -73,6 +73,10 @@ struct Avatar2App: App {
                         cta: .init(label: "Explore effects", url: URL(string: "aaavatar://effects")!)
                     ))
                 }
+                // Visuele-verificatie: schrijf de venster-frameview als PNG.
+                if args.contains("--badge-preview") {
+                    scheduleBadgePreviewCapture()
+                }
             }
             #endif
             // E17.5: getargete berichten ophalen bij app-start (faalt stil).
@@ -208,4 +212,51 @@ struct Avatar2App: App {
         }
     }
 }
+
+#if DEBUG
+/// Visuele-verificatie-haak (--badge-preview): schrijf de venster-frameview
+/// — incl. de OS-traffic-lights — als PNG naar /tmp zodat de topbar-uitlijning
+/// offline te checken is. Geen screen-recording-permissie nodig: de app rendert
+/// zijn eigen view-hiërarchie (frameView = superview van de contentView).
+private func scheduleBadgePreviewCapture() {
+    // Sandbox blokkeert /tmp → schrijf naar de container-tmp (NSTemporaryDirectory).
+    let dir = NSTemporaryDirectory()
+    let shotPath = dir + "av2_self_shot.png"
+    let statusPath = dir + "av2_capture_status.txt"
+    var attempts = 0
+    func status(_ s: String) {
+        let url = URL(fileURLWithPath: statusPath)
+        let line = (s + "\n").data(using: .utf8) ?? Data()
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); h.write(line); try? h.close()
+        } else {
+            try? line.write(to: url)
+        }
+    }
+    func tryCapture() {
+        attempts += 1
+        let wins = NSApp.windows.filter { $0.isVisible && $0.contentView != nil }
+        status("attempt=\(attempts) total=\(NSApp.windows.count) visibleWithContent=\(wins.count) sizes=\(wins.map { Int($0.frame.width) })")
+        guard let window = wins.max(by: { $0.frame.width < $1.frame.width }),
+              let target = window.contentView?.superview ?? window.contentView,
+              target.bounds.width > 100 else {
+            if attempts < 12 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: tryCapture) }
+            return
+        }
+        let bounds = target.bounds
+        guard let rep = target.bitmapImageRepForCachingDisplay(in: bounds) else {
+            if attempts < 12 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: tryCapture) }
+            return
+        }
+        target.cacheDisplay(in: bounds, to: rep)
+        if let data = rep.representation(using: .png, properties: [:]) {
+            try? data.write(to: URL(fileURLWithPath: shotPath))
+            status("WROTE shot bounds=\(NSStringFromRect(bounds))")
+        } else {
+            status("png-encode-failed")
+        }
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: tryCapture)
+}
+#endif
 

@@ -41,6 +41,13 @@ final class OnboardingModel {
         self.auth = auth
         self.defaults = defaults
         self.hasCompleted = defaults.bool(forKey: Self.completedKey)
+        #if DEBUG
+        // Visuele-verificatie-haak: sla de flow over zodat de shell (incl.
+        // topbar-badge) direct te screenshotten is.
+        if ProcessInfo.processInfo.arguments.contains("--badge-preview") {
+            hasCompleted = true
+        }
+        #endif
     }
 
     /// Onboarding tonen zolang niet afgerond én niet ingelogd — een uit de

@@ -70,13 +70,22 @@ enum PortraitExporter {
             return nil
         }()
 
+        // De achtergrondLAAG ÍS de originele foto (Original-modus / Portrait zonder
+        // eigen achtergrond) → uitgelijnd op de cutout-rect tekenen (registreert,
+        // niet dubbel). Custom upload → aspect-fill. Spiegelt EditorView.
+        let bgIsAlignedOriginal = portrait.backgroundImageData == nil
+            && portrait.backgroundColorHex == nil
+            && (portrait.useOriginalBackground || blur)
+
         var composited: CGImage
         if var bg = backgroundImage {
-            // Original-modus + custom afbeelding: scherp onderwerp over de
-            // achtergrond. Portrait: vervaag die achtergrond eerst (onderwerp scherp).
+            // Scherp onderwerp over de achtergrond. Portrait: vervaag die achtergrond
+            // eerst (onderwerp blijft scherp).
             if blur { bg = BackgroundBlur.blurred(bg) ?? bg }
+            let background: BackgroundCompositor.Background =
+                bgIsAlignedOriginal ? .alignedImage(bg) : .image(bg)
             composited = (try? BackgroundCompositor.composite(
-                cutout: cutout, over: .image(bg), placement: placement, outputSize: side
+                cutout: cutout, over: background, placement: placement, outputSize: side
             )) ?? cutout
         } else if let hex = portrait.backgroundColorHex, let rgb = rgbComponents(hex) {
             composited = (try? BackgroundCompositor.composite(

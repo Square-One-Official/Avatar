@@ -100,4 +100,60 @@ final class BackgroundCompositorTests: XCTestCase {
         XCTAssertGreaterThan(center.b, 200)
         XCTAssertEqual(center.a, 255)
     }
+
+    /// Effen-kleur "originele" achtergrond.
+    private func makeSolid(red: CGFloat, green: CGFloat, blue: CGFloat, size: Int = 64) -> CGImage {
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8,
+                            bytesPerRow: 0, space: cs,
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.setFillColor(CGColor(red: red, green: green, blue: blue, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        return ctx.makeImage()!
+    }
+
+    /// Original-modus (`.alignedImage`): de originele foto landt op EXACT de
+    /// cutout-rect (registreert achter het onderwerp) i.p.v. het hele vierkant te
+    /// vullen — anders zou het onderwerp dubbel verschijnen.
+    func testAlignedImageRegistersAtCutoutRectNotAspectFill() throws {
+        // Plaatsing 0,5× op 16/16 in 64-units → rect (top-left) ≈ x/y 64..192,
+        // center (128,128) bij outputSize 256 (factor 4, drawScale 2, drawW/H 128).
+        let out = try BackgroundCompositor.composite(
+            cutout: makeCutout(),                       // links rood-opaak, rechts transparant
+            over: .alignedImage(makeSolid(red: 0, green: 1, blue: 0)),
+            placement: .init(offsetX: 16, offsetY: 16, scale: 0.5, canvasUnit: 64),
+            outputSize: 256
+        )
+        // Transparante (rechter) cutout-helft BINNEN de rect → het origineel toont groen.
+        let throughCutout = pixel(out, x: 160, y: 128)
+        XCTAssertGreaterThan(throughCutout.g, 200)
+        XCTAssertLessThan(throughCutout.r, 60)
+        XCTAssertEqual(throughCutout.a, 255)
+        // Opake (linker) cutout-helft → rood onderwerp bovenop.
+        let subject = pixel(out, x: 96, y: 128)
+        XCTAssertGreaterThan(subject.r, 200)
+        XCTAssertLessThan(subject.g, 80)
+        // Hoek BUITEN de cutout-rect → transparant. Bewijst aligned ≠ aspect-fill
+        // (een aspect-fill zou hier opaak groen geven, zoals testImageBackground…).
+        let corner = pixel(out, x: 4, y: 4)
+        XCTAssertEqual(corner.a, 0)
+    }
+
+    /// `scale == 0` → padded fit (0,85): de aligned-achtergrond deelt diezelfde
+    /// fit-rect met het cutout (geen aspect-fill).
+    func testAlignedImageScaleZeroUsesPaddedFit() throws {
+        let out = try BackgroundCompositor.composite(
+            cutout: makeCutout(),
+            over: .alignedImage(makeSolid(red: 0, green: 1, blue: 0)),
+            placement: .init(offsetX: 0, offsetY: 0, scale: 0, canvasUnit: 64),
+            outputSize: 256
+        )
+        // Verre hoek valt buiten de gecentreerde fit-rect → transparant.
+        let corner = pixel(out, x: 4, y: 4)
+        XCTAssertEqual(corner.a, 0)
+        // Transparante cutout-helft binnen de fit-rect → groen origineel.
+        let throughCutout = pixel(out, x: 150, y: 128)
+        XCTAssertGreaterThan(throughCutout.g, 200)
+        XCTAssertEqual(throughCutout.a, 255)
+    }
 }

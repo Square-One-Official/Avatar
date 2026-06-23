@@ -13,29 +13,47 @@ struct IsolatingCanvas: View {
     /// nil = fase 1 (cutout rekent nog); gevuld = fase 2 (reveal).
     let cutout: NSImage?
 
-    @State private var backgroundFaded = false
-
     var body: some View {
         DSCanvasCard {
-            portraitLayer(original)
-                .overlay {
-                    DSColor.Background.app
-                        .opacity(backgroundFaded ? 1 : 0)
-                }
-                .overlay {
-                    if let cutout {
-                        portraitLayer(cutout)
-                    }
-                }
+            IsolatingFrameLayer(original: original, cutout: cutout)
         }
         .frame(maxWidth: 456, maxHeight: 456)
         .padding(.vertical, DSSpacing.gap8)
-        .onChange(of: cutout != nil, initial: true) { _, hasCutout in
-            guard hasCutout else { return }
-            withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
-                backgroundFaded = true
+    }
+}
+
+/// De reveal-laag (E05.3): origineel gevuld → een app-achtergrondlaag fadet
+/// erover terwijl de cutout erbovenop verschijnt. Gedeeld door de full-screen
+/// `IsolatingCanvas` (eerste import) én de in-frame editor-isolating (E-fix:
+/// bij een VERVANGENDE import blijft de editor-scaffold staan en speelt de
+/// reveal ín het frame i.p.v. het hele scherm te vervangen). De clip-vorm
+/// verschilt per context: de kaart-rechthoek (full-screen) of de frame-vorm
+/// (cirkel) in de editor.
+struct IsolatingFrameLayer: View {
+    let original: NSImage
+    let cutout: NSImage?
+    var clipShape: AnyShape = AnyShape(Rectangle())
+
+    @State private var backgroundFaded = false
+
+    var body: some View {
+        portraitLayer(original)
+            .overlay {
+                DSColor.Background.app
+                    .opacity(backgroundFaded ? 1 : 0)
             }
-        }
+            .overlay {
+                if let cutout {
+                    portraitLayer(cutout)
+                }
+            }
+            .clipShape(clipShape)
+            .onChange(of: cutout != nil, initial: true) { _, hasCutout in
+                guard hasCutout else { return }
+                withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
+                    backgroundFaded = true
+                }
+            }
     }
 
     private func portraitLayer(_ image: NSImage) -> some View {
