@@ -62,24 +62,52 @@ end $$;
 -- 3. Reassign every existing object inside the `payload` schema to the new
 --    owner. `REASSIGN OWNED BY` is too broad (it would also move tables in
 --    `public.*` owned by the old role), so we enumerate per relkind.
---    Sequences need ALTER SEQUENCE; tables/views/matviews/foreign/partitioned
---    accept ALTER TABLE.
+--    Tables/views/matviews/foreign/partitioned first; sequences last.
+--
+--    Linked sequences (an integer/serial column's identity sequence) can't
+--    be reassigned directly — Postgres throws
+--    `0A000: cannot change owner of sequence "<X>". Sequence is linked to
+--    table "<Y>".` They piggyback on the owning table's ALTER TABLE OWNER,
+--    so doing tables first means they're already on the new owner by the
+--    time we'd consider them, and the second loop skips them via pg_depend.
 do $$
 declare
   rec record;
 begin
   for rec in
-    select c.oid::regclass::text as objname, c.relkind
+    select c.oid::regclass::text as objname
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'payload'
-      and c.relkind in ('r','v','m','f','p','S')
+      and c.relkind in ('r','v','m','f','p')
   loop
-    if rec.relkind = 'S' then
-      execute format('alter sequence %s owner to payload_app', rec.objname);
-    else
-      execute format('alter table %s owner to payload_app', rec.objname);
-    end if;
+    execute format('alter table %s owner to payload_app', rec.objname);
+  end loop;
+end $$;
+
+-- Standalone sequences only — skip ones with a pg_depend link to a table
+-- column (deptype='a' = auto-owned). Those were reassigned together with
+-- the table in the previous loop.
+do $$
+declare
+  rec record;
+begin
+  for rec in
+    select c.oid::regclass::text as objname
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'payload'
+      and c.relkind = 'S'
+      and not exists (
+        select 1 from pg_depend d
+        where d.classid    = 'pg_class'::regclass
+          and d.objid      = c.oid
+          and d.refclassid = 'pg_class'::regclass
+          and d.refobjsubid > 0
+          and d.deptype    = 'a'
+      )
+  loop
+    execute format('alter sequence %s owner to payload_app', rec.objname);
   end loop;
 end $$;
 
