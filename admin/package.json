@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
-    "vercel-build": "payload generate:importmap && payload migrate && next build",
+    "vercel-build": "payload generate:importmap && next build",
     "start": "next start",
     "generate:types": "payload generate:types",
     "payload": "payload"
