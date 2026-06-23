@@ -179,6 +179,12 @@ struct ShellView: View {
                 // geen donkere band waar de (donkere) fototop onder de chrome kruipt.
                 canvas
                     .padding(.top, DSSpacing.gap8)
+                    // Tijdens een drag fade't de hele canvas-inhoud (foto +
+                    // Name/Role-chip + editor-toolbar) uit naar de app-
+                    // achtergrond, zodat alleen de dropzone-overlay overblijft —
+                    // een schone lei, net als first-use (bevinding: drag toont
+                    // dropzone óver de avatar i.p.v. leeg scherm).
+                    .opacity(model.isDropTargeted ? 0 : 1)
             }
         }
         // Punt 19: top-uitlijning — de VStack centreerde verticaal,
@@ -243,7 +249,7 @@ struct ShellView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: model.showHairNudge)
-        .animation(.easeOut(duration: 0.15), value: model.isDropTargeted)
+        .dsMotion(DSMotion.fast, value: model.isDropTargeted)
     }
 
     private var isolatingStatusLabel: String? {
@@ -276,11 +282,10 @@ struct ShellView: View {
     private var editorCanvas: some View {
         switch model.canvas {
         case .empty:
-            // Tijdens een drag verdwijnt de first-use-inhoud en blijft
-            // alleen de dropzone over (bevinding 2).
-            if model.isDropTargeted {
-                DSColor.Background.app
-            } else if model.showsFirstUseEmptyState {
+            // Drag-fade (first-use-inhoud weg, alleen dropzone over) wordt nu
+            // centraal door de `.opacity(isDropTargeted)` op de canvas geregeld,
+            // zodat álle states uniform faden i.p.v. alleen first-use.
+            if model.showsFirstUseEmptyState {
                 FirstUseEmptyState {
                     model.presentOpenPanel()
                 }
