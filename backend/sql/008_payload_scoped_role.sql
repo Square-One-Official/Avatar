@@ -33,6 +33,19 @@ begin
   end if;
 end $$;
 
+-- 1a. Supabase quirk: the `postgres` role this migration runs as is NOT a
+--     superuser (Supabase locked that down). ALTER SCHEMA ... OWNER TO and
+--     ALTER TABLE ... OWNER TO require either superuser OR membership of
+--     the target role — otherwise Postgres throws
+--     `42501: must be able to SET ROLE "payload_app"`. Granting payload_app
+--     to postgres makes the ownership reassignment legal without escalating
+--     payload_app's actual privileges. (`current_user` is whatever role
+--     the SQL editor is connected as — typically `postgres`.)
+do $$
+begin
+  execute format('grant payload_app to %I', current_user);
+end $$;
+
 -- 2. Schema ownership. Payload auto-creates `payload` on first deploy with
 --    `push: true`, owned by whichever role made the connection (currently
 --    the service role / postgres). Reassigning ownership lets the scoped
