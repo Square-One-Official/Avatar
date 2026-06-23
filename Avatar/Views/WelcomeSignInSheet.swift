@@ -20,6 +20,11 @@ struct WelcomeSignInSheet: View {
     /// dismisses the sheet (sign-in, skip, OS-level close) marks it seen.
     @AppStorage("hasSeenWelcomeSignIn") private var hasSeenWelcomeSignIn = false
 
+    /// Drives the secondary "Already paid? Restore Pro" sheet that posts
+    /// to `/v1/auth/send-recovery-email`. Local @State because the sheet
+    /// is always presented as a child of this one and never persisted.
+    @State private var showRecoverProSheet = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Headline block
@@ -69,6 +74,22 @@ struct WelcomeSignInSheet: View {
                 }
                 .buttonStyle(PressableButtonStyle())
                 .keyboardShortcut(.cancelAction)
+
+                // Subdued tertiary affordance for users who already bought
+                // Pro on another Mac (or before signing in) — opens
+                // `RecoverProSheet` which POSTs to /v1/auth/send-recovery-email.
+                // Deliberately low-contrast so it doesn't compete with the
+                // primary Google sign-in CTA above.
+                Button {
+                    showRecoverProSheet = true
+                } label: {
+                    Text(Loc.recoverProLink)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 22)
@@ -78,6 +99,10 @@ struct WelcomeSignInSheet: View {
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
         .animation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
+        .sheet(isPresented: $showRecoverProSheet) {
+            RecoverProSheet()
+                .environment(appState)
+        }
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in
             // Auto-dismiss on successful sign-in — the user already gave
             // intent by clicking the button; no need for them to come

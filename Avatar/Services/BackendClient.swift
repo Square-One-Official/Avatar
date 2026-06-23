@@ -268,6 +268,51 @@ final class BackendClient {
         return resp.email
     }
 
+    // MARK: POST /v1/auth/send-recovery-email
+    /// "Already paid? Restore Pro on this Mac" affordance. Posts an
+    /// email address the user typed in, and the backend emails a magic
+    /// link if that address has a paid account on file. Distinct from
+    /// `resendMagicLink()` because there's no device-grant on a fresh
+    /// install — we have to take the email from the user.
+    ///
+    /// Anti-enumeration: the backend always returns 200 on a
+    /// well-formed call, regardless of whether the email exists. The
+    /// only client-visible distinctions are 400 (invalid email shape)
+    /// and 429 (rate-limited). The UI message is always "If we have an
+    /// account, we sent a link" — never "no such email".
+    enum RecoveryEmailError: LocalizedError {
+        case invalidEmail
+        case rateLimited
+        case unknown
+        var errorDescription: String? {
+            switch self {
+            case .invalidEmail: return "Please enter a valid email address."
+            case .rateLimited:  return "Too many requests. Wait a minute and try again."
+            case .unknown:      return "Couldn't send the link right now. Try again in a moment."
+            }
+        }
+    }
+    func sendRecoveryEmail(_ email: String) async throws {
+        struct Body: Encodable { let email: String }
+        let body = try JSONEncoder().encode(Body(email: email))
+        struct Empty: Decodable { let sent: Bool }
+        do {
+            let _: Empty = try await requestAllowingAnonymous(
+                "/v1/auth/send-recovery-email", method: "POST", body: body
+            )
+        } catch BackendError.rateLimited {
+            throw RecoveryEmailError.rateLimited
+        } catch BackendError.server(400, _) {
+            throw RecoveryEmailError.invalidEmail
+        } catch {
+            // 5xx, transport, decode — collapse into the generic
+            // RecoveryEmailError.unknown so the sheet can use a single
+            // copy block. The original error is dropped because the
+            // anti-enumeration contract means we can't show it anyway.
+            throw RecoveryEmailError.unknown
+        }
+    }
+
     // MARK: POST /v1/checkout/topup
     /// Buy a one-time credit pack. Topped-up credits stack with the monthly
     /// grant and never expire. Same union response shape as `subscribe()`.

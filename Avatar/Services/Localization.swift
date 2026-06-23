@@ -292,6 +292,31 @@ enum Loc {
         en ? "Sign in with Google" : "Aanmelden met Google"
     }
 
+    // MARK: Pro recovery sheet (fresh install, paid before signing in)
+    static var recoverProLink: String {
+        en ? "Already paid? Restore Pro with email" : "Al betaald? Herstel Pro met e-mail"
+    }
+    static var recoverProTitle: String {
+        en ? "Restore Pro on this Mac" : "Pro herstellen op deze Mac"
+    }
+    static var recoverProBody: String {
+        en ? "Enter the email you used to buy Pro. We'll send a sign-in link if we find a matching account."
+           : "Voer het e-mailadres in waarmee je Pro hebt gekocht. We sturen een aanmeldlink als we een bijbehorend account vinden."
+    }
+    static var recoverProEmailLabel: String {
+        en ? "Email" : "E-mailadres"
+    }
+    static var recoverProSendCta: String {
+        en ? "Send recovery link" : "Stuur herstellink"
+    }
+    static var recoverProSent: String {
+        en ? "If we have an account for that email, we sent a sign-in link. Check your inbox."
+           : "Als we een account voor dat e-mailadres hebben, hebben we een aanmeldlink gestuurd. Bekijk je inbox."
+    }
+    static var recoverProCancel: String {
+        en ? "Cancel" : "Annuleren"
+    }
+
     // MARK: Onboarding — Privacy mode step
     static var onboardingPrivacyTitle: String {
         en ? "How should AI work?" : "Hoe mag AI werken?"
