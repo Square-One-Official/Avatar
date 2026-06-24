@@ -60,6 +60,17 @@ export const Effects: CollectionConfig = {
       },
     },
     {
+      name: "styleReference",
+      type: "upload",
+      relationTo: "media",
+      required: false,
+      admin: {
+        description:
+          "Optional example output sent to the AI model as a visual style guide alongside the prompt. Use a full-face portrait with this effect already applied — the model will match its style. Leave empty to rely on the prompt alone.",
+        position: "sidebar",
+      },
+    },
+    {
       name: "prompt",
       type: "textarea",
       required: true,

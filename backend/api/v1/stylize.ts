@@ -180,6 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
   // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
+  let styleReferenceDataUrl: string | null = null;
   const styleKey = (req.body?.style ?? "") as string;
   const hairPreset = (req.body?.hair_preset ?? "") as string;
   const hairPrompt = (req.body?.hair_prompt ?? "") as string;
@@ -193,12 +194,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // blijven werken tijdens het seed-venster (en als de CMS even onbereikbaar
     // is). STYLE_PROMPTS verdwijnt zodra de effecten in de CMS bevestigd zijn.
     const effects = await fetchActiveEffects();
-    const mapped = effects.find((e) => e.key === styleKey)?.prompt ?? STYLE_PROMPTS[styleKey];
+    const effect = effects.find((e) => e.key === styleKey);
+    const mapped = effect?.prompt ?? STYLE_PROMPTS[styleKey];
     if (!mapped) {
       res.status(400).json({ error: "unknown_style" });
       return;
     }
     prompt = mapped;
+    // Fetch the style reference image if the CMS effect has one, so it can be
+    // passed to the model as a visual style guide alongside the prompt.
+    if (effect?.styleReferenceUrl) {
+      try {
+        const refRes = await fetch(effect.styleReferenceUrl);
+        if (refRes.ok) {
+          const buf = Buffer.from(await refRes.arrayBuffer());
+          const mime = refRes.headers.get("content-type") ?? "image/jpeg";
+          styleReferenceDataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        }
+      } catch {
+        // Soft-fail: no reference is better than aborting the stylize call.
+      }
+    }
   } else if (hairPreset) {
     const mapped = HAIR_PRESETS[hairPreset];
     if (!mapped) {
@@ -291,6 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resultUrl = await stylizeEdit({
       imageDataUrl: flatDataUrl,
       prompt,
+      styleReferenceDataUrl,
       width: meta.width ?? 0,
       height: meta.height ?? 0,
       model: modelRef,

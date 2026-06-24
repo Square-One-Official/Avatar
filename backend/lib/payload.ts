@@ -312,6 +312,7 @@ export type PayloadEffect = {
   label: string;
   prompt: string;
   thumbnailUrl: string | null;
+  styleReferenceUrl: string | null;
   order: number;
 };
 
@@ -358,8 +359,10 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
   const thumb = r.thumbnail as { url?: string } | null | undefined;
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const styleRef = r.styleReference as { url?: string } | null | undefined;
+  const styleReferenceUrl = styleRef && typeof styleRef.url === "string" ? styleRef.url : null;
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, thumbnailUrl, order };
+  return { key, label, prompt, thumbnailUrl, styleReferenceUrl, order };
 }
 
 // ---------------------------------------------------------------------------
