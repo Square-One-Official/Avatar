@@ -612,6 +612,21 @@ public final class BackendClient {
         return resp.effects
     }
 
+    // MARK: GET /v1/app-config (CMS-gestuurd, E33+)
+    /// App-brede visuele configuratie (splash-achtergrond + lege-canvas-avatars).
+    /// Anoniem-vriendelijk — gebruikt vóórdat de gebruiker is ingelogd.
+    private struct AppConfigResponse: Decodable {
+        let splashBackgroundUrl: URL?
+        let emptyStateAvatarUrls: [URL]
+    }
+    public func appConfig() async throws -> RemoteAppConfig {
+        let resp: AppConfigResponse = try await requestAllowingAnonymous("/v1/app-config", method: "GET")
+        return RemoteAppConfig(
+            splashBackgroundUrl: resp.splashBackgroundUrl,
+            emptyStateAvatarUrls: resp.emptyStateAvatarUrls
+        )
+    }
+
     // MARK: GET /v1/backgrounds (CMS-gestuurd, E33+)
     /// CMS-achtergronden gegroepeerd op categorie. Anoniem-vriendelijk.
     /// Het paneel toont elke unieke `category`-waarde als een gelabelde sectie.

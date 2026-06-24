@@ -20,6 +20,7 @@ struct ShellView: View {
     }
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
     @State private var setBusyMessage: String?
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
@@ -44,10 +45,14 @@ struct ShellView: View {
                 // inzet 4) — zelfde inset waarmee de kaartradius
                 // concentrisch rekent (bevinding 17).
                 .padding(SidebarView.edgeInset)
-                .transition(.move(edge: .trailing))
+                // Kale move (géén eigen animatie): de transitie ERFT de container-
+                // animatie hieronder, zodat de sidebar-slide en de canvas-
+                // hercentrering onder ÉÉN spring in lockstep bewegen (geen
+                // desync). Reduce-motion → kale fade i.p.v. snap.
+                .transition(reduceMotion ? .opacity : .move(edge: .trailing))
             }
         }
-        .animation(.spring(duration: 0.35), value: model.isSidebarVisible)
+        .dsMotion(DSMotion.springTransform, value: model.isSidebarVisible)
         .background(DSColor.Background.app)
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
@@ -83,10 +88,10 @@ struct ShellView: View {
             if let message = setBusyMessage {
                 DSToast(title: message) {}
                     .padding(DSSpacing.gap5)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(.dsSlide(.trailing, reduceMotion: reduceMotion))
             }
         }
-        .animation(.spring(duration: 0.3), value: setBusyMessage)
+        .dsMotion(DSMotion.enter, value: setBusyMessage)
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
@@ -173,12 +178,12 @@ struct ShellView: View {
                     )
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
-                // de topstrook (zie de overlays hieronder). Het canvas houdt een
-                // SLANKE top-inset (gap-8 i.p.v. de oude ~64pt kopstrook) zodat de
-                // foto NETJES ónder de titel valt — titel op zwart, foto eronder,
-                // geen donkere band waar de (donkere) fototop onder de chrome kruipt.
+                // de topstrook (zie de overlays hieronder).
+                // Besluit Thierry (2026-06-24): GEEN top-inset meer — het canvas
+                // loopt door tot de bovenrand van het venster (symmetrisch met de
+                // onderkant), met de top-chrome (topbar + naam-chip + Frame/Background)
+                // erover zwevend i.p.v. in een aparte Background.app-band.
                 canvas
-                    .padding(.top, DSSpacing.gap8)
                     // Tijdens een drag fade't de hele canvas-inhoud (foto +
                     // Name/Role-chip + editor-toolbar) uit naar de app-
                     // achtergrond, zodat alleen de dropzone-overlay overblijft —
@@ -245,10 +250,10 @@ struct ShellView: View {
                     onDismiss: { model.dismissHairNudge() }
                 )
                 .padding(.bottom, DSSpacing.gap4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
             }
         }
-        .animation(.spring(duration: 0.3), value: model.showHairNudge)
+        .dsMotion(DSMotion.enter, value: model.showHairNudge)
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
     }
 
@@ -309,9 +314,7 @@ struct ShellView: View {
                 // centraal door de `.opacity(isDropTargeted)` op de canvas geregeld,
                 // zodat álle states uniform faden i.p.v. alleen first-use.
                 if model.showsFirstUseEmptyState {
-                    FirstUseEmptyState {
-                        model.presentOpenPanel()
-                    }
+                    FirstUseEmptyState(onChooseFile: { model.presentOpenPanel() }, entitlement: entitlement)
                 } else {
                     // E27.7-fix: launch-restore loopt nog, of een herstelde selectie
                     // decodeert off-main (~1s) → neutrale canvas-achtergrond i.p.v. de

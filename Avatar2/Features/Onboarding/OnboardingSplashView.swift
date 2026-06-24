@@ -6,15 +6,32 @@
 // frame: knop-onderkant ±66 van 800). De licht→donker-overgang naar de
 // e-mailstap loopt via de bestaande flow-fade.
 
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
 struct OnboardingSplashView: View {
     let model: OnboardingModel
+    var entitlement: EntitlementModel? = nil
+
+    @State private var splashUrl: URL? = OnboardingSplashView.cachedSplashUrl
+
+    private static var cachedSplashUrl: URL? = nil
 
     var body: some View {
         ZStack {
-            SplashBackgroundPlaceholder()
+            if let url = splashUrl {
+                AsyncImage(url: url) { phase in
+                    if let img = phase.image {
+                        img.resizable().scaledToFill()
+                    } else {
+                        SplashBackgroundPlaceholder()
+                    }
+                }
+                .ignoresSafeArea()
+            } else {
+                SplashBackgroundPlaceholder()
+            }
             Text("Welcome to Aaavatar. One look for every team portrait")
                 .dsTextStyle(.h1)
                 .foregroundStyle(DSColor.Foreground.primaryStaticBlack)
@@ -28,6 +45,14 @@ struct OnboardingSplashView: View {
             .padding(.bottom, DSSpacing.gap8 + DSSpacing.gap8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { await loadSplashUrl() }
+    }
+
+    private func loadSplashUrl() async {
+        guard let backend = entitlement?.backend else { return }
+        guard let url = (try? await backend.appConfig())?.splashBackgroundUrl else { return }
+        OnboardingSplashView.cachedSplashUrl = url
+        splashUrl = url
     }
 }
 

@@ -7,13 +7,14 @@ import SwiftUI
 
 struct OnboardingFlow: View {
     @Bindable var model: OnboardingModel
+    var entitlement: EntitlementModel? = nil
 
     var body: some View {
         ZStack {
             DSColor.Background.app.ignoresSafeArea()
             switch model.step {
             case .splash:
-                OnboardingSplashView(model: model)
+                OnboardingSplashView(model: model, entitlement: entitlement)
                     .transition(.opacity)
             case .email:
                 OnboardingEmailView(model: model)
@@ -29,7 +30,7 @@ struct OnboardingFlow: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: model.step)
+        .dsMotion(DSMotion.emphasis, value: model.step)
         .preferredColorScheme(.dark)
     }
 }

@@ -6,12 +6,19 @@
 // daaronder "Drop a portrait" (Labels/Base primary) en "or choose a file"
 // (subtle + lime link, opent de bestandskiezer net als de plus).
 
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
 struct FirstUseEmptyState: View {
     /// E05.2 (Import) hangt hier de bestandskiezer aan.
     let onChooseFile: () -> Void
+    /// CMS-avatars (E33+); optioneel zodat de view ook zonder backend werkt.
+    var entitlement: EntitlementModel? = nil
+
+    @State private var avatarUrls: [URL] = FirstUseEmptyState.cachedAvatarUrls
+
+    private static var cachedAvatarUrls: [URL] = []
 
     /// Figma Frame 28 (469×524): posities linksboven per avatar.
     private static let memojiOffsets: [CGSize] = [
@@ -41,6 +48,7 @@ struct FirstUseEmptyState: View {
                 ForEach(Array(Self.memojiOffsets.enumerated()), id: \.offset) { index, position in
                     MemojiPlaceholder(
                         color: Self.memojiColors[index % Self.memojiColors.count],
+                        imageUrl: index < avatarUrls.count ? avatarUrls[index] : nil,
                         diameter: Self.avatarSize * scale
                     )
                     .offset(
@@ -55,6 +63,14 @@ struct FirstUseEmptyState: View {
         }
         .background(DSColor.Background.app)
         // E23: volgt de AppearancePreference (geen forced .dark meer).
+        .task { await loadAvatarUrls() }
+    }
+
+    private func loadAvatarUrls() async {
+        guard let backend = entitlement?.backend else { return }
+        guard let urls = try? await backend.appConfig(), !urls.emptyStateAvatarUrls.isEmpty else { return }
+        FirstUseEmptyState.cachedAvatarUrls = urls.emptyStateAvatarUrls
+        avatarUrls = urls.emptyStateAvatarUrls
     }
 
     /// Schaal t.o.v. de Figma-ring (469×524) binnen de beschikbare ruimte,
@@ -87,22 +103,41 @@ struct FirstUseEmptyState: View {
                         }
                         .buttonStyle(.plain)
                         .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                     }
                 }
             }
     }
 }
 
-/// ASSET-PLACEHOLDER (plan/ASSETS.md #2): memoji-figuur uit App / First
-/// use. Cirkel in projects-paletkleur (zoals het frame) met persoonsglyph
-/// en dashed markeringsrand; de echte memoji-beelden komen in de
-/// assetbatch van Thierry. Diameter schaalt mee met de ring (punt 18b).
+/// Eén avatar-cirkel in de lege-canvas-ring. Als `imageUrl` aanwezig is,
+/// wordt het CMS-portret getoond (met cirkel-clip); anders de gekleurde
+/// placeholder met `person.fill`-glyph (ASSET-PLACEHOLDER, plan/ASSETS.md #2).
 private struct MemojiPlaceholder: View {
     let color: Color
+    let imageUrl: URL?
     let diameter: CGFloat
 
     var body: some View {
+        Group {
+            if let url = imageUrl {
+                AsyncImage(url: url) { phase in
+                    if let img = phase.image {
+                        img.resizable().scaledToFill()
+                    } else {
+                        placeholderCircle
+                    }
+                }
+                .frame(width: diameter, height: diameter)
+                .clipShape(Circle())
+            } else {
+                placeholderCircle
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var placeholderCircle: some View {
         ZStack {
             Circle().fill(color)
             Image(systemName: "person.fill")
@@ -115,6 +150,5 @@ private struct MemojiPlaceholder: View {
                 )
         }
         .frame(width: diameter, height: diameter)
-        .accessibilityHidden(true)
     }
 }
