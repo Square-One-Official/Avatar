@@ -14,6 +14,7 @@ import { Effects } from "./collections/Effects";
 import { Backgrounds } from "./collections/Backgrounds";
 import { AuditLog } from "./collections/AuditLog";
 import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
+import { AppConfig } from "./globals/AppConfig";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,7 @@ export default buildConfig({
   },
   editor: lexicalEditor(),
   collections: [Users, Media, Announcements, BadgeComponents, Effects, Backgrounds, NewsletterUnsubscribes, AuditLog],
+  globals: [AppConfig],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {

@@ -430,6 +430,64 @@ function normalizeBackground(raw: unknown): PayloadBackground | null {
 }
 
 // ---------------------------------------------------------------------------
+// AppConfig — singleton Global voor app-brede visuele configuratie (E33+).
+// Payload-endpoint: GET /api/globals/app-config?depth=1
+//
+// splashBackgroundUrl — achtergrond Onboarding Splash-scherm (was hardcoded gradient)
+// emptyStateAvatarUrls — maximaal 6 portret-voorbeelden in de lege-canvas-cirkels
+//
+// Beide vallen terug op de ingebouwde placeholder als het veld leeg is.
+// ---------------------------------------------------------------------------
+
+export type PayloadAppConfig = {
+  splashBackgroundUrl: string | null;
+  emptyStateAvatarUrls: string[];
+};
+
+let appConfigCache: { expiresAt: number; payload: PayloadAppConfig } | null = null;
+
+export async function fetchAppConfig(): Promise<PayloadAppConfig> {
+  const now = Date.now();
+  if (appConfigCache && appConfigCache.expiresAt > now) {
+    return appConfigCache.payload;
+  }
+  const base = payloadBase();
+  const empty: PayloadAppConfig = { splashBackgroundUrl: null, emptyStateAvatarUrls: [] };
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL/KEY missing — app-config disabled");
+    return empty;
+  }
+
+  const url = new URL(`${base}/globals/app-config`);
+  url.searchParams.set("depth", "1");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload app-config fetch failed", res.status, await res.text().catch(() => ""));
+    return empty;
+  }
+  const doc = (await res.json()) as Record<string, unknown>;
+
+  const splashRef = doc.splashBackground as { url?: string } | null | undefined;
+  const splashBackgroundUrl = splashRef && typeof splashRef.url === "string" ? splashRef.url : null;
+
+  const rawAvatars = Array.isArray(doc.emptyStateAvatars) ? doc.emptyStateAvatars : [];
+  const emptyStateAvatarUrls: string[] = rawAvatars
+    .map((item: unknown) => {
+      if (typeof item !== "object" || item === null) return null;
+      const img = (item as Record<string, unknown>).image as { url?: string } | null | undefined;
+      return img && typeof img.url === "string" ? img.url : null;
+    })
+    .filter((u): u is string => u !== null);
+
+  const payload: PayloadAppConfig = { splashBackgroundUrl, emptyStateAvatarUrls };
+  appConfigCache = { expiresAt: now + CACHE_TTL_MS, payload };
+  return payload;
+}
+
+// ---------------------------------------------------------------------------
 // E17.2 — Messages (verenigd model, slug "messages"). Naast de announcement-
 // functies hierboven; niet-destructief. Spiegelt admin/src/collections/
 // Messages.ts: kanaal + targeting-group + schedule-group + body/image/cta.
