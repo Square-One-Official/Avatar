@@ -77,6 +77,16 @@ export default buildConfig({
       collections: {
         media: {
           prefix: "media",
+          // Generate a direct Supabase Storage public URL instead of routing
+          // through Payload's proxy (/api/media/file/…). Direct URL is faster
+          // and doesn't depend on Payload being healthy to serve thumbnails.
+          // Transforms S3_ENDPOINT (…/storage/v1/s3) → …/storage/v1/object/public/{bucket}/{prefix}/{filename}
+          generateFileURL: ({ filename, prefix: p }) => {
+            const base = (process.env.S3_ENDPOINT ?? "").replace(/\/s3\/?$/, "");
+            const bucket = process.env.S3_BUCKET ?? "announcement-media";
+            const path = p ? `${p}/${filename}` : filename;
+            return `${base}/object/public/${bucket}/${path}`;
+          },
         },
       },
       bucket: process.env.S3_BUCKET ?? "announcement-media",
