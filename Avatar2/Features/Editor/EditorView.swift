@@ -479,6 +479,31 @@ struct EditorView: View {
         }
     }
 
+    /// Remove background: her-isoleer het HUIDIGE beeld (rawCutout) met de lokale
+    /// cutout-engine zodat het weer vrijstaand/transparant wordt. Gebruikt het
+    /// dedicated onIsolateSubject-pad (throws bij falen) i.p.v. applyEffectResult,
+    /// dat een stille fallback heeft die de achtergrond zou laten staan. Herstelt
+    /// o.a. een achtergrond die na een Effect was achtergebleven.
+    private func removeBackground() {
+        guard let portraitModel else { return }
+        let current = rawCutout
+        let before = NSImage(data: portraitModel.cutoutData)
+        Task { @MainActor in
+            do {
+                let cut = try await onIsolateSubject(current)
+                onApplyResult(cut)
+                if let before {
+                    ImageEnhanceUndo.register(
+                        undoManager, target: portraitModel, apply: onApplyResult,
+                        undoTo: before, redoTo: cut, actionName: "Remove background"
+                    )
+                }
+            } catch {
+                entitlement?.presentError("Could not remove the background — subject isolation failed.")
+            }
+        }
+    }
+
     /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
     /// in de canvas-toolbar, dus hier zonder Auto-enhance-menu).
     private var editColorPanel: some View {
@@ -505,12 +530,14 @@ struct EditorView: View {
             // E31.3: Restore body → FLUX.1 Fill Pro outpaints missing body parts
             // (arms, shoulders) into the current cutout; BiRefNet re-extracts alpha.
             onRestoreBody: runFillBody,
+            onRemoveBackground: removeBackground,
             isPro: entitlement?.isProActive ?? false,
             // E24.28: toon de active-state van de lokale toggles.
             studioLightOn: localToggleBaselines["Studio Light"] != nil,
             portraitOn: portraitModel?.portraitBlur == true,
             retouchOn: localToggleBaselines["One click retouch"] != nil,
             showRetouch: true,
+            showRemoveBackground: true,
             // E24.27: AI-één-tik-acties zitten nu IN het Light & color-paneel.
             showAutoEnhance: true
         )
@@ -552,7 +579,10 @@ struct EditorView: View {
                         IsolatingFrameLayer(
                             original: isolating.original,
                             cutout: isolating.cutout,
-                            clipShape: frameClipShape
+                            clipShape: frameClipShape,
+                            // In het frame past de foto IN het kader (geen
+                            // fill-crop die staande foto's tot een gezicht inzoomt).
+                            fills: false
                         )
                         .transition(reduceMotion ? .opacity : .blurFade)
                     } else {
@@ -594,10 +624,10 @@ struct EditorView: View {
                     }
                 }
                 // E-fix: animeer de overstap isolating ↔ result-canvas (snappy
-                // easeOut ~220ms — het systeem antwoordt; de trage reveal-fade
-                // zit al ín IsolatingFrameLayer). De blur in .blurFade maskeert de
-                // vorm/positie-sprong tussen gevuld origineel en gekadreerde cutout.
-                .animation(.easeOut(duration: 0.22), value: isolating == nil)
+                // ease-out — het systeem antwoordt; de trage reveal-fade zit al ín
+                // IsolatingFrameLayer). De blur in .blurFade maskeert de vorm/
+                // positie-sprong tussen gevuld origineel en gekadreerde cutout.
+                .dsMotion(DSMotion.base, value: isolating == nil)
             }
             // (E33: de frame-selectie-ring is verhuisd naar de SCREEN-SPACE chrome-
             // overlay hieronder — vóór de scaleEffect kromp hij mee met de camera-
@@ -690,7 +720,7 @@ struct EditorView: View {
                                 gridEnabled: $canvasGridEnabled,
                                 // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
                                 // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
-                                background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
+                                background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement).onHover { pointerOverChrome = $0 } }
                             )
                             .fixedSize()
                             .position(x: cx, y: visTop + DSSpacing.gap6)
@@ -731,7 +761,9 @@ struct EditorView: View {
                     chromeHovered: pointerOverChrome && (canvasMenu != nil || activeTool != nil)
                 )
             }
-            .padding(.top, DSSpacing.gap8)
+            // Geen top-inset: het canvas loopt door tot de bovenrand van het
+            // venster (symmetrisch met de onderkant); de frame-chrome (naam-chip +
+            // Frame/Background-toolbar) zweeft eroverheen i.p.v. in een aparte band.
             // E18.17: staat er een paneel/sidebar open, dan sluit een klik
             // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
             .overlay {
@@ -775,6 +807,9 @@ struct EditorView: View {
                     activeTool = nil
                     canvasSubjectSelected = false
                     canvasFrameSelected = true
+                    // Een eventuele view-zoom van het vorige portret mag niet
+                    // doorwerken in de reveal (anders compoundeert 'ie de inzoom).
+                    camera.reset()
                 }
             }
             // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
@@ -832,7 +867,7 @@ struct EditorView: View {
                 }
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
-                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground)
+                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement)
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
@@ -866,7 +901,9 @@ struct EditorView: View {
             toolbarAccessories
         }
         .padding(.horizontal, DSSpacing.gap3)
-        .padding(.bottom, DSSpacing.gap2)
+        // Geen bottom-padding: het canvas loopt door tot de onderrand van het
+        // venster; de zwevende toolbar houdt zelf zijn gap2-inset (DSEditPanel-
+        // Container) zodat hij nét boven de rand hangt.
         #if DEBUG
         .onAppear {
             if let tool = Self.debugInitialTool {

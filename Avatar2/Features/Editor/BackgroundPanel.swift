@@ -16,12 +16,22 @@ struct BackgroundPanel: View {
     /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
     /// `portrait` blijft de bron voor display/selectie-state (Original/custom).
     var onApply: ((PortraitBackground) -> Void)? = nil
+    /// Benodigd voor de CMS-achtergronden-fetch; optioneel zodat bestaande
+    /// aanroeplocaties zonder entitlement blijven werken.
+    var entitlement: EntitlementModel? = nil
+
     @State private var brand = BrandColorKit.shared
     // E24.24: persistente custom-achtergrond-uploads (herbruikbare swatches).
     @State private var customImages = BackgroundImageKit.shared
     // E25.2: DSColorPicker vanuit de "+"-knop in de Color-rij.
     @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
+    // CMS-achtergronden (E33+). Sessie-cache zodat herhaalbaar openen
+    // geen flits geeft; leeg = nog niet geladen (geen fallback nodig).
+    @State private var cmsBackgrounds: [RemoteBackground] = BackgroundPanel.sessionCache
+
+    private static var sessionCache: [RemoteBackground] = []
+    private static let imageCache = NSCache<NSURL, NSImage>()
 
     private let swatch: CGFloat = 36
 
@@ -32,9 +42,90 @@ struct BackgroundPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             section("Background") { backgroundModeRow }
             section("Image") { imageRow }
+            ForEach(cmsCategories, id: \.self) { cat in
+                section(cat) { cmsRow(for: cat) }
+            }
             section("Color") { colorRow }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await loadCMSBackgrounds() }
+    }
+
+    private var cmsCategories: [String] {
+        var seen = Set<String>()
+        return cmsBackgrounds.compactMap { seen.insert($0.category).inserted ? $0.category : nil }
+    }
+
+    private func loadCMSBackgrounds() async {
+        guard let backend = entitlement?.backend else { return }
+        let fetched = (try? await backend.backgrounds()) ?? []
+        guard !fetched.isEmpty else { return }
+        BackgroundPanel.sessionCache = fetched
+        cmsBackgrounds = fetched
+        prefetchThumbnails(for: fetched)
+    }
+
+    private func prefetchThumbnails(for items: [RemoteBackground]) {
+        let urls = items.map(\.thumbnailUrl)
+            .filter { BackgroundPanel.imageCache.object(forKey: $0 as NSURL) == nil }
+        guard !urls.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            await withTaskGroup(of: Void.self) { group in
+                for url in urls {
+                    group.addTask {
+                        guard let (data, _) = try? await URLSession.shared.data(from: url),
+                              let image = NSImage(data: data) else { return }
+                        BackgroundPanel.imageCache.setObject(image, forKey: url as NSURL)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cmsRow(for category: String) -> some View {
+        scrollRow {
+            ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
+                Button { selectCMSBackground(bg) } label: {
+                    let cached = BackgroundPanel.imageCache.object(forKey: bg.thumbnailUrl as NSURL)
+                    RoundedRectangle(cornerRadius: DSRadius.lg)
+                        .fill(DSColor.Background.neutral)
+                        .frame(width: swatch, height: swatch)
+                        .overlay {
+                            if let img = cached {
+                                Image(nsImage: img)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                AsyncImage(url: bg.thumbnailUrl) { img in
+                                    img.resizable().scaledToFill()
+                                } placeholder: {
+                                    Color(white: 0.85)
+                                }
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                }
+                .buttonStyle(.plain)
+                .dsHoverScale()
+                .help(bg.label)
+            }
+        }
+    }
+
+    private func selectCMSBackground(_ bg: RemoteBackground) {
+        Task {
+            let url = bg.imageUrl
+            let cached = BackgroundPanel.imageCache.object(forKey: url as NSURL)
+            let data: Data?
+            if let img = cached {
+                data = img.pngData()
+            } else {
+                data = try? await URLSession.shared.data(from: url).0
+            }
+            guard let png = data else { return }
+            await MainActor.run { apply(.image(png)) }
+        }
     }
 
     // MARK: Background-modus — Original (bovenaan) + Transparent (E24.31)

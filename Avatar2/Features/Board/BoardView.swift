@@ -59,8 +59,9 @@ struct BoardView: View {
     /// stopt het auto-fitten.
     @State private var lastFit: CanvasCamera?
 
-    // Drag-state (board-space).
-    @State private var dragStart: CGPoint?
+    // Drag-state (board-space): per-portrait startposities zodat een multi-select
+    // als groep versleept kan worden met één gezamenlijke translatie.
+    @State private var dragStartPositions: [PersistentIdentifier: CGPoint] = [:]
 
     // E29.1: multi-select op de board.
     @State private var selection: Set<PersistentIdentifier> = []
@@ -85,7 +86,7 @@ struct BoardView: View {
     @State private var batchMenu: BatchMenu?
     // E29.3: loopt tijdens de "Match lighting"-normalisatie over de selectie.
     @State private var isMatchingLight = false
-    private enum BatchMenu: Hashable { case background, adjust }
+    private enum BatchMenu: Hashable { case background, adjust, align, organize }
 
     private var selectedPortraits: [Portrait2] {
         portraits.filter { selection.contains($0.persistentModelID) }
@@ -118,6 +119,15 @@ struct BoardView: View {
             ZStack {
                 DSColor.Background.app
 
+                // Viewport-vullende laag voor marquee + deselect-all — ONDER boardCanvas
+                // zodat node-gestures (bovenliggende laag) prioriteit houden. Altijd
+                // volledig zichtbaar, ongeacht camera.scale, zodat de gebruiker ook van
+                // buiten het visueel verkleinde canvas kan beginnen te slepen.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { selection.removeAll() }
+                    .gesture(viewportMarqueeGesture)
+
                 if portraits.isEmpty {
                     Text("No portraits yet")
                         .dsTextStyle(.bodyMedium)
@@ -141,6 +151,7 @@ struct BoardView: View {
                 hud
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .coordinateSpace(name: "boardRoot")
             // E29.2: batch-toolbar bovenaan zodra er ≥1 geselecteerd is. Als
             // top-overlay (deterministisch) + padding om onder de app-topbar te
             // blijven.
@@ -233,11 +244,10 @@ struct BoardView: View {
     private var boardCanvas: some View {
         ZStack(alignment: .topLeading) {
             // Onzichtbaar vlak dat de board-maat bepaalt (de nodes positioneren
-            // hierop absoluut). E29.1: sleep = marquee-selectie, tik = deselect-all.
+            // hierop absoluut). Gestures zijn verplaatst naar de viewport-laag in
+            // `body` zodat ze werken ongeacht het camera-schaal-niveau.
             Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture { selection.removeAll() }
-                .gesture(marqueeGesture)
+                .allowsHitTesting(false)
 
             // E27.5: virtualisatie — alleen nodes die in (of net buiten) de
             // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
@@ -249,8 +259,20 @@ struct BoardView: View {
                 // slaat z'n body over. Gestures + hover hangen BUITEN `.equatable()`
                 // (verse closures zouden de skip anders breken); de camera-
                 // afhankelijke drag-math blijft in `BoardView`.
+                // De achtergrondLAAG ÍS de originele foto (Original-modus, of
+                // Portrait-blur zonder eigen achtergrond) → spiegelt
+                // EditorView.backgroundIsAlignedOriginal: custom upload/kleur wint.
+                let bgIsAlignedOriginal = p.backgroundImageData == nil
+                    && p.backgroundColorHex == nil
+                    && (p.useOriginalBackground || p.portraitBlur)
                 BoardNodeView(
                     thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
+                    // Origineel als achtergrondLAAG (uitgelijnd achter de cutout-thumb),
+                    // gedecodeerd + downscaled via dezelfde store (nooit de volle
+                    // originalData per frame). nil tenzij Original-modus actief is.
+                    backgroundOriginalImage: bgIsAlignedOriginal
+                        ? thumbs.original(for: p, maxDimension: cardSide * 2)
+                        : nil,
                     isSelected: selection.contains(p.persistentModelID),
                     frameShape: p.frameShape,
                     name: p.name,
@@ -295,25 +317,36 @@ struct BoardView: View {
         }
     }
 
-    /// E29.1: marquee — sleep op de lege board spant een selectie-rechthoek;
+    /// Viewport-coördinaat → board-coördinaat (inverse van `screenPoint`).
+    private func toBoardSpace(_ p: CGPoint) -> CGPoint {
+        let vpC  = CGPoint(x: viewport.width  / 2, y: viewport.height  / 2)
+        let brdC = CGPoint(x: boardSize.width / 2, y: boardSize.height / 2)
+        return CGPoint(
+            x: brdC.x + (p.x - vpC.x - camera.offset.width)  / camera.scale,
+            y: brdC.y + (p.y - vpC.y - camera.offset.height) / camera.scale
+        )
+    }
+
+    /// E29.1: marquee — sleep op de viewport spant een selectie-rechthoek;
     /// nodes waarvan het midden erin valt worden geselecteerd (cmd/shift =
     /// toevoegen aan de bestaande selectie). De selectie loopt live mee tijdens
-    /// de sleep (niet pas bij loslaten): bij het eerste frame leggen we de
-    /// basis vast (additief → huidige selectie, anders leeg) en elke frame
-    /// rekenen we de hits opnieuw tegen die vaste basis.
-    private var marqueeGesture: some Gesture {
-        DragGesture(minimumDistance: 6)
+    /// de sleep. Zit op de viewport-laag (niet binnen boardCanvas) zodat de
+    /// gebruiker ook buiten het visueel verkleinde canvas kan beginnen te slepen.
+    /// Viewport-coördinaten worden on-the-fly omgezet naar board-space via
+    /// `toBoardSpace(_:)`.
+    private var viewportMarqueeGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named("boardRoot"))
             .onChanged { value in
                 if marquee == nil {
                     let additive = NSEvent.modifierFlags.contains(.command)
                         || NSEvent.modifierFlags.contains(.shift)
                     marqueeBase = additive ? selection : []
                 }
-                let rect = CGRect(
-                    x: min(value.startLocation.x, value.location.x),
-                    y: min(value.startLocation.y, value.location.y),
-                    width: abs(value.location.x - value.startLocation.x),
-                    height: abs(value.location.y - value.startLocation.y)
+                let start = toBoardSpace(value.startLocation)
+                let end   = toBoardSpace(value.location)
+                let rect  = CGRect(
+                    x: min(start.x, end.x), y: min(start.y, end.y),
+                    width: abs(end.x - start.x), height: abs(end.y - start.y)
                 )
                 marquee = rect
                 let hits = Set(
@@ -429,12 +462,19 @@ struct BoardView: View {
         .dsPanelSurface(cornerRadius: DSRadius.lg)
     }
 
-    private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+    private func menuRow(_ title: String, icon: String, destructive: Bool = false,
+                         shortcut: String? = nil, disabled: Bool = false,
+                         action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
                 Image(systemName: icon).font(.system(size: 12, weight: .medium)).frame(width: 16)
                 Text(title).dsTextStyle(.labelBase)
-                Spacer(minLength: 0)
+                Spacer(minLength: DSSpacing.gap4)
+                if let shortcut {
+                    Text(shortcut)
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                }
             }
             .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
             .padding(.horizontal, DSSpacing.gap2)
@@ -444,6 +484,8 @@ struct BoardView: View {
             .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
     }
 
     /// Top-leading van het menu (viewport-space), net onder de node-kaart en
@@ -614,22 +656,36 @@ struct BoardView: View {
         // In scherm-space is ÷camera.scale de enige (juiste) correctie.
         DragGesture(minimumDistance: 5, coordinateSpace: .global)
             .onChanged { value in
-                if dragStart == nil {
-                    dragStart = CGPoint(x: portrait.boardX, y: portrait.boardY)
+                // Draait het gesleepte portret mee in een multi-selectie?
+                let groupDrag = selection.count >= 2
+                    && selection.contains(portrait.persistentModelID)
+                let dragGroup: [Portrait2] = groupDrag ? selectedPortraits : [portrait]
+
+                // Leg startposities eenmalig vast bij het begin van de sleep.
+                if dragStartPositions.isEmpty {
+                    for p in dragGroup {
+                        dragStartPositions[p.persistentModelID] = CGPoint(x: p.boardX, y: p.boardY)
+                    }
                 }
-                guard let start = dragStart else { return }
+
                 // Scherm-delta → board-space (÷ camera-zoom).
-                portrait.boardX = start.x + value.translation.width / camera.scale
-                portrait.boardY = start.y + value.translation.height / camera.scale
+                let dx = value.translation.width / camera.scale
+                let dy = value.translation.height / camera.scale
+                for p in dragGroup {
+                    guard let start = dragStartPositions[p.persistentModelID] else { continue }
+                    p.boardX = start.x + dx
+                    p.boardY = start.y + dy
+                }
             }
             .onEnded { _ in
-                if let start = dragStart {
-                    BoardMoveUndo.register(
-                        undoManager, portrait: portrait,
-                        from: start, to: CGPoint(x: portrait.boardX, y: portrait.boardY)
-                    )
+                let groupDrag = selection.count >= 2
+                    && selection.contains(portrait.persistentModelID)
+                let dragGroup: [Portrait2] = groupDrag ? selectedPortraits : [portrait]
+                let before = dragGroup.compactMap { dragStartPositions[$0.persistentModelID] }
+                if !before.isEmpty {
+                    registerMoveUndo(dragGroup, before: before, name: "Move")
                 }
-                dragStart = nil
+                dragStartPositions = [:]
             }
     }
 
@@ -644,6 +700,11 @@ struct BoardView: View {
             Button("") { zoom(1.25) }.keyboardShortcut("=", modifiers: .command)
             Button("") { zoom(0.8) }.keyboardShortcut("-", modifiers: .command)
             Button("") { fit() }.keyboardShortcut("0", modifiers: .command)
+            Button("") { selection = Set(portraits.map(\.persistentModelID)) }.keyboardShortcut("a", modifiers: .command)
+            // Organize-snelkoppelingen (^⌥): de methodes guarden zelf op selectiegrootte.
+            Button("") { tidyUpSelection() }.keyboardShortcut("t", modifiers: [.control, .option])
+            Button("") { distributeSelection(.vertical) }.keyboardShortcut("v", modifiers: [.control, .option])
+            Button("") { distributeSelection(.horizontal) }.keyboardShortcut("h", modifiers: [.control, .option])
         }
         .opacity(0)
         .allowsHitTesting(false)
@@ -696,6 +757,16 @@ struct BoardView: View {
                 .disabled(isMatchingLight)
 
                 Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+                // Figma-pariteit: de 6 uitlijn-assen zitten gevouwen onder één
+                // pil (icoon + chevron) die de zwevende uitlijn-capsule opent.
+                alignMenuButton
+
+                // Organize: tidy-up + distribute-spacing onder één grid-pil met
+                // chevron (zelfde groepeer-patroon als Figma's "Organize").
+                organizeMenuButton
+
+                Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
             }
 
             // Adjust: dezelfde kleurcorrectie op alle geselecteerde (dropdown).
@@ -736,6 +807,78 @@ struct BoardView: View {
         .dsToolbarCapsule(size: .compact)
     }
 
+    /// Uitlijn-pil (icoon + chevron). Opent een zwevende capsule met de 6 assen
+    /// — de capsule blijft open zodat meerdere uitlijningen na elkaar kunnen.
+    private var alignMenuButton: some View {
+        DSCapsuleToolButton(
+            Image(systemName: "align.horizontal.left.fill"),
+            showChevron: true,
+            isActive: batchMenu == .align,
+            size: .compact,
+            action: { batchMenu = (batchMenu == .align) ? nil : .align }
+        )
+        .overlay(alignment: .top) {
+            if batchMenu == .align {
+                HStack(spacing: DSToolbarSize.compact.itemSpacing) {
+                    alignIcon("align.horizontal.left", .left)
+                    alignIcon("align.horizontal.center", .centerH)
+                    alignIcon("align.horizontal.right", .right)
+                    alignIcon("align.vertical.top", .top)
+                    alignIcon("align.vertical.center", .centerV)
+                    alignIcon("align.vertical.bottom", .bottom)
+                }
+                .dsToolbarCapsule(size: .compact)
+                .offset(y: DSToolbarSize.compact.height
+                          + DSToolbarSize.compact.containerPadding
+                          + DSSpacing.gap2)
+                .zIndex(10)
+            }
+        }
+    }
+
+    private func alignIcon(_ symbol: String, _ axis: BoardAlignAxis) -> some View {
+        DSCapsuleToolButton(Image(systemName: symbol), size: .compact,
+                            action: { alignSelection(axis) })
+    }
+
+    /// Organize-pil (grid-icoon + chevron): tidy-up + distribute-spacing in een
+    /// rij-dropdown (zelfde menu-rij-stijl als het rechtermuis-menu).
+    private var organizeMenuButton: some View {
+        DSCapsuleToolButton(
+            Image(systemName: "square.grid.2x2"),
+            label: "Organize",
+            showChevron: true,
+            isActive: batchMenu == .organize,
+            size: .compact,
+            action: { batchMenu = (batchMenu == .organize) ? nil : .organize }
+        )
+        .overlay(alignment: .top) {
+            if batchMenu == .organize {
+                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                    menuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
+                        batchMenu = nil; tidyUpSelection()
+                    }
+                    menuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
+                            shortcut: "⌃⌥V", disabled: selection.count < 3) {
+                        batchMenu = nil; distributeSelection(.vertical)
+                    }
+                    menuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
+                            shortcut: "⌃⌥H", disabled: selection.count < 3) {
+                        batchMenu = nil; distributeSelection(.horizontal)
+                    }
+                }
+                .padding(DSSpacing.gap1)
+                .frame(minWidth: 240, alignment: .leading)
+                .dsPanelSurface(cornerRadius: DSRadius.lg)
+                .fixedSize()
+                .offset(y: DSToolbarSize.compact.height
+                          + DSToolbarSize.compact.containerPadding
+                          + DSSpacing.gap2)
+                .zIndex(10)
+            }
+        }
+    }
+
     /// E31.7: gedeelde "Background"-knop met de volledige `BackgroundPanel` als
     /// zwevende dropdown — dezelfde panel-UI als de single-editor. `display`
     /// levert de selectie-state + Original/custom-bron; de apply gaat via
@@ -753,7 +896,7 @@ struct BoardView: View {
         )
         .overlay(alignment: .top) {
             if isOpen {
-                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) })
+                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, entitlement: entitlement)
                     .padding(DSSpacing.gap4)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
@@ -802,6 +945,84 @@ struct BoardView: View {
             portrait.setBackground(bg)
             cache.invalidate(portrait)
         }
+    }
+
+    private func alignSelection(_ axis: BoardAlignAxis) {
+        let targets = selectedPortraits
+        guard targets.count >= 2 else { return }
+        let before = targets.map { CGPoint(x: $0.boardX, y: $0.boardY) }
+        let minX = targets.map(\.boardX).min()!, maxX = targets.map(\.boardX).max()!
+        let minY = targets.map(\.boardY).min()!, maxY = targets.map(\.boardY).max()!
+        withAnimation(.spring(duration: 0.25, bounce: 0.08)) {
+            switch axis {
+            case .left:    targets.forEach { $0.boardX = minX }
+            case .centerH: targets.forEach { $0.boardX = (minX + maxX) / 2 }
+            case .right:   targets.forEach { $0.boardX = maxX }
+            case .top:     targets.forEach { $0.boardY = minY }
+            case .centerV: targets.forEach { $0.boardY = (minY + maxY) / 2 }
+            case .bottom:  targets.forEach { $0.boardY = maxY }
+            }
+        }
+        registerMoveUndo(targets, before: before, name: "Align")
+    }
+
+    private func tidyUpSelection() {
+        let targets = selectedPortraits.sorted {
+            $0.boardY != $1.boardY ? $0.boardY < $1.boardY : $0.boardX < $1.boardX
+        }
+        guard targets.count >= 2 else { return }
+        let before = targets.map { CGPoint(x: $0.boardX, y: $0.boardY) }
+        let cols = max(1, Int(ceil(sqrt(Double(targets.count)))))
+        let rows = Int(ceil(Double(targets.count) / Double(cols)))
+        let cx = targets.map(\.boardX).reduce(0, +) / Double(targets.count)
+        let cy = targets.map(\.boardY).reduce(0, +) / Double(targets.count)
+        let gridW = Double(cols) * Double(cardSide) + Double(cols - 1) * Double(gap)
+        let gridH = Double(rows) * Double(cellHeight) + Double(rows - 1) * Double(gap)
+        let ox = cx - gridW / 2 + Double(cardSide) / 2
+        let oy = cy - gridH / 2 + Double(cellHeight) / 2
+        withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+            for (i, p) in targets.enumerated() {
+                p.boardX = ox + Double(i % cols) * (Double(cardSide) + Double(gap))
+                p.boardY = oy + Double(i / cols) * (Double(cellHeight) + Double(gap))
+            }
+        }
+        registerMoveUndo(targets, before: before, name: "Tidy Up")
+    }
+
+    /// Verdeel de selectie met gelijke tussenruimte langs één as. Houdt de uiterste
+    /// twee vast en zet de rest op gelijke afstand ertussen (Figma "distribute
+    /// spacing"; voor gelijke kaartmaten = gelijke center-afstand). Vereist ≥3.
+    private func distributeSelection(_ axis: BoardDistributeAxis) {
+        let targets = selectedPortraits
+        guard targets.count >= 3 else { return }
+        let before = targets.map { CGPoint(x: $0.boardX, y: $0.boardY) }
+        withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+            switch axis {
+            case .horizontal:
+                let sorted = targets.sorted { $0.boardX < $1.boardX }
+                let lo = sorted.first!.boardX, hi = sorted.last!.boardX
+                let step = (hi - lo) / Double(sorted.count - 1)
+                for (i, p) in sorted.enumerated() { p.boardX = lo + Double(i) * step }
+            case .vertical:
+                let sorted = targets.sorted { $0.boardY < $1.boardY }
+                let lo = sorted.first!.boardY, hi = sorted.last!.boardY
+                let step = (hi - lo) / Double(sorted.count - 1)
+                for (i, p) in sorted.enumerated() { p.boardY = lo + Double(i) * step }
+            }
+        }
+        registerMoveUndo(targets, before: before, name: "Distribute")
+    }
+
+    /// Gedeelde, gegroepeerde undo voor een batch-verplaatsing (align/tidy/distribute):
+    /// één undo-groep, per portret een `BoardMoveUndo` van oud→nieuw.
+    private func registerMoveUndo(_ targets: [Portrait2], before: [CGPoint], name: String) {
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName(name)
+        for (i, p) in targets.enumerated() {
+            BoardMoveUndo.register(undoManager, portrait: p,
+                                   from: before[i], to: CGPoint(x: p.boardX, y: p.boardY))
+        }
+        undoManager?.endUndoGrouping()
     }
 
     /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
@@ -880,7 +1101,7 @@ struct BoardView: View {
             gridEnabled: .constant(false),
             showFramingActions: false,
             showGrid: false,
-            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }) }
+            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }, entitlement: entitlement) }
         )
     }
 
@@ -1056,6 +1277,11 @@ struct BoardView: View {
 /// verse closures de equatable-skip niet breken.
 private struct BoardNodeView: View, Equatable {
     let thumbnail: NSImage?
+    /// Origineel als achtergrondLAAG (Original-modus / Portrait-blur), al
+    /// gedecodeerd + downscaled door de ThumbnailStore. nil = geen Original-laag.
+    /// Wordt op DEZELFDE scaledToFit+padding-rect als de cutout-thumb getekend,
+    /// zodat het originele onderwerp achter het cutout-onderwerp registreert.
+    let backgroundOriginalImage: NSImage?
     let isSelected: Bool
     let frameShape: ExportShape
     let name: String
@@ -1078,6 +1304,9 @@ private struct BoardNodeView: View, Equatable {
     static func == (lhs: BoardNodeView, rhs: BoardNodeView) -> Bool {
         lhs.isSelected == rhs.isSelected
             && lhs.thumbnail === rhs.thumbnail
+            // Op identiteit (cache-stabiel) — vangt zowel modus-wissel (nil↔beeld)
+            // als de async decode-voltooiing, net als `thumbnail`.
+            && lhs.backgroundOriginalImage === rhs.backgroundOriginalImage
             && lhs.frameShape == rhs.frameShape
             && lhs.name == rhs.name
             && lhs.role == rhs.role
@@ -1107,7 +1336,7 @@ private struct BoardNodeView: View, Equatable {
             VStack(spacing: 2) {
                 Text(name.isEmpty ? "Untitled" : name)
                     .dsTextStyle(.labelBase)
-                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.primary)
+                    .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.primary)
                     .lineLimit(1)
                 if !role.isEmpty {
                     Text(role)
@@ -1143,6 +1372,18 @@ private struct BoardNodeView: View, Equatable {
                     // Portrait: vervaag de custom-achtergrond (de onderwerp-thumb erboven blijft scherp).
                     .blur(radius: portraitBlur ? BackgroundBlur.canvasRadius(side: cardSide) : 0)
             }
+            // Original-modus: de originele foto op EXACT dezelfde scaledToFit+padding-
+            // rect als de cutout-thumb → het originele onderwerp registreert achter het
+            // scherpe onderwerp (niet dubbel; cutout en origineel delen de aspect-ratio).
+            // Portrait: vervaagd (onderwerp-thumb erboven blijft scherp).
+            else if let original = backgroundOriginalImage {
+                Image(nsImage: original)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .padding(cardSide * 0.08)
+                    .blur(radius: portraitBlur ? BackgroundBlur.canvasRadius(side: cardSide) : 0)
+            }
             // E27.5: gecachete, verkleinde thumbnail (geen re-decode per frame),
             // E30.2 mét de niet-destructieve Adjust-laag erop (WYSIWYG). De cache is
             // (id, updatedAt)-gekeyd (E27.6 Tier 0), dus in-place-edits verversen vanzelf.
@@ -1160,6 +1401,14 @@ private struct BoardNodeView: View, Equatable {
         .clipShape(clip)
         .overlay(clip.stroke(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
     }
+}
+
+private enum BoardAlignAxis {
+    case left, centerH, right, top, centerV, bottom
+}
+
+private enum BoardDistributeAxis {
+    case horizontal, vertical
 }
 
 /// E27.4: undo/redo voor een board-node-verplaatsing (zelfde genest-register-

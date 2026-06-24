@@ -612,6 +612,17 @@ public final class BackendClient {
         return resp.effects
     }
 
+    // MARK: GET /v1/backgrounds (CMS-gestuurd, E33+)
+    /// CMS-achtergronden gegroepeerd op categorie. Anoniem-vriendelijk.
+    /// Het paneel toont elke unieke `category`-waarde als een gelabelde sectie.
+    private struct BackgroundsResponse: Decodable {
+        let backgrounds: [RemoteBackground]
+    }
+    public func backgrounds() async throws -> [RemoteBackground] {
+        let resp: BackgroundsResponse = try await requestAllowingAnonymous("/v1/backgrounds", method: "GET")
+        return resp.backgrounds
+    }
+
     // MARK: GET /v1/messages (E17.3)
     /// Getargete in-app-berichten (verenigd Message-model, E17.2). De server
     /// filtert op cohort/signup-datum/app-versie/platform/expiry/seen; de
