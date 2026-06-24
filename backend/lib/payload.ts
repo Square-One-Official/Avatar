@@ -366,6 +366,70 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
 }
 
 // ---------------------------------------------------------------------------
+// Backgrounds — CMS-gestuurde achtergronden (E33+). Elke rij is één swatch in
+// het Background-paneel van de macOS Editor, gegroepeerd op `category`.
+// De volledige afbeelding (`imageUrl`) dient voor compositing; `thumbnailUrl`
+// is de kleine swatch voor de panel-preview (valt terug op imageUrl).
+// ---------------------------------------------------------------------------
+
+export type PayloadBackground = {
+  key: string;
+  label: string;
+  category: string;
+  imageUrl: string;
+  thumbnailUrl: string | null;
+  order: number;
+};
+
+let backgroundCache: { expiresAt: number; payload: PayloadBackground[] } | null = null;
+
+export async function fetchActiveBackgrounds(): Promise<PayloadBackground[]> {
+  const now = Date.now();
+  if (backgroundCache && backgroundCache.expiresAt > now) {
+    return backgroundCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — backgrounds disabled");
+    return [];
+  }
+
+  const url = new URL(`${base}/backgrounds`);
+  url.searchParams.set("limit", "200");
+  url.searchParams.set("depth", "1");
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "category,order");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload backgrounds fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const backgrounds = docs.map(normalizeBackground).filter((b): b is PayloadBackground => b !== null);
+  backgroundCache = { expiresAt: now + CACHE_TTL_MS, payload: backgrounds };
+  return backgrounds;
+}
+
+function normalizeBackground(raw: unknown): PayloadBackground | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const category = typeof r.category === "string" ? r.category.trim() : null;
+  const img = r.image as { url?: string } | null | undefined;
+  const imageUrl = img && typeof img.url === "string" ? img.url : null;
+  if (!key || !category || !imageUrl) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, category, imageUrl, thumbnailUrl, order };
+}
+
+// ---------------------------------------------------------------------------
 // E17.2 — Messages (verenigd model, slug "messages"). Naast de announcement-
 // functies hierboven; niet-destructief. Spiegelt admin/src/collections/
 // Messages.ts: kanaal + targeting-group + schedule-group + body/image/cta.
