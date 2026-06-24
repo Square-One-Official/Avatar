@@ -38,6 +38,19 @@ struct BoardView: View {
     @State private var canvasMenu: CanvasToolbarMenu?
 
     /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
+    private var boardToolbarItems: [DSToolbarItem<EditorTool>] {
+        let flags = entitlement.featureFlags
+        return EditorView.toolbarItems.filter { item in
+            switch item.id {
+            case .effects:    return flags.effectsEnabled
+            case .face:       return flags.faceEnabled
+            case .hair:       return flags.hairEnabled
+            case .clothing:   return flags.clothesEnabled
+            default:          return true
+            }
+        }
+    }
+
     private var selectedNode: Portrait2? {
         guard selection.count == 1, let id = selection.first else { return nil }
         return portraits.first { $0.persistentModelID == id }
@@ -271,7 +284,7 @@ struct BoardView: View {
                     // gedecodeerd + downscaled via dezelfde store (nooit de volle
                     // originalData per frame). nil tenzij Original-modus actief is.
                     backgroundOriginalImage: bgIsAlignedOriginal
-                        ? thumbs.original(for: p, maxDimension: cardSide * 2)
+                        ? thumbs.originalBackdrop(for: p, maxDimension: cardSide * 2)
                         : nil,
                     isSelected: selection.contains(p.persistentModelID),
                     frameShape: p.frameShape,
@@ -1159,7 +1172,7 @@ struct BoardView: View {
                 .dsPanelSurface(cornerRadius: DSRadius.xl)
             }
 
-            DSBottomToolbar(items: EditorView.toolbarItems, selection: $editTool)
+            DSBottomToolbar(items: boardToolbarItems, selection: $editTool)
         }
     }
 

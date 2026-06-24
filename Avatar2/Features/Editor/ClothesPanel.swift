@@ -38,7 +38,7 @@ final class ClothesModel {
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
     var isBusy: Bool { phase == .working }
 
-    func apply(preset: ClothesStyle? = nil, freeText: String? = nil, base: NSImage) async {
+    func apply(presetKey: String? = nil, freeText: String? = nil, base: NSImage) async {
         guard !isBusy else { return }
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
@@ -59,7 +59,7 @@ final class ClothesModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.editClothes(imagePNG: png, preset: preset, freeText: freeText)
+            let (data, _) = try await entitlement.backend.editClothes(imagePNG: png, presetKey: presetKey, freeText: freeText)
             guard let image = NSImage(data: data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
@@ -90,24 +90,36 @@ struct ClothesPanel: View {
 
     @State private var model: ClothesModel
     @State private var prompt = ""
+    @State private var cmsPresets: [RemotePreset] = []
+
+    private static var sessionCache: [RemotePreset]? = nil
+
+    private static let fallbackPresets: [RemotePreset] = ClothesStyle.allCases.enumerated().map {
+        RemotePreset(key: $0.element.rawValue, label: $0.element.label, order: $0.offset)
+    }
+
+    private var presets: [RemotePreset] {
+        cmsPresets.isEmpty ? ClothesPanel.fallbackPresets : cmsPresets
+    }
 
     init(baseImage: NSImage, entitlement: EntitlementModel, onApply: @escaping (NSImage) -> Void = { _ in }) {
         self.baseImage = baseImage
         self.entitlement = entitlement
         self.onApply = onApply
         _model = State(initialValue: ClothesModel(entitlement: entitlement, onApply: onApply))
+        _cmsPresets = State(initialValue: ClothesPanel.sessionCache ?? [])
     }
 
     var body: some View {
         DSEditPanel(title: "Change upper clothes", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
 
-                // Outfit-presets.
+                // Outfit-presets (CMS-gestuurd; fallback: ClothesStyle.allCases).
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
-                        ForEach(ClothesStyle.allCases) { preset in
+                        ForEach(presets) { preset in
                             DSChip(preset.label, type: .neutral) {
-                                Task { await model.apply(preset: preset, base: baseImage) }
+                                Task { await model.apply(presetKey: preset.key, base: baseImage) }
                             }
                         }
                     }
@@ -137,6 +149,13 @@ struct ClothesPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .disabled(model.isBusy)
+        }
+        .task {
+            guard ClothesPanel.sessionCache == nil else { return }
+            if let fetched = try? await entitlement.backend.clothesPresets(), !fetched.isEmpty {
+                ClothesPanel.sessionCache = fetched
+                cmsPresets = fetched
+            }
         }
     }
 }

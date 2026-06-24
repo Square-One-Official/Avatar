@@ -11,6 +11,20 @@ import SwiftUI
 struct PaywallSheet: View {
     @Bindable var model: EntitlementModel
 
+    @State private var cmsProFeatures: [String] = PaywallSheet.proFeaturesCache ?? []
+    private static var proFeaturesCache: [String]? = nil
+
+    private static let fallbackProFeatures = [
+        "Unlimited images",
+        "All Starter features",
+        "All editing features",
+        "\(ProTier.pro.monthlyCredits) editing credits",
+    ]
+
+    private var proFeatures: [String] {
+        cmsProFeatures.isEmpty ? PaywallSheet.fallbackProFeatures : cmsProFeatures
+    }
+
     var body: some View {
         Group {
             if model.account == nil {
@@ -39,6 +53,14 @@ struct PaywallSheet: View {
         .background(DSColor.Background.card)
         .preferredColorScheme(.dark)
         .task { await model.refresh() }
+        .task {
+            guard PaywallSheet.proFeaturesCache == nil else { return }
+            if let config = try? await model.backend.appConfig(),
+               !config.paywallProFeatures.isEmpty {
+                PaywallSheet.proFeaturesCache = config.paywallProFeatures
+                cmsProFeatures = config.paywallProFeatures
+            }
+        }
     }
 
     private var loadingPlaceholder: some View {
@@ -122,7 +144,7 @@ struct PaywallSheet: View {
             checkoutErrorView
             footer
         }
-        .animation(.easeOut(duration: 0.18), value: model.selectedInterval)
+        .animation(DSMotion.base, value: model.selectedInterval)
     }
 
     // Monthly / Yearly segmented pill (lokaal; geen AvatarUI-wijziging).
@@ -194,10 +216,7 @@ struct PaywallSheet: View {
                     .foregroundStyle(DSColor.Foreground.subtle)
             }
             VStack(alignment: .leading, spacing: DSSpacing.gap1_5) {
-                featureRow("Unlimited images")
-                featureRow("All Starter features")
-                featureRow("All editing features")
-                featureRow("\(ProTier.pro.monthlyCredits) editing credits")
+                ForEach(proFeatures, id: \.self) { featureRow($0) }
             }
             .padding(.top, DSSpacing.gap3)
             Spacer(minLength: DSSpacing.gap6)
@@ -218,7 +237,7 @@ struct PaywallSheet: View {
         .background(DSColor.Background.app, in: RoundedRectangle(cornerRadius: DSRadius.xl2))
         .overlay {
             RoundedRectangle(cornerRadius: DSRadius.xl2).strokeBorder(
-                highlighted ? DSColor.Action.primary : DSColor.Foreground.divider,
+                highlighted ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
                 lineWidth: highlighted ? DSBorderWidth.medium : DSBorderWidth.thin
             )
         }
@@ -228,7 +247,7 @@ struct PaywallSheet: View {
         HStack(spacing: DSSpacing.gap2) {
             Image(systemName: "checkmark")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(DSColor.Action.primary)
+                .foregroundStyle(DSColor.Action.primaryForeground)
             Text(text)
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.subtle)
@@ -267,14 +286,14 @@ struct PaywallSheet: View {
                     .foregroundStyle(DSColor.Foreground.primary)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16))
-                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.muted)
+                    .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted)
             }
             .padding(.horizontal, DSSpacing.gap4)
             .padding(.vertical, DSSpacing.gap3)
             .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.lg))
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg).strokeBorder(
-                    isSelected ? DSColor.Action.primary : DSColor.Foreground.divider,
+                    isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
                     lineWidth: DSBorderWidth.thin
                 )
             }

@@ -14,6 +14,10 @@ import Observation
 final class EntitlementModel {
     private(set) var account: AccountPayload?
 
+    /// Remote feature flags (E33+). Default = allEnabled zodat de app nooit
+    /// kapot gaat als de CMS onbereikbaar is bij startup.
+    private(set) var featureFlags: RemoteFeatureFlags = .allEnabled
+
     var isPaywallPresented = false
     /// Op=op-toast (HTTP 402 / credits op): toast eerst, paywall op tik.
     private(set) var isShowingOutOfCreditsToast = false
@@ -116,6 +120,25 @@ final class EntitlementModel {
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
     var monthlyResetAt: Date? { account?.monthlyResetAt }
 
+    /// Aftellende quota-tekst ("X left of Y" / "N credits") — één bron voor de
+    /// topbar én de left-nav (PoC). Pro: resterende credits over de maand-grant;
+    /// top-ups stapelen erbovenop (geen vaste noemer) → kale balans. Free: rest
+    /// van de lifetime-cap.
+    var quotaSummary: String {
+        if isProActive {
+            let quota = monthlyQuota
+            if quota > 0, creditsRemaining <= quota {
+                return "\(creditsRemaining) left of \(quota)"
+            }
+            return "\(creditsRemaining) credits"
+        }
+        if let free = freeImportsRemaining {
+            let remaining = max(0, min(FreeTier.maxPortraits, free))
+            return "\(remaining) left of \(FreeTier.maxPortraits)"
+        }
+        return ""
+    }
+
     // MARK: - Account-pagina (E15.3)
 
     var accountEmail: String? { auth.email }
@@ -165,8 +188,13 @@ final class EntitlementModel {
     /// Anoniem-vriendelijk: zonder token valt /v1/account terug op de
     /// device-grant-lookup. Offline of fout → state blijft staan.
     func refresh() async {
-        if let payload = try? await backend.me() {
+        async let accountFetch = backend.me()
+        async let flagsFetch = backend.featureFlags()
+        if let payload = try? await accountFetch {
             account = payload
+        }
+        if let flags = try? await flagsFetch {
+            featureFlags = flags
         }
     }
 

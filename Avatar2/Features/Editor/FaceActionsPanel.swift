@@ -26,7 +26,7 @@ import SwiftUI
 final class FaceEffectsModel {
     enum Phase: Equatable {
         case idle
-        case working(FaceEdit)
+        case working(String) // label of the active preset
         case failed(String)
     }
 
@@ -51,27 +51,27 @@ final class FaceEffectsModel {
     /// De titel van de kaart die momenteel verwerkt (nil = idle) — voedt de
     /// spinner/dim-logica in FaceActionsPanel, net als EffectsPanel.isWorking.
     var workingTitle: String? {
-        if case let .working(edit) = phase { return edit.label }
+        if case let .working(label) = phase { return label }
         return nil
     }
 
     /// Tik op een Beauty-kaart: gate → genereren. Tijdens een lopende edit
     /// negeren we tikken.
-    func apply(_ edit: FaceEdit) {
+    func apply(presetKey: String, label: String) {
         guard !isBusy else { return }
-        Task { await generate(edit) }
+        Task { await generate(presetKey: presetKey, label: label) }
     }
 
-    private func generate(_ edit: FaceEdit) async {
+    private func generate(presetKey: String, label: String) async {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         guard let png = baseImage.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
-        phase = .working(edit)
+        phase = .working(label)
         entitlement.presentWorking(
-            title: edit.label,
+            title: label,
             messages: [
                 "Reading the portrait…",
                 "Working on the details…",
@@ -81,7 +81,7 @@ final class FaceEffectsModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.editFace(imagePNG: png, preset: edit)
+            let (data, _) = try await entitlement.backend.editFace(imagePNG: png, presetKey: presetKey)
             guard let image = NSImage(data: data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
@@ -113,6 +113,27 @@ struct FaceActionsPanel: View {
     var isPro: Bool = false
 
     @State private var model: FaceEffectsModel
+    @State private var cmsPresets: [RemotePreset] = []
+
+    private static var sessionCache: [RemotePreset]? = nil
+
+    private static let fallbackPresets: [RemotePreset] = FaceEdit.allCases.enumerated().map {
+        RemotePreset(key: $0.element.rawValue, label: $0.element.label, order: $0.offset)
+    }
+
+    private var presets: [RemotePreset] {
+        cmsPresets.isEmpty ? FaceActionsPanel.fallbackPresets : cmsPresets
+    }
+
+    // Bekende icon-mapping per preset-sleutel (voor nu alleen de 3 bestaande).
+    private func icon(for key: String) -> Ph {
+        switch key {
+        case "whiten-teeth": return .tooth
+        case "apply-makeup": return .palette
+        case "reduce-wrinkles": return .smiley
+        default: return .sparkle
+        }
+    }
 
     init(
         baseImage: NSImage,
@@ -127,26 +148,7 @@ struct FaceActionsPanel: View {
         _model = State(initialValue: FaceEffectsModel(
             entitlement: entitlement, baseImage: baseImage, onApply: onApply
         ))
-    }
-
-    private struct Card: Identifiable {
-        let id = UUID()
-        let title: String
-        let icon: Ph
-        var isCloud: Bool = false
-        var isOn: Bool = false
-        let handler: () -> Void
-    }
-
-    private var cards: [Card] {
-        [
-            Card(title: FaceEdit.whitenTeeth.label, icon: .tooth, isCloud: true,
-                 handler: { model.apply(.whitenTeeth) }),
-            Card(title: FaceEdit.applyMakeup.label, icon: .palette, isCloud: true,
-                 handler: { model.apply(.applyMakeup) }),
-            Card(title: FaceEdit.reduceWrinkles.label, icon: .smiley, isCloud: true,
-                 handler: { model.apply(.reduceWrinkles) }),
-        ]
+        _cmsPresets = State(initialValue: FaceActionsPanel.sessionCache ?? [])
     }
 
     private let cardWidth: CGFloat = 112
@@ -156,18 +158,20 @@ struct FaceActionsPanel: View {
         let workingTitle = model.workingTitle
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DSSpacing.gap2) {
-                ForEach(cards) { card in
-                    let isWorking = workingTitle == card.title
-                    Button(action: card.handler) {
+                ForEach(presets) { preset in
+                    let isWorking = workingTitle == preset.label
+                    Button {
+                        model.apply(presetKey: preset.key, label: preset.label)
+                    } label: {
                         DSThumbnailCard(
-                            label: card.title,
-                            isPro: card.isCloud && !isPro,
-                            isSelected: card.isOn,
+                            label: preset.label,
+                            isPro: !isPro,
+                            isSelected: false,
                             isWorking: isWorking,
                             tileSize: cardWidth,
                             tileHeight: cardHeight
                         ) {
-                            card.icon.regular
+                            icon(for: preset.key).regular
                                 .scaledToFit()
                                 .frame(width: 36, height: 36)
                         }
@@ -183,5 +187,12 @@ struct FaceActionsPanel: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .horizontalScrollEdgeFade()
+        .task {
+            guard FaceActionsPanel.sessionCache == nil else { return }
+            if let fetched = try? await entitlement.backend.facePresets(), !fetched.isEmpty {
+                FaceActionsPanel.sessionCache = fetched
+                cmsPresets = fetched
+            }
+        }
     }
 }

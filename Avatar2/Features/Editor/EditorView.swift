@@ -137,6 +137,9 @@ struct EditorView: View {
     @State private var decodedCutout: NSImage?
     @State private var decodedOriginal: NSImage?
     @State private var decodedBackground: NSImage?
+    /// Gestylede volle originele foto van het actieve effect → Original-achtergrond
+    /// die bij het effect past. nil = geen actief effect (rauwe originele foto).
+    @State private var decodedEffectBackground: NSImage?
     /// E27.1: de canvas-camera (VIEW-zoom + pan over de HELE scène). Vervangt de
     /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
     /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
@@ -221,6 +224,9 @@ struct EditorView: View {
         decodedCutout = portraitModel.flatMap { NSImage(data: $0.cutoutData) }
         decodedOriginal = portraitModel?.originalData.flatMap { NSImage(data: $0) }
         decodedBackground = portraitModel?.backgroundImageData.flatMap { NSImage(data: $0) }
+        // Effect-apply/-toggle roept `touch()` → updatedAt verandert → dit ververst
+        // mee, zodat de backdrop het actieve effect volgt.
+        decodedEffectBackground = portraitModel?.effectBackgroundData.flatMap { NSImage(data: $0) }
     }
 
     /// E24.16: de clip-vorm voor het canvas, volgend op `Portrait2.frameShape`
@@ -276,12 +282,17 @@ struct EditorView: View {
     /// custom upload, óf de originele foto (Original-modus, of Portrait zonder
     /// expliciete achtergrond). nil = vlakke kleur of geen achtergrond.
     private var backgroundLayerImage: NSImage? {
-        if let custom = decodedBackground { return custom }                     // .image
-        if portraitModel?.backgroundColorHex != nil { return nil }              // .color → geen beeld-laag
-        if portraitModel?.useOriginalBackground == true { return originalImage } // .original
-        if portraitBlurOn { return originalImage }                             // .transparent + Portrait → origineel
-        return nil                                                              // .transparent
+        if let custom = decodedBackground { return custom }                          // .image
+        if portraitModel?.backgroundColorHex != nil { return nil }                   // .color → geen beeld-laag
+        if portraitModel?.useOriginalBackground == true { return originalBackdropImage } // .original
+        if portraitBlurOn { return originalBackdropImage }                          // .transparent + Portrait → origineel
+        return nil                                                                   // .transparent
     }
+
+    /// De "originele foto"-achtergrondlaag: bij een actief effect de gestylede volle
+    /// foto (zodat de backdrop bij het effect past), anders de rauwe originele foto.
+    /// Beide delen het cutout-frame/-ratio → de bestaande aligned-render klopt.
+    private var originalBackdropImage: NSImage? { decodedEffectBackground ?? originalImage }
 
     /// E24.31-fix (2026-06-23): de achtergrondlaag-afbeelding ÍS de originele foto
     /// (Original-modus, of Portrait-blur zonder eigen achtergrond) — géén custom
@@ -370,12 +381,23 @@ struct EditorView: View {
         DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Clothing"),
     ]
 
-    // E31.5: de capsule-overflow `⋯` is leeg. Background (dat Figma in deze
-    // overflow zette) verhuisde — bewuste afwijking, besluit Thierry — naar de
-    // frame-lokale toolbar (canvas-gerelateerd). Geen andere secundaire tools →
-    // de `⋯`-knop verschijnt niet (DSBottomToolbar toont 'm alleen bij inhoud).
-    // Zodra er wél overflow-tools komen, keert de `⋯` automatisch terug.
+    // E31.5: de capsule-overflow `⋯` is leeg.
     private static let overflowItems: [DSToolbarItem<EditorTool>] = []
+
+    /// Feature-flag-gefilterde toolbar (E33+). Verbergt tools waarvan de
+    /// remote flag uit staat. Default (offline/CMS down) = alles zichtbaar.
+    private var activeToolbarItems: [DSToolbarItem<EditorTool>] {
+        let flags = entitlement?.featureFlags ?? .allEnabled
+        return Self.toolbarItems.filter { item in
+            switch item.id {
+            case .effects:    return flags.effectsEnabled
+            case .face:       return flags.faceEnabled
+            case .hair:       return flags.hairEnabled
+            case .clothing:   return flags.clothesEnabled
+            default:          return true
+            }
+        }
+    }
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
     /// sidebar en openen hun paneel. E18.20: GEEN eigen withAnimation meer —
@@ -553,7 +575,7 @@ struct EditorView: View {
         // E28.5: de toolbars zijn altijd zichtbaar in de editor (één portret =
         // altijd het actieve canvas).
         DSEditPanelContainer(
-            tools: Self.toolbarItems,
+            tools: activeToolbarItems,
             activeTool: toolSelection,
             overflowTools: Self.overflowItems,
             overflowActions: overflowActions,

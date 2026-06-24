@@ -39,7 +39,7 @@ final class HairModel {
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
     var isBusy: Bool { phase == .working }
 
-    func apply(preset: HairStyle? = nil, freeText: String? = nil, base: NSImage) async {
+    func apply(presetKey: String? = nil, freeText: String? = nil, base: NSImage) async {
         guard !isBusy else { return }
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
@@ -60,7 +60,7 @@ final class HairModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.editHair(imagePNG: png, preset: preset, freeText: freeText)
+            let (data, _) = try await entitlement.backend.editHair(imagePNG: png, presetKey: presetKey, freeText: freeText)
             guard let image = NSImage(data: data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
@@ -96,24 +96,36 @@ struct HairPanel: View {
 
     @State private var model: HairModel
     @State private var prompt = ""
+    @State private var cmsPresets: [RemotePreset] = []
+
+    private static var sessionCache: [RemotePreset]? = nil
+
+    private static let fallbackPresets: [RemotePreset] = HairStyle.allCases.enumerated().map {
+        RemotePreset(key: $0.element.rawValue, label: $0.element.label, order: $0.offset)
+    }
+
+    private var presets: [RemotePreset] {
+        cmsPresets.isEmpty ? HairPanel.fallbackPresets : cmsPresets
+    }
 
     init(baseImage: NSImage, entitlement: EntitlementModel, onApply: @escaping (NSImage) -> Void = { _ in }) {
         self.baseImage = baseImage
         self.entitlement = entitlement
         self.onApply = onApply
         _model = State(initialValue: HairModel(entitlement: entitlement, onApply: onApply))
+        _cmsPresets = State(initialValue: HairPanel.sessionCache ?? [])
     }
 
     var body: some View {
         DSEditPanel(title: "Change hair", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
 
-                // Kapsel-presets.
+                // Kapsel-presets (CMS-gestuurd; fallback: HairStyle.allCases).
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
-                        ForEach(HairStyle.allCases) { style in
-                            DSChip(style.label, type: .neutral) {
-                                Task { await model.apply(preset: style, base: baseImage) }
+                        ForEach(presets) { preset in
+                            DSChip(preset.label, type: .neutral) {
+                                Task { await model.apply(presetKey: preset.key, base: baseImage) }
                             }
                         }
                     }
@@ -143,6 +155,13 @@ struct HairPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .disabled(model.isBusy)
+        }
+        .task {
+            guard HairPanel.sessionCache == nil else { return }
+            if let fetched = try? await entitlement.backend.hairPresets(), !fetched.isEmpty {
+                HairPanel.sessionCache = fetched
+                cmsPresets = fetched
+            }
         }
     }
 }

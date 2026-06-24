@@ -382,7 +382,7 @@ public final class BackendClient {
     /// tekst gaat als `hair_prompt` (server giet het in een vast sjabloon —
     /// geen rauwe instructie). Resultaat = opaque PNG + bijgewerkt saldo;
     /// 402 → `BackendError.noCredits` (paywall).
-    public func editHair(imagePNG: Data, preset: HairStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
+    public func editHair(imagePNG: Data, presetKey: String? = nil, freeText: String? = nil) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -400,7 +400,7 @@ public final class BackendClient {
         }
         let body = try JSONEncoder().encode(
             Body(storageKey: storageKey,
-                 hairPreset: preset?.rawValue,
+                 hairPreset: presetKey,
                  hairPrompt: freeText,
                  generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
@@ -418,7 +418,7 @@ public final class BackendClient {
     /// `freeText`; de server mapt het naar een clothes-only edit-prompt met
     /// het harde acceptatiecriterium (gezicht/haar/pose/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editClothes(imagePNG: Data, preset: ClothesStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
+    public func editClothes(imagePNG: Data, presetKey: String? = nil, freeText: String? = nil) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -436,7 +436,7 @@ public final class BackendClient {
         }
         let body = try JSONEncoder().encode(
             Body(storageKey: storageKey,
-                 clothesPreset: preset?.rawValue,
+                 clothesPreset: presetKey,
                  clothesPrompt: freeText,
                  generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
@@ -454,7 +454,7 @@ public final class BackendClient {
     /// server mapt `face_preset` naar een gezicht-only edit-prompt met het
     /// harde acceptatiecriterium (identiteit/pose/haar/kleding/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editFace(imagePNG: Data, preset: FaceEdit) async throws -> (Data, Int) {
+    public func editFace(imagePNG: Data, presetKey: String) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -470,7 +470,7 @@ public final class BackendClient {
         }
         let body = try JSONEncoder().encode(
             Body(storageKey: storageKey,
-                 facePreset: preset.rawValue,
+                 facePreset: presetKey,
                  generationModel: GenerationModelStore.shared.current.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
@@ -613,18 +613,40 @@ public final class BackendClient {
     }
 
     // MARK: GET /v1/app-config (CMS-gestuurd, E33+)
-    /// App-brede visuele configuratie (splash-achtergrond + lege-canvas-avatars).
-    /// Anoniem-vriendelijk — gebruikt vóórdat de gebruiker is ingelogd.
-    private struct AppConfigResponse: Decodable {
-        let splashBackgroundUrl: URL?
-        let emptyStateAvatarUrls: [URL]
-    }
+    /// App-brede visuele configuratie. Anoniem-vriendelijk.
     public func appConfig() async throws -> RemoteAppConfig {
-        let resp: AppConfigResponse = try await requestAllowingAnonymous("/v1/app-config", method: "GET")
+        let resp: RemoteAppConfigResponse = try await requestAllowingAnonymous("/v1/app-config", method: "GET")
         return RemoteAppConfig(
             splashBackgroundUrl: resp.splashBackgroundUrl,
-            emptyStateAvatarUrls: resp.emptyStateAvatarUrls
+            emptyStateAvatarUrls: resp.emptyStateAvatarUrls,
+            gradientPresets: resp.gradientPresets,
+            paywallProFeatures: resp.paywallProFeatures
         )
+    }
+
+    // MARK: GET /v1/hair-presets, /v1/clothes-presets, /v1/face-presets (CMS, E33+)
+    /// Kapsel-presets voor het Hair-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func hairPresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/hair-presets", method: "GET")
+        return resp.presets
+    }
+
+    /// Kleding-presets voor het Clothes-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func clothesPresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/clothes-presets", method: "GET")
+        return resp.presets
+    }
+
+    /// Face beauty-presets voor het Face-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func facePresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/face-presets", method: "GET")
+        return resp.presets
+    }
+
+    // MARK: GET /v1/feature-flags (CMS-gestuurd, E33+)
+    /// Remote feature flags. Anoniem-vriendelijk; soft-fail → allEnabled.
+    public func featureFlags() async throws -> RemoteFeatureFlags {
+        try await requestAllowingAnonymous("/v1/feature-flags", method: "GET")
     }
 
     // MARK: GET /v1/backgrounds (CMS-gestuurd, E33+)

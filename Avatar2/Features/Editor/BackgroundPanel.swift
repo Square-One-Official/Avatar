@@ -6,6 +6,7 @@
 // compositing). Tegelijk gaat het dot-grid uit.
 
 import AppKit
+import AvatarKit
 import AvatarUI
 import SwiftUI
 
@@ -29,8 +30,11 @@ struct BackgroundPanel: View {
     // CMS-achtergronden (E33+). Sessie-cache zodat herhaalbaar openen
     // geen flits geeft; leeg = nog niet geladen (geen fallback nodig).
     @State private var cmsBackgrounds: [RemoteBackground] = BackgroundPanel.sessionCache
+    // CMS-gradient-presets (E33+). Leeg = fallback op BackgroundKit.gradientPresets.
+    @State private var cmsGradients: [RemoteGradientPreset] = BackgroundPanel.gradientCache
 
     private static var sessionCache: [RemoteBackground] = []
+    private static var gradientCache: [RemoteGradientPreset] = []
     private static let imageCache = NSCache<NSURL, NSImage>()
 
     private let swatch: CGFloat = 36
@@ -58,11 +62,19 @@ struct BackgroundPanel: View {
 
     private func loadCMSBackgrounds() async {
         guard let backend = entitlement?.backend else { return }
-        let fetched = (try? await backend.backgrounds()) ?? []
-        guard !fetched.isEmpty else { return }
-        BackgroundPanel.sessionCache = fetched
-        cmsBackgrounds = fetched
-        prefetchThumbnails(for: fetched)
+        async let bgFetch = backend.backgrounds()
+        async let configFetch = backend.appConfig()
+        let fetched = (try? await bgFetch) ?? []
+        if !fetched.isEmpty {
+            BackgroundPanel.sessionCache = fetched
+            cmsBackgrounds = fetched
+            prefetchThumbnails(for: fetched)
+        }
+        let config = (try? await configFetch) ?? .empty
+        if !config.gradientPresets.isEmpty {
+            BackgroundPanel.gradientCache = config.gradientPresets
+            cmsGradients = config.gradientPresets
+        }
     }
 
     private func prefetchThumbnails(for items: [RemoteBackground]) {
@@ -248,14 +260,29 @@ struct BackgroundPanel: View {
                 }
             }
 
-            ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
-                Button { selectGradient(colors) } label: {
-                    RoundedRectangle(cornerRadius: DSRadius.lg)
-                        .fill(BackgroundKit.gradient(colors))
-                        .frame(width: swatch, height: swatch)
+            // Gradient-presets: CMS-gestuurd als aanwezig, anders hardgecodeerde fallback.
+            if cmsGradients.isEmpty {
+                ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
+                    Button { selectGradient(colors) } label: {
+                        RoundedRectangle(cornerRadius: DSRadius.lg)
+                            .fill(BackgroundKit.gradient(colors))
+                            .frame(width: swatch, height: swatch)
+                    }
+                    .buttonStyle(.plain)
+                    .dsHoverScale()
                 }
-                .buttonStyle(.plain)
-                .dsHoverScale()
+            } else {
+                ForEach(cmsGradients, id: \.label) { g in
+                    if let from = Color(hexRGB: g.fromHex), let to = Color(hexRGB: g.toHex) {
+                        Button { selectGradient([from, to]) } label: {
+                            RoundedRectangle(cornerRadius: DSRadius.lg)
+                                .fill(BackgroundKit.gradient([from, to]))
+                                .frame(width: swatch, height: swatch)
+                        }
+                        .buttonStyle(.plain)
+                        .dsHoverScale()
+                    }
+                }
             }
         }
     }
