@@ -8,7 +8,7 @@ import {
   UnknownModelOverrideError,
 } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { fetchActiveEffects } from "../../lib/payload.js";
+import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets } from "../../lib/payload.js";
 import { flattenOnGrey } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
@@ -216,7 +216,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
   } else if (hairPreset) {
-    const mapped = HAIR_PRESETS[hairPreset];
+    // CMS-first: try Payload, fall back to hardcoded HAIR_PRESETS.
+    const cmsPresets = await fetchActiveHairPresets();
+    const mapped = cmsPresets.find((p) => p.key === hairPreset)?.prompt ?? HAIR_PRESETS[hairPreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_hair_preset" });
       return;
@@ -231,7 +233,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = HAIR_FREE_TEMPLATE(hairPrompt.trim());
   } else if (clothesPreset) {
-    const mapped = CLOTHES_PRESETS[clothesPreset];
+    // CMS-first: try Payload, fall back to hardcoded CLOTHES_PRESETS.
+    const cmsPresets = await fetchActiveClothesPresets();
+    const mapped = cmsPresets.find((p) => p.key === clothesPreset)?.prompt ?? CLOTHES_PRESETS[clothesPreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_clothes_preset" });
       return;
@@ -245,7 +249,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = CLOTHES_FREE_TEMPLATE(clothesPrompt.trim());
   } else if (facePreset) {
-    const mapped = FACE_PRESETS[facePreset];
+    // CMS-first: try Payload, fall back to hardcoded FACE_PRESETS.
+    const cmsPresets = await fetchActiveFacePresets();
+    const mapped = cmsPresets.find((p) => p.key === facePreset)?.prompt ?? FACE_PRESETS[facePreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_face_preset" });
       return;

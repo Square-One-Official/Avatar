@@ -12,9 +12,13 @@ import { BadgeComponents } from "./collections/BadgeComponents";
 import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
 import { Effects } from "./collections/Effects";
 import { Backgrounds } from "./collections/Backgrounds";
+import { Hair } from "./collections/Hair";
+import { Clothes } from "./collections/Clothes";
+import { Face } from "./collections/Face";
 import { AuditLog } from "./collections/AuditLog";
 import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 import { AppConfig } from "./globals/AppConfig";
+import { FeatureFlags } from "./globals/FeatureFlags";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,8 +31,8 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, BadgeComponents, Effects, Backgrounds, NewsletterUnsubscribes, AuditLog],
-  globals: [AppConfig],
+  collections: [Users, Media, Announcements, BadgeComponents, Effects, Backgrounds, Hair, Clothes, Face, NewsletterUnsubscribes, AuditLog],
+  globals: [AppConfig, FeatureFlags],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {

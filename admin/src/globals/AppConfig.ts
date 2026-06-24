@@ -56,5 +56,58 @@ export const AppConfig: GlobalConfig = {
         },
       ],
     },
+    {
+      name: "gradientPresets",
+      type: "array",
+      label: "Gradient presets (Background panel)",
+      required: false,
+      admin: {
+        description:
+          "Kleurovergang-achtergronden in het Background-paneel. " +
+          "Leeg laten valt terug op de 5 ingebouwde presets. " +
+          "Voeg rijen toe om extra opties te bieden zonder app-update.",
+      },
+      fields: [
+        {
+          name: "label",
+          type: "text",
+          required: true,
+          admin: { description: 'Weergavenaam, bv. "Sky blue" of "Sunset".' },
+        },
+        {
+          name: "fromHex",
+          type: "text",
+          required: true,
+          admin: { description: 'Startkleur als 6-cijferige hex, inclusief #. Bv. "#6EC6FF".' },
+        },
+        {
+          name: "toHex",
+          type: "text",
+          required: true,
+          admin: { description: 'Eindkleur als 6-cijferige hex, inclusief #. Bv. "#E3F2FF".' },
+        },
+      ],
+    },
+    {
+      name: "paywallProFeatures",
+      type: "array",
+      label: "Paywall — Pro feature bullets",
+      maxRows: 8,
+      required: false,
+      admin: {
+        description:
+          "Checkmark-regels in de Pro-kaart op het Paywall-scherm. " +
+          "Leeg laten toont de ingebouwde Engelse teksten als fallback. " +
+          "Maximaal 8 regels; volgorde bepaalt de weergavevolgorde.",
+      },
+      fields: [
+        {
+          name: "text",
+          type: "text",
+          required: true,
+          admin: { description: 'Bv. "Unlimited AI effects" of "Remove background instantly".' },
+        },
+      ],
+    },
   ],
 };

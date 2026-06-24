@@ -10,8 +10,10 @@ import { fetchAppConfig } from "../../lib/payload.js";
  * hardgecodeerde placeholders in de app zichtbaar blijven.
  *
  * Response: {
- *   splash_background_url: string | null,     ← Onboarding Splash achtergrond
- *   empty_state_avatar_urls: string[]          ← Lege-canvas-cirkels (max 6)
+ *   splash_background_url: string | null,            ← Onboarding Splash achtergrond
+ *   empty_state_avatar_urls: string[],                ← Lege-canvas-cirkels (max 6)
+ *   gradient_presets: [{ label, from_hex, to_hex }], ← Background-paneel gradients
+ *   paywall_pro_features: string[]                    ← Paywall Pro-kaart bullets
  * }
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -25,9 +27,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       splash_background_url: config.splashBackgroundUrl,
       empty_state_avatar_urls: config.emptyStateAvatarUrls,
+      gradient_presets: config.gradientPresets.map(({ label, fromHex, toHex }) => ({
+        label,
+        from_hex: fromHex,
+        to_hex: toHex,
+      })),
+      paywall_pro_features: config.paywallProFeatures,
     });
   } catch (err) {
     console.error("/v1/app-config error", err instanceof Error ? err.message : String(err));
-    res.status(200).json({ splash_background_url: null, empty_state_avatar_urls: [] });
+    res.status(200).json({
+      splash_background_url: null,
+      empty_state_avatar_urls: [],
+      gradient_presets: [],
+      paywall_pro_features: [],
+    });
   }
 }

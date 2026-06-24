@@ -442,6 +442,8 @@ function normalizeBackground(raw: unknown): PayloadBackground | null {
 export type PayloadAppConfig = {
   splashBackgroundUrl: string | null;
   emptyStateAvatarUrls: string[];
+  gradientPresets: Array<{ label: string; fromHex: string; toHex: string }>;
+  paywallProFeatures: string[];
 };
 
 let appConfigCache: { expiresAt: number; payload: PayloadAppConfig } | null = null;
@@ -452,7 +454,12 @@ export async function fetchAppConfig(): Promise<PayloadAppConfig> {
     return appConfigCache.payload;
   }
   const base = payloadBase();
-  const empty: PayloadAppConfig = { splashBackgroundUrl: null, emptyStateAvatarUrls: [] };
+  const empty: PayloadAppConfig = {
+    splashBackgroundUrl: null,
+    emptyStateAvatarUrls: [],
+    gradientPresets: [],
+    paywallProFeatures: [],
+  };
   if (!base || !PAYLOAD_API_KEY) {
     console.warn("PAYLOAD_API_URL/KEY missing — app-config disabled");
     return empty;
@@ -482,8 +489,166 @@ export async function fetchAppConfig(): Promise<PayloadAppConfig> {
     })
     .filter((u): u is string => u !== null);
 
-  const payload: PayloadAppConfig = { splashBackgroundUrl, emptyStateAvatarUrls };
+  const rawGradients = Array.isArray(doc.gradientPresets) ? doc.gradientPresets : [];
+  const gradientPresets: Array<{ label: string; fromHex: string; toHex: string }> = rawGradients
+    .map((g: unknown) => {
+      if (typeof g !== "object" || g === null) return null;
+      const o = g as Record<string, unknown>;
+      const label = typeof o.label === "string" ? o.label.trim() : "";
+      const fromHex = typeof o.fromHex === "string" ? o.fromHex.trim() : "";
+      const toHex = typeof o.toHex === "string" ? o.toHex.trim() : "";
+      if (!fromHex || !toHex) return null;
+      return { label: label || "Gradient", fromHex, toHex };
+    })
+    .filter((g): g is { label: string; fromHex: string; toHex: string } => g !== null);
+
+  const rawBullets = Array.isArray(doc.paywallProFeatures) ? doc.paywallProFeatures : [];
+  const paywallProFeatures: string[] = rawBullets
+    .map((b: unknown) => {
+      if (typeof b !== "object" || b === null) return null;
+      const text = (b as Record<string, unknown>).text;
+      return typeof text === "string" && text.trim() ? text.trim() : null;
+    })
+    .filter((t): t is string => t !== null);
+
+  const payload: PayloadAppConfig = {
+    splashBackgroundUrl,
+    emptyStateAvatarUrls,
+    gradientPresets,
+    paywallProFeatures,
+  };
   appConfigCache = { expiresAt: now + CACHE_TTL_MS, payload };
+  return payload;
+}
+
+// ---------------------------------------------------------------------------
+// Hair / Clothes / Face presets — CMS-gestuurde preset-collecties (E33+).
+// Elke rij is één chip/kaart in het paneel. De `prompt` zit in het type maar
+// wordt NIET geëxporteerd naar de client — alleen /v1/stylize gebruikt hem.
+// ---------------------------------------------------------------------------
+
+export type PayloadHairPreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadClothesPreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadFacePreset = { key: string; label: string; prompt: string; order: number };
+
+let hairCache: { expiresAt: number; payload: PayloadHairPreset[] } | null = null;
+let clothesCache: { expiresAt: number; payload: PayloadClothesPreset[] } | null = null;
+let faceCache: { expiresAt: number; payload: PayloadFacePreset[] } | null = null;
+
+function normalizePreset(raw: unknown): { key: string; label: string; prompt: string; order: number } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const prompt = typeof r.prompt === "string" ? r.prompt.trim() : null;
+  if (!key || !prompt) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, prompt, order };
+}
+
+async function fetchPresets(
+  slug: string,
+  cache: { expiresAt: number; payload: unknown[] } | null,
+  setCache: (c: { expiresAt: number; payload: unknown[] }) => void,
+): Promise<Array<{ key: string; label: string; prompt: string; order: number }>> {
+  const now = Date.now();
+  if (cache && cache.expiresAt > now) {
+    return cache.payload as Array<{ key: string; label: string; prompt: string; order: number }>;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn(`PAYLOAD_API_URL/KEY missing — ${slug} disabled`);
+    return [];
+  }
+  const url = new URL(`${base}/${slug}`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "0");
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "order");
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error(`Payload ${slug} fetch failed`, res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const presets = docs.map(normalizePreset).filter((p): p is { key: string; label: string; prompt: string; order: number } => p !== null);
+  setCache({ expiresAt: now + CACHE_TTL_MS, payload: presets });
+  return presets;
+}
+
+export async function fetchActiveHairPresets(): Promise<PayloadHairPreset[]> {
+  return fetchPresets("hair-presets", hairCache, (c) => {
+    hairCache = c as { expiresAt: number; payload: PayloadHairPreset[] };
+  });
+}
+
+export async function fetchActiveClothesPresets(): Promise<PayloadClothesPreset[]> {
+  return fetchPresets("clothes-presets", clothesCache, (c) => {
+    clothesCache = c as { expiresAt: number; payload: PayloadClothesPreset[] };
+  });
+}
+
+export async function fetchActiveFacePresets(): Promise<PayloadFacePreset[]> {
+  return fetchPresets("face-presets", faceCache, (c) => {
+    faceCache = c as { expiresAt: number; payload: PayloadFacePreset[] };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Feature flags — singleton Global in Payload (E33+). Alle flags default
+// naar `true` zodat de app nooit kapot gaat bij een CMS-storing.
+// ---------------------------------------------------------------------------
+
+export type PayloadFeatureFlags = {
+  effectsEnabled: boolean;
+  hairEnabled: boolean;
+  clothesEnabled: boolean;
+  faceEnabled: boolean;
+  backgroundsEnabled: boolean;
+};
+
+const FEATURE_FLAGS_DEFAULT: PayloadFeatureFlags = {
+  effectsEnabled: true,
+  hairEnabled: true,
+  clothesEnabled: true,
+  faceEnabled: true,
+  backgroundsEnabled: true,
+};
+
+let featureFlagsCache: { expiresAt: number; payload: PayloadFeatureFlags } | null = null;
+
+export async function fetchFeatureFlags(): Promise<PayloadFeatureFlags> {
+  const now = Date.now();
+  if (featureFlagsCache && featureFlagsCache.expiresAt > now) {
+    return featureFlagsCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL/KEY missing — feature-flags defaulting to all enabled");
+    return FEATURE_FLAGS_DEFAULT;
+  }
+  const url = new URL(`${base}/globals/feature-flags`);
+  url.searchParams.set("depth", "0");
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload feature-flags fetch failed", res.status, await res.text().catch(() => ""));
+    return FEATURE_FLAGS_DEFAULT;
+  }
+  const doc = (await res.json()) as Record<string, unknown>;
+  const flag = (name: string) => (doc[name] === false ? false : true);
+  const payload: PayloadFeatureFlags = {
+    effectsEnabled: flag("effectsEnabled"),
+    hairEnabled: flag("hairEnabled"),
+    clothesEnabled: flag("clothesEnabled"),
+    faceEnabled: flag("faceEnabled"),
+    backgroundsEnabled: flag("backgroundsEnabled"),
+  };
+  featureFlagsCache = { expiresAt: now + CACHE_TTL_MS, payload };
   return payload;
 }
 
