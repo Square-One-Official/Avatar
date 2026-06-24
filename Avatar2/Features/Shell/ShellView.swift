@@ -31,8 +31,15 @@ struct ShellView: View {
         // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
         // resterende ruimte (één spring, geen layoutshift).
         HStack(spacing: 0) {
+            // PoC (left-nav): Granola-stijl app-navigatie, losstaande kaart links.
+            if model.isLeftNavVisible {
+                LeftNavView(model: model, entitlement: entitlement)
+                    .padding(LeftNavView.edgeInset)
+                    .transition(reduceMotion ? .opacity : .move(edge: .leading))
+            }
             mainArea
-            if model.isSidebarVisible {
+            // De set-sidebar hoort alleen bij Studio (de galerij organiseert zelf).
+            if model.isSidebarVisible && model.section == .studio {
                 SidebarView(
                     selectedID: model.selectedPortrait?.persistentModelID,
                     onSelect: { model.select($0) },
@@ -53,6 +60,7 @@ struct ShellView: View {
             }
         }
         .dsMotion(DSMotion.springTransform, value: model.isSidebarVisible)
+        .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(DSColor.Background.app)
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
@@ -76,6 +84,10 @@ struct ShellView: View {
             if let portrait = model.selectedPortrait {
                 RenameSheet(portrait: portrait)
             }
+        }
+        // PoC (left-nav): "Manage backgrounds" vanuit het gebruikersmenu.
+        .sheet(isPresented: $model.isShowingManageBackgrounds) {
+            ManageBackgroundsSheet()
         }
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
@@ -133,6 +145,12 @@ struct ShellView: View {
             }
             // E27.4: open de board-view (alle portretten op één canvas).
             if args.contains("--board") { model.isBoardMode = true }
+            // PoC (left-nav): open de Portraits-galerij direct voor de smoke.
+            if args.contains("--portraits") { model.section = .portraits }
+            // PoC (left-nav): forceer de left-nav dicht (collapsed-screenshot).
+            if args.contains("--hide-leftnav") { model.isLeftNavVisible = false }
+            // PoC (left-nav): open "Manage backgrounds" direct voor de smoke.
+            if args.contains("--manage-backgrounds") { model.isShowingManageBackgrounds = true }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])
@@ -176,6 +194,10 @@ struct ShellView: View {
                             .opacity(0)
                             .accessibilityHidden(true)
                     )
+            } else if model.section == .portraits {
+                // PoC (left-nav): de Portraits-galerij vervangt de canvas-
+                // weergave; topbar blijft erover staan.
+                PortraitsGalleryView(model: model)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
                 // de topstrook (zie de overlays hieronder).
@@ -228,9 +250,12 @@ struct ShellView: View {
                 isBoardActive: model.isBoardMode,
                 onToggleBoard: { model.toggleBoard() },
                 // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
-                canToggleSidebar: model.canExport,
+                canToggleSidebar: model.canExport && model.section == .studio,
                 isSidebarActive: model.isSidebarVisible,
-                onToggleSidebar: { model.toggleSidebar() }
+                onToggleSidebar: { model.toggleSidebar() },
+                // PoC (left-nav): Granola-stijl in-/uitklap-toggle.
+                isLeftNavVisible: model.isLeftNavVisible,
+                onToggleLeftNav: { model.toggleLeftNav() }
             )
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten

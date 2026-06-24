@@ -68,6 +68,11 @@ final class Portrait2 {
     var boardOrder: Int = 0
     var boardPlaced: Bool = false
 
+    /// PoC (left-nav): de map waarin dit portret is ingedeeld (Portraits-
+    /// galerij). Optionele to-one; de inverse + delete-rule wonen op
+    /// `Folder2.portraits`. nil = "Unfiled". Lichtgewicht migratie via nil.
+    var folder: Folder2?
+
     /// E24.33: Effects-cache op het portret. `effectBaseData` = de cutout van
     /// vóór er een effect werd toegepast ("None"/origineel voor de Effects-
     /// feature, eenmalig vastgelegd). `effectActiveRaw` = het actieve effect

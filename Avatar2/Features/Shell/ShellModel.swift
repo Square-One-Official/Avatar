@@ -69,6 +69,28 @@ final class ShellModel {
     /// Sidebar/set (E05.4): Images-tool of avatar-toggle opent het paneel.
     var isSidebarVisible = false
 
+    // MARK: - App-navigatie (PoC: Granola-stijl left-nav)
+
+    /// Top-level secties die de left-nav aanstuurt. `studio` = de editor-canvas
+    /// (default), `portraits` = de Riverside-stijl galerij met mappen.
+    enum AppSection { case studio, portraits }
+    var section: AppSection = .studio
+
+    /// De left-nav staat standaard open (Granola-stijl); inklapbaar.
+    var isLeftNavVisible = true
+
+    /// "Manage backgrounds"-sheet vanuit het gebruikersmenu in de left-nav.
+    var isShowingManageBackgrounds = false
+
+    func toggleLeftNav() { isLeftNavVisible.toggle() }
+
+    /// Wissel naar een sectie (sluit een eventuele Settings-overlay; die hoort
+    /// niet bij een sectie maar bovenop de hele shell).
+    func showSection(_ section: AppSection) {
+        isShowingSettings = false
+        self.section = section
+    }
+
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
     /// weergave als view-state; de topbar (quota + gear) blijft staan.
     /// Gear toggelt, Esc sluit.

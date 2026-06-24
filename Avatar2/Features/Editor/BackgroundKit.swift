@@ -101,6 +101,12 @@ final class BrandColorKit {
         hexColors.append(hex)
         defaults.set(hexColors, forKey: Self.key)
     }
+
+    /// PoC (Manage backgrounds): verwijder een brand-kleur uit de kit.
+    func remove(_ hex: String) {
+        hexColors.removeAll { $0 == hex }
+        defaults.set(hexColors, forKey: Self.key)
+    }
 }
 
 /// E24.24: persistente custom achtergrond-AFBEELDINGEN (uploads). Net als de
@@ -158,6 +164,14 @@ final class BackgroundImageKit {
         imageIDs.append(id)
         defaults.set(imageIDs, forKey: Self.key)
         return png
+    }
+
+    /// PoC (Manage backgrounds): verwijder een upload (bestand + id + cache).
+    func remove(_ id: String) {
+        if let u = url(id) { try? FileManager.default.removeItem(at: u) }
+        imageCache[id] = nil
+        imageIDs.removeAll { $0 == id }
+        defaults.set(imageIDs, forKey: Self.key)
     }
 }
 

@@ -36,6 +36,7 @@
 		1B6646132381C29B4FE739BB /* ImageAdjustments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8024D84C778A83045FEA287D /* ImageAdjustments.swift */; };
 		1C4C56A4E68C65DA7693862C /* EffectsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D20171AB0033DB9DC0D8437 /* EffectsPanel.swift */; };
 		1E2B5F5EB2EECFD9C067FBDD /* LibraryImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3181E7327476F43F448EA102 /* LibraryImportSheet.swift */; };
+		1E72586A66936AB3977C6652 /* ManageBackgroundsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5935E244C409DB420FDEF /* ManageBackgroundsSheet.swift */; };
 		20996F25FD0206DF7C4CFDC6 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */; };
 		21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */; };
@@ -107,6 +108,7 @@
 		6F3610CB62B56FF6FF361E03 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		6F88BA1D977E666AE9CE8B16 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = F1CAAB87E8E174A425083C2F /* logo.png */; };
 		6F8B473ACB0AABDCB73F0EE6 /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
+		71D8271AC0392FB757D67696 /* LeftNavView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C504E7ED42D59197C3971A3A /* LeftNavView.swift */; };
 		7344A7378B3152DF1E80D4DB /* PaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DAB476FF9BEA4B6547CA1B5 /* PaywallSheet.swift */; };
 		7870C16E796A489E5CE7BFAA /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
 		78A5AFD8FEAA9E85A10389FC /* FileAuthStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96955F87205367E1A31005B8 /* FileAuthStorage.swift */; };
@@ -185,6 +187,7 @@
 		D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85946241C86C51F94E31DFF8 /* PortraitHeader.swift */; };
 		D3902C8E716FB212480A16B3 /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */; };
 		D43723746F3532F825382CAB /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
+		D4817F27762F9D7C51324091 /* PortraitsGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */; };
 		D481897535E17F0376EA1C21 /* ProUpsellToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80857857F8C364DD00524644 /* ProUpsellToastView.swift */; };
 		D4851113A8AB34D81F2CE4EE /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */; };
 		D4B598B61B0C0A9912859FDF /* EntitlementModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42425F916AF8200C81E49949 /* EntitlementModel.swift */; };
@@ -211,6 +214,7 @@
 		EAA5F4DF5638ED9457ED418F /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA293E7F1CF952594B0EB25E /* UpdateManager.swift */; };
 		EB50CDB10D4599C8DE75F64D /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		EBE90C07C35BAA7F586C5E6D /* PortraitUndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7194822E14F9864C38869D98 /* PortraitUndoManager.swift */; };
+		EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */; };
 		EC7A1D866680F10A21325569 /* AlphaHitTestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 952C9B6AE02D2195F2903AC3 /* AlphaHitTestTests.swift */; };
 		EDCEBBF69658512E9483D13B /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
 		EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */; };
@@ -279,6 +283,7 @@
 		509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolTests.swift; sourceTree = "<group>"; };
 		5127F7FAC6DD92487E178E76 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
+		54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitsGalleryView.swift; sourceTree = "<group>"; };
 		547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutoutDataUndo.swift; sourceTree = "<group>"; };
 		5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasActionToolbar.swift; sourceTree = "<group>"; };
@@ -346,9 +351,11 @@
 		C1658094DC9377C3D97B55BF /* ClothesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClothesPanel.swift; sourceTree = "<group>"; };
 		C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepPrivacy.swift; sourceTree = "<group>"; };
 		C447017F67D767535688965F /* Avatar2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Avatar2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C504E7ED42D59197C3971A3A /* LeftNavView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftNavView.swift; sourceTree = "<group>"; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
 		C9329E36279558288146B065 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
+		CAF5935E244C409DB420FDEF /* ManageBackgroundsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageBackgroundsSheet.swift; sourceTree = "<group>"; };
 		CBFBA66AF626E08F10F1333C /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
 		D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelTests.swift; sourceTree = "<group>"; };
 		D7F0C232F29D34C390EAED00 /* URL+ExternalScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ExternalScheme.swift"; sourceTree = "<group>"; };
@@ -360,6 +367,7 @@
 		DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthEncryption.swift; sourceTree = "<group>"; };
 		DE931792D085D73E20E9D67F /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		DED2448B10A7B5504F841578 /* ProBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProBadge.swift; sourceTree = "<group>"; };
+		E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder2.swift; sourceTree = "<group>"; };
 		E21A227552D65C64EBB609A5 /* Mesh 02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 02.png"; sourceTree = "<group>"; };
 		E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatingCanvas.swift; sourceTree = "<group>"; };
 		E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellMetrics.swift; sourceTree = "<group>"; };
@@ -429,6 +437,7 @@
 			isa = PBXGroup;
 			children = (
 				547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */,
+				E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */,
 				654967493F525682771975A5 /* Portrait2.swift */,
 				3DB5F24C632ED79CFC435879 /* SidebarView.swift */,
 			);
@@ -594,6 +603,7 @@
 		83F8F7DF473C7C5DF14AAC3F /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				CAF5935E244C409DB420FDEF /* ManageBackgroundsSheet.swift */,
 				60E31735EC49E308BA808F7F /* PrivacyPreferences2.swift */,
 				FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */,
 				63EB8AB21396622AB916B788 /* SettingsAccountPage.swift */,
@@ -685,7 +695,9 @@
 				155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */,
 				FFCC71547FA68BD97E340BCB /* HairNudgeBanner.swift */,
 				E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */,
+				C504E7ED42D59197C3971A3A /* LeftNavView.swift */,
 				85946241C86C51F94E31DFF8 /* PortraitHeader.swift */,
+				54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */,
 				E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */,
 				9E2F90C51F873C306E8E73DF /* ShellModel.swift */,
 				9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */,
@@ -1022,12 +1034,15 @@
 				C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */,
 				CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */,
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
+				EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */,
 				480BA658926DC445242BB6F0 /* FramingConstants.swift in Sources */,
 				20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */,
 				A4595011162E8E75689EB453 /* HairNudgeBanner.swift in Sources */,
 				491B02E74B243F21C30E93AC /* HairPanel.swift in Sources */,
 				98BF6D7595FADB314B44D4A0 /* ImageEnhanceUndo.swift in Sources */,
 				44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */,
+				71D8271AC0392FB757D67696 /* LeftNavView.swift in Sources */,
+				1E72586A66936AB3977C6652 /* ManageBackgroundsSheet.swift in Sources */,
 				21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */,
 				D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */,
 				286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */,
@@ -1041,6 +1056,7 @@
 				06D8524B3CC946C0C948A302 /* Portrait2.swift in Sources */,
 				694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */,
 				D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */,
+				D4817F27762F9D7C51324091 /* PortraitsGalleryView.swift in Sources */,
 				D7CFDCF65F3FA907C6C87990 /* PrivacyPreferences2.swift in Sources */,
 				A18F996918674D38830D05D8 /* RenameSheet.swift in Sources */,
 				DB96EB8FBA87155B22F9E247 /* ReversibleChange.swift in Sources */,

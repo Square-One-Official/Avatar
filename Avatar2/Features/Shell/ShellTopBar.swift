@@ -25,6 +25,10 @@ struct ShellTopBar: View {
     var canToggleSidebar: Bool = false
     var isSidebarActive: Bool = false
     var onToggleSidebar: () -> Void = {}
+    /// PoC (left-nav): in-/uitklappen van de Granola-stijl left-nav. Wanneer de
+    /// nav open staat toont die zelf de quota, dus verbergen we de topbar-teller.
+    var isLeftNavVisible: Bool = false
+    var onToggleLeftNav: () -> Void = {}
 
     /// Visuele-verificatie-haak: toon de quota-badge met een vaste preview-
     /// tekst zonder ingelogd account (--badge-preview). No-op in normale runs.
@@ -52,7 +56,7 @@ struct ShellTopBar: View {
     // wegklapt tijdens de Settings-toggle.
     @ViewBuilder
     private var quotaCluster: some View {
-        if model.hasCompletedFirstCutout || Self.isBadgePreview {
+        if (model.hasCompletedFirstCutout && !isLeftNavVisible) || Self.isBadgePreview {
             HStack(spacing: DSSpacing.gap2) {
                 Text(quotaLabel)
                     .dsTextStyle(.labelSmall)
@@ -85,6 +89,15 @@ struct ShellTopBar: View {
             Spacer(minLength: DSSpacing.gap2)
             ZStack(alignment: .trailing) {
                 HStack(spacing: DSSpacing.gap2) {
+                    // PoC (left-nav): Granola-stijl in-/uitklap-toggle.
+                    DSToolButton(
+                        Image(systemName: "sidebar.left"),
+                        label: "Sidebar",
+                        isActive: isLeftNavVisible,
+                        tooltipEdge: .bottom
+                    ) {
+                        onToggleLeftNav()
+                    }
                     if canExport {
                         DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
                             onExport()

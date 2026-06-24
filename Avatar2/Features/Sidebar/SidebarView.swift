@@ -19,7 +19,13 @@ struct SidebarView: View {
 
     // Laatst bewerkt bovenaan, zoals v1 (punt 13).
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
+    // PoC (left-nav): mappen voor het folder-filter + "Move to folder".
+    @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var searchText = ""
+    /// PoC (left-nav): filter de (volledige) lijst op map. nil-sentinels via enum.
+    @State private var folderFilter: FolderFilter = .all
+
+    enum FolderFilter: Hashable { case all, unfiled, folder(PersistentIdentifier) }
 
     let selectedID: PersistentIdentifier?
     let onSelect: (Portrait2) -> Void
@@ -54,18 +60,41 @@ struct SidebarView: View {
     @State private var thumbs = ThumbnailStore()
 
     private var filtered: [Portrait2] {
+        // PoC (left-nav): eerst op map filteren, dan op zoektekst.
+        var base = portraits
+        switch folderFilter {
+        case .all: break
+        case .unfiled: base = base.filter { $0.folder == nil }
+        case .folder(let id): base = base.filter { $0.folder?.persistentModelID == id }
+        }
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return portraits }
-        return portraits.filter {
+        guard !query.isEmpty else { return base }
+        return base.filter {
             $0.name.localizedCaseInsensitiveContains(query)
                 || $0.role.localizedCaseInsensitiveContains(query)
         }
     }
 
+    /// Label voor de folder-filter-knop.
+    private var folderFilterLabel: String {
+        switch folderFilter {
+        case .all: return "All images"
+        case .unfiled: return "Unfiled"
+        case .folder(let id): return folders.first { $0.persistentModelID == id }?.name ?? "Folder"
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
+            // PoC (left-nav): map-filter — de set-sidebar toont nu álle beelden,
+            // optioneel gefilterd op map.
+            folderFilterMenu
+                .padding(.horizontal, DSSpacing.gap4)
+                .padding(.top, DSSpacing.gap4)
             DSSearchField(text: $searchText)
-                .padding(DSSpacing.gap4)
+                .padding(.horizontal, DSSpacing.gap4)
+                .padding(.top, DSSpacing.gap2)
+                .padding(.bottom, DSSpacing.gap4)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
@@ -192,6 +221,40 @@ struct SidebarView: View {
         }
     }
 
+    // MARK: - PoC (left-nav) map-filter
+
+    private var folderFilterMenu: some View {
+        Menu {
+            Button { folderFilter = .all } label: { Label("All images", systemImage: "square.grid.2x2") }
+            Button { folderFilter = .unfiled } label: { Label("Unfiled", systemImage: "tray") }
+            if !folders.isEmpty { Divider() }
+            ForEach(folders) { folder in
+                Button { folderFilter = .folder(folder.persistentModelID) } label: { Text(folder.name) }
+            }
+        } label: {
+            HStack(spacing: DSSpacing.gap2) {
+                Image(systemName: "folder")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(DSColor.Foreground.muted)
+                Text(folderFilterLabel)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            .padding(.horizontal, DSSpacing.gap3)
+            .frame(height: 36)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DSColor.Background.inset, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+    }
+
     // MARK: - E24.22 DS-rechtermuis-menu
 
     private func rowContextMenu(for portrait: Portrait2) -> some View {
@@ -204,6 +267,7 @@ struct SidebarView: View {
                 Divider().padding(.vertical, 2)
             }
             menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTarget = portrait }
+            moveToFolderMenu(for: portrait)
             menuRow("Export…", icon: "square.and.arrow.up") { menuTarget = nil; onExport(portrait) }
             Divider().padding(.vertical, 2)
             menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTarget = portrait }
@@ -211,6 +275,41 @@ struct SidebarView: View {
         .padding(DSSpacing.gap1)
         .frame(width: 190)
         .dsPanelSurface(cornerRadius: DSRadius.lg)
+    }
+
+    /// PoC (left-nav): submenu "Move to folder" — verplaatst het portret naar
+    /// Unfiled, een bestaande map, of een nieuw aangemaakte map.
+    private func moveToFolderMenu(for portrait: Portrait2) -> some View {
+        Menu {
+            Button("Unfiled") { menuTarget = nil; portrait.folder = nil }
+            if !folders.isEmpty { Divider() }
+            ForEach(folders) { folder in
+                Button(folder.name) { menuTarget = nil; portrait.folder = folder }
+            }
+            Divider()
+            Button("New folder…") {
+                menuTarget = nil
+                let f = Folder2(name: "Untitled folder \(folders.count + 1)", order: folders.count + 1)
+                modelContext.insert(f)
+                portrait.folder = f
+            }
+        } label: {
+            HStack(spacing: DSSpacing.gap2) {
+                Image(systemName: "folder").font(.system(size: 12, weight: .medium)).frame(width: 16)
+                Text("Move to folder").dsTextStyle(.labelBase)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            .foregroundStyle(DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
     }
 
     /// E19.4: klik-afhandeling met cmd/shift voor multi-select; gewone klik =
