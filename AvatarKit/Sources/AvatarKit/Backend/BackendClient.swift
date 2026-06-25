@@ -345,6 +345,39 @@ public final class BackendClient {
         return (data, resp.creditsRemaining)
     }
 
+    // MARK: POST /v1/stylize (custom effect, E34)
+    /// Past een gebruiker-gemaakt custom effect toe: stuurt het portret + de
+    /// `custom_effect_id` (i.p.v. een `style`-key). De server zoekt de eigen rij
+    /// op, giet de opgeslagen beschrijving in het custom-sjabloon en hangt de
+    /// referentie-afbeelding als tweede beeld aan de model-call (stijlreferentie).
+    /// Pro-only (403 `pro_required` → `BackendError.proRequired`); 402 → paywall.
+    /// Zelfde response als `stylize(imagePNG:styleKey:)`.
+    public func stylize(imagePNG: Data, customEffectID: String) async throws -> (Data, Int) {
+        let storageKey = try await uploadInputPNG(imagePNG)
+        struct Body: Encodable {
+            let storageKey: String
+            let customEffectId: String
+            let generationModel: String
+            let modelOverride: String?
+            enum CodingKeys: String, CodingKey {
+                case storageKey = "storage_key"
+                case customEffectId = "custom_effect_id"
+                case generationModel = "generation_model"
+                case modelOverride = "model_override"
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(storageKey: storageKey, customEffectId: customEffectID,
+                 generationModel: GenerationModelStore.shared.current.rawValue,
+                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return (data, resp.creditsRemaining)
+    }
+
     // MARK: POST /v1/upscale (Boost resolution, E10.3)
     /// Verhoogt de resolutie van het cutout via Real-ESRGAN (2×). De backend
     /// flattent op grijs, upscalet de RGB en hangt het alfa herschaald weer
@@ -610,6 +643,60 @@ public final class BackendClient {
     public func effects() async throws -> [RemoteEffect] {
         let resp: EffectsResponse = try await requestAllowingAnonymous("/v1/effects", method: "GET")
         return resp.effects
+    }
+
+    // MARK: /v1/custom-effects (E34) — user-created effects, synced per account
+    /// De eigen custom effecten (kaart + thumbnail = referentiebeeld + id). Pro-
+    /// only (403 `pro_required` → `BackendError.proRequired`); de prompt (de
+    /// beschrijving) blijft server-side, net als bij `effects()`. Vereist een
+    /// sessie (niet anoniem) — custom effecten horen bij een account.
+    private struct CustomEffectsResponse: Decodable {
+        let effects: [RemoteCustomEffect]
+    }
+    public func customEffects() async throws -> [RemoteCustomEffect] {
+        let resp: CustomEffectsResponse = try await request("/v1/custom-effects", method: "GET")
+        return resp.effects
+    }
+
+    /// Maakt een custom effect: uploadt het referentiebeeld via de upload-bypass
+    /// (zoals stylize/cutout) en stuurt de key + beschrijving (+ optioneel label)
+    /// naar `POST /v1/custom-effects`. De server her-bewaart het beeld in de
+    /// publieke `custom-effects`-bucket (referentie + thumbnail) en geeft de
+    /// nieuwe rij terug. Pro-only; genereren kost niets — pas het tóépassen
+    /// (apply) kost een credit via `stylize(imagePNG:customEffectID:)`.
+    private struct CreateCustomEffectResponse: Decodable {
+        let effect: RemoteCustomEffect
+    }
+    public func createCustomEffect(
+        description: String,
+        label: String?,
+        referencePNG: Data
+    ) async throws -> RemoteCustomEffect {
+        let storageKey = try await uploadInputPNG(referencePNG)
+        struct Body: Encodable {
+            let storageKey: String
+            let description: String
+            let label: String?
+            enum CodingKeys: String, CodingKey {
+                case storageKey = "storage_key"
+                case description
+                case label
+            }
+        }
+        let body = try JSONEncoder().encode(
+            Body(storageKey: storageKey, description: description, label: label)
+        )
+        let resp: CreateCustomEffectResponse = try await request(
+            "/v1/custom-effects", method: "POST", body: body
+        )
+        return resp.effect
+    }
+
+    /// Verwijdert een eigen custom effect (rij + referentiebeeld). Pro-only,
+    /// eigenaar-gescoped (404 als de rij niet bestaat/niet van jou is).
+    public func deleteCustomEffect(id: String) async throws {
+        struct Empty: Decodable { let ok: Bool }
+        let _: Empty = try await request("/v1/custom-effects/\(id)", method: "DELETE")
     }
 
     // MARK: GET /v1/app-config (CMS-gestuurd, E33+)

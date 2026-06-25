@@ -265,6 +265,13 @@ export async function stylizeEdit(input: {
   width: number;
   height: number;
   model?: string | null;
+  /**
+   * E34: optionele STIJL-REFERENTIE (user-created custom effect). Gaat als
+   * tweede beeld mee in de model-image-array; het portret (`imageDataUrl`)
+   * blijft het eerste/te-bewerken beeld. De prompt verheldert de rol (zie
+   * stylize.ts CUSTOM_STYLE_TEMPLATE). nil = gewone één-beeld-stylize.
+   */
+  referenceDataUrl?: string | null;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
@@ -279,12 +286,24 @@ export async function stylizeEdit(input: {
 
 function stylizeInputFor(
   ref: string,
-  input: { imageDataUrl: string; prompt: string; width: number; height: number },
+  input: {
+    imageDataUrl: string;
+    prompt: string;
+    width: number;
+    height: number;
+    referenceDataUrl?: string | null;
+  },
 ): Record<string, unknown> {
+  // E34: het portret eerst (te bewerken), de optionele stijlreferentie tweede.
+  // Alle vier armen nemen een image-array, dus een tweede beeld is een append;
+  // de prompt (CUSTOM_STYLE_TEMPLATE) vertelt het model welke rol elk speelt.
+  const images = input.referenceDataUrl
+    ? [input.imageDataUrl, input.referenceDataUrl]
+    : [input.imageDataUrl];
   if (ref.startsWith("google/nano-banana")) {
     return {
       prompt: input.prompt,
-      image_input: [input.imageDataUrl],
+      image_input: images,
       aspect_ratio: "match_input_image",
       output_format: "png",
     };
@@ -297,7 +316,7 @@ function stylizeInputFor(
     // seedream-4); bij een veld-mismatch faalt de dev-only call zichtbaar.
     return {
       prompt: input.prompt,
-      image_input: [input.imageDataUrl],
+      image_input: images,
       aspect_ratio: "match_input_image",
       size: "2K",
     };
@@ -305,7 +324,7 @@ function stylizeInputFor(
   if (ref.startsWith("black-forest-labs/flux-2")) {
     return {
       prompt: input.prompt,
-      input_images: [input.imageDataUrl],
+      input_images: images,
       resolution: "match_input_image",
       aspect_ratio: "match_input_image",
       output_format: "png",
@@ -317,7 +336,7 @@ function stylizeInputFor(
   if (ref.startsWith("openai/gpt-image")) {
     return {
       prompt: input.prompt,
-      input_images: [input.imageDataUrl],
+      input_images: images,
       // Identity-behoud staat of valt met input_fidelity=high; quality=high
       // is de eerlijke vergelijking met de andere pro-armen (en de reden
       // voor STYLIZE_TIMEOUT_MS).

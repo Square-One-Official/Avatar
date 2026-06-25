@@ -7,8 +7,9 @@ import {
   resolveModelOverride,
   UnknownModelOverrideError,
 } from "../../lib/models.js";
-import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
+import { activeSubscription, currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects } from "../../lib/payload.js";
+import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
 import { flattenOnGrey } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
@@ -29,6 +30,27 @@ export const config = {
  */
 const IDENTITY_CLAUSE =
   "Keep the person's facial features, expression, hairstyle and clothing clearly recognizable so the person remains identifiable.";
+
+/**
+ * Custom-effect prompt (E34). The FIRST image is the portrait to restyle; the
+ * SECOND image is the user's style reference. The template is the hard frame
+ * around the user's free-text description — it pins the roles of the two
+ * images (edit the first, borrow the look of the second; do NOT paste the
+ * reference's subject/composition) and reuses the identity clause so the
+ * person stays recognizable. The description is sandwiched, never the whole
+ * instruction, so a user can't repurpose the call into an arbitrary edit.
+ */
+const CUSTOM_STYLE_TEMPLATE = (description: string) => {
+  const refinement = description ? `Style direction: ${description}. ` : "";
+  return (
+    "Restyle the first image (the portrait). Apply the visual style, colour " +
+    "palette, materials, texture and artistic technique of the second image " +
+    "to it as a STYLE REFERENCE only — do not copy the subject, face, pose or " +
+    "composition of the second image. " +
+    refinement +
+    IDENTITY_CLAUSE
+  );
+};
 
 const STYLE_PROMPTS: Record<string, string> = {
   clay:
@@ -180,6 +202,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
   // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
+  // E34: optionele stijlreferentie (custom effect). Blijft nil voor alle
+  // bestaande intents; alleen de custom-effect-tak vult 'm.
+  let referenceDataUrl: string | null = null;
+  const customEffectId = (req.body?.custom_effect_id ?? "") as string;
   const styleKey = (req.body?.style ?? "") as string;
   const hairPreset = (req.body?.hair_preset ?? "") as string;
   const hairPrompt = (req.body?.hair_prompt ?? "") as string;
@@ -187,7 +213,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const clothesPrompt = (req.body?.clothes_prompt ?? "") as string;
   const facePreset = (req.body?.face_preset ?? "") as string;
   const freePrompt = (req.body?.prompt ?? "") as string;
-  if (styleKey) {
+  if (customEffectId) {
+    // E34: user-created custom effect. Pro-only (de capability is Pro), eigenaar-
+    // gescoped. De prompt = de opgeslagen beschrijving in een vast sjabloon; de
+    // referentie-afbeelding gaat als tweede beeld mee naar het model.
+    const isPro = isDevUser || (await activeSubscription(user.id)) !== null;
+    if (!isPro) {
+      res.status(403).json({ error: "pro_required" });
+      return;
+    }
+    const effect = await getCustomEffect(user.id, customEffectId);
+    if (!effect) {
+      res.status(400).json({ error: "unknown_custom_effect" });
+      return;
+    }
+    prompt = CUSTOM_STYLE_TEMPLATE(effect.prompt);
+    try {
+      const refBytes = await downloadReferenceBytes(effect.reference_path);
+      referenceDataUrl = `data:image/png;base64,${refBytes.toString("base64")}`;
+    } catch (e) {
+      console.error(
+        "/v1/stylize custom reference fetch failed:",
+        e instanceof Error ? e.message : String(e),
+      );
+      res.status(500).json({ error: "reference_fetch_failed" });
+      return;
+    }
+  } else if (styleKey) {
     // E33: Effects-stijlen zijn CMS-gestuurd. Zoek de key eerst in Payload op;
     // val terug op de hardgecodeerde STYLE_PROMPTS zodat de vier launch-keys
     // blijven werken tijdens het seed-venster (en als de CMS even onbereikbaar
@@ -294,6 +346,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       width: meta.width ?? 0,
       height: meta.height ?? 0,
       model: modelRef,
+      // E34: nil voor alle bestaande intents; gezet voor een custom effect.
+      referenceDataUrl,
     });
     const download = await fetch(resultUrl);
     if (!download.ok) {
