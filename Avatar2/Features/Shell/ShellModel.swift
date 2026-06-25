@@ -132,12 +132,27 @@ final class ShellModel {
         section = .portraits
     }
 
-    /// Open één portret in de editor (vanuit Home of een map-grid).
+    /// Waar de editor vandaan geopend is — bepaalt waar "terug" (breadcrumb /
+    /// back-chevron) naartoe keert.
+    enum OpenOrigin: Equatable { case home; case portraits(PersistentIdentifier?) }
+    private(set) var openOrigin: OpenOrigin = .home
+
+    /// Open één portret in de editor (vanuit Home of een map-grid). Onthoudt de
+    /// herkomst zodat `goBack()` naar de juiste surface terugkeert.
     func openPortrait(_ portrait: Portrait2) {
         isShowingSettings = false
         clearPortraitSelection()
+        openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
         select(portrait)
         section = .editor
+    }
+
+    /// Terug vanuit de editor naar de herkomst-surface (Home of Portraits+map).
+    func goBack() {
+        switch openOrigin {
+        case .home: showHome()
+        case .portraits(let folderID): showPortraits(folderID: folderID)
+        }
     }
 
     // MARK: - Multi-selectie (Finder-stijl, gedeeld over Home + Portraits-lenzen)
@@ -321,7 +336,8 @@ final class ShellModel {
         modelContext.insert(portrait)
         select(portrait)
         // PoC (left-nav): een verse import opent meteen de editor (top-right-
-        // chrome verschijnt) i.p.v. op Home/Portraits te blijven.
+        // chrome verschijnt) i.p.v. op Home/Portraits te blijven; "terug" → Home.
+        openOrigin = .home
         section = .editor
     }
 

@@ -200,9 +200,11 @@ struct ShellView: View {
                 // PoC (left-nav): Home — het overzicht (laatste + eerdere /
                 // first-use). De top-right-chrome blijft hier weg.
                 HomeView(model: model, entitlement: entitlement)
+                    .transition(.opacity)
             } else if model.section == .portraits {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
                 PortraitsGalleryView(model: model, entitlement: entitlement)
+                    .transition(.opacity)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
                 // de topstrook (zie de overlays hieronder).
@@ -217,8 +219,13 @@ struct ShellView: View {
                     // een schone lei, net als first-use (bevinding: drag toont
                     // dropzone óver de avatar i.p.v. leeg scherm).
                     .opacity(model.isDropTargeted ? 0 : 1)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
             }
         }
+        // Phase 4: drill-in (en terug) animeert als zoom-in + cross-fade op
+        // section-wissels; reduce-motion → kale fade. (Een precieze
+        // matchedGeometry-hero is een follow-up om samen met Thierry te tunen.)
+        .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.85), value: model.section)
         // Punt 19: top-uitlijning — de VStack centreerde verticaal,
         // waardoor de kaart bij lage vensters onder de quota-rij kroop;
         // header hoort vast bovenaan (Figma y=32), de foto is het enige
@@ -250,6 +257,15 @@ struct ShellView: View {
                 canExport: model.canExport,
                 onExport: { model.exportCurrentPortrait() }
             )
+        }
+        // Phase 4: drill-in-breadcrumb linksboven — alleen tijdens het bewerken.
+        .overlay(alignment: .topLeading) {
+            if model.section == .editor && !model.isShowingSettings {
+                LibraryBreadcrumb(model: model)
+                    .padding(.leading, model.isLeftNavVisible ? DSSpacing.gap5 : 96)
+                    .padding(.top, DSSpacing.gap3)
+                    .transition(.opacity)
+            }
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
