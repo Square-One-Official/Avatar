@@ -82,24 +82,27 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
+    /// Max-breedte van de featured-kaart — compacter dan de volledige
+    /// vensterbreedte (gebruikersfeedback).
+    private let featuredMaxWidth: CGFloat = 360
+
     private func featured(_ portrait: Portrait2) -> some View {
         Button { model.openPortrait(portrait) } label: {
             ZStack(alignment: .bottomLeading) {
+                // De HELE afbeelding zichtbaar in een vierkant (scaledToFit, geen
+                // crop); eventuele letterbox-randen krijgen de inset-kleur.
                 ZStack {
                     DSColor.Background.inset
                     if let image = thumbs.thumbnail(for: portrait, maxDimension: 600, adjusted: false) {
-                        Image(nsImage: image).resizable().scaledToFill()
+                        Image(nsImage: image).resizable().scaledToFit()
                     }
                 }
-                .frame(height: 240)
-                .frame(maxWidth: .infinity)
-                .clipped()
+                .aspectRatio(1, contentMode: .fit)
 
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.55)],
                     startPoint: .center, endPoint: .bottom
                 )
-                .frame(height: 240)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
@@ -114,6 +117,7 @@ struct HomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: featuredMaxWidth, alignment: .leading)
     }
 
     private var uploadBar: some View {
