@@ -266,56 +266,13 @@ struct BoardView: View {
             // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
             // zoom op een grote set.
             ForEach(visibleNodes(), id: \.portrait.persistentModelID) { item in
-                let p = item.portrait
-                // E27.6 (Tier 1): de node-visuals zitten in een losse, `Equatable`
-                // view → een pan/zoom-only change laat 'm `==` blijven en SwiftUI
-                // slaat z'n body over. Gestures + hover hangen BUITEN `.equatable()`
-                // (verse closures zouden de skip anders breken); de camera-
-                // afhankelijke drag-math blijft in `BoardView`.
-                // De achtergrondLAAG ÍS de originele foto (Original-modus, of
-                // Portrait-blur zonder eigen achtergrond) → spiegelt
-                // EditorView.backgroundIsAlignedOriginal: custom upload/kleur wint.
-                let bgIsAlignedOriginal = p.backgroundImageData == nil
-                    && p.backgroundColorHex == nil
-                    && (p.useOriginalBackground || p.portraitBlur)
-                BoardNodeView(
-                    thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
-                    // Origineel als achtergrondLAAG (uitgelijnd achter de cutout-thumb),
-                    // gedecodeerd + downscaled via dezelfde store (nooit de volle
-                    // originalData per frame). nil tenzij Original-modus actief is.
-                    backgroundOriginalImage: bgIsAlignedOriginal
-                        ? thumbs.originalBackdrop(for: p, maxDimension: cardSide * 2)
-                        : nil,
-                    isSelected: selection.contains(p.persistentModelID),
-                    frameShape: p.frameShape,
-                    name: p.name,
-                    role: p.role,
-                    backgroundColorHex: p.backgroundColorHex,
-                    backgroundImageData: p.backgroundImageData,
-                    portraitBlur: p.portraitBlur,
-                    contentVersion: p.updatedAt,
-                    cardSide: cardSide,
-                    labelGap: labelGap,
-                    labelHeight: labelHeight,
-                    cellHeight: cellHeight
-                )
-                .equatable()
-                .contentShape(Rectangle())
-                .dsHoverHighlight(cornerRadius: DSRadius.xl4)
-                // E29.1: dubbelklik = openen in de editor; enkelklik = selecteren
-                // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
-                .onTapGesture(count: 2) { onOpen(p) }
-                .onTapGesture { tapNode(p) }
-                // Rechtermuis → hetzelfde DS-menu als de sidebar. Selecteert de
-                // node eerst als 'ie nog niet in de selectie zit (Finder-gedrag),
-                // zodat "Export N portraits…" alleen verschijnt bij een echte
-                // multi-selectie; binnen een bestaande ≥2-selectie blijft die staan.
-                .onRightClick {
-                    if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
-                    menuTarget = p
-                }
-                .gesture(dragGesture(for: p))
-                .position(x: item.center.x, y: item.center.y)
+                // E-fix (schone build): de node + al z'n modifiers staan in een aparte
+                // methode i.p.v. inline. Eén grote ForEach-closure (14-arg BoardNodeView
+                // + `.equatable()` + 6 modifiers + gestures) tipte de Swift type-checker
+                // over z'n complexiteitslimiet bij een schone build (incrementeel
+                // hergebruikte de oude .o, dus onzichtbaar) → de misleidende
+                // "ForEach … Binding<C>"-cascade. Extractie houdt de inferentie klein.
+                boardNode(item)
             }
 
             // E29.1: marquee-rechthoek (board-space; lijn ÷camera = constant dun).
@@ -382,6 +339,53 @@ struct BoardView: View {
     /// node-drag + `BoardMoveUndo` verschuiven direct, zonder een aparte cache te
     /// syncen. (Bij echte duizenden: een grid-bucket-index i.p.v. de O(n)-scan — pas
     /// als profiling het vraagt.)
+    /// De node + al z'n modifiers (zie de extractie-reden bij de ForEach). Los
+    /// gehouden zodat de type-checker elke node-expressie klein genoeg houdt.
+    /// E27.6: de visuals zitten in de `Equatable` BoardNodeView (pan/zoom-only =
+    /// `==` blijft → body geskipt); gestures/hover hangen erbuiten.
+    private func boardNode(_ item: (portrait: Portrait2, center: CGPoint)) -> some View {
+        let p = item.portrait
+        // De achtergrondLAAG ÍS de originele foto (Original-modus, of Portrait-blur
+        // zonder eigen achtergrond) → spiegelt EditorView.backgroundIsAlignedOriginal.
+        let bgIsAlignedOriginal = p.backgroundImageData == nil
+            && p.backgroundColorHex == nil
+            && (p.useOriginalBackground || p.portraitBlur)
+        return BoardNodeView(
+            thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
+            backgroundOriginalImage: bgIsAlignedOriginal
+                ? thumbs.originalBackdrop(for: p, maxDimension: cardSide * 2)
+                : nil,
+            isSelected: selection.contains(p.persistentModelID),
+            frameShape: p.frameShape,
+            name: p.name,
+            role: p.role,
+            backgroundColorHex: p.backgroundColorHex,
+            backgroundImageData: p.backgroundImageData,
+            portraitBlur: p.portraitBlur,
+            contentVersion: p.updatedAt,
+            cardSide: cardSide,
+            labelGap: labelGap,
+            labelHeight: labelHeight,
+            cellHeight: cellHeight
+        )
+        .equatable()
+        .contentShape(Rectangle())
+        .dsHoverHighlight(cornerRadius: DSRadius.xl4)
+        // Dubbelklik = openen in de editor; enkelklik = selecteren (cmd/shift =
+        // toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
+        .onTapGesture(count: 2) { onOpen(p) }
+        .onTapGesture { tapNode(p) }
+        // Rechtermuis → DS-menu; selecteert de node eerst als 'ie nog niet in de
+        // selectie zit (Finder), zodat "Export N…" alleen bij een echte multi-
+        // selectie verschijnt; binnen een bestaande ≥2-selectie blijft die staan.
+        .onRightClick {
+            if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
+            menuTarget = p
+        }
+        .gesture(dragGesture(for: p))
+        .position(x: item.center.x, y: item.center.y)
+    }
+
     private func visibleNodes() -> [(portrait: Portrait2, center: CGPoint)] {
         guard viewport.width > 0, viewport.height > 0, camera.scale > 0 else {
             return portraits.enumerated().map { (portrait: $1, center: center(of: $1, index: $0)) }
