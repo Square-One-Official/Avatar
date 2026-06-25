@@ -10,6 +10,29 @@ import Observation
 import SwiftData
 import UniformTypeIdentifiers
 
+/// De Finder-stijl "lens" op de Portraits-collectie. Alleen actief op de
+/// Portraits-surface; Home blijft een vaste, lens-vrije dashboard.
+enum LibraryViewMode: String, CaseIterable, Identifiable {
+    case canvas, grid, list, gallery
+    var id: String { rawValue }
+    var symbol: String {
+        switch self {
+        case .canvas:  "rectangle.3.group"
+        case .grid:    "square.grid.2x2"
+        case .list:    "list.bullet"
+        case .gallery: "rectangle.split.3x1"
+        }
+    }
+    var label: String {
+        switch self {
+        case .canvas:  "Canvas"
+        case .grid:    "Grid"
+        case .list:    "List"
+        case .gallery: "Gallery"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class ShellModel {
@@ -154,6 +177,19 @@ final class ShellModel {
 
     /// Pro-status voor het bulk-export-watermerk (`entitlement` is privé).
     var isPro: Bool { entitlement.isProActive }
+
+    // MARK: - Portraits view-mode (Finder-stijl lens; alleen op de Portraits-surface)
+
+    /// De gekozen lens op de Portraits-grid. Persistent (UserDefaults), globaal
+    /// (niet per map). Default `.grid` — wat er nu staat. Home is lens-vrij.
+    var portraitsViewMode: LibraryViewMode = {
+        LibraryViewMode(rawValue: UserDefaults.standard.string(forKey: "portraits.viewMode") ?? "") ?? .grid
+    }()
+
+    func setPortraitsViewMode(_ mode: LibraryViewMode) {
+        portraitsViewMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "portraits.viewMode")
+    }
 
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
     /// weergave als view-state; de topbar (quota + gear) blijft staan.

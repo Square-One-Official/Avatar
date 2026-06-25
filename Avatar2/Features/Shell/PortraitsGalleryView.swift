@@ -36,33 +36,60 @@ struct PortraitsGalleryView: View {
             if items.isEmpty {
                 emptyState
             } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
-                        ForEach(items) { portrait in
-                            PortraitGridTile(
-                                portrait: portrait, folders: folders, model: model,
-                                isSelected: model.isPortraitSelected(portrait),
-                                ordered: { items.map(\.persistentModelID) },
-                                selectedTargets: { items.filter { model.isPortraitSelected($0) } }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, DSSpacing.gap6)
-                    .padding(.bottom, DSSpacing.gap6)
+                switch model.portraitsViewMode {
+                case .grid: gridBody
+                // Canvas/List/Gallery landen in Phase 3 — voorlopig een nette
+                // placeholder zodat de switcher nu al voelbaar schakelt.
+                case .canvas, .list, .gallery: comingSoon(model.portraitsViewMode)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
+    }
+
+    private var gridBody: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
+                ForEach(items) { portrait in
+                    PortraitGridTile(
+                        portrait: portrait, folders: folders, model: model,
+                        isSelected: model.isPortraitSelected(portrait),
+                        ordered: { items.map(\.persistentModelID) },
+                        selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+                    )
+                }
+            }
+            .padding(.horizontal, DSSpacing.gap6)
+            .padding(.bottom, DSSpacing.gap6)
+        }
+    }
+
+    private func comingSoon(_ mode: LibraryViewMode) -> some View {
+        VStack(spacing: DSSpacing.gap2) {
+            Image(systemName: mode.symbol)
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(DSColor.Foreground.muted)
+            Text("\(mode.label) view").dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
+            Text("Coming next.").dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(selectedFolder?.name ?? "All portraits")
-                .dsTextStyle(.h3)
-                .foregroundStyle(DSColor.Foreground.primary)
-            Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(DSColor.Foreground.muted)
+        HStack(alignment: .center, spacing: DSSpacing.gap4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selectedFolder?.name ?? "All portraits")
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            Spacer(minLength: 0)
+            // Finder-stijl lens-switcher — de header rendert 'm, dus alleen op
+            // de Portraits-surface zichtbaar.
+            LibraryViewSwitcher(mode: model.portraitsViewMode) { model.setPortraitsViewMode($0) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DSSpacing.gap6)
