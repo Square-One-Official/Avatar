@@ -16,6 +16,7 @@ struct HomeView: View {
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var thumbs = ThumbnailStore()
+    @State private var featuredHovering = false
 
     // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
     // (Color.clear + aspectRatio(.fit)) wordt nooit breder dan z'n kolom, dus
@@ -116,10 +117,19 @@ struct HomeView: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous)
+                        .strokeBorder(
+                            featuredHovering ? DSColor.Action.primary : DSColor.Foreground.divider,
+                            lineWidth: featuredHovering ? DSBorderWidth.medium : DSBorderWidth.thin
+                        )
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .frame(maxWidth: featuredMaxWidth, alignment: .leading)
+        .onHover { featuredHovering = $0 }
+        .dsMotion(DSMotion.micro, value: featuredHovering)
     }
 
     private var uploadBar: some View {

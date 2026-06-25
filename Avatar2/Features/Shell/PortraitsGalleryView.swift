@@ -6,6 +6,7 @@
 // DS-tokens, in de geest van het hoofddesign.
 
 import AppKit
+import AvatarKit
 import AvatarUI
 import SwiftData
 import SwiftUI
@@ -180,23 +181,125 @@ struct PortraitComposite: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: cacheKey) { load() }
+        .task(id: cacheKey) { await load() }
     }
 
     private var cacheKey: String {
         "\(portrait.persistentModelID.hashValue)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension))"
     }
 
-    @MainActor
-    private func load() {
+    private func load() async {
         let key = cacheKey as NSString
         if let cached = Self.cache.object(forKey: key) { image = cached; return }
-        // Altijd vierkant (uniforme tegels); de transform/achtergrond komen exact
-        // uit de editor-pijplijn. Geen watermerk op een thumbnail.
-        guard let data = PortraitExporter.makePNG(
-            for: portrait, watermark: false, side: Int(maxDimension), shape: .square
-        ), let img = NSImage(data: data) else { return }
-        Self.cache.setObject(img, forKey: key)
-        image = img
+        // De waarden van het SwiftData-model op de main-thread lichten, dan de
+        // (zware) compositie OFF-MAIN renderen — anders blokkeert elke nieuwe
+        // tegel tijdens het scrollen de main-thread. Resultaat wordt gecachet, dus
+        // het is effectief een snapshot dat één keer berekend wordt.
+        let spec = PortraitThumbnailRenderer.Spec(
+            cutoutData: portrait.cutoutData,
+            originalData: portrait.originalData,
+            backgroundImageData: portrait.backgroundImageData,
+            backgroundColorHex: portrait.backgroundColorHex,
+            useOriginalBackground: portrait.useOriginalBackground,
+            portraitBlur: portrait.portraitBlur,
+            offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale,
+            brightness: portrait.adjustBrightness, contrast: portrait.adjustContrast,
+            saturation: portrait.adjustSaturation, temperature: portrait.adjustTemperature,
+            side: Int(maxDimension)
+        )
+        let boxed = await Task.detached(priority: .userInitiated) { () -> SendableImage? in
+            guard let cg = PortraitThumbnailRenderer.render(spec) else { return nil }
+            return SendableImage(image: NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height)))
+        }.value
+        guard let boxed, !Task.isCancelled else { return }
+        Self.cache.setObject(boxed.image, forKey: key)
+        image = boxed.image
     }
+}
+
+/// `NSImage` is niet Sendable; off-main gemaakt en daarna alléén op de main-actor
+/// gelezen → veilig over de actorgrens (zelfde patroon als ShellModel).
+private struct SendableImage: @unchecked Sendable { let image: NSImage }
+
+/// Off-main portret-compositie — dezelfde pijplijn als `PortraitExporter`
+/// (achtergrond + opgeslagen transform + Adjust), maar nonisolated zodat het de
+/// scroll niet blokkeert. Werkt op uitgelichte waarden (geen SwiftData-model).
+enum PortraitThumbnailRenderer {
+    struct Spec: Sendable {
+        let cutoutData: Data
+        let originalData: Data?
+        let backgroundImageData: Data?
+        let backgroundColorHex: String?
+        let useOriginalBackground: Bool
+        let portraitBlur: Bool
+        let offsetX: Double, offsetY: Double, scale: Double
+        let brightness: Double, contrast: Double, saturation: Double, temperature: Double
+        let side: Int
+    }
+
+    static func render(_ s: Spec) -> CGImage? {
+        guard var cutout = cgImage(from: s.cutoutData) else { return nil }
+
+        // Niet-destructieve Adjust-laag (alleen als hij niet neutraal is).
+        let neutral = s.brightness == 0 && s.contrast == 1 && s.saturation == 1 && s.temperature == 0
+        if !neutral, let adjusted = PortraitEnhancer.colorAdjust(
+            cutout, brightness: s.brightness, contrast: s.contrast,
+            saturation: s.saturation, temperatureShift: s.temperature
+        ) { cutout = adjusted }
+
+        let placement = BackgroundCompositor.Placement(
+            offsetX: s.offsetX, offsetY: s.offsetY, scale: s.scale, canvasUnit: 1024
+        )
+        let originalCG = s.originalData.flatMap { cgImage(from: $0) }
+        let bgIsAlignedOriginal = s.backgroundImageData == nil && s.backgroundColorHex == nil
+            && (s.useOriginalBackground || s.portraitBlur)
+
+        let backgroundImage: CGImage? = {
+            if let data = s.backgroundImageData, let bg = cgImage(from: data) { return bg }
+            if s.backgroundColorHex != nil { return nil }
+            if s.useOriginalBackground || s.portraitBlur { return originalCG }
+            return nil
+        }()
+
+        if var bg = backgroundImage {
+            if s.portraitBlur { bg = BackgroundBlur.blurred(bg) ?? bg }
+            let background: BackgroundCompositor.Background =
+                bgIsAlignedOriginal ? .alignedImage(bg) : .image(bg)
+            return (try? BackgroundCompositor.composite(
+                cutout: cutout, over: background, placement: placement, outputSize: s.side
+            )) ?? cutout
+        }
+        if let hex = s.backgroundColorHex, let rgb = rgb(hex) {
+            return (try? BackgroundCompositor.composite(
+                cutout: cutout, over: .color(red: rgb.r, green: rgb.g, blue: rgb.b),
+                placement: placement, outputSize: s.side
+            )) ?? cutout
+        }
+        // Geen achtergrond → onderwerp op transparant (de tegel-inset schijnt erdoor).
+        return (try? BackgroundCompositor.composite(
+            cutout: cutout, over: .image(clearPixel), placement: placement, outputSize: s.side
+        )) ?? cutout
+    }
+
+    private static func cgImage(from data: Data) -> CGImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(src, 0, nil)
+    }
+
+    private static func rgb(_ hex: String) -> (r: Double, g: Double, b: Double)? {
+        var str = hex
+        if str.hasPrefix("#") { str.removeFirst() }
+        guard str.count == 6, let v = UInt32(str, radix: 16) else { return nil }
+        return (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
+    }
+
+    private static let clearPixel: CGImage = {
+        let ctx = CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        ctx.clear(CGRect(x: 0, y: 0, width: 1, height: 1))
+        return ctx.makeImage()!
+    }()
 }
