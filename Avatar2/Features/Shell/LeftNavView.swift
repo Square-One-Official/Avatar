@@ -46,6 +46,15 @@ struct LeftNavView: View {
                     }
 
                     portraitsSection
+
+                    // E35.2: Banners-bibliotheek (herbruikbare covers).
+                    LeftNavRow(
+                        icon: Image(systemName: "rectangle.on.rectangle.angled"),
+                        title: "Banners",
+                        isSelected: model.section == .banners && !model.isShowingSettings
+                    ) {
+                        model.showBanners()
+                    }
                 }
                 .padding(.horizontal, DSSpacing.gap2)
                 .padding(.top, DSSpacing.gap2)
@@ -79,13 +88,6 @@ struct LeftNavView: View {
                 style: .continuous
             )
         )
-        // Subtiele scheidingslijn rechts (kleur-verschil alleen is niet genoeg
-        // in Light mode wanneer card ≈ white en content ook bijna white is).
-        .overlay(alignment: .trailing) {
-            DSColor.Foreground.divider
-                .frame(width: DSBorderWidth.thin)
-                .ignoresSafeArea()
-        }
         .task { await entitlement.refresh() }
         .alert("Rename folder", isPresented: Binding(
             get: { renamingFolder != nil },

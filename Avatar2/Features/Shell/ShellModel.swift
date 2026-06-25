@@ -13,7 +13,8 @@ import UniformTypeIdentifiers
 /// De Finder-stijl "lens" op de Portraits-collectie. Alleen actief op de
 /// Portraits-surface; Home blijft een vaste, lens-vrije dashboard.
 enum LibraryViewMode: String, CaseIterable, Identifiable {
-    case canvas, grid, list, gallery
+    // Volgorde = de switcher-volgorde (allCases). Grid is de default → staat links.
+    case grid, canvas, list, gallery
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -99,7 +100,7 @@ final class ShellModel {
     /// `portraits` = de map-grid (via de inklapbare Portraits-sectie in de nav);
     /// `editor` = één portret bewerken (de bestaande canvas). De top-right-
     /// iconen tonen alléén in `editor`.
-    enum AppSection { case home, portraits, editor }
+    enum AppSection { case home, portraits, banners, editor }
     var section: AppSection = .home
 
     /// Welke map de Portraits-grid toont (nil = alle beelden).
@@ -130,6 +131,13 @@ final class ShellModel {
         clearPortraitSelection()
         selectedFolderID = folderID
         section = .portraits
+    }
+
+    /// E35.2: naar de Banners-bibliotheek.
+    func showBanners() {
+        isShowingSettings = false
+        clearPortraitSelection()
+        section = .banners
     }
 
     /// Waar de editor vandaan geopend is — bepaalt waar "terug" (breadcrumb /
@@ -197,13 +205,13 @@ final class ShellModel {
 
     /// De gekozen lens op de Portraits-grid. Persistent (UserDefaults), globaal
     /// (niet per map). Default `.grid` — wat er nu staat. Home is lens-vrij.
-    var portraitsViewMode: LibraryViewMode = {
-        LibraryViewMode(rawValue: UserDefaults.standard.string(forKey: "portraits.viewMode") ?? "") ?? .grid
-    }()
+    /// Default-lens op de Portraits-surface = grid (besluit Thierry). NIET meer
+    /// cross-launch persistent — elke start opent in grid; binnen de sessie
+    /// onthoudt het model je gekozen lens.
+    var portraitsViewMode: LibraryViewMode = .grid
 
     func setPortraitsViewMode(_ mode: LibraryViewMode) {
         portraitsViewMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: "portraits.viewMode")
     }
 
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
@@ -213,6 +221,10 @@ final class ShellModel {
 
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
     var isShowingExport = false
+
+    /// E34.5: social-preview-overlay (LinkedIn/X/Instagram-in-context + banner).
+    /// Vervangt — met een crossfade — de editor; de ✕ in de preview sluit 'm.
+    var isShowingSocialPreview = false
 
     /// E24.21: gedeelde rename-modal (Name + Role), geopend vanuit de
     /// Name/Role-knop op het canvas (sidebar gebruikt z'n eigen renameTarget).
@@ -740,6 +752,16 @@ final class ShellModel {
     var canExport: Bool {
         if case .result = canvas { return selectedPortrait != nil }
         return false
+    }
+
+    /// E34.5: previewen kan zodra er een afgewerkt portret op het canvas staat
+    /// (dezelfde voorwaarde als exporteren).
+    var canPreview: Bool { canExport }
+
+    /// E34.5: open de social-preview-overlay.
+    func showSocialPreview() {
+        guard selectedPortrait != nil else { return }
+        isShowingSocialPreview = true
     }
 
     /// E08.2: exporteer het huidige portret als vierkante PNG (1024) en open

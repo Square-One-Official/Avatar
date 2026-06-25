@@ -119,6 +119,47 @@ enum PortraitExporter {
         return png(from: final)
     }
 
+    /// E34.7: bouwt de WIJDE cover-banner-PNG voor een platform (LinkedIn/X).
+    /// nil voor platforms zonder cover (Instagram) of bij een renderfout. De
+    /// vulling komt uit `BannerResolver` (match-portret / kleur / afbeelding);
+    /// het onderwerp wordt NIET ingebakken (LinkedIn/X leggen de profielfoto er
+    /// zelf overheen). Free-tier krijgt een hoek-watermerk.
+    @MainActor
+    static func makeBannerPNG(
+        for portrait: Portrait2,
+        platform: SocialPlatform,
+        watermark: Bool
+    ) -> Data? {
+        guard let coverSize = platform.coverSize else { return nil }
+        let fill = BannerResolver.fill(for: portrait)
+        guard var cover = try? BannerCompositor.composite(fill: fill, size: coverSize) else { return nil }
+        if watermark { cover = bannerWatermark(cover) ?? cover }
+        return png(from: cover)
+    }
+
+    /// Hoek-watermerk voor de wijde banner (rechtsonder, maat naar de HOOGTE
+    /// geschaald — de breedte is veel groter). Spiegelt `applyWatermark`.
+    private static func bannerWatermark(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let fontSize = CGFloat(h) * 0.07
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
+        ]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: "Made with Aaavatar", attributes: attrs))
+        let bounds = CTLineGetImageBounds(line, ctx)
+        let margin = CGFloat(h) * 0.06
+        ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)
+        ctx.setShadow(offset: .zero, blur: fontSize * 0.3, color: NSColor.black.withAlphaComponent(0.5).cgColor)
+        CTLineDraw(line, ctx)
+        return ctx.makeImage()
+    }
+
     /// E19.1: maskeer de output tot een cirkel (transparant eromheen).
     private static func circleMasked(_ image: CGImage) -> CGImage? {
         let w = image.width, h = image.height

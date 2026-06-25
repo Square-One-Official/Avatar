@@ -163,7 +163,9 @@ struct Avatar2App: App {
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         // PoC (left-nav): Folder2 erbij voor de Portraits-galerij (lichtgewicht
         // migratie: nieuw model + optionele Portrait2.folder-relatie).
-        .modelContainer(for: [Portrait2.self, Folder2.self])
+        // E35.1: Banner2 erbij voor de Banners-bibliotheek (lichtgewicht migratie:
+        // nieuw model, geen relaties).
+        .modelContainer(for: [Portrait2.self, Folder2.self, Banner2.self])
         // Bevinding 1 (E04.5): Figma kent geen aparte titelbalk — één zwart
         // vlak, traffic lights inline, geen venstertitel. hiddenTitleBar
         // geeft full-size content; de topbar reserveert zelf ruimte naast

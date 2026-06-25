@@ -47,6 +47,24 @@ struct ShellView: View {
         // dicht is (gebruikersfeedback). Over de nav heen wanneer open, over de
         // hoofdweergave wanneer dicht; dezelfde positie in beide gevallen.
         .overlay(alignment: .topLeading) { sidebarToggle }
+        // E34.5: social-preview is FULL-SCREEN — een crossfade-overlay op
+        // VENSTERNIVEAU (over de left-nav + content + sidebar-toggle heen) zodat
+        // de hele editor wegvalt. De eigen ✕ in de preview sluit 'm.
+        .overlay {
+            if model.isShowingSocialPreview, let portrait = model.selectedPortrait {
+                SocialPreviewView(
+                    portrait: portrait,
+                    isPro: entitlement.isProActive,
+                    onClose: { model.isShowingSocialPreview = false },
+                    onManageBanners: {
+                        model.isShowingSocialPreview = false
+                        model.showBanners()
+                    }
+                )
+                .transition(.opacity)
+            }
+        }
+        .dsMotion(DSMotion.base, value: model.isShowingSocialPreview)
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
         // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
@@ -98,6 +116,10 @@ struct ShellView: View {
             // E19.1 smoke-haak: open de export-popup ná de selectie-restore.
             if ProcessInfo.processInfo.arguments.contains("--show-export") {
                 model.exportCurrentPortrait()
+            }
+            // E34.5 smoke-haak: open de social-preview-overlay ná de restore.
+            if ProcessInfo.processInfo.arguments.contains("--show-social-preview") {
+                model.showSocialPreview()
             }
             // Smoke-run-haak: `--show-settings [pagina]` wordt in
             // ShellModel.init gelezen (vóór first render, geen venster-race);
@@ -205,6 +227,10 @@ struct ShellView: View {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
                 PortraitsGalleryView(model: model, entitlement: entitlement)
                     .transition(.opacity)
+            } else if model.section == .banners {
+                // E35.3: Banners-bibliotheek.
+                BannersGalleryView(model: model)
+                    .transition(.opacity)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
                 // de topstrook (zie de overlays hieronder).
@@ -255,7 +281,9 @@ struct ShellView: View {
                 // Top-right-chrome alléén in de editor (niet op Home/Portraits).
                 isEditing: model.section == .editor,
                 canExport: model.canExport,
-                onExport: { model.exportCurrentPortrait() }
+                onExport: { model.exportCurrentPortrait() },
+                canPreview: model.canPreview,
+                onPreview: { model.showSocialPreview() }
             )
         }
         // Phase 4: drill-in-breadcrumb linksboven — alleen tijdens het bewerken.

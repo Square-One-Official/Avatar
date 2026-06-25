@@ -121,6 +121,17 @@ final class Portrait2 {
     /// op de originele foto. Lichtgewicht migratie via de default (false).
     var portraitBlur: Bool = false
 
+    /// E34: Banner-achtergrond voor de social-preview-covers (LinkedIn/X). APART
+    /// van de portret-`background`: de banner is wijd (4:1 / 3:1) en kan de
+    /// portret-achtergrond MATCHEN óf ervan afwijken (eigen kleur/afbeelding). De
+    /// "precies één modus"-invariant woont in `bannerBackground`/`setBannerBackground`
+    /// (spiegelt `background`). Default = `.matchPortrait` (zero-config: de banner
+    /// volgt de avatar-achtergrond). Lichtgewicht migratie via de defaults
+    /// (`bannerMatchesBackground` = true, kleur/afbeelding nil).
+    var bannerColorHex: String?
+    @Attribute(.externalStorage) var bannerImageData: Data?
+    var bannerMatchesBackground: Bool = true
+
     init(
         name: String = "",
         role: String = "",
@@ -190,6 +201,29 @@ final class Portrait2 {
         }
         touch()
     }
+
+    /// E34: de banner-keuze als ÉÉN waarde-object (spiegelt `background`).
+    /// Precies één van: match-portret (default), kleur (hex) of afbeelding
+    /// (upload/gradient/CMS/AI — wijde PNG-bytes).
+    var bannerBackground: BannerBackground {
+        if bannerMatchesBackground { return .matchPortrait }
+        if let bannerColorHex { return .color(bannerColorHex) }
+        if let bannerImageData { return .image(bannerImageData) }
+        return .matchPortrait
+    }
+
+    /// Zet de banner-modus (wist de andere velden) + `touch()`.
+    func setBannerBackground(_ banner: BannerBackground) {
+        switch banner {
+        case .matchPortrait:
+            bannerMatchesBackground = true; bannerColorHex = nil; bannerImageData = nil
+        case .color(let hex):
+            bannerMatchesBackground = false; bannerColorHex = hex; bannerImageData = nil
+        case .image(let data):
+            bannerMatchesBackground = false; bannerColorHex = nil; bannerImageData = data
+        }
+        touch()
+    }
 }
 
 /// Audit-cleanup (DDD): de achtergrond-modus van een portret. Precies één van:
@@ -198,6 +232,17 @@ final class Portrait2 {
 enum PortraitBackground: Equatable {
     case transparent
     case original
+    case color(String)
+    case image(Data)
+}
+
+/// E34: de banner-achtergrond-modus (social-preview-covers). Precies één van:
+/// match-portret (leid af uit `Portrait2.background`), kleur (hex) of afbeelding
+/// (upload/gradient/CMS/AI — wijde PNG-bytes). Een aparte enum i.p.v.
+/// `PortraitBackground`: de banner heeft een match-modus die het portret niet
+/// kent, is wijd-aspect, en mag bewust van de portret-achtergrond afwijken.
+enum BannerBackground: Equatable {
+    case matchPortrait
     case color(String)
     case image(Data)
 }
