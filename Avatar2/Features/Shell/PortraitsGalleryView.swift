@@ -16,7 +16,6 @@ struct PortraitsGalleryView: View {
 
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
-    @State private var thumbs = ThumbnailStore()
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
@@ -40,9 +39,12 @@ struct PortraitsGalleryView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
                         ForEach(items) { portrait in
-                            PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
-                                model.openPortrait(portrait)
-                            }
+                            PortraitGridTile(
+                                portrait: portrait, folders: folders, model: model,
+                                isSelected: model.isPortraitSelected(portrait),
+                                ordered: { items.map(\.persistentModelID) },
+                                selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+                            )
                         }
                     }
                     .padding(.horizontal, DSSpacing.gap6)
@@ -86,12 +88,16 @@ struct PortraitsGalleryView: View {
 /// Dubbelklik opent de editor; rechtermuis verplaatst naar een map of verwijdert.
 struct PortraitGridTile: View {
     let portrait: Portrait2
-    let thumbs: ThumbnailStore
     let folders: [Folder2]
     let model: ShellModel
-    let onOpen: () -> Void
+    let isSelected: Bool
+    /// Zichtbare volgorde (voor ⇧-bereikselectie) — lazy, alleen bij een klik.
+    let ordered: () -> [PersistentIdentifier]
+    /// De huidige selectie als modellen (voor bulk-acties) — lazy, bij menu-actie.
+    let selectedTargets: () -> [Portrait2]
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.undoManager) private var undoManager
     @State private var hovering = false
 
     var body: some View {
@@ -107,32 +113,37 @@ struct PortraitGridTile: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
                     .strokeBorder(
-                        hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
-                        lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
+                        (isSelected || hovering) ? DSColor.Action.primary : DSColor.Foreground.divider,
+                        lineWidth: (isSelected || hovering) ? DSBorderWidth.medium : DSBorderWidth.thin
                     )
             )
+            // Selectie-vinkje (Finder-stijl) rechtsboven.
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(DSColor.Background.app, DSColor.Action.primary)
+                        .padding(DSSpacing.gap2)
+                }
+            }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .dsMotion(DSMotion.micro, value: hovering)
-            .onTapGesture { onOpen() }
-            .help("Open in the editor")
-        .contextMenu {
-            Button("Open") { onOpen() }
-            Menu("Move to folder") {
-                Button("Unfiled") { portrait.folder = nil }
-                if !folders.isEmpty { Divider() }
-                ForEach(folders) { folder in
-                    Button(folder.name) { portrait.folder = folder }
-                }
-                Divider()
-                Button("New folder…") {
-                    let f = Folder2(name: "Untitled folder \(folders.count + 1)", order: folders.count + 1)
-                    modelContext.insert(f)
-                    portrait.folder = f
-                }
+            .dsMotion(DSMotion.micro, value: isSelected)
+            // Plain klik = openen; ⌘/⇧ = multi-select (gedeeld via ShellModel).
+            .onTapGesture {
+                model.handlePortraitClick(portrait, ordered: ordered(), mods: NSApp.currentEvent?.modifierFlags ?? [])
             }
-            Divider()
-            Button("Delete", role: .destructive) { modelContext.delete(portrait) }
+            .help("Click to open · ⌘-click to select")
+            // Sleep een portret naar een map in de left-nav (zie LeftNavView).
+            // Een klik zonder beweging blijft 'open'; pas bij verslepen start de drag.
+            .draggable(PortraitDragItem(id: portrait.persistentModelID))
+        .contextMenu {
+            portraitContextMenu(
+                for: portrait, model: model, folders: folders,
+                selectedTargets: selectedTargets, undoManager: undoManager, modelContext: modelContext
+            )
         }
     }
 

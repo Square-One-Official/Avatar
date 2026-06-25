@@ -5,6 +5,7 @@
 // welkomsttekst erboven. Net-nieuw scherm — DS-tokens, in de geest van het
 // hoofddesign.
 
+import AppKit
 import AvatarUI
 import SwiftData
 import SwiftUI
@@ -13,9 +14,10 @@ struct HomeView: View {
     let model: ShellModel
     let entitlement: EntitlementModel
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.undoManager) private var undoManager
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
-    @State private var thumbs = ThumbnailStore()
     @State private var featuredHovering = false
 
     // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
@@ -71,9 +73,12 @@ struct HomeView: View {
                             .foregroundStyle(DSColor.Foreground.subtle)
                         LazyVGrid(columns: columns, spacing: DSSpacing.gap5) {
                             ForEach(Array(portraits.dropFirst())) { portrait in
-                                PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
-                                    model.openPortrait(portrait)
-                                }
+                                PortraitGridTile(
+                                    portrait: portrait, folders: folders, model: model,
+                                    isSelected: model.isPortraitSelected(portrait),
+                                    ordered: { portraits.map(\.persistentModelID) },
+                                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } }
+                                )
                             }
                         }
                     }
@@ -95,45 +100,67 @@ struct HomeView: View {
     private let featuredMaxWidth: CGFloat = 420
 
     private func featured(_ portrait: Portrait2) -> some View {
-        Button { model.openPortrait(portrait) } label: {
-            // Zelfde robuuste vierkant als de grid-tegels: Color.clear bepaalt de
-            // 1:1-maat, de compositie ligt eroverheen (anders dicteert de
-            // achtergrond-afbeelding z'n eigen — tweemaal zo hoge — ratio).
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    ZStack(alignment: .bottomLeading) {
-                        PortraitComposite(portrait: portrait, maxDimension: 600)
+        let isSelected = model.isPortraitSelected(portrait)
+        // Zelfde robuuste vierkant als de grid-tegels: Color.clear bepaalt de
+        // 1:1-maat, de compositie ligt eroverheen (anders dicteert de
+        // achtergrond-afbeelding z'n eigen — tweemaal zo hoge — ratio).
+        return Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                ZStack(alignment: .bottomLeading) {
+                    PortraitComposite(portrait: portrait, maxDimension: 600)
 
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.55)],
-                            startPoint: .center, endPoint: .bottom
-                        )
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.55)],
+                        startPoint: .center, endPoint: .bottom
+                    )
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                                .dsTextStyle(.labelLarge).foregroundStyle(.white).lineLimit(1)
-                            if !portrait.role.isEmpty {
-                                Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
-                            }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
+                            .dsTextStyle(.labelLarge).foregroundStyle(.white).lineLimit(1)
+                        if !portrait.role.isEmpty {
+                            Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                         }
-                        .padding(DSSpacing.gap4)
                     }
+                    .padding(DSSpacing.gap4)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous)
-                        .strokeBorder(
-                            featuredHovering ? DSColor.Action.primary : DSColor.Foreground.divider,
-                            lineWidth: featuredHovering ? DSBorderWidth.medium : DSBorderWidth.thin
-                        )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous)
+                    .strokeBorder(
+                        (isSelected || featuredHovering) ? DSColor.Action.primary : DSColor.Foreground.divider,
+                        lineWidth: (isSelected || featuredHovering) ? DSBorderWidth.medium : DSBorderWidth.thin
+                    )
+            )
+            // Selectie-vinkje (Finder-stijl) rechtsboven.
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(DSColor.Background.app, DSColor.Action.primary)
+                        .padding(DSSpacing.gap3)
+                }
+            }
+            .contentShape(Rectangle())
+            .frame(maxWidth: featuredMaxWidth, alignment: .leading)
+            .onHover { featuredHovering = $0 }
+            .dsMotion(DSMotion.micro, value: featuredHovering)
+            .dsMotion(DSMotion.micro, value: isSelected)
+            // Plain klik = openen; ⌘/⇧ = multi-select (gedeeld via ShellModel).
+            .onTapGesture {
+                model.handlePortraitClick(portrait, ordered: portraits.map(\.persistentModelID), mods: NSApp.currentEvent?.modifierFlags ?? [])
+            }
+            .contextMenu {
+                portraitContextMenu(
+                    for: portrait, model: model, folders: folders,
+                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+                    undoManager: undoManager, modelContext: modelContext
                 )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: featuredMaxWidth, alignment: .leading)
-        .onHover { featuredHovering = $0 }
-        .dsMotion(DSMotion.micro, value: featuredHovering)
+            }
+            // Ook de uitgelichte Recent-kaart is naar een map sleepbaar.
+            .draggable(PortraitDragItem(id: portrait.persistentModelID))
     }
 
     private var uploadBar: some View {

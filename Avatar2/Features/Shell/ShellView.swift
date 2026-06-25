@@ -21,8 +21,6 @@ struct ShellView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
-    @State private var setBusyMessage: String?
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
     @State private var debugShowColorPicker = false
     @State private var debugPickerColor: Color = Color(hue: 0.55, saturation: 0.7, brightness: 0.9)
@@ -82,15 +80,15 @@ struct ShellView: View {
                 .padding(DSSpacing.gap8)
                 .background(DSColor.Background.app)
         }
-        // E19.5: voortgangs-toast voor Align set / Match lighting.
+        // E19.5: voortgangs-toast voor de set-acties (Align/Match/Export).
         .overlay(alignment: .bottomTrailing) {
-            if let message = setBusyMessage {
+            if let message = model.setBusyMessage {
                 DSToast(title: message) {}
                     .padding(DSSpacing.gap5)
                     .transition(.dsSlide(.trailing, reduceMotion: reduceMotion))
             }
         }
-        .dsMotion(DSMotion.enter, value: setBusyMessage)
+        .dsMotion(DSMotion.enter, value: model.setBusyMessage)
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde

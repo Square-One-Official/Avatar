@@ -97,12 +97,14 @@ final class ShellModel {
     /// Naar het overzicht (Home).
     func showHome() {
         isShowingSettings = false
+        clearPortraitSelection()
         section = .home
     }
 
     /// Naar de Portraits-grid van een map (nil = alle beelden).
     func showPortraits(folderID: PersistentIdentifier? = nil) {
         isShowingSettings = false
+        clearPortraitSelection()
         selectedFolderID = folderID
         section = .portraits
     }
@@ -110,9 +112,48 @@ final class ShellModel {
     /// Open één portret in de editor (vanuit Home of een map-grid).
     func openPortrait(_ portrait: Portrait2) {
         isShowingSettings = false
+        clearPortraitSelection()
         select(portrait)
         section = .editor
     }
+
+    // MARK: - Multi-selectie (Finder-stijl, gedeeld over Home + Portraits-lenzen)
+
+    /// Geselecteerde portretten — los van de canvas-selectie (`selectedPortrait`).
+    /// Gedeeld over Home en alle Portraits-lenzen zodat rechtermuis + bulk-acties
+    /// overal werken; wordt gewist bij navigatie (Home/Portraits/openen).
+    var selectedPortraitIDs: Set<PersistentIdentifier> = []
+    @ObservationIgnored private var selectionAnchorID: PersistentIdentifier?
+
+    func isPortraitSelected(_ portrait: Portrait2) -> Bool {
+        selectedPortraitIDs.contains(portrait.persistentModelID)
+    }
+
+    func clearPortraitSelection() {
+        selectedPortraitIDs.removeAll()
+        selectionAnchorID = nil
+    }
+
+    /// Klik op een tegel/rij: plain = openen (single-click-open blijft); ⌘ =
+    /// toggle; ⇧ = bereik vanaf het anker in `ordered` (de zichtbare volgorde).
+    func handlePortraitClick(_ portrait: Portrait2, ordered: [PersistentIdentifier], mods: NSEvent.ModifierFlags) {
+        let id = portrait.persistentModelID
+        if mods.contains(.command) {
+            if selectedPortraitIDs.contains(id) { selectedPortraitIDs.remove(id) } else { selectedPortraitIDs.insert(id) }
+            selectionAnchorID = id
+        } else if mods.contains(.shift), let anchor = selectionAnchorID,
+                  let from = ordered.firstIndex(of: anchor), let to = ordered.firstIndex(of: id) {
+            for pid in ordered[min(from, to)...max(from, to)] { selectedPortraitIDs.insert(pid) }
+        } else {
+            openPortrait(portrait)
+        }
+    }
+
+    /// Set-brede voortgang (Align/Match/Export) als toast; ShellView toont 'm.
+    var setBusyMessage: String?
+
+    /// Pro-status voor het bulk-export-watermerk (`entitlement` is privé).
+    var isPro: Bool { entitlement.isProActive }
 
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
     /// weergave als view-state; de topbar (quota + gear) blijft staan.
