@@ -21,6 +21,9 @@ struct ShellView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Gedeelde hero-morph-namespace (Portraits-tegel → editor-canvas). Zie
+    /// [[HeroMorph]]. Bij reduce-motion injecteren we 'm niet → kale fade.
+    @Namespace private var heroNS
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
     @State private var debugShowColorPicker = false
     @State private var debugPickerColor: Color = Color(hue: 0.55, saturation: 0.7, brightness: 0.9)
@@ -154,6 +157,17 @@ struct ShellView: View {
             if args.contains("--board") { model.showPortraits(); model.setPortraitsViewMode(.canvas) }
             // PoC (left-nav): open de Portraits-galerij direct voor de smoke.
             if args.contains("--portraits") { model.section = .portraits }
+            // Smoke: forceer een specifieke lens op de Portraits-surface
+            // (`--lens grid|list|gallery|canvas`) — deterministisch i.p.v. klikken.
+            if let i = args.firstIndex(of: "--lens"), args.indices.contains(i + 1) {
+                model.showPortraits()
+                switch args[i + 1] {
+                case "list": model.setPortraitsViewMode(.list)
+                case "gallery": model.setPortraitsViewMode(.gallery)
+                case "canvas": model.setPortraitsViewMode(.canvas)
+                default: model.setPortraitsViewMode(.grid)
+                }
+            }
             // PoC (left-nav): forceer de left-nav dicht (collapsed-screenshot).
             if args.contains("--hide-leftnav") { model.isLeftNavVisible = false }
             // PoC (left-nav): open "Manage backgrounds" direct voor de smoke.
@@ -164,6 +178,13 @@ struct ShellView: View {
             }
             // E24.21: open de rename-modal voor de smoke.
             if args.contains("--show-rename") { model.isShowingRename = true }
+            // Smoke (hero-morph): toon de grid, drill na een marge in het jongste
+            // portret zodat de tegel→canvas-morph deterministisch speelt.
+            if args.contains("--drill-in-demo") {
+                model.section = .portraits
+                try? await Task.sleep(for: .seconds(3))
+                model.debugDrillIntoFirstPortrait()
+            }
             // E25.1: open de standalone DSColorPicker voor de smoke.
             if args.contains("--show-colorpicker") { debugShowColorPicker = true }
             // E24.24: simuleer een persistente upload (kit + achtergrond).
@@ -238,20 +259,39 @@ struct ShellView: View {
                 // loopt door tot de bovenrand van het venster (symmetrisch met de
                 // onderkant), met de top-chrome (topbar + naam-chip + Frame/Background)
                 // erover zwevend i.p.v. in een aparte Background.app-band.
-                canvas
-                    // Tijdens een drag fade't de hele canvas-inhoud (foto +
-                    // Name/Role-chip + editor-toolbar) uit naar de app-
-                    // achtergrond, zodat alleen de dropzone-overlay overblijft —
-                    // een schone lei, net als first-use (bevinding: drag toont
-                    // dropzone óver de avatar i.p.v. leeg scherm).
-                    .opacity(model.isDropTargeted ? 0 : 1)
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
+                ZStack {
+                    canvas
+                        // Tijdens een drag fade't de hele canvas-inhoud (foto +
+                        // Name/Role-chip + editor-toolbar) uit naar de app-
+                        // achtergrond, zodat alleen de dropzone-overlay overblijft —
+                        // een schone lei, net als first-use (bevinding: drag toont
+                        // dropzone óver de avatar i.p.v. leeg scherm).
+                        .opacity(model.isDropTargeted ? 0 : 1)
+                    // Hero-morph: de getikte tegel "groeit" naar het canvas. De
+                    // overlay leeft alleen tijdens de morph en crossfadet dan naar
+                    // de echte EditorView eronder. Zie [[HeroMorph]].
+                    heroMorphOverlay
+                }
+                // Forward = hero-morph (overlay), back = kale fade → editor zelf
+                // faden, de overlay draagt de zoom. (reduce-motion: ook fade.)
+                .transition(.opacity)
             }
         }
-        // Phase 4: drill-in (en terug) animeert als zoom-in + cross-fade op
-        // section-wissels; reduce-motion → kale fade. (Een precieze
-        // matchedGeometry-hero is een follow-up om samen met Thierry te tunen.)
+        // Phase 4 + follow-up: drill-in animeert als matchedGeometry-hero (tegel →
+        // canvas, zie [[HeroMorph]]); back-nav houdt de cross-fade. reduce-motion →
+        // kale fade (heroNS niet geïnjecteerd). Eén spring drijft de section-swap
+        // én de gematchte geometrie.
         .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.85), value: model.section)
+        // De hero-namespace zakt via de Environment naar de lens-tegels (geen
+        // threading door vier lens-views). nil bij reduce-motion → no-op.
+        .environment(\.heroNamespace, reduceMotion ? nil : heroNS)
+        // Laat de hero-overlay landen, crossfade 'm dan weg naar de echte editor.
+        .onChange(of: model.heroMorphID) { _, id in
+            guard id != nil else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                withAnimation(.easeOut(duration: 0.22)) { model.clearHeroMorph() }
+            }
+        }
         // Punt 19: top-uitlijning — de VStack centreerde verticaal,
         // waardoor de kaart bij lage vensters onder de quota-rij kroop;
         // header hoort vast bovenaan (Figma y=32), de foto is het enige
@@ -317,6 +357,24 @@ struct ShellView: View {
         }
         .dsMotion(DSMotion.enter, value: model.showHairNudge)
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
+    }
+
+    /// Hero-morph-bestemming: een korte, niet-interactieve composiet van het
+    /// geopende portret die — via de gedeelde namespace — vanaf de tegelrect naar
+    /// het canvas morpht en daarna wegfadet (de echte EditorView staat eronder).
+    /// `isSource: false`: de tegel levert de bronrect, deze overlay morpht ernaar.
+    @ViewBuilder
+    private var heroMorphOverlay: some View {
+        if let heroID = model.heroMorphID, let portrait = model.selectedPortrait {
+            PortraitComposite(portrait: portrait, maxDimension: 700)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
+                .heroPortrait(heroID, isSource: false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(DSSpacing.gap8)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+        }
     }
 
     private var isolatingStatusLabel: String? {

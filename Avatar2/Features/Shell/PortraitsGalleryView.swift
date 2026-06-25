@@ -140,6 +140,9 @@ struct PortraitGridTile: View {
             .aspectRatio(1, contentMode: .fit)
             .overlay { composed }
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
+            // Hero-morph-bron: deze geclipte tegel levert de bronrect waaruit de
+            // editor-overlay groeit bij het openen. Zie [[HeroMorph]].
+            .heroPortrait(portrait.persistentModelID, isSource: true)
             .overlay(
                 RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
                     .strokeBorder(

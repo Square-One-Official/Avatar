@@ -145,18 +145,36 @@ final class ShellModel {
     enum OpenOrigin: Equatable { case home; case portraits(PersistentIdentifier?) }
     private(set) var openOrigin: OpenOrigin = .home
 
+    /// Hero-morph: het portret dat NU van tegel → editor-canvas morpht. De tegel
+    /// (bron) en de korte editor-overlay (bestemming) delen via dit id één
+    /// `matchedGeometryEffect`. nil = geen morph bezig (de overlay is dan weg en de
+    /// editor staat kaal). Gezet bij `openPortrait`, gewist door de view zodra de
+    /// morph is geland (`clearHeroMorph`). Bij reduce-motion blijft het nil → kale
+    /// fade. Zie [[HeroMorph]].
+    private(set) var heroMorphID: PersistentIdentifier?
+
+    /// De view heeft de morph laten landen → overlay weg (crossfade naar de echte
+    /// editor). Idempotent.
+    func clearHeroMorph() { heroMorphID = nil }
+
     /// Open één portret in de editor (vanuit Home of een map-grid). Onthoudt de
     /// herkomst zodat `goBack()` naar de juiste surface terugkeert.
     func openPortrait(_ portrait: Portrait2) {
         isShowingSettings = false
         clearPortraitSelection()
         openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
+        // Hero-morph alleen vanaf de Portraits-surface (daar staan de tegels die
+        // de bronrect leveren) en niet bij reduce-motion.
+        heroMorphID = (section == .portraits && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+            ? portrait.persistentModelID : nil
         select(portrait)
         section = .editor
     }
 
     /// Terug vanuit de editor naar de herkomst-surface (Home of Portraits+map).
     func goBack() {
+        // Back-nav houdt (eerste versie) de bestaande fade — geen reverse-hero.
+        heroMorphID = nil
         switch openOrigin {
         case .home: showHome()
         case .portraits(let folderID): showPortraits(folderID: folderID)
@@ -727,6 +745,17 @@ final class ShellModel {
             modelContext.insert(copy)
         }
         isSidebarVisible = true
+    }
+
+    /// Smoke-haak (hero-morph): drill vanaf de Portraits-grid in het jongste
+    /// portret zodat de tegel→canvas-morph deterministisch speelt voor de capture.
+    func debugDrillIntoFirstPortrait() {
+        guard let modelContext else { return }
+        var fd = FetchDescriptor<Portrait2>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        fd.fetchLimit = 1
+        guard let first = try? modelContext.fetch(fd).first else { return }
+        section = .portraits  // herkomst = Portraits → de hero-morph vuurt
+        openPortrait(first)
     }
     #endif
 

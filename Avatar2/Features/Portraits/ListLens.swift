@@ -31,7 +31,12 @@ struct ListLens: View {
                                 mods: NSApp.currentEvent?.modifierFlags ?? []
                             )
                         },
-                        avatar: { PortraitComposite(portrait: p, maxDimension: 96) }
+                        avatar: {
+                            // Hero-morph-bron: de rij opent het portret, dus de morph
+                            // vertrekt vanaf de rij-thumbnail. Zie [[HeroMorph]].
+                            PortraitComposite(portrait: p, maxDimension: 96)
+                                .heroPortrait(p.persistentModelID, isSource: true)
+                        }
                     )
                     .contextMenu {
                         portraitContextMenu(

@@ -12,6 +12,11 @@ struct Avatar2App: App {
     /// E17.5: getargete in-app-berichten (verenigd Message-model).
     @State private var messaging: MessagingService
 
+    /// Eigen SwiftData-store voor de set (E05.4). Normaal de persistente store;
+    /// onder `--smoke-store` (DEBUG) een GEÏSOLEERDE, gezaaide in-memory store zodat
+    /// smoke-screenshots Thierry's echte portretten niet vervuilen.
+    private let modelContainer: ModelContainer
+
     init() {
         // Eén venster, geen tabs: zonder dit injecteert AppKit een eigen
         // "View"-menu (Show Tab Bar / Show All Tabs) náást SwiftUI's View-menu →
@@ -25,6 +30,30 @@ struct Avatar2App: App {
         _onboarding = State(initialValue: OnboardingModel(auth: auth))
         _entitlement = State(initialValue: entitlement)
         _messaging = State(initialValue: MessagingService(backend: entitlement.backend))
+        modelContainer = Self.makeModelContainer()
+    }
+
+    /// Bouwt de set-store: persistent in productie, gezaaid in-memory bij
+    /// `--smoke-store` (DEBUG-smoke).
+    private static func makeModelContainer() -> ModelContainer {
+        let models: [any PersistentModel.Type] = [Portrait2.self, Folder2.self, Banner2.self]
+        let schema = Schema(models)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--smoke-store") {
+            if let container = try? ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            ) {
+                SmokeSeed.populate(container.mainContext)
+                return container
+            }
+        }
+        #endif
+        do {
+            return try ModelContainer(for: schema)
+        } catch {
+            fatalError("Kon de Avatar2-store niet maken: \(error)")
+        }
     }
 
     var body: some Scene {
@@ -161,11 +190,10 @@ struct Avatar2App: App {
             }
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
-        // PoC (left-nav): Folder2 erbij voor de Portraits-galerij (lichtgewicht
-        // migratie: nieuw model + optionele Portrait2.folder-relatie).
-        // E35.1: Banner2 erbij voor de Banners-bibliotheek (lichtgewicht migratie:
-        // nieuw model, geen relaties).
-        .modelContainer(for: [Portrait2.self, Folder2.self, Banner2.self])
+        // PoC (left-nav): Folder2 voor de Portraits-galerij, E35.1: Banner2 voor de
+        // Banners-bibliotheek. De container wordt in `init` gebouwd (persistent, of
+        // gezaaid in-memory bij `--smoke-store`).
+        .modelContainer(modelContainer)
         // Bevinding 1 (E04.5): Figma kent geen aparte titelbalk — één zwart
         // vlak, traffic lights inline, geen venstertitel. hiddenTitleBar
         // geeft full-size content; de topbar reserveert zelf ruimte naast
