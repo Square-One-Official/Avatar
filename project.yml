@@ -242,6 +242,14 @@ targets:
           - CFBundleURLName: nl.squareone.aaavatar2.scheme
             CFBundleURLSchemes:
               - aaavatar
+        # PoC (left-nav): eigen sleep-type voor het verplaatsen van een portret
+        # naar een map (PortraitDragItem). Geëxporteerd zodat de interne drag
+        # niet matcht op de venster-brede foto-import (.fileURL/.image).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: nl.squareone.aaavatar2.portrait-ref
+            UTTypeDescription: Aaavatar portrait reference
+            UTTypeConformsTo:
+              - public.data
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2

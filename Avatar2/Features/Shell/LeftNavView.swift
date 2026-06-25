@@ -24,6 +24,8 @@ struct LeftNavView: View {
     @State private var showUserMenu = false
     @State private var renamingFolder: Folder2?
     @State private var draftName = ""
+    /// De map waarboven nu een portret zweeft (drop-highlight). Eén tegelijk.
+    @State private var dropTargetedFolderID: PersistentIdentifier?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -163,6 +165,7 @@ struct LeftNavView: View {
         let isSelected = model.section == .portraits
             && model.selectedFolderID == folder.persistentModelID
             && !model.isShowingSettings
+        let isDropTargeted = dropTargetedFolderID == folder.persistentModelID
         return Button {
             model.showPortraits(folderID: folder.persistentModelID)
         } label: {
@@ -173,18 +176,36 @@ struct LeftNavView: View {
                 Text(folder.name).dsTextStyle(.labelBase).lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
+            .foregroundStyle(isSelected || isDropTargeted ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
             .padding(.leading, 26)
             .padding(.trailing, DSSpacing.gap2)
             .frame(height: 32)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                isSelected ? DSColor.Background.neutralStronger : .clear,
+                isDropTargeted ? DSColor.Action.primary.opacity(0.18)
+                    : (isSelected ? DSColor.Background.neutralStronger : .clear),
                 in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
             )
+            .overlay {
+                if isDropTargeted {
+                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Drop-doel: sleep een portret hier naartoe om het in deze map te zetten.
+        .dropDestination(for: PortraitDragItem.self) { items, _ in
+            move(items, into: folder)
+        } isTargeted: { targeted in
+            if targeted {
+                dropTargetedFolderID = folder.persistentModelID
+            } else if dropTargetedFolderID == folder.persistentModelID {
+                dropTargetedFolderID = nil
+            }
+        }
+        .dsMotion(DSMotion.micro, value: isDropTargeted)
         .contextMenu {
             Button("Rename") { draftName = folder.name; renamingFolder = folder }
             Button("Delete", role: .destructive) {
@@ -192,6 +213,19 @@ struct LeftNavView: View {
                 modelContext.delete(folder)
             }
         }
+    }
+
+    /// Verplaats de gesleepte portretten naar `folder` (haalt het echte Portrait2
+    /// op via de SwiftData-identiteit uit de drag-payload). `true` als er minstens
+    /// één daadwerkelijk verplaatst is.
+    private func move(_ items: [PortraitDragItem], into folder: Folder2) -> Bool {
+        var moved = false
+        for item in items {
+            guard let portrait = modelContext.model(for: item.id) as? Portrait2 else { continue }
+            portrait.folder = folder
+            moved = true
+        }
+        return moved
     }
 
     private var isPortraitsAllSelected: Bool {
