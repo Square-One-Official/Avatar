@@ -17,9 +17,10 @@ struct HomeView: View {
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var thumbs = ThumbnailStore()
 
-    // Adaptief rooster van nette vierkanten met ruimte ertussen — i.p.v. 3
-    // uitgerekte kolommen die op een breed venster gigantisch worden.
-    private let columns = [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: DSSpacing.gap4)]
+    // Vast 4-koloms rooster met duidelijke ruimte ertussen (gebruikersfeedback:
+    // max 3–4 naast elkaar, niet de overvloeiende adaptieve variant die
+    // overliep). Flexibele kolommen vullen de breedte exact → geen clipping.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap5), count: 4)
 
     var body: some View {
         if portraits.isEmpty {
@@ -67,7 +68,7 @@ struct HomeView: View {
                         Text("Earlier")
                             .dsTextStyle(.labelLarge)
                             .foregroundStyle(DSColor.Foreground.subtle)
-                        LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
+                        LazyVGrid(columns: columns, spacing: DSSpacing.gap5) {
                             ForEach(Array(portraits.dropFirst())) { portrait in
                                 PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
                                     model.openPortrait(portrait)
@@ -85,8 +86,8 @@ struct HomeView: View {
     }
 
     /// Max-breedte van de featured-kaart — compacter dan de volledige
-    /// vensterbreedte (gebruikersfeedback).
-    private let featuredMaxWidth: CGFloat = 360
+    /// vensterbreedte, maar iets groter dan voorheen (gebruikersfeedback).
+    private let featuredMaxWidth: CGFloat = 420
 
     private func featured(_ portrait: Portrait2) -> some View {
         Button { model.openPortrait(portrait) } label: {
