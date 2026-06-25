@@ -129,7 +129,7 @@ struct ShellView: View {
                 model.debugScaleSubject(factor: f)
             }
             // E27.4: open de board-view (alle portretten op één canvas).
-            if args.contains("--board") { model.isBoardMode = true }
+            if args.contains("--board") { model.showPortraits(); model.setPortraitsViewMode(.canvas) }
             // PoC (left-nav): open de Portraits-galerij direct voor de smoke.
             if args.contains("--portraits") { model.section = .portraits }
             // PoC (left-nav): forceer de left-nav dicht (collapsed-screenshot).
@@ -202,7 +202,7 @@ struct ShellView: View {
                 HomeView(model: model, entitlement: entitlement)
             } else if model.section == .portraits {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
-                PortraitsGalleryView(model: model)
+                PortraitsGalleryView(model: model, entitlement: entitlement)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
                 // de topstrook (zie de overlays hieronder).
@@ -285,20 +285,9 @@ struct ShellView: View {
 
     @ViewBuilder
     private var canvas: some View {
-        // E27.4: de board-view (alle portretten) vervangt de enkel-portret-canvas
-        // in board-modus. Klik een portret → selecteren + terug naar de editor.
-        if model.isBoardMode {
-            BoardView(
-                model: model,
-                entitlement: entitlement,
-                onOpen: { portrait in
-                    model.select(portrait)
-                    model.isBoardMode = false
-                }
-            )
-        } else {
-            editorCanvas
-        }
+        // De board/canvas is nu een Portraits-LENS (LibraryViewMode.canvas), geen
+        // studio-modus meer → de studio toont altijd de enkel-portret-editor.
+        editorCanvas
     }
 
     @ViewBuilder

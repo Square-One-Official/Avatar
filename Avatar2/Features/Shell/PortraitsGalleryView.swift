@@ -13,6 +13,7 @@ import SwiftUI
 
 struct PortraitsGalleryView: View {
     let model: ShellModel
+    let entitlement: EntitlementModel
 
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
@@ -40,8 +41,9 @@ struct PortraitsGalleryView: View {
                 case .grid: gridBody
                 case .list: ListLens(items: items, model: model, folders: folders)
                 case .gallery: GalleryLens(items: items, model: model, folders: folders)
-                // Canvas (folder-gescope BoardView) landt als laatste lens.
-                case .canvas: comingSoon(.canvas)
+                // Canvas = de vrije board-lens, gescope op de huidige map.
+                case .canvas: BoardView(folderID: model.selectedFolderID, model: model,
+                                        entitlement: entitlement, onOpen: { model.openPortrait($0) })
                 }
             }
         }
@@ -64,17 +66,6 @@ struct PortraitsGalleryView: View {
             .padding(.horizontal, DSSpacing.gap6)
             .padding(.bottom, DSSpacing.gap6)
         }
-    }
-
-    private func comingSoon(_ mode: LibraryViewMode) -> some View {
-        VStack(spacing: DSSpacing.gap2) {
-            Image(systemName: mode.symbol)
-                .font(.system(size: 36, weight: .light))
-                .foregroundStyle(DSColor.Foreground.muted)
-            Text("\(mode.label) view").dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
-            Text("Coming next.").dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var header: some View {

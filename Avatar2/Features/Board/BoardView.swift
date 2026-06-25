@@ -15,8 +15,17 @@ import SwiftData
 import SwiftUI
 
 struct BoardView: View {
+    /// Folder-scope (Portraits-canvas-lens): nil = alle beelden, anders alleen de
+    /// portretten van die map. Default nil → ongewijzigd gedrag.
+    var folderID: PersistentIdentifier? = nil
     /// Dezelfde bron als de sidebar (E05.4): alle portretten, jongste eerst.
-    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
+    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var allPortraits: [Portrait2]
+    /// Folder-gescope set die HEEL BoardView aanstuurt (layout/selectie/
+    /// visibleNodes/boardSize). Eén plek scopen → alle call-sites volgen vanzelf.
+    private var portraits: [Portrait2] {
+        guard let folderID else { return allPortraits }
+        return allPortraits.filter { $0.folder?.persistentModelID == folderID }
+    }
     /// E30.1: dezelfde edit-pipeline als de editor — bij één-selectie zetten we
     /// `model.selectedPortrait` op de node en hergebruiken we model.applyEffectResult
     /// (cloud-re-isolatie!) / commitAdjust i.p.v. die logica te dupliceren.
