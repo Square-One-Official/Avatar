@@ -71,10 +71,19 @@ final class ShellModel {
 
     // MARK: - App-navigatie (PoC: Granola-stijl left-nav)
 
-    /// Top-level secties die de left-nav aanstuurt. `studio` = de editor-canvas
-    /// (default), `portraits` = de Riverside-stijl galerij met mappen.
-    enum AppSection { case studio, portraits }
-    var section: AppSection = .studio
+    /// Top-level secties die de left-nav aanstuurt.
+    /// `home` = overzicht (laatste + eerdere portretten / first-use), default;
+    /// `portraits` = de map-grid (via de inklapbare Portraits-sectie in de nav);
+    /// `editor` = één portret bewerken (de bestaande canvas). De top-right-
+    /// iconen tonen alléén in `editor`.
+    enum AppSection { case home, portraits, editor }
+    var section: AppSection = .home
+
+    /// Welke map de Portraits-grid toont (nil = alle beelden).
+    var selectedFolderID: PersistentIdentifier?
+
+    /// Of de Portraits-sectie in de nav is uitgeklapt (toont de mappen).
+    var isPortraitsExpanded = true
 
     /// De left-nav staat standaard open (Granola-stijl); inklapbaar.
     var isLeftNavVisible = true
@@ -83,12 +92,26 @@ final class ShellModel {
     var isShowingManageBackgrounds = false
 
     func toggleLeftNav() { isLeftNavVisible.toggle() }
+    func togglePortraitsExpanded() { isPortraitsExpanded.toggle() }
 
-    /// Wissel naar een sectie (sluit een eventuele Settings-overlay; die hoort
-    /// niet bij een sectie maar bovenop de hele shell).
-    func showSection(_ section: AppSection) {
+    /// Naar het overzicht (Home).
+    func showHome() {
         isShowingSettings = false
-        self.section = section
+        section = .home
+    }
+
+    /// Naar de Portraits-grid van een map (nil = alle beelden).
+    func showPortraits(folderID: PersistentIdentifier? = nil) {
+        isShowingSettings = false
+        selectedFolderID = folderID
+        section = .portraits
+    }
+
+    /// Open één portret in de editor (vanuit Home of een map-grid).
+    func openPortrait(_ portrait: Portrait2) {
+        isShowingSettings = false
+        select(portrait)
+        section = .editor
     }
 
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
@@ -227,6 +250,9 @@ final class ShellModel {
         let portrait = Portrait2(cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
         select(portrait)
+        // PoC (left-nav): een verse import opent meteen de editor (top-right-
+        // chrome verschijnt) i.p.v. op Home/Portraits te blijven.
+        section = .editor
     }
 
     /// Selectie uit de sidebar: portret op canvas, naam/rol in de header.

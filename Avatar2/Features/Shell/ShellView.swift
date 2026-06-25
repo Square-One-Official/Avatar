@@ -31,35 +31,15 @@ struct ShellView: View {
         // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
         // resterende ruimte (één spring, geen layoutshift).
         HStack(spacing: 0) {
-            // PoC (left-nav): Granola-stijl app-navigatie, losstaande kaart links.
+            // PoC (left-nav): Granola-stijl app-navigatie als de enige sidebar
+            // (de oude rechter set-sidebar is verwijderd).
             if model.isLeftNavVisible {
                 LeftNavView(model: model, entitlement: entitlement)
                     .padding(LeftNavView.edgeInset)
                     .transition(reduceMotion ? .opacity : .move(edge: .leading))
             }
             mainArea
-            // De set-sidebar hoort alleen bij Studio (de galerij organiseert zelf).
-            if model.isSidebarVisible && model.section == .studio {
-                SidebarView(
-                    selectedID: model.selectedPortrait?.persistentModelID,
-                    onSelect: { model.select($0) },
-                    onAdd: { model.presentOpenPanel() },
-                    onExport: { model.select($0); model.exportCurrentPortrait() },
-                    onSetBusy: { setBusyMessage = $0 },
-                    isPro: entitlement.isProActive
-                )
-                // Losstaande kaart met marge rondom (bevinding 8; frame-
-                // inzet 4) — zelfde inset waarmee de kaartradius
-                // concentrisch rekent (bevinding 17).
-                .padding(SidebarView.edgeInset)
-                // Kale move (géén eigen animatie): de transitie ERFT de container-
-                // animatie hieronder, zodat de sidebar-slide en de canvas-
-                // hercentrering onder ÉÉN spring in lockstep bewegen (geen
-                // desync). Reduce-motion → kale fade i.p.v. snap.
-                .transition(reduceMotion ? .opacity : .move(edge: .trailing))
-            }
         }
-        .dsMotion(DSMotion.springTransform, value: model.isSidebarVisible)
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(DSColor.Background.app)
         // E23: geen forced .dark meer — de hoofdshell volgt de
@@ -183,10 +163,8 @@ struct ShellView: View {
     private var mainArea: some View {
         VStack(spacing: 0) {
             if model.isShowingSettings {
-                // Punt 14: Settings vervangt de canvas-weergave binnen het
-                // hoofdvenster; topbar (quota + gear) blijft als overlay
-                // staan. Esc sluit (verborgen cancel-knop, werkt
-                // venster-breed); de gear toggelt.
+                // Settings vervangt de hoofdweergave; Esc sluit (verborgen
+                // cancel-knop, venster-breed) of de ✕ in de topbar.
                 SettingsRootView(entitlement: entitlement)
                     .background(
                         Button("") { model.isShowingSettings = false }
@@ -194,9 +172,12 @@ struct ShellView: View {
                             .opacity(0)
                             .accessibilityHidden(true)
                     )
+            } else if model.section == .home {
+                // PoC (left-nav): Home — het overzicht (laatste + eerdere /
+                // first-use). De top-right-chrome blijft hier weg.
+                HomeView(model: model, entitlement: entitlement)
             } else if model.section == .portraits {
-                // PoC (left-nav): de Portraits-galerij vervangt de canvas-
-                // weergave; topbar blijft erover staan.
+                // PoC (left-nav): de Portraits-grid van de geselecteerde map.
                 PortraitsGalleryView(model: model)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
@@ -232,28 +213,17 @@ struct ShellView: View {
                     .allowsHitTesting(false)
             }
         }
-        // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
-        // de "top"-strook uit de App-frames. De gear toggelt de in-window
-        // Settings (punt 14) en toont de active-state zolang die open is.
+        // PoC (left-nav): uitgeklede topbar — alleen een subtiele reveal-knop
+        // (als de nav verborgen is) en, tijdens het bewerken, de Share-knop.
+        // Settings/credits/board/library zitten nu in de left-nav.
         .overlay(alignment: .top) {
             ShellTopBar(
-                model: entitlement,
                 isSettingsActive: model.isShowingSettings,
                 onToggleSettings: { model.isShowingSettings.toggle() },
-                // Capabilities NIET meer gaten met `!isShowingSettings`: de
-                // editor-cluster blijft gemount zodat ShellTopBar 'm als geheel
-                // kan kruisvervagen naar de Close-knop (geen verspringen).
+                // Top-right-chrome alléén in de editor (niet op Home/Portraits).
+                isEditing: model.section == .editor,
                 canExport: model.canExport,
                 onExport: { model.exportCurrentPortrait() },
-                // E27.4: board-modus-toggle (alle portretten op één canvas).
-                canToggleBoard: model.canExport,
-                isBoardActive: model.isBoardMode,
-                onToggleBoard: { model.toggleBoard() },
-                // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
-                canToggleSidebar: model.canExport && model.section == .studio,
-                isSidebarActive: model.isSidebarVisible,
-                onToggleSidebar: { model.toggleSidebar() },
-                // PoC (left-nav): Granola-stijl in-/uitklap-toggle.
                 isLeftNavVisible: model.isLeftNavVisible,
                 onToggleLeftNav: { model.toggleLeftNav() }
             )
