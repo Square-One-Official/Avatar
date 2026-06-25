@@ -114,8 +114,8 @@ struct PortraitGridTile: View {
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .dsMotion(DSMotion.micro, value: hovering)
-            .onTapGesture(count: 2) { onOpen() }
-            .help("Double-click to open in the editor")
+            .onTapGesture { onOpen() }
+            .help("Open in the editor")
         .contextMenu {
             Button("Open") { onOpen() }
             Menu("Move to folder") {
