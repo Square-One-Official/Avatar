@@ -18,6 +18,9 @@ struct PortraitsGalleryView: View {
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
 
+    /// Gemeten hoogte van de zwevende header → top-inset voor elke lens.
+    @State private var headerHeight: CGFloat = 0
+
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
 
@@ -32,16 +35,45 @@ struct PortraitsGalleryView: View {
     }
 
     var body: some View {
-        lensContent
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            // De header (incl. switcher) als VASTE top-inset i.p.v. een VStack-broer:
-            // de canvas-lens (BoardView) is een gulzige top-level GeometryReader die
-            // als VStack-broer de header — én de left-nav — liet inklappen. Met
-            // safeAreaInset blijft de header bovenaan vastgepind en krijgt elke lens
-            // de ruimte erónder (grid/list/gallery scrollen eronder; de canvas vult
-            // en de header zweeft erover) zonder de omliggende layout te breken.
-            .safeAreaInset(edge: .top, spacing: 0) { header }
-            .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
+        // Header (titel + switcher) ZWEEFT bovenaan; elke lens krijgt een top-inset
+        // ter grootte van de (gemeten) header zodat z'n inhoud er nooit achter valt.
+        //
+        // Waarom niet een VStack-broer of `.safeAreaInset`: de full-bleed board-lens
+        // (BoardView) is verticaal gulzig — als VStack-broer drukt 'ie de header van
+        // het scherm (titel + switcher verdwenen, alleen de subtitle lekt op y≈0) en
+        // als safeAreaInset-content klapt de inset in. De scroll-lenzen gedragen zich
+        // wél netjes, maar één uniforme, board-proof layout is robuuster: de header
+        // als bovenliggende laag (vult nooit mee, verdwijnt dus nooit) + een top-inset
+        // per lens. De board fit z'n nodes onder de inset; de scroll-lenzen scrollen
+        // eronder.
+        // De buitenste GeometryReader is hier een MIN-WIDTH-firewall, geen
+        // gulzigaard: hij voedt z'n kinderen ALTIJD een concrete maat (geo.size),
+        // dus de board-lens krijgt een exacte `.frame(width:height:)` i.p.v. via
+        // `.frame(maxWidth:.infinity)` terug te vallen op z'n grote ideale boardSize
+        // wanneer de ouder een nil-breedte voorstelt. Dát terugvallen lekte de
+        // board-breedte omhoog en perste de vaste 236pt-nav in elkaar (de echte
+        // oorzaak; het weghalen van BoardView's eigen GeometryReader in d00387e
+        // raakte 'm niet). Met een exacte maat kan geen enkele lens de nav of de
+        // header nog verdringen.
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                lensContent
+                    .frame(width: geo.size.width,
+                           height: max(0, geo.size.height - headerHeight),
+                           alignment: .top)
+                    .clipped()
+                    .padding(.top, headerHeight)
+                header
+                    .background(
+                        GeometryReader { hGeo in
+                            Color.clear.preference(key: HeaderHeightKey.self, value: hGeo.size.height)
+                        }
+                    )
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+        }
+        .onPreferenceChange(HeaderHeightKey.self) { headerHeight = $0 }
+        .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
     }
 
     @ViewBuilder private var lensContent: some View {
@@ -112,6 +144,12 @@ struct PortraitsGalleryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+/// Meet de zwevende-header-hoogte zodat elke lens er precies onder begint.
+private struct HeaderHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// Gedeelde portret-tegel (Home + Portraits-grid). Vierkant, met naam/rol eronder.
