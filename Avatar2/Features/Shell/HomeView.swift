@@ -17,7 +17,9 @@ struct HomeView: View {
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var thumbs = ThumbnailStore()
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
+    // Adaptief rooster van nette vierkanten met ruimte ertussen — i.p.v. 3
+    // uitgerekte kolommen die op een breed venster gigantisch worden.
+    private let columns = [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: DSSpacing.gap4)]
 
     var body: some View {
         if portraits.isEmpty {

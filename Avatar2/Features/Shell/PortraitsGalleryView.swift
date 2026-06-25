@@ -94,7 +94,10 @@ struct PortraitGridTile: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+        // Eén nette, UNIFORME vierkante tegel: het beeld vult het vierkant
+        // (scaledToFill), naam/rol als overlay onderin — zo varieert de hoogte
+        // nooit (label-onder-de-kaart maakte rijen ongelijk).
+        ZStack(alignment: .bottomLeading) {
             ZStack {
                 DSColor.Background.inset
                 if let image = thumbs.thumbnail(for: portrait, maxDimension: 280, adjusted: false) {
@@ -103,24 +106,29 @@ struct PortraitGridTile: View {
             }
             .aspectRatio(1, contentMode: .fit)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
-                    .strokeBorder(
-                        hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
-                        lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
-                    )
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.55)],
+                startPoint: .center, endPoint: .bottom
             )
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                    .dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary).lineLimit(1)
+                    .dsTextStyle(.labelBase).foregroundStyle(.white).lineLimit(1)
                 if !portrait.role.isEmpty {
-                    Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted).lineLimit(1)
+                    Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
             }
-            .padding(.horizontal, DSSpacing.gap1)
+            .padding(DSSpacing.gap3)
         }
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
+                .strokeBorder(
+                    hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
+                    lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
+                )
+        )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .dsMotion(DSMotion.micro, value: hovering)
