@@ -35,7 +35,9 @@ struct ShellView: View {
             // (de oude rechter set-sidebar is verwijderd).
             if model.isLeftNavVisible {
                 LeftNavView(model: model, entitlement: entitlement)
-                    .padding(LeftNavView.edgeInset)
+                    // Flush aan top/left/bottom van het venster (macOS knipt de
+                    // venstercorners zelf af); alleen rechts een gap naar de content.
+                    .padding(.trailing, LeftNavView.edgeInset)
                     .transition(reduceMotion ? .opacity : .move(edge: .leading))
             }
             mainArea

@@ -27,12 +27,11 @@ struct LeftNavView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Reserveer de strook voor de OS traffic-lights. De sidebar-toggle
-            // staat nu op vensterniveau (ShellView) zodat hij ALTIJD náást de
-            // traffic-lights blijft staan, of de nav nu open of dicht is.
+            // Reserveer de strook voor de OS traffic-lights. Flush sidebar:
+            // de strip is 44 pt (traffic-lights zitten op ~y=12 → nav-items
+            // starten op y=44, geeft ~28 pt lucht onder de groene knop).
             Color.clear
-                .frame(height: 28)
-                .padding(.top, DSSpacing.gap1)
+                .frame(height: 44)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {
@@ -65,13 +64,26 @@ struct LeftNavView: View {
         }
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(
-            DSColor.Background.card,
-            in: .rect(
-                cornerRadius: DSRadius.concentric(inset: Self.edgeInset),
+        // Flush aan de linker/boven/onderkant van het venster: geen radius links
+        // (macOS knipt de venstercorners zelf af). Rechts concentrisch t.o.v.
+        // de 4 pt trailing-inset die ShellView toepast.
+        .background(DSColor.Background.card)
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: DSRadius.concentric(inset: Self.edgeInset),
+                topTrailingRadius: DSRadius.concentric(inset: Self.edgeInset),
                 style: .continuous
             )
         )
+        // Subtiele scheidingslijn rechts (kleur-verschil alleen is niet genoeg
+        // in Light mode wanneer card ≈ white en content ook bijna white is).
+        .overlay(alignment: .trailing) {
+            DSColor.Foreground.divider
+                .frame(width: DSBorderWidth.thin)
+                .ignoresSafeArea()
+        }
         .task { await entitlement.refresh() }
         .alert("Rename folder", isPresented: Binding(
             get: { renamingFolder != nil },
