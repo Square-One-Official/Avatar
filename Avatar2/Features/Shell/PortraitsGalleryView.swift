@@ -32,23 +32,31 @@ struct PortraitsGalleryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            if items.isEmpty {
-                emptyState
-            } else {
-                switch model.portraitsViewMode {
-                case .grid: gridBody
-                case .list: ListLens(items: items, model: model, folders: folders)
-                case .gallery: GalleryLens(items: items, model: model, folders: folders)
-                // Canvas = de vrije board-lens, gescope op de huidige map.
-                case .canvas: BoardView(folderID: model.selectedFolderID, model: model,
-                                        entitlement: entitlement, onOpen: { model.openPortrait($0) })
-                }
+        lensContent
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // De header (incl. switcher) als VASTE top-inset i.p.v. een VStack-broer:
+            // de canvas-lens (BoardView) is een gulzige top-level GeometryReader die
+            // als VStack-broer de header — én de left-nav — liet inklappen. Met
+            // safeAreaInset blijft de header bovenaan vastgepind en krijgt elke lens
+            // de ruimte erónder (grid/list/gallery scrollen eronder; de canvas vult
+            // en de header zweeft erover) zonder de omliggende layout te breken.
+            .safeAreaInset(edge: .top, spacing: 0) { header }
+            .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
+    }
+
+    @ViewBuilder private var lensContent: some View {
+        if items.isEmpty {
+            emptyState
+        } else {
+            switch model.portraitsViewMode {
+            case .grid: gridBody
+            case .list: ListLens(items: items, model: model, folders: folders)
+            case .gallery: GalleryLens(items: items, model: model, folders: folders)
+            // Canvas = de vrije board-lens, gescope op de huidige map.
+            case .canvas: BoardView(folderID: model.selectedFolderID, model: model,
+                                    entitlement: entitlement, onOpen: { model.openPortrait($0) })
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
     }
 
     private var gridBody: some View {
@@ -87,6 +95,9 @@ struct PortraitsGalleryView: View {
         .padding(.horizontal, DSSpacing.gap6)
         .padding(.top, DSSpacing.gap8)
         .padding(.bottom, DSSpacing.gap4)
+        // Eigen dekvlak: als top-inset zweeft de header over de lens-inhoud
+        // (de canvas, of een gescrollde grid), dus hij heeft een achtergrond nodig.
+        .background(DSColor.Background.app)
     }
 
     private var emptyState: some View {

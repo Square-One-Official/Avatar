@@ -36,7 +36,9 @@ struct LibraryBreadcrumb: View {
         let name = model.selectedPortrait.map { $0.name.isEmpty ? "Untitled" : $0.name } ?? "Untitled"
         switch model.openOrigin {
         case .home:
-            crumb("Home") { model.showHome() }
+            // E35.5: het editor-broodkruim wijst naar Portraits (niet Home) — een
+            // portret hoort onder Portraits, ook al is het vanaf Home geopend.
+            crumb("Portraits") { model.showPortraits(folderID: nil) }
             sep
             leaf(name)
         case .portraits(let folderID):

@@ -1,7 +1,9 @@
 // Gallery-lens voor de Portraits-surface (Finder-stijl): één grote preview boven
 // + een horizontale filmstrip onder. Klik een filmstrip-thumb = focus (preview
 // wisselt); ⌘/⇧-klik = multi-select; klik de grote preview = openen in de editor.
-// Rechtermuis = enkel/bulk-menu. Selectie leest mee met `model.selectedPortraitIDs`.
+// ←/→ (of de pijl-knoppen op de preview) bladeren CYCLISCH door de set; de
+// filmstrip volgt mee. Rechtermuis = enkel/bulk-menu. Selectie leest mee met
+// `model.selectedPortraitIDs`.
 
 import AppKit
 import AvatarUI
@@ -21,10 +23,27 @@ struct GalleryLens: View {
         items.first { $0.persistentModelID == focusID } ?? items.first
     }
 
+    private var focusedIndex: Int {
+        items.firstIndex { $0.persistentModelID == focused?.persistentModelID } ?? 0
+    }
+
+    /// Cyclisch bladeren (−1 = vorige, +1 = volgende).
+    private func cycle(_ delta: Int) {
+        guard items.count > 1 else { return }
+        let next = (focusedIndex + delta + items.count) % items.count
+        focusID = items[next].persistentModelID
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if let f = focused { preview(f) } else { Spacer() }
             filmstrip
+        }
+        // ←/→ bladeren door de gallery (cyclisch). Onzichtbare knoppen — alleen
+        // actief zolang de gallery-lens zichtbaar is.
+        .background {
+            Button("") { cycle(-1) }.keyboardShortcut(.leftArrow, modifiers: []).opacity(0)
+            Button("") { cycle(1) }.keyboardShortcut(.rightArrow, modifiers: []).opacity(0)
         }
     }
 
@@ -48,24 +67,54 @@ struct GalleryLens: View {
         .padding(DSSpacing.gap6)
         .contentShape(Rectangle())
         .onTapGesture { model.openPortrait(p) }
-        .help("Click to open in the editor")
+        .help("Click to open · ← / → to browse")
+        // Blader-pijlen links/rechts (cyclisch). De knoppen vangen hun eigen klik,
+        // dus ze openen het portret niet.
+        .overlay(alignment: .leading) { navArrow("chevron.left") { cycle(-1) } }
+        .overlay(alignment: .trailing) { navArrow("chevron.right") { cycle(1) } }
         .contextMenu { menu(p) }
+    }
+
+    private func navArrow(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(width: 40, height: 40)
+                .background(DSColor.Background.card, in: Circle())
+                .overlay(Circle().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(DSSpacing.gap5)
+        .opacity(items.count > 1 ? 1 : 0)
+        .allowsHitTesting(items.count > 1)
     }
 
     // MARK: - Filmstrip
 
     private var filmstrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DSSpacing.gap3) {
-                ForEach(items) { p in filmThumb(p) }
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DSSpacing.gap3) {
+                    ForEach(items) { p in
+                        filmThumb(p).id(p.persistentModelID)
+                    }
+                }
+                .padding(.horizontal, DSSpacing.gap6)
+                .padding(.vertical, DSSpacing.gap4)
             }
-            .padding(.horizontal, DSSpacing.gap6)
-            .padding(.vertical, DSSpacing.gap4)
-        }
-        .frame(height: 116)
-        .background(DSColor.Background.card)
-        .overlay(alignment: .top) {
-            Rectangle().fill(DSColor.Foreground.divider).frame(height: DSBorderWidth.thin)
+            .frame(height: 116)
+            .background(DSColor.Background.card)
+            .overlay(alignment: .top) {
+                Rectangle().fill(DSColor.Foreground.divider).frame(height: DSBorderWidth.thin)
+            }
+            // De filmstrip volgt de focus (klik of ←/→) en centreert 'm.
+            .onChange(of: focusID) { _, id in
+                guard let id else { return }
+                withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
+            }
         }
     }
 

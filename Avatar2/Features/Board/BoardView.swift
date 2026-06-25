@@ -135,9 +135,10 @@ struct BoardView: View {
     }
 
     var body: some View {
-        // Top-level GeometryReader = de echte canvas-slot-maat (de vaste board-
-        // maat lekt zo niet de viewport-meting in).
-        GeometryReader { geo in
+        // GEEN top-level GeometryReader: die is gulzig en perst de left-nav smaller
+        // in board-view (de scroll-lenzen niet). De inhoud vult 'polite' via
+        // .frame(maxWidth/maxHeight: .infinity); de viewport-maat meten we in een
+        // .background(GeometryReader), wat de omliggende layout niet beïnvloedt.
             ZStack {
                 DSColor.Background.app
 
@@ -172,7 +173,7 @@ struct BoardView: View {
 
                 hud
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coordinateSpace(name: "boardRoot")
             // E29.2: batch-toolbar bovenaan zodra er ≥1 geselecteerd is. Als
             // top-overlay (deterministisch) + padding om onder de app-topbar te
@@ -239,8 +240,15 @@ struct BoardView: View {
             } message: {
                 Text("This can't be undone.")
             }
-            .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
-            .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
+            // Viewport-maat meten zónder gulzige top-level GeometryReader: een
+            // .background(GeometryReader) matcht de inhoudsmaat en raakt de layout niet.
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
+                        .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
+                }
+            )
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
             // is; `didInitialFit` latcht pas bij een niet-lege set.
             .onChange(of: portraits.count) { _, _ in assignInitialLayout(); fitIfNeeded() }
@@ -258,7 +266,6 @@ struct BoardView: View {
                     editTool = nil
                 }
             }
-        }
     }
 
     // MARK: - Board-canvas (absolute node-posities)
