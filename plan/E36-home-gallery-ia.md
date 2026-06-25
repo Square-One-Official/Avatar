@@ -1,0 +1,99 @@
+# E36 — Home & gallery-IA (unified overzicht + Banners als grid)
+
+Team: **FEAT** (+ DS waar een nieuw AvatarUI-component nodig is)
+
+Voortgekomen uit feedback (Thierry, 2026-06-26): nu we Banners hebben moet de **Home** een
+echt overzicht van álle items worden, en de **Banners-sectie** moet zich net als Portraits
+gedragen (een overzicht van je gemaakte banners), niet een gradient-generator. De gradient-
+quick-create vervalt; in plaats daarvan een **empty state** met "Make banner" + CMS-presets.
+
+Samenhang: dit epic herziet de IA en gallery-schermen. De editor zelf = **E37 (Banner
+Studio)**, de procedurale shaders = **E38**, CMS-presets = **E39**, banner-als-portret-
+achtergrond = **E40**. E35 (banner-bibliotheek, "geen canvas") wordt hierdoor uitgebreid; de
+gradient-presetrij uit 35.3 wordt vervangen (zie 36.2).
+
+**Design-uitgangspunt (geldt voor alle stories):** géén 1-op-1 Figma-referentie — deze schermen
+bestaan nog niet in Figma. Bouwen **in de geest van het design system**: uitsluitend AvatarUI-
+tokens/-componenten (`DSColor`, `DSSpacing`, `DSRadius`, `DSTypography`, `DSMotion`,
+`DSThumbnailCard`, `DSCanvasCard`, empty-state-patroon). Nieuwe componenten horen in `AvatarUI/`
+(DS-story) als ze herbruikbaar zijn, anders feature-lokaal "in DS-stijl". Referentie-patronen
+(géén kopie — inspiratie tegen AI-slop):
+- Unified home met "Recent items" hero + secties: [Fabric](https://mobbin.com/screens/4417cfa4-28b4-4db7-8ba7-3170b2e9cfb5), [Edits](https://mobbin.com/screens/95d5f3b7-3390-4636-97e3-86241d01e167).
+- Projecten-grid met thumbnails + context-acties: [Canva](https://mobbin.com/screens/55975230-ad04-4689-83e9-81363662bc5d), [Procreate Pocket](https://mobbin.com/screens/bfdbd700-03ad-4746-a35a-1b844f5dba83), [Unfold](https://mobbin.com/screens/c89383b7-fa06-4ae0-ac97-f728b7d9cba3).
+
+---
+
+## 36.1 — BannersGalleryView → Portraits-stijl grid
+- status: ready
+- owner: —
+- team: FEAT
+
+Herbouw [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift) zodat ze de
+Portraits-gallery spiegelt i.p.v. de huidige upload/gradient-pagina:
+- Drijvende header ("Banners" + primaire "Make banner"-knop) zoals
+  [PortraitsGalleryView](Avatar2/Features/Portraits/PortraitsGalleryView.swift) (gemeten header-
+  hoogte via preference key).
+- `LazyVGrid` van **wijde** banner-tegels (aspect 3:1, `DSThumbnailCard`-stijl, geclipte hoeken,
+  hover/selectie-state, naam-label). Tegel-min/max afgestemd op de wijde verhouding (niet de
+  vierkante portret-tegel). Thumbnail uit `Banner2.imageData` (later: gerenderde `BannerDoc`-
+  preview, E37).
+- **Verwijder** de "Start from a gradient"-presetrij en `addGradient(...)` (gradients zijn
+  overbodig). Upload blijft als secundaire actie (in de "Make banner"-flow / overflow, niet als
+  losse knop bovenaan).
+- Rechtsklik-contextmenu: Rename / Duplicate / Delete (spiegelt portret-tegel).
+- Klik op een tegel → opent de Banner Studio (E37; tot 37.2 bestaat: open een tijdelijke
+  placeholder-detail of no-op met TODO-marker — niet blokkerend).
+- **Geen Figma-ref** — DS-tokens; patroon = Portraits-gallery.
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 36.2 — Banners empty-state ("Make banner" + presets)
+- status: ready
+- owner: —
+- team: FEAT (+ DS indien nieuw empty-state-component)
+- blockedBy: 36.1
+
+Empty-state wanneer `banners.isEmpty`, in de geest van `FirstUseEmptyState` (Portraits) maar
+banner-specifiek:
+- Korte kop + sub ("Maak je eerste banner") + prominente **"Make banner"** primaire knop
+  (→ E37 Studio, lege canvas).
+- Daaronder een rij/raster **presets** (wijde preview-kaarten) waaruit je kunt kiezen → opent de
+  Studio voorgevuld. Presets komen uit de CMS (**E39**); tot 39.x: een lokale fallback-set
+  (markeer als placeholder in `plan/ASSETS.md`) zodat interactie/animatie volledig af is.
+- Geen gradient-knoppen meer.
+- **Geen Figma-ref** — DS-tokens; patroon = empty-state + template-gallery
+  ([GoDaddy Studio](https://mobbin.com/screens/d9df013b-3e5b-4a3a-a12c-0054b26868f4),
+  [Photoroom "start from blank/preset"](https://mobbin.com/screens/49af6b73-b3a8-49f8-8e72-1b10a8d93c4e)).
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 36.3 — HomeView → unified overzicht van alle items
+- status: ready
+- owner: —
+- team: FEAT
+- blockedBy: 36.1
+
+Herzie [HomeView](Avatar2/Features/Shell/HomeView.swift) tot één overzicht van álle items:
+- **Portraits-sectie bovenaan**: meest recente portret als grote "hero"-kaart, de overige recente
+  portretten kleiner ernaast/eronder (zoals nu het "Recent"/"Earlier"-idee, maar visueel
+  duidelijker: 1 groot + N klein). Klik → editor (bestaande `openPortrait` + hero-morph).
+- **Banners-sectie daaronder**: rij/raster recent gemaakte banners (kleinere wijde kaarten) +
+  een "See all"/sectie-kop → `showBanners()`. Klik → Banner Studio (E37).
+- (Optioneel, indien E39 klaar) een "Start a banner"-presetrij onderaan.
+- Empty-gedrag: als beide leeg → bestaande first-use; als alleen banners leeg → toon enkel
+  Portraits-sectie + een subtiele "Make a banner"-CTA.
+- Behoud de zwevende "Upload portrait"-knop / pas aan tot een nette primaire actie.
+- **Geen Figma-ref** — DS-tokens; patroon = unified home (Fabric/Edits, zie kop).
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 36.4 — Left-nav + sectie-routing afstemmen
+- status: ready
+- owner: —
+- team: FEAT
+- blockedBy: 36.1
+
+Kleine afronding van navigatie nu Home een overzicht is:
+- Controleer dat `ShellModel`-secties (home/portraits/banners/editor) + left-nav-rijen kloppen;
+  "Banners" blijft onder Portraits. (Let op: `LeftNavView.swift` wordt parallel bewerkt door een
+  andere sessie — raak alleen aan wat nodig is en stage per pad.)
+- "Make banner" vanuit nav/home/empty-state komt consistent in de Studio (E37) uit.
+- **Geen Figma-ref** — DS-tokens.
+- DoD: beide targets bouwen, tests groen, Result-regel.

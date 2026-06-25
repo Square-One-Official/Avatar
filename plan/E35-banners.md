@@ -7,6 +7,15 @@ preview en de "match avatar"-crop oogde matig. Besluit: een **aparte Banners-bib
 herbruikbare, WIJDE banners (één beeld; upload of gradient-preset, later AI) — die je in de
 social-preview kiest. Geen design-canvas.
 
+> **Uitgebreid (Thierry, 2026-06-26) → E36–E40.** Nieuwe richting: de gradient-quick-create
+> vervalt; de Banners-sectie wordt een Portraits-achtig overzicht ([E36](E36-home-gallery-ia.md))
+> met een empty-state + CMS-presets ([E39](E39-cms-banner-presets.md)); "make banner" opent een
+> echte **Banner Studio** met onderste toolbar + Figma-stijl shaders
+> ([E37](E37-banner-studio.md), [E38](E38-shaders-engine.md)); een banner is bruikbaar als
+> portret-achtergrond ([E40](E40-banner-as-portrait-background.md)); Home wordt een unified
+> overzicht. De E35-MVP blijft werken en wordt door deze epics vervangen/uitgebreid (zie 36.1
+> voor de gradient-rij en de `Banner2`→`BannerDoc`-migratie in 37.1).
+
 ## 35.1 — Banner2-model + container
 - status: done
 - owner: INFRA (2026-06-25)

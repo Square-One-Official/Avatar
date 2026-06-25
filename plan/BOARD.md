@@ -37,3 +37,10 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
 | [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.7) |
 | [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
+| [E34 Social Preview & Banner](E34-social-preview.md) | FEAT+AI+INFRA | **done** (34.1–34.7); 34.8–34.10 AI-generatie backlog |
+| [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
+| [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **36.1–36.4 ready** (unified home, banners-grid, empty-state) |
+| [E37 Banner Studio (editor)](E37-banner-studio.md) | FEAT+INFRA+DS | **37.1 ready**, 37.2–37.7 backlog (canvas + onderste toolbar) |
+| [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **38.1 ready**, 38.2–38.4 backlog (Figma-stijl Metal-shaders) |
+| [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **39.1 ready**, 39.2 backlog |
+| [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **40.1 ready**, 40.2 backlog |
