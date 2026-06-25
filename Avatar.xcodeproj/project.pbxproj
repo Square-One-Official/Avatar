@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		006533721A36E01939D5789D /* ListLens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217E085CE2EE3A20C24CAA53 /* ListLens.swift */; };
 		01F567F761E6F3C8934AC4C0 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1191A20AC32839CBA5B4807 /* AuthManager.swift */; };
 		021E0E31E2907C54E028C0CE /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1191A20AC32839CBA5B4807 /* AuthManager.swift */; };
 		06AA209FBD19063A78F21083 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
@@ -50,6 +51,7 @@
 		2BF00FB85FDB9DB07C4F8B93 /* AnnouncementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */; };
 		2CC00BB877BB10A664982FB7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
+		2EF7F8EB149CAEE9A964786A /* GalleryLens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A994817DBF1F697B602C11 /* GalleryLens.swift */; };
 		3197AE4B5A4D58A48431FC55 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957551E62840A0AAD27DF491 /* BoardView.swift */; };
 		31DAF9F07220B9D4B393328C /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
 		31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BF6F54BCF4084CCFDFFFBC /* TransformUndo.swift */; };
@@ -241,6 +243,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00A994817DBF1F697B602C11 /* GalleryLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryLens.swift; sourceTree = "<group>"; };
 		017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		04DB02B2DB9C74DFDC9D41E6 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		04DD6F25623AC483A733A2EA /* AdjustUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustUndo.swift; sourceTree = "<group>"; };
@@ -263,6 +266,7 @@
 		1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitContextMenu.swift; sourceTree = "<group>"; };
 		1D40E681885CB6D731F70EDA /* SettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsModel.swift; sourceTree = "<group>"; };
 		2010776A8205C9E5E7F1E828 /* WorkingToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingToastView.swift; sourceTree = "<group>"; };
+		217E085CE2EE3A20C24CAA53 /* ListLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListLens.swift; sourceTree = "<group>"; };
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
 		2B9319A21481EA22D57BC2DA /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
@@ -629,7 +633,9 @@
 		99E943B31632B60FCAC81349 /* Portraits */ = {
 			isa = PBXGroup;
 			children = (
+				00A994817DBF1F697B602C11 /* GalleryLens.swift */,
 				130B694AC7ED3AF581DFAEB1 /* LibraryViewSwitcher.swift */,
+				217E085CE2EE3A20C24CAA53 /* ListLens.swift */,
 				1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */,
 				499AFD3440A49F0D511B668B /* PortraitSetActions.swift */,
 			);
@@ -1056,6 +1062,7 @@
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
 				EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */,
 				480BA658926DC445242BB6F0 /* FramingConstants.swift in Sources */,
+				2EF7F8EB149CAEE9A964786A /* GalleryLens.swift in Sources */,
 				20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */,
 				A4595011162E8E75689EB453 /* HairNudgeBanner.swift in Sources */,
 				491B02E74B243F21C30E93AC /* HairPanel.swift in Sources */,
@@ -1064,6 +1071,7 @@
 				44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */,
 				71D8271AC0392FB757D67696 /* LeftNavView.swift in Sources */,
 				F2D880EFA91CC1AF1FA4F89A /* LibraryViewSwitcher.swift in Sources */,
+				006533721A36E01939D5789D /* ListLens.swift in Sources */,
 				1E72586A66936AB3977C6652 /* ManageBackgroundsSheet.swift in Sources */,
 				21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */,
 				D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */,

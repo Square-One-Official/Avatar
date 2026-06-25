@@ -38,9 +38,10 @@ struct PortraitsGalleryView: View {
             } else {
                 switch model.portraitsViewMode {
                 case .grid: gridBody
-                // Canvas/List/Gallery landen in Phase 3 — voorlopig een nette
-                // placeholder zodat de switcher nu al voelbaar schakelt.
-                case .canvas, .list, .gallery: comingSoon(model.portraitsViewMode)
+                case .list: ListLens(items: items, model: model, folders: folders)
+                case .gallery: GalleryLens(items: items, model: model, folders: folders)
+                // Canvas (folder-gescope BoardView) landt als laatste lens.
+                case .canvas: comingSoon(.canvas)
                 }
             }
         }
