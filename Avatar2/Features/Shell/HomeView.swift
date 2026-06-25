@@ -53,7 +53,7 @@ struct HomeView: View {
     // MARK: - Overzicht (niet-lege store)
 
     private var overview: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap5) {
                     Text("Recent")
@@ -79,11 +79,15 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap6)
-                .padding(.bottom, DSSpacing.gap6)
+                // Extra bottom padding so last row isn't hidden behind the floating button.
+                .padding(.bottom, 80)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             uploadBar
+                .padding(.bottom, DSSpacing.gap5)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// Max-breedte van de featured-kaart — compacter dan de volledige
@@ -134,28 +138,24 @@ struct HomeView: View {
 
     private var uploadBar: some View {
         Button { model.presentOpenPanel() } label: {
-            HStack(spacing: DSSpacing.gap3) {
+            HStack(spacing: DSSpacing.gap2) {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 22, weight: .regular))
+                    .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(DSColor.Foreground.subtle)
-                Text("Upload a new portrait")
-                    .dsTextStyle(.bodyMedium)
+                Text("Upload portrait")
+                    .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.subtle)
-                Spacer(minLength: 0)
                 DSBadge("⌘U", type: .neutral)
             }
             .padding(.horizontal, DSSpacing.gap4)
-            .frame(height: 56)
-            .background(DSColor.Background.inset, in: RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous)
-                    .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
-            )
-            .contentShape(Rectangle())
+            .frame(height: 44)
+            .background(DSColor.Background.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .keyboardShortcut("u", modifiers: .command)
-        .padding(.horizontal, DSSpacing.gap6)
-        .padding(.bottom, DSSpacing.gap5)
     }
 }
