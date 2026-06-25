@@ -61,7 +61,7 @@ private struct DSToggleTrackStyle: ButtonStyle {
             }
             .frame(width: Self.trackSize.width, height: Self.trackSize.height)
             .onHover { isHovering = $0 }
-            .animation(.easeOut(duration: 0.1), value: isHovering)
+            .animation(DSMotion.micro, value: isHovering)
             .animation(.spring(duration: 0.2), value: isPressed)
             .animation(.spring(duration: 0.2), value: isOn)
         }

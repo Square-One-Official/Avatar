@@ -20,6 +20,12 @@ public enum DSMotion {
     public static let springSmall     = Animation.spring(duration: 0.30, bounce: 0) // kleine moves, status-toast
     public static let springTransform = Animation.spring(duration: 0.40, bounce: 0) // canvas-transform, align-set, sidebar
 
+    // Enter/exit-asymmetrie (Emil/animations.dev): een surface verschijnt met
+    // `enter` en verdwijnt één tik sneller met `exit` — de dismiss voelt zo
+    // snappier dan de entree, nooit andersom.
+    public static let enter = emphasis // 0.25 ease-out — surface komt op
+    public static let exit  = base     // 0.20 ease-out — surface gaat dicht (sneller)
+
     /// macOS "Verminder beweging"-vlag voor imperatieve withAnimation-sites.
     public static var reduceMotionEnabled: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -45,5 +51,40 @@ private struct DSMotionModifier<V: Equatable>: ViewModifier {
     let value: V
     func body(content: Content) -> some View {
         content.animation(reduceMotion ? nil : animation, value: value)
+    }
+}
+
+public extension AnyTransition {
+    /// Edge-slide met asymmetrische timing: entree `enter` (ease-out), dismiss
+    /// `exit` (één tik sneller). De opacity wordt NIET los meegefade — dat
+    /// desynct met de move onder een spring en is precies de "stagger+fade" die
+    /// buggy oogde. Reduce-motion → kale opacity-fade, geen beweging.
+    static func dsSlide(
+        _ edge: Edge,
+        reduceMotion: Bool = false,
+        enter: Animation = DSMotion.enter,
+        exit: Animation = DSMotion.exit
+    ) -> AnyTransition {
+        guard !reduceMotion else { return .opacity.animation(DSMotion.exit) }
+        return .asymmetric(
+            insertion: .move(edge: edge).animation(enter),
+            removal:   .move(edge: edge).animation(exit)
+        )
+    }
+
+    /// Anchor-bewuste scale+fade voor dropdowns/popovers: schaalt vanaf de
+    /// trigger-rand (niet vanuit het midden). Scale en opacity delen één curve.
+    static func dsScaleFade(
+        anchor: UnitPoint,
+        reduceMotion: Bool = false,
+        enter: Animation = DSMotion.fast,
+        exit: Animation = DSMotion.fast
+    ) -> AnyTransition {
+        let shape = AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: anchor))
+        guard !reduceMotion else { return .opacity.animation(DSMotion.fast) }
+        return .asymmetric(
+            insertion: shape.animation(enter),
+            removal:   shape.animation(exit)
+        )
     }
 }

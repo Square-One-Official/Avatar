@@ -10,11 +10,20 @@ import AppKit
 import AvatarKit
 import SwiftUI
 
-/// E19.1: export-vorm (v1-pariteit). Circle maskeert de vierkante output.
+/// E19.1: export-vorm (v1-pariteit). Circle/rounded maskeren de vierkante output.
+/// `.rounded` (Slack/Discord-stijl) is export-only — de canvas-frame biedt alleen
+/// square/circle, en alle canvas-checks zijn binair `== .circle` (rounded valt daar
+/// dus terug op square). Alleen de export-picker itereert over `allCases`.
 enum ExportShape: String, CaseIterable, Identifiable {
-    case square, circle
+    case square, circle, rounded
     var id: String { rawValue }
-    var label: String { self == .square ? "Square" : "Circle" }
+    var label: String {
+        switch self {
+        case .square: return "Square"
+        case .circle: return "Circle"
+        case .rounded: return "Rounded"
+        }
+    }
 }
 
 enum PortraitExporter {
@@ -53,12 +62,15 @@ enum PortraitExporter {
         )
 
         let blur = portrait.portraitBlur
-        let originalCG = portrait.originalData.flatMap {
+        // "Originele foto"-achtergrondlaag: bij een actief effect de gestylede volle
+        // foto (backdrop past bij het effect), anders de rauwe originele foto. Beide
+        // delen het cutout-frame/-ratio → de aligned-render registreert gelijk.
+        let originalCG = (portrait.effectBackgroundData ?? portrait.originalData).flatMap {
             NSImage(data: $0)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         }
         // AchtergrondLAAG-beeld (spiegelt EditorView.backgroundLayerImage): custom
-        // upload, óf de originele foto bij Original-modus en bij Portrait zonder
-        // expliciete achtergrond. nil = vlakke kleur of geen achtergrond.
+        // upload, óf de (evt. gestylede) originele foto bij Original-modus en bij
+        // Portrait zonder expliciete achtergrond. nil = vlakke kleur of geen achtergrond.
         let backgroundImage: CGImage? = {
             if let data = portrait.backgroundImageData,
                let bg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
@@ -97,7 +109,11 @@ enum PortraitExporter {
             composited = transparentSquare(cutout: cutout, placement: placement, side: side) ?? cutout
         }
 
-        if shape == .circle { composited = circleMasked(composited) ?? composited }
+        switch shape {
+        case .circle: composited = circleMasked(composited) ?? composited
+        case .rounded: composited = roundedMasked(composited) ?? composited
+        case .square: break
+        }
 
         let final = watermark ? applyWatermark(to: composited, shape: shape) : composited
         return png(from: final)
@@ -117,17 +133,22 @@ enum PortraitExporter {
         return ctx.makeImage()
     }
 
-    /// Presenteert het macOS share sheet vanaf een view-anker.
-    @MainActor
-    static func share(_ data: Data, from view: NSView?) {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Aaavatar-portrait.png")
-        try? data.write(to: url)
-        let picker = NSSharingServicePicker(items: [url])
-        let anchor = view ?? NSApp.keyWindow?.contentView
-        if let anchor {
-            picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
-        }
+    /// Maskeer de output tot een afgeronde vierkant (Slack/Discord-stijl,
+    /// transparant in de hoeken). Hoekradius ≈ 22% van de zijde.
+    private static func roundedMasked(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.clear(CGRect(x: 0, y: 0, width: w, height: h))
+        let radius = CGFloat(min(w, h)) * 0.22
+        let path = CGPath(roundedRect: CGRect(x: 0, y: 0, width: w, height: h),
+                          cornerWidth: radius, cornerHeight: radius, transform: nil)
+        ctx.addPath(path)
+        ctx.clip()
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 
     // MARK: - Helpers
@@ -182,11 +203,11 @@ enum PortraitExporter {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
         let bounds = CTLineGetImageBounds(line, ctx)
         let margin = CGFloat(w) * 0.03
-        // E24.16: bij een cirkel valt de hoek-positie buiten de zichtbare vorm
-        // → centreer horizontaal en til de tekst in de cirkel (≈10% van onder,
-        // ruim binnen de koorde-breedte op die hoogte). Vierkant = hoek
-        // rechtsonder zoals voorheen.
-        if shape == .circle {
+        // E24.16: bij een cirkel/afgeronde vorm valt de hoek-positie buiten (of in
+        // de wegmaskeerde hoek van) de zichtbare vorm → centreer horizontaal en til
+        // de tekst omhoog (≈10% van onder, ruim binnen de breedte op die hoogte).
+        // Vierkant = hoek rechtsonder zoals voorheen.
+        if shape != .square {
             ctx.textPosition = CGPoint(x: (CGFloat(w) - bounds.width) / 2, y: CGFloat(h) * 0.10)
         } else {
             ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)

@@ -100,7 +100,7 @@ struct SettingsAIModelsPage: View {
                 Spacer(minLength: DSSpacing.gap4)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(isSelected ? DSColor.Action.primary : DSColor.Foreground.muted)
+                    .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted)
             }
             .padding(DSSpacing.gap3)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -301,7 +301,7 @@ struct SettingsAIModelsPage: View {
                 if prefs.engine == .downloadedModel {
                     Text("Active")
                         .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                 }
                 DSIconButton(Image(systemName: "trash")) {
                     model.delete()

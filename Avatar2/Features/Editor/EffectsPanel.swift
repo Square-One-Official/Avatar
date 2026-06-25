@@ -35,9 +35,19 @@ final class EffectsModel {
     /// Ingesteld door EffectsPanel via de SwiftUI-omgeving zodat selectie-wijzigingen
     /// in hetzelfde undo-groepje als de bijbehorende beeld-swap landen.
     var undoManager: UndoManager?
-    /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de fallback zodat het
-    /// paneel nooit leeg opent; `loadEffects()` vervangt 'm met de CMS-lijst.
-    private(set) var remoteEffects: [RemoteEffect] = RemoteEffect.fallback
+    /// Sessie-cache: gedeeld over alle instanties zodat herhaaldelijk openen van
+    /// het paneel niet terugvalt op de hardgecodeerde fallback. Leeg = eerste open.
+    private static var sessionCache: [RemoteEffect] = []
+    /// Thumbnail-afbeeldingen gedownload na de eerste fetch; gedeeld over instanties.
+    private static let imageCache = NSCache<NSURL, NSImage>()
+    /// Teller die oploopt telkens een thumbnail in de cache belandt, zodat de
+    /// SwiftUI-view herrendert en de gecachede afbeelding meteen toont.
+    private(set) var thumbnailVersion: Int = 0
+
+    /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de sessie-cache als
+    /// die al gevuld is (eerder geladen in dezelfde sessie), anders op de fallback.
+    private(set) var remoteEffects: [RemoteEffect] =
+        EffectsModel.sessionCache.isEmpty ? RemoteEffect.fallback : EffectsModel.sessionCache
 
     private let entitlement: EntitlementModel
     private let onApply: (NSImage) -> Void
@@ -94,6 +104,17 @@ final class EffectsModel {
         self.selected = activeKey.flatMap { k in remoteEffects.first { $0.key == k } }
     }
 
+    /// Het beeld dat naar de stylize-backend gaat: de PRISTINE volle originele foto
+    /// (incl. achtergrond) zodat het effect óók de achtergrond stylet → de Original-
+    /// achtergrondlaag past straks bij het effect. De foreground wordt daarna her-
+    /// geïsoleerd uit dit volle resultaat (applyEffectResult, preserveSourceAlpha).
+    /// Val terug op `base` (de cutout) als er geen originele foto is (legacy/odd
+    /// import; de Original-bg-keuze is dan toch verborgen omdat originalData ontbreekt).
+    private var stylizeSource: NSImage {
+        if let data = portrait?.originalData, let img = NSImage(data: data) { return img }
+        return base
+    }
+
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
 
     var isBusy: Bool { if case .working = phase { return true } else { return false } }
@@ -107,11 +128,38 @@ final class EffectsModel {
     func loadEffects() async {
         let fetched = (try? await entitlement.backend.effects()) ?? []
         guard !fetched.isEmpty else { return }
+        EffectsModel.sessionCache = fetched
         remoteEffects = fetched
         let activeKey = selected?.key ?? portrait?.effectActiveRaw
         if let activeKey {
             selected = fetched.first { $0.key == activeKey } ?? selected
         }
+        prefetchThumbnails(for: fetched)
+    }
+
+    /// Downloads thumbnail URLs in the background and caches them as NSImages.
+    /// Each successful download bumps `thumbnailVersion` so the view re-renders.
+    private func prefetchThumbnails(for effects: [RemoteEffect]) {
+        let urls = effects.compactMap(\.thumbnailUrl)
+            .filter { EffectsModel.imageCache.object(forKey: $0 as NSURL) == nil }
+        guard !urls.isEmpty else { return }
+        Task.detached(priority: .utility) { [weak self] in
+            await withTaskGroup(of: Void.self) { group in
+                for url in urls {
+                    group.addTask {
+                        guard let (data, _) = try? await URLSession.shared.data(from: url),
+                              let image = NSImage(data: data) else { return }
+                        EffectsModel.imageCache.setObject(image, forKey: url as NSURL)
+                        await MainActor.run { self?.thumbnailVersion += 1 }
+                    }
+                }
+            }
+        }
+    }
+
+    func cachedThumbnail(for effect: RemoteEffect) -> NSImage? {
+        guard let url = effect.thumbnailUrl else { return nil }
+        return EffectsModel.imageCache.object(forKey: url as NSURL)
     }
 
     /// None-kaart: terug naar het basisbeeld (instant, geen credits).
@@ -155,7 +203,10 @@ final class EffectsModel {
     private func generate(_ effect: RemoteEffect) async {
         // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        guard let png = base.pngData() else {
+        // Stylet de VOLLE originele foto (incl. achtergrond), niet de cutout: zo
+        // krijgt de Original-achtergrond hetzelfde effect. De foreground komt er
+        // daarna weer uitgeïsoleerd uit (applyEffectResult).
+        guard let png = stylizeSource.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
@@ -327,7 +378,18 @@ struct EffectsPanel: View {
     /// terwijl 'ie laadt of als het effect geen thumbnail heeft.
     @ViewBuilder
     private func thumbnail(for effect: RemoteEffect) -> some View {
-        if let url = effect.thumbnailUrl {
+        // thumbnailVersion registreert bij @Observable tracking zodat de view
+        // herrendert zodra prefetchThumbnails een afbeelding in de cache zet.
+        // `let _` (geen kale `_ =`) — een ViewBuilder accepteert geen Void-expressie.
+        let _ = model.thumbnailVersion
+        if let image = model.cachedThumbnail(for: effect) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(width: cardWidth, height: cardHeight)
+                .clipped()
+        } else if let url = effect.thumbnailUrl {
             AsyncImage(url: url) { image in
                 image
                     .resizable()

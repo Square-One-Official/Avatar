@@ -79,7 +79,7 @@ public struct DSFeatureIndicator: View {
                 } label: {
                     Text(routeLabel)
                         .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                 }
                 .buttonStyle(DSStateOpacityButtonStyle())
             }

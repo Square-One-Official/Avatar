@@ -13,6 +13,7 @@ struct SignInSheet: View {
     var onSignedIn: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Phase { case email, otp }
     @State private var phase: Phase = .email
@@ -50,14 +51,14 @@ struct SignInSheet: View {
                     entitlement.dismissAuthError()
                 }
                 .padding(DSSpacing.gap4)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
                 .task {
                     try? await Task.sleep(for: .seconds(5))
                     entitlement.dismissAuthError()
                 }
             }
         }
-        .animation(.easeOut(duration: 0.2), value: entitlement.authError)
+        .dsMotion(DSMotion.enter, value: entitlement.authError)
         // Schone start: geen oude fout van een vorige poging.
         .onAppear { entitlement.dismissAuthError() }
     }

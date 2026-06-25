@@ -34,6 +34,10 @@ struct EditColorPanel: View {
     var onBoost: () -> Void = {}
     // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
     var onRestoreBody: () -> Void = {}
+    /// Verwijder de achtergrond: her-isoleer het onderwerp (lokale cutout-engine)
+    /// zodat het beeld weer vrijstaand/transparant wordt. Herstelt o.a. een
+    /// achtergrond die na een Effect was achtergebleven.
+    var onRemoveBackground: () -> Void = {}
     var isPro: Bool = false
     /// E24.28: of de lokale "Studio Light"-toggle momenteel AAN staat.
     var studioLightOn: Bool = false
@@ -44,6 +48,9 @@ struct EditColorPanel: View {
     /// Toon de "One click retouch"-chip als eerste in de één-tik-rij. Default uit
     /// zodat de board batch-adjust 'm niet toont (retouch = per beeld).
     var showRetouch: Bool = false
+    /// Toon de "Remove background"-chip. Default uit zodat de board batch-adjust
+    /// 'm niet toont (isolatie = per beeld, niet zinvol als batch).
+    var showRemoveBackground: Bool = false
     /// E24.3: in de Adjust-popover staat de AI-dropdown apart (canvas-toolbar),
     /// dus dan tonen we alléén de sliders + Reset.
     var showAutoEnhance: Bool = true
@@ -121,6 +128,11 @@ struct EditColorPanel: View {
                                     credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
                         // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
                         quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                        // Remove background: lokale her-isolatie (gratis) → vrijstaand
+                        // beeld terug, ook na een Effect dat een achtergrond achterliet.
+                        if showRemoveBackground {
+                            quickAction("Remove background", icon: "scissors", action: onRemoveBackground)
+                        }
                     }
                     .padding(.vertical, DSSpacing.gap1)
                     .scrollRowTrailingInset()

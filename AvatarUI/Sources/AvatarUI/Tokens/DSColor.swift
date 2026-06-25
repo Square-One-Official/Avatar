@@ -77,10 +77,20 @@ public enum DSColor {
 
     /// `foreground/action/primary/*` — brand-lime, beide themes gelijk.
     public enum Action {
-        /// `foreground/action/primary/default` — #d5f466 (lime-accent)
+        /// `foreground/action/primary/default` — #d5f466 (lime-accent). Dit is de
+        /// brand-FILL (badge-bg, paneel-fill, toggle-aan, selectie op canvas):
+        /// lime hoort als vlak, niet als inkt. Beide themes gelijk.
         public static let primary = Color(hex: 0xD5F466)
-        /// `foreground/action/primary/on-action` — #073c31
+        /// `foreground/action/primary/on-action` — #073c31 (diepe brand-groen,
+        /// de inkt-op-lime van de badge).
         public static let onAction = Color(hex: 0x073C31)
+        /// Brand-accent als INKT/RAND op een neutrale surface (active toolbar-pil,
+        /// active ring, selectie-foreground). Lime is op zwart perfecte inkt, maar
+        /// wast op een lichte surface weg (contrast ~1.2:1) → theme-bewust: dark =
+        /// lime #d5f466 (ongewijzigd, dark = fallback), light = #073c31 — exact de
+        /// diepe groen waarmee de badge zijn lime al paart, zodat active-states
+        /// 1-op-1 met de badge meelezen i.p.v. te vervagen.
+        public static let primaryForeground = Color(lightHex: 0x073C31, darkHex: 0xD5F466)
     }
 
     /// `Projects/*` — kleurlabels (Project color picker), beide themes gelijk.

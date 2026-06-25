@@ -43,7 +43,7 @@ public struct DSOTPField: View {
         .contentShape(Rectangle())
         .onTapGesture { isFocused = true }
         .accessibilityLabel(Text("One-time password"))
-        .animation(.easeOut(duration: 0.15), value: validation)
+        .animation(DSMotion.fast, value: validation)
     }
 
     private func cell(at index: Int) -> some View {

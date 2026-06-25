@@ -114,6 +114,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
     // E-fix: losse acties in de capsule-overflow (`⋯`) zonder eigen paneel.
     private let overflowActions: [DSToolbarAction]
     @Binding private var activeTool: Tool?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // E-fix: schakelt de feature-pillen uit (gedimd) terwijl er niets is om op te
     // werken — bv. tijdens een vervangende import waarin de cutout nog rekent.
     private let toolsEnabled: Bool
@@ -144,39 +145,45 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
     }
 
     public var body: some View {
-        VStack(spacing: DSSpacing.gap2) {
-            // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt
-            // de onderkant i.p.v. de foto te verkleinen.
-            // E24.25-fix: de foto is een ZUSTER van het paneel (geen overlay-
-            // kind van het transitionende paneel) MET een STABIELE identity
-            // (.id) zodat hij niet mee-animeert/faded als `activeTool` wisselt.
-            // Alléén het paneel transitionet (schuift in van onderen); de foto
-            // blijft volledig stabiel — geen korte fade meer bij menu-open.
-            ZStack(alignment: .bottom) {
-                photo
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .id("editorPhoto")
+        // Besluit Thierry (2026-06-24): het canvas loopt door tot de onderrand van
+        // het venster en de toolbar ZWEEFT eroverheen (Figma floatingToolbar) —
+        // i.p.v. een eigen VStack-rij die onder de toolbar een lege Background.app-
+        // band achterliet ("toolbar heeft al een achtergrondkleur"). De foto vult
+        // dus de volle hoogte; paneel + toolbar liggen als bottom-overlay erover.
+        // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt de
+        // onderkant i.p.v. de foto te verkleinen. STABIELE identity (.id) zodat de
+        // foto niet mee-animeert/faded als `activeTool` wisselt.
+        photo
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .id("editorPhoto")
+            .overlay(alignment: .bottom) {
+                VStack(spacing: DSSpacing.gap2) {
+                    if let tool = activeTool {
+                        panel(tool)
+                            // E-fix (motion): STABIELE identity over tool-wissels
+                            // heen. Tool→tool is daardoor een in-place update i.p.v.
+                            // insert+remove; alléén echte open/dicht (nil ↔ tool)
+                            // triggert de slide-transitie. Kale edge-slide op één
+                            // ease-out-curve, exit sneller dan enter.
+                            .id("editPanel")
+                            .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
+                    }
 
-                if let tool = activeTool {
-                    panel(tool)
-                        .padding(.bottom, DSSpacing.gap2)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    DSBottomToolbar(
+                        items: tools, selection: $activeTool,
+                        overflow: overflowTools, overflowActions: overflowActions,
+                        toolsEnabled: toolsEnabled
+                    ) {
+                        toolbarAccessory
+                    }
+                    .fixedSize()
                 }
+                .padding(.bottom, DSSpacing.gap2)
             }
-            // Clip zodat het paneel netjes vanaf de onderrand in schuift.
-            .clipped()
-
-            DSBottomToolbar(
-                items: tools, selection: $activeTool,
-                overflow: overflowTools, overflowActions: overflowActions,
-                toolsEnabled: toolsEnabled
-            ) {
-                toolbarAccessory
-            }
-                .fixedSize()
-        }
-        // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
-        .animation(.spring(duration: 0.35), value: activeTool)
+            // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
+            // De slide-timing zelf zit op de transitie (enter/exit-asymmetrie); deze
+            // modifier levert de transactie + animeert de hoogte-settle.
+            .dsMotion(DSMotion.enter, value: activeTool)
     }
 }
 

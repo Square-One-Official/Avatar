@@ -95,6 +95,16 @@ final class Portrait2 {
         set { effectCacheData = try? JSONEncoder().encode(newValue) }
     }
 
+    /// De gestylede VOLLE afbeelding (incl. gestylede achtergrond) van het ACTIEVE
+    /// effect — gebruikt als Original-achtergrondlaag zodat de backdrop bij het
+    /// effect past. Sinds effects de volle originele foto styleren (i.p.v. de
+    /// cutout) ÍS de `effectCache`-waarde dat volle beeld. nil = geen actief effect
+    /// → val terug op de rauwe originele foto.
+    var effectBackgroundData: Data? {
+        guard let key = effectActiveRaw else { return nil }
+        return effectCache[key]
+    }
+
     /// E24.31: "Original"-achtergrond. Sinds 2026-06-23 (Thierry) = gebruik de
     /// ORIGINELE importfoto als achtergrondLAAG met het (scherpe, bewerkte)
     /// onderwerp eroverheen — i.p.v. de hele originele foto vol te tonen. Zo kan

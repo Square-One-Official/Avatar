@@ -56,6 +56,7 @@ struct CanvasActionToolbar<Background: View>: View {
     var showFramingActions: Bool = true
     var showGrid: Bool = true
     @ViewBuilder var background: () -> Background
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
@@ -86,7 +87,7 @@ struct CanvasActionToolbar<Background: View>: View {
         // E32: zelfde solide Card-capsule als de onderste toolbar (geen glas/rand),
         // alleen compacter (`.compact`).
         .dsToolbarCapsule(size: .compact)
-        .animation(.easeOut(duration: 0.14), value: activeMenu)
+        .dsMotion(DSMotion.fast, value: activeMenu)
         #if DEBUG
         .onAppear {
             let args = ProcessInfo.processInfo.arguments
@@ -133,7 +134,7 @@ struct CanvasActionToolbar<Background: View>: View {
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
                     .zIndex(10)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
             }
         }
     }
@@ -176,7 +177,7 @@ struct CanvasActionToolbar<Background: View>: View {
                 if frameShape == shape {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                 }
             }
             .foregroundStyle(DSColor.Foreground.primary)

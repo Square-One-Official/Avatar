@@ -45,7 +45,7 @@ public struct DSCanvasCard<Content: View>: View {
                     // de canvas minder druk oogt. In rust staat het op vol.
                     DSDotGrid()
                         .opacity(dotGridDimmed ? 0.35 : 1)
-                        .animation(.easeInOut(duration: 0.15), value: dotGridDimmed)
+                        .animation(DSMotion.fast, value: dotGridDimmed)
                 }
             }
             .clipShape(surfaceClip)
