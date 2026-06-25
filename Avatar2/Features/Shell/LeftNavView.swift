@@ -27,24 +27,12 @@ struct LeftNavView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Strook die de OS traffic-lights vrijhoudt; de inklap-toggle staat
-            // er subtiel naast (Granola-stijl), niet als 48pt tool-knop.
-            HStack(spacing: 0) {
-                Spacer().frame(width: 52)
-                Button { model.toggleLeftNav() } label: {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Hide sidebar")
-                Spacer(minLength: 0)
-            }
-            .frame(height: 28)
-            .padding(.horizontal, DSSpacing.gap2)
-            .padding(.top, DSSpacing.gap1)
+            // Reserveer de strook voor de OS traffic-lights. De sidebar-toggle
+            // staat nu op vensterniveau (ShellView) zodat hij ALTIJD náást de
+            // traffic-lights blijft staan, of de nav nu open of dicht is.
+            Color.clear
+                .frame(height: 28)
+                .padding(.top, DSSpacing.gap1)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {

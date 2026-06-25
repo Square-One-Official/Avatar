@@ -42,6 +42,11 @@ struct ShellView: View {
         }
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(DSColor.Background.app)
+        // PoC (left-nav): de sidebar-toggle staat op VENSTERNIVEAU náást de
+        // traffic-lights en blijft ALTIJD zichtbaar — of de nav nu open of
+        // dicht is (gebruikersfeedback). Over de nav heen wanneer open, over de
+        // hoofdweergave wanneer dicht; dezelfde positie in beide gevallen.
+        .overlay(alignment: .topLeading) { sidebarToggle }
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
         // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
@@ -160,6 +165,25 @@ struct ShellView: View {
         }
     }
 
+    /// PoC (left-nav): persistente sidebar-toggle náást de OS traffic-lights —
+    /// altijd zichtbaar, of de nav nu open of dicht is. Subtiel (geen 48pt
+    /// tool-knop), Granola-stijl. Op vensterniveau zodat de positie identiek
+    /// blijft over de nav (open) of de hoofdweergave (dicht).
+    private var sidebarToggle: some View {
+        Button { model.toggleLeftNav() } label: {
+            Image(systemName: "sidebar.left")
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(DSColor.Foreground.muted)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(model.isLeftNavVisible ? "Hide sidebar" : "Show sidebar")
+        .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
+        .frame(height: ShellMetrics.windowControlsRowHeight)
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
     private var mainArea: some View {
         VStack(spacing: 0) {
             if model.isShowingSettings {
@@ -213,9 +237,10 @@ struct ShellView: View {
                     .allowsHitTesting(false)
             }
         }
-        // PoC (left-nav): uitgeklede topbar — alleen een subtiele reveal-knop
-        // (als de nav verborgen is) en, tijdens het bewerken, de Share-knop.
-        // Settings/credits/board/library zitten nu in de left-nav.
+        // PoC (left-nav): uitgeklede topbar — alleen, tijdens het bewerken, de
+        // Share-knop (+ ✕ in Settings). De sidebar-toggle staat los op
+        // vensterniveau (zie `sidebarToggle`). Settings/credits/board/library
+        // zitten nu in de left-nav.
         .overlay(alignment: .top) {
             ShellTopBar(
                 isSettingsActive: model.isShowingSettings,
@@ -223,9 +248,7 @@ struct ShellView: View {
                 // Top-right-chrome alléén in de editor (niet op Home/Portraits).
                 isEditing: model.section == .editor,
                 canExport: model.canExport,
-                onExport: { model.exportCurrentPortrait() },
-                isLeftNavVisible: model.isLeftNavVisible,
-                onToggleLeftNav: { model.toggleLeftNav() }
+                onExport: { model.exportCurrentPortrait() }
             )
         }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
