@@ -17,12 +17,10 @@ struct HomeView: View {
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var thumbs = ThumbnailStore()
 
-    // Vast 4-koloms rooster met duidelijke ruimte ertussen. Flexibele
-    // GridItems liepen hier over (tegels te breed → geen zichtbare gap +
-    // clipping aan de randen), dus meten we de beschikbare breedte en geven we
-    // de tegels een EXACTE vaste maat die precies past, met echte gaps ertussen.
-    private let earlierColumns = 4
-    @State private var earlierWidth: CGFloat = 0
+    // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
+    // (Color.clear + aspectRatio(.fit)) wordt nooit breder dan z'n kolom, dus
+    // gewone flexibele kolommen volstaan nu — geen overloop, echte gaps.
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap5), count: 4)
 
     var body: some View {
         if portraits.isEmpty {
@@ -70,7 +68,13 @@ struct HomeView: View {
                         Text("Earlier")
                             .dsTextStyle(.labelLarge)
                             .foregroundStyle(DSColor.Foreground.subtle)
-                        earlierGrid
+                        LazyVGrid(columns: columns, spacing: DSSpacing.gap5) {
+                            ForEach(Array(portraits.dropFirst())) { portrait in
+                                PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
+                                    model.openPortrait(portrait)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap6)
@@ -81,37 +85,6 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// "Earlier"-rooster: tegels met een EXACTE breedte (uit de gemeten
-    /// beschikbare ruimte) zodat 4 vierkanten + duidelijke gaps precies passen —
-    /// geen overloop, gegarandeerd zichtbare ruimte ertussen.
-    private var earlierGrid: some View {
-        let spacing = DSSpacing.gap5
-        let cols = CGFloat(earlierColumns)
-        let tile = earlierWidth > 0
-            ? max(0, (earlierWidth - spacing * (cols - 1)) / cols)
-            : 0
-        let gridColumns = Array(
-            repeating: GridItem(.fixed(tile), spacing: spacing),
-            count: earlierColumns
-        )
-        return LazyVGrid(columns: gridColumns, alignment: .leading, spacing: spacing) {
-            ForEach(Array(portraits.dropFirst())) { portrait in
-                PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
-                    model.openPortrait(portrait)
-                }
-                .frame(width: tile, height: tile)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            GeometryReader { geo in
-                Color.clear.onChange(of: geo.size.width, initial: true) { _, width in
-                    earlierWidth = width
-                }
-            }
-        )
-    }
-
     /// Max-breedte van de featured-kaart — compacter dan de volledige
     /// vensterbreedte, maar iets groter dan voorheen (gebruikersfeedback).
     private let featuredMaxWidth: CGFloat = 420
@@ -119,15 +92,10 @@ struct HomeView: View {
     private func featured(_ portrait: Portrait2) -> some View {
         Button { model.openPortrait(portrait) } label: {
             ZStack(alignment: .bottomLeading) {
-                // De HELE afbeelding zichtbaar in een vierkant (scaledToFit, geen
-                // crop); eventuele letterbox-randen krijgen de inset-kleur.
-                ZStack {
-                    DSColor.Background.inset
-                    if let image = thumbs.thumbnail(for: portrait, maxDimension: 600, adjusted: false) {
-                        Image(nsImage: image).resizable().scaledToFit()
-                    }
-                }
-                .aspectRatio(1, contentMode: .fit)
+                // Dezelfde compositie als de editor: achtergrond + vrijstaand
+                // onderwerp, in een vierkant.
+                PortraitComposite(portrait: portrait, thumbs: thumbs, maxDimension: 600)
+                    .aspectRatio(1, contentMode: .fit)
 
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.55)],

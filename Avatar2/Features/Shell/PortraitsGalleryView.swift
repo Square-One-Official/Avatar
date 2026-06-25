@@ -94,46 +94,27 @@ struct PortraitGridTile: View {
     @State private var hovering = false
 
     var body: some View {
-        // Eén nette, UNIFORME vierkante tegel: het beeld vult het vierkant
-        // (scaledToFill), naam/rol als overlay onderin — zo varieert de hoogte
-        // nooit (label-onder-de-kaart maakte rijen ongelijk).
-        ZStack(alignment: .bottomLeading) {
-            ZStack {
-                DSColor.Background.inset
-                if let image = thumbs.thumbnail(for: portrait, maxDimension: 280, adjusted: false) {
-                    Image(nsImage: image).resizable().scaledToFill()
-                }
-            }
+        // Vierkante tegel via het canonieke Color.clear + aspectRatio(.fit) +
+        // overlay-patroon — robuust in een LazyVGrid (nooit groter dan de kolom,
+        // dus geen overloop/overlap). De tegel toont de ECHTE compositie zoals de
+        // editor: de gekozen achtergrond (kleur/afbeelding/origineel) met het
+        // vrijstaande onderwerp erover — niet langer de kale cutout.
+        Color.clear
             .aspectRatio(1, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.55)],
-                startPoint: .center, endPoint: .bottom
+            .overlay { composed }
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
+                    .strokeBorder(
+                        hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
+                        lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
+                    )
             )
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                    .dsTextStyle(.labelBase).foregroundStyle(.white).lineLimit(1)
-                if !portrait.role.isEmpty {
-                    Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
-                }
-            }
-            .padding(DSSpacing.gap3)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
-                .strokeBorder(
-                    hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
-                    lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
-                )
-        )
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .dsMotion(DSMotion.micro, value: hovering)
-        .onTapGesture(count: 2) { onOpen() }
-        .help("Double-click to open in the editor")
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .dsMotion(DSMotion.micro, value: hovering)
+            .onTapGesture(count: 2) { onOpen() }
+            .help("Double-click to open in the editor")
         .contextMenu {
             Button("Open") { onOpen() }
             Menu("Move to folder") {
@@ -151,6 +132,72 @@ struct PortraitGridTile: View {
             }
             Divider()
             Button("Delete", role: .destructive) { modelContext.delete(portrait) }
+        }
+    }
+
+    // De compositie binnen het vierkant: de gedeelde achtergrond+onderwerp-
+    // render + de naam/rol-overlay onderin.
+    @ViewBuilder
+    private var composed: some View {
+        ZStack(alignment: .bottomLeading) {
+            PortraitComposite(portrait: portrait, thumbs: thumbs, maxDimension: 280)
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.55)],
+                startPoint: .center, endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
+                    .dsTextStyle(.labelBase).foregroundStyle(.white).lineLimit(1)
+                if !portrait.role.isEmpty {
+                    Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                }
+            }
+            .padding(DSSpacing.gap3)
+        }
+    }
+}
+
+/// Gedeelde portret-compositie: de gekozen achtergrond (kleur/afbeelding/
+/// origineel) met het vrijstaande onderwerp erover (scaledToFit). Eén bron voor
+/// de Home-featured én de grid-tegels, zodat framing en achtergrond overal
+/// gelijk zijn aan wat de editor toont — i.p.v. een kale cutout op grijs.
+struct PortraitComposite: View {
+    let portrait: Portrait2
+    let thumbs: ThumbnailStore
+    let maxDimension: CGFloat
+
+    var body: some View {
+        ZStack {
+            backgroundLayer
+            if let cutout = thumbs.thumbnail(for: portrait, maxDimension: maxDimension, adjusted: true) {
+                Image(nsImage: cutout).resizable().scaledToFit()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var backgroundLayer: some View {
+        switch portrait.background {
+        case .color(let hex):
+            Color(hexRGB: hex) ?? DSColor.Background.inset
+        case .image(let data):
+            bgImage(data)
+        case .original:
+            if let data = portrait.originalData { bgImage(data) } else { DSColor.Background.inset }
+        case .transparent:
+            DSColor.Background.inset
+        }
+    }
+
+    @ViewBuilder
+    private func bgImage(_ data: Data) -> some View {
+        if let img = NSImage(data: data) {
+            Image(nsImage: img).resizable().scaledToFill()
+        } else {
+            DSColor.Background.inset
         }
     }
 }
