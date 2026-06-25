@@ -17,10 +17,12 @@ struct HomeView: View {
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var thumbs = ThumbnailStore()
 
-    // Vast 4-koloms rooster met duidelijke ruimte ertussen (gebruikersfeedback:
-    // max 3–4 naast elkaar, niet de overvloeiende adaptieve variant die
-    // overliep). Flexibele kolommen vullen de breedte exact → geen clipping.
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap5), count: 4)
+    // Vast 4-koloms rooster met duidelijke ruimte ertussen. Flexibele
+    // GridItems liepen hier over (tegels te breed → geen zichtbare gap +
+    // clipping aan de randen), dus meten we de beschikbare breedte en geven we
+    // de tegels een EXACTE vaste maat die precies past, met echte gaps ertussen.
+    private let earlierColumns = 4
+    @State private var earlierWidth: CGFloat = 0
 
     var body: some View {
         if portraits.isEmpty {
@@ -68,13 +70,7 @@ struct HomeView: View {
                         Text("Earlier")
                             .dsTextStyle(.labelLarge)
                             .foregroundStyle(DSColor.Foreground.subtle)
-                        LazyVGrid(columns: columns, spacing: DSSpacing.gap5) {
-                            ForEach(Array(portraits.dropFirst())) { portrait in
-                                PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
-                                    model.openPortrait(portrait)
-                                }
-                            }
-                        }
+                        earlierGrid
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap6)
@@ -83,6 +79,37 @@ struct HomeView: View {
             uploadBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// "Earlier"-rooster: tegels met een EXACTE breedte (uit de gemeten
+    /// beschikbare ruimte) zodat 4 vierkanten + duidelijke gaps precies passen —
+    /// geen overloop, gegarandeerd zichtbare ruimte ertussen.
+    private var earlierGrid: some View {
+        let spacing = DSSpacing.gap5
+        let cols = CGFloat(earlierColumns)
+        let tile = earlierWidth > 0
+            ? max(0, (earlierWidth - spacing * (cols - 1)) / cols)
+            : 0
+        let gridColumns = Array(
+            repeating: GridItem(.fixed(tile), spacing: spacing),
+            count: earlierColumns
+        )
+        return LazyVGrid(columns: gridColumns, alignment: .leading, spacing: spacing) {
+            ForEach(Array(portraits.dropFirst())) { portrait in
+                PortraitGridTile(portrait: portrait, thumbs: thumbs, folders: folders, model: model) {
+                    model.openPortrait(portrait)
+                }
+                .frame(width: tile, height: tile)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { geo in
+                Color.clear.onChange(of: geo.size.width, initial: true) { _, width in
+                    earlierWidth = width
+                }
+            }
+        )
     }
 
     /// Max-breedte van de featured-kaart — compacter dan de volledige
