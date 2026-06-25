@@ -140,7 +140,7 @@ struct PortraitGridTile: View {
     @ViewBuilder
     private var composed: some View {
         ZStack(alignment: .bottomLeading) {
-            PortraitComposite(portrait: portrait, thumbs: thumbs, maxDimension: 280)
+            PortraitComposite(portrait: portrait, maxDimension: 280)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.55)],
@@ -159,45 +159,44 @@ struct PortraitGridTile: View {
     }
 }
 
-/// Gedeelde portret-compositie: de gekozen achtergrond (kleur/afbeelding/
-/// origineel) met het vrijstaande onderwerp erover (scaledToFit). Eén bron voor
-/// de Home-featured én de grid-tegels, zodat framing en achtergrond overal
-/// gelijk zijn aan wat de editor toont — i.p.v. een kale cutout op grijs.
+/// Gedeelde portret-compositie. Rendert via dezelfde `PortraitExporter`-pijplijn
+/// als de export/editor (achtergrond + de OPGESLAGEN transform/zoom + Adjust),
+/// als een vierkant — zo matchen de framing/cropping en de achtergrond in elke
+/// thumbnail exact wat de editor toont (i.p.v. een kale, anders-gekadreerde
+/// cutout). Resultaat wordt gecachet op (portret, updatedAt, maat).
 struct PortraitComposite: View {
     let portrait: Portrait2
-    let thumbs: ThumbnailStore
     let maxDimension: CGFloat
+
+    @State private var image: NSImage?
+
+    private static let cache = NSCache<NSString, NSImage>()
 
     var body: some View {
         ZStack {
-            backgroundLayer
-            if let cutout = thumbs.thumbnail(for: portrait, maxDimension: maxDimension, adjusted: true) {
-                Image(nsImage: cutout).resizable().scaledToFit()
+            DSColor.Background.inset
+            if let image {
+                Image(nsImage: image).resizable().scaledToFill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: cacheKey) { load() }
     }
 
-    @ViewBuilder
-    private var backgroundLayer: some View {
-        switch portrait.background {
-        case .color(let hex):
-            Color(hexRGB: hex) ?? DSColor.Background.inset
-        case .image(let data):
-            bgImage(data)
-        case .original:
-            if let data = portrait.originalData { bgImage(data) } else { DSColor.Background.inset }
-        case .transparent:
-            DSColor.Background.inset
-        }
+    private var cacheKey: String {
+        "\(portrait.persistentModelID.hashValue)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension))"
     }
 
-    @ViewBuilder
-    private func bgImage(_ data: Data) -> some View {
-        if let img = NSImage(data: data) {
-            Image(nsImage: img).resizable().scaledToFill()
-        } else {
-            DSColor.Background.inset
-        }
+    @MainActor
+    private func load() {
+        let key = cacheKey as NSString
+        if let cached = Self.cache.object(forKey: key) { image = cached; return }
+        // Altijd vierkant (uniforme tegels); de transform/achtergrond komen exact
+        // uit de editor-pijplijn. Geen watermerk op een thumbnail.
+        guard let data = PortraitExporter.makePNG(
+            for: portrait, watermark: false, side: Int(maxDimension), shape: .square
+        ), let img = NSImage(data: data) else { return }
+        Self.cache.setObject(img, forKey: key)
+        image = img
     }
 }

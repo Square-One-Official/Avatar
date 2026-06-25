@@ -91,28 +91,32 @@ struct HomeView: View {
 
     private func featured(_ portrait: Portrait2) -> some View {
         Button { model.openPortrait(portrait) } label: {
-            ZStack(alignment: .bottomLeading) {
-                // Dezelfde compositie als de editor: achtergrond + vrijstaand
-                // onderwerp, in een vierkant.
-                PortraitComposite(portrait: portrait, thumbs: thumbs, maxDimension: 600)
-                    .aspectRatio(1, contentMode: .fit)
+            // Zelfde robuuste vierkant als de grid-tegels: Color.clear bepaalt de
+            // 1:1-maat, de compositie ligt eroverheen (anders dicteert de
+            // achtergrond-afbeelding z'n eigen — tweemaal zo hoge — ratio).
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    ZStack(alignment: .bottomLeading) {
+                        PortraitComposite(portrait: portrait, maxDimension: 600)
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.55)],
-                    startPoint: .center, endPoint: .bottom
-                )
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.55)],
+                            startPoint: .center, endPoint: .bottom
+                        )
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                        .dsTextStyle(.labelLarge).foregroundStyle(.white).lineLimit(1)
-                    if !portrait.role.isEmpty {
-                        Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
+                                .dsTextStyle(.labelLarge).foregroundStyle(.white).lineLimit(1)
+                            if !portrait.role.isEmpty {
+                                Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                            }
+                        }
+                        .padding(DSSpacing.gap4)
                     }
                 }
-                .padding(DSSpacing.gap4)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-            .contentShape(Rectangle())
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .frame(maxWidth: featuredMaxWidth, alignment: .leading)
