@@ -124,8 +124,12 @@ struct EditColorPanel: View {
                         // Portrait: vervaagt de achtergrond (origineel/custom), onderwerp scherp.
                         quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
                         quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                        // E41.2: localOnly draait Boost on-device → gratis, dus geen
+                        // credit-chip maar "Free".
                         quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
-                                    credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                                    credit: PrivacyPreferences2.shared.mode == .localOnly
+                                        ? "Free" : CreditMeter.chipLabel(for: .upscale),
+                                    action: onBoost)
                         // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
                         quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
                         // Remove background: lokale her-isolatie (gratis) → vrijstaand

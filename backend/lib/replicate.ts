@@ -226,18 +226,29 @@ export async function upscale(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
+  const ref = input.model ?? defaultModelRef("upscale");
   const output = (await runWithRetry(
     "upscale",
-    () => replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
-      input: {
-        image: input.imageDataUrl,
-        scale: 2,
-        face_enhance: false,
-      },
+    () => replicate.run(ref as `${string}/${string}`, {
+      input: upscaleInputFor(ref, input.imageDataUrl),
     }),
   )) as unknown;
 
   return extractUrl(output, "upscale");
+}
+
+/**
+ * Per-model input-vertaling voor de upscaler (E41.1; spiegelt stylizeInputFor).
+ * crystal-upscaler (default, portret) gebruikt `{ image, scale_factor }`;
+ * Real-ESRGAN `{ image, scale, face_enhance }` — nu MÉT face_enhance zodat ook
+ * de goedkope fallback gezichten verscherpt i.p.v. ze zacht te laten. Onbekende
+ * refs vallen op de Real-ESRGAN-vorm terug.
+ */
+function upscaleInputFor(ref: string, imageDataUrl: string): Record<string, unknown> {
+  if (ref.startsWith("philz1337x/crystal-upscaler")) {
+    return { image: imageDataUrl, scale_factor: 2 };
+  }
+  return { image: imageDataUrl, scale: 2, face_enhance: true };
 }
 
 /**

@@ -127,13 +127,23 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3: Boost resolution. Real-ESRGAN — robuuste, goedkope 2–4× upscaler
-  // (~$0,002–0,005/call, ruim binnen 1 credit). Community-model → gepind op
-  // versie (unversioned slug 404t, zelfde patroon als birefnet). Bij een
-  // 404 op de preview de hash herpinnen via replicate.com/nightmareai/real-esrgan.
+  // E10.3 + E41.1: Boost resolution. Default = crystal-upscaler — portret-
+  // geoptimaliseerd (behoudt huidtextuur + identiteit, geen "plastic look"),
+  // ~$0,016/beeld, snel. Beste keuze voor een avatar-app (identiteit = product).
+  // Real-ESRGAN blijft als goedkoop alternatief, nu MÉT face_enhance (zie
+  // upscaleInputFor in replicate.ts) zodat ook de fallback gezichten verscherpt.
+  //
+  // ⚠️ crystal-upscaler is een community-model → de unversioned slug kan op
+  // replicate.run 404'en (zelfde patroon als birefnet/deoldify). PIN de versie-
+  // hash en verifieer het endpoint op een preview-deploy vóór productie:
+  // https://replicate.com/philz1337x/crystal-upscaler/versions
   upscale: {
-    defaultModel: "real-esrgan",
+    defaultModel: "crystal-upscaler",
     models: {
+      "crystal-upscaler": {
+        ref: "philz1337x/crystal-upscaler",
+        label: "Crystal Upscaler (portrait)",
+      },
       "real-esrgan": {
         ref: "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
         label: "Real-ESRGAN",
