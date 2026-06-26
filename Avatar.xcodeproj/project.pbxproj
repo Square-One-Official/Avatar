@@ -153,6 +153,7 @@
 		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
+		921AAEAC18B164193A5B0C2E /* LocalUpscale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E2DEEC1EC0C83C7E12F490 /* LocalUpscale.swift */; };
 		9288CBAB25581CF0C8EC3AF2 /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */; };
 		93DE69BFD660664855889F69 /* Portrait.swift in Sources */ = {isa = PBXBuildFile; fileRef = A781DB69220F07CD4C7450BC /* Portrait.swift */; };
@@ -168,6 +169,7 @@
 		9C94125C6E3A2A41DA93400B /* BackgroundBlur.swift in Sources */ = {isa = PBXBuildFile; fileRef = 944A04C42B02792DA0CA60F7 /* BackgroundBlur.swift */; };
 		9CD001913A6515D8E41C4D9A /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F17C123521D20C3E207A5B /* EdgeBenchmark.swift */; };
 		9CDEBB9401C040885B7B35B8 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A67F34619015B892E51F8BA0 /* ExportService.swift */; };
+		9CF91F689F47904D7A69234F /* LocalUpscaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */; };
 		9D6640E0D022ED16BA4DE46F /* BannersGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */; };
 		9E422036F5B5DDF8C2134D5B /* CanvasInteractionCatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7477A0B1A2FE5E7ABBFFCDC4 /* CanvasInteractionCatcher.swift */; };
 		9E600F2BBB451CE9B583F601 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 68ED8B66E0CC1A6CA182DCCB /* Assets.xcassets */; };
@@ -294,6 +296,7 @@
 		16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBadge.swift; sourceTree = "<group>"; };
 		18A2A30C157ECE416A5F149E /* SettingsPreferencesPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPreferencesPage.swift; sourceTree = "<group>"; };
 		193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairEdgeHeuristic.swift; sourceTree = "<group>"; };
+		19E2DEEC1EC0C83C7E12F490 /* LocalUpscale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUpscale.swift; sourceTree = "<group>"; };
 		1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitContextMenu.swift; sourceTree = "<group>"; };
 		1D40E681885CB6D731F70EDA /* SettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsModel.swift; sourceTree = "<group>"; };
 		2010776A8205C9E5E7F1E828 /* WorkingToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingToastView.swift; sourceTree = "<group>"; };
@@ -346,6 +349,7 @@
 		5EF100DCFD517EBCFF88035A /* AvatarUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarUI; path = AvatarUI; sourceTree = SOURCE_ROOT; };
 		5FEC338C38035806F6E59DFF /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		60E31735EC49E308BA808F7F /* PrivacyPreferences2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences2.swift; sourceTree = "<group>"; };
+		6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUpscaleTests.swift; sourceTree = "<group>"; };
 		63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarProQuotaCard.swift; sourceTree = "<group>"; };
 		63EB8AB21396622AB916B788 /* SettingsAccountPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAccountPage.swift; sourceTree = "<group>"; };
 		64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKit.swift; sourceTree = "<group>"; };
@@ -573,6 +577,7 @@
 				193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */,
 				48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */,
 				EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */,
+				19E2DEEC1EC0C83C7E12F490 /* LocalUpscale.swift */,
 				3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */,
 				9C2B6957003039CB34DD8610 /* PortraitExporter.swift */,
 				0DF217BE4C824910EAD866B8 /* ReversibleChange.swift */,
@@ -749,6 +754,7 @@
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
 				9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */,
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
+				6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 				6F4C6433C0A7DD0C9E89C753 /* Portrait2Tests.swift */,
 				CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */,
@@ -1203,6 +1209,7 @@
 				0E0FAC5B382DEFF1C740BF67 /* LibraryBreadcrumb.swift in Sources */,
 				F2D880EFA91CC1AF1FA4F89A /* LibraryViewSwitcher.swift in Sources */,
 				006533721A36E01939D5789D /* ListLens.swift in Sources */,
+				921AAEAC18B164193A5B0C2E /* LocalUpscale.swift in Sources */,
 				1E72586A66936AB3977C6652 /* ManageBackgroundsSheet.swift in Sources */,
 				21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */,
 				D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */,
@@ -1262,6 +1269,7 @@
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,
 				DEBA4BDD4881DC5C0C5A4A1A /* EffectCutoutTests.swift in Sources */,
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
+				9CF91F689F47904D7A69234F /* LocalUpscaleTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 				B75EB071FBBE2203B62354C2 /* Portrait2Tests.swift in Sources */,
 				D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */,

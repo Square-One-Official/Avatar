@@ -10,6 +10,11 @@ import AvatarKit
 import AvatarUI
 import SwiftUI
 
+/// E41.2: hoe een "Boost resolution" draait — lokaal (gratis, on-device) of
+/// online (beste kwaliteit, 1 credit). De gebruiker kiest per keer via het
+/// dropdown-menu op de Boost-chip.
+enum BoostMode: Equatable, Sendable { case local, online }
+
 struct EditColorPanel: View {
     /// E24.14: de RAUWE cutout (zonder Adjust-laag). De sliders renderen er live
     /// bovenop; de commit persisteert alléén de params (niet-destructief).
@@ -28,7 +33,8 @@ struct EditColorPanel: View {
     /// achtergrondLAAG en houdt het onderwerp scherp (macOS-webcam-Portrait).
     var onPortrait: () -> Void = {}
     var onColorise: () -> Void = {}
-    var onBoost: () -> Void = {}
+    /// E41.2: Boost met de gekozen modus (lokaal/gratis of online/1 credit).
+    var onBoost: (BoostMode) -> Void = { _ in }
     // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
     var onRestoreBody: () -> Void = {}
     /// Verwijder de achtergrond: her-isoleer het onderwerp (lokale cutout-engine)
@@ -52,6 +58,10 @@ struct EditColorPanel: View {
     /// dus dan tonen we alléén de sliders + Reset.
     var showAutoEnhance: Bool = true
 
+    // E41.2: Boost-modus-dropdown (lokaal/online) + onthouden laatste keuze.
+    @State private var showBoostMenu = false
+    @State private var boostMode: BoostMode =
+        PrivacyPreferences2.shared.mode == .localOnly ? .local : .online
     @State private var seeded = false
     @State private var brightness = 0.0
     @State private var contrast = 1.0
@@ -121,8 +131,8 @@ struct EditColorPanel: View {
                         // Portrait: vervaagt de achtergrond (origineel/custom), onderwerp scherp.
                         quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
                         quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
-                        quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
-                                    credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                        // E41.2: Boost met modus-dropdown (gratis on-device vs online).
+                        boostMenuChip
                         // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
                         quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
                         // Remove background: lokale her-isolatie (gratis) → vrijstaand
@@ -189,6 +199,48 @@ struct EditColorPanel: View {
         .buttonStyle(.plain)
         .dsHoverScale()
         .fixedSize()
+    }
+
+    /// E41.2: Boost-chip met dropdown — kies gratis (on-device) of online (1
+    /// credit). Het dropdown-menu is onze `DSContextMenuPanel` + `DSMenuRow` in
+    /// een popover (zelfde patroon als de DSColorPicker-popover). De chip toont de
+    /// laatst gekozen modus; een rij kiezen zet de modus én draait de Boost.
+    private var boostMenuChip: some View {
+        let cloudAllowed = PrivacyPreferences2.shared.mode == .cloudAllowed
+        return Button { showBoostMenu = true } label: {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: 12, weight: .medium))
+                Text("Boost").dsTextStyle(.labelSmall)
+                Text(boostMode == .local ? "Free" : "1 credit")
+                    .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            .foregroundStyle(DSColor.Foreground.primary)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 32)
+            .background(DSColor.Background.neutral, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
+        .fixedSize()
+        .popover(isPresented: $showBoostMenu, arrowEdge: .bottom) {
+            DSContextMenuPanel(minWidth: 230) {
+                DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free") {
+                    showBoostMenu = false
+                    boostMode = .local
+                    onBoost(.local)
+                }
+                DSMenuRow("Online", icon: "cloud",
+                          shortcut: cloudAllowed ? "Best · 1 credit" : "Enable online") {
+                    showBoostMenu = false
+                    boostMode = .online
+                    onBoost(.online)
+                }
+            }
+            .padding(DSSpacing.gap1)
+            .appliedAppearancePreference()
+        }
     }
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {

@@ -440,6 +440,9 @@ struct EditorView: View {
                     await performBoostResolution()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .effectResultStored)) { _ in
+                stylizeQuality.flushPendingPostBoost()
+            }
             .sheet(isPresented: Binding(
                 get: { stylizeQuality.preGate != nil },
                 set: { if !$0 { stylizeQuality.resolvePreGate(.proceed) } }
@@ -909,18 +912,19 @@ struct EditorView: View {
             toolbarAccessories
         }
         .padding(.horizontal, DSSpacing.gap3)
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .topTrailing) {
             if let offer = stylizeQuality.postBoostOffer {
                 PostStylizeBoostBanner(
                     offer: offer,
                     onSharpen: {
                         stylizeQuality.dismissPostBoost()
-                        runBoostResolution()
+                        runBoostResolution(.online)
                     },
                     onDismiss: { stylizeQuality.dismissPostBoost() }
                 )
-                .padding(.horizontal, DSSpacing.gap8)
-                .padding(.bottom, 72)
+                .padding(.top, DSSpacing.gap3)
+                .padding(.trailing, DSSpacing.gap3)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         // Geen bottom-padding: het canvas loopt door tot de onderrand van het
@@ -1096,7 +1100,16 @@ struct EditorView: View {
     }
 
     /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
-    private func runBoostResolution() {
+    /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
+    private func runBoostResolution(_ mode: BoostMode) {
+        guard !isBoosting, let entitlement, let portraitModel,
+              let png = rawCutout.pngData() else { return }
+        // E41.2: de gebruiker koos de modus via het Boost-dropdown. Lokaal =
+        // gratis, on-device, geen gate. Online = beste kwaliteit, cloud + credit.
+        if mode == .local {
+            runLocalBoost(png: png, portraitModel: portraitModel, entitlement: entitlement)
+            return
+        }
         Task { await performBoostResolution() }
     }
 
@@ -1104,6 +1117,7 @@ struct EditorView: View {
     private func performBoostResolution() async {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
+        // .online — E18.2: contextuele gate (online uit → enable → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         let before = rawCutout
         entitlement.presentWorking(
@@ -1134,6 +1148,34 @@ struct EditorView: View {
             entitlement.handleOutOfCredits()
         } catch {
             entitlement.presentError("Couldn't boost the resolution. Please try again.")
+        }
+    }
+
+    /// E41.2: lokale Boost (Core Image Lanczos + unsharp, off-main). Geen cloud,
+    /// geen credits, geen gate; undo'baar net als de cloud-route. `entitlement`
+    /// dient enkel voor de werk-/foutmelding.
+    private func runLocalBoost(png: Data, portraitModel: Portrait2, entitlement: EntitlementModel) {
+        let before = rawCutout
+        entitlement.presentWorking(
+            title: "Boosting resolution",
+            messages: ["Upscaling on your Mac…", "Sharpening the details…", "Keeping it private…"]
+        )
+        Task {
+            isBoosting = true
+            defer { isBoosting = false }
+            let outData = await Task.detached(priority: .userInitiated) {
+                LocalUpscale.boost(pngData: png)
+            }.value
+            entitlement.dismissWorkingToast()
+            guard let outData, let after = NSImage(data: outData) else {
+                entitlement.presentError("Couldn't boost the resolution. Please try again.")
+                return
+            }
+            onApplyResult(after)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel, apply: onApplyResult,
+                undoTo: before, redoTo: after, actionName: "Boost resolution"
+            )
         }
     }
 
