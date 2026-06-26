@@ -16,6 +16,9 @@ struct HomeView: View {
 
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
+    // E36.3: banners als tweede sectie in het overzicht.
+    @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
+    private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
     @State private var featuredHovering = false
     @State private var menuTarget: Portrait2?
     @State private var menuAnchor: CGRect = .zero
@@ -87,6 +90,8 @@ struct HomeView: View {
                             }
                         }
                     }
+
+                    bannersSection
                 }
                 .padding(.horizontal, DSSpacing.gap6)
                 // Extra bottom padding so last row isn't hidden behind the floating button.
@@ -106,6 +111,74 @@ struct HomeView: View {
             folders: folders,
             selectedTargets: { portraits.filter { model.isPortraitSelected($0) } }
         )
+    }
+
+    // MARK: - Banners-sectie (E36.3)
+
+    @ViewBuilder private var bannersSection: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+            HStack {
+                Text("Banners")
+                    .dsTextStyle(.labelLarge)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                Spacer()
+                Button { model.showBanners() } label: {
+                    Text("See all").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, DSSpacing.gap2)
+
+            if savedBanners.isEmpty {
+                Button { model.showBanners() } label: {
+                    RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
+                        .strokeBorder(DSColor.Foreground.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
+                        .frame(height: 64)
+                        .overlay {
+                            HStack(spacing: DSSpacing.gap2) {
+                                Image(systemName: "plus")
+                                Text("Make a banner").dsTextStyle(.labelBase)
+                            }
+                            .foregroundStyle(DSColor.Foreground.muted)
+                        }
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DSSpacing.gap4) {
+                        ForEach(savedBanners.prefix(8)) { doc in
+                            homeBannerCard(doc)
+                        }
+                    }
+                    .padding(.bottom, DSSpacing.gap1)
+                }
+            }
+        }
+    }
+
+    private func homeBannerCard(_ doc: BannerDoc) -> some View {
+        Button { model.openBannerStudio(doc) } label: {
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                ZStack {
+                    DSColor.Background.inset
+                    if let data = doc.previewImageData, let img = NSImage(data: data) {
+                        Image(nsImage: img).resizable().scaledToFill()
+                    }
+                }
+                .frame(width: 240, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                        .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+                )
+                Text(doc.name.isEmpty ? "Untitled banner" : doc.name)
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale(1.02)
     }
 
     /// Max-breedte van de featured-kaart — compacter dan de volledige

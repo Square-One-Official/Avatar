@@ -76,8 +76,10 @@ banner-specifiek:
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 36.3 — HomeView → unified overzicht van alle items
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [HomeView](Avatar2/Features/Shell/HomeView.swift) toont nu naast de portret-sectie (Recent = grote featured + Earlier-grid, al aanwezig) een **Banners-sectie** onderaan: kop + "See all" (→ showBanners) + een horizontale rij recente banner-kaarten (BannerDoc-previews → openBannerStudio), of een "Make a banner"-CTA als er nog geen zijn. Unified overzicht van álle items. DoD groen.
 - team: FEAT
 - blockedBy: 36.1
 
