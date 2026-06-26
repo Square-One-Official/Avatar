@@ -130,8 +130,10 @@ landt — tot dan een nette disabled/Pro-stub). Schrijft `BannerDoc.fill`, undo'
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.4 — Text-panel
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerTextPanel](Avatar2/Features/Banners/BannerTextPanel.swift) — "Add text" + per-laag kaart: inhoud (TextField), grootte (slider 24–240), gewicht (Menu Regular/Medium/Semibold/Bold), kleur (`DSColorPicker`), verticale plaatsing (top/midden/onder → y), verwijderen. Mutaties via `doc.layers.texts` → `touch()` → live canvas (CoreText). Gewired in `BannerStudioView.panel(.text)`. Follow-up (wanneer de canvas laag-sleep + meerregelige render krijgt): font-familie, letter-/regelafstand, horizontale uitlijning. DoD groen.
 - team: FEAT (+ DS indien nieuw text-control-component)
 - blockedBy: 37.2
 

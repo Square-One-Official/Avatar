@@ -143,6 +143,8 @@ struct BannerStudioView: View {
         switch tool {
         case .background:
             BannerBackgroundPanel(doc: doc)
+        case .text:
+            BannerTextPanel(doc: doc)
         default:
             DSEditPanel(title: tool.label) {
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {
