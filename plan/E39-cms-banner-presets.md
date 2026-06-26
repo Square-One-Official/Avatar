@@ -45,10 +45,25 @@ Backend (`admin/` + `backend/`):
   endpoint, Result-regel.
 
 ## 39.2 — Consumptie: empty-state + home + "start from preset"
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT
 - blockedBy: 39.1, 37.2
+- Result: CMS-presets nu live in de empty-state én op home, gespiegeld op
+  `EffectsModel.loadEffects()`. Nieuw `BannerPresetsModel` (@Observable): sessie-cache (gedeeld,
+  statisch) + lokale `BannerPresetItem.fallback` (6 mesh/solid-presets met labels) zodat de UI
+  nooit leeg/kapot is; `load()` haalt `backend.bannerPresets()`, decodeert elke opake
+  `config`-JSON → `BannerLayers` (per-preset skip i.p.v. hele-lijst-fail bij corrupte config),
+  soft-fail behoudt fallback; thumbnail-prefetch via gedeelde `NSCache` + `thumbnailVersion`-bump
+  (achtergrond-`URLSession`, off-main). `BannersGalleryView` krijgt `entitlement` + bouwt het
+  model in `init`, `.task { load() }`, en `BannersEmptyState` toont nu CMS/fallback-presets
+  (thumbnail als gecachet, anders fill-preview) met label; klik → `makeBanner(from:)` opent de
+  Studio voorgeladen. `HomeView` idem: model in `init`, `.task` op de overview, en de lege
+  Banners-sectie toont nu een maak-tegel + horizontale preset-rij (`homePresetCard`) i.p.v. enkel
+  de dashed-knop; klik maakt een `BannerDoc` en opent de Studio. `ShellView` reikt `entitlement`
+  door aan de gallery. DoD groen: Avatar2 + AvatarKit/AvatarUI-tests groen (build-v2.sh "alles
+  groen"; enkel benign CoreData NSXPCConnection-testruis). Eerdere clean-build ving een
+  `thumbnailURL`↔`thumbnailUrl`-casing-typo die incrementeel was gemist — gefixt.
 
 - Banners-empty-state (E36.2) + home-presetrij (E36.3) laden `bannerPresets()` (session-cache +
   lokale fallback, spiegelt `EffectsModel.loadEffects()` + thumbnail-prefetch).

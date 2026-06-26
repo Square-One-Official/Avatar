@@ -17,6 +17,14 @@ struct BannersGalleryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var banners: [BannerDoc]
 
+    /// CMS-presets (E39.2) voor de empty-state; soft-fail → lokale fallback.
+    @State private var presetsModel: BannerPresetsModel
+
+    init(model: ShellModel, entitlement: EntitlementModel) {
+        self.model = model
+        _presetsModel = State(initialValue: BannerPresetsModel(backend: entitlement.backend))
+    }
+
     @State private var headerHeight: CGFloat = 0
     @State private var renaming: BannerDoc?
     @State private var draftName = ""
@@ -46,6 +54,7 @@ struct BannersGalleryView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .onPreferenceChange(BannersHeaderHeightKey.self) { headerHeight = $0 }
+        .task { await presetsModel.load() }
         .coordinateSpace(name: Self.contextMenuSpace)
         .overlay { contextMenu }
         .alert("Rename banner", isPresented: Binding(
@@ -67,6 +76,7 @@ struct BannersGalleryView: View {
     @ViewBuilder private var gridArea: some View {
         if banners.isEmpty {
             BannersEmptyState(
+                presetsModel: presetsModel,
                 onMake: { makeBanner() },
                 onPreset: { layers in makeBanner(from: layers) }
             )
@@ -217,21 +227,15 @@ private struct BannerGridTile: View {
     }
 }
 
-/// E36.2 — Banners-empty-state: kop + "Make banner" + een raster presets
-/// (lokale fallback; CMS-presets volgen in E39.2). Klik = open de Studio.
+/// E36.2 + E39.2 — Banners-empty-state: kop + "Make banner" + een raster
+/// presets. De presets komen uit het CMS (`BannerPresetsModel`, soft-fail →
+/// lokale fallback). Een CMS-preset met preview-URL toont z'n thumbnail; anders
+/// (of voor lokale fallbacks) rendert de kaart de fill zelf. Klik = open de
+/// Studio met de preset ingeladen.
 private struct BannersEmptyState: View {
+    let presetsModel: BannerPresetsModel
     let onMake: () -> Void
     let onPreset: (BannerLayers) -> Void
-
-    /// Lokale fallback-presets (worden in E39.2 door CMS-presets aangevuld/vervangen).
-    static let presets: [BannerLayers] = [
-        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#6EC6FF", x: 0, y: 0), MeshStop(hex: "#E3F2FF", x: 1, y: 1)])),
-        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#FFB4A2", x: 0, y: 0), MeshStop(hex: "#E7C6FF", x: 1, y: 1)])),
-        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#2C3E50", x: 0, y: 0), MeshStop(hex: "#4CA1AF", x: 1, y: 1)])),
-        BannerLayers(fill: .solid(hex: "#1C1917")),
-        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#B5EAD7", x: 0, y: 0), MeshStop(hex: "#C7CEEA", x: 1, y: 1)])),
-        BannerLayers(fill: .solid(hex: "#D5F466")),
-    ]
 
     var body: some View {
         ScrollView {
@@ -252,8 +256,8 @@ private struct BannersEmptyState: View {
                     Text("Or start from a preset")
                         .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: DSSpacing.gap3)], spacing: DSSpacing.gap3) {
-                        ForEach(Array(Self.presets.enumerated()), id: \.offset) { _, layers in
-                            Button { onPreset(layers) } label: { presetCard(layers) }
+                        ForEach(presetsModel.presets) { preset in
+                            Button { onPreset(preset.layers) } label: { presetCard(preset) }
                                 .buttonStyle(.plain)
                                 .dsHoverScale()
                         }
@@ -266,14 +270,29 @@ private struct BannersEmptyState: View {
         }
     }
 
-    @ViewBuilder private func presetCard(_ layers: BannerLayers) -> some View {
-        fillPreview(layers.fill)
+    @ViewBuilder private func presetCard(_ preset: BannerPresetItem) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            ZStack {
+                // thumbnailVersion observeren zodat een net-binnengekomen CMS-preview
+                // de kaart herrendert (de cache zelf is statisch/niet-geobserveerd).
+                let _ = presetsModel.thumbnailVersion
+                if let img = presetsModel.cachedThumbnail(for: preset) {
+                    Image(nsImage: img).resizable().scaledToFill()
+                } else {
+                    fillPreview(preset.layers.fill)
+                }
+            }
             .aspectRatio(1500.0 / 500.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
                     .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
             )
+            Text(preset.label)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.subtle)
+                .lineLimit(1)
+        }
     }
 
     @ViewBuilder private func fillPreview(_ fill: BannerFill) -> some View {

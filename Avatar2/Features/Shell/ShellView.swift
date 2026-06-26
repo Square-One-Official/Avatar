@@ -262,7 +262,7 @@ struct ShellView: View {
                     .transition(.opacity)
             } else if model.section == .banners {
                 // E35.3: Banners-bibliotheek.
-                BannersGalleryView(model: model)
+                BannersGalleryView(model: model, entitlement: entitlement)
                     .transition(.opacity)
             } else {
                 // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in

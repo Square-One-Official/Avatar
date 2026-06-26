@@ -14,14 +14,23 @@ struct HomeView: View {
     let model: ShellModel
     let entitlement: EntitlementModel
 
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     // E36.3: banners als tweede sectie in het overzicht.
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
     private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
+    // E39.2: CMS-presets voor de "start from preset"-rij (soft-fail → fallback).
+    @State private var presetsModel: BannerPresetsModel
     @State private var featuredHovering = false
     @State private var menuTarget: Portrait2?
     @State private var menuAnchor: CGRect = .zero
+
+    init(model: ShellModel, entitlement: EntitlementModel) {
+        self.model = model
+        self.entitlement = entitlement
+        _presetsModel = State(initialValue: BannerPresetsModel(backend: entitlement.backend))
+    }
 
     // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
     // (Color.clear + aspectRatio(.fit)) wordt nooit breder dan z'n kolom, dus
@@ -103,6 +112,7 @@ struct HomeView: View {
                 .padding(.bottom, DSSpacing.gap5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { await presetsModel.load() }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
         .portraitContextMenuOverlay(
             target: $menuTarget,
@@ -130,19 +140,18 @@ struct HomeView: View {
             .padding(.top, DSSpacing.gap2)
 
             if savedBanners.isEmpty {
-                Button { model.showBanners() } label: {
-                    RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
-                        .strokeBorder(DSColor.Foreground.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
-                        .frame(height: 64)
-                        .overlay {
-                            HStack(spacing: DSSpacing.gap2) {
-                                Image(systemName: "plus")
-                                Text("Make a banner").dsTextStyle(.labelBase)
-                            }
-                            .foregroundStyle(DSColor.Foreground.muted)
+                // Nog geen banners → de "start from preset"-rij (E39.2): een
+                // maak-tegel gevolgd door CMS-presets (soft-fail → fallback).
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DSSpacing.gap4) {
+                        makeBannerTile
+                        let _ = presetsModel.thumbnailVersion
+                        ForEach(presetsModel.presets) { preset in
+                            homePresetCard(preset)
                         }
+                    }
+                    .padding(.bottom, DSSpacing.gap1)
                 }
-                .buttonStyle(.plain)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap4) {
@@ -154,6 +163,73 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    /// Maak-tegel die de Banners-tab opent (zelfde maat als de preset-kaarten).
+    private var makeBannerTile: some View {
+        Button { model.showBanners() } label: {
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                    .strokeBorder(DSColor.Foreground.divider, style: StrokeStyle(lineWidth: 1, dash: [5]))
+                    .frame(width: 240, height: 80)
+                    .overlay {
+                        HStack(spacing: DSSpacing.gap2) {
+                            Image(systemName: "plus")
+                            Text("Make a banner").dsTextStyle(.labelSmall)
+                        }
+                        .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                Text("New").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle).lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale(1.02)
+    }
+
+    /// Een CMS/fallback-preset-kaart: opent de Banner Studio met de preset
+    /// ingeladen als nieuw `BannerDoc` (E39.2).
+    private func homePresetCard(_ preset: BannerPresetItem) -> some View {
+        Button { makeBanner(from: preset.layers) } label: {
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                ZStack {
+                    if let img = presetsModel.cachedThumbnail(for: preset) {
+                        Image(nsImage: img).resizable().scaledToFill()
+                    } else {
+                        presetFill(preset.layers.fill)
+                    }
+                }
+                .frame(width: 240, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                        .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+                )
+                Text(preset.label)
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale(1.02)
+    }
+
+    @ViewBuilder private func presetFill(_ fill: BannerFill) -> some View {
+        switch fill {
+        case let .solid(hex):
+            (Color(hexRGB: hex) ?? .black)
+        case let .meshGradient(stops):
+            LinearGradient(colors: stops.compactMap { Color(hexRGB: $0.hex) }, startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .image:
+            DSColor.Background.inset
+        }
+    }
+
+    /// Maakt een banner vanuit een preset-laagstack en opent de Studio.
+    private func makeBanner(from layers: BannerLayers) {
+        let doc = BannerDoc(layers: layers)
+        modelContext.insert(doc)
+        model.openBannerStudio(doc)
     }
 
     private func homeBannerCard(_ doc: BannerDoc) -> some View {

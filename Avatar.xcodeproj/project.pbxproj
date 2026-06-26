@@ -141,6 +141,7 @@
 		89C89D347949E200275051E3 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		8A196264D08873D2B5233B3A /* Banner2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75684711188D45F74A4EE9B4 /* Banner2.swift */; };
 		8BA79F365F5F7B49329FF371 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
+		8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */; };
 		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
@@ -432,6 +433,7 @@
 		F1CAAB87E8E174A425083C2F /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
 		F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDropZone.swift; sourceTree = "<group>"; };
 		F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementService.swift; sourceTree = "<group>"; };
+		F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerPresetsModel.swift; sourceTree = "<group>"; };
 		F814DBBEE1B0EDD799B6EF51 /* PortraitDragItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitDragItem.swift; sourceTree = "<group>"; };
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -779,6 +781,7 @@
 				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
 				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
+				F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
 				98854DF3AAC38E4D368DD522 /* BannerSizePanel.swift */,
 				EAA5F8B3F5EEE3E08FA0A619 /* BannerStudioView.swift */,
@@ -1125,6 +1128,7 @@
 				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
 				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
+				8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
 				46341383B254B4510C27AD85 /* BannerSizePanel.swift in Sources */,
 				C9664D75BEA6CD7A80A3776F /* BannerStudioView.swift in Sources */,
