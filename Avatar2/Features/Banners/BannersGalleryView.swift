@@ -66,18 +66,10 @@ struct BannersGalleryView: View {
 
     @ViewBuilder private var gridArea: some View {
         if banners.isEmpty {
-            // Empty-state ("Make banner" + presets) komt in E36.2; tot dan een
-            // rustige plaatshouder in de geest van de Portraits-empty-state.
-            VStack(spacing: DSSpacing.gap2) {
-                Image(systemName: "rectangle.on.rectangle.angled")
-                    .font(.system(size: 36, weight: .light))
-                    .foregroundStyle(DSColor.Foreground.muted)
-                Text("No banners yet")
-                    .dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
-                Text("Make a banner to use behind your profile picture.")
-                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            BannersEmptyState(
+                onMake: { makeBanner() },
+                onPreset: { layers in makeBanner(from: layers) }
+            )
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: DSSpacing.gap4) {
@@ -154,6 +146,13 @@ struct BannersGalleryView: View {
         model.openBannerStudio(doc)
     }
 
+    /// Maakt een banner vanuit een preset-laagstack en opent de Studio.
+    private func makeBanner(from layers: BannerLayers) {
+        let doc = BannerDoc(layers: layers)
+        modelContext.insert(doc)
+        model.openBannerStudio(doc)
+    }
+
     private func duplicate(_ banner: BannerDoc) {
         let base = banner.name.isEmpty ? "Untitled banner" : banner.name
         let copy = BannerDoc(
@@ -214,6 +213,77 @@ private struct BannerGridTile: View {
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.subtle)
                 .lineLimit(1)
+        }
+    }
+}
+
+/// E36.2 — Banners-empty-state: kop + "Make banner" + een raster presets
+/// (lokale fallback; CMS-presets volgen in E39.2). Klik = open de Studio.
+private struct BannersEmptyState: View {
+    let onMake: () -> Void
+    let onPreset: (BannerLayers) -> Void
+
+    /// Lokale fallback-presets (worden in E39.2 door CMS-presets aangevuld/vervangen).
+    static let presets: [BannerLayers] = [
+        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#6EC6FF", x: 0, y: 0), MeshStop(hex: "#E3F2FF", x: 1, y: 1)])),
+        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#FFB4A2", x: 0, y: 0), MeshStop(hex: "#E7C6FF", x: 1, y: 1)])),
+        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#2C3E50", x: 0, y: 0), MeshStop(hex: "#4CA1AF", x: 1, y: 1)])),
+        BannerLayers(fill: .solid(hex: "#1C1917")),
+        BannerLayers(fill: .meshGradient(stops: [MeshStop(hex: "#B5EAD7", x: 0, y: 0), MeshStop(hex: "#C7CEEA", x: 1, y: 1)])),
+        BannerLayers(fill: .solid(hex: "#D5F466")),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: DSSpacing.gap6) {
+                VStack(spacing: DSSpacing.gap2) {
+                    Image(systemName: "rectangle.on.rectangle.angled")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(DSColor.Foreground.muted)
+                    Text("Make your first banner")
+                        .dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
+                    Text("A wide cover for LinkedIn, X and more — also usable behind your profile picture.")
+                        .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+                        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                }
+                DSPrimaryButton("Make banner") { onMake() }
+
+                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                    Text("Or start from a preset")
+                        .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: DSSpacing.gap3)], spacing: DSSpacing.gap3) {
+                        ForEach(Array(Self.presets.enumerated()), id: \.offset) { _, layers in
+                            Button { onPreset(layers) } label: { presetCard(layers) }
+                                .buttonStyle(.plain)
+                                .dsHoverScale()
+                        }
+                    }
+                }
+                .frame(maxWidth: 640)
+            }
+            .padding(DSSpacing.gap8)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder private func presetCard(_ layers: BannerLayers) -> some View {
+        fillPreview(layers.fill)
+            .aspectRatio(1500.0 / 500.0, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
+                    .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+            )
+    }
+
+    @ViewBuilder private func fillPreview(_ fill: BannerFill) -> some View {
+        switch fill {
+        case let .solid(hex):
+            (Color(hexRGB: hex) ?? .black)
+        case let .meshGradient(stops):
+            LinearGradient(colors: stops.compactMap { Color(hexRGB: $0.hex) }, startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .image:
+            DSColor.Background.inset
         }
     }
 }

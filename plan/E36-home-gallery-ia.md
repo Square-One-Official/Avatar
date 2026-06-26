@@ -55,8 +55,10 @@ Portraits-gallery spiegelt i.p.v. de huidige upload/gradient-pagina:
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 36.2 — Banners empty-state ("Make banner" + presets)
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** `BannersEmptyState` (in [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift)) — kop + "Make banner" (→ lege Studio) + een raster **preset-kaarten** (wijde fill-previews; klik → nieuw `BannerDoc` met die laagstack + Studio). Lokale fallback-presets nu; CMS-presets vervangen/vullen aan in E39.2. DoD groen.
 - team: FEAT (+ DS indien nieuw empty-state-component)
 - blockedBy: 36.1
 
