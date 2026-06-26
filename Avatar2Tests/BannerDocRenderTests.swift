@@ -42,6 +42,40 @@ final class BannerDocRenderTests: XCTestCase {
         XCTAssertEqual(opaqueRatio(cg), 1.0, accuracy: 0.001)
     }
 
+    /// Telt (ongeveer) witte pixels — om te bewijzen dat een witte tekstlaag
+    /// daadwerkelijk OP de donkere fill wordt getekend (de opacity-test hierboven
+    /// zou ook zonder tekst slagen).
+    private func nearWhiteRatio(_ cg: CGImage) -> Double {
+        let w = cg.width, h = cg.height
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 0, count: bpr * h)
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: bpr,
+            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return 0 }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var light = 0
+        for i in stride(from: 0, to: buf.count, by: 4) where buf[i] > 200 && buf[i + 1] > 200 && buf[i + 2] > 200 {
+            light += 1
+        }
+        return Double(light) / Double(w * h)
+    }
+
+    func testTextLayerActuallyDrawsPixels() {
+        let dark = BannerDoc(canvasSize: CGSize(width: 1500, height: 500),
+                             layers: BannerLayers(fill: .solid(hex: "#101010")))
+        let withText = BannerDoc(canvasSize: CGSize(width: 1500, height: 500),
+                                 layers: BannerLayers(fill: .solid(hex: "#101010"),
+                                                      texts: [BannerTextLayer(string: "Aaavatar", fontSize: 120, colorHex: "#FFFFFF")]))
+        guard let bare = BannerDocRenderer.render(dark), let texted = BannerDocRenderer.render(withText) else {
+            return XCTFail("render gaf nil")
+        }
+        // De kale donkere fill heeft ~0 witte pixels; mét witte tekst méér.
+        XCTAssertEqual(nearWhiteRatio(bare), 0, accuracy: 0.0005)
+        XCTAssertGreaterThan(nearWhiteRatio(texted), 0.001, "witte tekstlaag tekende geen zichtbare pixels")
+    }
+
     func testExportSizeOverridesCanvas() {
         let doc = BannerDoc(canvasSize: CGSize(width: 1500, height: 500), layers: BannerLayers(fill: .solid(hex: "#000000")))
         let cg = BannerDocRenderer.render(doc, size: CGSize(width: 1584, height: 396))

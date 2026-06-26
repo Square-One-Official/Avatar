@@ -42,14 +42,14 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
         }
     }
 
-    /// Plaatshouder-tekst tot het echte paneel landt (welke story het invult).
-    var placeholder: String {
+    /// Korte omschrijving van de tool (gebruikersgericht).
+    var summary: String {
         switch self {
-        case .background: return "Solid color, mesh gradient, upload or generate an image. (E37.3)"
-        case .shaders:    return "Procedural effects — noise, dither, mesh gradient, lens distortion, warp. (E37.7 · E38)"
-        case .text:       return "Add and style text — font, size, weight, color, alignment. (E37.4)"
-        case .logo:       return "Place a logo and manage your brand colors. (E37.5)"
-        case .size:       return "Platform sizes — LinkedIn, X, wide. (E37.6)"
+        case .background: return "Solid color, mesh gradient, upload or generate an image."
+        case .shaders:    return "Procedural effects — noise, dither, mesh gradients, lens distortion and warp — applied live on your banner."
+        case .text:       return "Add and style text — font, size, weight, color, alignment."
+        case .logo:       return "Place a logo and manage your brand colors."
+        case .size:       return "Platform sizes — LinkedIn, X, wide."
         }
     }
 }
@@ -154,16 +154,31 @@ struct BannerStudioView: View {
             BannerLogoPanel(doc: doc)
         case .size:
             BannerSizePanel(doc: doc)
-        default:
-            DSEditPanel(title: tool.label) {
-                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                    Text(tool.placeholder)
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+        case .shaders:
+            shadersComingSoon
+        }
+    }
+
+    /// Shaders draaien op een Metal-shaderengine die in deze build nog niet is
+    /// ingeschakeld; tot dan een eerlijke "coming soon"-kaart i.p.v. een leeg/
+    /// kapot ogend paneel.
+    private var shadersComingSoon: some View {
+        DSEditPanel(title: BannerTool.shaders.label) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+                HStack(spacing: DSSpacing.gap2) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(DSColor.Action.primary)
+                    Text("Coming soon")
+                        .dsTextStyle(.labelLarge)
+                        .foregroundStyle(DSColor.Foreground.primary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(BannerTool.shaders.summary)
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
