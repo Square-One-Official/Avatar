@@ -36,7 +36,7 @@ struct Avatar2App: App {
     /// Bouwt de set-store: persistent in productie, gezaaid in-memory bij
     /// `--smoke-store` (DEBUG-smoke).
     private static func makeModelContainer() -> ModelContainer {
-        let models: [any PersistentModel.Type] = [Portrait2.self, Folder2.self, Banner2.self]
+        let models: [any PersistentModel.Type] = [Portrait2.self, Folder2.self, Banner2.self, BannerDoc.self]
         let schema = Schema(models)
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--smoke-store") {

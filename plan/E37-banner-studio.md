@@ -41,9 +41,21 @@ portret-toolbar (minder tools, geen Enhance/Face/Hair/Shirt).
 ---
 
 ## 37.1 — BannerDoc-model + container + render-pijplijn
-- status: ready
-- owner: —
+- status: done
+- owner: INFRA (2026-06-26)
 - team: INFRA
+
+**Result:** `BannerDoc` @Model ([BannerDoc.swift](Avatar2/Features/Banners/BannerDoc.swift)) —
+naast `Banner2`/`Portrait2`/`Folder2` in de container ([Avatar2App.swift](Avatar2/Avatar2App.swift)):
+canvas-maat (default 1500×500) + een Codable laag-stack `BannerLayers` (fill: solid/meshGradient/
+image · `[BannerTextLayer]` · `BannerLogoLayer?` · forward-compat `[BannerShaderLayer]` voor E38)
+als externalStorage-JSON, met zware beeld-bytes (`fillImageData`/`logoImageData`/`previewImageData`)
+als losse externalStorage-blobs. `BannerDoc.from(banner2:)` opent een platte E35-`Banner2` als één
+image-fill-laag (geen dataverlies). [BannerDocRenderer](Avatar2/Features/Banners/BannerDocRenderer.swift)
+componeert fill (via `BannerCompositor`, linear-sRGB) + logo + tekst (CoreText `CTLine`) tot een
+ondoorzichtige wijde CGImage; `size`-override voor exportmaten; shaders-haak gereserveerd voor E38.2.
+3 unit-tests (fill+tekst → opake 1500×500 PNG; export-maat-override 1584×396; Banner2-migratie
+behoudt bytes) groen; volledige DoD groen (Avatar + Avatar2 + AvatarKit + AvatarUI).
 
 Vervang het "platte beeld"-model door een **bewerkbaar, herbruikbaar document** (de editor moet
 heropenen):

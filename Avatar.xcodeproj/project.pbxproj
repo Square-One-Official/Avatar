@@ -57,6 +57,7 @@
 		31DAF9F07220B9D4B393328C /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
 		31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8BF6F54BCF4084CCFDFFFBC /* TransformUndo.swift */; };
 		32028D20901C7C13C4B668E4 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B9319A21481EA22D57BC2DA /* EditorView.swift */; };
+		325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */; };
 		32BA05BD3FE62DB19FF6512F /* AnnouncementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */; };
 		33BFC94F103869184FDAEE4E /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5FEC338C38035806F6E59DFF /* README.md */; };
 		3479E0155E6EF2E5151E251D /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5FEC338C38035806F6E59DFF /* README.md */; };
@@ -127,6 +128,7 @@
 		82491CEFF1852DDF363A9E13 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A67F34619015B892E51F8BA0 /* ExportService.swift */; };
 		850254B0FC758B3438E67CCD /* WelcomeSignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */; };
 		85461649DB9BB1202DDCE7E4 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */; };
+		859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */; };
 		867313BD6DC51163C952CA94 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
@@ -175,6 +177,7 @@
 		B7BE94756631FED1390881A5 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		B7EDC4EF58F5F0EDBAE8E873 /* ImportDropZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */; };
 		B83C7D4364C30F0B497432B6 /* OnboardingStepEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F687FF9D2FCFD8F72505C3 /* OnboardingStepEngine.swift */; };
+		B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */; };
 		B8FF564CD5FA186B77A96C95 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */; };
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
@@ -283,6 +286,7 @@
 		2DA1D618559461FE8CE56E1C /* OnboardingOTPView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingOTPView.swift; sourceTree = "<group>"; };
 		2DA344343F0EF03C724D5743 /* LibraryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryArchive.swift; sourceTree = "<group>"; };
 		2F137F8D4D25DCECC222EE48 /* StatusChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusChip.swift; sourceTree = "<group>"; };
+		3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDocRenderTests.swift; sourceTree = "<group>"; };
 		3181E7327476F43F448EA102 /* LibraryImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryImportSheet.swift; sourceTree = "<group>"; };
 		32A3B14B7F7E0E66FDC42980 /* BannerResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerResolver.swift; sourceTree = "<group>"; };
 		3309483DB7C17688EECFF2A9 /* SmokeSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeSeed.swift; sourceTree = "<group>"; };
@@ -310,6 +314,7 @@
 		547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutoutDataUndo.swift; sourceTree = "<group>"; };
 		5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasActionToolbar.swift; sourceTree = "<group>"; };
+		5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDoc.swift; sourceTree = "<group>"; };
 		5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSignInSheet.swift; sourceTree = "<group>"; };
 		5DE64240C8D2B68EB34AA721 /* Mesh 05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 05.png"; sourceTree = "<group>"; };
 		5EF100DCFD517EBCFF88035A /* AvatarUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AvatarUI; path = AvatarUI; sourceTree = SOURCE_ROOT; };
@@ -349,6 +354,7 @@
 		8D4ED56B1FF8421CA09C1EA5 /* .gitignore */ = {isa = PBXFileReference; path = .gitignore; sourceTree = "<group>"; };
 		8DAB476FF9BEA4B6547CA1B5 /* PaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallSheet.swift; sourceTree = "<group>"; };
 		8DF6691A4EAE77341E894EDB /* Avatar2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Avatar2App.swift; sourceTree = "<group>"; };
+		9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDocRenderer.swift; sourceTree = "<group>"; };
 		9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellTopBar.swift; sourceTree = "<group>"; };
 		943E8CCEC9CCEFB639805EF6 /* CanvasFrameChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFrameChip.swift; sourceTree = "<group>"; };
 		944A04C42B02792DA0CA60F7 /* BackgroundBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundBlur.swift; sourceTree = "<group>"; };
@@ -702,6 +708,7 @@
 			children = (
 				952C9B6AE02D2195F2903AC3 /* AlphaHitTestTests.swift */,
 				14DD51E68A2A1951BA1990DD /* AutoFramerTests.swift */,
+				3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */,
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
 				9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */,
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
@@ -753,6 +760,8 @@
 			isa = PBXGroup;
 			children = (
 				75684711188D45F74A4EE9B4 /* Banner2.swift */,
+				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
+				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
 			);
 			path = Banners;
@@ -1091,6 +1100,8 @@
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
 				8A196264D08873D2B5233B3A /* Banner2.swift in Sources */,
 				65EF36B5643AA2E984D829EE /* BannerChooser.swift in Sources */,
+				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
+				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
 				9D6640E0D022ED16BA4DE46F /* BannersGalleryView.swift in Sources */,
 				3197AE4B5A4D58A48431FC55 /* BoardView.swift in Sources */,
@@ -1176,6 +1187,7 @@
 			files = (
 				EC7A1D866680F10A21325569 /* AlphaHitTestTests.swift in Sources */,
 				CE49AA0F4C494B5D4D81E589 /* AutoFramerTests.swift in Sources */,
+				B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */,
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,
 				DEBA4BDD4881DC5C0C5A4A1A /* EffectCutoutTests.swift in Sources */,
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
