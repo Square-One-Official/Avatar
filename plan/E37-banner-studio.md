@@ -175,7 +175,7 @@ Een logo/merkbeeld plaatsen: upload (PNG met alpha), schalen/positioneren op can
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.7 — Shaders-panel integratie (consumeert E38)
-- status: backlog
+- status: blocked (Metal Toolchain — zie E38.1)
 - owner: —
 - team: FEAT
 - blockedBy: 37.2, 38.2, 38.3

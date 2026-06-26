@@ -31,8 +31,16 @@ lokaal.
 ---
 
 ## 38.1 — Metal-shaderbibliotheek + ShaderEffect-model
-- status: ready
-- owner: —
+- status: blocked
+- owner: AI/INFRA (2026-06-26)
+- blocker: **Metal Toolchain niet geïnstalleerd.** Xcode 26.4 (MacOSX26.4 SDK) levert de
+  `metal`-compiler als losse component; `.metal`-bestanden compileren niet → build faalt met
+  "cannot execute tool 'metal' due to missing Metal Toolchain; use: xcodebuild -downloadComponent
+  MetalToolchain". De volledige shader-engine (38.1–38.4) + de Studio-shaders-tool (E37.7) wachten
+  hierop. De code was geschreven en de Swift-kant compileert; alleen het `.metal`-doel blokkeert.
+  **Deblokkeren:** `xcodebuild -downloadComponent MetalToolchain` (multi-GB, Thierry's keuze).
+  Daarna: herplaats BannerShaders.metal + ShaderEffect + BannerShaderModifier (uit deze sessie) en
+  bouw verder.
 - team: AI/INFRA
 
 - `.metal`-library met de kern-shaderfuncties (parametrisch): **fractalNoise** (fBm/Perlin,
