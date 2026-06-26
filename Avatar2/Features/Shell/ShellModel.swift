@@ -140,6 +140,12 @@ final class ShellModel {
         section = .banners
     }
 
+    /// E37.2: de Banner Studio is een venster-niveau-overlay (zoals de
+    /// social-preview), gekoppeld aan het te bewerken `BannerDoc`. nil = dicht.
+    var editingBanner: BannerDoc?
+    func openBannerStudio(_ doc: BannerDoc) { editingBanner = doc }
+    func closeBannerStudio() { editingBanner = nil }
+
     /// Waar de editor vandaan geopend is — bepaalt waar "terug" (breadcrumb /
     /// back-chevron) naartoe keert.
     enum OpenOrigin: Equatable { case home; case portraits(PersistentIdentifier?) }

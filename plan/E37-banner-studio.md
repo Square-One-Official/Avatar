@@ -80,10 +80,24 @@ heropenen):
   tests groen, Result-regel.
 
 ## 37.2 — Studio-shell: canvas-kaart + onderste capsule-toolbar
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT (+ DS voor nieuwe chrome)
 - blockedBy: 37.1
+
+**Result:** [BannerStudioView](Avatar2/Features/Banners/BannerStudioView.swift) — venster-niveau
+crossfade-overlay (zoals de social-preview) op één `BannerDoc`, gewired via
+`ShellModel.editingBanner`/`openBannerStudio`/`closeBannerStudio` + een `.overlay` in
+[ShellView](Avatar2/Features/Shell/ShellView.swift). Topbar = Close · gecentreerd naam-veld
+(rename) · Save (rendert preview-cache via `BannerDocRenderer`). Onderste capsule-toolbar via
+`DSEditPanelContainer` met `BannerTool` **Background · Shaders · Text · Logo · Size**; elk opent
+een `DSEditPanel`-plaatshouder (37.3–37.7 vullen ze). Live wijde canvas-kaart toont de
+`BannerDocRenderer`-render. [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift)
+is nu `BannerDoc`-backed: "Make banner" → nieuw doc + Studio, tegel-klik opent het doc,
+Rename/Duplicate/Delete op `BannerDoc`. **Bewuste DS-afwijking:** `DSCanvasCard` is 1:1-
+vergrendeld → de wijde canvas is een DS-token-kaart (Background.card/xl4). **Compat-noot:** de
+social-preview `BannerChooser` leest nog `Banner2`; reconciliatie → 37.6. DoD groen (Avatar +
+Avatar2 + AvatarKit + AvatarUI), 3 BannerDocRenderTests groen.
 
 De editor-romp:
 - Nieuwe sectie/overlay (analoog aan `EditorView`/`SocialPreviewView` op shell-niveau):

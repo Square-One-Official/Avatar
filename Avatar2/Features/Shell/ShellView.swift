@@ -66,6 +66,15 @@ struct ShellView: View {
             }
         }
         .dsMotion(DSMotion.base, value: model.isShowingSocialPreview)
+        // E37.2: de Banner Studio is óók een full-screen crossfade-overlay op
+        // vensterniveau (over left-nav + content), gekoppeld aan het open BannerDoc.
+        .overlay {
+            if let doc = model.editingBanner {
+                BannerStudioView(doc: doc, onClose: { model.closeBannerStudio() })
+                    .transition(.opacity)
+            }
+        }
+        .dsMotion(DSMotion.base, value: model.editingBanner != nil)
         // Editor-topbar + breadcrumb op vensterniveau, boven de preview-overlay,
         // zodat Edit/Preview/Share en de trail zichtbaar blijven in preview-modus.
         .overlay(alignment: .top) {

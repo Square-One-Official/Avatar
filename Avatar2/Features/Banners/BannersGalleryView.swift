@@ -1,10 +1,11 @@
-// Banners-bibliotheek (E35.3 → E36.1). Een overzicht van je gemaakte banners,
-// nét als Portraits: een zwevende header (titel + telling + "Make banner") boven
-// een rooster van WIJDE banner-tegels met hover-rand en naam-overlay; rechtsklik
-// = Rename/Duplicate/Delete. De gradient-snel-maker is weg (E36.1, besluit
-// Thierry 2026-06-26): banners maak je voortaan in de Banner Studio (E37); upload
-// is een secundaire route binnen die flow. Net-nieuw scherm — DS-tokens, in de
-// geest van het hoofddesign.
+// Banners-bibliotheek (E35.3 → E36.1 → E37.2). Een overzicht van je gemaakte
+// banners, nét als Portraits: een zwevende header (titel + telling + "Make
+// banner") boven een rooster van WIJDE banner-tegels met hover-rand en
+// naam-overlay; rechtsklik = Rename/Duplicate/Delete. De gradient-snel-maker is
+// weg (E36.1). Sinds E37.2 is de canonieke store `BannerDoc` (een bewerkbaar
+// document): "Make banner" en tegel-klik openen de Banner Studio. De
+// social-preview-compat (oude `Banner2` → BannerChooser/-Resolver) wordt in 37.6
+// verzoend; tot dan toont deze gallery de BannerDoc-previews.
 
 import AppKit
 import AvatarUI
@@ -14,24 +15,19 @@ import SwiftUI
 struct BannersGalleryView: View {
     let model: ShellModel
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Banner2.updatedAt, order: .reverse) private var banners: [Banner2]
+    @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var banners: [BannerDoc]
 
-    /// Gemeten hoogte van de zwevende header → top-inset voor de grid.
     @State private var headerHeight: CGFloat = 0
-    @State private var renaming: Banner2?
+    @State private var renaming: BannerDoc?
     @State private var draftName = ""
-    @State private var menuBanner: Banner2?
+    @State private var menuBanner: BannerDoc?
     @State private var menuAnchor: CGRect = .zero
 
     private static let contextMenuSpace = "bannersContextMenu"
 
-    // Wijde tegels — een paar naast elkaar, schaalt met de breedte.
     private let columns = [GridItem(.adaptive(minimum: 320, maximum: 480), spacing: DSSpacing.gap4)]
 
     var body: some View {
-        // Zelfde zwevende-header-aanpak als PortraitsGalleryView: de header zweeft
-        // bovenaan (vult nooit mee, verdwijnt dus nooit), de grid krijgt een
-        // top-inset ter grootte van de gemeten header.
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 gridArea
@@ -90,7 +86,7 @@ struct BannersGalleryView: View {
                             menuBanner = banner
                             menuAnchor = frame
                         } onOpen: {
-                            // TODO(E37.2): open de Banner Studio op dit document.
+                            model.openBannerStudio(banner)
                         }
                     }
                 }
@@ -151,34 +147,33 @@ struct BannersGalleryView: View {
 
     // MARK: Acties
 
-    /// Maakt een nieuwe banner. TODO(E37.2): open de lege Banner Studio. Tot die
-    /// er is, blijft upload de werkende creatie-route (wordt in E37 secundair).
+    /// Maakt een nieuw, leeg banner-document en opent het in de Banner Studio.
     private func makeBanner() {
-        uploadBanner()
+        let doc = BannerDoc()
+        modelContext.insert(doc)
+        model.openBannerStudio(doc)
     }
 
-    private func uploadBanner() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url,
-              let data = try? Data(contentsOf: url) else { return }
-        let banner = Banner2(name: url.deletingPathExtension().lastPathComponent, imageData: data)
-        modelContext.insert(banner)
-    }
-
-    private func duplicate(_ banner: Banner2) {
+    private func duplicate(_ banner: BannerDoc) {
         let base = banner.name.isEmpty ? "Untitled banner" : banner.name
-        let copy = Banner2(name: "\(base) copy", imageData: banner.imageData)
+        let copy = BannerDoc(
+            name: "\(base) copy",
+            canvasSize: banner.canvasSize,
+            layers: banner.layers,
+            fillImageData: banner.fillImageData,
+            logoImageData: banner.logoImageData,
+            previewImageData: banner.previewImageData
+        )
         modelContext.insert(copy)
     }
 }
 
 /// Wijde banner-tegel (3:1) met hover-rand en naam-overlay — spiegelt
-/// `PortraitGridTile`, maar wijd en zonder multi-select. Klik opent (later) de
-/// Banner Studio; rechtsklik triggert het contextmenu.
+/// `PortraitGridTile`, maar wijd en zonder multi-select. Klik opent de Banner
+/// Studio; rechtsklik triggert het contextmenu. Toont de gerenderde
+/// `previewImageData` (nil = nog niet bewaard → plaatshouder).
 private struct BannerGridTile: View {
-    let banner: Banner2
+    let banner: BannerDoc
     let onContextMenu: (CGRect) -> Void
     let onOpen: () -> Void
 
@@ -191,8 +186,12 @@ private struct BannerGridTile: View {
                 .overlay {
                     ZStack {
                         DSColor.Background.inset
-                        if let img = NSImage(data: banner.imageData) {
+                        if let data = banner.previewImageData, let img = NSImage(data: data) {
                             Image(nsImage: img).resizable().scaledToFill()
+                        } else {
+                            Image(systemName: "rectangle.on.rectangle.angled")
+                                .font(.system(size: 24, weight: .light))
+                                .foregroundStyle(DSColor.Foreground.muted)
                         }
                     }
                 }
