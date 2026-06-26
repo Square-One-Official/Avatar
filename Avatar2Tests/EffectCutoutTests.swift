@@ -71,4 +71,30 @@ final class EffectCutoutTests: XCTestCase {
     func testResizedNulMaatGeeftNil() {
         XCTAssertNil(ShellModel.resized(cgImage(w: 10, h: 10), to: .zero))
     }
+
+    // Quality rev2 — transform scale adjustment when keeping a higher-res cutout.
+
+    func testAdjustedScalePreservesCanvasWidth() {
+        let newScale = ShellModel.adjustedScaleForResolutionChange(
+            oldWidth: 800, newWidth: 832, currentScale: 0.5
+        )
+        let oldImgW = 800.0 * 0.5
+        let newImgW = 832.0 * newScale
+        XCTAssertEqual(oldImgW, newImgW, accuracy: 0.001)
+    }
+
+    func testAdjustedScaleZeroScaleUnchanged() {
+        XCTAssertEqual(
+            ShellModel.adjustedScaleForResolutionChange(oldWidth: 800, newWidth: 832, currentScale: 0),
+            0
+        )
+    }
+
+    func testApplyAlphaMaskKeepsHigherResRGB() {
+        let cutout = image(alpha: 255, size: 100)
+        let styled = image(alpha: 255, size: 200)
+        let masked = ShellModel.applyAlphaMask(from: cutout, to: styled)
+        XCTAssertEqual(masked?.cgImage(forProposedRect: nil, context: nil, hints: nil)?.width, 200)
+        XCTAssertEqual(masked?.cgImage(forProposedRect: nil, context: nil, hints: nil)?.height, 200)
+    }
 }

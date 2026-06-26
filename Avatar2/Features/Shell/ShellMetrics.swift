@@ -28,8 +28,12 @@ enum ShellMetrics {
     /// (top-uitgelijnd i.p.v. gecentreerd → "touching the top", feedback Thierry).
     static let windowControlsRowHeight: CGFloat = 32
 
-    /// Editor-topbar (breadcrumb + view-toggle + Share): compacte band, flush
-    /// onder de vensterrand (Granola-stijl). Gelijk aan control-hoogte — geen
-    /// extra verticale slack.
+    /// Editor-topbar (breadcrumb + view-toggle + Share): control-hoogte.
     static let topBarRowHeight: CGFloat = 28
+
+    /// Lucht tussen vensterrand en editor-topbar — gelijk aan trailing inset.
+    static let topBarTopInset: CGFloat = topBarInset
+
+    /// Totale hoogte van de top-chrome-band (inset + controls).
+    static var topBarBandHeight: CGFloat { topBarTopInset + topBarRowHeight }
 }

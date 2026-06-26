@@ -59,10 +59,11 @@ struct CanvasTransformOverlay: View {
         ]
 
         ZStack {
-            // E24.29: subtiel selectiekader op de onderwerp-box (vaste 1pt lijn —
-            // screen-space, dus geen camera-verdikking).
+            // E24.29: selectiekader op de onderwerp-box (vaste 1pt lijn —
+            // screen-space). primaryForeground i.p.v. lime-fill: leesbaar op lichte
+            // én donkere canvas (E23 theme-bewust).
             Rectangle()
-                .strokeBorder(DSColor.Action.primary.opacity(0.45), lineWidth: 1)
+                .strokeBorder(DSColor.Action.primaryForeground.opacity(0.85), lineWidth: 1)
                 .frame(width: max(0, halfW * 2), height: max(0, halfH * 2))
                 .position(center)
                 .allowsHitTesting(false)
@@ -87,10 +88,10 @@ struct CanvasTransformOverlay: View {
     }
 
     private func handleDot(at pos: CGPoint, center: CGPoint) -> some View {
-        // E24.29: 10pt-dot — hier vaste schermgrootte (screen-space overlay).
+        // E24.29: 10pt-dot — vaste schermgrootte (screen-space overlay).
         Circle()
-            .fill(.white)
-            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 1.5))
+            .fill(DSColor.Background.card)
+            .overlay(Circle().strokeBorder(DSColor.Action.primaryForeground, lineWidth: 1.5))
             .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
             .frame(width: 10, height: 10)
             .position(pos)

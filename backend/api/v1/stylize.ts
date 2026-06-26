@@ -300,6 +300,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error(`stylize result fetch failed: ${download.status}`);
     }
     const resultBytes = Buffer.from(await download.arrayBuffer());
+    const resultMeta = await sharp(resultBytes).metadata();
+    const inputW = meta.width ?? 0;
+    const inputH = meta.height ?? 0;
+    const outputW = resultMeta.width ?? 0;
+    const outputH = resultMeta.height ?? 0;
+    const cutoutW = Number(req.body?.cutout_w) || 0;
+    const cutoutH = Number(req.body?.cutout_h) || 0;
+    console.info(
+      `[stylize_dims] input=${inputW}x${inputH} output=${outputW}x${outputH}` +
+        (cutoutW > 0 ? ` cutout=${cutoutW}x${cutoutH}` : ""),
+    );
 
     if (!isDevUser) {
       await logCredit({
@@ -315,6 +326,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       image: resultBytes.toString("base64"),
       credits_remaining: creditsRemaining,
       model: modelRef ?? MODEL_REGISTRY.stylize.defaultModel,
+      input_width: inputW,
+      input_height: inputH,
+      output_width: outputW,
+      output_height: outputH,
     });
   } catch (err) {
     // Log the message only — the Replicate SDK embeds the auth header in the

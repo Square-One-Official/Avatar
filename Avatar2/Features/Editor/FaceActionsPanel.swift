@@ -34,15 +34,21 @@ final class FaceEffectsModel {
 
     private let entitlement: EntitlementModel
     private let baseImage: NSImage
+    private let portrait: Portrait2?
+    private let coordinator: StylizeQualityCoordinator?
     private let onApply: (NSImage) -> Void
 
     init(
         entitlement: EntitlementModel,
         baseImage: NSImage,
+        portrait: Portrait2? = nil,
+        coordinator: StylizeQualityCoordinator? = nil,
         onApply: @escaping (NSImage) -> Void
     ) {
         self.entitlement = entitlement
         self.baseImage = baseImage
+        self.portrait = portrait
+        self.coordinator = coordinator
         self.onApply = onApply
     }
 
@@ -63,12 +69,19 @@ final class FaceEffectsModel {
     }
 
     private func generate(presetKey: String, label: String) async {
-        // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        guard let png = baseImage.pngData() else {
+
+        let source = StylizeQuality.editStylizeSource(cutout: baseImage)
+        _ = await coordinator?.gateBeforeStylize(
+            source: source, portrait: portrait, cutout: baseImage, isEffects: false
+        )
+        let cutoutBefore = NSImage(data: portrait?.cutoutData ?? Data()) ?? baseImage
+
+        guard let png = source.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
+        let (cutoutW, cutoutH) = StylizeQuality.cutoutDimensions(for: cutoutBefore)
         phase = .working(label)
         entitlement.presentWorking(
             title: label,
@@ -81,17 +94,21 @@ final class FaceEffectsModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.editFace(imagePNG: png, presetKey: presetKey)
-            guard let image = NSImage(data: data) else {
+            let result = try await entitlement.backend.editFace(
+                imagePNG: png, presetKey: presetKey,
+                cutoutWidth: cutoutW, cutoutHeight: cutoutH
+            )
+            guard let image = NSImage(data: result.data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("The edited image came back unreadable.")
                 return
             }
+            StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
             phase = .idle
             entitlement.dismissWorkingToast()
             onApply(image)
-            // Saldo bijwerken zodat de topbar-quota klopt na de aftrek.
+            coordinator?.offerPostBoostIfNeeded(result: image, cutoutBefore: cutoutBefore)
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
@@ -108,6 +125,8 @@ final class FaceEffectsModel {
 struct FaceActionsPanel: View {
     let baseImage: NSImage
     let entitlement: EntitlementModel
+    var portrait: Portrait2?
+    var coordinator: StylizeQualityCoordinator?
     /// E32.1: resultaat van een generatieve face-edit toepassen (undo'baar).
     var onApply: (NSImage) -> Void = { _ in }
     var isPro: Bool = false
@@ -138,15 +157,23 @@ struct FaceActionsPanel: View {
     init(
         baseImage: NSImage,
         entitlement: EntitlementModel,
+        portrait: Portrait2? = nil,
+        coordinator: StylizeQualityCoordinator? = nil,
         onApply: @escaping (NSImage) -> Void = { _ in },
         isPro: Bool = false
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
+        self.portrait = portrait
+        self.coordinator = coordinator
         self.onApply = onApply
         self.isPro = isPro
         _model = State(initialValue: FaceEffectsModel(
-            entitlement: entitlement, baseImage: baseImage, onApply: onApply
+            entitlement: entitlement,
+            baseImage: baseImage,
+            portrait: portrait,
+            coordinator: coordinator,
+            onApply: onApply
         ))
         _cmsPresets = State(initialValue: FaceActionsPanel.sessionCache ?? [])
     }

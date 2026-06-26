@@ -42,30 +42,17 @@ struct ShellView: View {
         .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
         // Vaste venster-chrome: traffic-light-strook + toggle schuiven niet mee
         // met de sidebar-animatie; de strip hoort visueel bij de nav wanneer open.
+        // Verborgen tijdens banner studio (full-screen); preview houdt de left-nav.
         .overlay(alignment: .topLeading) {
-            ShellSidebarChrome(
-                isSidebarVisible: model.isLeftNavVisible,
-                onToggleSidebar: { model.toggleLeftNav() }
-            )
-            .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-        }
-        // E34.5: social-preview is FULL-SCREEN — een crossfade-overlay op
-        // VENSTERNIVEAU (over de left-nav + content + sidebar-toggle heen).
-        // Terug naar Edit via de shell-topbar; die blijft erboven zichtbaar.
-        .overlay {
-            if model.isShowingSocialPreview, let portrait = model.selectedPortrait {
-                SocialPreviewView(
-                    portrait: portrait,
-                    isPro: entitlement.isProActive,
-                    onManageBanners: {
-                        model.isShowingSocialPreview = false
-                        model.showBanners()
-                    }
+            if model.editingBanner == nil {
+                ShellSidebarChrome(
+                    isSidebarVisible: model.isLeftNavVisible,
+                    onToggleSidebar: { model.toggleLeftNav() }
                 )
-                .transition(.opacity)
+                .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
             }
         }
-        .dsMotion(DSMotion.base, value: model.isShowingSocialPreview)
+        // E34.5: social-preview is een editor-modus in de content-kolom (geen overlay).
         // E37.2: de Banner Studio is óók een full-screen crossfade-overlay op
         // vensterniveau (over left-nav + content), gekoppeld aan het open BannerDoc.
         .overlay {
@@ -75,13 +62,10 @@ struct ShellView: View {
             }
         }
         .dsMotion(DSMotion.base, value: model.editingBanner != nil)
-        // Editor-topbar + breadcrumb op vensterniveau, boven de preview-overlay,
-        // zodat Edit/Preview/Share en de trail zichtbaar blijven in preview-modus.
+        // Editor-topbar + breadcrumb op vensterniveau, boven preview/banner-overlays.
         .overlay(alignment: .top) {
-            shellTopBar
-        }
-        .overlay(alignment: .topLeading) {
-            shellEditorBreadcrumb
+            editorTopChromeBand
+                .ignoresSafeArea(.container, edges: .top)
         }
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
@@ -255,6 +239,10 @@ struct ShellView: View {
                 // PoC (left-nav): Home — het overzicht (laatste + eerdere /
                 // first-use). De top-right-chrome blijft hier weg.
                 HomeView(model: model, entitlement: entitlement)
+                    // Tijdens een drag fade't de hele Home-inhoud uit zodat alleen
+                    // de dropzone-overlay (op mainArea-niveau) zichtbaar blijft —
+                    // zelfde gedrag als de editor-canvas.
+                    .opacity(model.isDropTargeted ? 0 : 1)
                     .transition(.opacity)
             } else if model.section == .portraits {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
@@ -265,24 +253,29 @@ struct ShellView: View {
                 BannersGalleryView(model: model, entitlement: entitlement)
                     .transition(.opacity)
             } else {
-                // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
-                // de topstrook (zie de overlays hieronder).
-                // Besluit Thierry (2026-06-24): GEEN top-inset meer — het canvas
-                // loopt door tot de bovenrand van het venster (symmetrisch met de
-                // onderkant), met de top-chrome (topbar + naam-chip + Frame/Background)
-                // erover zwevend i.p.v. in een aparte Background.app-band.
-                ZStack {
-                    canvas
-                        // Tijdens een drag fade't de hele canvas-inhoud (foto +
-                        // Name/Role-chip + editor-toolbar) uit naar de app-
-                        // achtergrond, zodat alleen de dropzone-overlay overblijft —
-                        // een schone lei, net als first-use (bevinding: drag toont
-                        // dropzone óver de avatar i.p.v. leeg scherm).
-                        .opacity(model.isDropTargeted ? 0 : 1)
-                    // Hero-morph: de getikte tegel "groeit" naar het canvas. De
-                    // overlay leeft alleen tijdens de morph en crossfadet dan naar
-                    // de echte EditorView eronder. Zie [[HeroMorph]].
-                    heroMorphOverlay
+                // Editor-sectie: Edit en Preview zijn wisselende modi (geen overlay —
+                // de canvas leeft niet door onder de preview).
+                Group {
+                    if model.isShowingSocialPreview {
+                        SocialPreviewView(
+                            model: model,
+                            isPro: entitlement.isProActive
+                        )
+                    } else {
+                        ZStack {
+                            canvas
+                                // Tijdens een drag fade't de hele canvas-inhoud (foto +
+                                // Name/Role-chip + editor-toolbar) uit naar de app-
+                                // achtergrond, zodat alleen de dropzone-overlay overblijft —
+                                // een schone lei, net als first-use (bevinding: drag toont
+                                // dropzone óver de avatar i.p.v. leeg scherm).
+                                .opacity(model.isDropTargeted ? 0 : 1)
+                            // Hero-morph: de getikte tegel "groeit" naar het canvas. De
+                            // overlay leeft alleen tijdens de morph en crossfadet dan naar
+                            // de echte EditorView eronder. Zie [[HeroMorph]].
+                            heroMorphOverlay
+                        }
+                    }
                 }
                 // Forward = hero-morph (overlay), back = kale fade → editor zelf
                 // faden, de overlay draagt de zoom. (reduce-motion: ook fade.)
@@ -294,6 +287,7 @@ struct ShellView: View {
         // kale fade (heroNS niet geïnjecteerd). Eén spring drijft de section-swap
         // én de gematchte geometrie.
         .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.85), value: model.section)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingSocialPreview)
         // De hero-namespace zakt via de Environment naar de lens-tegels (geen
         // threading door vier lens-views). nil bij reduce-motion → no-op.
         .environment(\.heroNamespace, reduceMotion ? nil : heroNS)
@@ -317,7 +311,7 @@ struct ShellView: View {
         .overlay {
             // Geen dropzone bovenop Settings (punt 14): de drop zelf wordt
             // in handleDrop genegeerd zolang Settings open staat.
-            if model.isDropTargeted && !model.isShowingSettings {
+            if model.isDropTargeted && !model.isShowingSettings && !model.isShowingSocialPreview {
                 DropzoneOverlay()
                     .allowsHitTesting(false)
             }
@@ -326,14 +320,14 @@ struct ShellView: View {
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
         // Image added 4017:1849), niet aan de foto geplakt.
         .overlay(alignment: .bottomTrailing) {
-            if let label = isolatingStatusLabel {
+            if let label = isolatingStatusLabel, !model.isShowingSocialPreview {
                 IsolatingStatusPill(label: label)
                     .padding(DSSpacing.gap4)
             }
         }
         // E05.6: eenmalige hifi-haar-nudge — subtiel onderin, geen modal.
         .overlay(alignment: .bottom) {
-            if model.showHairNudge && !model.isShowingSettings {
+            if model.showHairNudge && !model.isShowingSettings && !model.isShowingSocialPreview {
                 HairNudgeBanner(
                     onDownload: { model.acceptHairNudge() },
                     onDismiss: { model.dismissHairNudge() }
@@ -364,34 +358,36 @@ struct ShellView: View {
         }
     }
 
-    /// Top-right chrome (Edit/Preview + Share, of ✕ in Settings) — vensterniveau
-    /// zodat het boven de social-preview-overlay blijft.
-    private var shellTopBar: some View {
-        ShellTopBar(
-            isSettingsActive: model.isShowingSettings,
-            onToggleSettings: { model.isShowingSettings.toggle() },
-            isEditing: model.section == .editor,
-            canExport: model.canExport,
-            onExport: { model.exportCurrentPortrait() },
-            canPreview: model.canPreview,
-            isPreviewActive: model.isShowingSocialPreview,
-            onPreviewActiveChange: { active in
-                if active { model.showSocialPreview() }
-                else { model.isShowingSocialPreview = false }
-            }
-        )
-        .ignoresSafeArea(.container, edges: .top)
-    }
-
-    /// Drill-in-breadcrumb — vensterniveau, schuift mee met de sidebar-breedte.
+    /// Eén compacte topband: breadcrumb links, Edit/Preview + Share rechts —
+    /// gedeelde top-inset zodat beide dezelfde afstand tot de vensterrand houden.
     @ViewBuilder
-    private var shellEditorBreadcrumb: some View {
-        if model.section == .editor && !model.isShowingSettings {
-            LibraryBreadcrumb(model: model)
-                .padding(.leading, shellEditorBreadcrumbLeading)
-                .transition(.opacity)
-                .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-                .ignoresSafeArea(.container, edges: .top)
+    private var editorTopChromeBand: some View {
+        if model.section == .editor || model.isShowingSettings {
+            HStack(alignment: .top, spacing: DSSpacing.gap2) {
+                if model.section == .editor && !model.isShowingSettings {
+                    LibraryBreadcrumb(model: model)
+                        .padding(.leading, shellEditorBreadcrumbLeading)
+                        .transition(.opacity)
+                        .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+                }
+                Spacer(minLength: DSSpacing.gap2)
+                ShellTopBar(
+                    isSettingsActive: model.isShowingSettings,
+                    onToggleSettings: { model.isShowingSettings.toggle() },
+                    isEditing: model.section == .editor,
+                    canExport: model.canExport,
+                    onExport: { model.exportCurrentPortrait() },
+                    canPreview: model.canPreview,
+                    isPreviewActive: model.isShowingSocialPreview,
+                    onPreviewActiveChange: { active in
+                        if active { model.showSocialPreview() }
+                        else { model.isShowingSocialPreview = false }
+                    }
+                )
+            }
+            .padding(.top, ShellMetrics.topBarTopInset)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
         }
     }
 
@@ -529,7 +525,7 @@ struct ShellView: View {
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         // Punt 14: tijdens Settings geen imports — de canvas-weergave is
         // niet zichtbaar, een stille import zou verwarren.
-        guard !model.isShowingSettings else { return false }
+        guard !model.isShowingSettings, !model.isShowingSocialPreview else { return false }
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
                 let url: URL?

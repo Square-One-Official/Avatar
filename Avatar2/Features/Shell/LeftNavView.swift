@@ -380,6 +380,7 @@ private struct LeftNavExpandableHeader: View {
     let onCreateFolder: () -> Void
 
     @State private var rowHovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Vaste breedte links zodat label niet verschuift bij icon ↔ chevron.
     /// Zelfde 18 pt als `LeftNavRow`-iconen → label kolom lijn-ligt met Home/Banners.
@@ -433,17 +434,7 @@ private struct LeftNavExpandableHeader: View {
     @ViewBuilder
     private var leadingSlot: some View {
         ZStack {
-            if rowHovering {
-                Button(action: onToggleExpanded) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .dsHoverHighlight(cornerRadius: DSRadius.md)
-            } else {
+            Group {
                 Image(systemName: icon)
                     .resizable()
                     .scaledToFit()
@@ -456,8 +447,25 @@ private struct LeftNavExpandableHeader: View {
                 }
                 .buttonStyle(.plain)
             }
+            .opacity(rowHovering ? 0 : 1)
+            .scaleEffect(rowHovering ? 0.94 : 1, anchor: .center)
+            .allowsHitTesting(!rowHovering)
+
+            Button(action: onToggleExpanded) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+            .opacity(rowHovering ? 1 : 0)
+            .scaleEffect(rowHovering ? 1 : 0.94, anchor: .center)
+            .allowsHitTesting(rowHovering)
         }
         .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+        .animation(reduceMotion ? nil : DSMotion.micro, value: rowHovering)
     }
 
     private var rowBackground: Color {

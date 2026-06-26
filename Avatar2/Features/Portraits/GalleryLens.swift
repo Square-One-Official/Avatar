@@ -144,10 +144,7 @@ struct GalleryLens: View {
             )
             .overlay(alignment: .topTrailing) {
                 if isSel {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(DSColor.Background.app, DSColor.Action.primary)
+                    DSSelectionCheckBadge(size: 15)
                         .padding(3)
                 }
             }

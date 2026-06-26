@@ -120,11 +120,13 @@ enum AutoFramer {
     static func metrics(for image: CGImage) -> Metrics {
         var metrics = Metrics(bodyBottomY: 0)
 
-        // Gezicht + pupillen (VNDetectFaceLandmarksRequest; grootste gezicht).
-        let request = VNDetectFaceLandmarksRequest()
+        // Gezicht + lichaam in één Vision-pass (twee aparte handlers waren ~2× zo traag).
+        let faceRequest = VNDetectFaceLandmarksRequest()
+        let bodyRequest = VNDetectHumanBodyPoseRequest()
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        if (try? handler.perform([request])) != nil,
-           let observations = request.results, !observations.isEmpty {
+        _ = try? handler.perform([faceRequest, bodyRequest])
+
+        if let observations = faceRequest.results, !observations.isEmpty {
             let imgW = CGFloat(image.width)
             let imgH = CGFloat(image.height)
             let largest = observations.max {
@@ -163,19 +165,16 @@ enum AutoFramer {
             }
         }
 
-        // Onderkant lichaam: body-pose, anders alpha-scan.
-        metrics.bodyBottomY = bodyPoseBottom(in: image)
+        // Onderkant lichaam: body-pose (zelfde pass), anders gesamplede alpha-scan.
+        metrics.bodyBottomY = bodyPoseBottom(from: bodyRequest.results?.first, imageHeight: image.height)
             ?? contentBottomFromAlpha(of: image)
             ?? 0
         return metrics
     }
 
-    private static func bodyPoseBottom(in image: CGImage) -> CGFloat? {
-        let request = VNDetectHumanBodyPoseRequest()
-        let handler = VNImageRequestHandler(cgImage: image, options: [:])
-        guard (try? handler.perform([request])) != nil,
-              let observation = request.results?.first else { return nil }
-        let imgH = CGFloat(image.height)
+    private static func bodyPoseBottom(from observation: VNHumanBodyPoseObservation?, imageHeight: Int) -> CGFloat? {
+        guard let observation else { return nil }
+        let imgH = CGFloat(imageHeight)
         var lowestY: CGFloat = 0
         for jointName in observation.availableJointNames {
             guard let point = try? observation.recognizedPoint(jointName),
@@ -186,22 +185,23 @@ enum AutoFramer {
     }
 
     /// Alpha-scan van onder naar boven (v1-fallback bij mislukte pose).
+    /// Samplet horizontaal (stap ~w/64) — volledige kolom-scan was tot ~64× trager.
     private static func contentBottomFromAlpha(of image: CGImage) -> CGFloat? {
         let w = image.width
         let h = image.height
         guard w > 0, h > 0 else { return nil }
         let bpr = w * 4
         var pixels = [UInt8](repeating: 0, count: h * bpr)
-        guard let cs = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(
-                data: &pixels, width: w, height: h, bitsPerComponent: 8,
-                bytesPerRow: bpr, space: cs,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              ) else { return nil }
+        guard let ctx = CGContext(
+            data: &pixels, width: w, height: h, bitsPerComponent: 8,
+            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let sampleStep = max(1, w / 64)
         for row in stride(from: h - 1, through: 0, by: -1) {
             let base = row * bpr
-            for col in 0..<w where pixels[base + col * 4 + 3] > 8 {
+            for col in stride(from: 0, to: w, by: sampleStep) where pixels[base + col * 4 + 3] > 20 {
                 return CGFloat(row)
             }
         }

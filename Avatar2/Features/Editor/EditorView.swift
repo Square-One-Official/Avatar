@@ -169,6 +169,10 @@ struct EditorView: View {
     @State private var isColorising = false
     /// Loopt tijdens Fill in Body (FLUX.1). Voorkomt dubbele calls.
     @State private var isFillingBody = false
+    /// E06.5: Vision-detectie voor auto-frame.
+    @State private var isAutoFraming = false
+    /// Stylize quality: pre-gate sheets + post-stylize sharpen offer.
+    @State private var stylizeQuality = StylizeQualityCoordinator()
     /// E18.12: lokale (gratis, omkeerbare) enhances zijn aan/uit-knoppen —
     /// One-click retouch + Studio Light. Key = actietitel; waarde = de foto
     /// van vóór het toepassen (om naar terug te keren). Aanwezig = aan. 2e klik
@@ -251,10 +255,10 @@ struct EditorView: View {
     /// OUTER ring en de naam-chip-rand. CanvasFrameChip gebruikt dezelfde waarde.
     static let frameSelectionGrey = Color(white: 0.6)
 
-    /// Ruimte bóven het canvas: flush breadcrumb-rij (28pt) + header-row (28pt)
-    /// + gap boven de kaart — voorkomt dat de naam/toolbar in de breadcrumb klikken.
+    /// Ruimte bóven het canvas: top-chrome-band + header-row (28pt) + gap
+    /// boven de kaart — voorkomt dat de naam/toolbar in de breadcrumb klikken.
     private static let canvasTopChromeInset: CGFloat =
-        28 + DSSpacing.gap4 + 28 + DSSpacing.gap2
+        ShellMetrics.topBarBandHeight + DSSpacing.gap4 + 28 + DSSpacing.gap2
 
     /// E07.1: is er een achtergrond-laag (dan dot-grid uit)? Origineel, custom
     /// afbeelding, kleur, óf Portrait-op-transparant (valt op origineel terug).
@@ -430,6 +434,19 @@ struct EditorView: View {
             // elkaar uit — opent de sidebar, dan klapt het paneel dicht.
             .onChange(of: isSidebarVisible) { _, visible in
                 if visible { activeTool = nil }
+            }
+            .onAppear {
+                stylizeQuality.onBoostCutout = {
+                    await performBoostResolution()
+                }
+            }
+            .sheet(isPresented: Binding(
+                get: { stylizeQuality.preGate != nil },
+                set: { if !$0 { stylizeQuality.resolvePreGate(.proceed) } }
+            )) {
+                if let gate = stylizeQuality.preGate {
+                    PreStylizeQualitySheet(gate: gate) { stylizeQuality.resolvePreGate($0) }
+                }
             }
     }
 
@@ -715,10 +732,11 @@ struct EditorView: View {
                                 onSetFrameShape: setFrameShape,
                                 activeMenu: $canvasMenu,
                                 gridEnabled: $canvasGridEnabled,
+                                isAutoFraming: isAutoFraming,
                                 layout: .headerRow,
                                 background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement).onHover { pointerOverChrome = $0 } }
                             )
-                            .disabled(isolating != nil)
+                            .disabled(isolating != nil || isAutoFraming)
                         }
                         .fixedSize(horizontal: true, vertical: false)
                         .offset(x: visLeft, y: visTop - 28 - DSSpacing.gap2)
@@ -830,6 +848,8 @@ struct EditorView: View {
                     FaceActionsPanel(
                         baseImage: rawCutout,
                         entitlement: entitlement,
+                        portrait: portraitModel,
+                        coordinator: stylizeQuality,
                         onApply: undoableApplyPreservingAlpha("Face edit"),
                         isPro: entitlement.isProActive
                     )
@@ -843,17 +863,35 @@ struct EditorView: View {
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
                 // de panel-view-models seeden hun basisbeeld eenmalig via @State —
                 // bij een portret-wissel moet het paneel herbouwen (anders stale).
-                ClothesPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change clothes"))
+                ClothesPanel(
+                    baseImage: rawCutout,
+                    entitlement: entitlement,
+                    portrait: portraitModel,
+                    coordinator: stylizeQuality,
+                    onApply: undoableApply("Change clothes")
+                )
                     .id(portraitModel?.persistentModelID)
             } else if tool == .effects, let entitlement {
                 // E09.2: stijl-kaarten op het productie-/v1/stylize. E24.33: het
                 // portret levert de effect-cache (instant schakelen, geen regen).
-                EffectsPanel(baseImage: rawCutout, entitlement: entitlement, portrait: portraitModel, onApply: undoableApplyPreservingAlpha("Apply effect"))
+                EffectsPanel(
+                    baseImage: rawCutout,
+                    entitlement: entitlement,
+                    portrait: portraitModel,
+                    coordinator: stylizeQuality,
+                    onApply: undoableApplyPreservingAlpha("Apply effect")
+                )
                     .id(portraitModel?.persistentModelID)
             } else if tool == .hair, let entitlement {
                 // E11.2: kapsel-chips + vrije prompt op de hair-intent van
                 // /v1/stylize (nano-banana instruction-edit, E11.1-route).
-                HairPanel(baseImage: rawCutout, entitlement: entitlement, onApply: undoableApply("Change hair"))
+                HairPanel(
+                    baseImage: rawCutout,
+                    entitlement: entitlement,
+                    portrait: portraitModel,
+                    coordinator: stylizeQuality,
+                    onApply: undoableApply("Change hair")
+                )
                     .id(portraitModel?.persistentModelID)
             } else {
                 DSEditPanel(title: tool.label) {
@@ -871,6 +909,20 @@ struct EditorView: View {
             toolbarAccessories
         }
         .padding(.horizontal, DSSpacing.gap3)
+        .overlay(alignment: .bottom) {
+            if let offer = stylizeQuality.postBoostOffer {
+                PostStylizeBoostBanner(
+                    offer: offer,
+                    onSharpen: {
+                        stylizeQuality.dismissPostBoost()
+                        runBoostResolution()
+                    },
+                    onDismiss: { stylizeQuality.dismissPostBoost() }
+                )
+                .padding(.horizontal, DSSpacing.gap8)
+                .padding(.bottom, 72)
+            }
+        }
         // Geen bottom-padding: het canvas loopt door tot de onderrand van het
         // venster; de zwevende toolbar houdt zelf zijn gap2-inset (DSEditPanel-
         // Container) zodat hij nét boven de rand hangt.
@@ -909,9 +961,14 @@ struct EditorView: View {
     /// E06.5: AutoFramer op het huidige portret; zonder model of CGImage
     /// is er niets te kadreren (knop is dan een no-op).
     private func runAutomaticFraming() {
-        guard let portraitModel,
-              let cg = portrait.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        Task { await AutoFramer.apply(to: portraitModel, image: cg, undoManager: undoManager) }
+        guard !isAutoFraming,
+              let portraitModel,
+              let cg = rawCutout.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        isAutoFraming = true
+        Task {
+            defer { isAutoFraming = false }
+            await AutoFramer.apply(to: portraitModel, image: cg, undoManager: undoManager)
+        }
     }
 
     /// E12.1: lokale Core Image-enhance op het huidige portret. Niet-
@@ -1039,11 +1096,14 @@ struct EditorView: View {
     }
 
     /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
-    /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
     private func runBoostResolution() {
+        Task { await performBoostResolution() }
+    }
+
+    @MainActor
+    private func performBoostResolution() async {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
-        // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         let before = rawCutout
         entitlement.presentWorking(
@@ -1056,29 +1116,24 @@ struct EditorView: View {
                 "Almost crisp…",
             ]
         )
-        Task {
-            isBoosting = true
-            defer { isBoosting = false }
-            do {
-                let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
-                guard let after = NSImage(data: data) else {
-                    entitlement.dismissWorkingToast()
-                    return
-                }
-                entitlement.dismissWorkingToast()
-                onApplyResult(after)
-                ImageEnhanceUndo.register(
-                    undoManager, target: portraitModel, apply: onApplyResult,
-                    undoTo: before, redoTo: after, actionName: "Boost resolution"
-                )
-                await entitlement.refresh()
-            } catch BackendError.noCredits {
-                entitlement.dismissWorkingToast()
-                entitlement.handleOutOfCredits()
-            } catch {
-                entitlement.dismissWorkingToast()
-                entitlement.presentError("Couldn't boost the resolution. Please try again.")
-            }
+        isBoosting = true
+        defer {
+            isBoosting = false
+            entitlement.dismissWorkingToast()
+        }
+        do {
+            let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
+            guard let after = NSImage(data: data) else { return }
+            onApplyResult(after)
+            ImageEnhanceUndo.register(
+                undoManager, target: portraitModel, apply: onApplyResult,
+                undoTo: before, redoTo: after, actionName: "Boost resolution"
+            )
+            await entitlement.refresh()
+        } catch BackendError.noCredits {
+            entitlement.handleOutOfCredits()
+        } catch {
+            entitlement.presentError("Couldn't boost the resolution. Please try again.")
         }
     }
 

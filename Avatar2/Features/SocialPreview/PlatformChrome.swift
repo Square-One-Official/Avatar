@@ -4,22 +4,18 @@
 // neutraal grijs (DS-tokens, auto-theming). De avatar-plek per platform komt uit
 // `SocialPlatform`-geometrie zodat preview en cover-export gelijk lopen.
 //
-// Aesthetic skill: hiërarchie via realisme (niet via grootte) — het oog landt op
-// de avatar-in-context. Terughoudendheid: simpele afgeronde blokken voor navbar,
-// naam/headline, knoppen en een post/grid-zone; geen nep-tekst, logo's of foto's.
+// Klik op avatar of banner opent kiezer-panelen in de parent (E34 follow-up).
 
 import AvatarUI
 import SwiftUI
 
 struct PlatformChrome<Banner: View, Avatar: View>: View {
     let platform: SocialPlatform
-    /// Vaste kaartbreedte; alle geometrie wordt hieruit afgeleid (voorspelbaar in
-    /// zowel de enkel-weergave als de "All"-grid).
     var width: CGFloat
-    /// De cover/banner-laag (LinkedIn/X). Ongebruikt voor Instagram.
+    var coordinateSpace: CoordinateSpace = .local
+    var onAvatarTap: ((CGRect) -> Void)?
+    var onBannerTap: ((CGRect) -> Void)?
     @ViewBuilder var banner: () -> Banner
-    /// De scherpe, ronde profielfoto (de parent levert het rauwe beeld; deze view
-    /// clipt 'm rond + zet de platform-ring eromheen).
     @ViewBuilder var avatar: () -> Avatar
 
     var body: some View {
@@ -42,20 +38,20 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
     // MARK: LinkedIn — cover 4:1, avatar linksonder, headline + feed-card
 
     private var linkedIn: some View {
-        let bandH = width / 4                                  // 4:1
+        let bandH = width / 4
         let d = bandH * (platform.profileDiameterFraction ?? 0.62)
         let pad = width * 0.05
         return VStack(alignment: .leading, spacing: 0) {
             navBar(Image("LinkedInLogo"))
             coverBand(height: bandH, avatarDiameter: d)
             VStack(alignment: .leading, spacing: pad * 0.5) {
-                Color.clear.frame(height: d / 2 - pad * 0.5)   // ruimte onder de overlappende avatar
-                skel(width * 0.46, width * 0.032)              // naam
-                skel(width * 0.30, width * 0.024)              // functie/headline
-                skel(width * 0.20, width * 0.022)              // locatie
-                pill(width * 0.20, width * 0.05)               // "Connect"-knop
+                Color.clear.frame(height: d / 2 - pad * 0.5)
+                skel(width * 0.46, width * 0.032)
+                skel(width * 0.30, width * 0.024)
+                skel(width * 0.20, width * 0.022)
+                pill(width * 0.20, width * 0.05)
                 Color.clear.frame(height: pad * 0.5)
-                feedCard(height: width * 0.16)                 // vage feed-kaart
+                feedCard(height: width * 0.16)
             }
             .padding(.horizontal, pad)
             .padding(.bottom, pad)
@@ -65,7 +61,7 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
     // MARK: X — cover 3:1, avatar linksonder (half onder de band), tweets
 
     private var xChrome: some View {
-        let bandH = width / 3                                  // 3:1
+        let bandH = width / 3
         let d = bandH * (platform.profileDiameterFraction ?? 0.56)
         let pad = width * 0.05
         return VStack(alignment: .leading, spacing: 0) {
@@ -75,10 +71,10 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
                 HStack(alignment: .top) {
                     Color.clear.frame(height: d / 2 - pad * 0.5)
                     Spacer()
-                    pill(width * 0.18, width * 0.05)           // "Follow"-knop rechtsboven
+                    pill(width * 0.18, width * 0.05)
                 }
-                skel(width * 0.32, width * 0.032)              // naam
-                skel(width * 0.22, width * 0.024)              // @handle
+                skel(width * 0.32, width * 0.032)
+                skel(width * 0.22, width * 0.024)
                 Color.clear.frame(height: pad * 0.3)
                 tweetRow()
                 tweetRow()
@@ -97,8 +93,7 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
             navBar(Image("InstagramLogo"))
 
             HStack(spacing: pad) {
-                ringedAvatar(diameter: d)
-                // Stats: 3 kolommen (getal + label).
+                tappableAvatar(diameter: d)
                 HStack(spacing: pad) {
                     ForEach(0..<3, id: \.self) { _ in
                         VStack(spacing: width * 0.012) {
@@ -112,21 +107,19 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
             .padding(.horizontal, pad)
 
             VStack(alignment: .leading, spacing: width * 0.012) {
-                skel(width * 0.4, width * 0.022)               // bio
+                skel(width * 0.4, width * 0.022)
                 skel(width * 0.28, width * 0.022)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, pad)
 
-            grid()                                             // 3×3 post-grid
+            grid()
         }
         .padding(.bottom, pad)
     }
 
     // MARK: - Building blocks
 
-    /// Slanke platform-navbalk met het merk-logo (monochroom, subtiel) + een paar
-    /// nav-stubs rechts — nét genoeg om het platform te herkennen, ruisvrij.
     private func navBar(_ logo: Image) -> some View {
         let h = width * 0.085
         return HStack(spacing: width * 0.02) {
@@ -148,29 +141,44 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Cover-band met de banner-laag + de overlappende, geringde profielfoto
-    /// linksonder (LinkedIn/X). De avatar valt half onder de band → géén clip.
     private func coverBand(height bandH: CGFloat, avatarDiameter d: CGFloat) -> some View {
         let center = platform.profileCenterInCover ?? UnitPoint(x: 0.14, y: 1.0)
-        return banner()
-            .frame(width: width, height: bandH)
-            .clipped()
-            .overlay(alignment: .topLeading) {
-                ringedAvatar(diameter: d)
-                    .position(x: width * center.x, y: bandH * center.y)
-            }
-            // De overlay mag onder de band uitsteken (avatar-overlap).
-            .frame(width: width, height: bandH, alignment: .topLeading)
-            .zIndex(1)
+        return ZStack(alignment: .topLeading) {
+            banner()
+                .frame(width: width, height: bandH)
+                .clipped()
+                .contentShape(Rectangle())
+                .previewTapTarget(
+                    in: coordinateSpace,
+                    enabled: onBannerTap != nil
+                ) { onBannerTap?($0) }
+
+            ringedAvatar(diameter: d)
+                .position(x: width * center.x, y: bandH * center.y)
+                .zIndex(1)
+        }
+        .frame(width: width, height: bandH, alignment: .topLeading)
+        .zIndex(1)
     }
 
-    /// De scherpe, ronde profielfoto met een platform-ring (kaartkleur) eromheen.
+    private func tappableAvatar(diameter d: CGFloat) -> some View {
+        ringedAvatar(diameter: d)
+            .previewTapTarget(
+                in: coordinateSpace,
+                enabled: onAvatarTap != nil
+            ) { onAvatarTap?($0) }
+    }
+
     private func ringedAvatar(diameter d: CGFloat) -> some View {
         avatar()
             .frame(width: d, height: d)
             .clipShape(Circle())
             .overlay(Circle().strokeBorder(DSColor.Background.card, lineWidth: max(2, d * 0.04)))
             .shadow(color: DSColor.Background.shadow.opacity(0.25), radius: d * 0.03, y: d * 0.01)
+            .previewTapTarget(
+                in: coordinateSpace,
+                enabled: onAvatarTap != nil
+            ) { onAvatarTap?($0) }
     }
 
     private func skel(_ w: CGFloat, _ h: CGFloat) -> some View {

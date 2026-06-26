@@ -207,10 +207,7 @@ struct PortraitGridTile: View {
             // Selectie-vinkje (Finder-stijl) rechtsboven.
             .overlay(alignment: .topTrailing) {
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(DSColor.Background.app, DSColor.Action.primary)
+                    DSSelectionCheckBadge(size: 20)
                         .padding(DSSpacing.gap2)
                 }
             }

@@ -305,6 +305,110 @@ public final class BackendClient {
     }
 
     // MARK: POST /v1/stylize
+
+    /// Pixel dimensions returned by `/v1/stylize` (instrumentation + post-boost UI).
+    public struct StylizeDimensions: Decodable, Sendable, Equatable {
+        public let inputWidth: Int
+        public let inputHeight: Int
+        public let outputWidth: Int
+        public let outputHeight: Int
+
+        enum CodingKeys: String, CodingKey {
+            case inputWidth = "input_width"
+            case inputHeight = "input_height"
+            case outputWidth = "output_width"
+            case outputHeight = "output_height"
+        }
+
+        public var outputLongEdge: Int { max(outputWidth, outputHeight) }
+    }
+
+    /// Result of any `/v1/stylize` call (Effects, hair, clothes, face).
+    public struct StylizeCallResult: Sendable {
+        public let data: Data
+        public let creditsRemaining: Int
+        public let dimensions: StylizeDimensions?
+    }
+
+    private struct StylizeResponse: Decodable {
+        let image: String
+        let creditsRemaining: Int
+        let inputWidth: Int?
+        let inputHeight: Int?
+        let outputWidth: Int?
+        let outputHeight: Int?
+
+        var dimensions: StylizeDimensions? {
+            guard let inputWidth, let inputHeight, let outputWidth, let outputHeight else { return nil }
+            return StylizeDimensions(
+                inputWidth: inputWidth, inputHeight: inputHeight,
+                outputWidth: outputWidth, outputHeight: outputHeight
+            )
+        }
+    }
+
+    private struct StylizeBody: Encodable {
+        let storageKey: String
+        let generationModel: String
+        let modelOverride: String?
+        let cutoutW: Int?
+        let cutoutH: Int?
+        let style: String?
+        let hairPreset: String?
+        let hairPrompt: String?
+        let clothesPreset: String?
+        let clothesPrompt: String?
+        let facePreset: String?
+
+        enum CodingKeys: String, CodingKey {
+            case storageKey = "storage_key"
+            case generationModel = "generation_model"
+            case modelOverride = "model_override"
+            case cutoutW = "cutout_w"
+            case cutoutH = "cutout_h"
+            case style
+            case hairPreset = "hair_preset"
+            case hairPrompt = "hair_prompt"
+            case clothesPreset = "clothes_preset"
+            case clothesPrompt = "clothes_prompt"
+            case facePreset = "face_preset"
+        }
+    }
+
+    private func runStylize(
+        imagePNG: Data,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        style: String? = nil,
+        hairPreset: String? = nil,
+        hairPrompt: String? = nil,
+        clothesPreset: String? = nil,
+        clothesPrompt: String? = nil,
+        facePreset: String? = nil
+    ) async throws -> StylizeCallResult {
+        let storageKey = try await uploadInputPNG(imagePNG)
+        let body = try JSONEncoder().encode(
+            StylizeBody(
+                storageKey: storageKey,
+                generationModel: GenerationModelStore.shared.current.rawValue,
+                modelOverride: DevModelOverrides.shared.override(for: .stylize),
+                cutoutW: cutoutWidth,
+                cutoutH: cutoutHeight,
+                style: style,
+                hairPreset: hairPreset,
+                hairPrompt: hairPrompt,
+                clothesPreset: clothesPreset,
+                clothesPrompt: clothesPrompt,
+                facePreset: facePreset
+            )
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return StylizeCallResult(data: data, creditsRemaining: resp.creditsRemaining, dimensions: resp.dimensions)
+    }
+
     /// Effects (E09.2; CMS-gestuurd sinds E33) — stuurt het huidige portret + een
     /// stijl-key naar het productie-`/v1/stylize`. De `styleKey` komt uit de
     /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
@@ -315,34 +419,16 @@ public final class BackendClient {
     ///
     /// Op 402 (geen credits) gooit dit `BackendError.noCredits` → de caller
     /// toont de paywall; andere fouten propageren voor de faaltoast.
-    private struct StylizeResponse: Decodable {
-        let image: String
-        let creditsRemaining: Int          // decoded from `credits_remaining`
-    }
-    public func stylize(imagePNG: Data, styleKey: String) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let style: String
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case style
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey, style: styleKey,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func stylize(
+        imagePNG: Data,
+        styleKey: String,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            style: styleKey
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/upscale (Boost resolution, E10.3)
@@ -382,34 +468,17 @@ public final class BackendClient {
     /// tekst gaat als `hair_prompt` (server giet het in een vast sjabloon —
     /// geen rauwe instructie). Resultaat = opaque PNG + bijgewerkt saldo;
     /// 402 → `BackendError.noCredits` (paywall).
-    public func editHair(imagePNG: Data, presetKey: String? = nil, freeText: String? = nil) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let hairPreset: String?
-            let hairPrompt: String?
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case hairPreset = "hair_preset"
-                case hairPrompt = "hair_prompt"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 hairPreset: presetKey,
-                 hairPrompt: freeText,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editHair(
+        imagePNG: Data,
+        presetKey: String? = nil,
+        freeText: String? = nil,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            hairPreset: presetKey, hairPrompt: freeText
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/stylize (clothes-intent, E10.4)
@@ -418,34 +487,17 @@ public final class BackendClient {
     /// `freeText`; de server mapt het naar een clothes-only edit-prompt met
     /// het harde acceptatiecriterium (gezicht/haar/pose/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editClothes(imagePNG: Data, presetKey: String? = nil, freeText: String? = nil) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let clothesPreset: String?
-            let clothesPrompt: String?
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case clothesPreset = "clothes_preset"
-                case clothesPrompt = "clothes_prompt"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 clothesPreset: presetKey,
-                 clothesPrompt: freeText,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editClothes(
+        imagePNG: Data,
+        presetKey: String? = nil,
+        freeText: String? = nil,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            clothesPreset: presetKey, clothesPrompt: freeText
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/stylize (face-intent, E32.1)
@@ -454,31 +506,16 @@ public final class BackendClient {
     /// server mapt `face_preset` naar een gezicht-only edit-prompt met het
     /// harde acceptatiecriterium (identiteit/pose/haar/kleding/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editFace(imagePNG: Data, presetKey: String) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let facePreset: String
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case facePreset = "face_preset"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 facePreset: presetKey,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editFace(
+        imagePNG: Data,
+        presetKey: String,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            facePreset: presetKey
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/checkout/subscribe-anonymous

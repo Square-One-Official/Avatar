@@ -5,9 +5,6 @@
 // De één-tik-acties (One click retouch/Studio Light/Colorise/Boost/Restore body)
 // staan als compacte chips bovenin het Enhance-paneel. One-click retouch verhuisde
 // hierheen uit het Face-paneel (Thierry, 2026-06-23).
-//
-// Figma-TODO: er is (nog) geen DS-slider-component; dit gebruikt SwiftUI's
-// Slider met DS-tint. Vervangen zodra de slider in de library staat.
 
 import AvatarKit
 import AvatarUI
@@ -199,7 +196,7 @@ struct EditColorPanel: View {
             Text(label)
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
-            Slider(
+            DSSlider(
                 value: value,
                 in: range,
                 onEditingChanged: { editing in
@@ -211,8 +208,6 @@ struct EditColorPanel: View {
                     }
                 }
             )
-            .controlSize(.small)
-            .tint(DSColor.Action.primary)
             .onChange(of: value.wrappedValue) { _, _ in schedulePreview() }
         }
     }

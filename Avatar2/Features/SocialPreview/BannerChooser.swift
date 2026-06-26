@@ -1,18 +1,17 @@
 // Banner-kiezer in de social-preview (E35.4). Kies "Match avatar" (default) of
-// één van je opgeslagen banners (Banners-bibliotheek). Maken/uploaden gebeurt in
-// de Banners-sectie — hier kies je alleen. Een keuze kopieert de banner-bytes
+// één van je opgeslagen banners (Banners-bibliotheek). Maken gebeurt in de
+// Banners-sectie — hier kies je alleen. Een keuze kopieert de banner-bytes
 // naar het portret (`.image`), undo'baar via de caller.
 
+import AppKit
 import AvatarUI
 import SwiftData
 import SwiftUI
 
-struct BannerChooser: View {
+struct BannerPickerContent: View {
     let portrait: Portrait2
     var onApply: (BannerBackground) -> Void
-    var onManage: () -> Void
 
-    // E37.6: de social-preview kiest nu uit `BannerDoc`-previews (de Studio-store).
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var banners: [BannerDoc]
     private var savedBanners: [BannerDoc] { banners.filter { $0.previewImageData != nil } }
 
@@ -20,10 +19,8 @@ struct BannerChooser: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            // Match avatar (default).
             matchRow
 
-            // Opgeslagen banners.
             VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                 Text("Your banners")
                     .dsTextStyle(.bodySmall)
@@ -39,8 +36,6 @@ struct BannerChooser: View {
                 ForEach(savedBanners) { banner in
                     bannerTile(banner)
                 }
-
-                newBannerTile
             }
         }
     }
@@ -91,21 +86,35 @@ struct BannerChooser: View {
             .help(banner.name.isEmpty ? "Untitled banner" : banner.name)
         }
     }
+}
 
-    private var newBannerTile: some View {
-        Button(action: onManage) {
-            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .strokeBorder(DSColor.Foreground.divider, style: StrokeStyle(lineWidth: 1, dash: [4]))
-                .frame(height: 40)
-                .overlay {
-                    HStack(spacing: DSSpacing.gap1_5) {
-                        Image(systemName: "plus").font(.system(size: 12, weight: .semibold))
-                        Text("New banner").dsTextStyle(.labelSmall)
-                    }
-                    .foregroundStyle(DSColor.Foreground.muted)
+struct BannerPickerPanel: View {
+    let portrait: Portrait2
+    let platform: SocialPlatform
+    var isPro: Bool
+    var onApply: (BannerBackground) -> Void
+    var onSave: (SocialPlatform) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+            Text("Banner")
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+
+            BannerPickerContent(portrait: portrait, onApply: onApply)
+
+            if platform.hasCover {
+                DSPrimaryButton("Save \(platform.displayName) banner", fullWidth: true) {
+                    onSave(platform)
                 }
+            }
+
+            if !isPro {
+                Text("Free exports include a small “Made with Aaavatar” mark.")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .buttonStyle(.plain)
-        .help("Create banners in the Banners section")
     }
 }

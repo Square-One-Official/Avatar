@@ -1,13 +1,7 @@
-// Social-preview-surface (E34.5). Volledige overlay over de editor (crossfade,
-// shell-niveau): toont de profielfoto-in-context in een minimalistisch skeleton-
-// wireframe per platform. Bovenaan een segmented-control (LinkedIn default · X ·
-// Instagram · All); rechts de banner-bediening + export. Terug naar Edit via de
-// shell-topbar (Edit · Preview segmented control) — geen aparte sluit-knop.
-//
-// De ronde profielfoto hergebruikt de bestaande export-pijplijn
-// (PortraitExporter, shape .circle); de banner-laag komt uit BannerResolver
-// (match-portret / kleur / afbeelding) en wordt voor de preview direct in SwiftUI
-// getekend (geen volle composite per frame — dat is alleen de export, E34.7).
+// Social-preview-surface (E34.5). Eigen modus in de editor-sectie: toont de
+// profielfoto-in-context in een minimalistisch skeleton-wireframe per platform.
+// Klik op de avatar of banner in de mockup opent een kiezer-paneel; profiel-
+// export via de shell-topbar (Share). Terug naar Edit via Edit · Preview.
 
 import AppKit
 import AvatarKit
@@ -15,34 +9,36 @@ import AvatarUI
 import SwiftUI
 
 struct SocialPreviewView: View {
-    let portrait: Portrait2
+    let model: ShellModel
     var isPro: Bool = false
-    /// E35.4: navigeer naar de Banners-bibliotheek (sluit de preview).
-    var onManageBanners: () -> Void = {}
 
     @Environment(\.undoManager) private var undoManager
     @State private var tab: PreviewTab = .linkedIn
     @State private var avatarImage: NSImage?
     @State private var bannerFill: BannerCompositor.Fill?
+    @State private var activePicker: PreviewPicker?
 
+    private static let pickerSpace = "socialPreviewPicker"
+
+    private var portrait: Portrait2? { model.selectedPortrait }
     private var cardWidth: CGFloat { tab == .all ? 380 : 540 }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            HStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            DSColor.Background.app
+                .ignoresSafeArea(edges: [.horizontal, .bottom])
+                .padding(.top, ShellMetrics.topBarBandHeight)
+
+            VStack(spacing: 0) {
+                header
                 previewArea
-                controlColumn
-                    .padding(.trailing, DSSpacing.gap3)
-                    .padding(.bottom, DSSpacing.gap3)
             }
+            .padding(.top, ShellMetrics.topBarBandHeight)
+
+            pickerOverlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DSColor.Background.app)
-        // Shell-topbar (breadcrumb + Edit/Preview + Share) zweeft erboven;
-        // platform-switcher begint onder die rij.
-        .padding(.top, ShellMetrics.topBarRowHeight)
-        .task(id: portrait.updatedAt) { refresh() }
+        .task(id: portrait?.updatedAt) { await refresh() }
     }
 
     // MARK: Header — platform segmented switcher
@@ -65,7 +61,15 @@ struct SocialPreviewView: View {
         ScrollView {
             VStack(spacing: DSSpacing.gap8) {
                 ForEach(tab.platforms) { platform in
-                    PlatformChrome(platform: platform, width: cardWidth) {
+                    PlatformChrome(
+                        platform: platform,
+                        width: cardWidth,
+                        coordinateSpace: .named(Self.pickerSpace),
+                        onAvatarTap: { activePicker = .portrait(anchor: $0) },
+                        onBannerTap: platform.hasCover
+                            ? { activePicker = .banner(anchor: $0, platform: platform) }
+                            : nil
+                    ) {
                         bannerLayer
                     } avatar: {
                         avatarView
@@ -75,7 +79,33 @@ struct SocialPreviewView: View {
             .frame(maxWidth: .infinity)
             .padding(DSSpacing.gap8)
         }
+        .coordinateSpace(name: Self.pickerSpace)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var pickerOverlay: some View {
+        if let activePicker, let portrait {
+            switch activePicker {
+            case .portrait(let anchor):
+                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker = nil }) {
+                    PortraitPickerPanel(current: portrait) { selected in
+                        model.selectPortraitInPreview(selected)
+                        self.activePicker = nil
+                    }
+                }
+            case .banner(let anchor, let platform):
+                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker = nil }) {
+                    BannerPickerPanel(
+                        portrait: portrait,
+                        platform: platform,
+                        isPro: isPro,
+                        onApply: applyBanner,
+                        onSave: saveBanner
+                    )
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -99,52 +129,15 @@ struct SocialPreviewView: View {
         }
     }
 
-    // MARK: Controls — banner picker + export
-
-    private var controlColumn: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap5) {
-            Text("Banner")
-                .dsTextStyle(.h3)
-                .foregroundStyle(DSColor.Foreground.primary)
-
-            ScrollView {
-                BannerChooser(portrait: portrait, onApply: applyBanner, onManage: onManageBanners)
-            }
-            .frame(maxHeight: .infinity)
-
-            Spacer(minLength: 0)
-
-            VStack(spacing: DSSpacing.gap2) {
-                DSNeutralButton("Save profile picture", fullWidth: true) { saveProfilePicture() }
-                ForEach(tab.platforms.filter(\.hasCover)) { platform in
-                    DSPrimaryButton("Save \(platform.displayName) banner", fullWidth: true) {
-                        saveBanner(platform)
-                    }
-                }
-            }
-
-            if !isPro {
-                Text("Free exports include a small “Made with Aaavatar” mark.")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(DSSpacing.gap5)
-        .frame(width: 300)
-        .frame(maxHeight: .infinity, alignment: .top)
-        // Zwevende, afgeronde kaart met lucht rondom (zoals de left-nav) i.p.v.
-        // een edge-to-edge paneel met scheidingslijn.
-        .background(
-            DSColor.Background.card,
-            in: RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
-        )
-    }
-
     // MARK: Actions
 
     @MainActor
-    private func refresh() {
+    private func refresh() async {
+        guard let portrait else {
+            avatarImage = nil
+            bannerFill = nil
+            return
+        }
         avatarImage = PortraitExporter
             .makePNG(for: portrait, watermark: false, side: 512, shape: .circle)
             .flatMap(NSImage.init(data:))
@@ -152,20 +145,18 @@ struct SocialPreviewView: View {
     }
 
     private func applyBanner(_ banner: BannerBackground) {
+        guard let portrait else { return }
         let before = portrait.bannerBackground
         guard before != banner else { return }
         portrait.setBannerBackground(banner)
         ReversibleChange.register(
             undoManager, target: portrait, from: before, to: banner, actionName: "Banner"
         ) { p, b in p.setBannerBackground(b) }
-    }
-
-    private func saveProfilePicture() {
-        let data = PortraitExporter.makePNG(for: portrait, watermark: !isPro, side: 512, shape: .circle)
-        save(data, defaultName: "Aaavatar-profile.png")
+        Task { await refresh() }
     }
 
     private func saveBanner(_ platform: SocialPlatform) {
+        guard let portrait else { return }
         let data = PortraitExporter.makeBannerPNG(for: portrait, platform: platform, watermark: !isPro)
         save(data, defaultName: "Aaavatar-\(platform.rawValue)-cover.png")
     }

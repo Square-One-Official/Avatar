@@ -121,6 +121,7 @@ final class ShellModel {
     /// Naar het overzicht (Home).
     func showHome() {
         isShowingSettings = false
+        isShowingSocialPreview = false
         clearPortraitSelection()
         section = .home
     }
@@ -128,6 +129,7 @@ final class ShellModel {
     /// Naar de Portraits-grid van een map (nil = alle beelden).
     func showPortraits(folderID: PersistentIdentifier? = nil) {
         isShowingSettings = false
+        isShowingSocialPreview = false
         clearPortraitSelection()
         selectedFolderID = folderID
         section = .portraits
@@ -136,6 +138,7 @@ final class ShellModel {
     /// E35.2: naar de Banners-bibliotheek.
     func showBanners() {
         isShowingSettings = false
+        isShowingSocialPreview = false
         clearPortraitSelection()
         section = .banners
     }
@@ -167,6 +170,7 @@ final class ShellModel {
     /// herkomst zodat `goBack()` naar de juiste surface terugkeert.
     func openPortrait(_ portrait: Portrait2) {
         isShowingSettings = false
+        isShowingSocialPreview = false
         clearPortraitSelection()
         openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
         // Hero-morph alleen vanaf de Portraits-surface (daar staan de tegels die
@@ -255,8 +259,8 @@ final class ShellModel {
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
     var isShowingExport = false
 
-    /// E34.5: social-preview-overlay (LinkedIn/X/Instagram-in-context + banner).
-    /// Vervangt — met een crossfade — de editor; de ✕ in de preview sluit 'm.
+    /// E34.5: social-preview-modus (LinkedIn/X/Instagram-in-context + banner).
+    /// Vervangt de editor-canvas in de content-kolom; terug via Edit in de topbar.
     var isShowingSocialPreview = false
 
     /// E24.21: gedeelde rename-modal (Name + Role), geopend vanuit de
@@ -466,43 +470,54 @@ final class ShellModel {
               let rgbCG = rgbImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return nil
         }
-        let cutoutCI = CIImage(cgImage: cutoutCG)
+        var cutoutCI = CIImage(cgImage: cutoutCG)
         var rgbCI = CIImage(cgImage: rgbCG)
 
-        // Schaal het gestylede beeld naar de afmetingen van de cutout (backend
-        // rendert op ~1 MP, de cutout kan een andere resolutie hebben).
-        let sw = cutoutCI.extent.width / rgbCI.extent.width
-        let sh = cutoutCI.extent.height / rgbCI.extent.height
-        if abs(sw - 1) > 0.005 || abs(sh - 1) > 0.005 {
+        let outW = max(cutoutCG.width, rgbCG.width)
+        let outH = max(cutoutCG.height, rgbCG.height)
+        let outRect = CGRect(x: 0, y: 0, width: outW, height: outH)
+
+        if rgbCG.width != outW || rgbCG.height != outH {
+            let sw = CGFloat(outW) / CGFloat(rgbCG.width)
+            let sh = CGFloat(outH) / CGFloat(rgbCG.height)
             rgbCI = rgbCI.transformed(by: CGAffineTransform(scaleX: sw, y: sh))
         }
+        if cutoutCG.width != outW || cutoutCG.height != outH {
+            let sw = CGFloat(outW) / CGFloat(cutoutCG.width)
+            let sh = CGFloat(outH) / CGFloat(cutoutCG.height)
+            cutoutCI = cutoutCI.transformed(by: CGAffineTransform(scaleX: sw, y: sh))
+            cutoutCI = hardenedAlphaMask(cutoutCI)
+        }
 
-        // Pas de alpha van de cutout toe als masker op de gestylede RGB-pixels.
-        // CIBlendWithAlphaMask: inputImage * mask.alpha + background * (1 - mask.alpha)
         let masked = rgbCI.applyingFilter("CIBlendWithAlphaMask", parameters: [
             kCIInputBackgroundImageKey: CIImage.empty(),
             "inputMaskImage": cutoutCI
         ])
 
         let ctx = CIContext(options: [.useSoftwareRenderer: false])
-        let size = CGSize(width: cutoutCG.width, height: cutoutCG.height)
-        guard let out = ctx.createCGImage(masked, from: CGRect(origin: .zero, size: size)) else {
-            return nil
-        }
-        return NSImage(cgImage: out, size: NSSize(width: size.width, height: size.height))
+        guard let out = ctx.createCGImage(masked, from: outRect) else { return nil }
+        return NSImage(cgImage: out, size: NSSize(width: outW, height: outH))
+    }
+
+    /// Re-threshold a scaled alpha mask to avoid soft halos after Lanczos upscale.
+    nonisolated private static func hardenedAlphaMask(_ mask: CIImage) -> CIImage {
+        // High contrast + slight bias ≈ hard threshold at ~0.5 on the alpha channel.
+        let contrasted = mask.applyingFilter("CIColorControls", parameters: [
+            kCIInputContrastKey: 20,
+            kCIInputBrightnessKey: -0.45,
+            kCIInputSaturationKey: 0,
+        ])
+        return contrasted.cropped(to: mask.extent)
     }
 
     /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
     /// her-render het canvas met de niet-destructieve Adjust-laag erbovenop.
     private func storeEffectResult(_ image: NSImage, on portrait: Portrait2) {
-        // E24.36: de opgeslagen transform (offsetX/offsetY/scale) is in absolute
-        // bronpixels uitgedrukt. Een generatieve edit (nano-banana) houdt wél de RATIO
-        // aan (aspect_ratio: match_input_image) maar niet de exacte pixelmaat
-        // (Gemini rendert op ~1 MP) → dezelfde transform op een ander formaat
-        // verspringt het beeld. Hybride correctie:
-        //   • ratio (vrijwel) gelijk → schaal terug naar de exacte oude pixelmaat;
-        //     de transform blijft geldig, de gebruiker behoudt zijn positie.
-        //   • model gaf een echt andere ratio → reset + her-kadreer op het gezicht.
+        // E24.36 + quality rev2: generatieve edits houden de ratio aan maar niet
+        // de pixelmaat (~1 MP van nano-banana). Hybride correctie:
+        //   • ratio drift ≥ 2% → reset + AutoFramer;
+        //   • resultaat groter dan oude cutout → behoud resolutie, pas scale aan;
+        //   • resultaat kleiner → Lanczos terug naar oude maat (transform blijft).
         let oldCG = NSImage(data: portrait.cutoutData)?
             .cgImage(forProposedRect: nil, context: nil, hints: nil)
         let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
@@ -513,12 +528,24 @@ final class ShellModel {
             let oldRatio = Double(oldCG.width) / Double(oldCG.height)
             let newRatio = Double(newCG.width) / Double(newCG.height)
             let drift = abs(newRatio - oldRatio) / oldRatio
-            let oldSize = CGSize(width: oldCG.width, height: oldCG.height)
-            if drift < 0.02, let resized = Self.resized(newCG, to: oldSize) {
-                stored = resized
-            } else {
+            let oldPixels = oldCG.width * oldCG.height
+            let newPixels = newCG.width * newCG.height
+            if drift >= 0.02 {
                 portrait.offsetX = 0; portrait.offsetY = 0; portrait.scale = 0
                 didReset = true
+            } else if newPixels > oldPixels {
+                if portrait.scale > 0 {
+                    let factor = min(
+                        Double(oldCG.width) / Double(newCG.width),
+                        Double(oldCG.height) / Double(newCG.height)
+                    )
+                    portrait.scale *= factor
+                }
+            } else {
+                let oldSize = CGSize(width: oldCG.width, height: oldCG.height)
+                if let resized = Self.resized(newCG, to: oldSize) {
+                    stored = resized
+                }
             }
         }
         if let png = stored.pngData() {
@@ -802,10 +829,15 @@ final class ShellModel {
     /// (dezelfde voorwaarde als exporteren).
     var canPreview: Bool { canExport }
 
-    /// E34.5: open de social-preview-overlay.
+    /// E34.5: schakel naar de social-preview-modus (vervangt de editor-canvas).
     func showSocialPreview() {
         guard selectedPortrait != nil else { return }
         isShowingSocialPreview = true
+    }
+
+    /// Wissel portret in preview zonder terug naar Edit te gaan.
+    func selectPortraitInPreview(_ portrait: Portrait2) {
+        select(portrait)
     }
 
     /// E08.2: exporteer het huidige portret als vierkante PNG (1024) en open

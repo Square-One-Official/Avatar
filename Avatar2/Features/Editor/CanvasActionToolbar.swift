@@ -56,6 +56,8 @@ struct CanvasActionToolbar<Background: View>: View {
     @Binding var activeMenu: CanvasToolbarMenu?
     /// E24.26: grid/thirds-overlay aan/uit (toggle in de toolbar).
     @Binding var gridEnabled: Bool
+    /// Vision-detectie loopt voor auto-frame (subtiele spinner op Frame-knop).
+    var isAutoFraming: Bool = false
     /// E31.7: de board hergebruikt deze toolbar maar zonder de editor-only
     /// transform-acties (Auto-frame/Crop/Fix-angle) en zonder de grid-toggle —
     /// die hebben geen effect op een statische board-node. Default true →
@@ -92,10 +94,7 @@ struct CanvasActionToolbar<Background: View>: View {
                     surface: buttonSurface,
                     action: { gridEnabled.toggle() }
                 ) {
-                    Ph.gridNine.regular
-                        .scaledToFit()
-                        .frame(width: buttonSize.iconPointSize,
-                               height: buttonSize.iconPointSize)
+                    pillIcon(.gridNine)
                 }
                 .help("Toggle alignment grid")
             }
@@ -126,15 +125,19 @@ struct CanvasActionToolbar<Background: View>: View {
         DSCapsuleToolButton(
             label: title,
             showChevron: chevron,
-            isActive: activeMenu == menu,
+            isActive: activeMenu == menu || (menu == .frame && isAutoFraming),
             size: buttonSize,
             surface: buttonSurface,
             action: { activeMenu = (activeMenu == menu) ? nil : menu }
         ) {
-            icon.regular
-                .scaledToFit()
-                .frame(width: buttonSize.iconPointSize,
-                       height: buttonSize.iconPointSize)
+            if menu == .frame && isAutoFraming {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: buttonSize.iconPointSize,
+                           height: buttonSize.iconPointSize)
+            } else {
+                pillIcon(icon)
+            }
         }
         .overlay(alignment: .top) {
             if activeMenu == menu {
@@ -153,6 +156,14 @@ struct CanvasActionToolbar<Background: View>: View {
 
     private var dropdownGap: CGFloat {
         layout == .headerRow ? DSSpacing.gap2 : buttonSize.containerPadding + DSSpacing.gap2
+    }
+
+    /// Phosphor bold ≈ SF Symbol `.medium` in de onderste toolbar — regular oogt
+    /// te dun op de compact/chip pillen.
+    private func pillIcon(_ icon: Ph) -> some View {
+        icon.bold
+            .scaledToFit()
+            .frame(width: buttonSize.iconPointSize, height: buttonSize.iconPointSize)
     }
 
     // MARK: Dropdown-inhoud

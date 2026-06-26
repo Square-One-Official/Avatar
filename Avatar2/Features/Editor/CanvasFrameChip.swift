@@ -11,6 +11,8 @@ struct CanvasFrameChip: View {
     var name: String?
     var onRename: () -> Void
 
+    @State private var hovering = false
+
     private var displayName: String {
         let n = name ?? ""
         return n.isEmpty ? "Name" : n
@@ -24,13 +26,18 @@ struct CanvasFrameChip: View {
             .lineLimit(1)
             .frame(height: 28)
             .padding(.horizontal, DSSpacing.gap3)
-            .background(DSColor.Background.card, in: Capsule(style: .continuous))
+            .background(
+                DSColor.neutralSurface(pressed: false, hovering: hovering, base: DSColor.Background.neutralStronger),
+                in: Capsule(style: .continuous)
+            )
             .overlay(
                 Capsule(style: .continuous)
                     .strokeBorder(EditorView.frameSelectionGrey, lineWidth: 1.5)
             )
             .contentShape(Capsule(style: .continuous))
-            .onTapGesture(count: 2) { onRename() }
+            .onHover { hovering = $0 }
+            .animation(DSMotion.micro, value: hovering)
+            .onDoubleClick { onRename() }
             .help("Double-click to rename")
     }
 }

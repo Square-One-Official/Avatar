@@ -52,6 +52,8 @@ final class EffectsModel {
     private let entitlement: EntitlementModel
     private let onApply: (NSImage) -> Void
     private let portrait: Portrait2?
+    private let coordinator: StylizeQualityCoordinator?
+    private let cutoutImage: NSImage
     /// Het "None"/origineel-beeld waarop effecten worden gegenereerd.
     private(set) var base: NSImage
     /// Sessie-cache (gehydrateerd uit het portret) — key → beeld.
@@ -64,11 +66,15 @@ final class EffectsModel {
         entitlement: EntitlementModel,
         baseImage: NSImage,
         portrait: Portrait2?,
+        cutoutImage: NSImage,
+        coordinator: StylizeQualityCoordinator?,
         onApply: @escaping (NSImage) -> Void
     ) {
         self.entitlement = entitlement
         self.onApply = onApply
         self.portrait = portrait
+        self.cutoutImage = cutoutImage
+        self.coordinator = coordinator
 
         // Hydrateer uit het portret (E24.33). Cache + basis zijn key-gestuurd
         // (string), LOS van de CMS-lijst: zo blijft de hydratie correct ook als
@@ -104,15 +110,9 @@ final class EffectsModel {
         self.selected = activeKey.flatMap { k in remoteEffects.first { $0.key == k } }
     }
 
-    /// Het beeld dat naar de stylize-backend gaat: de PRISTINE volle originele foto
-    /// (incl. achtergrond) zodat het effect óók de achtergrond stylet → de Original-
-    /// achtergrondlaag past straks bij het effect. De foreground wordt daarna her-
-    /// geïsoleerd uit dit volle resultaat (applyEffectResult, preserveSourceAlpha).
-    /// Val terug op `base` (de cutout) als er geen originele foto is (legacy/odd
-    /// import; de Original-bg-keuze is dan toch verborgen omdat originalData ontbreekt).
-    private var stylizeSource: NSImage {
-        if let data = portrait?.originalData, let img = NSImage(data: data) { return img }
-        return base
+    /// Het beeld dat naar de stylize-backend gaat — zie `StylizeQuality.effectsStylizeSource`.
+    private func stylizeSource(choice: StylizeQuality.EffectsSourceChoice) -> NSImage {
+        StylizeQuality.effectsStylizeSource(portrait: portrait, cutout: cutoutImage, choice: choice)
     }
 
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
@@ -201,15 +201,22 @@ final class EffectsModel {
     }
 
     private func generate(_ effect: RemoteEffect) async {
-        // E18.2: contextuele gate (online uit → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
-        // Stylet de VOLLE originele foto (incl. achtergrond), niet de cutout: zo
-        // krijgt de Original-achtergrond hetzelfde effect. De foreground komt er
-        // daarna weer uitgeïsoleerd uit (applyEffectResult).
-        guard let png = stylizeSource.pngData() else {
+
+        let (_, effectsChoice) = await coordinator?.gateBeforeStylize(
+            source: stylizeSource(choice: .original),
+            portrait: portrait,
+            cutout: cutoutImage,
+            isEffects: true
+        ) ?? (.proceed, .original)
+        let source = stylizeSource(choice: effectsChoice)
+        let cutoutBefore = NSImage(data: portrait?.cutoutData ?? Data()) ?? cutoutImage
+
+        guard let png = source.pngData() else {
             entitlement.presentError("Couldn't read the portrait.")
             return
         }
+        let (cutoutW, cutoutH) = StylizeQuality.cutoutDimensions(for: cutoutBefore)
         phase = .working(effect)
         entitlement.presentWorking(
             title: "Applying style",
@@ -223,13 +230,17 @@ final class EffectsModel {
             ]
         )
         do {
-            let (data, _) = try await entitlement.backend.stylize(imagePNG: png, styleKey: effect.key)
-            guard let image = NSImage(data: data) else {
+            let result = try await entitlement.backend.stylize(
+                imagePNG: png, styleKey: effect.key,
+                cutoutWidth: cutoutW, cutoutHeight: cutoutH
+            )
+            guard let image = NSImage(data: result.data) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("The styled image came back unreadable.")
                 return
             }
+            StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
             cache[effect.key] = image
             if let png = image.pngData() { pngCache[effect.key] = png }
             let prevSelected = selected
@@ -237,9 +248,9 @@ final class EffectsModel {
             phase = .idle
             entitlement.dismissWorkingToast()
             onApply(image)
+            coordinator?.offerPostBoostIfNeeded(result: image, cutoutBefore: cutoutBefore)
             registerSelectionUndo(from: prevSelected, to: effect)
             persist()
-            // Saldo bijwerken zodat de topbar-quota klopt na de aftrek.
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
@@ -284,6 +295,7 @@ struct EffectsPanel: View {
     let baseImage: NSImage
     let entitlement: EntitlementModel
     var portrait: Portrait2?
+    var coordinator: StylizeQualityCoordinator?
     var onApply: (NSImage) -> Void = { _ in }
 
     @State private var model: EffectsModel
@@ -293,14 +305,21 @@ struct EffectsPanel: View {
         baseImage: NSImage,
         entitlement: EntitlementModel,
         portrait: Portrait2? = nil,
+        coordinator: StylizeQualityCoordinator? = nil,
         onApply: @escaping (NSImage) -> Void = { _ in }
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
         self.portrait = portrait
+        self.coordinator = coordinator
         self.onApply = onApply
         _model = State(initialValue: EffectsModel(
-            entitlement: entitlement, baseImage: baseImage, portrait: portrait, onApply: onApply
+            entitlement: entitlement,
+            baseImage: baseImage,
+            portrait: portrait,
+            cutoutImage: baseImage,
+            coordinator: coordinator,
+            onApply: onApply
         ))
     }
 

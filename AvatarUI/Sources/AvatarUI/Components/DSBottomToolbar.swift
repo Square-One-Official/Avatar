@@ -34,7 +34,7 @@ public enum DSToolbarSize: Sendable {
         switch self {
         case .regular: 18
         case .compact: 15
-        case .chip: 14
+        case .chip: 15
         }
     }
     /// Labelstijl in de pil.
@@ -199,8 +199,8 @@ extension DSBottomToolbar where Accessory == EmptyView {
 }
 
 /// Rust-oppervlak van een capsule-toolbar-knop. `.ghost` = transparant tot hover
-/// (onderste/bovenste toolbar). `.secondary` = DS fill in rust (zelfde card-vulling
-/// als de FigJam-naam-chip) — voor losse header-row pillen naast de chip.
+/// (onderste/bovenste toolbar). `.secondary` = `background/neutral-stronger` in
+/// rust — voor losse header-row pillen naast de FigJam-naam-chip.
 public enum CapsuleToolSurface {
     case ghost
     case secondary
@@ -333,7 +333,7 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
             DSColor.neutralSurface(
                 pressed: isActive || configuration.isPressed,
                 hovering: isHovering,
-                base: surface == .secondary ? DSColor.Background.card : .clear
+                base: surface == .secondary ? DSColor.Background.neutralStronger : .clear
             )
         }
     }
