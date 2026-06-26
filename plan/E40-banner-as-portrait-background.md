@@ -13,8 +13,10 @@ toont upload + CMS-backgrounds + presets. Een banner is een wijde PNG → past i
 ---
 
 ## 40.1 — "Use a banner" als achtergrond-bron in BackgroundPanel
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BackgroundPanel](Avatar2/Features/Editor/BackgroundPanel.swift) kreeg een **"Banners"**-sectie (alleen zichtbaar als er ≥1 banner met preview is): wijde tegels van `BannerDoc.previewImageData` → `apply(.image(data))` (undo'baar via het bestaande apply-pad; geselecteerde banner krijgt een ring). Sluit de cirkel — een in de Studio gemaakte banner is herbruikbaar als portret-achtergrond. DoD groen.
 - team: FEAT
 - blockedBy: 37.1
 

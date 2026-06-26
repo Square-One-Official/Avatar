@@ -8,6 +8,7 @@
 import AppKit
 import AvatarKit
 import AvatarUI
+import SwiftData
 import SwiftUI
 
 struct BackgroundPanel: View {
@@ -32,6 +33,9 @@ struct BackgroundPanel: View {
     @State private var cmsBackgrounds: [RemoteBackground] = BackgroundPanel.sessionCache
     // CMS-gradient-presets (E33+). Leeg = fallback op BackgroundKit.gradientPresets.
     @State private var cmsGradients: [RemoteGradientPreset] = BackgroundPanel.gradientCache
+    // E40.1: gemaakte banners als achtergrond-bron (BannerDoc-previews).
+    @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
+    private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
 
     private static var sessionCache: [RemoteBackground] = []
     private static var gradientCache: [RemoteGradientPreset] = []
@@ -46,6 +50,9 @@ struct BackgroundPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             section("Background") { backgroundModeRow }
             section("Image") { imageRow }
+            if !savedBanners.isEmpty {
+                section("Banners") { bannersRow }
+            }
             ForEach(cmsCategories, id: \.self) { cat in
                 section(cat) { cmsRow(for: cat) }
             }
@@ -346,6 +353,34 @@ struct BackgroundPanel: View {
         }
         .buttonStyle(.plain)
         .dsHoverScale()
+    }
+
+    // MARK: Banners-rij (E40.1) — een gemaakte banner als portret-achtergrond
+
+    private var bannersRow: some View {
+        scrollRow {
+            ForEach(savedBanners) { doc in
+                if let data = doc.previewImageData, let img = NSImage(data: data) {
+                    Button { apply(.image(data)) } label: {
+                        RoundedRectangle(cornerRadius: DSRadius.lg)
+                            .fill(DSColor.Background.neutral)
+                            .frame(width: swatch * 3, height: swatch)
+                            .overlay { Image(nsImage: img).resizable().scaledToFill() }
+                            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DSRadius.lg)
+                                    .strokeBorder(
+                                        portrait?.backgroundImageData == data ? DSColor.Action.primary : .clear,
+                                        lineWidth: DSBorderWidth.medium
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .dsHoverScale()
+                    .help(doc.name.isEmpty ? "Untitled banner" : doc.name)
+                }
+            }
+        }
     }
 
     // MARK: Acties
