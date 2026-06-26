@@ -61,3 +61,10 @@ commit-/chat-historie.
 - Credit-chip op "Boost" toont in localOnly "Free" i.p.v. een credit-kost.
 - DoD: beide targets bouwen, een test die `LocalUpscale` een groter beeld oplevert, tests groen,
   Result-regel.
+- Follow-up (Thierry 2026-06-26): expliciete keuze i.p.v. impliciet op de privacymodus — de
+  Boost-chip is nu een **dropdown** (popover met onze `DSContextMenuPanel` + `DSMenuRow`, zelfde
+  patroon als de DSColorPicker-popover): "On device · Free" vs "Online · Best · 1 credit"
+  (in localOnly toont Online "Enable online" en loopt via de bestaande cloud-gate). `onBoost` werd
+  `(BoostMode) -> Void`; `runBoostResolution(_:)` vertakt op de gekozen modus i.p.v. op de
+  privacymodus. De chip onthoudt de laatste keuze. Geen auto-spend: de gebruiker kiest per keer.
+  DoD groen.

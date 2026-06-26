@@ -1040,16 +1040,16 @@ struct EditorView: View {
 
     /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
     /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
-    private func runBoostResolution() {
+    private func runBoostResolution(_ mode: BoostMode) {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
-        // E41.2: localOnly → on-device upscale (geen cloud, geen credits, geen
-        // gate). Anders het bestaande cloud-pad.
-        if PrivacyPreferences2.shared.mode == .localOnly {
+        // E41.2: de gebruiker koos de modus via het Boost-dropdown. Lokaal =
+        // gratis, on-device, geen gate. Online = beste kwaliteit, cloud + credit.
+        if mode == .local {
             runLocalBoost(png: png, portraitModel: portraitModel, entitlement: entitlement)
             return
         }
-        // E18.2: contextuele gate (online uit → login → upgrade).
+        // .online — E18.2: contextuele gate (online uit → enable → login → upgrade).
         guard entitlement.allowCloudFeature() else { return }
         let before = rawCutout
         entitlement.presentWorking(
