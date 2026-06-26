@@ -132,6 +132,15 @@ final class Portrait2 {
     @Attribute(.externalStorage) var bannerImageData: Data?
     var bannerMatchesBackground: Bool = true
 
+    /// E40.2: stabiele verwijzing (encoded `PersistentIdentifier`) naar de
+    /// `BannerDoc` waarvan de huidige `.image`-achtergrond is overgenomen — nil
+    /// als de achtergrond niet (meer) van een banner komt. Maakt een "Update
+    /// background"-actie mogelijk wanneer die banner later in de Studio wijzigt
+    /// (de opgeslagen bytes lopen dan achter op `BannerDoc.previewImageData`).
+    /// Wordt door elke `setBackground` gewist en alléén door de banner-bron weer
+    /// gezet. Lichtgewicht migratie via de default (nil).
+    var backgroundBannerID: String?
+
     init(
         name: String = "",
         role: String = "",
@@ -187,8 +196,12 @@ final class Portrait2 {
         return .transparent
     }
 
-    /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`.
+    /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`. Wist
+    /// ook de E40.2-bannerkoppeling; de banner-bron zet 'm daarna expliciet
+    /// terug zodat alleen een uit-een-banner overgenomen achtergrond gekoppeld
+    /// blijft.
     func setBackground(_ background: PortraitBackground) {
+        backgroundBannerID = nil
         switch background {
         case .transparent:
             useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = nil

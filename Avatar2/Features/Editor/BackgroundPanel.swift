@@ -355,13 +355,26 @@ struct BackgroundPanel: View {
         .dsHoverScale()
     }
 
-    // MARK: Banners-rij (E40.1) — een gemaakte banner als portret-achtergrond
+    // MARK: Banners-rij (E40.1/E40.2) — een gemaakte banner als portret-achtergrond
+
+    /// Stabiele sleutel voor een banner (encoded `PersistentIdentifier`), zodat
+    /// E40.2 een portret aan z'n bron-banner kan koppelen, ook nadat de banner
+    /// (en dus z'n bytes) in de Studio wijzigt.
+    private func bannerKey(_ doc: BannerDoc) -> String? {
+        (try? JSONEncoder().encode(doc.persistentModelID))?.base64EncodedString()
+    }
 
     private var bannersRow: some View {
         scrollRow {
             ForEach(savedBanners) { doc in
                 if let data = doc.previewImageData, let img = NSImage(data: data) {
-                    Button { apply(.image(data)) } label: {
+                    // Gekoppeld = dit portret nam z'n achtergrond van déze banner
+                    // (E40.2). Stale = de banner is sindsdien in de Studio gewijzigd
+                    // (opgeslagen bytes ≠ huidige preview) → "Update background".
+                    let linked = portrait?.backgroundBannerID != nil && portrait?.backgroundBannerID == bannerKey(doc)
+                    let isCurrent = linked || portrait?.backgroundImageData == data
+                    let isStale = linked && portrait?.backgroundImageData != data
+                    Button { applyBanner(doc) } label: {
                         RoundedRectangle(cornerRadius: DSRadius.lg)
                             .fill(DSColor.Background.neutral)
                             .frame(width: swatch * 3, height: swatch)
@@ -370,17 +383,44 @@ struct BackgroundPanel: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: DSRadius.lg)
                                     .strokeBorder(
-                                        portrait?.backgroundImageData == data ? DSColor.Action.primary : .clear,
+                                        isCurrent ? DSColor.Action.primary : .clear,
                                         lineWidth: DSBorderWidth.medium
                                     )
                             )
+                            .overlay(alignment: .topTrailing) {
+                                if isStale { updateBadge }
+                            }
                     }
                     .buttonStyle(.plain)
                     .dsHoverScale()
-                    .help(doc.name.isEmpty ? "Untitled banner" : doc.name)
+                    .help(isStale
+                          ? "This banner changed — click to update the background"
+                          : (doc.name.isEmpty ? "Untitled banner" : doc.name))
                 }
             }
         }
+    }
+
+    /// E40.2: subtiel "Update"-vaantje op een gekoppelde-maar-verouderde banner.
+    private var updateBadge: some View {
+        HStack(spacing: 2) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+            Text("Update")
+        }
+        .dsTextStyle(.labelSmall)
+        .foregroundStyle(.white)
+        .padding(.horizontal, DSSpacing.gap1)
+        .padding(.vertical, 1)
+        .background(DSColor.Action.primary, in: Capsule())
+        .padding(DSSpacing.gap1)
+    }
+
+    /// Past de huidige banner-preview toe als achtergrond én legt de E40.2-
+    /// koppeling vast (alleen in de enkel-portret-editor, niet in de board-batch).
+    private func applyBanner(_ doc: BannerDoc) {
+        guard let data = doc.previewImageData else { return }
+        apply(.image(data))
+        if onApply == nil { portrait?.backgroundBannerID = bannerKey(doc) }
     }
 
     // MARK: Acties
