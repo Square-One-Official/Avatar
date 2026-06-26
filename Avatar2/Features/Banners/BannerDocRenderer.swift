@@ -18,7 +18,14 @@ enum BannerDocRenderer {
     /// Rendert `doc` naar een ondoorzichtige wijde CGImage. `size` overschrijft de
     /// canvas-maat (bv. een platform-exportmaat); default = `doc.canvasSize`.
     /// `watermark` stempelt het free-tier "Made with Aaavatar"-merk rechtsonder.
-    static func render(_ doc: BannerDoc, size: CGSize? = nil, watermark: Bool = false) -> CGImage? {
+    /// `excludingTextIDs` laat tekstlagen weg die op het canvas live worden bewerkt
+    /// (het `NSTextField` toont die scherp; meebakken zou dubbel/wazig geven).
+    static func render(
+        _ doc: BannerDoc,
+        size: CGSize? = nil,
+        watermark: Bool = false,
+        excludingTextIDs: Set<UUID> = []
+    ) -> CGImage? {
         let target = size ?? doc.canvasSize
         let w = max(1, Int(target.width.rounded()))
         let h = max(1, Int(target.height.rounded()))
@@ -45,7 +52,7 @@ enum BannerDocRenderer {
         if let logo = layers.logo, let data = doc.logoImageData, let cg = Self.cgImage(from: data) {
             drawLogo(cg, layer: logo, in: ctx, canvas: canvas)
         }
-        for text in layers.texts {
+        for text in layers.texts where !excludingTextIDs.contains(text.id) {
             drawText(text, in: ctx, canvas: canvas)
         }
 
@@ -145,7 +152,7 @@ enum BannerDocRenderer {
     // MARK: - Tekst
 
     private static func drawText(_ layer: BannerTextLayer, in ctx: CGContext, canvas: CGSize) {
-        guard !layer.string.isEmpty else { return }
+        guard !BannerTextPresets.isEmptyOrPlaceholder(layer.string) else { return }
         let weight = nsFontWeight(layer.weightRaw)
         let font = layer.fontName.flatMap { NSFont(name: $0, size: layer.fontSize) }
             ?? NSFont.systemFont(ofSize: layer.fontSize, weight: weight)

@@ -30,18 +30,18 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
         switch self {
         case .background: return Image(systemName: "photo.fill")
         case .shaders:    return Image(systemName: "sparkles")
-        case .text:       return Image(systemName: "textformat")
-        case .logo:       return Image(systemName: "rosette")
+        case .text:       return Image(systemName: "character.textbox")
+        case .logo:       return Image(systemName: "photo")
         case .size:       return Image(systemName: "aspectratio")
         }
     }
 
     var summary: String {
         switch self {
-        case .background: return "Solid colour, gradient, or upload an image — drag on the canvas to reframe."
+        case .background: return "Colour or gradient here — tap the canvas to add a photo background."
         case .shaders:    return "Procedural effects applied to the whole banner."
-        case .text:       return "Add and style text — tap or drag on the canvas to position."
-        case .logo:       return "Place a logo and manage your brand colours."
+        case .text:       return "Tap the canvas to add text — drag to move, use the toolbar to style."
+        case .logo:       return "Tap the canvas to place a logo — drag to move, corners to scale."
         case .size:       return "Platform sizes — LinkedIn, X, wide."
         }
     }
@@ -57,6 +57,9 @@ struct BannerStudioView: View {
     @State private var name: String
     @State private var preview: NSImage?
     @State private var canvasSelection: BannerCanvasSelection?
+    @State private var isEditingText = false
+    @State private var logoFilename = "logo.png"
+    @State private var backgroundFilename = "background.png"
     @State private var shownHints: Set<BannerTool> = []
     @State private var thumbnailBakeTask: Task<Void, Never>?
 
@@ -85,7 +88,10 @@ struct BannerStudioView: View {
         }
         .task(id: doc.updatedAt) { await refreshPreview() }
         .onChange(of: doc.updatedAt) { _, _ in scheduleThumbnailBake() }
+        .onChange(of: canvasSelection) { _, _ in Task { await refreshPreview() } }
+        .onChange(of: isEditingText) { _, _ in Task { await refreshPreview() } }
         .onChange(of: activeTool) { _, tool in
+            Task { await refreshPreview() }
             guard let tool else { return }
             autoSelectForTool(tool)
         }
@@ -151,6 +157,9 @@ struct BannerStudioView: View {
                     BannerCanvasOverlay(
                         doc: doc,
                         selection: $canvasSelection,
+                        isEditingText: $isEditingText,
+                        logoFilename: $logoFilename,
+                        backgroundFilename: $backgroundFilename,
                         activeTool: activeTool,
                         canvasSize: doc.canvasSize,
                         undoManager: undoManager
@@ -176,9 +185,9 @@ struct BannerStudioView: View {
             case .background:
                 BannerBackgroundPanel(doc: doc, subtitle: showHint ? tool.summary : nil)
             case .text:
-                BannerTextPanel(doc: doc, selectedLayerID: selectedTextBinding, subtitle: showHint ? tool.summary : nil)
+                EmptyView()
             case .logo:
-                BannerLogoPanel(doc: doc, selection: $canvasSelection, subtitle: showHint ? tool.summary : nil)
+                EmptyView()
             case .size:
                 BannerSizePanel(doc: doc, subtitle: showHint ? tool.summary : nil)
             case .shaders:
@@ -190,27 +199,19 @@ struct BannerStudioView: View {
         }
     }
 
-    private var selectedTextBinding: Binding<UUID?> {
-        Binding(
-            get: {
-                if case let .text(id) = canvasSelection { return id }
-                return nil
-            },
-            set: { new in
-                if let new { canvasSelection = .text(new) }
-                else if case .text = canvasSelection { canvasSelection = nil }
-            }
-        )
-    }
-
     private func autoSelectForTool(_ tool: BannerTool) {
         switch tool {
         case .text:
             if canvasSelection == nil, let first = doc.layers.texts.first {
                 canvasSelection = .text(first.id)
             }
+            isEditingText = doc.layers.texts.isEmpty
         case .logo:
             if doc.layers.logo != nil { canvasSelection = .logo }
+        case .background:
+            if doc.layers.fill == .image, doc.fillImageData != nil {
+                canvasSelection = .backgroundFill
+            }
         default:
             break
         }
@@ -245,8 +246,15 @@ struct BannerStudioView: View {
     }
 
     private func refreshPreview() async {
-        guard let cg = composedImage(watermark: false) else { return }
+        guard let cg = composedImage(watermark: false, excludingTextIDs: editingTextIDs) else { return }
         preview = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
+    /// De tekst-id die live op het canvas wordt bewerkt (en dus uit de gebakken
+    /// preview moet) — precies wanneer het `NSTextField` zichtbaar is in de chrome.
+    private var editingTextIDs: Set<UUID> {
+        guard activeTool == .text, case let .text(id) = canvasSelection else { return [] }
+        return [id]
     }
 
     private func scheduleThumbnailBake() {
@@ -265,8 +273,8 @@ struct BannerStudioView: View {
         }
     }
 
-    private func composedImage(watermark: Bool) -> CGImage? {
-        guard let base = BannerDocRenderer.render(doc) else { return nil }
+    private func composedImage(watermark: Bool, excludingTextIDs: Set<UUID> = []) -> CGImage? {
+        guard let base = BannerDocRenderer.render(doc, excludingTextIDs: excludingTextIDs) else { return nil }
         let shaded = BannerShaderRenderer.bake(base, shaders: doc.layers.shaders, size: doc.canvasSize) ?? base
         guard watermark else { return shaded }
         return BannerDocRenderer.stampWatermark(on: shaded) ?? shaded

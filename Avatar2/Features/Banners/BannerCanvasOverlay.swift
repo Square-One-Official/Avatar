@@ -1,5 +1,4 @@
-// E37.8 + E37.11 — Interactieve canvas-overlay: tik om te selecteren, sleep om
-// tekst/logo te verplaatsen of (Background-tool) het image-fill te reframen.
+// E37.8 + E37.11 + E37.13–37.15 — Canvas-overlay: Freeform tekst, logo en achtergrond-image.
 
 import AppKit
 import AvatarUI
@@ -8,6 +7,9 @@ import SwiftUI
 struct BannerCanvasOverlay: View {
     @Bindable var doc: BannerDoc
     @Binding var selection: BannerCanvasSelection?
+    @Binding var isEditingText: Bool
+    @Binding var logoFilename: String
+    @Binding var backgroundFilename: String
     let activeTool: BannerTool?
     let canvasSize: CGSize
     let undoManager: UndoManager?
@@ -16,13 +18,20 @@ struct BannerCanvasOverlay: View {
     @State private var dragStartDocument: BannerDocUndo.DocumentSnapshot?
     @State private var dragStartCanvasPoint: CGPoint?
     @State private var dragMode: DragMode?
+    @State private var didMoveDuringDrag = false
 
     private enum DragMode {
         case moveLayer
         case reframeBackground
+        case pendingTap
     }
 
     private static let space = "bannerCanvas"
+    private static let tapThreshold: CGFloat = 4
+
+    private var dropEnabled: Bool {
+        activeTool == .logo || activeTool == .background
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -33,83 +42,122 @@ struct BannerCanvasOverlay: View {
                 x: (frame.width - drawn.width) / 2,
                 y: (frame.height - drawn.height) / 2
             )
+            let layout = BannerCanvasChromeMetrics.Layout(drawn: drawn, origin: origin, scale: scale)
 
             ZStack {
-                selectionRing(drawn: drawn, origin: origin, scale: scale)
+                chrome(for: layout)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .gesture(canvasGesture(drawn: drawn, origin: origin, scale: scale))
+            .gesture(canvasGesture(layout: layout))
+            .bannerCanvasDrop(isEnabled: dropEnabled, onDrop: handleDroppedImage)
+            .onDeleteCommand { deleteSelectedText() }
             .coordinateSpace(name: Self.space)
         }
     }
 
-    // MARK: Selection ring
-
     @ViewBuilder
-    private func selectionRing(drawn: CGSize, origin: CGPoint, scale: CGFloat) -> some View {
-        if let rect = selectedRect(scale: scale) {
-            let screen = CGRect(
-                x: origin.x + rect.minX * scale,
-                y: origin.y + rect.minY * scale,
-                width: rect.width * scale,
-                height: rect.height * scale
-            )
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .strokeBorder(DSColor.Action.primaryForeground.opacity(0.9), lineWidth: 1.5)
-                .frame(width: screen.width, height: screen.height)
-                .position(x: screen.midX, y: screen.midY)
-                .allowsHitTesting(false)
-                .animation(DSMotion.micro, value: selection)
-        }
-    }
-
-    private func selectedRect(scale: CGFloat) -> CGRect? {
-        _ = scale
+    private func chrome(for layout: BannerCanvasChromeMetrics.Layout) -> some View {
         switch selection {
         case let .text(id):
-            guard let layer = doc.layers.texts.first(where: { $0.id == id }) else { return nil }
-            return BannerLayoutMetrics.textRect(layer: layer, canvas: canvasSize)
+            BannerCanvasTextChrome(
+                doc: doc,
+                selection: $selection,
+                layerID: id,
+                activeTool: activeTool,
+                canvasSize: canvasSize,
+                drawn: layout.drawn,
+                origin: layout.origin,
+                scale: layout.scale,
+                undoManager: undoManager,
+                isEditing: $isEditingText
+            )
         case .logo:
-            guard let logo = doc.layers.logo,
-                  let data = doc.logoImageData,
-                  let cg = BannerDocRenderer.cgImage(from: data) else { return nil }
-            return BannerLayoutMetrics.logoRect(layer: logo, logoImage: cg, canvas: canvasSize)
+            BannerCanvasImageChrome(
+                doc: doc,
+                selection: $selection,
+                activeTool: activeTool,
+                canvasSize: canvasSize,
+                layout: layout,
+                undoManager: undoManager,
+                filename: logoFilename,
+                onReplace: { replaceLogo() }
+            )
+        case .backgroundFill:
+            BannerCanvasBackgroundChrome(
+                doc: doc,
+                selection: $selection,
+                activeTool: activeTool,
+                canvasSize: canvasSize,
+                layout: layout,
+                undoManager: undoManager,
+                filename: backgroundFilename,
+                onReplace: { replaceBackgroundImage() }
+            )
         case nil:
-            return nil
+            EmptyView()
         }
     }
 
     // MARK: Gestures
 
-    private func canvasGesture(drawn: CGSize, origin: CGPoint, scale: CGFloat) -> some Gesture {
+    private func canvasGesture(layout: BannerCanvasChromeMetrics.Layout) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
             .onChanged { value in
-                let canvasPoint = screenToCanvas(value.location, drawn: drawn, origin: origin, scale: scale)
+                let canvasPoint = screenToCanvas(value.location, layout: layout)
+                if hypot(value.translation.width, value.translation.height) > Self.tapThreshold {
+                    didMoveDuringDrag = true
+                }
                 if dragMode == nil {
-                    beginDrag(at: canvasPoint, startLocation: value.startLocation, drawn: drawn, origin: origin, scale: scale)
+                    beginDrag(at: canvasPoint, layout: layout)
                 }
                 applyDrag(to: canvasPoint)
             }
-            .onEnded { _ in
-                endDrag()
+            .onEnded { value in
+                let canvasPoint = screenToCanvas(value.location, layout: layout)
+                finishDrag(at: canvasPoint)
             }
     }
 
-    private func beginDrag(
-        at canvasPoint: CGPoint,
-        startLocation: CGPoint,
-        drawn: CGSize,
-        origin: CGPoint,
-        scale: CGFloat
-    ) {
-        _ = startLocation; _ = drawn; _ = origin; _ = scale
+    private func beginDrag(at canvasPoint: CGPoint, layout: BannerCanvasChromeMetrics.Layout) {
+        _ = layout
         dragStartCanvasPoint = canvasPoint
+        didMoveDuringDrag = false
+
         if activeTool == .background, doc.layers.fill == .image, doc.fillImageData != nil {
+            selection = .backgroundFill
             dragMode = .reframeBackground
             dragStartDocument = BannerDocUndo.snapshot(of: doc)
             return
         }
+
+        if activeTool == .text {
+            dragMode = .pendingTap
+            if let hit = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize) {
+                selection = hit
+                if case .text = hit {
+                    isEditingText = false
+                    dragMode = .moveLayer
+                    dragStartLayers = doc.layers
+                } else if case .logo = hit {
+                    dragMode = .moveLayer
+                    dragStartLayers = doc.layers
+                }
+            }
+            return
+        }
+
+        if activeTool == .logo {
+            dragMode = .pendingTap
+            if let hit = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize),
+               case .logo = hit {
+                selection = .logo
+                dragMode = .moveLayer
+                dragStartLayers = doc.layers
+            }
+            return
+        }
+
         if selection == nil {
             selection = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize)
         }
@@ -126,7 +174,173 @@ struct BannerCanvasOverlay: View {
             moveSelection(to: canvasPoint)
         case .reframeBackground:
             reframeBackground(dragDelta: canvasPoint)
+        case .pendingTap:
+            if didMoveDuringDrag, selection != nil {
+                dragMode = .moveLayer
+                dragStartLayers = doc.layers
+                moveSelection(to: canvasPoint)
+            }
         }
+    }
+
+    private func finishDrag(at canvasPoint: CGPoint) {
+        if dragMode == .moveLayer, !didMoveDuringDrag {
+            if case .text = selection, activeTool == .text {
+                isEditingText = true
+            }
+            endDrag()
+            return
+        }
+
+        guard dragMode == .pendingTap, !didMoveDuringDrag else {
+            endDrag()
+            return
+        }
+        switch activeTool {
+        case .text:
+            let hit = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize)
+            if hit == nil {
+                if selection != nil {
+                    finalizeSelectedTextLayer()
+                    selection = nil
+                    isEditingText = false
+                } else {
+                    addText(at: canvasPoint)
+                }
+            } else if case let .text(id) = hit {
+                selection = .text(id)
+                isEditingText = true
+            }
+        case .logo:
+            if case .logo = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize) {
+                break
+            } else {
+                addLogo(at: canvasPoint)
+            }
+        case .background:
+            if doc.layers.fill != .image || doc.fillImageData == nil {
+                addBackgroundImage()
+            } else {
+                selection = .backgroundFill
+            }
+        default:
+            break
+        }
+        endDrag()
+    }
+
+    private func finalizeSelectedTextLayer() {
+        guard case let .text(id) = selection,
+              let index = doc.layers.texts.firstIndex(where: { $0.id == id }) else { return }
+        let layer = doc.layers.texts[index]
+        guard BannerTextPresets.isEmptyOrPlaceholder(layer.string) else { return }
+        let before = doc.layers
+        var layers = doc.layers
+        layers.texts.remove(at: index)
+        doc.layers = layers
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+    }
+
+    private func deleteSelectedText() {
+        guard case let .text(id) = selection else { return }
+        let before = doc.layers
+        var layers = doc.layers
+        layers.texts.removeAll { $0.id == id }
+        guard layers != before else { return }
+        doc.layers = layers
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+        selection = nil
+        isEditingText = false
+    }
+
+    // MARK: Mutations
+
+    private func addText(at canvasPoint: CGPoint) {
+        let before = doc.layers
+        let nx = min(1, max(0, canvasPoint.x / canvasSize.width))
+        let ny = min(1, max(0, canvasPoint.y / canvasSize.height))
+        let layer = BannerTextLayer(
+            string: "",
+            fontSize: 50,
+            colorHex: "#FFFFFF",
+            alignRaw: 1,
+            x: nx,
+            y: ny
+        )
+        var layers = doc.layers
+        layers.texts.append(layer)
+        doc.layers = layers
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Add text")
+        selection = .text(layer.id)
+        isEditingText = true
+    }
+
+    private func addLogo(at canvasPoint: CGPoint, picked prePicked: PickedImage? = nil) {
+        guard let picked = prePicked ?? BannerNativePanels.pickImage(maxSide: 1024) else { return }
+        let before = BannerDocUndo.snapshot(of: doc)
+        let nx = min(1, max(0, canvasPoint.x / canvasSize.width))
+        let ny = min(1, max(0, canvasPoint.y / canvasSize.height))
+        doc.logoImageData = picked.data
+        logoFilename = picked.filename
+        var layers = doc.layers
+        layers.logo = BannerLogoLayer(x: nx, y: ny, scale: 0.25)
+        doc.layers = layers
+        let after = BannerDocUndo.snapshot(of: doc)
+        BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: "Add logo")
+        selection = .logo
+    }
+
+    private func replaceLogo() {
+        guard let picked = BannerNativePanels.pickImage(maxSide: 1024) else { return }
+        let before = BannerDocUndo.snapshot(of: doc)
+        doc.logoImageData = picked.data
+        logoFilename = picked.filename
+        if doc.layers.logo == nil {
+            var layers = doc.layers
+            layers.logo = BannerLogoLayer()
+            doc.layers = layers
+        }
+        let after = BannerDocUndo.snapshot(of: doc)
+        BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: "Replace logo")
+        selection = .logo
+    }
+
+    private func handleDroppedImage(_ picked: PickedImage) {
+        switch activeTool {
+        case .logo:
+            addLogo(
+                at: CGPoint(x: canvasSize.width * 0.5, y: canvasSize.height * 0.5),
+                picked: picked
+            )
+        case .background:
+            applyBackgroundImage(picked, actionName: "Add background")
+        default:
+            break
+        }
+    }
+
+    private func addBackgroundImage() {
+        guard let picked = BannerNativePanels.pickImage(maxSide: 2048) else { return }
+        applyBackgroundImage(picked, actionName: "Add background")
+    }
+
+    private func replaceBackgroundImage() {
+        guard let picked = BannerNativePanels.pickImage(maxSide: 2048) else { return }
+        applyBackgroundImage(picked, actionName: "Replace background")
+    }
+
+    private func applyBackgroundImage(_ picked: PickedImage, actionName: String) {
+        let before = BannerDocUndo.snapshot(of: doc)
+        doc.fillImageData = picked.data
+        doc.fillImageFocalX = 0.5
+        doc.fillImageFocalY = 0.5
+        backgroundFilename = picked.filename
+        var layers = doc.layers
+        layers.fill = .image
+        doc.layers = layers
+        let after = BannerDocUndo.snapshot(of: doc)
+        BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: actionName)
+        selection = .backgroundFill
     }
 
     private func moveSelection(to canvasPoint: CGPoint) {
@@ -142,7 +356,7 @@ struct BannerCanvasOverlay: View {
             guard layers.logo != nil else { return }
             layers.logo?.x = nx
             layers.logo?.y = ny
-        case nil:
+        case .backgroundFill, nil:
             return
         }
         doc.layers = layers
@@ -164,6 +378,7 @@ struct BannerCanvasOverlay: View {
         dragStartLayers = nil
         dragStartDocument = nil
         dragStartCanvasPoint = nil
+        didMoveDuringDrag = false
         if mode == .moveLayer, let before = beforeLayers, before != doc.layers {
             BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: doc.layers, actionName: "Move")
         }
@@ -175,10 +390,10 @@ struct BannerCanvasOverlay: View {
         }
     }
 
-    private func screenToCanvas(_ point: CGPoint, drawn: CGSize, origin: CGPoint, scale: CGFloat) -> CGPoint {
+    private func screenToCanvas(_ point: CGPoint, layout: BannerCanvasChromeMetrics.Layout) -> CGPoint {
         CGPoint(
-            x: (point.x - origin.x) / scale,
-            y: (point.y - origin.y) / scale
+            x: (point.x - layout.origin.x) / layout.scale,
+            y: (point.y - layout.origin.y) / layout.scale
         )
     }
 }

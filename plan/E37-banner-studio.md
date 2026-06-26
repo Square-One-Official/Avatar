@@ -249,3 +249,47 @@ drag-to-reframe hint; Generate-stub verwijderd; actieve gradient/image-indicator
 whole banner". [DSEditPanel](AvatarUI/Sources/AvatarUI/Components/DSEditPanel.swift) optionele
 `subtitle` voor éénregelige first-open hints per tool. [BannerShaderPanel](Avatar2/Features/Banners/BannerShaderPanel.swift)
 gebruikt nieuwe [DSSlider](AvatarUI/Sources/AvatarUI/Components/DSSlider.swift). DoD groen.
+
+## 37.13 — Freeform text + native macOS panels
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + DS
+- blockedBy: 37.8, 37.9
+
+**Result:** [BannerCanvasTextChrome](Avatar2/Features/Banners/BannerCanvasTextChrome.swift) +
+[BannerTextFloatingToolbar](Avatar2/Features/Banners/BannerTextFloatingToolbar.swift) +
+[BannerInlineTextField](Avatar2/Features/Banners/BannerInlineTextField.swift) — tap-to-add op canvas,
+inline edit met select-all placeholder, floating pill (kleur · Aa · grootte). Native
+[NSFontPanel](Avatar2/Features/Banners/BannerNativePanels.swift) via **Fonts…** / dubbelklik Aa;
+[NSColorPanel] voor More Text Colours. Text-tool opent geen onderpaneel (`EmptyView`). DoD groen.
+
+## 37.14 — Freeform logo image on canvas
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.5, 37.8
+
+**Result:** [BannerCanvasImageChrome](Avatar2/Features/Banners/BannerCanvasImageChrome.swift) +
+[BannerImageFloatingToolbar](Avatar2/Features/Banners/BannerImageFloatingToolbar.swift) — tap canvas
+→ `NSOpenPanel` → logo op tap-positie; blauwe rand + 4 hoek-handles (scale); floating toolbar
+(info/replace/remove/preview). Logo-tool: geen onderpaneel. DoD groen.
+
+## 37.15 — Freeform background image on canvas
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + INFRA
+- blockedBy: 37.3, 37.11
+
+**Result:** [BannerCanvasBackgroundChrome](Avatar2/Features/Banners/BannerCanvasBackgroundChrome.swift) —
+tap canvas (Background-tool) → image fill; volledige canvas-selectierand + floating toolbar;
+drag-to-reframe focal point. [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift):
+alleen kleur/gradient; image via canvas. `BannerCanvasSelection.backgroundFill`. DoD groen.
+
+## 37.16 — PaperKit spike (backlog)
+- status: backlog
+- team: FEAT + INFRA
+- blockedBy: macOS 27 SDK on dev-Mac
+
+**Scope:** Evaluate [PaperKit](https://developer.apple.com/documentation/paperkit) (`PaperMarkupViewController`,
+`ImageMarkup`, `MarkupAdornment`) as optional canvas engine when deployment target ≥ macOS 27.
+Huidige implementatie blijft `BannerDoc` + Freeform-chrome op macOS 14+. Geen implementatie tot OS-besluit.

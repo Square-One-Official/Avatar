@@ -8,7 +8,9 @@ enum BannerLayoutMetrics {
 
     /// Tekst-bounding box in canvas-pixels; oorsprong linksboven (SwiftUI).
     static func textRect(layer: BannerTextLayer, canvas: CGSize) -> CGRect {
-        guard !layer.string.isEmpty else { return .zero }
+        if BannerTextPresets.isEmptyOrPlaceholder(layer.string) {
+            return fallbackTextRect(layer: layer, canvas: canvas)
+        }
         let weight = nsFontWeight(layer.weightRaw)
         let font = layer.fontName.flatMap { NSFont(name: $0, size: layer.fontSize) }
             ?? NSFont.systemFont(ofSize: layer.fontSize, weight: weight)
@@ -29,6 +31,20 @@ enum BannerLayoutMetrics {
         return CGRect(x: textX, y: textY, width: bounds.width, height: bounds.height)
     }
 
+    /// Minimale hit-target rond tekstanker (placeholder / lege string tijdens edit).
+    static func fallbackTextRect(layer: BannerTextLayer, canvas: CGSize) -> CGRect {
+        let fontH = layer.fontSize
+        let fontW = max(120, CGFloat(layer.string.count) * layer.fontSize * 0.55)
+        let anchorX = layer.x * canvas.width
+        let centerYTop = layer.y * canvas.height
+        return CGRect(
+            x: anchorX - fontW / 2,
+            y: centerYTop - fontH / 2,
+            width: fontW,
+            height: fontH
+        )
+    }
+
     static func logoRect(layer: BannerLogoLayer, logoImage: CGImage, canvas: CGSize) -> CGRect {
         let targetW = max(1, layer.scale * canvas.width)
         let aspect = CGFloat(logoImage.height) / CGFloat(max(1, logoImage.width))
@@ -43,7 +59,7 @@ enum BannerLayoutMetrics {
         let layers = doc.layers
         for text in layers.texts.reversed() {
             let rect = textRect(layer: text, canvas: canvas)
-            if rect.width > 0, rect.insetBy(dx: -8, dy: -8).contains(point) {
+            if rect.insetBy(dx: -8, dy: -8).contains(point) {
                 return .text(text.id)
             }
         }

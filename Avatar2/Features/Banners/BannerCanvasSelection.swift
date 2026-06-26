@@ -6,4 +6,5 @@ import Foundation
 enum BannerCanvasSelection: Equatable, Sendable {
     case text(UUID)
     case logo
+    case backgroundFill
 }

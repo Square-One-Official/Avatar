@@ -19,7 +19,10 @@ struct BannerBackgroundPanel: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
                 section("Color") { colorRow }
                 section("Gradient") { gradientRow }
-                section("Image") { imageRow }
+                Text("Tap the canvas to add a photo background — drag to reframe when selected.")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -108,30 +111,6 @@ struct BannerBackgroundPanel: View {
         }
     }
 
-    // MARK: Image
-
-    private var imageRow: some View {
-        HStack(spacing: DSSpacing.gap2) {
-            DSNeutralButton("Upload image") { upload() }
-            if doc.layers.fill == .image, let data = doc.fillImageData, let img = NSImage(data: data) {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: swatch * 1.6, height: swatch)
-                    .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                            .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
-                    )
-            }
-            if doc.layers.fill == .image, doc.fillImageData != nil {
-                Text("Drag on canvas to reframe.")
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-            }
-        }
-    }
-
     // MARK: Swatch
 
     private func swatchButton(_ color: Color, _ action: @escaping () -> Void) -> some View {
@@ -188,24 +167,5 @@ struct BannerBackgroundPanel: View {
         var layers = doc.layers
         layers.fill = .meshGradient(stops: stops)
         doc.layers = layers
-    }
-
-    private func applyImage(_ png: Data) {
-        doc.fillImageData = png
-        doc.fillImageFocalX = 0.5
-        doc.fillImageFocalY = 0.5
-        var layers = doc.layers
-        layers.fill = .image
-        doc.layers = layers
-    }
-
-    private func upload() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url,
-              let raw = try? Data(contentsOf: url) else { return }
-        let png = BackgroundKit.downscaledPNG(raw, maxSide: 2048) ?? raw
-        applyImage(png)
     }
 }

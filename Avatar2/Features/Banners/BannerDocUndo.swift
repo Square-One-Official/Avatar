@@ -7,10 +7,13 @@ enum BannerDocUndo {
         var layers: BannerLayers
     }
 
+    /// Volledige document-snapshot incl. image-bytes (logo/background replace).
     struct DocumentSnapshot: Equatable {
         var layers: BannerLayers
         var fillImageFocalX: Double
         var fillImageFocalY: Double
+        var fillImageData: Data?
+        var logoImageData: Data?
     }
 
     @MainActor
@@ -37,9 +40,7 @@ enum BannerDocUndo {
     ) {
         guard before != after else { return }
         ReversibleChange.register(undoManager, target: doc, from: before, to: after, actionName: actionName) { doc, snap in
-            doc.layers = snap.layers
-            doc.fillImageFocalX = snap.fillImageFocalX
-            doc.fillImageFocalY = snap.fillImageFocalY
+            apply(snap, to: doc)
         }
     }
 
@@ -47,7 +48,17 @@ enum BannerDocUndo {
         DocumentSnapshot(
             layers: doc.layers,
             fillImageFocalX: doc.fillImageFocalX,
-            fillImageFocalY: doc.fillImageFocalY
+            fillImageFocalY: doc.fillImageFocalY,
+            fillImageData: doc.fillImageData,
+            logoImageData: doc.logoImageData
         )
+    }
+
+    static func apply(_ snap: DocumentSnapshot, to doc: BannerDoc) {
+        doc.layers = snap.layers
+        doc.fillImageFocalX = snap.fillImageFocalX
+        doc.fillImageFocalY = snap.fillImageFocalY
+        doc.fillImageData = snap.fillImageData
+        doc.logoImageData = snap.logoImageData
     }
 }
