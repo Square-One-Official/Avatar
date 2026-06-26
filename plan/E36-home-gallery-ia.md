@@ -24,9 +24,17 @@ tokens/-componenten (`DSColor`, `DSSpacing`, `DSRadius`, `DSTypography`, `DSMoti
 ---
 
 ## 36.1 — BannersGalleryView → Portraits-stijl grid
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT
+
+**Result:** [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift) herbouwd als
+Portraits-spiegel: zwevende, gemeten header (titel + banner-telling + primaire **"Make banner"**)
+boven een `LazyVGrid` van WIJDE (3:1) `BannerGridTile`s met hover-rand (DS-`Action.primary`) en
+naam-label. **Gradient-snel-maker verwijderd** (`presetsRow`/`addGradient`/`BackgroundKit`/
+`BannerCompositor`-gebruik weg). Rechtsklik = Rename/**Duplicate**/Delete. "Make banner" opent
+voorlopig de upload (TODO E37.2 → Banner Studio); tegel-klik is een no-op-placeholder (TODO
+E37.2). Empty-state-placeholder in DS-stijl tot E36.2. Volledige DoD groen.
 
 Herbouw [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift) zodat ze de
 Portraits-gallery spiegelt i.p.v. de huidige upload/gradient-pagina:
