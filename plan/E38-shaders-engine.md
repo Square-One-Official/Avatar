@@ -95,8 +95,9 @@ en render off-main.
   gedreven door `ShaderEffect.params` (label + range uit de catalogus, dict-binding op
   `BannerShaderLayer.params`). Bindt op een lokale `@State`-werk-kopie (zoals het text-paneel) →
   vloeiende sliders; `onChange` schrijft terug naar `doc.layers.shaders` → live canvas-bake
-  (E38.2). Live preview-thumbnails per shader zijn als follow-up genoteerd (niet vereist voor DoD).
-  DoD groen.
+  (E38.2). Polish (2026-06-26): elke catalogus-chip toont nu een **live preview-thumbnail** —
+  een representatief mini-staal (gradient + vormen) met de shader (default-params) er live op via
+  `.bannerShaders`, zodat je het effect ziet vóór toevoegen. DoD groen.
 
 DS-controls voor shader-parameters (sliders/segments/color in AvatarUI-stijl, reduce-motion-
 proof), generiek gedreven door `ShaderEffect.params`. Een effect-kaartenrij (kies shader) +

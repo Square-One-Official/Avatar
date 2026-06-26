@@ -55,11 +55,16 @@ struct BannerShaderPanel: View {
 
     private func effectChip(_ effect: ShaderEffect) -> some View {
         VStack(spacing: DSSpacing.gap1) {
-            Image(systemName: icon(for: effect.key))
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(DSColor.Action.primary)
-                .frame(width: 44, height: 32)
-                .background(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous).fill(DSColor.Background.inset))
+            // Live preview-thumbnail: het staal mét déze shader (default-params)
+            // erop — zo zie je het effect vóór toevoegen (E38.3-follow-up).
+            Self.sampleSwatch
+                .frame(width: 56, height: 36)
+                .bannerShaders([effect.makeLayer()])
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                        .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+                )
             Text(effect.displayName)
                 .dsTextStyle(.labelSmall)
                 .foregroundStyle(DSColor.Foreground.subtle)
@@ -68,15 +73,19 @@ struct BannerShaderPanel: View {
         .frame(width: 64)
     }
 
-    private func icon(for key: String) -> String {
-        switch key {
-        case "grain":    return "circle.grid.3x3.fill"
-        case "noise":    return "aqi.medium"
-        case "dither":   return "squareshape.split.3x3"
-        case "halftone": return "circle.grid.2x2"
-        case "lens":     return "circle.circle"
-        case "warp":     return "wave.3.right"
-        default:          return "sparkles"
+    /// Representatief mini-staal (gradient + vormen) zodat élke shader — óók de
+    /// distortions/halftone, die structuur nodig hebben — zichtbaar verschilt in
+    /// z'n live-preview-thumbnail.
+    @ViewBuilder private static var sampleSwatch: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.30, green: 0.55, blue: 1.00),
+                         Color(red: 0.65, green: 0.40, blue: 0.95),
+                         Color(red: 1.00, green: 0.55, blue: 0.65)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            Circle().fill(.white.opacity(0.55)).frame(width: 14).offset(x: -11, y: -5)
+            Capsule().fill(.white.opacity(0.85)).frame(width: 26, height: 4).offset(y: 8)
         }
     }
 
