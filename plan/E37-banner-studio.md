@@ -191,3 +191,61 @@ worden in `BannerDocRenderer` bij export gerasterd.
 - **Geen Figma-ref** — DS-tokens; patroon = Effects-rij + param-sheet (Figma-shaders, Spotify
   Effects).
 - DoD: beide targets bouwen, tests groen, Result-regel.
+
+---
+
+## 37.8 — Canvas tap-select + drag (Apple-minimal)
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2
+
+**Result:** [BannerCanvasOverlay](Avatar2/Features/Banners/BannerCanvasOverlay.swift) +
+[BannerCanvasSelection](Avatar2/Features/Banners/BannerCanvasSelection.swift) +
+[BannerLayoutMetrics](Avatar2/Features/Banners/BannerLayoutMetrics.swift) — tap-select tekst/logo
+op de canvas-kaart, sleep om te verplaatsen, subtiele selectiering (geen handles/rotatie).
+Selectie sync't met Text/Logo-panelen; Text-tool opent met eerste laag geselecteerd. DoD groen.
+
+## 37.9 — Curated fonts + L/C/R alignment
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT (+ DS `DSSegmentedControl`)
+- blockedBy: 37.4, 37.8
+
+**Result:** [BannerFontCatalog](Avatar2/Features/Banners/BannerFontCatalog.swift) (~10 system
+fonts) + [BannerTextPanel](Avatar2/Features/Banners/BannerTextPanel.swift) font-menu,
+`DSSegmentedControl` voor links/midden/rechts, geselecteerde laag highlight.
+[BannerDocRenderer](Avatar2/Features/Banners/BannerDocRenderer.swift) respecteert `alignRaw`.
+Alignment unit-test in `BannerDocRenderTests`. DoD groen.
+
+## 37.10 — Undo/redo + Done + debounced preview bake
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2
+
+**Result:** [BannerDocUndo](Avatar2/Features/Banners/BannerDocUndo.swift) — `ReversibleChange`
+voor laag-verplaatsingen + background-reframe. [BannerStudioView](Avatar2/Features/Banners/BannerStudioView.swift):
+Undo/Redo in topbar; Save → **Done**; debounced `previewImageData`-bake (800 ms). DoD groen.
+
+## 37.11 — Image background drag-to-reframe
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + INFRA
+- blockedBy: 37.3
+
+**Result:** [BannerDoc](Avatar2/Features/Banners/BannerDoc.swift) — `fillImageFocalX/Y` (default
+0.5). [BannerCompositor](AvatarKit/Sources/AvatarKit/Engines/BannerCompositor.swift) aspect-fill
+vanuit focal point. [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift):
+drag-to-reframe hint; Generate-stub verwijderd; actieve gradient/image-indicators. DoD groen.
+
+## 37.12 — Effects clarity + tool hints
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + DS
+- blockedBy: 37.7
+
+**Result:** Toolbar **Shaders → Effects**; paneltitel "Effects"; lege-staat copy "Applied to the
+whole banner". [DSEditPanel](AvatarUI/Sources/AvatarUI/Components/DSEditPanel.swift) optionele
+`subtitle` voor éénregelige first-open hints per tool. [BannerShaderPanel](Avatar2/Features/Banners/BannerShaderPanel.swift)
+gebruikt nieuwe [DSSlider](AvatarUI/Sources/AvatarUI/Components/DSSlider.swift). DoD groen.
