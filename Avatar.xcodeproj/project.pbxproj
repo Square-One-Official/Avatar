@@ -73,6 +73,7 @@
 		430A107B1D3198CE9ECDBA44 /* ProBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED2448B10A7B5504F841578 /* ProBadge.swift */; };
 		4341E7B1ED1B23CD51BBAF22 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = F1CAAB87E8E174A425083C2F /* logo.png */; };
 		44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */; };
+		46341383B254B4510C27AD85 /* BannerSizePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98854DF3AAC38E4D368DD522 /* BannerSizePanel.swift */; };
 		46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A3B14B7F7E0E66FDC42980 /* BannerResolver.swift */; };
 		480BA658926DC445242BB6F0 /* FramingConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF5244B77EE121141D48309 /* FramingConstants.swift */; };
 		491B02E74B243F21C30E93AC /* HairPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */; };
@@ -373,6 +374,7 @@
 		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
 		96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerBackgroundPanel.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
+		98854DF3AAC38E4D368DD522 /* BannerSizePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerSizePanel.swift; sourceTree = "<group>"; };
 		9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectCutoutTests.swift; sourceTree = "<group>"; };
 		9C2B6957003039CB34DD8610 /* PortraitExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitExporter.swift; sourceTree = "<group>"; };
 		9D9DE22FF27058CBDB93A7F8 /* ShellModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellModelTests.swift; sourceTree = "<group>"; };
@@ -778,6 +780,7 @@
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
 				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
+				98854DF3AAC38E4D368DD522 /* BannerSizePanel.swift */,
 				EAA5F8B3F5EEE3E08FA0A619 /* BannerStudioView.swift */,
 				ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */,
 			);
@@ -1123,6 +1126,7 @@
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
 				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
+				46341383B254B4510C27AD85 /* BannerSizePanel.swift in Sources */,
 				C9664D75BEA6CD7A80A3776F /* BannerStudioView.swift in Sources */,
 				586DA2974FA6C2E92F0888A1 /* BannerTextPanel.swift in Sources */,
 				9D6640E0D022ED16BA4DE46F /* BannersGalleryView.swift in Sources */,

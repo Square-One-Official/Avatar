@@ -158,8 +158,10 @@ Een logo/merkbeeld plaatsen: upload (PNG met alpha), schalen/positioneren op can
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.6 — Size/Layout-presets + export + social-preview-compat
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerSizePanel](Avatar2/Features/Banners/BannerSizePanel.swift) — platform-maatpresets (X 1500×500, LinkedIn 1584×396, Wide 1600×500) zetten `doc.canvasSize` non-destructief (genormaliseerde tekst/logo-posities overleven). Export-knop in de Studio-topbar → `BannerDocRenderer.render(watermark: !isPro)` → NSSavePanel-PNG (free-tier hoek-watermerk "Made with Aaavatar" via nieuwe `drawWatermark`). Social-preview-compat: [BannerChooser](Avatar2/Features/SocialPreview/BannerChooser.swift) leest nu `BannerDoc.previewImageData` i.p.v. `Banner2` — banners uit de Studio verschijnen in de preview-kiezer. DoD groen.
 - team: FEAT
 - blockedBy: 37.2, 37.3
 

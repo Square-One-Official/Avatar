@@ -12,7 +12,9 @@ struct BannerChooser: View {
     var onApply: (BannerBackground) -> Void
     var onManage: () -> Void
 
-    @Query(sort: \Banner2.updatedAt, order: .reverse) private var banners: [Banner2]
+    // E37.6: de social-preview kiest nu uit `BannerDoc`-previews (de Studio-store).
+    @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var banners: [BannerDoc]
+    private var savedBanners: [BannerDoc] { banners.filter { $0.previewImageData != nil } }
 
     private var isMatchSelected: Bool { portrait.bannerMatchesBackground }
 
@@ -27,14 +29,14 @@ struct BannerChooser: View {
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
 
-                if banners.isEmpty {
+                if savedBanners.isEmpty {
                     Text("No banners yet. Create some in the Banners section.")
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                ForEach(banners) { banner in
+                ForEach(savedBanners) { banner in
                     bannerTile(banner)
                 }
 
@@ -67,25 +69,27 @@ struct BannerChooser: View {
         .buttonStyle(.plain)
     }
 
-    private func bannerTile(_ banner: Banner2) -> some View {
-        let selected = !portrait.bannerMatchesBackground && portrait.bannerImageData == banner.imageData
-        return Button { onApply(.image(banner.imageData)) } label: {
-            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .fill(DSColor.Background.inset)
-                .aspectRatio(1500.0 / 500.0, contentMode: .fit)
-                .overlay {
-                    if let img = NSImage(data: banner.imageData) {
-                        Image(nsImage: img).resizable().scaledToFill()
+    @ViewBuilder private func bannerTile(_ banner: BannerDoc) -> some View {
+        if let data = banner.previewImageData {
+            let selected = !portrait.bannerMatchesBackground && portrait.bannerImageData == data
+            Button { onApply(.image(data)) } label: {
+                RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
+                    .fill(DSColor.Background.inset)
+                    .aspectRatio(1500.0 / 500.0, contentMode: .fit)
+                    .overlay {
+                        if let img = NSImage(data: data) {
+                            Image(nsImage: img).resizable().scaledToFill()
+                        }
                     }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                        .strokeBorder(DSColor.Foreground.primary, lineWidth: selected ? 2 : 0)
-                }
+                    .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
+                            .strokeBorder(DSColor.Foreground.primary, lineWidth: selected ? 2 : 0)
+                    }
+            }
+            .buttonStyle(.plain)
+            .help(banner.name.isEmpty ? "Untitled banner" : banner.name)
         }
-        .buttonStyle(.plain)
-        .help(banner.name.isEmpty ? "Untitled banner" : banner.name)
     }
 
     private var newBannerTile: some View {

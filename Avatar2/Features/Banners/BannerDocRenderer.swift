@@ -17,7 +17,8 @@ enum BannerDocRenderer {
 
     /// Rendert `doc` naar een ondoorzichtige wijde CGImage. `size` overschrijft de
     /// canvas-maat (bv. een platform-exportmaat); default = `doc.canvasSize`.
-    static func render(_ doc: BannerDoc, size: CGSize? = nil) -> CGImage? {
+    /// `watermark` stempelt het free-tier "Made with Aaavatar"-merk rechtsonder.
+    static func render(_ doc: BannerDoc, size: CGSize? = nil, watermark: Bool = false) -> CGImage? {
         let target = size ?? doc.canvasSize
         let w = max(1, Int(target.width.rounded()))
         let h = max(1, Int(target.height.rounded()))
@@ -43,7 +44,28 @@ enum BannerDocRenderer {
             drawText(text, in: ctx, canvas: canvas)
         }
 
+        if watermark { drawWatermark(in: ctx, canvas: canvas) }
+
         return ctx.makeImage()
+    }
+
+    /// Free-tier hoek-watermerk rechtsonder (spiegelt PortraitExporter): wit op
+    /// 85% met een lichte schaduw, hoogte-relatief geschaald.
+    private static func drawWatermark(in ctx: CGContext, canvas: CGSize) {
+        let fontSize = max(14, canvas.height * 0.05)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
+        ]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: "Made with Aaavatar", attributes: attrs))
+        let bounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
+        let margin = canvas.height * 0.06
+        ctx.saveGState()
+        ctx.textMatrix = .identity
+        ctx.setShadow(offset: CGSize(width: 0, height: -1), blur: 3, color: NSColor.black.withAlphaComponent(0.4).cgColor)
+        ctx.textPosition = CGPoint(x: canvas.width - bounds.width - margin, y: margin)
+        CTLineDraw(line, ctx)
+        ctx.restoreGState()
     }
 
     // MARK: - Fill

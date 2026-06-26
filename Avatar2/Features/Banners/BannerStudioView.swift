@@ -14,6 +14,7 @@ import AppKit
 import AvatarUI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// De tools in de Studio-capsule. Simpeler dan de portret-editor; toegespitst op
 /// wat een mooie banner nodig heeft (UX-onderzoek E37).
@@ -64,8 +65,11 @@ struct BannerStudioView: View {
     @State private var name: String
     @State private var preview: NSImage?
 
-    init(doc: BannerDoc, onClose: @escaping () -> Void) {
+    let isPro: Bool
+
+    init(doc: BannerDoc, isPro: Bool, onClose: @escaping () -> Void) {
         self.doc = doc
+        self.isPro = isPro
         self.onClose = onClose
         _name = State(initialValue: doc.name)
     }
@@ -105,6 +109,7 @@ struct BannerStudioView: View {
 
             Spacer(minLength: 0)
 
+            DSNeutralButton("Export") { export() }
             DSPrimaryButton("Save") { save() }
         }
         .padding(.horizontal, DSSpacing.gap6)
@@ -147,6 +152,8 @@ struct BannerStudioView: View {
             BannerTextPanel(doc: doc)
         case .logo:
             BannerLogoPanel(doc: doc)
+        case .size:
+            BannerSizePanel(doc: doc)
         default:
             DSEditPanel(title: tool.label) {
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {
@@ -179,6 +186,19 @@ struct BannerStudioView: View {
         }
         doc.touch()
         onClose()
+    }
+
+    /// Rendert de doc op canvas-maat → PNG → NSSavePanel; free-tier watermerk.
+    private func export() {
+        commitName()
+        guard let cg = BannerDocRenderer.render(doc, watermark: !isPro),
+              let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = (doc.name.isEmpty ? "banner" : doc.name) + ".png"
+        if panel.runModal() == .OK, let url = panel.url {
+            try? png.write(to: url)
+        }
     }
 
     private func refreshPreview() async {

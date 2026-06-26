@@ -70,7 +70,7 @@ struct ShellView: View {
         // vensterniveau (over left-nav + content), gekoppeld aan het open BannerDoc.
         .overlay {
             if let doc = model.editingBanner {
-                BannerStudioView(doc: doc, onClose: { model.closeBannerStudio() })
+                BannerStudioView(doc: doc, isPro: entitlement.isProActive, onClose: { model.closeBannerStudio() })
                     .transition(.opacity)
             }
         }
