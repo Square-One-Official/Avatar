@@ -97,8 +97,10 @@ Herzie [HomeView](Avatar2/Features/Shell/HomeView.swift) tot één overzicht van
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 36.4 — Left-nav + sectie-routing afstemmen
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** Geverifieerd — `ShellModel`-secties (home/portraits/banners/editor) + de left-nav-"Banners"-rij (→ `showBanners()`, correct gehighlight) kloppen; "Make banner" komt consistent in de Studio uit vanuit de gallery-header, de home-CTA én de empty-state (E36.1/36.2/36.3). Geen codewijziging nodig (Thierry's nav-refactor blijft leidend); v2-main bouwt groen. Geen aparte build.
 - team: FEAT
 - blockedBy: 36.1
 
