@@ -49,6 +49,7 @@
 		286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */; };
 		2910C9E84F1A95DDE6EAF669 /* BulkAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81C29944A4F31F74C9CD6F54 /* BulkAligner.swift */; };
 		2AE09B3845EA1E0F90A53B18 /* PillSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */; };
+		2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */; };
 		2BF00FB85FDB9DB07C4F8B93 /* AnnouncementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */; };
 		2CC00BB877BB10A664982FB7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
@@ -285,6 +286,7 @@
 		1D40E681885CB6D731F70EDA /* SettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsModel.swift; sourceTree = "<group>"; };
 		2010776A8205C9E5E7F1E828 /* WorkingToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingToastView.swift; sourceTree = "<group>"; };
 		217E085CE2EE3A20C24CAA53 /* ListLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListLens.swift; sourceTree = "<group>"; };
+		22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerLogoPanel.swift; sourceTree = "<group>"; };
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
 		2B9319A21481EA22D57BC2DA /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
@@ -774,6 +776,7 @@
 				96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */,
 				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
+				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
 				EAA5F8B3F5EEE3E08FA0A619 /* BannerStudioView.swift */,
 				ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */,
@@ -1118,6 +1121,7 @@
 				65EF36B5643AA2E984D829EE /* BannerChooser.swift in Sources */,
 				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
+				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
 				C9664D75BEA6CD7A80A3776F /* BannerStudioView.swift in Sources */,
 				586DA2974FA6C2E92F0888A1 /* BannerTextPanel.swift in Sources */,

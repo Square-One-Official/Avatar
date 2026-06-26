@@ -145,6 +145,8 @@ struct BannerStudioView: View {
             BannerBackgroundPanel(doc: doc)
         case .text:
             BannerTextPanel(doc: doc)
+        case .logo:
+            BannerLogoPanel(doc: doc)
         default:
             DSEditPanel(title: tool.label) {
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {

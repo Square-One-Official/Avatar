@@ -145,8 +145,10 @@ canvas (sleep/positioneer), `DSTextField` voor invoer, undo'baar. Render via Cor
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.5 — Logo/Brand-panel
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerLogoPanel](Avatar2/Features/Banners/BannerLogoPanel.swift) — Logo: upload PNG (NSOpenPanel + downscale) → `doc.logoImageData` + `layers.logo`; schaal-slider (0.08–0.6), 3×3 plaatsings-grid (x/y), verwijderen. Brand colors: `BrandColorKit`-palet (swatches + `DSColorPicker` om toe te voegen). Live canvas-render via `BannerDocRenderer` (logo aspect-correct geschaald). Gewired in `BannerStudioView.panel(.logo)`. DoD groen.
 - team: FEAT
 - blockedBy: 37.2
 
