@@ -140,14 +140,19 @@ struct BannerStudioView: View {
     // MARK: Panels (plaatshouders — 37.3–37.7 vullen ze)
 
     @ViewBuilder private func panel(_ tool: BannerTool) -> some View {
-        DSEditPanel(title: tool.label) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                Text(tool.placeholder)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+        switch tool {
+        case .background:
+            BannerBackgroundPanel(doc: doc)
+        default:
+            DSEditPanel(title: tool.label) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                    Text(tool.placeholder)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

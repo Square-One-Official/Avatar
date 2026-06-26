@@ -193,6 +193,7 @@
 		C944B1F772FD3DFE3305D6C8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */; };
 		C9664D75BEA6CD7A80A3776F /* BannerStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA5F8B3F5EEE3E08FA0A619 /* BannerStudioView.swift */; };
 		CAE42ED6303F5E98B46050A9 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
+		CB2FA25E146105832D019C0C /* BannerBackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */; };
 		CCA2BEDFD96893E3A58ECA03 /* SettingsAccountPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63EB8AB21396622AB916B788 /* SettingsAccountPage.swift */; };
 		CCDA297FDC7DB266C5C99205 /* AvatarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */; };
 		CDB95161CB6C1EA3E20EC37E /* CanvasFrameChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 943E8CCEC9CCEFB639805EF6 /* CanvasFrameChip.swift */; };
@@ -367,6 +368,7 @@
 		952C9B6AE02D2195F2903AC3 /* AlphaHitTestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaHitTestTests.swift; sourceTree = "<group>"; };
 		957551E62840A0AAD27DF491 /* BoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		96955F87205367E1A31005B8 /* FileAuthStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAuthStorage.swift; sourceTree = "<group>"; };
+		96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerBackgroundPanel.swift; sourceTree = "<group>"; };
 		97E1236EB27F5CE8A83B67DF /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
 		9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EffectCutoutTests.swift; sourceTree = "<group>"; };
 		9C2B6957003039CB34DD8610 /* PortraitExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitExporter.swift; sourceTree = "<group>"; };
@@ -767,6 +769,7 @@
 			isa = PBXGroup;
 			children = (
 				75684711188D45F74A4EE9B4 /* Banner2.swift */,
+				96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */,
 				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
@@ -1108,6 +1111,7 @@
 				C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */,
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
 				8A196264D08873D2B5233B3A /* Banner2.swift in Sources */,
+				CB2FA25E146105832D019C0C /* BannerBackgroundPanel.swift in Sources */,
 				65EF36B5643AA2E984D829EE /* BannerChooser.swift in Sources */,
 				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,

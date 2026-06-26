@@ -114,10 +114,12 @@ De editor-romp:
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.3 — Background/Fill-panel
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT
 - blockedBy: 37.2
+
+**Result:** [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift) — zet `BannerDoc.fill`: Color-rij (`DSColorPicker` + `BackgroundKit.colorPresets` + `BrandColorKit`-kleuren, geselecteerde swatch krijgt een ring), Gradient-rij (`BackgroundKit.gradientPresets` → `.meshGradient`-stops), Image-rij (Upload via NSOpenPanel + `BackgroundKit.downscaledPNG` → `.image`; Generate = disabled stub "coming soon"). Mutaties via `doc.layers`/`fillImageData` → `touch()` → live canvas-her-render. Gewired in `BannerStudioView.panel(.background)`. DoD groen.
 
 `DSEditPanel` "Background": solid-kleur (brand-kleuren uit `BrandColorKit` + `DSColorPicker`),
 mesh-gradient (meerdere stops; deelt de mesh-shader uit E38 of een nette gradient-fallback),
