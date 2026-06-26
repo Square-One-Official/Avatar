@@ -1,14 +1,8 @@
 // Banner Studio (E37.2). De editor-romp: een venster-niveau-overlay (zoals de
 // social-preview) die op één `BannerDoc` werkt. Een wijde canvas-kaart toont de
-// live render; een onderste capsule-toolbar (Background · Shaders · Text · Logo ·
+// live render; een onderste capsule-toolbar (Background · Effects · Text · Logo ·
 // Size) opent per tool een paneel — in de geest van de portret-editor
-// (`DSEditPanelContainer`), maar simpeler. De panelen zelf zijn in 37.2 nog
-// plaatshouders; 37.3–37.7 vullen ze.
-//
-// NB: `DSCanvasCard` is 1:1-vergrendeld (vierkant export-canvas); een banner is
-// WIJD, dus de canvas-kaart is hier een DS-token-kaart (Background.card, xl4) op
-// de doc-aspect i.p.v. `DSCanvasCard` — bewuste DS-afwijking, in de geest van het
-// systeem.
+// (`DSEditPanelContainer`), maar simpeler.
 
 import AppKit
 import AvatarUI
@@ -25,7 +19,7 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .background: return "Background"
-        case .shaders:    return "Shaders"
+        case .shaders:    return "Effects"
         case .text:       return "Text"
         case .logo:       return "Logo"
         case .size:       return "Size"
@@ -42,13 +36,12 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
         }
     }
 
-    /// Korte omschrijving van de tool (gebruikersgericht).
     var summary: String {
         switch self {
-        case .background: return "Solid color, mesh gradient, upload or generate an image."
-        case .shaders:    return "Procedural effects — noise, dither, mesh gradients, lens distortion and warp — applied live on your banner."
-        case .text:       return "Add and style text — font, size, weight, color, alignment."
-        case .logo:       return "Place a logo and manage your brand colors."
+        case .background: return "Solid colour, gradient, or upload an image — drag on the canvas to reframe."
+        case .shaders:    return "Procedural effects applied to the whole banner."
+        case .text:       return "Add and style text — tap or drag on the canvas to position."
+        case .logo:       return "Place a logo and manage your brand colours."
         case .size:       return "Platform sizes — LinkedIn, X, wide."
         }
     }
@@ -58,12 +51,14 @@ struct BannerStudioView: View {
     let doc: BannerDoc
     let onClose: () -> Void
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.undoManager) private var undoManager
 
     @State private var activeTool: BannerTool?
     @State private var name: String
     @State private var preview: NSImage?
+    @State private var canvasSelection: BannerCanvasSelection?
+    @State private var shownHints: Set<BannerTool> = []
+    @State private var thumbnailBakeTask: Task<Void, Never>?
 
     let isPro: Bool
 
@@ -89,6 +84,12 @@ struct BannerStudioView: View {
             }
         }
         .task(id: doc.updatedAt) { await refreshPreview() }
+        .onChange(of: doc.updatedAt) { _, _ in scheduleThumbnailBake() }
+        .onChange(of: activeTool) { _, tool in
+            guard let tool else { return }
+            autoSelectForTool(tool)
+        }
+        .onDisappear { thumbnailBakeTask?.cancel() }
     }
 
     // MARK: Top bar
@@ -96,6 +97,8 @@ struct BannerStudioView: View {
     private var topBar: some View {
         HStack(spacing: DSSpacing.gap3) {
             DSToolButton(Image(systemName: "xmark"), label: "Close", surface: .ghost) { onClose() }
+
+            undoRedoCluster
 
             Spacer(minLength: 0)
 
@@ -110,13 +113,26 @@ struct BannerStudioView: View {
             Spacer(minLength: 0)
 
             DSNeutralButton("Export") { export() }
-            DSPrimaryButton("Save") { save() }
+            DSPrimaryButton("Done") { done() }
         }
         .padding(.horizontal, DSSpacing.gap6)
         .padding(.vertical, DSSpacing.gap4)
     }
 
-    // MARK: Canvas (wijde DS-kaart — zie kop-noot over DSCanvasCard)
+    private var undoRedoCluster: some View {
+        HStack(spacing: DSSpacing.gap1) {
+            DSToolButton(Image(systemName: "arrow.uturn.backward"), label: "Undo", surface: .ghost) {
+                undoManager?.undo()
+            }
+            .disabled(!(undoManager?.canUndo ?? false))
+            DSToolButton(Image(systemName: "arrow.uturn.forward"), label: "Redo", surface: .ghost) {
+                undoManager?.redo()
+            }
+            .disabled(!(undoManager?.canRedo ?? false))
+        }
+    }
+
+    // MARK: Canvas
 
     private var canvas: some View {
         ZStack {
@@ -131,6 +147,15 @@ struct BannerStudioView: View {
                             .scaledToFill()
                     }
                 }
+                .overlay {
+                    BannerCanvasOverlay(
+                        doc: doc,
+                        selection: $canvasSelection,
+                        activeTool: activeTool,
+                        canvasSize: doc.canvasSize,
+                        undoManager: undoManager
+                    )
+                }
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
@@ -142,20 +167,52 @@ struct BannerStudioView: View {
         }
     }
 
-    // MARK: Panels (plaatshouders — 37.3–37.7 vullen ze)
+    // MARK: Panels
 
     @ViewBuilder private func panel(_ tool: BannerTool) -> some View {
+        let showHint = !shownHints.contains(tool)
+        Group {
+            switch tool {
+            case .background:
+                BannerBackgroundPanel(doc: doc, subtitle: showHint ? tool.summary : nil)
+            case .text:
+                BannerTextPanel(doc: doc, selectedLayerID: selectedTextBinding, subtitle: showHint ? tool.summary : nil)
+            case .logo:
+                BannerLogoPanel(doc: doc, selection: $canvasSelection, subtitle: showHint ? tool.summary : nil)
+            case .size:
+                BannerSizePanel(doc: doc, subtitle: showHint ? tool.summary : nil)
+            case .shaders:
+                BannerShaderPanel(doc: doc, subtitle: showHint ? tool.summary : nil)
+            }
+        }
+        .onAppear {
+            if showHint { shownHints.insert(tool) }
+        }
+    }
+
+    private var selectedTextBinding: Binding<UUID?> {
+        Binding(
+            get: {
+                if case let .text(id) = canvasSelection { return id }
+                return nil
+            },
+            set: { new in
+                if let new { canvasSelection = .text(new) }
+                else if case .text = canvasSelection { canvasSelection = nil }
+            }
+        )
+    }
+
+    private func autoSelectForTool(_ tool: BannerTool) {
         switch tool {
-        case .background:
-            BannerBackgroundPanel(doc: doc)
         case .text:
-            BannerTextPanel(doc: doc)
+            if canvasSelection == nil, let first = doc.layers.texts.first {
+                canvasSelection = .text(first.id)
+            }
         case .logo:
-            BannerLogoPanel(doc: doc)
-        case .size:
-            BannerSizePanel(doc: doc)
-        case .shaders:
-            BannerShaderPanel(doc: doc)
+            if doc.layers.logo != nil { canvasSelection = .logo }
+        default:
+            break
         }
     }
 
@@ -168,19 +225,13 @@ struct BannerStudioView: View {
         doc.touch()
     }
 
-    /// Rendert de doc → preview-cache + sluit. (Banner2-mirror voor gallery/
-    /// social-preview-compat: zie 37.6 — gallery toont nu BannerDoc.)
-    private func save() {
+    /// Sluit de studio; wijzigingen zijn al opgeslagen (SwiftData). Bak thumbnail.
+    private func done() {
         commitName()
-        if let cg = composedImage(watermark: false),
-           let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
-            doc.previewImageData = png
-        }
-        doc.touch()
+        bakeThumbnail()
         onClose()
     }
 
-    /// Rendert de doc op canvas-maat → PNG → NSSavePanel; free-tier watermerk.
     private func export() {
         commitName()
         guard let cg = composedImage(watermark: !isPro),
@@ -194,15 +245,26 @@ struct BannerStudioView: View {
     }
 
     private func refreshPreview() async {
-        // Klein canvas (≤1500×500) — render op de main-actor is goedkoop genoeg.
         guard let cg = composedImage(watermark: false) else { return }
         preview = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
-    /// Het volledige banner-beeld: CPU-compositie (fill+tekst+logo) via
-    /// `BannerDocRenderer`, dan de GPU-shader-stack erin gerasterd (E38.2), en
-    /// optioneel het free-tier watermerk scherp bovenop. Eén pad voor
-    /// preview/save/export → wat-je-ziet = wat-je-bewaart/exporteert.
+    private func scheduleThumbnailBake() {
+        thumbnailBakeTask?.cancel()
+        thumbnailBakeTask = Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { bakeThumbnail() }
+        }
+    }
+
+    private func bakeThumbnail() {
+        if let cg = composedImage(watermark: false),
+           let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
+            doc.previewImageData = png
+        }
+    }
+
     private func composedImage(watermark: Bool) -> CGImage? {
         guard let base = BannerDocRenderer.render(doc) else { return nil }
         let shaded = BannerShaderRenderer.bake(base, shaders: doc.layers.shaders, size: doc.canvasSize) ?? base

@@ -10,15 +10,15 @@ import SwiftUI
 
 struct BannerShaderPanel: View {
     @Bindable var doc: BannerDoc
+    var subtitle: String?
 
     /// Lokale werk-kopie van de shader-stack; UI bindt hierop, `onChange` synct.
     @State private var layers: [BannerShaderLayer] = []
     @State private var didLoad = false
 
     var body: some View {
-        DSEditPanel(title: "Shaders") {
+        DSEditPanel(title: "Effects", subtitle: subtitle) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                // Catalogus — tik om een effect toe te voegen.
                 Text("Add effect")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.muted)
@@ -31,11 +31,14 @@ struct BannerShaderPanel: View {
                                 .help("Add \(effect.displayName)")
                         }
                     }
-                    .padding(.vertical, DSSpacing.gap1)
+                    .padding(.vertical, DSSpacing.gap2)
+                    .padding(.leading, DSSpacing.gap1)
+                    .scrollRowTrailingInset()
                 }
+                .horizontalScrollEdgeFade()
 
                 if layers.isEmpty {
-                    Text("No effects yet — add one above. Stack several; the top one renders first.")
+                    Text("No effects yet — add one above. Applied to the whole banner.")
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -130,7 +133,7 @@ struct BannerShaderPanel: View {
                             .dsTextStyle(.labelSmall)
                             .foregroundStyle(DSColor.Foreground.muted)
                             .frame(width: 64, alignment: .leading)
-                        Slider(value: paramBinding(layer, p), in: p.range)
+                        DSSlider(value: paramBinding(layer, p), in: p.range)
                     }
                 }
             }

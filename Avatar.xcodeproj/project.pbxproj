@@ -134,6 +134,11 @@
 		850254B0FC758B3438E67CCD /* WelcomeSignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */; };
 		85461649DB9BB1202DDCE7E4 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */; };
 		859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */; };
+		B6A7C8D9EA0B1C6D748F901A /* BannerCanvasOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F60718293A4B5C /* BannerCanvasOverlay.swift */; };
+		B7A8C9DAEB1C2D7E859A012B /* BannerCanvasSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A3C4D5E6F70829304B5C6D /* BannerCanvasSelection.swift */; };
+		B8A9CADBEC2D3E8F96AB123C /* BannerDocUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A4C5D6E7F8093A415C6D7E /* BannerDocUndo.swift */; };
+		B9AABDCEFD3E4F9077BC234D /* BannerFontCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A5C6D7E8F90A4B526D7E8F /* BannerFontCatalog.swift */; };
+		BAABCDEFF04F509188CD345E /* BannerLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A6C7D8E9FA0B5C637E8F90 /* BannerLayoutMetrics.swift */; };
 		867313BD6DC51163C952CA94 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
 		88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
@@ -330,6 +335,11 @@
 		5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
 		5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasActionToolbar.swift; sourceTree = "<group>"; };
 		5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDoc.swift; sourceTree = "<group>"; };
+		B1A2C3D4E5F60718293A4B5C /* BannerCanvasOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasOverlay.swift; sourceTree = "<group>"; };
+		B2A3C4D5E6F70829304B5C6D /* BannerCanvasSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasSelection.swift; sourceTree = "<group>"; };
+		B3A4C5D6E7F8093A415C6D7E /* BannerDocUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDocUndo.swift; sourceTree = "<group>"; };
+		B4A5C6D7E8F90A4B526D7E8F /* BannerFontCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerFontCatalog.swift; sourceTree = "<group>"; };
+		B5A6C7D8E9FA0B5C637E8F90 /* BannerLayoutMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerLayoutMetrics.swift; sourceTree = "<group>"; };
 		5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeSignInSheet.swift; sourceTree = "<group>"; };
 		5DE64240C8D2B68EB34AA721 /* Mesh 05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 05.png"; sourceTree = "<group>"; };
 		5EE7F2A8D942B0AE34DE7F17 /* ShellSidebarChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSidebarChrome.swift; sourceTree = "<group>"; };
@@ -789,8 +799,13 @@
 			children = (
 				75684711188D45F74A4EE9B4 /* Banner2.swift */,
 				96F1C1F07D5D7E872C42FB3C /* BannerBackgroundPanel.swift */,
+				B1A2C3D4E5F60718293A4B5C /* BannerCanvasOverlay.swift */,
+				B2A3C4D5E6F70829304B5C6D /* BannerCanvasSelection.swift */,
 				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
+				B3A4C5D6E7F8093A415C6D7E /* BannerDocUndo.swift */,
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
+				B4A5C6D7E8F90A4B526D7E8F /* BannerFontCatalog.swift */,
+				B5A6C7D8E9FA0B5C637E8F90 /* BannerLayoutMetrics.swift */,
 				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
 				F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
@@ -1139,9 +1154,14 @@
 				650F96FF4A0AF83F8279DE30 /* BackgroundPanel.swift in Sources */,
 				8A196264D08873D2B5233B3A /* Banner2.swift in Sources */,
 				CB2FA25E146105832D019C0C /* BannerBackgroundPanel.swift in Sources */,
+				B6A7C8D9EA0B1C6D748F901A /* BannerCanvasOverlay.swift in Sources */,
+				B7A8C9DAEB1C2D7E859A012B /* BannerCanvasSelection.swift in Sources */,
 				65EF36B5643AA2E984D829EE /* BannerChooser.swift in Sources */,
 				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
+				B8A9CADBEC2D3E8F96AB123C /* BannerDocUndo.swift in Sources */,
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
+				B9AABDCEFD3E4F9077BC234D /* BannerFontCatalog.swift in Sources */,
+				BAABCDEFF04F509188CD345E /* BannerLayoutMetrics.swift in Sources */,
 				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
 				8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,

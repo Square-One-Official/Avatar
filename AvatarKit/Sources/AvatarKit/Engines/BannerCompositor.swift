@@ -29,7 +29,12 @@ public enum BannerCompositor {
     }
 
     /// Compositeert `fill` tot een ondoorzichtige cover van `size` pixels.
-    public static func composite(fill: Fill, size: CGSize) throws -> CGImage {
+    /// `imageFocal` verschuift het brandpunt bij aspect-fill (0.5 = gecentreerd).
+    public static func composite(
+        fill: Fill,
+        size: CGSize,
+        imageFocal: CGPoint = CGPoint(x: 0.5, y: 0.5)
+    ) throws -> CGImage {
         let w = max(1, Int(size.width.rounded()))
         let h = max(1, Int(size.height.rounded()))
         let rect = CGRect(x: 0, y: 0, width: w, height: h)
@@ -39,7 +44,7 @@ public enum BannerCompositor {
         case let .color(r, g, b):
             content = CIImage(color: CIColor(red: r, green: g, blue: b)).cropped(to: rect)
         case let .image(image):
-            content = aspectFill(CIImage(cgImage: image), into: rect)
+            content = aspectFill(CIImage(cgImage: image), into: rect, focal: imageFocal)
         }
 
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -54,16 +59,18 @@ public enum BannerCompositor {
     /// Schaalt en centreert een CIImage zodat hij `rect` volledig vult
     /// (aspect-fill), met hoge-kwaliteit resampling. Spiegelt
     /// `BackgroundCompositor.aspectFill`.
-    private static func aspectFill(_ image: CIImage, into rect: CGRect) -> CIImage {
+    private static func aspectFill(_ image: CIImage, into rect: CGRect, focal: CGPoint) -> CIImage {
         let ext = image.extent
         guard ext.width > 0, ext.height > 0 else { return image.cropped(to: rect) }
         let scale = max(rect.width / ext.width, rect.height / ext.height)
         let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         let s = scaled.extent
-        let dx = rect.midX - s.midX
-        let dy = rect.midY - s.midY
+        let focalX = s.minX + focal.x * s.width
+        let focalY = s.minY + focal.y * s.height
+        let tx = rect.midX - focalX
+        let ty = rect.midY - focalY
         return scaled
-            .transformed(by: CGAffineTransform(translationX: dx, y: dy))
+            .transformed(by: CGAffineTransform(translationX: tx, y: ty))
             .cropped(to: rect)
     }
 }

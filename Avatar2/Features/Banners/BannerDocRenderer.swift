@@ -25,7 +25,12 @@ enum BannerDocRenderer {
         let canvas = CGSize(width: w, height: h)
         let layers = doc.layers
 
-        guard let base = renderFill(layers.fill, fillImageData: doc.fillImageData, size: canvas) else {
+        guard let base = renderFill(
+            layers.fill,
+            fillImageData: doc.fillImageData,
+            fillImageFocal: CGPoint(x: doc.fillImageFocalX, y: doc.fillImageFocalY),
+            size: canvas
+        ) else {
             return nil
         }
 
@@ -85,17 +90,21 @@ enum BannerDocRenderer {
 
     // MARK: - Fill
 
-    private static func renderFill(_ fill: BannerFill, fillImageData: Data?, size: CGSize) -> CGImage? {
+    private static func renderFill(
+        _ fill: BannerFill,
+        fillImageData: Data?,
+        fillImageFocal: CGPoint,
+        size: CGSize
+    ) -> CGImage? {
         switch fill {
         case let .solid(hex):
             let (r, g, b, _) = rgba(hex: hex)
             return try? BannerCompositor.composite(fill: .color(red: r, green: g, blue: b), size: size)
         case .image:
             guard let data = fillImageData, let cg = cgImage(from: data) else {
-                // Geen bytes (yet) → neutrale donkere fill i.p.v. een nil-render.
                 return try? BannerCompositor.composite(fill: .color(red: 0.11, green: 0.10, blue: 0.09), size: size)
             }
-            return try? BannerCompositor.composite(fill: .image(cg), size: size)
+            return try? BannerCompositor.composite(fill: .image(cg), size: size, imageFocal: fillImageFocal)
         case let .meshGradient(stops):
             return renderMesh(stops, size: size)
         }
@@ -152,15 +161,22 @@ enum BannerDocRenderer {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: single, attributes: attrs))
         let bounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
 
-        // Genormaliseerd middelpunt; y=0 = BOVEN → CG-bottom-left omrekenen.
-        let cx = layer.x * canvas.width
+        // Genormaliseerd anker; y=0 = BOVEN → CG-bottom-left omrekenen.
+        let anchorX = layer.x * canvas.width
         let cy = canvas.height * (1 - layer.y)
+
+        let textX: CGFloat
+        switch layer.alignRaw {
+        case 0: textX = -bounds.minX
+        case 2: textX = -bounds.width - bounds.minX
+        default: textX = -bounds.width / 2 - bounds.minX
+        }
 
         ctx.saveGState()
         ctx.textMatrix = .identity
-        ctx.translateBy(x: cx, y: cy)
+        ctx.translateBy(x: anchorX, y: cy)
         if layer.rotation != 0 { ctx.rotate(by: -layer.rotation * .pi / 180) }
-        ctx.textPosition = CGPoint(x: -bounds.width / 2 - bounds.minX, y: -bounds.height / 2 - bounds.minY)
+        ctx.textPosition = CGPoint(x: textX, y: -bounds.height / 2 - bounds.minY)
         CTLineDraw(line, ctx)
         ctx.restoreGState()
     }

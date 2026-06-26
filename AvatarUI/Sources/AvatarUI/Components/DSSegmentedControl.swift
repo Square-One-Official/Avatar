@@ -6,6 +6,7 @@ import SwiftUI
 
 public struct DSSegmentedControl<Tag: Hashable>: View {
     @Binding private var selection: Tag
+    @Namespace private var selectionNamespace
     private let segments: [Segment]
     private let equalWidth: Bool
 
@@ -38,7 +39,7 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
         }
         .padding(DSSpacing.gap0_5)
         .background(DSColor.Background.neutral, in: Capsule())
-        .dsMotion(DSMotion.base, value: selection)
+        .dsMotion(DSMotion.springSmall, value: selection)
     }
 
     @ViewBuilder
@@ -46,7 +47,7 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
         let isSelected = selection == segment.tag
         let horizontalPadding = equalWidth ? DSSpacing.gap2 : DSSpacing.gap4
         Button {
-            DSMotion.animate(DSMotion.base) { selection = segment.tag }
+            DSMotion.animate(DSMotion.springSmall) { selection = segment.tag }
         } label: {
             Text(segment.label)
                 .dsTextStyle(.labelBase)
@@ -58,7 +59,9 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
                 .frame(maxWidth: equalWidth ? .infinity : nil)
                 .background {
                     if isSelected {
-                        Capsule().fill(DSColor.Background.neutralStronger)
+                        Capsule()
+                            .fill(DSColor.Background.neutralStronger)
+                            .matchedGeometryEffect(id: "selection", in: selectionNamespace)
                     }
                 }
                 .contentShape(Capsule())

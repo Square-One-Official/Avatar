@@ -9,13 +9,17 @@ import SwiftUI
 
 struct BannerLogoPanel: View {
     @Bindable var doc: BannerDoc
+    @Binding var selection: BannerCanvasSelection?
+    var subtitle: String?
+
     @State private var brand = BrandColorKit.shared
-    @State private var newBrandColor: Color = .white
+    @State private var showBrandColorPicker = false
+    @State private var pickerColor: Color = .white
 
     private let swatch: CGFloat = 28
 
     var body: some View {
-        DSEditPanel(title: "Logo & brand") {
+        DSEditPanel(title: "Logo & brand", subtitle: subtitle) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
                 logoSection
                 brandSection
@@ -82,11 +86,23 @@ struct BannerLogoPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
             Text("Brand colors").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
             HStack(spacing: DSSpacing.gap2) {
-                DSColorPicker(color: Binding(
-                    get: { newBrandColor },
-                    set: { c in newBrandColor = c; if let hex = c.hexRGB { brand.add(hex) } }
-                ), supportsAlpha: false)
-                .frame(width: swatch, height: swatch)
+                Button { showBrandColorPicker = true } label: {
+                    Circle()
+                        .fill(DSColor.Background.neutral)
+                        .frame(width: swatch, height: swatch)
+                        .overlay {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(DSColor.Foreground.subtle)
+                        }
+                }
+                .buttonStyle(.plain)
+                .dsHoverScale()
+                .help("Add brand colour")
+                .popover(isPresented: $showBrandColorPicker, arrowEdge: .bottom) {
+                    DSColorPicker(color: $pickerColor, supportsAlpha: false)
+                        .appliedAppearancePreference()
+                }
 
                 ForEach(brand.hexColors, id: \.self) { hex in
                     if let color = Color(hexRGB: hex) {
@@ -101,6 +117,10 @@ struct BannerLogoPanel: View {
                     Text("Add brand colors with the picker.")
                         .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
                 }
+            }
+            .onChange(of: pickerColor) { _, c in
+                guard showBrandColorPicker, let hex = c.hexRGB else { return }
+                brand.add(hex)
             }
         }
     }
@@ -138,6 +158,7 @@ struct BannerLogoPanel: View {
         var layers = doc.layers
         layers.logo = BannerLogoLayer(x: 0.5, y: 0.5, scale: 0.25)
         doc.layers = layers
+        selection = .logo
     }
 
     private func removeLogo() {
@@ -145,5 +166,6 @@ struct BannerLogoPanel: View {
         var layers = doc.layers
         layers.logo = nil
         doc.layers = layers
+        if selection == .logo { selection = nil }
     }
 }

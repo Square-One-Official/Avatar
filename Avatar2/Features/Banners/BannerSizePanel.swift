@@ -8,6 +8,7 @@ import SwiftUI
 
 struct BannerSizePanel: View {
     @Bindable var doc: BannerDoc
+    var subtitle: String?
 
     private struct Preset: Identifiable {
         let id = UUID()
@@ -23,7 +24,7 @@ struct BannerSizePanel: View {
     ]
 
     var body: some View {
-        DSEditPanel(title: "Size") {
+        DSEditPanel(title: "Size", subtitle: subtitle) {
             VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                 ForEach(presets) { preset in
                     row(preset)
@@ -47,9 +48,7 @@ struct BannerSizePanel: View {
                 }
                 Spacer(minLength: 0)
                 if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(DSColor.Background.app, DSColor.Action.primary)
+                    DSSelectionCheckBadge()
                 }
             }
             .padding(DSSpacing.gap2)

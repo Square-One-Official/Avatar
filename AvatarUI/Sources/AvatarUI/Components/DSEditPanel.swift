@@ -21,6 +21,7 @@ private struct DSPanelContentHeightKey: PreferenceKey {
 
 public struct DSEditPanel<Content: View>: View {
     private let title: String
+    private let subtitle: String?
     private let credits: String?
     private let content: Content
     private let maxWidth: CGFloat
@@ -33,12 +34,14 @@ public struct DSEditPanel<Content: View>: View {
     /// i.p.v. het paneel op te rekken.
     public init(
         title: String,
+        subtitle: String? = nil,
         credits: String? = nil,
         maxWidth: CGFloat = 600,
         maxContentHeight: CGFloat = 280,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.credits = credits
         self.maxWidth = maxWidth
         self.maxContentHeight = maxContentHeight
@@ -47,15 +50,23 @@ public struct DSEditPanel<Content: View>: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            HStack {
-                Text(title)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                if let credits {
-                    Spacer()
-                    Text(credits)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                HStack {
+                    Text(title)
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    if let credits {
+                        Spacer()
+                        Text(credits)
+                            .dsTextStyle(.labelSmall)
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+                }
+                if let subtitle {
+                    Text(subtitle)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             // E18.15/18.18: één scrollbare kolom die de inhoud hugt — de

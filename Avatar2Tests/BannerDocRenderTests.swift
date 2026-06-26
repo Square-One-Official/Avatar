@@ -84,6 +84,47 @@ final class BannerDocRenderTests: XCTestCase {
         XCTAssertEqual(cg?.height, 396)
     }
 
+    func testTextAlignmentLeftDrawsLeftOfCenter() {
+        let center = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 1, x: 0.5, y: 0.5)
+        let left = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 0, x: 0.5, y: 0.5)
+        let right = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 2, x: 0.5, y: 0.5)
+        let base = BannerLayers(fill: .solid(hex: "#000000"))
+        guard let centerImg = BannerDocRenderer.render(BannerDoc(layers: BannerLayers(fill: base.fill, texts: [center]))),
+              let leftImg = BannerDocRenderer.render(BannerDoc(layers: BannerLayers(fill: base.fill, texts: [left]))),
+              let rightImg = BannerDocRenderer.render(BannerDoc(layers: BannerLayers(fill: base.fill, texts: [right])))
+        else {
+            return XCTFail("render gaf nil")
+        }
+        let centerWhiteX = whiteCentroidX(centerImg)
+        let leftWhiteX = whiteCentroidX(leftImg)
+        let rightWhiteX = whiteCentroidX(rightImg)
+        XCTAssertGreaterThan(leftWhiteX, centerWhiteX)
+        XCTAssertLessThan(rightWhiteX, centerWhiteX)
+    }
+
+    private func whiteCentroidX(_ cg: CGImage) -> Double {
+        let w = cg.width, h = cg.height
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 0, count: bpr * h)
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: bpr,
+            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return 0 }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var sumX = 0.0, count = 0.0
+        for y in 0..<h {
+            for x in 0..<w {
+                let i = y * bpr + x * 4
+                if buf[i] > 200 && buf[i + 1] > 200 && buf[i + 2] > 200 {
+                    sumX += Double(x)
+                    count += 1
+                }
+            }
+        }
+        return count > 0 ? sumX / count : 0
+    }
+
     func testBanner2MigrationKeepsImageBytes() {
         // 4×4 rode PNG als "platte" Banner2.
         let img = NSImage(size: NSSize(width: 4, height: 4))

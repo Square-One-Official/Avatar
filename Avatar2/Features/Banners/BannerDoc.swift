@@ -35,8 +35,12 @@ final class BannerDoc {
     /// Bron-bytes voor de logo-laag (PNG met alpha). nil tenzij er een logo is.
     @Attribute(.externalStorage) var logoImageData: Data?
     /// Gecachte gerenderde wijde PNG (thumbnails + social-preview-compat). Wordt
-    /// bij Save (E37.6) ververst.
+    /// bij Done (E37.6) / debounced auto-bake ververst.
     @Attribute(.externalStorage) var previewImageData: Data?
+
+    /// Genormaliseerd brandpunt (0…1) voor `.image`-fill — verschuift aspect-fill.
+    var fillImageFocalX: Double = 0.5
+    var fillImageFocalY: Double = 0.5
 
     init(
         name: String = "",
