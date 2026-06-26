@@ -43,6 +43,7 @@ struct SignInSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
+        .appliedAppearancePreference()
         // E18.24/18.21: de fout-REDEN als toast onderin (zodat zichtbaar is
         // wáárom het misging), naast de rode input-state. Auto-dismiss.
         .overlay(alignment: .bottom) {

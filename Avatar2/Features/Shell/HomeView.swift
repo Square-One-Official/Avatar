@@ -14,11 +14,11 @@ struct HomeView: View {
     let model: ShellModel
     let entitlement: EntitlementModel
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.undoManager) private var undoManager
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
     @State private var featuredHovering = false
+    @State private var menuTarget: Portrait2?
+    @State private var menuAnchor: CGRect = .zero
 
     // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
     // (Color.clear + aspectRatio(.fit)) wordt nooit breder dan z'n kolom, dus
@@ -77,7 +77,12 @@ struct HomeView: View {
                                     portrait: portrait, folders: folders, model: model,
                                     isSelected: model.isPortraitSelected(portrait),
                                     ordered: { portraits.map(\.persistentModelID) },
-                                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } }
+                                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+                                    onContextMenu: { frame in
+                                        model.preparePortraitContextMenu(on: portrait)
+                                        menuTarget = portrait
+                                        menuAnchor = frame
+                                    }
                                 )
                             }
                         }
@@ -93,6 +98,14 @@ struct HomeView: View {
                 .padding(.bottom, DSSpacing.gap5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .coordinateSpace(name: PortraitContextMenuSpace.name)
+        .portraitContextMenuOverlay(
+            target: $menuTarget,
+            anchor: menuAnchor,
+            model: model,
+            folders: folders,
+            selectedTargets: { portraits.filter { model.isPortraitSelected($0) } }
+        )
     }
 
     /// Max-breedte van de featured-kaart — compacter dan de volledige
@@ -152,12 +165,10 @@ struct HomeView: View {
             .onTapGesture {
                 model.handlePortraitClick(portrait, ordered: portraits.map(\.persistentModelID), mods: NSApp.currentEvent?.modifierFlags ?? [])
             }
-            .contextMenu {
-                portraitContextMenu(
-                    for: portrait, model: model, folders: folders,
-                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
-                    undoManager: undoManager, modelContext: modelContext
-                )
+            .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
+                model.preparePortraitContextMenu(on: portrait)
+                menuTarget = portrait
+                menuAnchor = frame
             }
             // Ook de uitgelichte Recent-kaart is naar een map sleepbaar.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))

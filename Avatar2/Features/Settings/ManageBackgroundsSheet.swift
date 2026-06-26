@@ -37,6 +37,7 @@ struct ManageBackgroundsSheet: View {
         }
         .frame(width: 540, height: 480)
         .background(DSColor.Background.app)
+        .appliedAppearancePreference()
     }
 
     // MARK: - Header

@@ -27,4 +27,9 @@ enum ShellMetrics {
     /// band is 32 pt (midden ≈ 16 pt). 28 pt zette de teller ~2 pt te hoog
     /// (top-uitgelijnd i.p.v. gecentreerd → "touching the top", feedback Thierry).
     static let windowControlsRowHeight: CGFloat = 32
+
+    /// Editor-topbar (breadcrumb + view-toggle + Share): compacte band, flush
+    /// onder de vensterrand (Granola-stijl). Gelijk aan control-hoogte — geen
+    /// extra verticale slack.
+    static let topBarRowHeight: CGFloat = 28
 }

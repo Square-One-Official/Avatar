@@ -154,17 +154,10 @@ struct EditorView: View {
     /// source of truth van de editor-selectie — standaard TRUE (bij openen is het
     /// portret geselecteerd zodat de toolbars meteen zichtbaar zijn) en het
     /// E28.5: in de enkel-portret-editor is het portret altijd "het actieve
-    /// canvas" → de toolbars zijn ALTIJD zichtbaar (selectie-gestuurd verbergen
-    /// hoort bij meerdere canvassen, de board). Deze vlag stuurt nu enkel nog de
+    /// canvas" → de toolbars zijn ALTIJD zichtbaar. Deze vlag stuurt enkel nog de
     /// transform-HANDLES (klik op het onderwerp → handles; klik op lege canvas /
     /// ESC → handles weg). Default false (geen handles tot je het onderwerp kiest).
     @State private var canvasSubjectSelected = false
-    /// E33: frame-selectie (FigJam) — APART van de onderwerp-selectie. Default
-    /// TRUE: het frame opent geselecteerd → top-toolbar zichtbaar + zachte ring
-    /// rond de kaart + active-stijl van de naam-chip. Een klik op het onderwerp
-    /// of de lege canvas houdt 'm aan; alléén een klik búíten het frame (of de
-    /// chip→reselect) schakelt 'm. Onderwerp-handles volgen `canvasSubjectSelected`.
-    @State private var canvasFrameSelected = true
     /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
     /// transform-overlay de handles tijdens het pannen even verbergt.
     @State private var canvasSubjectPanning = false
@@ -255,19 +248,13 @@ struct EditorView: View {
     }
 
     /// E33/R4: neutraal-grijze frame-selectiekleur (macOS-stijl), gedeeld door de
-    /// OUTER ring en de naam-chip-actiefrand. Vast grijs → appearance-stabiel.
-    /// CanvasFrameChip gebruikt dezelfde waarde (houd ze gelijk).
+    /// OUTER ring en de naam-chip-rand. CanvasFrameChip gebruikt dezelfde waarde.
     static let frameSelectionGrey = Color(white: 0.6)
 
-    /// E33: selecteer alléén het frame (toolbar + ring terug) en laat het
-    /// onderwerp los (handles weg) — gebruikt door de naam-chip en als
-    /// gemeenschappelijke ingang voor "klik op de lege canvas".
-    private func selectFrameOnly() {
-        DSMotion.animate(DSMotion.base) {
-            canvasFrameSelected = true
-            canvasSubjectSelected = false
-        }
-    }
+    /// Ruimte bóven het canvas: flush breadcrumb-rij (28pt) + header-row (28pt)
+    /// + gap boven de kaart — voorkomt dat de naam/toolbar in de breadcrumb klikken.
+    private static let canvasTopChromeInset: CGFloat =
+        28 + DSSpacing.gap4 + 28 + DSSpacing.gap2
 
     /// E07.1: is er een achtergrond-laag (dan dot-grid uit)? Origineel, custom
     /// afbeelding, kleur, óf Portrait-op-transparant (valt op origineel terug).
@@ -636,7 +623,6 @@ struct EditorView: View {
                                 gridEnabled: canvasGridEnabled,
                                 isSelected: $canvasSubjectSelected,
                                 isPanning: $canvasSubjectPanning,
-                                frameSelected: $canvasFrameSelected,
                                 frameShape: portraitModel?.frameShape ?? .circle,
                                 // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
                                 cameraScale: camera.scale
@@ -713,26 +699,15 @@ struct EditorView: View {
                             .stroke(Self.frameSelectionGrey, lineWidth: 2)
                             .frame(width: vis + 4, height: vis + 4)
                             .position(x: cx, y: cy)
-                            .opacity(canvasFrameSelected ? 1 : 0)
                             .allowsHitTesting(false)
 
-                        // Naam-chip: links uitgelijnd op de kaart-linkerrand, net
-                        // erboven (FigJam-label dat aan het frame plakt). Single =
-                        // frame selecteren, dubbelklik = hernoemen.
-                        CanvasFrameChip(
-                            name: portraitModel?.name,
-                            isActive: canvasFrameSelected,
-                            onSelect: { selectFrameOnly() },
-                            onRename: onRename
-                        )
-                        .fixedSize()
-                        // 28pt chip-hoogte + ~10pt lucht boven de kaartrand.
-                        .offset(x: visLeft, y: visTop - 38)
-
-                        // Frame-toolbar: gecentreerd op de kaart, NET BINNEN de
-                        // bovenrand (over de portret-top). Tracking → blijft ín het
-                        // frame op élk zoomniveau (i.p.v. erboven te zweven).
-                        if canvasFrameSelected {
+                        // Naam-chip + Frame/Background/grid: één rij linksboven de
+                        // kaart, altijd zichtbaar (zelfde hoogte als de chip).
+                        HStack(alignment: .center, spacing: DSSpacing.gap2) {
+                            CanvasFrameChip(
+                                name: portraitModel?.name,
+                                onRename: onRename
+                            )
                             CanvasActionToolbar(
                                 onAutoFrame: runAutomaticFraming,
                                 onFlip: flipHorizontally,
@@ -740,20 +715,13 @@ struct EditorView: View {
                                 onSetFrameShape: setFrameShape,
                                 activeMenu: $canvasMenu,
                                 gridEnabled: $canvasGridEnabled,
-                                // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
-                                // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
+                                layout: .headerRow,
                                 background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement).onHover { pointerOverChrome = $0 } }
                             )
-                            .fixedSize()
-                            .position(x: cx, y: visTop + DSSpacing.gap6)
-                            // Emil: nooit vanaf scale(0); scale-vanuit-0.96 + opacity, origin top.
-                            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-                            // E-fix: auto-frame/flip/frame-vorm/achtergrond werken op
-                            // de cutout — inert (zichtbaar voor continuïteit) tijdens
-                            // de isolating-fase. De naam-chip (hernoemen) en de
-                            // camera-pan/-zoom blijven wél actief.
                             .disabled(isolating != nil)
                         }
+                        .fixedSize(horizontal: true, vertical: false)
+                        .offset(x: visLeft, y: visTop - 28 - DSSpacing.gap2)
                     }
                     .frame(width: side, height: side)
                 }
@@ -763,12 +731,11 @@ struct EditorView: View {
             // en geopend paneel; de 3.16-garantie houdt paneel en toolbar
             // buiten schot. 456 was de Figma-maat bij 1000×700, geen cap.
             .aspectRatio(1, contentMode: .fit)
-            // E33/R3: licht uitgezoomde default — een ECHTE layout-marge rond de
-            // kaart zodat het naam-label er bij camera=1 nét boven past (de chrome-
-            // overlay tilt 'm 38pt op → marge ≥ 38 voorkomt afkappen door `.clipped()`)
-            // en de OUTER ring vrij van de slotrand blijft. Zoomt de gebruiker verder
-            // uit, dan volgt de chrome de camera (zie de screen-space overlay).
-            .padding(DSSpacing.gap8 + DSSpacing.gap3)
+            // Extra top-inset zodat breadcrumb + header-row (naam + Frame/Background)
+            // niet in elkaar vallen; zij/l onder marge voor ring + bottom-toolbar.
+            .padding(.top, Self.canvasTopChromeInset)
+            .padding(.horizontal, DSSpacing.gap8 + DSSpacing.gap3)
+            .padding(.bottom, DSSpacing.gap8 + DSSpacing.gap3)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // E27.1: ingezoomde scène binnen de canvas-slot houden (niet over de
             // panelen/toolbar lekken). De catcher vangt scroll/⌘-scroll/spatie-
@@ -802,18 +769,10 @@ struct EditorView: View {
                         }
                 }
             }
-            // (E33/R1: de frame-toolbar is verhuisd naar card-space hierboven —
-            // plakt nu aan de kaart-bovenrand i.p.v. in de slot-band te zweven.)
-            // E33: ring-fade + toolbar enter/exit samen animeren (reduced-motion-
-            // bewust). Eén bron i.p.v. losse withAnimation-sites; de initiële
-            // `true` ziet geen change → geen intro-animatie.
-            .dsMotion(DSMotion.base, value: canvasFrameSelected)
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
-            // E33: een ander portret opent frame-geselecteerd (toolbar/ring terug),
-            // onderwerp gedeselecteerd (handles weg).
+            // Onderwerp start gedeselecteerd (handles weg).
             .onChange(of: portraitModel?.persistentModelID) { _, _ in
                 camera.reset()
-                canvasFrameSelected = true
                 canvasSubjectSelected = false
                 refreshDecodedImages()
             }
@@ -828,30 +787,19 @@ struct EditorView: View {
                 if active {
                     activeTool = nil
                     canvasSubjectSelected = false
-                    canvasFrameSelected = true
                     // Een eventuele view-zoom van het vorige portret mag niet
                     // doorwerken in de reveal (anders compoundeert 'ie de inzoom).
                     camera.reset()
                 }
             }
-            // E28.4: betrouwbare deselect op een klik op de LEGE canvas. Bug-
-            // oorzaak: de enige klik-deselect (EditorCanvasView's Color.clear) dekt
-            // alleen het canvas-VIERKANT, niet de marge eromheen — en de camera-
-            // catcher/overlays zitten nu in die ruimte. Deze laag ligt áchter de
-            // kaart (de catcher laat clicks door via hitTest→nil), vult de hele
-            // foto-slot en deselecteert elke klik die niet op het onderwerp,
-            // de handles of een toolbar landt. Onderwerp-tap (selecteren) en
-            // EditorCanvasView's eigen deselect liggen erbóven → ongemoeid.
-            // E33: deze klik valt búíten het frame → deselecteert BEIDE (frame +
-            // onderwerp): toolbar + ring + handles weg. Altijd actief zolang er
-            // iets geselecteerd is (frame is default geselecteerd).
+            // E28.4: betrouwbare deselect op een klik op de LEGE canvas — laat
+            // alleen de transform-handles weg; frame-chrome blijft zichtbaar.
             .background {
-                if canvasFrameSelected || canvasSubjectSelected {
+                if canvasSubjectSelected {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
                             DSMotion.animate(DSMotion.base) {
-                                canvasFrameSelected = false
                                 canvasSubjectSelected = false
                             }
                         }

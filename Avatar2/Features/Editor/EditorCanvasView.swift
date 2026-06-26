@@ -28,11 +28,6 @@ struct EditorCanvasView: View {
     @Binding var isSelected: Bool
     /// E27.3: pan-drag bezig → EditorView dimt de (screen-space) handles weg.
     @Binding var isPanning: Bool
-    /// E33: frame-selectie (FigJam) — apart van onderwerp-selectie. Een klik op
-    /// de lege canvas-ruimte óf op het onderwerp houdt/zet het frame geselecteerd
-    /// (top-toolbar + ring + chip-highlight in EditorView); alléén een klik
-    /// búíten het frame (EditorView's deselect-laag) zet het weer uit.
-    @Binding var frameSelected: Bool
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
@@ -95,12 +90,10 @@ struct EditorCanvasView: View {
             let clip: AnyShape = frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
             ZStack {
                 // E24.17: klik BUITEN het onderwerp (de hoeken bij een cirkel,
-                // of de marge) = onderwerp deselecteren → handles weg. E33: deze
-                // klik valt nog ín het frame, dus het frame blijft/wordt
-                // geselecteerd (toolbar + ring blijven).
+                // of de marge) = onderwerp deselecteren → handles weg.
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture { isSelected = false; frameSelected = true }
+                    .onTapGesture { isSelected = false }
 
                 // Onderwerp op SUBJECT-schaal (Portrait2.scale via de handles).
                 // E27.1: de VIEW-zoom zit niet meer hier maar als camera op de
@@ -349,17 +342,14 @@ struct EditorCanvasView: View {
     private func selectFromTap(at location: CGPoint, imageRect: CGRect) {
         guard imageRect.width > 0, imageRect.height > 0, imageRect.contains(location) else {
             isSelected = false      // binnen de vorm maar buiten het beeld → leeg
-            frameSelected = true
             return
         }
         let u = (location.x - imageRect.minX) / imageRect.width
         let v = (location.y - imageRect.minY) / imageRect.height
         if image.isOpaqueAtNormalizedPoint(u: u, v: v) {
             isSelected = true       // persoon-pixel → onderwerp + handles
-            frameSelected = true
         } else {
             isSelected = false      // transparante achtergrond ín het frame
-            frameSelected = true
         }
     }
 

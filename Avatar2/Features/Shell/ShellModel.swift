@@ -198,6 +198,15 @@ final class ShellModel {
         selectionAnchorID = nil
     }
 
+    /// Rechtsklik op een portret: selecteer het als het nog niet in de set zit
+    /// (Finder-stijl) zodat bulk-acties alleen bij een echte multi-select gelden.
+    func preparePortraitContextMenu(on portrait: Portrait2) {
+        let id = portrait.persistentModelID
+        guard !selectedPortraitIDs.contains(id) else { return }
+        selectedPortraitIDs = [id]
+        selectionAnchorID = id
+    }
+
     /// Klik op een tegel/rij: plain = openen (single-click-open blijft); ⌘ =
     /// toggle; ⇧ = bereik vanaf het anker in `ordered` (de zichtbare volgorde).
     func handlePortraitClick(_ portrait: Portrait2, ordered: [PersistentIdentifier], mods: NSEvent.ModifierFlags) {

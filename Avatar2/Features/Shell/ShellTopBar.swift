@@ -1,10 +1,13 @@
 // Shell-topbar (PoC left-nav herziening). Sterk uitgekleed: de credits-teller,
 // de gear (Settings), de board- en de rechter-sidebar-toggle zijn weg — die
-// leven nu in de left-nav. De sidebar-inklap-toggle staat op vensterniveau
-// (ShellView) náást de traffic-lights, altijd zichtbaar. Wat hier overblijft:
-//   • rechts de editor-chrome (Share), die ALLEEN tijdens het bewerken van een
-//     portret zichtbaar is — niet op Home of in de Portraits-grid;
+// leven nu in de left-nav. De sidebar-inklap-toggle zit in ShellSidebarChrome
+// (ShellView) náást de traffic-lights, altijd op dezelfde vensterpositie.
+// Wat hier overblijft:
+//   • rechts de editor-chrome (view-toggle + Share), ALLEEN tijdens bewerken;
 //   • een ✕ om de in-window Settings te sluiten.
+//
+// Compacte Granola-stijl rij: gelabelde segmented control (Edit · Preview)
+// + gelabelde Share-pil (icoon links).
 
 import AvatarUI
 import SwiftUI
@@ -12,13 +15,16 @@ import SwiftUI
 struct ShellTopBar: View {
     let isSettingsActive: Bool
     let onToggleSettings: () -> Void
-    /// Editor-chrome (Share) toont ALLEEN tijdens het bewerken van een portret.
+    /// Editor-chrome toont ALLEEN tijdens het bewerken van een portret.
     var isEditing: Bool = false
     var canExport: Bool = false
     var onExport: () -> Void = {}
-    /// E34.5: Preview-knop (social-preview) náást Share, zelfde voorwaarde.
+    /// E34.5: social-preview als tweede segment naast Edit.
     var canPreview: Bool = false
-    var onPreview: () -> Void = {}
+    var isPreviewActive: Bool = false
+    var onPreviewActiveChange: (Bool) -> Void = { _ in }
+
+    private static let controlHeight: CGFloat = 28
 
     var body: some View {
         toolCluster
@@ -26,42 +32,93 @@ struct ShellTopBar: View {
             .animation(.easeOut(duration: 0.18), value: isSettingsActive)
     }
 
-    // Rechts: editor-chrome (Share) tijdens bewerken; ✕ in Settings-modus.
+    // Rechts: editor-chrome tijdens bewerken; ✕ in Settings-modus.
     private var toolCluster: some View {
         HStack(spacing: 0) {
             Spacer(minLength: DSSpacing.gap2)
             ZStack(alignment: .trailing) {
-                HStack(spacing: DSSpacing.gap2) {
+                HStack(spacing: DSSpacing.gap1_5) {
                     if isEditing && canPreview {
-                        PreviewButton { onPreview() }
+                        EditorViewModeToggle(
+                            isPreview: isPreviewActive,
+                            height: Self.controlHeight,
+                            onChange: onPreviewActiveChange
+                        )
                     }
                     if isEditing && canExport {
-                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
-                            onExport()
-                        }
+                        SharePillButton(height: Self.controlHeight, action: onExport)
                     }
                 }
                 .opacity(isSettingsActive ? 0 : 1)
                 .allowsHitTesting(!isSettingsActive)
 
-                // Enige knop in Settings-modus: ✕ sluit (canonieke sluit-glyph).
-                DSToolButton(Image(systemName: "xmark"), label: "Close", tooltipEdge: .bottom) {
-                    onToggleSettings()
-                }
+                DSCompactTopBarButton(
+                    icon: "xmark",
+                    label: "Close",
+                    height: Self.controlHeight,
+                    action: onToggleSettings
+                )
                 .opacity(isSettingsActive ? 1 : 0)
                 .allowsHitTesting(isSettingsActive)
             }
             .padding(.trailing, ShellMetrics.topBarInset)
         }
-        .padding(.top, DSSpacing.gap3)
-        .frame(height: 52, alignment: .top)
+        .frame(height: ShellMetrics.topBarRowHeight, alignment: .top)
     }
 }
 
-/// E34.5: gelabelde "Preview"-knop náást Share. Een gevulde pill op dezelfde
-/// hoogte als de 48-cirkel-Share-knop, met oog-glyph + tekst (i.p.v. een
-/// abstracte icoon-knop). Filled-surface gedrag spiegelt DSToolButton.filled.
-private struct PreviewButton: View {
+// MARK: - Editor view mode (Edit · Preview)
+
+/// Gelabelde segmented control — icoon + tekst per segment (pencil · eye).
+private struct EditorViewModeToggle: View {
+    let isPreview: Bool
+    let height: CGFloat
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment(icon: "pencil", label: "Edit", selected: !isPreview) {
+                onChange(false)
+            }
+            segment(icon: "eye", label: "Preview", selected: isPreview) {
+                onChange(true)
+            }
+        }
+        .padding(DSSpacing.gap0_5)
+        .background(DSColor.Background.neutral, in: Capsule())
+        .dsMotion(DSMotion.base, value: isPreview)
+    }
+
+    private func segment(icon: String, label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                Text(label)
+                    .dsTextStyle(.labelSmall)
+            }
+            .foregroundStyle(selected ? DSColor.Foreground.primary : DSColor.Foreground.muted)
+            .padding(.horizontal, DSSpacing.gap2_5)
+            .frame(height: height)
+            .background {
+                if selected {
+                    Capsule().fill(DSColor.Background.neutralStronger)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+}
+
+// MARK: - Share pill (icon + label, high-contrast)
+
+/// Gelabelde Share-knop — Granola-stijl: icoon links, tekst rechts, inverted
+/// surface (wit op dark / donker op light) als primaire actie in de topbar.
+private struct SharePillButton: View {
+    let height: CGFloat
     let action: () -> Void
     @State private var hovering = false
     @State private var pressed = false
@@ -69,17 +126,15 @@ private struct PreviewButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap1_5) {
-                Image(systemName: "eye").font(.system(size: 16, weight: .medium))
-                Text("Preview").dsTextStyle(.labelBase)
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 14, weight: .medium))
+                Text("Share")
+                    .dsTextStyle(.labelSmall)
             }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap4)
-            .frame(height: 48)
-            .background(
-                DSColor.neutralSurface(pressed: pressed, hovering: hovering,
-                                       base: DSColor.Background.neutral),
-                in: Capsule()
-            )
+            .foregroundStyle(DSColor.Background.app)
+            .padding(.horizontal, DSSpacing.gap3)
+            .frame(height: height)
+            .background(shareSurface, in: Capsule())
             .scaleEffect(pressed ? 0.97 : 1)
         }
         .buttonStyle(.plain)
@@ -87,11 +142,48 @@ private struct PreviewButton: View {
         .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
         .animation(DSMotion.micro, value: hovering)
         .animation(DSMotion.micro, value: pressed)
+        .accessibilityLabel("Share")
+    }
+
+    private var shareSurface: Color {
+        if pressed { return DSColor.Foreground.subtle }
+        if hovering { return DSColor.Foreground.subtle.opacity(0.92) }
+        return DSColor.Foreground.primary
     }
 }
 
-/// Lichtgewicht press-detectie (DragGesture min distance 0) voor de pill-press-
-/// state — Button alleen geeft geen pressed-callback in een .plain-style.
+// MARK: - Compact icon button (Settings close)
+
+private struct DSCompactTopBarButton: View {
+    let icon: String
+    let label: String
+    let height: CGFloat
+    let action: () -> Void
+    @State private var hovering = false
+    @State private var pressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(width: height, height: height)
+                .background(
+                    DSColor.neutralSurface(pressed: pressed, hovering: hovering,
+                                           base: DSColor.Background.neutral),
+                    in: Capsule()
+                )
+                .scaleEffect(pressed ? 0.97 : 1)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
+        .animation(DSMotion.micro, value: hovering)
+        .animation(DSMotion.micro, value: pressed)
+        .accessibilityLabel(label)
+    }
+}
+
 private extension View {
     func pressEvents(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) -> some View {
         simultaneousGesture(

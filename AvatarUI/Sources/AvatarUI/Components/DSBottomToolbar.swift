@@ -18,19 +18,55 @@ import SwiftUI
 public enum DSToolbarSize: Sendable {
     case regular
     case compact
+    /// Naast de FigJam-naam-chip (28pt) — losse pillen, geen outer capsule.
+    case chip
 
     /// Pil-hoogte (knop).
-    public var height: CGFloat { self == .regular ? 40 : 32 }
+    public var height: CGFloat {
+        switch self {
+        case .regular: 40
+        case .compact: 32
+        case .chip: 28
+        }
+    }
     /// Icoongrootte: SF Symbol `.font`-punt én Phosphor frame-zijde.
-    public var iconPointSize: CGFloat { self == .regular ? 18 : 15 }
+    public var iconPointSize: CGFloat {
+        switch self {
+        case .regular: 18
+        case .compact: 15
+        case .chip: 14
+        }
+    }
     /// Labelstijl in de pil.
-    public var textStyle: DSTextStyle { self == .regular ? .labelBase : .labelSmall }
+    public var textStyle: DSTextStyle {
+        switch self {
+        case .regular: .labelBase
+        case .compact, .chip: .labelSmall
+        }
+    }
     /// Horizontale padding binnen de pil.
-    public var horizontalPadding: CGFloat { self == .regular ? DSSpacing.gap3 : DSSpacing.gap2 }
+    public var horizontalPadding: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap3
+        case .compact: DSSpacing.gap2
+        case .chip: DSSpacing.gap3
+        }
+    }
     /// Ruimte tussen icoon/label/chevron én tussen pillen onderling.
-    public var itemSpacing: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    public var itemSpacing: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap2
+        case .compact, .chip: DSSpacing.gap1
+        }
+    }
     /// Inset van de capsule rondom de pillen.
-    public var containerPadding: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    public var containerPadding: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap2
+        case .compact: DSSpacing.gap1
+        case .chip: 0
+        }
+    }
     /// Schaal op pressed (identiek voor beide maten).
     public var pressScale: CGFloat { 0.97 }
 }
@@ -162,6 +198,14 @@ extension DSBottomToolbar where Accessory == EmptyView {
     }
 }
 
+/// Rust-oppervlak van een capsule-toolbar-knop. `.ghost` = transparant tot hover
+/// (onderste/bovenste toolbar). `.secondary` = DS fill in rust (zelfde card-vulling
+/// als de FigJam-naam-chip) — voor losse header-row pillen naast de chip.
+public enum CapsuleToolSurface {
+    case ghost
+    case secondary
+}
+
 /// E31.1 + E32: gelabelde capsule-pil (icoon + optioneel label + optionele
 /// chevron) uit `floatingToolbar` (4114:978). Gedeeld door de onderste toolbar
 /// (`.regular`) én de bovenste canvas-toolbar (`.compact`) — generiek over de
@@ -177,6 +221,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
     private let showChevron: Bool
     private let isActive: Bool
     private let size: DSToolbarSize
+    private let surface: CapsuleToolSurface
     private let action: () -> Void
 
     /// Generieke init: de caller levert een kant-en-klare icoon-view (Phosphor-pad).
@@ -185,6 +230,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
         showChevron: Bool = false,
         isActive: Bool = false,
         size: DSToolbarSize = .regular,
+        surface: CapsuleToolSurface = .ghost,
         action: @escaping () -> Void,
         @ViewBuilder icon: () -> Icon
     ) {
@@ -192,6 +238,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
         self.showChevron = showChevron
         self.isActive = isActive
         self.size = size
+        self.surface = surface
         self.action = action
         self.icon = icon()
     }
@@ -216,7 +263,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
             .padding(.horizontal, size.horizontalPadding)
             .frame(height: size.height)
         }
-        .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, pressScale: size.pressScale))
+        .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, surface: surface, pressScale: size.pressScale))
         .accessibilityLabel(Text(label ?? ""))
     }
 }
@@ -230,11 +277,12 @@ public extension DSCapsuleToolButton where Icon == _DSFontSizedIcon {
         showChevron: Bool = false,
         isActive: Bool = false,
         size: DSToolbarSize = .regular,
+        surface: CapsuleToolSurface = .ghost,
         action: @escaping () -> Void
     ) {
         self.init(
             label: label, showChevron: showChevron, isActive: isActive,
-            size: size, action: action
+            size: size, surface: surface, action: action
         ) {
             _DSFontSizedIcon(image: image, pointSize: size.iconPointSize)
         }
@@ -245,19 +293,22 @@ public extension DSCapsuleToolButton where Icon == _DSFontSizedIcon {
 /// in `DSToolButton`: ghost in rust, fill op hover/active.
 public struct CapsuleSurfaceStyle: ButtonStyle {
     let isActive: Bool
+    var surface: CapsuleToolSurface = .ghost
     let pressScale: CGFloat
 
-    public init(isActive: Bool, pressScale: CGFloat = 0.97) {
+    public init(isActive: Bool, surface: CapsuleToolSurface = .ghost, pressScale: CGFloat = 0.97) {
         self.isActive = isActive
+        self.surface = surface
         self.pressScale = pressScale
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        CapsuleSurface(isActive: isActive, pressScale: pressScale, configuration: configuration)
+        CapsuleSurface(isActive: isActive, surface: surface, pressScale: pressScale, configuration: configuration)
     }
 
     private struct CapsuleSurface: View {
         let isActive: Bool
+        let surface: CapsuleToolSurface
         let pressScale: CGFloat
         let configuration: ButtonStyle.Configuration
         @State private var isHovering = false
@@ -280,7 +331,9 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
 
         private var backgroundColor: Color {
             DSColor.neutralSurface(
-                pressed: isActive || configuration.isPressed, hovering: isHovering
+                pressed: isActive || configuration.isPressed,
+                hovering: isHovering,
+                base: surface == .secondary ? DSColor.Background.card : .clear
             )
         }
     }

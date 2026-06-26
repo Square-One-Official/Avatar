@@ -41,6 +41,7 @@ struct RenameSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 360)
         .background(DSColor.Background.app)
+        .appliedAppearancePreference()
         // Prefill met de gedeelde waarde; bij afwijkende waarden (gemengde
         // selectie) leeg, zodat Save bewust een nieuwe naam/rol op alles zet.
         .onAppear {

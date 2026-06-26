@@ -27,11 +27,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     }
 }
 
-/// Appearance-voorkeur (Preferences > Appearance > Theme). System is de
-/// Figma-default. De DS-tokens zijn vooralsnog dark-only, dus het directe
-/// visuele effect is beperkt tot systeemcontrols; de voorkeur is wél
-/// persistent en wordt op de root toegepast zodat een licht thema later
-/// alleen tokenwerk is.
+/// Appearance-voorkeur (Preferences > Appearance > Theme).
 enum AppearancePreference: String, CaseIterable, Identifiable {
     case system
     case light
@@ -60,10 +56,9 @@ enum SettingsDefaults {
     static let appearanceKey = "settings2.appearance"
 }
 
-/// Past de persistente Theme-voorkeur toe op een scene-root. System = nil
-/// (volg het systeem — identiek aan het gedrag vóór E15.1). Bewust internal,
-/// niet private (E01.14): als window-root-modifier zit de type-naam in
-/// SwiftUI's frame-autosave-sleutel; een private type levert een per-build
+/// Past de persistente Theme-voorkeur toe op een view (root of sheet). Bewust
+/// internal, niet private (E01.14): als window-root-modifier zit de type-naam
+/// in SwiftUI's frame-autosave-sleutel; een private type levert een per-build
 /// instabiele "(unknown context at $adres)"-signatuur op → wees-sleutels en
 /// een venster dat bij twee launch-condities tegelijk kan inklappen.
 struct AppearancePreferenceModifier: ViewModifier {
@@ -72,11 +67,23 @@ struct AppearancePreferenceModifier: ViewModifier {
     // dark-only was; nu de tokens theme-bewust zijn houdt .dark de look gelijk.
     @AppStorage(SettingsDefaults.appearanceKey)
     private var appearanceRaw: String = AppearancePreference.dark.rawValue
+    @State private var systemAppearance = SystemAppearanceObserver()
+
+    private var preference: AppearancePreference {
+        AppearancePreference(rawValue: appearanceRaw) ?? .dark
+    }
+
+    private var resolvedScheme: ColorScheme {
+        preference.resolvedColorScheme(systemIsDark: systemAppearance.isDark)
+    }
 
     func body(content: Content) -> some View {
-        content.preferredColorScheme(
-            (AppearancePreference(rawValue: appearanceRaw) ?? .dark).colorScheme
-        )
+        content
+            .preferredColorScheme(resolvedScheme)
+            .background(
+                WindowBackgroundPainter(colorScheme: resolvedScheme)
+                    .frame(width: 0, height: 0)
+            )
     }
 }
 

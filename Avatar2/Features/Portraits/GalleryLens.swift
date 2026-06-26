@@ -16,8 +16,8 @@ struct GalleryLens: View {
     let folders: [Folder2]
 
     @State private var focusID: PersistentIdentifier?
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.undoManager) private var undoManager
+    @State private var menuTarget: Portrait2?
+    @State private var menuAnchor: CGRect = .zero
 
     private var focused: Portrait2? {
         items.first { $0.persistentModelID == focusID } ?? items.first
@@ -39,6 +39,14 @@ struct GalleryLens: View {
             if let f = focused { preview(f) } else { Spacer() }
             filmstrip
         }
+        .coordinateSpace(name: PortraitContextMenuSpace.name)
+        .portraitContextMenuOverlay(
+            target: $menuTarget,
+            anchor: menuAnchor,
+            model: model,
+            folders: folders,
+            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+        )
         // ←/→ bladeren door de gallery (cyclisch). Onzichtbare knoppen — alleen
         // actief zolang de gallery-lens zichtbaar is.
         .background {
@@ -75,7 +83,7 @@ struct GalleryLens: View {
         // dus ze openen het portret niet.
         .overlay(alignment: .leading) { navArrow("chevron.left") { cycle(-1) } }
         .overlay(alignment: .trailing) { navArrow("chevron.right") { cycle(1) } }
-        .contextMenu { menu(p) }
+        .portraitContextMenuTrigger(portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor)
     }
 
     private func navArrow(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -153,14 +161,6 @@ struct GalleryLens: View {
                 }
             }
             .dsMotion(DSMotion.micro, value: isFocus)
-            .contextMenu { menu(p) }
-    }
-
-    @ViewBuilder private func menu(_ p: Portrait2) -> some View {
-        portraitContextMenu(
-            for: p, model: model, folders: folders,
-            selectedTargets: { items.filter { model.isPortraitSelected($0) } },
-            undoManager: undoManager, modelContext: modelContext
-        )
+            .portraitContextMenuTrigger(portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor)
     }
 }

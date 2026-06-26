@@ -1,61 +1,204 @@
 // Gedeeld rechtermuis-menu voor portret-tegels (Home + alle Portraits-lenzen).
-// Toont enkel-item-acties, of bulk-acties zodra er ≥2 geselecteerd zijn en op een
-// geselecteerd item wordt geklikt (Finder-stijl). De set-acties (Align/Match/
-// Export) komen uit `PortraitSetActions` (gelift uit de verwijderde set-sidebar).
+// DS-paneel i.p.v. native `.contextMenu`. Toont enkel-item-acties, of bulk-acties
+// zodra er ≥2 geselecteerd zijn en op een geselecteerd item wordt geklikt
+// (Finder-stijl).
 
+import AvatarUI
 import SwiftData
 import SwiftUI
 
-@MainActor @ViewBuilder
-func portraitContextMenu(
-    for portrait: Portrait2,
-    model: ShellModel,
-    folders: [Folder2],
-    selectedTargets: @escaping () -> [Portrait2],
-    undoManager: UndoManager?,
-    modelContext: ModelContext
-) -> some View {
-    let ids = model.selectedPortraitIDs
-    let isBulk = ids.count >= 2 && ids.contains(portrait.persistentModelID)
-    if isBulk {
+/// Naam voor de coordinate space waarin menu-ankers gemeten worden.
+enum PortraitContextMenuSpace {
+    static let name = "portraitContextMenu"
+    static var coordinateSpace: CoordinateSpace { .named(name) }
+}
+
+// MARK: - Zwevend menu (DS)
+
+struct PortraitDSContextMenu: View {
+    let portrait: Portrait2
+    let model: ShellModel
+    let folders: [Folder2]
+    let selectedTargets: () -> [Portrait2]
+    let undoManager: UndoManager?
+    let onDismiss: () -> Void
+    let onRequestDelete: ([Portrait2]) -> Void
+
+    @State private var moveFlyoutOpen = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DSSpacing.gap1) {
+            DSContextMenuPanel(minWidth: isBulk ? 230 : 190) {
+                if isBulk {
+                    bulkRows
+                } else {
+                    singleRows
+                }
+            }
+            if moveFlyoutOpen {
+                moveFlyout
+            }
+        }
+    }
+
+    private var isBulk: Bool {
+        let ids = model.selectedPortraitIDs
+        return ids.count >= 2 && ids.contains(portrait.persistentModelID)
+    }
+
+    @ViewBuilder private var singleRows: some View {
+        DSMenuRow("Open", icon: "arrow.up.forward") {
+            onDismiss(); model.openPortrait(portrait)
+        }
+        DSMenuRow("Move to folder", icon: "folder", showsChevron: true) {
+            moveFlyoutOpen.toggle()
+        }
+        DSMenuRow("Export…", icon: "square.and.arrow.up") {
+            onDismiss(); model.select(portrait); model.exportCurrentPortrait()
+        }
+        Divider().padding(.vertical, 2)
+        DSMenuRow("Delete", icon: "trash", destructive: true) {
+            onDismiss(); onRequestDelete([portrait])
+        }
+    }
+
+    @ViewBuilder private var bulkRows: some View {
         let targets = selectedTargets()
-        Button("Export \(targets.count) portraits…") {
+        let n = targets.count
+        DSMenuRow("Export \(n) portraits…", icon: "square.and.arrow.up.on.square") {
+            onDismiss()
             PortraitSetActions.export(targets, isPro: model.isPro) { model.setBusyMessage = $0 }
         }
-        portraitMoveMenu("Move \(targets.count) to folder", targets: targets, folders: folders, modelContext: modelContext)
-        Button("Align \(targets.count)") {
+        DSMenuRow("Move \(n) to folder", icon: "folder", showsChevron: true) {
+            moveFlyoutOpen.toggle()
+        }
+        DSMenuRow("Align \(n)", icon: "align.horizontal.left") {
+            onDismiss()
             PortraitSetActions.align(targets, undoManager: undoManager) { model.setBusyMessage = $0 }
         }
-        Button("Match lighting to this") {
-            PortraitSetActions.matchLighting(targets, reference: portrait, undoManager: undoManager) { model.setBusyMessage = $0 }
+        DSMenuRow("Match lighting to this", icon: "sun.max") {
+            onDismiss()
+            PortraitSetActions.matchLighting(
+                targets, reference: portrait, undoManager: undoManager
+            ) { model.setBusyMessage = $0 }
         }
-        Divider()
-        Button("Delete \(targets.count)", role: .destructive) {
-            for p in targets { modelContext.delete(p) }
-            model.clearPortraitSelection()
+        Divider().padding(.vertical, 2)
+        DSMenuRow("Delete \(n)", icon: "trash", destructive: true) {
+            onDismiss(); onRequestDelete(targets)
         }
-    } else {
-        Button("Open") { model.openPortrait(portrait) }
-        portraitMoveMenu("Move to folder", targets: [portrait], folders: folders, modelContext: modelContext)
-        Button("Export…") { model.select(portrait); model.exportCurrentPortrait() }
-        Divider()
-        Button("Delete", role: .destructive) { modelContext.delete(portrait) }
+    }
+
+    private var moveFlyout: some View {
+        let targets = isBulk ? selectedTargets() : [portrait]
+        return DSContextMenuPanel(minWidth: 180) {
+            DSMenuRow("Unfiled", icon: "tray") {
+                onDismiss()
+                for p in targets { p.folder = nil }
+            }
+            if !folders.isEmpty {
+                Divider().padding(.vertical, 2)
+                ForEach(folders) { folder in
+                    DSMenuRow(folder.name, icon: "folder") {
+                        onDismiss()
+                        for p in targets { p.folder = folder }
+                    }
+                }
+            }
+            Divider().padding(.vertical, 2)
+            DSMenuRow("New folder…", icon: "folder.badge.plus") {
+                onDismiss()
+                let f = Folder2(name: "Untitled folder \(folders.count + 1)", order: folders.count + 1)
+                modelContext.insert(f)
+                for p in targets { p.folder = f }
+            }
+        }
+    }
+
+    @Environment(\.modelContext) private var modelContext
+}
+
+// MARK: - Overlay helper
+
+struct PortraitContextMenuOverlay: View {
+    @Binding var target: Portrait2?
+    let anchor: CGRect
+    let model: ShellModel
+    let folders: [Folder2]
+    let selectedTargets: () -> [Portrait2]
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.undoManager) private var undoManager
+    @State private var deleteTargets: [Portrait2] = []
+
+    var body: some View {
+        Group {
+            if let portrait = target {
+                DSContextMenuOverlay(anchor: anchor, onDismiss: { target = nil }) {
+                    PortraitDSContextMenu(
+                        portrait: portrait,
+                        model: model,
+                        folders: folders,
+                        selectedTargets: selectedTargets,
+                        undoManager: undoManager,
+                        onDismiss: { target = nil },
+                        onRequestDelete: { deleteTargets = $0 }
+                    )
+                }
+            }
+        }
+        .confirmationDialog(
+            deleteTargets.count >= 2
+                ? "Delete \(deleteTargets.count) portraits?"
+                : "Delete this portrait?",
+            isPresented: Binding(
+                get: { !deleteTargets.isEmpty },
+                set: { if !$0 { deleteTargets = [] } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                for p in deleteTargets { modelContext.delete(p) }
+                model.clearPortraitSelection()
+                deleteTargets = []
+            }
+            Button("Cancel", role: .cancel) { deleteTargets = [] }
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 }
 
-@MainActor @ViewBuilder
-private func portraitMoveMenu(_ title: String, targets: [Portrait2], folders: [Folder2], modelContext: ModelContext) -> some View {
-    Menu(title) {
-        Button("Unfiled") { for p in targets { p.folder = nil } }
-        if !folders.isEmpty { Divider() }
-        ForEach(folders) { folder in
-            Button(folder.name) { for p in targets { p.folder = folder } }
+// MARK: - View extensions
+
+extension View {
+    func portraitContextMenuTrigger(
+        portrait: Portrait2,
+        model: ShellModel,
+        target: Binding<Portrait2?>,
+        anchor: Binding<CGRect>
+    ) -> some View {
+        contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
+            model.preparePortraitContextMenu(on: portrait)
+            target.wrappedValue = portrait
+            anchor.wrappedValue = frame
         }
-        Divider()
-        Button("New folder…") {
-            let f = Folder2(name: "Untitled folder \(folders.count + 1)", order: folders.count + 1)
-            modelContext.insert(f)
-            for p in targets { p.folder = f }
+    }
+
+    func portraitContextMenuOverlay(
+        target: Binding<Portrait2?>,
+        anchor: CGRect,
+        model: ShellModel,
+        folders: [Folder2],
+        selectedTargets: @escaping () -> [Portrait2]
+    ) -> some View {
+        overlay {
+            PortraitContextMenuOverlay(
+                target: target,
+                anchor: anchor,
+                model: model,
+                folders: folders,
+                selectedTargets: selectedTargets
+            )
         }
     }
 }

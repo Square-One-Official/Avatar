@@ -465,60 +465,27 @@ struct BoardView: View {
     private func nodeContextMenu(for portrait: Portrait2) -> some View {
         let bulk = selection.count >= 2
         let n = selection.count
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+        DSContextMenuPanel {
             if bulk {
-                menuRow("Rename \(n) portraits", icon: "pencil") {
+                DSMenuRow("Rename \(n) portraits", icon: "pencil") {
                     menuTarget = nil; renameTargets = selectedPortraits
                 }
-                menuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
+                DSMenuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
                     menuTarget = nil; bulkExport()
                 }
                 Divider().padding(.vertical, 2)
-                menuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
+                DSMenuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
                     menuTarget = nil; deleteTargets = selectedPortraits
                 }
             } else {
-                menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTargets = [portrait] }
-                menuRow("Export…", icon: "square.and.arrow.up") {
+                DSMenuRow("Rename", icon: "pencil") { menuTarget = nil; renameTargets = [portrait] }
+                DSMenuRow("Export…", icon: "square.and.arrow.up") {
                     menuTarget = nil; model.select(portrait); model.exportCurrentPortrait()
                 }
                 Divider().padding(.vertical, 2)
-                menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
+                DSMenuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
             }
         }
-        .padding(DSSpacing.gap1)
-        // Past zich aan de inhoud aan (de bulk-labels zijn langer), met een vloer
-        // van 190 zodat het enkel-menu niet te smal wordt. `.fixedSize()` in
-        // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
-        // precies, zonder vaste overbreedte.
-        .frame(minWidth: 190, alignment: .leading)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
-    }
-
-    private func menuRow(_ title: String, icon: String, destructive: Bool = false,
-                         shortcut: String? = nil, disabled: Bool = false,
-                         action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: icon).font(.system(size: 12, weight: .medium)).frame(width: 16)
-                Text(title).dsTextStyle(.labelBase)
-                Spacer(minLength: DSSpacing.gap4)
-                if let shortcut {
-                    Text(shortcut)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-            }
-            .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .dsHoverHighlight(cornerRadius: DSRadius.md)
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
     }
 
     /// Top-leading van het menu (viewport-space), net onder de node-kaart en
@@ -887,22 +854,19 @@ struct BoardView: View {
         )
         .overlay(alignment: .top) {
             if batchMenu == .organize {
-                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    menuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
+                DSContextMenuPanel(minWidth: 240) {
+                    DSMenuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
                         batchMenu = nil; tidyUpSelection()
                     }
-                    menuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
-                            shortcut: "⌃⌥V", disabled: selection.count < 3) {
+                    DSMenuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
+                              shortcut: "⌃⌥V", disabled: selection.count < 3) {
                         batchMenu = nil; distributeSelection(.vertical)
                     }
-                    menuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
-                            shortcut: "⌃⌥H", disabled: selection.count < 3) {
+                    DSMenuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
+                              shortcut: "⌃⌥H", disabled: selection.count < 3) {
                         batchMenu = nil; distributeSelection(.horizontal)
                     }
                 }
-                .padding(DSSpacing.gap1)
-                .frame(minWidth: 240, alignment: .leading)
-                .dsPanelSurface(cornerRadius: DSRadius.lg)
                 .fixedSize()
                 .offset(y: DSToolbarSize.compact.height
                           + DSToolbarSize.compact.containerPadding

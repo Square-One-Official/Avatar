@@ -51,19 +51,19 @@ struct ExportSheet: View {
             platformHint
 
             field("Shape") {
-                Picker("", selection: $shape) {
-                    ForEach(ExportShape.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                DSSegmentedControl(
+                    selection: $shape,
+                    segments: ExportShape.allCases.map { .init(tag: $0, label: $0.label) },
+                    equalWidth: true
+                )
             }
 
             field("Size") {
-                Picker("", selection: $size) {
-                    ForEach(PortraitExporter.sizeOptions, id: \.self) { Text("\($0)px").tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+                DSSegmentedControl(
+                    selection: $size,
+                    segments: PortraitExporter.sizeOptions.map { .init(tag: $0, label: "\($0)px") },
+                    equalWidth: true
+                )
                 Text(sizeCaption)
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
@@ -85,6 +85,7 @@ struct ExportSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
+        .appliedAppearancePreference()
         // Preview (256px) alléén opnieuw bij een vorm-wissel. De byte-grootte van
         // diezelfde PNG dient als referentie voor de grootteschatting per maat.
         .task(id: shape) {

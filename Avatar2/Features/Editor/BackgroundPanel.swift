@@ -311,6 +311,7 @@ struct BackgroundPanel: View {
             .help("Pick a colour")
             .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
                 DSColorPicker(color: $pickerColor, supportsAlpha: false)
+                    .appliedAppearancePreference()
             }
 
             ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in

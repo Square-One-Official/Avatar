@@ -1,7 +1,8 @@
 // Social-preview-surface (E34.5). Volledige overlay over de editor (crossfade,
 // shell-niveau): toont de profielfoto-in-context in een minimalistisch skeleton-
 // wireframe per platform. Bovenaan een segmented-control (LinkedIn default · X ·
-// Instagram · All) + een sluit-knop; rechts de banner-bediening + export.
+// Instagram · All); rechts de banner-bediening + export. Terug naar Edit via de
+// shell-topbar (Edit · Preview segmented control) — geen aparte sluit-knop.
 //
 // De ronde profielfoto hergebruikt de bestaande export-pijplijn
 // (PortraitExporter, shape .circle); de banner-laag komt uit BannerResolver
@@ -16,7 +17,6 @@ import SwiftUI
 struct SocialPreviewView: View {
     let portrait: Portrait2
     var isPro: Bool = false
-    var onClose: () -> Void = {}
     /// E35.4: navigeer naar de Banners-bibliotheek (sluit de preview).
     var onManageBanners: () -> Void = {}
 
@@ -39,28 +39,24 @@ struct SocialPreviewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DSColor.Background.app)
+        // Shell-topbar (breadcrumb + Edit/Preview + Share) zweeft erboven;
+        // platform-switcher begint onder die rij.
+        .padding(.top, ShellMetrics.topBarRowHeight)
         .task(id: portrait.updatedAt) { refresh() }
     }
 
-    // MARK: Header — segmented switcher + close
+    // MARK: Header — platform segmented switcher
 
     private var header: some View {
-        ZStack {
-            Picker("", selection: $tab) {
-                ForEach(PreviewTab.allCases) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 380)
-
-            HStack {
-                Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { onClose() }
-                    .accessibilityLabel("Close preview")
-            }
-        }
+        DSSegmentedControl(
+            selection: $tab,
+            segments: PreviewTab.allCases.map { .init(tag: $0, label: $0.label) },
+            equalWidth: true
+        )
+        .frame(width: 420)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, DSSpacing.gap5)
-        .padding(.vertical, DSSpacing.gap4)
+        .padding(.vertical, DSSpacing.gap3)
     }
 
     // MARK: Preview — skeleton chrome per platform

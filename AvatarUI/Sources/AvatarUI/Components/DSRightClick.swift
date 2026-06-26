@@ -10,12 +10,17 @@ import SwiftUI
 public extension View {
     /// Roept `perform` aan bij een rechtsklik; links-klik/hover gaan door.
     func onRightClick(perform: @escaping () -> Void) -> some View {
+        onRightClick { _ in perform() }
+    }
+
+    /// Roept `perform` aan met de klikpositie in de view-coördinaten van de overlay.
+    func onRightClick(perform: @escaping (CGPoint) -> Void) -> some View {
         overlay(RightClickCatcher(action: perform))
     }
 }
 
 private struct RightClickCatcher: NSViewRepresentable {
-    let action: () -> Void
+    let action: (CGPoint) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let v = CatcherView()
@@ -28,10 +33,11 @@ private struct RightClickCatcher: NSViewRepresentable {
     }
 
     final class CatcherView: NSView {
-        var action: (() -> Void)?
+        var action: ((CGPoint) -> Void)?
 
         override func rightMouseDown(with event: NSEvent) {
-            action?()
+            let point = convert(event.locationInWindow, from: nil)
+            action?(point)
         }
 
         // Vang alléén rechtskliks; alle andere events (links-klik, hover, scroll)

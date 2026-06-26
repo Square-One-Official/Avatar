@@ -144,6 +144,14 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
         self.toolbarAccessory = toolbarAccessory()
     }
 
+    /// Ruimte tussen paneel-onderkant en venster-onderkant: zwevende toolbar +
+    /// gap (identiek aan de oude VStack-spacing, maar zonder layout-shift).
+    private var panelBottomClearance: CGFloat {
+        DSToolbarSize.regular.height
+            + DSToolbarSize.regular.containerPadding * 2
+            + DSSpacing.gap2
+    }
+
     public var body: some View {
         // Besluit Thierry (2026-06-24): het canvas loopt door tot de onderrand van
         // het venster en de toolbar ZWEEFT eroverheen (Figma floatingToolbar) —
@@ -153,18 +161,20 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
         // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt de
         // onderkant i.p.v. de foto te verkleinen. STABIELE identity (.id) zodat de
         // foto niet mee-animeert/faded als `activeTool` wisselt.
+        //
+        // E-fix (motion): toolbar blijft vast onderaan (ZStack); alléén het paneel
+        // slide't. De oude VStack klapte de hoogte dicht terwijl `.move(.bottom)`
+        // naar een verschuivende onderrand rende → hang/stutter bij dismiss.
         photo
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .id("editorPhoto")
             .overlay(alignment: .bottom) {
-                VStack(spacing: DSSpacing.gap2) {
+                ZStack(alignment: .bottom) {
                     if let tool = activeTool {
                         panel(tool)
-                            // E-fix (motion): STABIELE identity over tool-wissels
-                            // heen. Tool→tool is daardoor een in-place update i.p.v.
-                            // insert+remove; alléén echte open/dicht (nil ↔ tool)
-                            // triggert de slide-transitie. Kale edge-slide op één
-                            // ease-out-curve, exit sneller dan enter.
+                            // STABIELE identity over tool-wissels heen. Tool→tool
+                            // is een in-place update; alléén nil ↔ tool triggert slide.
+                            .padding(.bottom, panelBottomClearance)
                             .id("editPanel")
                             .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
                     }
@@ -180,10 +190,10 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
                 }
                 .padding(.bottom, DSSpacing.gap2)
             }
-            // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
-            // De slide-timing zelf zit op de transitie (enter/exit-asymmetrie); deze
-            // modifier levert de transactie + animeert de hoogte-settle.
-            .dsMotion(DSMotion.enter, value: activeTool)
+            // E24.25: transactie voor paneel-insert/-remove — exit bij dicht,
+            // enter bij open (matcht dsSlide-asymmetrie). Geen hoogte-settle: de
+            // toolbar staat vast, dus geen layout-animatie die de slide verstoort.
+            .dsMotion(activeTool == nil ? DSMotion.exit : DSMotion.enter, value: activeTool)
     }
 }
 

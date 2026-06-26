@@ -32,33 +32,31 @@ struct ShellView: View {
         // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
         // resterende ruimte (één spring, geen layoutshift).
         HStack(spacing: 0) {
-            // PoC (left-nav): Granola-stijl app-navigatie als de enige sidebar
-            // (de oude rechter set-sidebar is verwijderd).
-            if model.isLeftNavVisible {
-                LeftNavView(model: model, entitlement: entitlement)
-                    // Flush aan top/left/bottom van het venster (macOS knipt de
-                    // venstercorners zelf af); alleen rechts een gap naar de content.
-                    .padding(.trailing, LeftNavView.edgeInset)
-                    .transition(reduceMotion ? .opacity : .move(edge: .leading))
-            }
+            // Blijft in de hiërarchie; breedte clip van links i.p.v. insert/remove
+            // + opacity/move — één spring, geen desync aan de bovenkant.
+            leftNavSlot
             mainArea
         }
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(DSColor.Background.app)
-        // PoC (left-nav): de sidebar-toggle staat op VENSTERNIVEAU náást de
-        // traffic-lights en blijft ALTIJD zichtbaar — of de nav nu open of
-        // dicht is (gebruikersfeedback). Over de nav heen wanneer open, over de
-        // hoofdweergave wanneer dicht; dezelfde positie in beide gevallen.
-        .overlay(alignment: .topLeading) { sidebarToggle }
+        .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
+        // Vaste venster-chrome: traffic-light-strook + toggle schuiven niet mee
+        // met de sidebar-animatie; de strip hoort visueel bij de nav wanneer open.
+        .overlay(alignment: .topLeading) {
+            ShellSidebarChrome(
+                isSidebarVisible: model.isLeftNavVisible,
+                onToggleSidebar: { model.toggleLeftNav() }
+            )
+            .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+        }
         // E34.5: social-preview is FULL-SCREEN — een crossfade-overlay op
-        // VENSTERNIVEAU (over de left-nav + content + sidebar-toggle heen) zodat
-        // de hele editor wegvalt. De eigen ✕ in de preview sluit 'm.
+        // VENSTERNIVEAU (over de left-nav + content + sidebar-toggle heen).
+        // Terug naar Edit via de shell-topbar; die blijft erboven zichtbaar.
         .overlay {
             if model.isShowingSocialPreview, let portrait = model.selectedPortrait {
                 SocialPreviewView(
                     portrait: portrait,
                     isPro: entitlement.isProActive,
-                    onClose: { model.isShowingSocialPreview = false },
                     onManageBanners: {
                         model.isShowingSocialPreview = false
                         model.showBanners()
@@ -68,6 +66,14 @@ struct ShellView: View {
             }
         }
         .dsMotion(DSMotion.base, value: model.isShowingSocialPreview)
+        // Editor-topbar + breadcrumb op vensterniveau, boven de preview-overlay,
+        // zodat Edit/Preview/Share en de trail zichtbaar blijven in preview-modus.
+        .overlay(alignment: .top) {
+            shellTopBar
+        }
+        .overlay(alignment: .topLeading) {
+            shellEditorBreadcrumb
+        }
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
         // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
@@ -100,6 +106,7 @@ struct ShellView: View {
             DSColorPicker(color: $debugPickerColor)
                 .padding(DSSpacing.gap8)
                 .background(DSColor.Background.app)
+                .appliedAppearancePreference()
         }
         // E19.5: voortgangs-toast voor de set-acties (Align/Match/Export).
         .overlay(alignment: .bottomTrailing) {
@@ -208,23 +215,19 @@ struct ShellView: View {
         }
     }
 
-    /// PoC (left-nav): persistente sidebar-toggle náást de OS traffic-lights —
-    /// altijd zichtbaar, of de nav nu open of dicht is. Subtiel (geen 48pt
-    /// tool-knop), Granola-stijl. Op vensterniveau zodat de positie identiek
-    /// blijft over de nav (open) of de hoofdweergave (dicht).
-    private var sidebarToggle: some View {
-        Button { model.toggleLeftNav() } label: {
-            Image(systemName: "sidebar.left")
-                .font(.system(size: 15, weight: .regular))
-                .foregroundStyle(DSColor.Foreground.muted)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(model.isLeftNavVisible ? "Hide sidebar" : "Show sidebar")
-        .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
-        .frame(height: ShellMetrics.windowControlsRowHeight)
-        .ignoresSafeArea(.container, edges: .top)
+    /// Sidebar-slot: altijd gemonteerd, onthult via leading-clip (zelfde spring als chrome).
+    private var leftNavSlot: some View {
+        LeftNavView(model: model, entitlement: entitlement)
+            .padding(.leading, LeftNavView.edgeInset)
+            .padding(.top, LeftNavView.edgeInset)
+            .padding(.bottom, LeftNavView.edgeInset)
+            .padding(.trailing, LeftNavView.edgeInset)
+            .frame(width: LeftNavView.layoutWidth, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(width: model.isLeftNavVisible ? LeftNavView.layoutWidth : 0, alignment: .leading)
+            .clipped()
+            .allowsHitTesting(model.isLeftNavVisible)
+            .accessibilityHidden(!model.isLeftNavVisible)
     }
 
     private var mainArea: some View {
@@ -310,31 +313,6 @@ struct ShellView: View {
                     .allowsHitTesting(false)
             }
         }
-        // PoC (left-nav): uitgeklede topbar — alleen, tijdens het bewerken, de
-        // Share-knop (+ ✕ in Settings). De sidebar-toggle staat los op
-        // vensterniveau (zie `sidebarToggle`). Settings/credits/board/library
-        // zitten nu in de left-nav.
-        .overlay(alignment: .top) {
-            ShellTopBar(
-                isSettingsActive: model.isShowingSettings,
-                onToggleSettings: { model.isShowingSettings.toggle() },
-                // Top-right-chrome alléén in de editor (niet op Home/Portraits).
-                isEditing: model.section == .editor,
-                canExport: model.canExport,
-                onExport: { model.exportCurrentPortrait() },
-                canPreview: model.canPreview,
-                onPreview: { model.showSocialPreview() }
-            )
-        }
-        // Phase 4: drill-in-breadcrumb linksboven — alleen tijdens het bewerken.
-        .overlay(alignment: .topLeading) {
-            if model.section == .editor && !model.isShowingSettings {
-                LibraryBreadcrumb(model: model)
-                    .padding(.leading, model.isLeftNavVisible ? DSSpacing.gap5 : 96)
-                    .padding(.top, DSSpacing.gap3)
-                    .transition(.opacity)
-            }
-        }
         // Status-pill op vensterniveau (bevinding 3): de frames zetten
         // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
         // Image added 4017:1849), niet aan de foto geplakt.
@@ -375,6 +353,41 @@ struct ShellView: View {
                 .allowsHitTesting(false)
                 .transition(.opacity)
         }
+    }
+
+    /// Top-right chrome (Edit/Preview + Share, of ✕ in Settings) — vensterniveau
+    /// zodat het boven de social-preview-overlay blijft.
+    private var shellTopBar: some View {
+        ShellTopBar(
+            isSettingsActive: model.isShowingSettings,
+            onToggleSettings: { model.isShowingSettings.toggle() },
+            isEditing: model.section == .editor,
+            canExport: model.canExport,
+            onExport: { model.exportCurrentPortrait() },
+            canPreview: model.canPreview,
+            isPreviewActive: model.isShowingSocialPreview,
+            onPreviewActiveChange: { active in
+                if active { model.showSocialPreview() }
+                else { model.isShowingSocialPreview = false }
+            }
+        )
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    /// Drill-in-breadcrumb — vensterniveau, schuift mee met de sidebar-breedte.
+    @ViewBuilder
+    private var shellEditorBreadcrumb: some View {
+        if model.section == .editor && !model.isShowingSettings {
+            LibraryBreadcrumb(model: model)
+                .padding(.leading, shellEditorBreadcrumbLeading)
+                .transition(.opacity)
+                .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+                .ignoresSafeArea(.container, edges: .top)
+        }
+    }
+
+    private var shellEditorBreadcrumbLeading: CGFloat {
+        (model.isLeftNavVisible ? LeftNavView.layoutWidth : 0) + DSSpacing.gap3
     }
 
     private var isolatingStatusLabel: String? {

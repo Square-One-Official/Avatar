@@ -14,8 +14,8 @@ struct ListLens: View {
     let model: ShellModel
     let folders: [Folder2]
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.undoManager) private var undoManager
+    @State private var menuTarget: Portrait2?
+    @State private var menuAnchor: CGRect = .zero
 
     var body: some View {
         ScrollView {
@@ -38,17 +38,21 @@ struct ListLens: View {
                                 .heroPortrait(p.persistentModelID, isSource: true)
                         }
                     )
-                    .contextMenu {
-                        portraitContextMenu(
-                            for: p, model: model, folders: folders,
-                            selectedTargets: { items.filter { model.isPortraitSelected($0) } },
-                            undoManager: undoManager, modelContext: modelContext
-                        )
-                    }
+                    .portraitContextMenuTrigger(
+                        portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor
+                    )
                 }
             }
             .padding(.horizontal, DSSpacing.gap6)
             .padding(.bottom, DSSpacing.gap6)
         }
+        .coordinateSpace(name: PortraitContextMenuSpace.name)
+        .portraitContextMenuOverlay(
+            target: $menuTarget,
+            anchor: menuAnchor,
+            model: model,
+            folders: folders,
+            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+        )
     }
 }

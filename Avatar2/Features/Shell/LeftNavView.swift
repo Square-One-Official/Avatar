@@ -17,23 +17,36 @@ struct LeftNavView: View {
     /// Breedte in lijn met Granola; iets smaller dan de oude set-sidebar.
     static let width: CGFloat = 236
     static let edgeInset: CGFloat = ShellMetrics.windowEdgeInset
+    /// Totale breedte van de sidebar-slot (kaart + horizontale inset-padding).
+    static var layoutWidth: CGFloat { width + edgeInset * 2 }
+    /// Breedte van de vaste chrome-strook t.o.v. de vensterrand (leading inset + kaart).
+    static var chromeRevealWidth: CGFloat { width + edgeInset }
+
+    static let windowChromeHeight: CGFloat = 44
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
+
+    /// Hoogte van de klikbare profielrij (zonder de omringende padding).
+    private static let userRowHeight: CGFloat = 40
 
     @State private var showUserMenu = false
     @State private var renamingFolder: Folder2?
+    @State private var isCreatingFolder = false
     @State private var draftName = ""
     /// De map waarboven nu een portret zweeft (drop-highlight). Eén tegelijk.
     @State private var dropTargetedFolderID: PersistentIdentifier?
+    @State private var menuFolder: Folder2?
+    @State private var menuAnchor: CGRect = .zero
+
+    private static let contextMenuSpace = "leftNavContextMenu"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Reserveer de strook voor de OS traffic-lights. Flush sidebar:
-            // de strip is 44 pt (traffic-lights zitten op ~y=12 → nav-items
-            // starten op y=44, geeft ~28 pt lucht onder de groene knop).
+            // Placeholder onder de vaste venster-chrome (ShellSidebarChrome).
             Color.clear
-                .frame(height: 44)
+                .frame(height: Self.windowChromeHeight)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {
@@ -75,19 +88,55 @@ struct LeftNavView: View {
         }
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        // Flush aan de linker/boven/onderkant van het venster: geen radius links
-        // (macOS knipt de venstercorners zelf af). Rechts concentrisch t.o.v.
-        // de 4 pt trailing-inset die ShellView toepast.
+        // Inset kaart (E03.15): dunne marge t.o.v. vensterrand op links/boven/
+        // onder; rechts dezelfde gap naar de content (ShellView padding).
         .background(DSColor.Background.card)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
+                bottomLeadingRadius: DSRadius.concentric(inset: Self.edgeInset),
                 bottomTrailingRadius: DSRadius.concentric(inset: Self.edgeInset),
-                topTrailingRadius: DSRadius.concentric(inset: Self.edgeInset),
+                topTrailingRadius: 0,
                 style: .continuous
             )
         )
+        .overlay {
+            if showUserMenu {
+                ZStack(alignment: .bottomLeading) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { showUserMenu = false }
+                    userMenu
+                        .fixedSize()
+                        .padding(.horizontal, DSSpacing.gap2)
+                        .padding(.bottom, DSSpacing.gap2 + Self.userRowHeight + DSSpacing.gap2)
+                        .transition(.dsScaleFade(anchor: .bottom, reduceMotion: reduceMotion))
+                }
+            }
+            if menuFolder != nil {
+                DSContextMenuOverlay(anchor: menuAnchor, onDismiss: { menuFolder = nil }) {
+                    if let folder = menuFolder {
+                        DSContextMenuPanel {
+                            DSMenuRow("Rename", icon: "pencil") {
+                                menuFolder = nil
+                                draftName = folder.name
+                                renamingFolder = folder
+                            }
+                            Divider().padding(.vertical, 2)
+                            DSMenuRow("Delete", icon: "trash", destructive: true) {
+                                menuFolder = nil
+                                if model.selectedFolderID == folder.persistentModelID {
+                                    model.selectedFolderID = nil
+                                }
+                                modelContext.delete(folder)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .coordinateSpace(name: Self.contextMenuSpace)
+        .dsMotion(DSMotion.fast, value: showUserMenu)
         .task { await entitlement.refresh() }
         .alert("Rename folder", isPresented: Binding(
             get: { renamingFolder != nil },
@@ -102,51 +151,26 @@ struct LeftNavView: View {
             }
             Button("Cancel", role: .cancel) { renamingFolder = nil }
         }
+        .alert("Create folder", isPresented: $isCreatingFolder) {
+            TextField("Folder name", text: $draftName)
+            Button("Create") { confirmCreateFolder() }
+            Button("Cancel", role: .cancel) { isCreatingFolder = false }
+        }
     }
 
     // MARK: - Portraits (inklapbaar) + mappen
 
     private var portraitsSection: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            // Kop: chevron + label (klik = uitklappen + naar 'alle beelden'),
-            // plus een "+" om een map te maken.
-            HStack(spacing: DSSpacing.gap1) {
-                Button {
-                    model.togglePortraitsExpanded()
-                    model.showPortraits(folderID: nil)
-                } label: {
-                    HStack(spacing: DSSpacing.gap2) {
-                        Image(systemName: model.isPortraitsExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(DSColor.Foreground.muted)
-                            .frame(width: 12)
-                        Image(systemName: "square.grid.2x2")
-                            .resizable().scaledToFit().frame(width: 16, height: 16)
-                        Text("Portraits").dsTextStyle(.labelBase)
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundStyle(isPortraitsAllSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
-                    .padding(.horizontal, DSSpacing.gap2)
-                    .frame(height: 34)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        isPortraitsAllSelected ? DSColor.Background.neutralStronger : .clear,
-                        in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Button { createFolder() } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Create folder")
-            }
+            LeftNavExpandableHeader(
+                title: "Portraits",
+                icon: "square.grid.2x2",
+                isSelected: isPortraitsAllSelected,
+                isExpanded: model.isPortraitsExpanded,
+                onNavigate: { model.showPortraits(folderID: nil) },
+                onToggleExpanded: { model.togglePortraitsExpanded() },
+                onCreateFolder: { beginCreateFolder() }
+            )
 
             if model.isPortraitsExpanded {
                 ForEach(folders) { folder in
@@ -156,7 +180,7 @@ struct LeftNavView: View {
                     Text("No folders yet")
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.muted)
-                        .padding(.leading, 38)
+                        .padding(.leading, LeftNavExpandableHeader.folderTextLeadingInset + LeftNavExpandableHeader.folderNestIndent)
                         .padding(.vertical, DSSpacing.gap1)
                 }
             }
@@ -168,35 +192,13 @@ struct LeftNavView: View {
             && model.selectedFolderID == folder.persistentModelID
             && !model.isShowingSettings
         let isDropTargeted = dropTargetedFolderID == folder.persistentModelID
-        return Button {
+        return LeftNavFolderRow(
+            name: folder.name,
+            isSelected: isSelected,
+            isDropTargeted: isDropTargeted
+        ) {
             model.showPortraits(folderID: folder.persistentModelID)
-        } label: {
-            HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: "folder")
-                    .font(.system(size: 13, weight: .regular))
-                    .frame(width: 16)
-                Text(folder.name).dsTextStyle(.labelBase).lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(isSelected || isDropTargeted ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
-            .padding(.leading, 26)
-            .padding(.trailing, DSSpacing.gap2)
-            .frame(height: 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isDropTargeted ? DSColor.Action.primary.opacity(0.18)
-                    : (isSelected ? DSColor.Background.neutralStronger : .clear),
-                in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
-            )
-            .overlay {
-                if isDropTargeted {
-                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
-                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
-                }
-            }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         // Drop-doel: sleep een portret hier naartoe om het in deze map te zetten.
         .dropDestination(for: PortraitDragItem.self) { items, _ in
             move(items, into: folder)
@@ -207,13 +209,9 @@ struct LeftNavView: View {
                 dropTargetedFolderID = nil
             }
         }
-        .dsMotion(DSMotion.micro, value: isDropTargeted)
-        .contextMenu {
-            Button("Rename") { draftName = folder.name; renamingFolder = folder }
-            Button("Delete", role: .destructive) {
-                if model.selectedFolderID == folder.persistentModelID { model.selectedFolderID = nil }
-                modelContext.delete(folder)
-            }
+        .contextMenuTrigger(in: .named(Self.contextMenuSpace)) { frame in
+            menuFolder = folder
+            menuAnchor = frame
         }
     }
 
@@ -234,14 +232,20 @@ struct LeftNavView: View {
         model.section == .portraits && model.selectedFolderID == nil && !model.isShowingSettings
     }
 
-    private func createFolder() {
+    private func beginCreateFolder() {
+        draftName = ""
+        isCreatingFolder = true
+    }
+
+    private func confirmCreateFolder() {
+        let name = draftName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
         let n = folders.count + 1
-        let folder = Folder2(name: "Untitled folder \(n)", order: n)
+        let folder = Folder2(name: name, order: n)
         modelContext.insert(folder)
         model.isPortraitsExpanded = true
         model.showPortraits(folderID: folder.persistentModelID)
-        draftName = folder.name
-        renamingFolder = folder
+        isCreatingFolder = false
     }
 
     // MARK: - Upgrade-banner + quota
@@ -249,16 +253,18 @@ struct LeftNavView: View {
     private var upgradeBanner: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
             HStack(spacing: DSSpacing.gap2) {
-                Text(entitlement.isProActive ? "Pro plan" : "Starter plan")
+                Text(entitlement.isProActive ? "Credits" : "Starter plan")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Spacer(minLength: 0)
-                if !entitlement.isProActive {
+                if entitlement.isProActive {
+                    DSChip("Add credits", type: .brand) { entitlement.requestUpgrade() }
+                } else {
                     DSChip("Upgrade", type: .brand) { entitlement.requestUpgrade() }
                 }
             }
-            if !entitlement.quotaSummary.isEmpty {
-                Text("\(entitlement.quotaSummary) images")
+            if !upgradeBannerQuotaText.isEmpty {
+                Text(upgradeBannerQuotaText)
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.muted)
             }
@@ -266,6 +272,16 @@ struct LeftNavView: View {
         .padding(DSSpacing.gap3)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DSColor.Background.inset, in: RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
+    }
+
+    /// Pro: credit-balans (niet "images"). Free: portrait-imports over lifetime-cap.
+    private var upgradeBannerQuotaText: String {
+        let summary = entitlement.quotaSummary
+        guard !summary.isEmpty else { return "" }
+        if entitlement.isProActive {
+            return summary.hasSuffix("credits") ? summary : "\(summary) credits"
+        }
+        return "\(summary) images"
     }
 
     // MARK: - Gebruikersrij + menu
@@ -291,15 +307,12 @@ struct LeftNavView: View {
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 40)
+            .frame(height: Self.userRowHeight)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .dsHoverHighlight(cornerRadius: DSRadius.lg)
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $showUserMenu, arrowEdge: .top) {
-            userMenu
-        }
     }
 
     private var userMenu: some View {
@@ -322,6 +335,7 @@ struct LeftNavView: View {
         }
         .padding(DSSpacing.gap1)
         .frame(width: 220)
+        .dsPanelSurface(cornerRadius: DSRadius.lg)
     }
 
     private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
@@ -351,6 +365,152 @@ struct LeftNavView: View {
     private var userInitial: String {
         let name = userDisplayName
         return name == "Sign in" ? "?" : String(name.prefix(1)).uppercased()
+    }
+}
+
+/// Inklapbare sectiekop (Granola-stijl): icoon standaard, chevron op row-hover,
+/// aparte hit areas voor navigeren / uitklappen / map aanmaken.
+private struct LeftNavExpandableHeader: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let isExpanded: Bool
+    let onNavigate: () -> Void
+    let onToggleExpanded: () -> Void
+    let onCreateFolder: () -> Void
+
+    @State private var rowHovering = false
+
+    /// Vaste breedte links zodat label niet verschuift bij icon ↔ chevron.
+    /// Zelfde 18 pt als `LeftNavRow`-iconen → label kolom lijn-ligt met Home/Banners.
+    private static let leadingSlotSize: CGFloat = 18
+
+    /// Leading inset van de Portraits-titel t.o.v. de rij (padding + slot + gap).
+    static var folderTextLeadingInset: CGFloat {
+        DSSpacing.gap2 + leadingSlotSize + DSSpacing.gap2
+    }
+
+    /// Extra inspringing zodat map-rijen visueel onder Portraits vallen.
+    static let folderNestIndent: CGFloat = DSSpacing.gap3
+
+    /// Leading padding voor een map-rij (icoon-kolom).
+    static var folderRowLeadingInset: CGFloat {
+        folderTextLeadingInset + folderNestIndent - 16 - DSSpacing.gap2
+    }
+
+    var body: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            leadingSlot
+
+            Button(action: onNavigate) {
+                Text(title)
+                    .dsTextStyle(.labelBase)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onCreateFolder) {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+            .help("Create folder")
+        }
+        .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
+        .padding(.horizontal, DSSpacing.gap2)
+        .frame(height: 34)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rowBackground, in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { rowHovering = $0 }
+        .dsMotion(DSMotion.micro, value: rowHovering)
+    }
+
+    @ViewBuilder
+    private var leadingSlot: some View {
+        ZStack {
+            if rowHovering {
+                Button(action: onToggleExpanded) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .dsHoverHighlight(cornerRadius: DSRadius.md)
+            } else {
+                Image(systemName: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+
+                Button(action: onNavigate) {
+                    Color.clear
+                        .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return DSColor.Background.neutralStronger }
+        if rowHovering { return DSColor.Background.neutral }
+        return .clear
+    }
+}
+
+/// Eén map-rij onder Portraits (indent + hover/selectie/drop-highlight).
+private struct LeftNavFolderRow: View {
+    let name: String
+    let isSelected: Bool
+    let isDropTargeted: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap2) {
+                Image(systemName: "folder")
+                    .font(.system(size: 13, weight: .regular))
+                    .frame(width: 16)
+                Text(name)
+                    .dsTextStyle(.labelBase)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected || isDropTargeted ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
+            .padding(.leading, LeftNavExpandableHeader.folderRowLeadingInset)
+            .padding(.trailing, DSSpacing.gap2)
+            .frame(height: 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+            .overlay {
+                if isDropTargeted {
+                    RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .dsMotion(DSMotion.micro, value: hovering || isDropTargeted)
+    }
+
+    private var rowBackground: Color {
+        if isDropTargeted { return DSColor.Action.primary.opacity(0.18) }
+        if isSelected { return DSColor.Background.neutralStronger }
+        if hovering { return DSColor.Background.neutral }
+        return .clear
     }
 }
 

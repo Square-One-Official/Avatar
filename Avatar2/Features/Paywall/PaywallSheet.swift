@@ -51,7 +51,7 @@ struct PaywallSheet: View {
             }
         }
         .background(DSColor.Background.card)
-        .preferredColorScheme(.dark)
+        .appliedAppearancePreference()
         .task { await model.refresh() }
         .task {
             guard PaywallSheet.proFeaturesCache == nil else { return }

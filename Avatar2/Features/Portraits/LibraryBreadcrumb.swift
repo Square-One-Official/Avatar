@@ -15,9 +15,9 @@ struct LibraryBreadcrumb: View {
         HStack(spacing: DSSpacing.gap2) {
             Button { model.goBack() } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.primary)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 22, height: 22)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -25,9 +25,9 @@ struct LibraryBreadcrumb: View {
 
             trail
         }
-        .padding(.leading, DSSpacing.gap2)
-        .padding(.trailing, DSSpacing.gap3)
-        .frame(height: 34)
+        .padding(.leading, DSSpacing.gap1_5)
+        .padding(.trailing, DSSpacing.gap2)
+        .frame(height: 28)
         .background(DSColor.Background.card, in: Capsule())
         .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
     }

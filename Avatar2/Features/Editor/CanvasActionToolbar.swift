@@ -36,6 +36,13 @@ enum CanvasToolbarMenu: Hashable {
     case frame, background
 }
 
+/// `.capsule` = compact capsule boven/in het frame (board batch-bar). `.headerRow` =
+/// losse 28pt-pillen naast de naam-chip (single-editor).
+enum CanvasToolbarLayout {
+    case capsule
+    case headerRow
+}
+
 struct CanvasActionToolbar<Background: View>: View {
     var onCrop: (() -> Void)?
     var onAutoFrame: () -> Void = {}
@@ -55,11 +62,19 @@ struct CanvasActionToolbar<Background: View>: View {
     /// single-editor ongewijzigd.
     var showFramingActions: Bool = true
     var showGrid: Bool = true
+    /// `.headerRow` = naast de naam-chip (28pt, geen outer capsule).
+    var layout: CanvasToolbarLayout = .capsule
     @ViewBuilder var background: () -> Background
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var buttonSize: DSToolbarSize { layout == .headerRow ? .chip : .compact }
+    private var buttonSurface: CapsuleToolSurface { layout == .headerRow ? .secondary : .ghost }
+    private var rowSpacing: CGFloat {
+        layout == .headerRow ? DSSpacing.gap2 : DSToolbarSize.compact.itemSpacing
+    }
+
     var body: some View {
-        HStack(spacing: DSSpacing.gap1) {
+        HStack(spacing: rowSpacing) {
             toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
                 frameMenu
             }
@@ -73,20 +88,19 @@ struct CanvasActionToolbar<Background: View>: View {
                 // nu dezelfde lime-ring + lime-tint als een actieve onderste pil.
                 DSCapsuleToolButton(
                     isActive: gridEnabled,
-                    size: .compact,
+                    size: buttonSize,
+                    surface: buttonSurface,
                     action: { gridEnabled.toggle() }
                 ) {
                     Ph.gridNine.regular
                         .scaledToFit()
-                        .frame(width: DSToolbarSize.compact.iconPointSize,
-                               height: DSToolbarSize.compact.iconPointSize)
+                        .frame(width: buttonSize.iconPointSize,
+                               height: buttonSize.iconPointSize)
                 }
                 .help("Toggle alignment grid")
             }
         }
-        // E32: zelfde solide Card-capsule als de onderste toolbar (geen glas/rand),
-        // alleen compacter (`.compact`).
-        .dsToolbarCapsule(size: .compact)
+        .modifier(CanvasToolbarChrome(layout: layout, buttonSize: buttonSize))
         .dsMotion(DSMotion.fast, value: activeMenu)
         #if DEBUG
         .onAppear {
@@ -113,13 +127,14 @@ struct CanvasActionToolbar<Background: View>: View {
             label: title,
             showChevron: chevron,
             isActive: activeMenu == menu,
-            size: .compact,
+            size: buttonSize,
+            surface: buttonSurface,
             action: { activeMenu = (activeMenu == menu) ? nil : menu }
         ) {
             icon.regular
                 .scaledToFit()
-                .frame(width: DSToolbarSize.compact.iconPointSize,
-                       height: DSToolbarSize.compact.iconPointSize)
+                .frame(width: buttonSize.iconPointSize,
+                       height: buttonSize.iconPointSize)
         }
         .overlay(alignment: .top) {
             if activeMenu == menu {
@@ -129,14 +144,15 @@ struct CanvasActionToolbar<Background: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
                     // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
                     .dsPanelSurface(cornerRadius: DSRadius.xl4)
-                    // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
-                    .offset(y: DSToolbarSize.compact.height
-                              + DSToolbarSize.compact.containerPadding
-                              + DSSpacing.gap2)
+                    .offset(y: buttonSize.height + dropdownGap)
                     .zIndex(10)
                     .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
             }
         }
+    }
+
+    private var dropdownGap: CGFloat {
+        layout == .headerRow ? DSSpacing.gap2 : buttonSize.containerPadding + DSSpacing.gap2
     }
 
     // MARK: Dropdown-inhoud
@@ -214,4 +230,18 @@ struct CanvasActionToolbar<Background: View>: View {
         .disabled(action == nil)
     }
 
+}
+
+private struct CanvasToolbarChrome: ViewModifier {
+    let layout: CanvasToolbarLayout
+    let buttonSize: DSToolbarSize
+
+    func body(content: Content) -> some View {
+        switch layout {
+        case .capsule:
+            content.dsToolbarCapsule(size: .compact)
+        case .headerRow:
+            content
+        }
+    }
 }

@@ -31,6 +31,5 @@ struct OnboardingFlow: View {
             }
         }
         .dsMotion(DSMotion.emphasis, value: model.step)
-        .preferredColorScheme(.dark)
     }
 }

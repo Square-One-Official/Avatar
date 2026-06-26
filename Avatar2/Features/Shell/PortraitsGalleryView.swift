@@ -20,6 +20,8 @@ struct PortraitsGalleryView: View {
 
     /// Gemeten hoogte van de zwevende header → top-inset voor elke lens.
     @State private var headerHeight: CGFloat = 0
+    @State private var menuTarget: Portrait2?
+    @State private var menuAnchor: CGRect = .zero
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
@@ -73,6 +75,14 @@ struct PortraitsGalleryView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .onPreferenceChange(HeaderHeightKey.self) { headerHeight = $0 }
+        .coordinateSpace(name: PortraitContextMenuSpace.name)
+        .portraitContextMenuOverlay(
+            target: $menuTarget,
+            anchor: menuAnchor,
+            model: model,
+            folders: folders,
+            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+        )
         .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
     }
 
@@ -82,8 +92,10 @@ struct PortraitsGalleryView: View {
         } else {
             switch model.portraitsViewMode {
             case .grid: gridBody
-            case .list: ListLens(items: items, model: model, folders: folders)
-            case .gallery: GalleryLens(items: items, model: model, folders: folders)
+            case .list:
+                ListLens(items: items, model: model, folders: folders)
+            case .gallery:
+                GalleryLens(items: items, model: model, folders: folders)
             // Canvas = de vrije board-lens, gescope op de huidige map.
             case .canvas: BoardView(folderID: model.selectedFolderID, model: model,
                                     entitlement: entitlement, onOpen: { model.openPortrait($0) })
@@ -99,7 +111,12 @@ struct PortraitsGalleryView: View {
                         portrait: portrait, folders: folders, model: model,
                         isSelected: model.isPortraitSelected(portrait),
                         ordered: { items.map(\.persistentModelID) },
-                        selectedTargets: { items.filter { model.isPortraitSelected($0) } }
+                        selectedTargets: { items.filter { model.isPortraitSelected($0) } },
+                        onContextMenu: { frame in
+                            model.preparePortraitContextMenu(on: portrait)
+                            menuTarget = portrait
+                            menuAnchor = frame
+                        }
                     )
                 }
             }
@@ -163,9 +180,8 @@ struct PortraitGridTile: View {
     let ordered: () -> [PersistentIdentifier]
     /// De huidige selectie als modellen (voor bulk-acties) — lazy, bij menu-actie.
     let selectedTargets: () -> [Portrait2]
+    let onContextMenu: (CGRect) -> Void
 
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.undoManager) private var undoManager
     @State private var hovering = false
 
     var body: some View {
@@ -210,12 +226,7 @@ struct PortraitGridTile: View {
             // Sleep een portret naar een map in de left-nav (zie LeftNavView).
             // Een klik zonder beweging blijft 'open'; pas bij verslepen start de drag.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))
-        .contextMenu {
-            portraitContextMenu(
-                for: portrait, model: model, folders: folders,
-                selectedTargets: selectedTargets, undoManager: undoManager, modelContext: modelContext
-            )
-        }
+            .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace, onTrigger: onContextMenu)
     }
 
     // De compositie binnen het vierkant: de gedeelde achtergrond+onderwerp-

@@ -58,6 +58,9 @@ public enum DSColor {
         public static let primaryStaticBlack = Color(hex: 0x111111)
         /// `foreground/default/thumb` — wit (dark) · donker (light)
         public static let thumb = Color(lightHex: 0x1C1917, darkHex: 0xFFFFFF)
+        /// Destructive actie-ink (menu-rijen, delete-knoppen) — niet de pastel
+        /// `Signal.error` achtergrond-token; leesbaar op card/panel surfaces.
+        public static let destructive = Color(lightHex: 0xDC2626, darkHex: 0xFF6B6B)
     }
 
     /// Signaalkleuren (Figma Badge Type=Error/Success/Warning/Info). Pastel,

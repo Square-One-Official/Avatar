@@ -9,7 +9,6 @@
 // naam/headline, knoppen en een post/grid-zone; geen nep-tekst, logo's of foto's.
 
 import AvatarUI
-import PhosphorSwift
 import SwiftUI
 
 struct PlatformChrome<Banner: View, Avatar: View>: View {
@@ -47,7 +46,7 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
         let d = bandH * (platform.profileDiameterFraction ?? 0.62)
         let pad = width * 0.05
         return VStack(alignment: .leading, spacing: 0) {
-            navBar(Ph.linkedinLogo.fill)
+            navBar(Image("LinkedInLogo"))
             coverBand(height: bandH, avatarDiameter: d)
             VStack(alignment: .leading, spacing: pad * 0.5) {
                 Color.clear.frame(height: d / 2 - pad * 0.5)   // ruimte onder de overlappende avatar
@@ -70,7 +69,7 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
         let d = bandH * (platform.profileDiameterFraction ?? 0.56)
         let pad = width * 0.05
         return VStack(alignment: .leading, spacing: 0) {
-            navBar(Ph.xLogo.fill)
+            navBar(Image("XLogo"))
             coverBand(height: bandH, avatarDiameter: d)
             VStack(alignment: .leading, spacing: pad * 0.5) {
                 HStack(alignment: .top) {
@@ -95,7 +94,7 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
         let pad = width * 0.05
         let d = width * 0.22
         return VStack(spacing: pad * 0.8) {
-            navBar(Ph.instagramLogo.fill)
+            navBar(Image("InstagramLogo"))
 
             HStack(spacing: pad) {
                 ringedAvatar(diameter: d)
