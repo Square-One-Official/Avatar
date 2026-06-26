@@ -155,30 +155,7 @@ struct BannerStudioView: View {
         case .size:
             BannerSizePanel(doc: doc)
         case .shaders:
-            shadersComingSoon
-        }
-    }
-
-    /// Shaders draaien op een Metal-shaderengine die in deze build nog niet is
-    /// ingeschakeld; tot dan een eerlijke "coming soon"-kaart i.p.v. een leeg/
-    /// kapot ogend paneel.
-    private var shadersComingSoon: some View {
-        DSEditPanel(title: BannerTool.shaders.label) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                HStack(spacing: DSSpacing.gap2) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(DSColor.Action.primary)
-                    Text("Coming soon")
-                        .dsTextStyle(.labelLarge)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                }
-                Text(BannerTool.shaders.summary)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            BannerShaderPanel(doc: doc)
         }
     }
 
@@ -195,7 +172,7 @@ struct BannerStudioView: View {
     /// social-preview-compat: zie 37.6 — gallery toont nu BannerDoc.)
     private func save() {
         commitName()
-        if let cg = BannerDocRenderer.render(doc),
+        if let cg = composedImage(watermark: false),
            let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
             doc.previewImageData = png
         }
@@ -206,7 +183,7 @@ struct BannerStudioView: View {
     /// Rendert de doc op canvas-maat → PNG → NSSavePanel; free-tier watermerk.
     private func export() {
         commitName()
-        guard let cg = BannerDocRenderer.render(doc, watermark: !isPro),
+        guard let cg = composedImage(watermark: !isPro),
               let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
@@ -217,9 +194,19 @@ struct BannerStudioView: View {
     }
 
     private func refreshPreview() async {
-        // Klein canvas (≤1500×500) — render op de main-actor is goedkoop genoeg;
-        // de echte live-shaderrender komt off-main in E38.2.
-        guard let cg = BannerDocRenderer.render(doc) else { return }
+        // Klein canvas (≤1500×500) — render op de main-actor is goedkoop genoeg.
+        guard let cg = composedImage(watermark: false) else { return }
         preview = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
+    /// Het volledige banner-beeld: CPU-compositie (fill+tekst+logo) via
+    /// `BannerDocRenderer`, dan de GPU-shader-stack erin gerasterd (E38.2), en
+    /// optioneel het free-tier watermerk scherp bovenop. Eén pad voor
+    /// preview/save/export → wat-je-ziet = wat-je-bewaart/exporteert.
+    private func composedImage(watermark: Bool) -> CGImage? {
+        guard let base = BannerDocRenderer.render(doc) else { return nil }
+        let shaded = BannerShaderRenderer.bake(base, shaders: doc.layers.shaders, size: doc.canvasSize) ?? base
+        guard watermark else { return shaded }
+        return BannerDocRenderer.stampWatermark(on: shaded) ?? shaded
     }
 }

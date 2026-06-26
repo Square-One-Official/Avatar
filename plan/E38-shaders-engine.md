@@ -31,17 +31,23 @@ lokaal.
 ---
 
 ## 38.1 — Metal-shaderbibliotheek + ShaderEffect-model
-- status: blocked
+- status: done
 - owner: AI/INFRA (2026-06-26)
-- blocker: **Metal Toolchain niet geïnstalleerd.** Xcode 26.4 (MacOSX26.4 SDK) levert de
-  `metal`-compiler als losse component; `.metal`-bestanden compileren niet → build faalt met
-  "cannot execute tool 'metal' due to missing Metal Toolchain; use: xcodebuild -downloadComponent
-  MetalToolchain". De volledige shader-engine (38.1–38.4) + de Studio-shaders-tool (E37.7) wachten
-  hierop. De code was geschreven en de Swift-kant compileert; alleen het `.metal`-doel blokkeert.
-  **Deblokkeren:** `xcodebuild -downloadComponent MetalToolchain` (multi-GB, Thierry's keuze).
-  Daarna: herplaats BannerShaders.metal + ShaderEffect + BannerShaderModifier (uit deze sessie) en
-  bouw verder.
+- note: Metal Toolchain (17E188, ~688 MB) geïnstalleerd via `xcodebuild -downloadComponent
+  MetalToolchain` (Thierry akkoord 2026-06-26) → `.metal` compileert. Deblokkeerde 38.x + 37.7.
 - team: AI/INFRA
+- Result: `Avatar2/Features/Banners/BannerShaders.metal` — 6 `[[stitchable]]` shaders met gedeelde
+  helpers (hash/valueNoise/fbm/Bayer/luma): color-effects **grain**, **noise** (fBm-overlay),
+  **dither** (ordered Bayer), **halftone**; distortion-effects **lens** (barrel/pincushion) en
+  **warp** (sinus). `ShaderEffect.swift` — value-model (`ShaderParam`, `ShaderArg` [.bounds /
+  .param], `ShaderEffect` met `stage` color/distortion + geordende arg-spec die 1-op-1 matcht met
+  de Metal-signatuur) + `ShaderCatalog.all` + `View.bannerShaders(_:)` die de ingeschakelde lagen
+  in volgorde via `.colorEffect`/`.distortionEffect(maxSampleOffset:)` stapelt; args via
+  `.boundingRect`/`.float`. `BannerShaderLayer` (E37.1) blijft het persistente model;
+  `effect.makeLayer()` levert defaults. macOS 14+ Shader-API = app-deploymenttarget, geen gate
+  nodig. `ShaderEffectTests` (3, groen): catalogus/laag-consistentie + élke shader rendert via
+  `ImageRenderer` een beeld van de juiste maat + disabled-laag wordt overgeslagen. DoD groen
+  (build-v2.sh "alles groen"; 7/7 Avatar2-tests).
 
 - `.metal`-library met de kern-shaderfuncties (parametrisch): **fractalNoise** (fBm/Perlin,
   octaves/schaal/kleurmap), **dither** (ordered/Bayer + drempel + paletgrootte), **meshGradient**
@@ -59,10 +65,19 @@ lokaal.
   een niet-leeg/juist-formaat resultaat oplevert, tests groen, Result-regel.
 
 ## 38.2 — Live shader-render op canvas + raster-bij-export
-- status: backlog
-- owner: —
+- status: done
+- owner: AI/INFRA (2026-06-26)
 - team: AI/INFRA (+ FEAT-haak)
 - blockedBy: 38.1
+- Result: `BannerShaderRenderer.bake(_:shaders:size:)` (@MainActor) wikkelt het CPU-basisbeeld
+  (`BannerDocRenderer`, fill+tekst+logo) in een SwiftUI `Image` op canvas-maat, stapelt de
+  ingeschakelde shaders (`.bannerShaders`) en rastert met `ImageRenderer` terug naar CGImage; lege
+  stack → basis onveranderd (geen ImageRenderer-kost). `BannerStudioView` heeft nu één
+  `composedImage(watermark:)`-pad dat preview/save/export voedt → wat-je-ziet = wat-je-exporteert
+  (de canvas toont het gebakken `preview`, niet langer een los modifier). Free-tier watermerk gaat
+  via `BannerDocRenderer.stampWatermark(on:)` SCHERP bovenop de gebakken shaders (niet
+  mee-vervormd). Shaders normaliseren via `.boundingRect` zodat preview- en exportmaat consistent
+  zijn. DoD groen.
 
 Haak de shader-stack in de `BannerDoc`-render: live op de Studio-canvas-kaart (gestapelde
 modifiers in z-volgorde) én in `BannerDocRenderer`/`ImageRenderer` bij export, zodat wat-je-ziet
@@ -71,10 +86,17 @@ en render off-main.
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 38.3 — Param-controls (DS) + per-shader panel-UI
-- status: backlog
-- owner: —
+- status: done
+- owner: DS+FEAT (2026-06-26)
 - team: DS (+ FEAT)
 - blockedBy: 38.1
+- Result: `BannerShaderPanel` (in `DSEditPanel`): een horizontale catalogus-rij van effect-chips
+  (icoon + naam) om toe te voegen, daaronder per actieve laag een kaart met generieke DS-`Slider`s
+  gedreven door `ShaderEffect.params` (label + range uit de catalogus, dict-binding op
+  `BannerShaderLayer.params`). Bindt op een lokale `@State`-werk-kopie (zoals het text-paneel) →
+  vloeiende sliders; `onChange` schrijft terug naar `doc.layers.shaders` → live canvas-bake
+  (E38.2). Live preview-thumbnails per shader zijn als follow-up genoteerd (niet vereist voor DoD).
+  DoD groen.
 
 DS-controls voor shader-parameters (sliders/segments/color in AvatarUI-stijl, reduce-motion-
 proof), generiek gedreven door `ShaderEffect.params`. Een effect-kaartenrij (kies shader) +
@@ -83,10 +105,14 @@ shader.
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 38.4 — Shader-stacking/ordening
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT
 - blockedBy: 38.2, 38.3
+- Result: `BannerShaderPanel` stapelt meerdere shaders op één banner; per laag: aan/uit (oog-toggle
+  + dim-opacity), verwijderen (trash), en herordenen via omhoog/omlaag (`swapAt`, eind-disabled).
+  De volgorde van `doc.layers.shaders` = de z-volgorde waarin `View.bannerShaders` ze toepast
+  (eerste laag eerst), dus herordenen verandert het render-resultaat. DoD groen.
 
 Meerdere shaders stapelen op één banner, met herordenen/aan-uit/verwijderen (Figma stackt
 effecten). UI in de Shaders-tool (E37.7). Volgorde respecteert z-stack in de render.

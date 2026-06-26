@@ -44,6 +44,7 @@
 		20D3306EA72A9AB3B9678019 /* HairEdgeHeuristic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193AC95D25EF732A7D1F0078 /* HairEdgeHeuristic.swift */; };
 		21AC649E5585B749AE8597F0 /* NSImage+PNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3603A78CF831F64CBEF9E792 /* NSImage+PNG.swift */; };
 		22F331DA021385FF381B6BEA /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A86EE5462E82319D323AF1C /* EditorView.swift */; };
+		231C6C86B56FD39E277C065F /* BannerShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 75C477CF2B37BD23C5B5D51A /* BannerShaders.metal */; };
 		248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3A383A9104F04C87490DC691 /* AvatarKit */; };
 		280A11648DAEFCF19F5E82C9 /* ProUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */; };
 		286A7078C477C6313F6F677C /* OnboardingEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */; };
@@ -113,6 +114,7 @@
 		692D91420BD13F3A0409A12A /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
 		694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2B6957003039CB34DD8610 /* PortraitExporter.swift */; };
 		6B544FC0626AD4CC467ECC79 /* ImageAdjustments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8024D84C778A83045FEA287D /* ImageAdjustments.swift */; };
+		6B7048D040C9D647818CC91E /* BannerShaderRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E28085965A8F0A7E153144 /* BannerShaderRenderer.swift */; };
 		6C3C8DA629E10764C6885815 /* SocialPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37DE6481CF2F31A8541F07C /* SocialPlatform.swift */; };
 		6C8929F949C422C5AC550163 /* logo.svg in Resources */ = {isa = PBXBuildFile; fileRef = DB0C0C9C43AFC1383D6C54E2 /* logo.svg */; };
 		6C9CE24C7807460ABEB8EBF9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
@@ -140,6 +142,7 @@
 		89AA16048F395B4CF00BA39D /* ProBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED2448B10A7B5504F841578 /* ProBadge.swift */; };
 		89C89D347949E200275051E3 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		8A196264D08873D2B5233B3A /* Banner2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75684711188D45F74A4EE9B4 /* Banner2.swift */; };
+		8AAE2CBCEDDD61A067C970EE /* ShaderEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA75506BA85C34AFDE8E8E2 /* ShaderEffect.swift */; };
 		8BA79F365F5F7B49329FF371 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
 		8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */; };
 		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
@@ -204,6 +207,7 @@
 		CE49AA0F4C494B5D4D81E589 /* AutoFramerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DD51E68A2A1951BA1990DD /* AutoFramerTests.swift */; };
 		CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */ = {isa = PBXBuildFile; productRef = 7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */; };
 		CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE27586F91E9706E71610E7 /* FaceActionsPanel.swift */; };
+		D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */; };
 		D10DD1DAD674FDF2DFD2FD11 /* OutOfCreditsToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F87925CBE72ABD8237FF3 /* OutOfCreditsToast.swift */; };
 		D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85946241C86C51F94E31DFF8 /* PortraitHeader.swift */; };
 		D27FD8B3821AA756198BDB78 /* PlatformChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67DA5A7897F95C4BCE9C4754 /* PlatformChrome.swift */; };
@@ -248,6 +252,7 @@
 		F2D880EFA91CC1AF1FA4F89A /* LibraryViewSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130B694AC7ED3AF581DFAEB1 /* LibraryViewSwitcher.swift */; };
 		F31E762F95DD3C336A3DE4B0 /* PortraitContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */; };
 		F3AB75972232C58F0B721E8A /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
+		F47A27DD4BB0D814A75E6449 /* BannerShaderPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F226995107551BCB754B9E17 /* BannerShaderPanel.swift */; };
 		F75326EE95AD345F1B6AB7E3 /* GoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67B1818524625F66274E218 /* GoogleSignInButton.swift */; };
 		FA2169F93286D9C1CFAA2E9E /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		FDEF7B9E193F229DB2F77825 /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
@@ -348,6 +353,7 @@
 		7477A0B1A2FE5E7ABBFFCDC4 /* CanvasInteractionCatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasInteractionCatcher.swift; sourceTree = "<group>"; };
 		7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		75684711188D45F74A4EE9B4 /* Banner2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Banner2.swift; sourceTree = "<group>"; };
+		75C477CF2B37BD23C5B5D51A /* BannerShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BannerShaders.metal; sourceTree = "<group>"; };
 		75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		7A86EE5462E82319D323AF1C /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		7E1F87925CBE72ABD8237FF3 /* OutOfCreditsToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutOfCreditsToast.swift; sourceTree = "<group>"; };
@@ -403,7 +409,9 @@
 		C504E7ED42D59197C3971A3A /* LeftNavView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftNavView.swift; sourceTree = "<group>"; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
+		C8E28085965A8F0A7E153144 /* BannerShaderRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerShaderRenderer.swift; sourceTree = "<group>"; };
 		C9329E36279558288146B065 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
+		CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderEffectTests.swift; sourceTree = "<group>"; };
 		CAF5935E244C409DB420FDEF /* ManageBackgroundsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageBackgroundsSheet.swift; sourceTree = "<group>"; };
 		CBFBA66AF626E08F10F1333C /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
 		D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModelTests.swift; sourceTree = "<group>"; };
@@ -416,6 +424,7 @@
 		DDA52AF8F365805B303AC7D9 /* OnboardingPrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingPrivacyView.swift; sourceTree = "<group>"; };
 		DDDD839FA3BB601A788A0854 /* AuthEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthEncryption.swift; sourceTree = "<group>"; };
 		DE931792D085D73E20E9D67F /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
+		DEA75506BA85C34AFDE8E8E2 /* ShaderEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderEffect.swift; sourceTree = "<group>"; };
 		DED2448B10A7B5504F841578 /* ProBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProBadge.swift; sourceTree = "<group>"; };
 		E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder2.swift; sourceTree = "<group>"; };
 		E21A227552D65C64EBB609A5 /* Mesh 02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 02.png"; sourceTree = "<group>"; };
@@ -431,6 +440,7 @@
 		ECB59382EAC176D9739FE9C7 /* Mesh 04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 04.png"; sourceTree = "<group>"; };
 		EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoAligner.swift; sourceTree = "<group>"; };
 		F1CAAB87E8E174A425083C2F /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
+		F226995107551BCB754B9E17 /* BannerShaderPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerShaderPanel.swift; sourceTree = "<group>"; };
 		F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDropZone.swift; sourceTree = "<group>"; };
 		F637C0CD25EC147F8D6F5627 /* AnnouncementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementService.swift; sourceTree = "<group>"; };
 		F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerPresetsModel.swift; sourceTree = "<group>"; };
@@ -731,6 +741,7 @@
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 				6F4C6433C0A7DD0C9E89C753 /* Portrait2Tests.swift */,
+				CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */,
 				9D9DE22FF27058CBDB93A7F8 /* ShellModelTests.swift */,
 				67095B33836C86C2D0368E3E /* ThumbnailRendererTests.swift */,
 			);
@@ -783,9 +794,13 @@
 				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
 				F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
+				F226995107551BCB754B9E17 /* BannerShaderPanel.swift */,
+				C8E28085965A8F0A7E153144 /* BannerShaderRenderer.swift */,
+				75C477CF2B37BD23C5B5D51A /* BannerShaders.metal */,
 				98854DF3AAC38E4D368DD522 /* BannerSizePanel.swift */,
 				EAA5F8B3F5EEE3E08FA0A619 /* BannerStudioView.swift */,
 				ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */,
+				DEA75506BA85C34AFDE8E8E2 /* ShaderEffect.swift */,
 			);
 			path = Banners;
 			sourceTree = "<group>";
@@ -1130,6 +1145,9 @@
 				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
 				8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
+				F47A27DD4BB0D814A75E6449 /* BannerShaderPanel.swift in Sources */,
+				6B7048D040C9D647818CC91E /* BannerShaderRenderer.swift in Sources */,
+				231C6C86B56FD39E277C065F /* BannerShaders.metal in Sources */,
 				46341383B254B4510C27AD85 /* BannerSizePanel.swift in Sources */,
 				C9664D75BEA6CD7A80A3776F /* BannerStudioView.swift in Sources */,
 				586DA2974FA6C2E92F0888A1 /* BannerTextPanel.swift in Sources */,
@@ -1194,6 +1212,7 @@
 				58BC823E9AD033A9C17F7636 /* SettingsModel.swift in Sources */,
 				4136DDEA29ECC6C5D4896AAB /* SettingsPreferencesPage.swift in Sources */,
 				58A132E1A87DB573598AF991 /* SettingsRootView.swift in Sources */,
+				8AAE2CBCEDDD61A067C970EE /* ShaderEffect.swift in Sources */,
 				994378F65582B21AD619D0A3 /* ShellMetrics.swift in Sources */,
 				0EACA40A9B4E46F1CCEAE54B /* ShellModel.swift in Sources */,
 				EC8A1EBF5958B99CAC29D58C /* ShellSidebarChrome.swift in Sources */,
@@ -1225,6 +1244,7 @@
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 				B75EB071FBBE2203B62354C2 /* Portrait2Tests.swift in Sources */,
+				D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */,
 				16F1A13941FC6D764E829943 /* ShellModelTests.swift in Sources */,
 				9719C92AD3812008649958D3 /* ThumbnailRendererTests.swift in Sources */,
 			);

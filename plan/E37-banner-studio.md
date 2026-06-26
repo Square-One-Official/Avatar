@@ -175,10 +175,15 @@ Een logo/merkbeeld plaatsen: upload (PNG met alpha), schalen/positioneren op can
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 37.7 — Shaders-panel integratie (consumeert E38)
-- status: blocked (Metal Toolchain — zie E38.1)
-- owner: —
+- status: done
+- owner: FEAT (2026-06-26)
 - team: FEAT
 - blockedBy: 37.2, 38.2, 38.3
+- Result: de "Shaders"-tool in `BannerStudioView.panel()` toont nu het echte `BannerShaderPanel`
+  (E38.3/38.4) i.p.v. de "coming soon"-kaart: kies/stapel procedurale effecten op de `BannerDoc`,
+  live op de canvas via de gebakken preview (E38.2), params via DS-sliders, stack-ordening via
+  omhoog/omlaag. Bij export worden de effecten via `BannerShaderRenderer` + `ImageRenderer`
+  gerasterd. DoD groen.
 
 "Shaders"-tool: kies/stapel procedurale effecten (E38) op de `BannerDoc`; live op canvas via de
 SwiftUI-`Shader`-render-haak; params via de DS-controls (38.3); stack-ordening (38.4). Effecten

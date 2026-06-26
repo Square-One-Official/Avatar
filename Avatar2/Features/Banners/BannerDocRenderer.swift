@@ -49,6 +49,21 @@ enum BannerDocRenderer {
         return ctx.makeImage()
     }
 
+    /// Stempelt het free-tier watermerk op een reeds-gerenderd beeld (bv. NÁ de
+    /// shader-bake, E38.2), zodat het merk scherp bovenop blijft i.p.v. mee te
+    /// vervormen met een distortion-shader.
+    static func stampWatermark(on cg: CGImage) -> CGImage? {
+        let w = cg.width, h = cg.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(
+            data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return cg }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        drawWatermark(in: ctx, canvas: CGSize(width: w, height: h))
+        return ctx.makeImage()
+    }
+
     /// Free-tier hoek-watermerk rechtsonder (spiegelt PortraitExporter): wit op
     /// 85% met een lichte schaduw, hoogte-relatief geschaald.
     private static func drawWatermark(in ctx: CGContext, canvas: CGSize) {
