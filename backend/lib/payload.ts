@@ -365,6 +365,72 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
 }
 
 // ---------------------------------------------------------------------------
+// E39 — Banner-presets (CMS-gestuurde startpunten, slug "banner-presets").
+// Spiegelt admin/src/collections/BannerPresets.ts: key + label + category +
+// thumbnail + config (JSON-string van de app's BannerLayers) + order. Een nieuw
+// banner-startpunt kan zo zonder app- of backend-deploy worden toegevoegd. De
+// `config` is een ondoorzichtige JSON-string die alléén de app decodeert; de
+// backend reikt 'm onbewerkt door.
+// ---------------------------------------------------------------------------
+
+export type PayloadBannerPreset = {
+  key: string;
+  label: string;
+  category: string;
+  thumbnailUrl: string | null;
+  config: string;
+  order: number;
+};
+
+let bannerPresetCache: { expiresAt: number; payload: PayloadBannerPreset[] } | null = null;
+
+export async function fetchActiveBannerPresets(): Promise<PayloadBannerPreset[]> {
+  const now = Date.now();
+  if (bannerPresetCache && bannerPresetCache.expiresAt > now) {
+    return bannerPresetCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — banner presets disabled");
+    return [];
+  }
+
+  const url = new URL(`${base}/banner-presets`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "1"); // resolve the thumbnail upload → { url }
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "order");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload banner-presets fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const presets = docs.map(normalizeBannerPreset).filter((p): p is PayloadBannerPreset => p !== null);
+  bannerPresetCache = { expiresAt: now + CACHE_TTL_MS, payload: presets };
+  return presets;
+}
+
+function normalizeBannerPreset(raw: unknown): PayloadBannerPreset | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const config = typeof r.config === "string" ? r.config.trim() : null;
+  // Onbruikbaar zonder key + config (de preset kan dan geen laagstack vormen) → skip.
+  if (!key || !config) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const category = typeof r.category === "string" && r.category.trim() ? r.category.trim() : "default";
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, category, thumbnailUrl, config, order };
+}
+
+// ---------------------------------------------------------------------------
 // E17.2 — Messages (verenigd model, slug "messages"). Naast de announcement-
 // functies hierboven; niet-destructief. Spiegelt admin/src/collections/
 // Messages.ts: kanaal + targeting-group + schedule-group + body/image/cta.

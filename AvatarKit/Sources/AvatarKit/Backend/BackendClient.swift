@@ -612,6 +612,18 @@ public final class BackendClient {
         return resp.effects
     }
 
+    // MARK: GET /v1/banner-presets (CMS-gestuurd, E39)
+    /// Banner-Studio-startpunten. Anoniem-vriendelijk; de empty-state/home
+    /// valt terug op lokale presets als dit faalt.
+    private struct BannerPresetsResponse: Decodable {
+        // Envelope-key `banner_presets` → `bannerPresets` via .convertFromSnakeCase.
+        let bannerPresets: [RemoteBannerPreset]
+    }
+    public func bannerPresets() async throws -> [RemoteBannerPreset] {
+        let resp: BannerPresetsResponse = try await requestAllowingAnonymous("/v1/banner-presets", method: "GET")
+        return resp.bannerPresets
+    }
+
     // MARK: GET /v1/app-config (CMS-gestuurd, E33+)
     /// App-brede visuele configuratie. Anoniem-vriendelijk.
     public func appConfig() async throws -> RemoteAppConfig {

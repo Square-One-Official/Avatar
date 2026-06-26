@@ -11,9 +11,24 @@ genormaliseerd `/v1/*`-endpoint → getypeerd AvatarKit-model → soft-fail-fall
 ---
 
 ## 39.1 — Payload-collectie + endpoint + AvatarKit-model/-client
-- status: ready
-- owner: —
+- status: done
+- owner: INFRA (2026-06-26)
 - team: INFRA
+- Result: CMS-pad voor banner-presets compleet, exact gespiegeld op `Effects`/`RemoteEffect`.
+  Backend (port-only, niet door build-v2.sh gebouwd — preview-verificatie volgt): nieuwe
+  Payload-collectie `admin/src/collections/BannerPresets.ts` (slug `banner-presets`; velden
+  key·label·category(select)·thumbnail(upload→media)·config(textarea)·order·active; `auditHooks`;
+  read voor user/bearer, mutatie admin-only) + geregistreerd in `admin/src/payload.config.ts`
+  (import + collections-array). `backend/lib/payload.ts`: `PayloadBannerPreset`-type +
+  `fetchActiveBannerPresets()` (60s-cache, `where[active]=true`, `sort=order`, `depth=1` voor
+  thumbnail-url) + `normalizeBannerPreset()` (skip zonder key+config). `backend/api/v1/banner-presets.ts`:
+  GET-handler, 405 op andere methods, snake_case-map (`thumbnail_url`), soft-fail →
+  `{banner_presets:[]}`. Route loopt via de bestaande `/v1/(.*)`-wildcard-rewrite (geen
+  vercel.json-functions-entry nodig — net als `effects`). AvatarKit: `RemoteBannerPreset`
+  (Decodable/Sendable, custom init met thumbnailUrl-String→URL + lege-config→nil-guards) +
+  `BackendClient.bannerPresets()` via `requestAllowingAnonymous`; envelope-key `banner_presets`
+  → `bannerPresets` onder `.convertFromSnakeCase`. DoD groen: beide targets bouwen, alle
+  AvatarKit/AvatarUI-tests groen (build-v2.sh exit 0).
 
 Backend (`admin/` + `backend/`):
 - `admin/src/collections/BannerPresets.ts` (slug `banner-presets`): velden `key` (uniek, =
