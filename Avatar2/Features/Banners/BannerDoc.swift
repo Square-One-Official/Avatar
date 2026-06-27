@@ -41,6 +41,8 @@ final class BannerDoc {
     /// Genormaliseerd brandpunt (0…1) voor `.image`-fill — verschuift aspect-fill.
     var fillImageFocalX: Double = 0.5
     var fillImageFocalY: Double = 0.5
+    /// Zoom t.o.v. aspect-fill (1 = fit-fill; >1 zoomt in).
+    var fillImageZoom: Double = 1.0
 
     init(
         name: String = "",
@@ -65,6 +67,19 @@ final class BannerDoc {
     func touch() { updatedAt = .now }
 
     var canvasSize: CGSize { CGSize(width: canvasWidth, height: canvasHeight) }
+
+    /// Zet een image-fill atomisch: bytes + fill-type + optioneel framing-reset.
+    func applyFillImage(_ png: Data, resetFraming: Bool = true) {
+        fillImageData = png
+        if resetFraming {
+            fillImageFocalX = 0.5
+            fillImageFocalY = 0.5
+            fillImageZoom = 1.0
+        }
+        var l = layers
+        l.fill = .image
+        layers = l
+    }
 
     /// De gedecodeerde laag-stack. Setter her-encodeert + `touch()`. Faalt een
     /// decode (corrupte/lege blob) dan valt 'ie terug op `.empty`.
@@ -118,10 +133,54 @@ struct BannerLayers: Codable, Equatable, Sendable {
 }
 
 /// De achtergrond-vulling. `.image` verwijst naar `BannerDoc.fillImageData`.
-enum BannerFill: Codable, Equatable, Sendable {
+enum BannerFill: Equatable, Sendable {
     case solid(hex: String)
     case meshGradient(stops: [MeshStop])
     case image
+}
+
+extension BannerFill: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case solid, meshGradient, image
+    }
+
+    init(from decoder: Decoder) throws {
+        // Legacy: `"fill": "image"` (plain string i.p.v. keyed enum).
+        if let single = try? decoder.singleValueContainer(),
+           let raw = try? single.decode(String.self) {
+            if raw == "image" {
+                self = .image
+                return
+            }
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let hex = try container.decodeIfPresent(String.self, forKey: .solid) {
+            self = .solid(hex: hex)
+            return
+        }
+        if let stops = try container.decodeIfPresent([MeshStop].self, forKey: .meshGradient) {
+            self = .meshGradient(stops: stops)
+            return
+        }
+        if container.contains(.image) {
+            _ = try container.decodeNil(forKey: .image)
+            self = .image
+            return
+        }
+        throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown BannerFill"))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .solid(hex):
+            try container.encode(hex, forKey: .solid)
+        case let .meshGradient(stops):
+            try container.encode(stops, forKey: .meshGradient)
+        case .image:
+            try container.encodeNil(forKey: .image)
+        }
+    }
 }
 
 /// Eén kleur-stop van een mesh-gradient, op genormaliseerde (0…1) positie.

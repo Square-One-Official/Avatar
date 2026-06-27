@@ -9,6 +9,7 @@ struct BannerBackgroundPanel: View {
     var subtitle: String?
 
     @State private var brand = BrandColorKit.shared
+    @State private var customImages = BackgroundImageKit.shared
     @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
 
@@ -19,7 +20,11 @@ struct BannerBackgroundPanel: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
                 section("Color") { colorRow }
                 section("Gradient") { gradientRow }
-                Text("Tap the canvas to add a photo background — drag to reframe when selected.")
+                section("Image") { imageRow }
+                if isImageFillActive {
+                    zoomRow
+                }
+                Text("Tap the canvas to add a photo — drag to reframe when selected.")
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -111,6 +116,87 @@ struct BannerBackgroundPanel: View {
         }
     }
 
+    // MARK: Image
+
+    private var imageRow: some View {
+        scrollRow {
+            Button(action: uploadCustom) {
+                RoundedRectangle(cornerRadius: DSRadius.lg)
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+            }
+            .buttonStyle(.plain)
+            .dsHoverScale()
+            .help("Upload image")
+
+            if let data = doc.fillImageData,
+               isImageFillActive,
+               kitIDMatchingCurrentFill() == nil,
+               let image = NSImage(data: data) {
+                imageSwatchButton(image: image, selected: true) {
+                    doc.applyFillImage(data, resetFraming: false)
+                }
+            }
+
+            ForEach(customImages.imageIDs, id: \.self) { id in
+                if let image = customImages.image(for: id) {
+                    let selected = isImageFillActive && kitIDMatchingCurrentFill() == id
+                    imageSwatchButton(image: image, selected: selected) {
+                        selectCustomImage(id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var zoomRow: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            Image(systemName: "plus.magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(DSColor.Foreground.muted)
+            DSSlider(value: zoomBinding, in: 1...3)
+                .frame(maxWidth: 180)
+        }
+    }
+
+    private var zoomBinding: Binding<Double> {
+        Binding(
+            get: { doc.fillImageZoom },
+            set: { newValue in
+                doc.fillImageZoom = newValue
+                doc.touch()
+            }
+        )
+    }
+
+    private func imageSwatchButton(image: NSImage, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            RoundedRectangle(cornerRadius: DSRadius.lg)
+                .fill(DSColor.Background.neutral)
+                .frame(width: swatch, height: swatch)
+                .overlay {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.lg)
+                        .strokeBorder(
+                            selected ? DSColor.Action.primary : DSColor.Foreground.divider,
+                            lineWidth: selected ? DSBorderWidth.medium : DSBorderWidth.thin
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
+    }
+
     // MARK: Swatch
 
     private func swatchButton(_ color: Color, _ action: @escaping () -> Void) -> some View {
@@ -130,6 +216,16 @@ struct BannerBackgroundPanel: View {
     }
 
     // MARK: State + apply
+
+    private var isImageFillActive: Bool {
+        if case .image = doc.layers.fill, doc.fillImageData != nil { return true }
+        return false
+    }
+
+    private func kitIDMatchingCurrentFill() -> String? {
+        guard let data = doc.fillImageData else { return nil }
+        return customImages.imageIDs.first { customImages.data(for: $0) == data }
+    }
 
     private var currentSolidColor: Color? {
         if case let .solid(hex) = doc.layers.fill { return Color(hexRGB: hex) }
@@ -167,5 +263,20 @@ struct BannerBackgroundPanel: View {
         var layers = doc.layers
         layers.fill = .meshGradient(stops: stops)
         doc.layers = layers
+    }
+
+    private func uploadCustom() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url,
+              let raw = try? Data(contentsOf: url) else { return }
+        let stored = customImages.add(raw) ?? raw
+        doc.applyFillImage(stored)
+    }
+
+    private func selectCustomImage(_ id: String) {
+        guard let data = customImages.data(for: id) else { return }
+        doc.applyFillImage(data, resetFraming: false)
     }
 }

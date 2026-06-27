@@ -185,7 +185,7 @@ final class BannerDocRenderTests: XCTestCase {
         func render(focalX: Double) -> CGImage? {
             let doc = BannerDoc(canvasSize: CGSize(width: 200, height: 100),
                                 layers: BannerLayers(fill: .image))
-            doc.fillImageData = wide
+            doc.applyFillImage(wide, resetFraming: false)
             doc.fillImageFocalX = focalX
             doc.fillImageFocalY = 0.5
             return BannerDocRenderer.render(doc)
@@ -196,6 +196,26 @@ final class BannerDocRenderTests: XCTestCase {
         let leftMean = meanRed(left)
         let rightMean = meanRed(right)
         XCTAssertNotEqual(leftMean, rightMean, accuracy: 1.0, "focal shift veranderde de zichtbare crop niet")
+    }
+
+    func testImageFillCodableBackwardCompat() throws {
+        let json = """
+        {"fill":"image","texts":[],"shaders":[]}
+        """.data(using: .utf8)!
+        let layers = try JSONDecoder().decode(BannerLayers.self, from: json)
+        XCTAssertEqual(layers.fill, .image)
+    }
+
+    func testImageFillZoomProducesOpaqueOutput() {
+        guard let png = solidPNG(width: 80, height: 80, color: .systemGreen) else {
+            return XCTFail("kon PNG niet maken")
+        }
+        let doc = BannerDoc(canvasSize: CGSize(width: 200, height: 100),
+                            layers: BannerLayers(fill: .image))
+        doc.applyFillImage(png)
+        doc.fillImageZoom = 2.0
+        guard let cg = BannerDocRenderer.render(doc) else { return XCTFail("render gaf nil") }
+        XCTAssertEqual(opaqueRatio(cg), 1.0, accuracy: 0.001)
     }
 
     private func solidPNG(width: Int, height: Int, color: NSColor) -> Data? {

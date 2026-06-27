@@ -86,16 +86,27 @@ struct BannerStudioView: View {
                 )
             }
         }
-        .task(id: doc.updatedAt) { await refreshPreview() }
+        .task(id: previewRefreshKey) { await refreshPreview() }
         .onChange(of: doc.updatedAt) { _, _ in scheduleThumbnailBake() }
         .onChange(of: canvasSelection) { _, _ in Task { await refreshPreview() } }
         .onChange(of: isEditingText) { _, _ in Task { await refreshPreview() } }
-        .onChange(of: activeTool) { _, tool in
+        .onChange(of: activeTool) { old, tool in
+            if old == .text, tool != .text { finalizeEmptyText() }
             Task { await refreshPreview() }
             guard let tool else { return }
             autoSelectForTool(tool)
         }
         .onDisappear { thumbnailBakeTask?.cancel() }
+    }
+
+    private var previewRefreshKey: String {
+        let fillTag: String
+        switch doc.layers.fill {
+        case .image: fillTag = "image"
+        case .solid: fillTag = "solid"
+        case .meshGradient: fillTag = "gradient"
+        }
+        return "\(doc.updatedAt.timeIntervalSinceReferenceDate)-\(fillTag)-\(doc.fillImageData?.count ?? 0)-\(doc.fillImageFocalX)-\(doc.fillImageFocalY)-\(doc.fillImageZoom)"
     }
 
     // MARK: Top bar
@@ -153,6 +164,13 @@ struct BannerStudioView: View {
                             .scaledToFill()
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
+                        .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+                )
+                // Chrome (selectie, handles, floating toolbars + dropdowns) ligt
+                // BUITEN de clip — anders worden menu's door de banner-rand afgekapt.
                 .overlay {
                     BannerCanvasOverlay(
                         doc: doc,
@@ -165,11 +183,6 @@ struct BannerStudioView: View {
                         undoManager: undoManager
                     )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
-                        .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
-                )
                 .frame(maxWidth: 1100)
                 .shadow(color: .black.opacity(0.25), radius: 40, y: 24)
                 .padding(.horizontal, DSSpacing.gap8)
@@ -202,10 +215,9 @@ struct BannerStudioView: View {
     private func autoSelectForTool(_ tool: BannerTool) {
         switch tool {
         case .text:
-            if canvasSelection == nil, let first = doc.layers.texts.first {
-                canvasSelection = .text(first.id)
-            }
-            isEditingText = doc.layers.texts.isEmpty
+            // Elke activatie van de Text-tool plaatst één nieuwe, direct-bewerkbare
+            // tekst (Freeform-model) — canvas-tikken voegen niets meer toe.
+            addTextLayer()
         case .logo:
             if doc.layers.logo != nil { canvasSelection = .logo }
         case .background:
@@ -215,6 +227,36 @@ struct BannerStudioView: View {
         default:
             break
         }
+    }
+
+    /// Voegt een lege tekstlaag in het canvas-midden toe en opent meteen de inline
+    /// editor. Aangeroepen door de Text-toolbarknop (niet door canvas-tikken).
+    private func addTextLayer() {
+        let layer = BannerTextLayer(
+            string: "", fontSize: 50, colorHex: "#FFFFFF", alignRaw: 1, x: 0.5, y: 0.5
+        )
+        let before = doc.layers
+        var layers = doc.layers
+        layers.texts.append(layer)
+        doc.layers = layers
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Add text")
+        canvasSelection = .text(layer.id)
+        isEditingText = true
+    }
+
+    /// Ruimt een nog-lege/placeholder tekstlaag op wanneer de Text-tool verlaten
+    /// wordt zonder dat er iets is getypt.
+    private func finalizeEmptyText() {
+        guard case let .text(id) = canvasSelection,
+              let index = doc.layers.texts.firstIndex(where: { $0.id == id }),
+              BannerTextPresets.isEmptyOrPlaceholder(doc.layers.texts[index].string) else { return }
+        let before = doc.layers
+        var layers = doc.layers
+        layers.texts.remove(at: index)
+        doc.layers = layers
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+        canvasSelection = nil
+        isEditingText = false
     }
 
     // MARK: Acties

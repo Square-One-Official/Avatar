@@ -12,6 +12,7 @@ enum BannerDocUndo {
         var layers: BannerLayers
         var fillImageFocalX: Double
         var fillImageFocalY: Double
+        var fillImageZoom: Double
         var fillImageData: Data?
         var logoImageData: Data?
     }
@@ -49,6 +50,7 @@ enum BannerDocUndo {
             layers: doc.layers,
             fillImageFocalX: doc.fillImageFocalX,
             fillImageFocalY: doc.fillImageFocalY,
+            fillImageZoom: doc.fillImageZoom,
             fillImageData: doc.fillImageData,
             logoImageData: doc.logoImageData
         )
@@ -58,6 +60,7 @@ enum BannerDocUndo {
         doc.layers = snap.layers
         doc.fillImageFocalX = snap.fillImageFocalX
         doc.fillImageFocalY = snap.fillImageFocalY
+        doc.fillImageZoom = snap.fillImageZoom
         doc.fillImageData = snap.fillImageData
         doc.logoImageData = snap.logoImageData
     }

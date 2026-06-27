@@ -36,6 +36,7 @@ enum BannerDocRenderer {
             layers.fill,
             fillImageData: doc.fillImageData,
             fillImageFocal: CGPoint(x: doc.fillImageFocalX, y: doc.fillImageFocalY),
+            fillImageZoom: doc.fillImageZoom,
             size: canvas
         ) else {
             return nil
@@ -101,6 +102,7 @@ enum BannerDocRenderer {
         _ fill: BannerFill,
         fillImageData: Data?,
         fillImageFocal: CGPoint,
+        fillImageZoom: Double,
         size: CGSize
     ) -> CGImage? {
         switch fill {
@@ -111,7 +113,12 @@ enum BannerDocRenderer {
             guard let data = fillImageData, let cg = cgImage(from: data) else {
                 return try? BannerCompositor.composite(fill: .color(red: 0.11, green: 0.10, blue: 0.09), size: size)
             }
-            return try? BannerCompositor.composite(fill: .image(cg), size: size, imageFocal: fillImageFocal)
+            return try? BannerCompositor.composite(
+                fill: .image(cg),
+                size: size,
+                imageFocal: fillImageFocal,
+                imageZoom: CGFloat(fillImageZoom)
+            )
         case let .meshGradient(stops):
             return renderMesh(stops, size: size)
         }

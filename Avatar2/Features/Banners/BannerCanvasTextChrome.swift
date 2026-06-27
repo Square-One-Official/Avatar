@@ -21,9 +21,14 @@ struct BannerCanvasTextChrome: View {
     @State private var scaleDragStartSize: Double?
     @State private var scaleDragStartDistance: CGFloat?
     @State private var layersBeforeScale: BannerLayers?
+    @FocusState private var boxFocused: Bool
 
     private var layer: BannerTextLayer? {
         doc.layers.texts.first(where: { $0.id == layerID })
+    }
+
+    private var deleteEnabled: Bool {
+        activeTool == .text && !isEditing
     }
 
     var body: some View {
@@ -43,22 +48,41 @@ struct BannerCanvasTextChrome: View {
                 draftString = layer.string
                 if BannerTextPresets.isEmptyOrPlaceholder(layer.string) {
                     isEditing = true
+                } else {
+                    boxFocused = true
                 }
             }
             .onChange(of: layer.string) { _, new in
                 if !isEditing { draftString = new }
+            }
+            .onChange(of: isEditing) { _, editing in
+                if !editing { boxFocused = true }
             }
         }
     }
 
     // MARK: - Chrome
 
+    // De selectierand is óók de delete-zone: rechtermuisknop → "Delete", en
+    // ⌫/Delete-toets als hij focus heeft (na committen/selecteren, niet tijdens
+    // typen). Hit-testing alleen aan in select-modus; de move-drag blijft via de
+    // overlay-gesture lopen.
     private func selectionBox(_ rect: CGRect) -> some View {
         Rectangle()
             .strokeBorder(Color.accentColor, lineWidth: 1.5)
             .frame(width: rect.width + 8, height: rect.height + 8)
+            .contentShape(Rectangle())
+            .focusable(deleteEnabled)
+            .focusEffectDisabled()
+            .focused($boxFocused)
+            .onDeleteCommand { removeLayer() }
+            .contextMenu {
+                Button(role: .destructive) { removeLayer() } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+            .allowsHitTesting(deleteEnabled)
             .position(x: rect.midX, y: rect.midY)
-            .allowsHitTesting(false)
     }
 
     private func scaleHandle(rect: CGRect) -> some View {

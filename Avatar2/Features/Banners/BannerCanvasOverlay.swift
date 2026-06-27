@@ -51,7 +51,6 @@ struct BannerCanvasOverlay: View {
             .contentShape(Rectangle())
             .gesture(canvasGesture(layout: layout))
             .bannerCanvasDrop(isEnabled: dropEnabled, onDrop: handleDroppedImage)
-            .onDeleteCommand { deleteSelectedText() }
             .coordinateSpace(name: Self.space)
         }
     }
@@ -198,15 +197,13 @@ struct BannerCanvasOverlay: View {
         }
         switch activeTool {
         case .text:
+            // Nieuwe tekst voeg je toe via de Text-toolbarknop (BannerStudioView),
+            // niet bij elke canvas-tik. Een lege tik selecteert/deselecteert alleen.
             let hit = BannerLayoutMetrics.hitTest(at: canvasPoint, doc: doc, canvas: canvasSize)
             if hit == nil {
-                if selection != nil {
-                    finalizeSelectedTextLayer()
-                    selection = nil
-                    isEditingText = false
-                } else {
-                    addText(at: canvasPoint)
-                }
+                finalizeSelectedTextLayer()
+                selection = nil
+                isEditingText = false
             } else if case let .text(id) = hit {
                 selection = .text(id)
                 isEditingText = true
@@ -241,39 +238,7 @@ struct BannerCanvasOverlay: View {
         BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
     }
 
-    private func deleteSelectedText() {
-        guard case let .text(id) = selection else { return }
-        let before = doc.layers
-        var layers = doc.layers
-        layers.texts.removeAll { $0.id == id }
-        guard layers != before else { return }
-        doc.layers = layers
-        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
-        selection = nil
-        isEditingText = false
-    }
-
     // MARK: Mutations
-
-    private func addText(at canvasPoint: CGPoint) {
-        let before = doc.layers
-        let nx = min(1, max(0, canvasPoint.x / canvasSize.width))
-        let ny = min(1, max(0, canvasPoint.y / canvasSize.height))
-        let layer = BannerTextLayer(
-            string: "",
-            fontSize: 50,
-            colorHex: "#FFFFFF",
-            alignRaw: 1,
-            x: nx,
-            y: ny
-        )
-        var layers = doc.layers
-        layers.texts.append(layer)
-        doc.layers = layers
-        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Add text")
-        selection = .text(layer.id)
-        isEditingText = true
-    }
 
     private func addLogo(at canvasPoint: CGPoint, picked prePicked: PickedImage? = nil) {
         guard let picked = prePicked ?? BannerNativePanels.pickImage(maxSide: 1024) else { return }
@@ -330,14 +295,10 @@ struct BannerCanvasOverlay: View {
     }
 
     private func applyBackgroundImage(_ picked: PickedImage, actionName: String) {
+        let stored = BackgroundImageKit.shared.add(picked.data) ?? picked.data
         let before = BannerDocUndo.snapshot(of: doc)
-        doc.fillImageData = picked.data
-        doc.fillImageFocalX = 0.5
-        doc.fillImageFocalY = 0.5
+        doc.applyFillImage(stored)
         backgroundFilename = picked.filename
-        var layers = doc.layers
-        layers.fill = .image
-        doc.layers = layers
         let after = BannerDocUndo.snapshot(of: doc)
         BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: actionName)
         selection = .backgroundFill
@@ -368,6 +329,7 @@ struct BannerCanvasOverlay: View {
         let dy = (canvasPoint.y - origin.y) / canvasSize.height
         doc.fillImageFocalX = min(1, max(0, start.fillImageFocalX - dx * 0.6))
         doc.fillImageFocalY = min(1, max(0, start.fillImageFocalY - dy * 0.6))
+        doc.touch()
     }
 
     private func endDrag() {
