@@ -100,7 +100,10 @@ struct HomeView: View {
                         }
                     }
 
-                    bannersSection
+                    // Banners-sectie achter de feature-flag (release zonder banners).
+                    if AppFeatureFlags.bannersEnabled {
+                        bannersSection
+                    }
                 }
                 .padding(.horizontal, DSSpacing.gap6)
                 // Extra bottom padding so last row isn't hidden behind the floating button.
@@ -112,7 +115,8 @@ struct HomeView: View {
                 .padding(.bottom, DSSpacing.gap5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task { await presetsModel.load() }
+        // CMS-banner-presets alleen laden als de Banners-suite aan staat.
+        .task { if AppFeatureFlags.bannersEnabled { await presetsModel.load() } }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
         .portraitContextMenuOverlay(
             target: $menuTarget,
@@ -270,7 +274,7 @@ struct HomeView: View {
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 ZStack(alignment: .bottomLeading) {
-                    PortraitComposite(portrait: portrait, maxDimension: 600)
+                    PortraitCompositeMeasured(portrait: portrait)
 
                     LinearGradient(
                         colors: [.clear, .black.opacity(0.55)],

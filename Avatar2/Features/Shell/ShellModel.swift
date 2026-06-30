@@ -118,8 +118,20 @@ final class ShellModel {
     func toggleLeftNav() { isLeftNavVisible.toggle() }
     func togglePortraitsExpanded() { isPortraitsExpanded.toggle() }
 
+    func closeBannerStudio() {
+        isShowingBannerPreview = false
+        editingBanner = nil
+    }
+
+    /// Sluit de Banner Studio bij shell-navigatie (sidebar, portret openen, …).
+    private func leaveBannerStudioIfOpen() {
+        guard editingBanner != nil else { return }
+        closeBannerStudio()
+    }
+
     /// Naar het overzicht (Home).
     func showHome() {
+        leaveBannerStudioIfOpen()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -128,6 +140,7 @@ final class ShellModel {
 
     /// Naar de Portraits-grid van een map (nil = alle beelden).
     func showPortraits(folderID: PersistentIdentifier? = nil) {
+        leaveBannerStudioIfOpen()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -137,6 +150,11 @@ final class ShellModel {
 
     /// E35.2: naar de Banners-bibliotheek.
     func showBanners() {
+        // Banners-suite achter een feature-flag (release zonder banners). Geen
+        // navigatie naar de bibliotheek zolang de flag uit staat; alle UI-entry
+        // points zijn al verborgen, dit is de vangnet-guard.
+        guard AppFeatureFlags.bannersEnabled else { showHome(); return }
+        leaveBannerStudioIfOpen()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -146,45 +164,59 @@ final class ShellModel {
     /// E37.2: de Banner Studio is een venster-niveau-overlay (zoals de
     /// social-preview), gekoppeld aan het te bewerken `BannerDoc`. nil = dicht.
     var editingBanner: BannerDoc?
-    func openBannerStudio(_ doc: BannerDoc) { editingBanner = doc }
-    func closeBannerStudio() { editingBanner = nil }
+    /// Banner-preview-modus (Edit · Preview in de shell-topbar).
+    var isShowingBannerPreview = false
+
+    enum BannerOpenOrigin: Equatable { case home, banners }
+    private(set) var bannerOpenOrigin: BannerOpenOrigin = .banners
+
+    func openBannerStudio(_ doc: BannerDoc) {
+        // Vangnet-guard: zonder de banners-flag opent de Studio niet, ook niet
+        // via een achtergebleven preset-/dup-pad. `editingBanner` blijft nil,
+        // dus de ShellView-studio-takken blijven onbereikbaar.
+        guard AppFeatureFlags.bannersEnabled else { return }
+        bannerOpenOrigin = (section == .banners) ? .banners : .home
+        isShowingBannerPreview = false
+        editingBanner = doc
+    }
+
+    /// Terug vanuit de Banner Studio naar de herkomst-surface.
+    func goBackFromBanner() {
+        switch bannerOpenOrigin {
+        case .home: showHome()
+        case .banners: showBanners()
+        }
+    }
+
+    var canExportBanner: Bool { editingBanner != nil }
+    var canPreviewBanner: Bool { editingBanner != nil }
+
+    func exportCurrentBanner(isPro: Bool) {
+        guard let doc = editingBanner else { return }
+        Task { @MainActor in
+            await BannerExport.presentSavePanel(doc: doc, isPro: isPro)
+        }
+    }
 
     /// Waar de editor vandaan geopend is — bepaalt waar "terug" (breadcrumb /
     /// back-chevron) naartoe keert.
     enum OpenOrigin: Equatable { case home; case portraits(PersistentIdentifier?) }
     private(set) var openOrigin: OpenOrigin = .home
 
-    /// Hero-morph: het portret dat NU van tegel → editor-canvas morpht. De tegel
-    /// (bron) en de korte editor-overlay (bestemming) delen via dit id één
-    /// `matchedGeometryEffect`. nil = geen morph bezig (de overlay is dan weg en de
-    /// editor staat kaal). Gezet bij `openPortrait`, gewist door de view zodra de
-    /// morph is geland (`clearHeroMorph`). Bij reduce-motion blijft het nil → kale
-    /// fade. Zie [[HeroMorph]].
-    private(set) var heroMorphID: PersistentIdentifier?
-
-    /// De view heeft de morph laten landen → overlay weg (crossfade naar de echte
-    /// editor). Idempotent.
-    func clearHeroMorph() { heroMorphID = nil }
-
     /// Open één portret in de editor (vanuit Home of een map-grid). Onthoudt de
     /// herkomst zodat `goBack()` naar de juiste surface terugkeert.
     func openPortrait(_ portrait: Portrait2) {
+        leaveBannerStudioIfOpen()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
         openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
-        // Hero-morph alleen vanaf de Portraits-surface (daar staan de tegels die
-        // de bronrect leveren) en niet bij reduce-motion.
-        heroMorphID = (section == .portraits && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
-            ? portrait.persistentModelID : nil
         select(portrait)
         section = .editor
     }
 
     /// Terug vanuit de editor naar de herkomst-surface (Home of Portraits+map).
     func goBack() {
-        // Back-nav houdt (eerste versie) de bestaande fade — geen reverse-hero.
-        heroMorphID = nil
         switch openOrigin {
         case .home: showHome()
         case .portraits(let folderID): showPortraits(folderID: folderID)
@@ -255,6 +287,13 @@ final class ShellModel {
     /// weergave als view-state; de topbar (quota + gear) blijft staan.
     /// Gear toggelt, Esc sluit.
     var isShowingSettings = false
+    var settingsPage: SettingsPage = .preferences
+
+    func openSettings(page: SettingsPage) {
+        leaveBannerStudioIfOpen()
+        settingsPage = page
+        isShowingSettings = true
+    }
 
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
     var isShowingExport = false
@@ -313,6 +352,7 @@ final class ShellModel {
             isShowingSettings = true
             if args.indices.contains(i + 1),
                let page = SettingsPage(rawValue: args[i + 1]) {
+                settingsPage = page
                 SettingsRootView.debugInitialPage = page
             }
         }
@@ -429,36 +469,36 @@ final class ShellModel {
     /// het model — beide moeten dus mee, anders blijft de oude foto staan.
     /// E24.14: destructieve ops bewerken de RAUWE cutout; de Adjust-laag blijft
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
-    func applyEffectResult(_ image: NSImage, preserveSourceAlpha: Bool = false) {
+    func applyEffectResult(_ image: NSImage, preserveSourceAlpha: Bool = false) async {
         guard let portrait = selectedPortrait else {
             setCanvas(.result(image))
             return
         }
-        // E24.30: een generatieve stylize (nano-banana) levert een VOL beeld
-        // mét achtergrond → de alpha is weg. Was de bron vrijstaand (transparante
-        // hoeken op de huidige cutout) én heeft het resultaat een dichte
-        // achtergrond (opake hoeken) → isoleer het onderwerp opnieuw zodat de
-        // transparantie terugkomt. Niet-genererende ops (flip/enhance/boost)
-        // behouden hun alpha → resultaat al transparant → geen her-isolatie.
-        let sourceFreestanding = Self.hasTransparentCorners(NSImage(data: portrait.cutoutData))
-        let resultHasBackground = !Self.hasTransparentCorners(image)
-        if sourceFreestanding && resultHasBackground {
-            Task { @MainActor in
-                let restored: NSImage
-                if preserveSourceAlpha,
-                   let cutout = NSImage(data: portrait.cutoutData),
-                   let masked = Self.applyAlphaMask(from: cutout, to: image) {
-                    // Effects/face-edits veranderen uiterlijk maar niet de vorm →
-                    // gebruik de huidige cutout-alpha als masker i.p.v. Vision
-                    // opnieuw te draaien op een geschilderd/artistiek beeld.
-                    restored = masked
-                } else {
-                    restored = (try? await self.reIsolateSubject(image)) ?? image
-                }
-                self.storeEffectResult(restored, on: portrait)
+        if preserveSourceAlpha {
+            // Face-edits: vorm blijft gelijk, Vision op een gestyled gezicht is
+            // onbetrouwbaar → hergebruik de bestaande alpha-laag.
+            let sourceFreestanding = Self.hasTransparentCorners(NSImage(data: portrait.cutoutData))
+            let resultHasBackground = !Self.hasTransparentCorners(image)
+            if sourceFreestanding && resultHasBackground,
+               let cutout = NSImage(data: portrait.cutoutData),
+               let masked = Self.applyAlphaMask(from: cutout, to: image) {
+                storeEffectResult(masked, on: portrait)
+                return
             }
-        } else {
             storeEffectResult(image, on: portrait)
+            return
+        }
+
+        // Generatieve stylize (effects/haar/kleding): server flattenOnGrey → opaque
+        // RGB terug. Her-isoleer tenzij het resultaat al een echte cutout is
+        // (boost/flip/enhance behouden alpha). Alleen hoeken checken faalt wanneer
+        // haar tot de rand loopt (bron) of het model transparante hoeken maar een
+        // grijze matte rond het onderwerp teruggeeft.
+        if Self.isLikelyCutout(image) {
+            storeEffectResult(image, on: portrait)
+        } else {
+            let restored = (try? await reIsolateSubject(image)) ?? image
+            storeEffectResult(restored, on: portrait)
         }
     }
 
@@ -548,6 +588,29 @@ final class ShellModel {
                 }
             }
         }
+        if !didReset,
+           let oldCG,
+           let finalCG = stored.cgImage(forProposedRect: nil, context: nil, hints: nil),
+           finalCG.width == oldCG.width, finalCG.height == oldCG.height,
+           let oldC = ShellModel.alphaCentroid(of: oldCG),
+           let newC = ShellModel.alphaCentroid(of: finalCG) {
+            let layoutScale: Double
+            if portrait.scale > 0 {
+                layoutScale = portrait.scale
+            } else {
+                let fit = AutoFramer.resolvedTransform(
+                    offsetX: 0, offsetY: 0, scale: 0,
+                    cutoutSize: CGSize(width: oldCG.width, height: oldCG.height)
+                )
+                layoutScale = Double(fit.scale)
+            }
+            if let delta = ShellModel.placementOffsetCompensation(
+                oldCentroid: oldC, newCentroid: newC, scale: layoutScale
+            ) {
+                portrait.offsetX += delta.dx
+                portrait.offsetY += delta.dy
+            }
+        }
         if let png = stored.pngData() {
             portrait.cutoutData = png
             portrait.touch()
@@ -628,6 +691,46 @@ final class ShellModel {
                        cornerAlpha(0, h - 1), cornerAlpha(w - 1, h - 1)]
         // vrijstaand als minstens 3 van de 4 hoeken (bijna) transparant zijn
         return corners.filter { $0 < 16 }.count >= 3
+    }
+
+    /// Sterkere cutout-check voor generatieve stylize-resultaten: transparante
+    /// hoeken plus een overwegend transparante buitenrand (geen grijze matte).
+    nonisolated static func isLikelyCutout(_ image: NSImage?) -> Bool {
+        guard hasTransparentCorners(image),
+              let image,
+              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return false
+        }
+        let w = cg.width, h = cg.height
+        guard w > 4, h > 4 else { return false }
+        let inset = max(1, min(w, h) / 20)
+        let stride = max(1, min(w, h) / 24)
+        var transparent = 0, total = 0
+        func sample(_ x: Int, _ y: Int) {
+            var pixel: [UInt8] = [0, 0, 0, 0]
+            guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+                  let ctx = CGContext(
+                    data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                    space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else { return }
+            ctx.interpolationQuality = .none
+            ctx.draw(cg, in: CGRect(x: -x, y: -(h - 1 - y), width: w, height: h))
+            total += 1
+            if pixel[3] < 16 { transparent += 1 }
+        }
+        var y = 0
+        while y < h {
+            var x = 0
+            while x < w {
+                if x < inset || x >= w - inset || y < inset || y >= h - inset {
+                    sample(x, y)
+                }
+                x += stride
+            }
+            y += stride
+        }
+        guard total > 0 else { return false }
+        return Double(transparent) / Double(total) >= 0.45
     }
 
     /// E22.3: goedkope live-preview voor de color-sliders — alléén het canvas,
@@ -789,14 +892,13 @@ final class ShellModel {
         isSidebarVisible = true
     }
 
-    /// Smoke-haak (hero-morph): drill vanaf de Portraits-grid in het jongste
-    /// portret zodat de tegel→canvas-morph deterministisch speelt voor de capture.
+    /// Smoke-haak: drill vanaf de Portraits-grid in het jongste portret.
     func debugDrillIntoFirstPortrait() {
         guard let modelContext else { return }
         var fd = FetchDescriptor<Portrait2>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
         fd.fetchLimit = 1
         guard let first = try? modelContext.fetch(fd).first else { return }
-        section = .portraits  // herkomst = Portraits → de hero-morph vuurt
+        section = .portraits
         openPortrait(first)
     }
     #endif

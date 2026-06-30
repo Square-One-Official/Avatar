@@ -50,7 +50,9 @@ struct BackgroundPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             section("Background") { backgroundModeRow }
             section("Image") { imageRow }
-            if !savedBanners.isEmpty {
+            // E40: een gemaakte banner als achtergrond — achter de feature-flag
+            // (release zonder banners).
+            if AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
                 section("Banners") { bannersRow }
             }
             ForEach(cmsCategories, id: \.self) { cat in
@@ -247,6 +249,16 @@ struct BackgroundPanel: View {
             }
             .buttonStyle(.plain)
             .dsHoverScale()
+
+            GenerateBackgroundSwatch(
+                context: .portrait,
+                entitlement: entitlement,
+                swatchSize: swatch,
+                onSaved: { data in
+                    let stored = customImages.add(data) ?? data
+                    apply(.image(stored))
+                }
+            )
 
             // E24.24: persistente custom-uploads als herbruikbare swatches.
             ForEach(customImages.imageIDs, id: \.self) { id in

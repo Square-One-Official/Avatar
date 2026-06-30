@@ -17,8 +17,8 @@ struct LeftNavView: View {
     /// Breedte in lijn met Granola; iets smaller dan de oude set-sidebar.
     static let width: CGFloat = 236
     static let edgeInset: CGFloat = ShellMetrics.windowEdgeInset
-    /// Totale breedte van de sidebar-slot (kaart + horizontale inset-padding).
-    static var layoutWidth: CGFloat { width + edgeInset * 2 }
+    /// Totale breedte van de sidebar-slot (kaart + leading inset).
+    static var layoutWidth: CGFloat { width + edgeInset }
     /// Breedte van de vaste chrome-strook t.o.v. de vensterrand (leading inset + kaart).
     static var chromeRevealWidth: CGFloat { width + edgeInset }
 
@@ -60,13 +60,16 @@ struct LeftNavView: View {
 
                     portraitsSection
 
-                    // E35.2: Banners-bibliotheek (herbruikbare covers).
-                    LeftNavRow(
-                        icon: Image(systemName: "rectangle.on.rectangle.angled"),
-                        title: "Banners",
-                        isSelected: model.section == .banners && !model.isShowingSettings
-                    ) {
-                        model.showBanners()
+                    // E35.2: Banners-bibliotheek (herbruikbare covers). Verborgen
+                    // achter de feature-flag (release zonder banners).
+                    if AppFeatureFlags.bannersEnabled {
+                        LeftNavRow(
+                            icon: Image(systemName: "rectangle.on.rectangle.angled"),
+                            title: "Banners",
+                            isSelected: model.section == .banners && !model.isShowingSettings
+                        ) {
+                            model.showBanners()
+                        }
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap2)
@@ -88,17 +91,11 @@ struct LeftNavView: View {
         }
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        // Inset kaart (E03.15): dunne marge t.o.v. vensterrand op links/boven/
-        // onder; rechts dezelfde gap naar de content (ShellView padding).
+        // Inset kaart: dunne marge links + boven/onder via ShellView; rechts flush
+        // op de content-kolom. macOS floating-panel hoekradius.
         .background(DSColor.Background.card)
         .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: DSRadius.concentric(inset: Self.edgeInset),
-                bottomTrailingRadius: DSRadius.concentric(inset: Self.edgeInset),
-                topTrailingRadius: 0,
-                style: .continuous
-            )
+            RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
         )
         .overlay {
             if showUserMenu {
@@ -407,6 +404,7 @@ private struct LeftNavExpandableHeader: View {
                 Text(title)
                     .dsTextStyle(.labelBase)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 

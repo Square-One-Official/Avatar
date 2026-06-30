@@ -27,13 +27,11 @@ struct SocialPreviewView: View {
         ZStack(alignment: .top) {
             DSColor.Background.app
                 .ignoresSafeArea(edges: [.horizontal, .bottom])
-                .padding(.top, ShellMetrics.topBarBandHeight)
 
             VStack(spacing: 0) {
                 header
                 previewArea
             }
-            .padding(.top, ShellMetrics.topBarBandHeight)
 
             pickerOverlay
         }
@@ -138,10 +136,14 @@ struct SocialPreviewView: View {
             bannerFill = nil
             return
         }
-        avatarImage = PortraitExporter
-            .makePNG(for: portrait, watermark: false, side: 512, shape: .circle)
+        avatarImage = await PortraitExporter
+            .makePNGAsync(for: portrait, watermark: false, side: 512, shape: .circle)
             .flatMap(NSImage.init(data:))
-        bannerFill = BannerResolver.fill(for: portrait)
+        // Zonder de Banners-suite matcht de banner altijd de portret-achtergrond
+        // (geen eigen banner-keuze meer); anders volgt 'ie de keuze van het portret.
+        bannerFill = AppFeatureFlags.bannersEnabled
+            ? BannerResolver.fill(for: portrait)
+            : BannerResolver.fill(for: portrait, banner: .matchPortrait)
     }
 
     private func applyBanner(_ banner: BannerBackground) {
@@ -157,7 +159,14 @@ struct SocialPreviewView: View {
 
     private func saveBanner(_ platform: SocialPlatform) {
         guard let portrait else { return }
-        let data = PortraitExporter.makeBannerPNG(for: portrait, platform: platform, watermark: !isPro)
+        // Bij uitgeschakelde Banners-suite exporteert "Save banner" altijd de
+        // portret-achtergrond (match), ongeacht een eventueel opgeslagen keuze.
+        let data = PortraitExporter.makeBannerPNG(
+            for: portrait,
+            platform: platform,
+            watermark: !isPro,
+            banner: AppFeatureFlags.bannersEnabled ? nil : .matchPortrait
+        )
         save(data, defaultName: "Aaavatar-\(platform.rawValue)-cover.png")
     }
 

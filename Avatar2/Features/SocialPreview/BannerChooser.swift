@@ -101,7 +101,17 @@ struct BannerPickerPanel: View {
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
 
-            BannerPickerContent(portrait: portrait, onApply: onApply)
+            if AppFeatureFlags.bannersEnabled {
+                // Volledige kiezer: match-avatar of een opgeslagen banner.
+                BannerPickerContent(portrait: portrait, onApply: onApply)
+            } else {
+                // Release zonder Banners-suite: geen maken/kiezen meer — de banner
+                // matcht de portret-achtergrond en kan alleen geëxporteerd worden.
+                Text("This banner matches your portrait background.")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if platform.hasCover {
                 DSPrimaryButton("Save \(platform.displayName) banner", fullWidth: true) {
