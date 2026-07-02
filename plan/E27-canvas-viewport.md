@@ -490,9 +490,19 @@ board-frame in Figma — node-kaart, spacing, lege-staat, modus-toggle en fit-ge
 Figma-referentie leggen vóór fase 3.
 
 ## 27.9 — Muiswiel: hasPreciseScrollingDeltas correct schalen · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
+
+**Result:** `CanvasInteractionCatcher` schaalt scroll-deltas nu per apparaat:
+trackpad (`hasPreciseScrollingDeltas`) blijft 1:1 (punten, gedrag ongewijzigd);
+muiswiel-line-deltas gaan ×`mouseWheelLineHeight` (24, binnen de plan-band
+20–40) voor pan én ⌘-scroll-zoom. De wiel-zoomfactor is geclampt op
+0.75–1.33/event zodat macOS-scroll-versnelling de zoom niet laat springen. De
+schaling leeft als pure statics (`scrollPanDelta`/`scrollZoomFactor`) op
+`CanvasInteractionCatcher`, gedekt door `Avatar2Tests/CanvasScrollScalingTests`
+(5 tests). Geldt automatisch voor editor én board (gedeelde catcher). Beide
+targets bouwen; AvatarKit (62) + AvatarUI (37) + Avatar2Tests groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C2).
 **Wat:** `CanvasInteractionCatcher.swift:100-113` behandelt elke scroll-delta als
