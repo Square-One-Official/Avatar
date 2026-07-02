@@ -619,7 +619,11 @@ struct GenerateBackgroundSwatch: View {
         guard let entitlement else { return }
         switch PrivacyPreferences2.shared.effectiveTier {
         case .onDevice:
+            // Zelfde gedrag als `ManageBackgroundsSheet.openGenerate`: de
+            // allowAIFeature-call toont de elevation-modal — dan NIET ook nog
+            // de generate-sheet openen (E49.2; dubbele modal-bug).
             _ = entitlement.allowAIFeature(.backgroundGenerate)
+            return
         case .appleCloud:
             guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
         case .thirdParty:

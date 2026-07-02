@@ -36,7 +36,7 @@ een aparte story per regel te hoeven claimen.
 **Result:** ✅ `PortraitHeader.swift` verwijderd + gederegistreerd (xcodegen, scheme-/Package.resolved-churn teruggedraaid); ✅ `EditorTool.dsSymbol` weg; ✅ `EditorTool.pendingStory` weg + stub-copy zonder story-nummers ("… tools are unavailable right now.", `EditorToolTests` mee); ✅ onbereikbare `canvasPanel(.background)`-tak weg (Background blijft via de `CanvasActionToolbar`-dropdown); ✅ stale ⌘=-comment bij `zoomCamera` herschreven naar de huidige View-menu/CanvasZoomEqualsShortcut-route (E27.10 had de verborgen knoppen al geschrapt); ✅ `Folder2.order`/`colorHex` weg (schrijf-sites LeftNavView/PortraitContextMenu/SmokeSeed mee-opgeschoond; lichte migratie, velden werden nergens gelezen); ✅ `ImagePlaygroundEntryButton` (+ private Available-struct, ongebruikte imports) weg — `ImagePlaygroundEntry.pngData` blijft (3 call-sites); ✅ `ThumbnailStore.invalidate()` no-op weg incl. alle 10 call-sites/cache-captures in BoardView; ☑︎ `OnboardingModel.finishSignedIn()` — reeds gedaan door E04.8 (0 hits). build-v2.sh volledig groen (Avatar + Avatar2 build, Avatar2-testsuite, AvatarKit- en AvatarUI-packagetests).
 
 ## 49.2 — Kleine UX-consistentie [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -59,6 +59,7 @@ een aparte story per regel te hoeven claimen.
   succesbevestiging (`OnboardingOTPView.swift:36-44`, `OnboardingEmailView.swift:40-44`)
   — naar `DSColor.Signal.error` + `DSValidationState.error`, in lijn met SignInSheet.
 **DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ export-/share-naam volgt `portrait.name` (sanitized, lege naam → oude "Aaavatar-portrait"-fallback) in ExportSheet; ✅ bulk-export op `makePNGAsync` (render off-main) + batch-dedupe `-2`/`-3` (case-insensitive) i.p.v. stil overschrijven; ✅ privacy-/terms-URL's naar één `AppLinks`-constante (`/privacy-policy` is live, `/privacy` was 404 — Settings/About gefixt; PaywallSheet + OnboardingEmailView mee); ✅ ⌘U app-breed als File-menu-command (`UploadPortraitCommands` + focused-scene-value uit ShellView, zelfde patroon als SettingsCommands/CanvasZoomCommands; view-scoped shortcut van de Home-knop af, ⌘U-badge blijft); ✅ `GenerateBackgroundSwatch.openSheet` `.onDevice`-tak kreeg de missende `return` (geen elevation-modal + sheet tegelijk meer, gelijk aan `ManageBackgroundsSheet.openGenerate`); ✅ onboarding-fouten in `DSColor.Signal.error` + veld-validation `.error` (OnboardingEmailView/OnboardingOTPView, in lijn met SignInSheet; resend-bevestiging blijft subtle); ✅ follow-ups: "Restore body"→"Fill in body" (AIFeatureRegistry.uiLabel + PrivacyFeatureMatrix) en dev-label "Fill body"→"Fill in body" (DevModelOverrides). build-v2.sh volledig groen.
 
 ## 49.3 — Perf-restjes [AI]
 - status: ready

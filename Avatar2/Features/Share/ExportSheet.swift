@@ -182,10 +182,18 @@ struct ExportSheet: View {
         PortraitExporter.makePNG(for: portrait, watermark: watermark, side: size, shape: shape)
     }
 
+    /// Export-/share-bestandsnaam op basis van de portretnaam (zoals de
+    /// bulk-export); lege naam valt terug op het oude "Aaavatar-portrait".
+    private var exportFileName: String {
+        let trimmed = portrait.name.trimmingCharacters(in: .whitespaces)
+        let base = trimmed.isEmpty ? "Aaavatar-portrait" : trimmed.replacingOccurrences(of: "/", with: "-")
+        return base + ".png"
+    }
+
     private func share() {
         guard let data = data() else { return }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Aaavatar-portrait.png")
+            .appendingPathComponent(exportFileName)
         try? data.write(to: url)
         // Sheet NIET sluiten: de native picker is verankerd aan de Share-knop;
         // de sheet wegtrekken zou ook de picker meenemen (de oude bug).
@@ -196,7 +204,7 @@ struct ExportSheet: View {
         guard let data = data() else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "Aaavatar-portrait.png"
+        panel.nameFieldStringValue = exportFileName
         if panel.runModal() == .OK, let url = panel.url {
             try? data.write(to: url)
         }

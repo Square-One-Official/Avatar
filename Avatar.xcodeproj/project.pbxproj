@@ -242,6 +242,7 @@
 		B8FF564CD5FA186B77A96C95 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */; };
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
+		C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE640D635F259A76EC318FDB /* AppLinks.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
 		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
 		C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9329E36279558288146B065 /* ExportSheet.swift */; };
@@ -260,6 +261,7 @@
 		CE49AA0F4C494B5D4D81E589 /* AutoFramerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DD51E68A2A1951BA1990DD /* AutoFramerTests.swift */; };
 		CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */ = {isa = PBXBuildFile; productRef = 7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */; };
 		CF614D480B6F6CC84CA59412 /* AIPrivacyTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E95FDC855FE9663A7F6421E /* AIPrivacyTier.swift */; };
+		CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */; };
 		CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE27586F91E9706E71610E7 /* FaceActionsPanel.swift */; };
 		D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */; };
 		D10DD1DAD674FDF2DFD2FD11 /* OutOfCreditsToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F87925CBE72ABD8237FF3 /* OutOfCreditsToast.swift */; };
@@ -400,6 +402,7 @@
 		41C70EB846E92A3FCDD00E5C /* LibraryBreadcrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBreadcrumb.swift; sourceTree = "<group>"; };
 		42425F916AF8200C81E49949 /* EntitlementModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModel.swift; sourceTree = "<group>"; };
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
+		44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadPortraitCommand.swift; sourceTree = "<group>"; };
 		46B2F1C093D7657D24C28653 /* BannerCanvasDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasDrop.swift; sourceTree = "<group>"; };
 		48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairPanel.swift; sourceTree = "<group>"; };
 		48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformOverlay.swift; sourceTree = "<group>"; };
@@ -509,6 +512,7 @@
 		A7F4BBC106F461A04908F03F /* PrivacyGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyGateTests.swift; sourceTree = "<group>"; };
 		ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTextPanel.swift; sourceTree = "<group>"; };
 		AE3A8D0A82AF96EE53F5E3EE /* BannerCanvasChromeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasChromeMetrics.swift; sourceTree = "<group>"; };
+		AE640D635F259A76EC318FDB /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTypeToEditTests.swift; sourceTree = "<group>"; };
 		B313E53EBD6AC732524D4690 /* ImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
 		B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingStatusView.swift; sourceTree = "<group>"; };
@@ -657,6 +661,7 @@
 		25450612C0A547C1E86969AE /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				AE640D635F259A76EC318FDB /* AppLinks.swift */,
 				104DC6671647D23FFB03532A /* RemoteThumbnail.swift */,
 				DD5144A00B0FE56D48BFED3B /* ThumbnailRenderer.swift */,
 				3E381F6622B4D1F0E8B88A50 /* ThumbnailStore.swift */,
@@ -1016,6 +1021,7 @@
 				9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */,
 				390524875FAE18DD4A1A916F /* ShellView.swift */,
 				3309483DB7C17688EECFF2A9 /* SmokeSeed.swift */,
+				44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -1342,6 +1348,7 @@
 				CF614D480B6F6CC84CA59412 /* AIPrivacyTier.swift in Sources */,
 				37DBE53613C79814FFD858A2 /* AdjustUndo.swift in Sources */,
 				A9D2A5FF7F46FFDDE4D8FE4C /* AppFeatureFlags.swift in Sources */,
+				C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */,
 				90B4834B1029881FE5011BEE /* AppleBackgroundPlaygroundModifier.swift in Sources */,
 				E37BDB111105A44AA7F0BDA5 /* AppleIntelligenceAvailability.swift in Sources */,
 				183E736C6ADAF26009FAB576 /* AppleIntelligenceAvailabilityRefresh.swift in Sources */,
@@ -1481,6 +1488,7 @@
 				31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */,
 				1516320AF8E8CED7840BCEAD /* URL+ExternalScheme.swift in Sources */,
 				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
+				CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */,
 				98AB53571B09A54CAC6D4E9F /* WindowAppearance.swift in Sources */,
 				95CD3DA3494929EBD52C9510 /* WorkingToastView.swift in Sources */,
 			);

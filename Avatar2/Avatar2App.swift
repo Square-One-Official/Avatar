@@ -219,6 +219,11 @@ struct Avatar2App: App {
                 Divider()
                 CanvasZoomCommands()
             }
+            // E49.2: ⌘U app-breed in het File-menu (werkt ook op board/editor);
+            // zelfde focused-scene-value-patroon als SettingsCommands hierboven.
+            CommandGroup(after: .newItem) {
+                UploadPortraitCommands()
+            }
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         // PoC (left-nav): Folder2 voor de Portraits-galerij, E35.1: Banner2 voor de

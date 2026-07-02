@@ -17,7 +17,7 @@ public enum DevModelFeature: String, CaseIterable, Sendable {
         switch self {
         case .cutout: return "Cut out"
         case .colorize: return "Colorize"
-        case .fillBody: return "Fill body"
+        case .fillBody: return "Fill in body"
         case .stylize: return "Generative (style/clothes/hair)"
         case .generateBackground: return "Generate background"
         }
