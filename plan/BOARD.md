@@ -20,7 +20,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | Epic | Team | Status |
 |------|------|--------|
 | [E01 Fundament](E01-fundament.md) | INFRA | **done** (1.1–1.15) |
-| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.4); **2.5 ready**, 2.6 backlog (audit-fix: kleurruimte-import + randkwaliteit) |
+| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); 2.6 backlog (audit-fix: randkwaliteit lage resolutie) |
 | [E03 Design system](E03-design-system.md) | DS | **done** (3.1–3.19) |
 | [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.7); **4.8 ready** (audit-fix: privacystap ingelogd pad) |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | **done** (5.1–5.8) |
