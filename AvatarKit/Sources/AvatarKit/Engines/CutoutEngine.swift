@@ -1,15 +1,15 @@
 import CoreGraphics
 import Foundation
 
-/// De drie cutout-paden uit de 1.x-pipeline. Volgorde = voorkeursvolgorde
-/// van de router wanneer geen expliciete keuze is gemaakt.
+/// De on-device cutout-paden. Volgorde = voorkeursvolgorde van de router
+/// wanneer geen expliciete keuze is gemaakt. (Het oude Replicate/cloud-pad is
+/// vervallen: cutout draait altijd on-device — Vision = "Regular quality",
+/// ORMBG = "High quality".)
 public enum CutoutEngineKind: String, CaseIterable, Sendable {
-    /// Apple Vision person-segmentation (on-device, default).
+    /// Apple Vision person-segmentation (on-device, default — "Regular quality").
     case vision
-    /// Gedownload ORMBG-model (on-device, opt-in download).
+    /// Gedownload ORMBG-model (on-device, opt-in download — "High quality").
     case ormbg
-    /// Replicate cloud (`men1scus/birefnet`), Pro-pad.
-    case replicate
 }
 
 /// Eén achtergrond-verwijder-engine. Implementaties komen in E02

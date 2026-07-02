@@ -24,15 +24,24 @@ final class StylizeQualityTests: XCTestCase {
         XCTAssertFalse(StylizeQuality.isLowResolution(solidImage(w: 1536, h: 2048)))
     }
 
-    func testPostBoostOfferedWhenResultSmallerThanCutout() {
-        let cutout = solidImage(w: 1600, h: 2400)
-        let result = solidImage(w: 832, h: 1248)
-        XCTAssertTrue(StylizeQuality.shouldOfferPostBoost(result: result, cutoutBefore: cutout))
+    func testSoftSourcePromptRequestedForLowResSource() {
+        XCTAssertTrue(StylizeQuality.requestsSoftSourcePrompt(for: solidImage(w: 800, h: 600)))
     }
 
-    func testPostBoostNotOfferedWhenResultMatchesCutout() {
-        let cutout = solidImage(w: 832, h: 1248)
-        XCTAssertFalse(StylizeQuality.shouldOfferPostBoost(result: cutout, cutoutBefore: cutout))
+    func testSoftSourcePromptNotRequestedForSharpSource() {
+        XCTAssertFalse(StylizeQuality.requestsSoftSourcePrompt(for: solidImage(w: 1536, h: 2048)))
+    }
+
+    func testDefaultEffectsSourceCutoutWithoutOriginalBackground() {
+        let portrait = Portrait2(cutoutData: Data([1]))
+        portrait.useOriginalBackground = false
+        XCTAssertEqual(StylizeQuality.defaultEffectsSourceChoice(portrait: portrait), .cutout)
+    }
+
+    func testDefaultEffectsSourceOriginalWhenOriginalBackground() {
+        let portrait = Portrait2(cutoutData: Data([1]))
+        portrait.useOriginalBackground = true
+        XCTAssertEqual(StylizeQuality.defaultEffectsSourceChoice(portrait: portrait), .original)
     }
 
     func testBlurDetectionDisabledByDefault() {

@@ -17,7 +17,7 @@ gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
   --title "Matting model v1 (ORMBG)" \
   --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
-  --repo thierrzz/Avatar
+  --repo Square-One-Official/Avatar
 
 # 4. Tell me the SHA-256 (printed by the script + saved in
 #    build/matting/matting-model.mlmodelc.zip.sha256), and I'll plumb it
@@ -102,7 +102,7 @@ gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
   --title "Matting model v1 (ORMBG)" \
   --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
-  --repo thierrzz/Avatar
+  --repo Square-One-Official/Avatar
 ```
 
 Tags follow `models/matting-vN` and act as permanent version pins —

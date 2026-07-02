@@ -59,7 +59,7 @@ from pathlib import Path
 BUILD_DIR = Path("build/matting")
 MODEL_NAME = "matting-model"
 RELEASE_TAG = "models/matting-v1"
-GH_REPO = "thierrzz/Avatar"
+GH_REPO = "Square-One-Official/Avatar"
 
 
 def main() -> None:

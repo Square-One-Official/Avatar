@@ -29,7 +29,7 @@ public actor OrmbgModelStore {
         public var modelDirName: String
 
         public static let current = Manifest(
-            zipURL: URL(string: "https://github.com/thierrzz/Avatar/releases/download/"
+            zipURL: URL(string: "https://github.com/Square-One-Official/Avatar/releases/download/"
                 + "models/matting-v1/matting-model.mlmodelc.zip")!,
             expectedSHA256: "7b0100451bf82a87b3c5fc50c7d4c79b4f6666575ac789701b1e8eacc008d347",
             version: "1",

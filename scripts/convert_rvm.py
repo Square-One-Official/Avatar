@@ -35,7 +35,7 @@ Output:
 
 Hosting:
     Upload the .zip to the GitHub release tagged `rvm-v5`:
-        https://github.com/thierrzz/Avatar/releases/tag/rvm-v5
+        https://github.com/Square-One-Official/Avatar/releases/tag/rvm-v5
     ModelManager.modelDownloadURL resolves to this URL automatically
     once currentModelVersion is bumped to "v5".
 """

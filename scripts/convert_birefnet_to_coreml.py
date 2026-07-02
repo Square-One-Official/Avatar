@@ -56,7 +56,7 @@ The script:
      `expectedSHA256` constant before tagging the GitHub release.
 
 After running:
-  1. Create a GitHub release on thierrzz/Avatar with tag
+  1. Create a GitHub release on Square-One-Official/Avatar with tag
      `models/birefnet-lite-v1` (do not reuse tags — version pin matters).
   2. Upload `birefnet-lite-matting.mlmodelc.zip` as a release asset.
   3. Update `ModelManager.modelURL` and `ModelManager.expectedSHA256` in
@@ -132,7 +132,7 @@ def main() -> None:
     print("Next steps:")
     print(f"  1. Create GH release: gh release create models/birefnet-lite-v1 \\")
     print(f"       {zip_path} --title 'BiRefNet lite-matting v1' \\")
-    print(f"       --notes 'CoreML fp16, 1024x1024, MIT licensed' --repo thierrzz/Avatar")
+    print(f"       --notes 'CoreML fp16, 1024x1024, MIT licensed' --repo Square-One-Official/Avatar")
     print("  2. Update ModelManager.modelURL + expectedSHA256 in Swift.")
 
 
