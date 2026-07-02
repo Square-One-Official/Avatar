@@ -48,7 +48,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **40.1 ready**, 40.2 backlog |
 | [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2); **41.3 ready** (audit-fix: model-pin) |
 | [E42 AI background generation](E42-ai-background-generation.md) | FEAT+INFRA+AI | **done** (42.1–42.3, 42.5–42.7); 42.4 backlog (wide T2I bakeoff) |
-| [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **43.1, 43.2, 43.5 ready** (P0 — release-blocker), 43.3–43.4 backlog |
+| [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **43.5 done**; 43.1–43.2 voorbereid, **wachten op prod-akkoord** (migratie 014 + prod-deploy + refund); 43.3–43.4 backlog |
 | [E44 Cloud-actie betrouwbaarheid](E44-cloud-betrouwbaarheid.md) | FEAT+INFRA | **44.1–44.2 ready**, 44.3 backlog |
 | [E46 Undo & bevestiging bij destructieve acties](E46-destructieve-acties.md) | FEAT | **done** (46.1–46.2); 46.3 backlog (undo/prullenbak bulk-delete) |
 | [E47 Testfundament kritieke paden](E47-testfundament.md) | INFRA+FEAT | **47.1–47.2 ready**, 47.3 backlog |

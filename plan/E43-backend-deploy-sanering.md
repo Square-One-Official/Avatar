@@ -137,9 +137,12 @@ app-release.
 zichtbaar uit; Result-regel.
 
 ## 43.5 — Untracked werk committen
-- status: ready
+- status: done
+- owner: hoofdsessie (2026-07-02)
 - team: INFRA (coördineert; elk team staget zijn eigen paden)
 - blockedBy: —
+
+**Result:** volledige dirty staat van v2-main eerst gevalideerd (Avatar + Avatar2 builds groen, AvatarKit 59/0, AvatarUI 37/0) en daarna per pad gecommit in 9 logische commits `ecf00d2`…`3ce73b3` (cutout-sanering incl. beide deletes, release-URLs, E42, banners+editor, shell/DS, admin, plan, projectregistratie); `git status` toont alleen nog `.cursor/` (bewust untracked).
 
 **Wat:** `git status` toont ±30 untracked source-files die de app wél compileert
 (heel `Features/Background/`, de AI-privacy-tier-stack in `Features/Settings/`,
