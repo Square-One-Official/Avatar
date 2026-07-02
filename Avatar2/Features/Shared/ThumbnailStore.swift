@@ -91,12 +91,6 @@ final class ThumbnailStore {
         return nil
     }
 
-    /// Bron-compat met de oude `BoardThumbnailCache`: met (id, updatedAt)-keying is
-    /// invalidatie automatisch (een edit bumpt `updatedAt` → nieuwe key → verse
-    /// decode), dus dit is een no-op. Behouden zodat de bestaande call-sites
-    /// (undo-closures e.d.) ongemoeid blijven.
-    func invalidate(_ portrait: Portrait2) {}
-
     private static func key(_ portrait: Portrait2, _ maxDimension: CGFloat) -> String {
         // De volledige identifier i.p.v. z'n 64-bit `hashValue` — even stabiel
         // binnen de sessie, maar zonder de (theoretische) hash-collisie tussen nodes.

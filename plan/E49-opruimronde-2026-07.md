@@ -10,7 +10,7 @@ een aparte story per regel te hoeven claimen.
 ---
 
 ## 49.1 — Dode code opruimen [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -33,6 +33,7 @@ een aparte story per regel te hoeven claimen.
 - `ThumbnailStore.invalidate()` — gedocumenteerde no-op.
 **Voorstel:** verwijderen resp. corrigeren per punt.
 **DoD:** beide targets bouwen, tests groen, Result-regel met de lijst afgevinkt.
+**Result:** ✅ `PortraitHeader.swift` verwijderd + gederegistreerd (xcodegen, scheme-/Package.resolved-churn teruggedraaid); ✅ `EditorTool.dsSymbol` weg; ✅ `EditorTool.pendingStory` weg + stub-copy zonder story-nummers ("… tools are unavailable right now.", `EditorToolTests` mee); ✅ onbereikbare `canvasPanel(.background)`-tak weg (Background blijft via de `CanvasActionToolbar`-dropdown); ✅ stale ⌘=-comment bij `zoomCamera` herschreven naar de huidige View-menu/CanvasZoomEqualsShortcut-route (E27.10 had de verborgen knoppen al geschrapt); ✅ `Folder2.order`/`colorHex` weg (schrijf-sites LeftNavView/PortraitContextMenu/SmokeSeed mee-opgeschoond; lichte migratie, velden werden nergens gelezen); ✅ `ImagePlaygroundEntryButton` (+ private Available-struct, ongebruikte imports) weg — `ImagePlaygroundEntry.pngData` blijft (3 call-sites); ✅ `ThumbnailStore.invalidate()` no-op weg incl. alle 10 call-sites/cache-captures in BoardView; ☑︎ `OnboardingModel.finishSignedIn()` — reeds gedaan door E04.8 (0 hits). build-v2.sh volledig groen (Avatar + Avatar2 build, Avatar2-testsuite, AvatarKit- en AvatarUI-packagetests).
 
 ## 49.2 — Kleine UX-consistentie [FEAT]
 - status: ready

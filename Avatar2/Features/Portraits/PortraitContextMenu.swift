@@ -191,7 +191,7 @@ struct PortraitContextMenuOverlay: View {
         defer { newFolderTargets = [] }
         let name = newFolderName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        let folder = Folder2(name: name, order: folders.count + 1)
+        let folder = Folder2(name: name)
         modelContext.insert(folder)
         for p in newFolderTargets { p.folder = folder }
     }

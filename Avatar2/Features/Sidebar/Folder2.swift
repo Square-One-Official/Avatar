@@ -13,20 +13,14 @@ import SwiftData
 final class Folder2 {
     var name: String
     var createdAt: Date
-    /// Sorteervolgorde in de galerij (handmatig herschikbaar later).
-    var order: Int = 0
-    /// Optionele tag-kleur (Riverside-stijl), hex #RRGGBB. nil = neutraal.
-    var colorHex: String?
 
     /// De portretten in deze map. `nullify` zodat het verwijderen van een map
     /// de portretten zelf niet wist — ze vallen terug naar "Unfiled".
     @Relationship(deleteRule: .nullify, inverse: \Portrait2.folder)
     var portraits: [Portrait2] = []
 
-    init(name: String, createdAt: Date = .now, order: Int = 0, colorHex: String? = nil) {
+    init(name: String, createdAt: Date = .now) {
         self.name = name
         self.createdAt = createdAt
-        self.order = order
-        self.colorHex = colorHex
     }
 }

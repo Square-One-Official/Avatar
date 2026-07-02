@@ -21,8 +21,8 @@ enum SmokeSeed {
             ("Ivy Holt", "Illustrator", 0xB2DFDB, 0x00695C),
             ("Leo Park", "Photographer", 0xFFCCBC, 0xBF360C),
         ]
-        let work = Folder2(name: "Work", order: 0, colorHex: "#4C8BF5")
-        let team = Folder2(name: "Team", order: 1, colorHex: "#34C759")
+        let work = Folder2(name: "Work")
+        let team = Folder2(name: "Team")
         context.insert(work)
         context.insert(team)
 

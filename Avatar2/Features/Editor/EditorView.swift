@@ -31,20 +31,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         }
     }
 
-    /// E20.1: semantisch DSIcon per tool (de toolbar schakelt hierop in 21.2).
-    var dsSymbol: DSIcon.Symbol {
-        switch self {
-        case .edit: .edit
-        case .effects: .effects
-        case .face: .face
-        case .clothing: .clothing
-        case .hair: .hair
-        case .background: .background
-        case .images: .images
-        }
-    }
-
-    /// SF-benadering van de toolbar-glyphs (tot 21.2 de toolbar op DSIcon zet).
+    /// SF-benadering van de toolbar-glyphs.
     var icon: Image {
         switch self {
         case .edit: Image(systemName: "paintpalette")  // E22.3: kleur-glyph
@@ -54,20 +41,6 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .hair: Image(systemName: "comb.fill")
         case .background: Image(systemName: "person.and.background.dotted")
         case .images: Image(systemName: "photo.on.rectangle.angled")
-        }
-    }
-
-    /// De story die het echte paneel levert (zichtbaar in de stub-copy
-    /// zolang het paneel er niet is).
-    var pendingStory: String {
-        switch self {
-        case .edit: "E06.3"
-        case .effects: "E09.2"
-        case .face: "E21.1"
-        case .clothing: "E10.2"
-        case .hair: "E11.2"
-        case .background: "E07.1"
-        case .images: "E05.4"
         }
     }
 }
@@ -645,8 +618,8 @@ struct EditorView: View {
         )
     }
 
-    // E27.1: verborgen sneltoets-knoppen voor ⌘+/⌘−/⌘0(fit)/⌘1(100%). ⌘= vangt
-    // de toets zonder shift; alles animeert soepel. Geen UI, geen hit-test.
+    // Zoom-acties voor de View-menu-commands (⌘+/⌘−/⌘0/⌘1, CanvasZoomCommands)
+    // en de ⌘=-shortcut (CanvasZoomEqualsShortcut); alles animeert soepel.
     private func zoomCamera(by factor: CGFloat) {
         withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
     }
@@ -1010,9 +983,6 @@ struct EditorView: View {
                     )
                     .id(portraitModel?.persistentModelID)
                 }
-            } else if tool == .background {
-                // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
-                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement)
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
@@ -1050,7 +1020,7 @@ struct EditorView: View {
                     .id(portraitModel?.persistentModelID)
             } else {
                 DSEditPanel(title: tool.label) {
-                    Text("\(tool.label) tools land here (\(tool.pendingStory)).")
+                    Text("\(tool.label) tools are unavailable right now.")
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)

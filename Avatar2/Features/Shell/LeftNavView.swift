@@ -297,8 +297,7 @@ struct LeftNavView: View {
     private func confirmCreateFolder() {
         let name = draftName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        let n = folders.count + 1
-        let folder = Folder2(name: name, order: n)
+        let folder = Folder2(name: name)
         modelContext.insert(folder)
         model.isPortraitsExpanded = true
         model.showPortraits(folderID: folder.persistentModelID)
