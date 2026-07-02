@@ -82,6 +82,44 @@ final class VisionCutoutEngineTests: XCTestCase {
         XCTAssertLessThan(alpha(at: 8, 8, in: cutout), 25)
     }
 
+    // MARK: - Kleurruimte-robuustheid (E02.5, audit-B1)
+
+    /// Regressie B1: een DeviceGray-bron (grayscale-PNG) gaf vóór de
+    /// outputColorSpace-guard `createCGImage(.RGBA8, grayCS)` = nil →
+    /// renderFailed. Nu moet de cutout gewoon slagen, in sRGB.
+    func testCutoutOnGrayscaleSourceSucceeds() async throws {
+        let fixture = ColorSpaceFixtures.grayPortrait(width: 800, height: 1000)
+        XCTAssertEqual(fixture.colorSpace?.model, .monochrome) // premisse
+
+        let engine = VisionCutoutEngine()
+        let cutout = try await engine.cutout(fixture)
+
+        XCTAssertEqual(cutout.width, 800)
+        XCTAssertEqual(cutout.height, 1000)
+        XCTAssertEqual(cutout.colorSpace?.model, .rgb)
+        // Onderwerp opaak, achtergrond-hoeken transparant — de guard mag
+        // niet alleen "niet crashen", de matte moet ook nog kloppen.
+        XCTAssertGreaterThan(alpha(at: 400, 500, in: cutout), 230)
+        XCTAssertLessThan(alpha(at: 10, 10, in: cutout), 25)
+        XCTAssertLessThan(alpha(at: 789, 10, in: cutout), 25)
+    }
+
+    /// Regressie B1: idem voor een DeviceCMYK-bron (CMYK-JPEG).
+    func testCutoutOnCMYKSourceSucceeds() async throws {
+        let fixture = ColorSpaceFixtures.cmykPortrait(width: 800, height: 1000)
+        XCTAssertEqual(fixture.colorSpace?.model, .cmyk) // premisse
+
+        let engine = VisionCutoutEngine()
+        let cutout = try await engine.cutout(fixture)
+
+        XCTAssertEqual(cutout.width, 800)
+        XCTAssertEqual(cutout.height, 1000)
+        XCTAssertEqual(cutout.colorSpace?.model, .rgb)
+        XCTAssertGreaterThan(alpha(at: 400, 500, in: cutout), 230)
+        XCTAssertLessThan(alpha(at: 10, 10, in: cutout), 25)
+        XCTAssertLessThan(alpha(at: 789, 10, in: cutout), 25)
+    }
+
     func testFlatImageThrowsNoSubjectFound() async {
         let engine = VisionCutoutEngine()
         do {

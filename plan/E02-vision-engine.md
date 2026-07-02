@@ -108,7 +108,7 @@ Op bestaande /v1/cutout via AvatarKit BackendClient.
 **Result:** `CloudCutoutEngine` (struct, `CutoutEngine`-conform, kind `.replicate`) in `AvatarKit/Engines/` — dunne adapter rond `BackendClient.cutout` (bestaande /v1/cutout incl. Storage-upload-flow en creditaftrek; BackendError's propageren ongewijzigd), PNG↔CGImage via ImageIO, `isAvailable` = sessie-aanwezig via nieuwe één-regel `BackendClient.hasSession` (buiten Engines/ — **INFRA-review gevraagd**); 5 tests zonder netwerk (URLProtocol-stub voor het volledige wire-pad, notSignedIn vóór I/O, alpha-roundtrip), totaal 25 packagetests groen; beide targets bouwen Debug groen via build-v2.sh.
 
 ## 2.5 — Kleurruimte-normalisatie bij import (grayscale/CMYK-fix)
-- status: ready
+- status: done
 - team: AI
 - blockedBy: —
 
@@ -130,7 +130,19 @@ consumers zoals AutoFramer/ClothesMaskGenerator) — of minimaal in beide engine
 **DoD:** beide targets bouwen; nieuwe grayscale/CMYK-fixture-tests in
 `VisionCutoutEngineTests` én `OrmbgEngineTests` slagen; tests groen; Result-regel.
 
-## 2.6 — Cutout-randkwaliteit op lage resolutie
+**Result:** twee niveaus zoals voorgesteld — (1) `SRGBNormalizer` (public, in
+`AvatarKit/Engines/`): élke import naar sRGB-RGBA8 op het éne choke-point
+`ShellModel.runCutout` (beide importImage-overloads); pass-through als al
+genormaliseerd, wide-gamut (P3) gaat bewust mee naar sRGB; (2) engine-guard
+`EngineRendering.outputColorSpace(for:)` (niet-RGB-bron → sRGB, RGB incl. P3
+blijft) op alle drie de `.RGBA8`-rendersites: VisionCutoutEngine eindrender +
+`visionInput`, OrmbgEngine eindrender. Tests: DeviceGray/DeviceCMYK
+hoofd+schouders-fixtures (gedeeld, `ColorSpaceFixtures`) door béide engines —
+de ORMBG-varianten draaien tegen het lokaal geïnstalleerde model
+(app-container-fallback; XCTSkip zonder installatie, guard dan nog gedekt via
+SRGBNormalizerTests) — plus 7 helper-tests (normalisatie/pass-through/alpha/
+P3/guard). AvatarKit 70 tests groen, AvatarUI 37 groen; Avatar én Avatar2
+bouwen Debug groen. — Cutout-randkwaliteit op lage resolutie
 - status: backlog
 - team: AI
 - blockedBy: —

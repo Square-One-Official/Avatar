@@ -386,10 +386,16 @@ final class ShellModel {
         await runCutout(on: cgImage)
     }
 
-    private func runCutout(on cgImage: CGImage) async {
+    private func runCutout(on importedImage: CGImage) async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport() else { return }
+        // E02.5 (audit-B1): élke import éérst naar sRGB-RGBA. Grayscale-PNG's
+        // (DeviceGray) en CMYK-JPEG's zijn incompatibel met de .RGBA8-render
+        // van de engines (createCGImage → nil → renderFailed, in béide dus de
+        // cascade redt niets). Beide importImage-overloads komen hier langs;
+        // downstream (persist/AutoFramer/engines) ziet dus altijd sRGB.
+        let cgImage = SRGBNormalizer.normalized(importedImage)
         let original = nsImage(from: cgImage)
         setCanvas(.processing(original))
         do {
