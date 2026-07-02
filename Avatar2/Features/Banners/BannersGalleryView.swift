@@ -30,6 +30,8 @@ struct BannersGalleryView: View {
     @State private var draftName = ""
     @State private var menuBanner: BannerDoc?
     @State private var menuAnchor: CGRect = .zero
+    /// E46.1: delete vraagt eerst bevestiging (zelfde patroon als portret-delete).
+    @State private var deleting: BannerDoc?
 
     private static let contextMenuSpace = "bannersContextMenu"
 
@@ -68,6 +70,27 @@ struct BannersGalleryView: View {
                 renaming = nil
             }
             Button("Cancel", role: .cancel) { renaming = nil }
+        }
+        // E46.1: delete met bevestiging (zelfde toon als portret-delete,
+        // PortraitContextMenu/BoardView). Verwijderen loopt via BannerDeletion
+        // zodat ook de E40.2-portretkoppeling wordt opgeruimd (E46.2).
+        .confirmationDialog(
+            "Delete this banner?",
+            isPresented: Binding(
+                get: { deleting != nil },
+                set: { if !$0 { deleting = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let banner = deleting {
+                    BannerDeletion.delete(banner, in: modelContext)
+                }
+                deleting = nil
+            }
+            Button("Cancel", role: .cancel) { deleting = nil }
+        } message: {
+            Text("This can't be undone.")
         }
     }
 
@@ -139,7 +162,7 @@ struct BannersGalleryView: View {
                         Divider().padding(.vertical, 2)
                         DSMenuRow("Delete", icon: "trash", destructive: true) {
                             menuBanner = nil
-                            modelContext.delete(banner)
+                            deleting = banner
                         }
                     }
                 }

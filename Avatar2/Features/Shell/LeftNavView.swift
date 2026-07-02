@@ -39,6 +39,8 @@ struct LeftNavView: View {
     @State private var dropTargetedFolderID: PersistentIdentifier?
     @State private var menuFolder: Folder2?
     @State private var menuAnchor: CGRect = .zero
+    /// E46.1: map-delete vraagt eerst bevestiging (zelfde patroon als portret-delete).
+    @State private var deletingFolder: Folder2?
 
     private static let contextMenuSpace = "leftNavContextMenu"
 
@@ -122,10 +124,7 @@ struct LeftNavView: View {
                             Divider().padding(.vertical, 2)
                             DSMenuRow("Delete", icon: "trash", destructive: true) {
                                 menuFolder = nil
-                                if model.selectedFolderID == folder.persistentModelID {
-                                    model.selectedFolderID = nil
-                                }
-                                modelContext.delete(folder)
+                                deletingFolder = folder
                             }
                         }
                     }
@@ -152,6 +151,30 @@ struct LeftNavView: View {
             TextField("Folder name", text: $draftName)
             Button("Create") { confirmCreateFolder() }
             Button("Cancel", role: .cancel) { isCreatingFolder = false }
+        }
+        // E46.1: delete met bevestiging (zelfde toon als portret-delete). De
+        // delete-rule is `.nullify`, dus de portretten in de map blijven bestaan —
+        // dat zegt de message expliciet.
+        .confirmationDialog(
+            "Delete this folder?",
+            isPresented: Binding(
+                get: { deletingFolder != nil },
+                set: { if !$0 { deletingFolder = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let folder = deletingFolder {
+                    if model.selectedFolderID == folder.persistentModelID {
+                        model.selectedFolderID = nil
+                    }
+                    modelContext.delete(folder)
+                }
+                deletingFolder = nil
+            }
+            Button("Cancel", role: .cancel) { deletingFolder = nil }
+        } message: {
+            Text("Portraits in this folder are kept. This can't be undone.")
         }
     }
 
