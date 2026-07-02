@@ -70,7 +70,7 @@ commit-/chat-historie.
   DoD groen.
 
 ## 41.3 — Crystal-upscaler versie-hash pinnen
-- status: done
+- status: in_progress (heropend 2026-07-02 22:xx)
 - team: INFRA
 - blockedBy: —
 
@@ -96,3 +96,11 @@ zijn — plus een expliciete check op de Boost-default; smoke OK, `npx tsc
 --noEmit` groen. Verificatie bewust statisch i.p.v. live (Replicate-ratelimit-
 regel: geen echte inference-calls); runtime-verificatie lift mee op de
 eerstvolgende preview/prod-deploy (E43-akkoord loopt).
+
+
+**Heropening 41.3 (2026-07-02 ~22:00):** de gepinde crystal-hash faalt live met
+422 "Invalid version or not permitted" → 500's op /v1/upscale (21:42). Hotfix
+(andere sessie, gecommit + gedeployed door hoofdsessie): default terug naar
+real-esrgan; crystal blijft geregistreerd. Vervolg: geldige hash ophalen via
+replicate.com/philz1337x/crystal-upscaler/versions (login vereist — Thierry),
+live testen op preview, dán default terugzetten.
