@@ -295,7 +295,8 @@ alleen kleur/gradient; image via canvas. `BannerCanvasSelection.backgroundFill`.
 Huidige implementatie blijft `BannerDoc` + Freeform-chrome op macOS 14+. Geen implementatie tot OS-besluit.
 
 ## 37.17 — Type-to-edit: keystroke-verlies door async first-responder-handoff [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -315,6 +316,20 @@ responder is (append aan `draftString` i.p.v. `.ignored`), óf maak de textview
 synchroon first responder (`viewDidMoveToWindow`-override, geen async-hop).
 **DoD:** beide targets bouwen; een keystroke-burst direct na het Text-tool-klikken
 verliest geen tekens; tests groen; Result-regel.
+
+**Result:** beide voorstel-sporen geïmplementeerd (belt-and-braces).
+(1) [BannerInlineTextField](Avatar2/Features/Banners/BannerInlineTextField.swift):
+async `makeFirstResponder`-hop vervangen door een synchrone claim in
+`PlaceholderTextView.viewDidMoveToWindow` (tijdens de render-commit, vóór het
+volgende key-event; caret achteraan of select-all). (2)
+[BannerCanvasTextChrome](Avatar2/Features/Banners/BannerCanvasTextChrome.swift):
+`handleTypeToEdit` buffert toetsen die tijdens de handoff nog in de chrome landen
+(`BannerTypeToEdit.appendToDraft` i.p.v. `.ignored`) en synct de draft direct naar
+de doc-laag (`syncDraftToDoc` — de editor-`onChange` hangt dan nog niet in de
+boom). Besluitlogica als testbaar `BannerTypeToEdit`-enum; 6 nieuwe tests
+([BannerTypeToEditTests](Avatar2Tests/BannerTypeToEditTests.swift)) incl.
+synchrone first-responder-claim zónder runloop-spin. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 97 groen; AvatarKit 86 + AvatarUI 37 groen).
 
 ## 37.18 — Placeholder-tekstlagen: document-brede sweep + herbake [FEAT]
 - status: ready

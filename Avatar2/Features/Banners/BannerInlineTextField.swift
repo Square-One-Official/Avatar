@@ -33,16 +33,13 @@ struct BannerInlineTextField: NSViewRepresentable {
         view.textContainer?.lineFragmentPadding = 0
         view.string = text
         applyStyle(to: view)
+        // 37.17 (audit-B6): first responder wordt SYNCHROON geclaimd zodra de view
+        // aan het venster hangt (`viewDidMoveToWindow`), niet via een async-hop.
+        // De oude `DispatchQueue.main.async { makeFirstResponder }` liet minimaal
+        // één runloop-cyclus gaan waarin toetsaanslagen nergens landden.
         if focusOnFirstAppear || selectAllOnFirstFocus {
-            DispatchQueue.main.async {
-                view.window?.makeFirstResponder(view)
-                if selectAllOnFirstFocus {
-                    view.selectAll(nil)
-                } else {
-                    let end = (view.string as NSString).length
-                    view.setSelectedRange(NSRange(location: end, length: 0))
-                }
-            }
+            view.wantsInitialFocus = true
+            view.selectAllOnInitialFocus = selectAllOnFirstFocus
         }
         return view
     }
@@ -138,6 +135,26 @@ struct BannerInlineTextField: NSViewRepresentable {
 final class PlaceholderTextView: NSTextView {
     var placeholderString: String = ""
     var placeholderColor: NSColor = .secondaryLabelColor
+
+    /// 37.17 — claim first responder zodra de view aan een venster hangt. Dit
+    /// gebeurt synchroon tijdens de SwiftUI-render-commit, dus vóór het volgende
+    /// key-event wordt verwerkt: geen runloop-gat waarin toetsen verloren gaan.
+    var wantsInitialFocus = false
+    var selectAllOnInitialFocus = false
+    private var didClaimInitialFocus = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard wantsInitialFocus, !didClaimInitialFocus, let window else { return }
+        didClaimInitialFocus = true
+        window.makeFirstResponder(self)
+        if selectAllOnInitialFocus {
+            selectAll(nil)
+        } else {
+            let end = (string as NSString).length
+            setSelectedRange(NSRange(location: end, length: 0))
+        }
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
