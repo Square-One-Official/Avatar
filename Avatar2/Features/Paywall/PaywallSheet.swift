@@ -110,8 +110,11 @@ struct PaywallSheet: View {
 
     private var subtitle: String {
         if model.showsTopup {
-            if let resetAt = model.monthlyResetAt {
-                return "Your 200 monthly credits refill on \(resetAt.formatted(date: .abbreviated, time: .omitted))."
+            // 14.7 (audit B8): datum alleen als hij in de toekomst ligt
+            // (stale period-end → periodloze copy), en het plan-quotum uit
+            // het model i.p.v. hardcoded "200".
+            if let resetAt = model.upcomingMonthlyResetAt {
+                return "Your \(model.monthlyQuota) monthly credits refill on \(resetAt.formatted(date: .abbreviated, time: .omitted))."
             }
             return "Your monthly credits refill with your plan."
         }

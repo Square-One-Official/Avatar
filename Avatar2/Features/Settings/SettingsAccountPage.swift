@@ -10,6 +10,8 @@ struct SettingsAccountPage: View {
     @Bindable var entitlement: EntitlementModel
     /// E18.1: e-mail+OTP-login vanuit Account als je uitgelogd bent.
     @State private var showSignIn = false
+    /// E15.7: bevestigingsdialoog vóór de definitieve account-verwijdering.
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -75,12 +77,26 @@ struct SettingsAccountPage: View {
                 // sign-in zit nu in de Email-rij hierboven.
                 if entitlement.isSignedIn {
                     SettingsSectionCard(title: "Session") {
-                        SettingsRow(
-                            title: "Sign out",
-                            subtitle: "You can sign back in any time with a code"
-                        ) {
-                            DSNeutralButton("Sign out") {
-                                entitlement.signOutAccount()
+                        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                            SettingsRow(
+                                title: "Sign out",
+                                subtitle: "You can sign back in any time with a code"
+                            ) {
+                                DSNeutralButton("Sign out") {
+                                    entitlement.signOutAccount()
+                                }
+                            }
+                            // E15.7 (audit C7): GDPR art. 17 — definitieve
+                            // verwijdering, achter een bevestigingsdialoog
+                            // (zelfde patroon als portret-delete).
+                            SettingsRow(
+                                title: "Delete account",
+                                subtitle: "Permanently removes your account, subscription and credits"
+                            ) {
+                                DSNeutralButton("Delete account…") {
+                                    showDeleteConfirm = true
+                                }
+                                .disabled(entitlement.isDeletingAccount)
                             }
                         }
                     }
@@ -95,10 +111,27 @@ struct SettingsAccountPage: View {
         .sheet(isPresented: $showSignIn) {
             SignInSheet(entitlement: entitlement)
         }
+        // E15.7: zelfde confirm-patroon als portret-delete
+        // (PortraitContextMenu) — destructieve actie nooit met één klik.
+        .confirmationDialog(
+            "Delete your account?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete account", role: .destructive) {
+                Task { await entitlement.deleteAccount() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes your account, cancels any subscription and removes your remaining credits. This can't be undone. Portraits stored on this Mac stay on this Mac.")
+        }
     }
 
     private var creditsSubtitle: String {
-        if let reset = entitlement.monthlyResetAt {
+        // 14.7 (audit B8): alleen een toekomstige refill-datum tonen — een
+        // stale `current_period_end` uit het verleden valt terug op de
+        // periodloze copy.
+        if let reset = entitlement.upcomingMonthlyResetAt {
             return "Refills on \(reset.formatted(date: .abbreviated, time: .omitted))"
         }
         return entitlement.isProActive

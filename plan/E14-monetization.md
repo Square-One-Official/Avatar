@@ -151,9 +151,32 @@ INFRA-story toevoegen i.p.v. zelf in AvatarKit bouwen.
 **Result:** `BackendClient.subscribe(interval:)` toegevoegd (authed `request`, hit `/v1/checkout/subscribe` — endpoint bestond al in productie) naast `subscribeAnonymous`; EntitlementModel.startSubscribe routeert ingelogde gebruikers (`auth.isSignedIn`) naar de authed flow (gekoppeld aan Supabase user-id, hergebruikt de Stripe-customer → geen dubbele customer), anonieme gebruikers naar de e-mail-flow. Geen UI-wijziging (zelfde paywall) → geen visuele smoke nodig. Kleine AvatarKit-toevoeging (INFRA-review genoteerd); geen backend-deploy nodig. Beide targets bouwen groen, suite groen.
 
 ## 14.7 — Stripe-webhook verifiëren + refill-datum-guard
-- status: ready
+- status: done
 - team: INFRA + FEAT
 - blockedBy: —
+- Result: Root cause gevonden en gefixt (branch v2/e14-15-audit-fixes). **Stripe-bevindingen:**
+  het live webhook-endpoint (`we_1TRZdZ…` → avatars-api-five.vercel.app/api/stripe-webhook)
+  staat op API-versie **2026-04-22.dahlia** terwijl de handler-code de acacia-shapes verwacht.
+  Sinds basil (2025-03-31) zit `current_period_start/end` niet meer top-level op de
+  Subscription (alleen op de items) → `new Date(undefined*1000).toISOString()` gooide een
+  RangeError → 500 → **failed delivery**. Zo is het `customer.subscription.deleted`-event van
+  4 jun (evt_1TeVNmAcH6vt33NABIJ88QlU, pending_webhooks=1 — enige gefaalde delivery) nooit
+  geland: de Supabase-rij `sub_1TTGaPAcH6vt33NAFPl7bFgM` zegt nog `active` /
+  period_end=2026-06-04 / cancel_at_period_end=false, terwijl Stripe zegt canceled
+  (opgezegd 4 mei, geëindigd 4 jun). Vandaar "Refills on 4 Jun 2026". Er is geen betalende
+  Pro die maandcredits mist (de enige sub is echt geëindigd), maar de ex-subscriber wordt
+  nog als actieve Pro geserveerd. Tweede stille faalweg bevestigd: invoice-lines dragen in
+  dahlia `pricing.price_details.price` i.p.v. `price` → tier-null → stille grant-skip.
+  **Fixes:** `stripe-webhook.ts` leest nu beide payload-shapes (`subscriptionPeriod()`,
+  `invoiceLinePriceId()`), gooit nooit meer op een ontbrekende periode (status-update
+  overleeft), en tier-null logt een zoekbare `[ALERT]`-console.error op alle drie de paden.
+  Client: `EntitlementModel.upcomingMonthlyResetAt` guard (verleden-datum → "Refills
+  monthly with your plan") in SettingsAccountPage + PaywallSheet, en "200" vervangen door
+  `model.monthlyQuota`. Tests: 2 nieuwe EntitlementModelTests (verleden/toekomst-datum);
+  alles groen (AvatarKit 78, AvatarUI 37, Avatar2 suite, `tsc --noEmit`).
+  **Follow-up:** webhook-fix mee in de eerstvolgende prod-deploy (E43-akkoord loopt);
+  daarna het 4-jun-deleted-event resenden vanuit het Stripe-dashboard (30-dagen-retentie
+  verloopt ±4 jul!) óf de subscriptions-rij handmatig op `canceled` zetten.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B8).
 **Wat:** Settings→Account en de top-up-paywall toonden "Refills on 4 Jun 2026" — een

@@ -129,6 +129,16 @@ final class EntitlementModel {
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
     var monthlyResetAt: Date? { account?.monthlyResetAt }
 
+    /// 14.7 (audit B8): de refill-datum, maar alléén als hij in de toekomst
+    /// ligt. `subscriptions.current_period_end` kan server-side stale raken
+    /// (gemiste Stripe-webhook-delivery) — een datum in het verleden is dan
+    /// een leugen ("Refills on 4 Jun 2026"). De UI valt in dat geval terug
+    /// op periodloze copy ("Refills monthly with your plan").
+    var upcomingMonthlyResetAt: Date? {
+        guard let reset = monthlyResetAt, reset > .now else { return nil }
+        return reset
+    }
+
     /// Aftellende quota-tekst ("X left of Y" / "N credits") — één bron voor de
     /// topbar én de left-nav (PoC). Pro: resterende credits over de maand-grant;
     /// top-ups stapelen erbovenop (geen vaste noemer) → kale balans. Free: rest
@@ -157,6 +167,32 @@ final class EntitlementModel {
     func signOutAccount() {
         auth.signOut()
         account = nil
+    }
+
+    // MARK: - Delete account (E15.7, audit C7 — GDPR art. 17)
+
+    /// Loopt zolang de server-side wipe bezig is (disable de rij-knop).
+    private(set) var isDeletingAccount = false
+
+    /// Verwijdert het account definitief via `/v1/account/delete` (cancelt
+    /// Stripe-subs, wist de Supabase-user) en logt bij succes lokaal uit.
+    /// De lokale bibliotheek (portretten/banners op deze Mac) blijft bewust
+    /// staan — die is van de gebruiker, niet van het account.
+    /// Faalt de wipe, dan blijft de sessie intact en meldt de fout-toast dat
+    /// een retry veilig is (het endpoint is idempotent).
+    @discardableResult
+    func deleteAccount() async -> Bool {
+        guard !isDeletingAccount else { return false }
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        do {
+            try await backend.deleteAccount()
+            signOutAccount()
+            return true
+        } catch {
+            presentError("Couldn't delete your account. Please try again — nothing was left half-deleted.")
+            return false
+        }
     }
 
     // MARK: - Sign-in (E18.1) — e-mail + OTP vanuit Account/gate

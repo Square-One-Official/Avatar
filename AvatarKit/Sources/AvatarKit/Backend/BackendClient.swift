@@ -708,6 +708,28 @@ public final class BackendClient {
         return resp.email
     }
 
+    // MARK: POST /v1/account/delete (E15.7)
+    /// GDPR art. 17 — verwijdert het account definitief. Server-side
+    /// (backend/api/v1/account/delete.ts): cancelt actieve Stripe-
+    /// subscriptions, veegt de cutout-uploads-prefix en wist de Supabase-
+    /// auth-user via de GoTrue admin API (FK-cascade ruimt de rest op).
+    /// Vereist een sessie (JWT = consent-signaal) plus de
+    /// `X-Confirm-Delete: yes`-header als tweede consent. POST i.p.v.
+    /// DELETE — het endpoint accepteert beide en URLSession is
+    /// inconsistent met DELETE+body.
+    private struct DeleteAccountResponse: Decodable {
+        let deleted: Bool
+    }
+    public func deleteAccount() async throws {
+        let resp: DeleteAccountResponse = try await request(
+            "/v1/account/delete", method: "POST",
+            extraHeaders: ["X-Confirm-Delete": "yes"]
+        )
+        // Het endpoint stuurt `deleted:false` alleen met een 5xx (dan is de
+        // server-throw hierboven al gebeurd), maar guard defensief.
+        guard resp.deleted else { throw BackendError.server(500, "delete_failed") }
+    }
+
     // MARK: POST /v1/checkout/topup
     /// Buy a one-time credit pack. Topped-up credits stack with the monthly
     /// grant and never expire. Same union response shape as `subscribe()`.
@@ -873,11 +895,13 @@ public final class BackendClient {
     private func request<R: Decodable>(
         _ path: String,
         method: String,
-        body: Data? = nil
+        body: Data? = nil,
+        extraHeaders: [String: String] = [:]
     ) async throws -> R {
         guard let token = auth.accessToken else { throw BackendError.notSignedIn }
         return try await send(
-            path: path, method: method, body: body, token: token
+            path: path, method: method, body: body, token: token,
+            extraHeaders: extraHeaders
         )
     }
 
@@ -899,12 +923,19 @@ public final class BackendClient {
         path: String,
         method: String,
         body: Data?,
-        token: String?
+        token: String?,
+        extraHeaders: [String: String] = [:]
     ) async throws -> R {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = method
         if let token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        // Endpoint-specifieke headers (E15.7: `X-Confirm-Delete` voor
+        // account-delete). Bewust vóór de vaste headers hieronder, zodat een
+        // extra header nooit een standaardheader kan overschrijven.
+        for (field, value) in extraHeaders {
+            req.setValue(value, forHTTPHeaderField: field)
         }
         // Stable per-Mac identifier for the free-tier anti-cheat layer.
         // Sent on every request so the backend can cross-reference the
