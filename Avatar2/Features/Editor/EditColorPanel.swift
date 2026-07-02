@@ -2,7 +2,7 @@
 // (Brightness/Contrast/Saturation/Temperature) passen meteen toe op de canvas
 // (goedkope preview via onPreview); op het loslaten van een slider commit een
 // undo-bare stap (onCommit before→after). Reset zet alles neutraal.
-// De één-tik-acties (One click retouch/Studio Light/Colorise/Boost/Restore body)
+// De één-tik-acties (One click retouch/Studio Light/Colorise/Boost/Fill in body)
 // staan als compacte chips bovenin het Enhance-paneel. One-click retouch verhuisde
 // hierheen uit het Face-paneel (Thierry, 2026-06-23).
 
@@ -49,8 +49,11 @@ struct EditColorPanel: View {
     var onColorise: () -> Void = {}
     /// E41.2: Boost met de gekozen modus (lokaal/gratis of online/1 credit).
     var onBoost: (BoostMode) -> Void = { _ in }
-    // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
-    var onRestoreBody: () -> Void = {}
+    // E31.3: verhuisde mee uit de frame-toolbar-AI-dropdown. E31.8 (audit C4):
+    // canonieke naam is "Fill in body" (chip + toast + undo-entry) — de oude
+    // chip-naam "Restore body" botste met de overflow-actie "Restore to
+    // original" (re-isolate, een andere functie).
+    var onFillBody: () -> Void = {}
     /// Verwijder de achtergrond: her-isoleer het onderwerp (altijd on-device).
     /// Draait met de actieve engine — ORMBG als "High quality" geïnstalleerd is,
     /// anders Apple Vision ("Regular quality"). Nooit een credit.
@@ -75,7 +78,7 @@ struct EditColorPanel: View {
     /// E24.3: in de Adjust-popover staat de AI-dropdown apart (canvas-toolbar),
     /// dus dan tonen we alléén de sliders + Reset.
     /// E29.5 (audit C6): dit gate ALLEEN de vijf AI-één-tik-chips (Studio Light/
-    /// Portrait/Colorise/Boost/Restore body) — de board-call-sites zetten 'm op
+    /// Portrait/Colorise/Boost/Fill in body) — de board-call-sites zetten 'm op
     /// `false` omdat ze die closures niet bedraden (default-leeg = dode chips);
     /// `showRetouch`/`showRemoveBackground` houden hun eigen chip zichtbaar.
     var showAutoEnhance: Bool = true
@@ -174,7 +177,10 @@ struct EditColorPanel: View {
                                 quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
                                 quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
                                 boostMenuChip
-                                quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                                // E31.8 (audit C4): canonieke naam + de echte
+                                // 2-credit-prijs via CreditMeter (getest label).
+                                quickAction("Fill in body", icon: "person.crop.rectangle", pro: !isPro,
+                                            credit: CreditMeter.chipLabel(for: .fillBody), action: onFillBody)
                             }
                             if showRemoveBackground {
                                 removeBackgroundMenuChip
@@ -251,9 +257,12 @@ struct EditColorPanel: View {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: isOn ? "checkmark" : icon).font(.system(size: 12, weight: .medium))
                 Text(label).dsTextStyle(.labelSmall)
+                // E31.8: Pro-badge en credit-prijs zijn onafhankelijk — een
+                // betaalde Pro-actie toont beide (Pro-gate én wat 'ie kost).
                 if pro {
                     DSProChip()
-                } else if let credit {
+                }
+                if let credit {
                     DSBadge(credit, type: .neutral, compact: true)
                 }
             }

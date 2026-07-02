@@ -1207,7 +1207,7 @@ struct BoardView: View {
                             onRetouch: { retouchNode(node) },
                             showRetouch: true,
                             // E29.5 (audit C6): Studio Light/Portrait/Colorise/
-                            // Boost/Restore body zijn op de board niet bedraad
+                            // Boost/Fill in body zijn op de board niet bedraad
                             // (default-lege closures) → verberg ze; alleen de
                             // wél-werkende retouch-chip + sliders blijven. Echt
                             // bedraden kan pas met de gedeelde apply/undo/gate-
