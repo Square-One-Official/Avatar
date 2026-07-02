@@ -11,6 +11,10 @@ struct Avatar2App: App {
     @State private var entitlement: EntitlementModel
     /// E17.5: getargete in-app-berichten (verenigd Message-model).
     @State private var messaging: MessagingService
+    /// E13.5 (audit-C1): dé app-brede Sparkle-updater — één SPUUpdater per
+    /// proces. Via Environment naar Settings→About; launch doet een
+    /// achtergrondcheck (zie `.task` hieronder).
+    @State private var updates: UpdateManager
 
     /// Eigen SwiftData-store voor de set (E05.4). Normaal de persistente store;
     /// onder `--smoke-store` (DEBUG) een GEÏSOLEERDE, gezaaide in-memory store zodat
@@ -30,6 +34,9 @@ struct Avatar2App: App {
         _onboarding = State(initialValue: OnboardingModel(auth: auth))
         _entitlement = State(initialValue: entitlement)
         _messaging = State(initialValue: MessagingService(backend: entitlement.backend))
+        // E13.5: Sparkle start hier (één per proces); in de unit-test-host
+        // valt UpdateManager zelf terug op een no-op-engine.
+        _updates = State(initialValue: UpdateManager())
         modelContainer = Self.makeModelContainer()
     }
 
@@ -106,6 +113,13 @@ struct Avatar2App: App {
             #endif
             // E17.5: getargete berichten ophalen bij app-start (faalt stil).
             .task { await messaging.refresh() }
+            // E13.5 (audit-C1): achtergrond-update-check bij launch — About
+            // hoeft nooit open. Eenmalig per proces (guard in de manager) en
+            // respecteert de "Automatic updates"-toggle.
+            .task { updates.checkForUpdatesInBackgroundAtLaunch() }
+            // E13.5: dezelfde instance voor Settings→About (geen tweede
+            // SPUUpdater per proces).
+            .environment(updates)
             // Account-fix: de Supabase-sessie (bearer-token) wordt ASYNC hersteld
             // via authStateChanges ná launch. De vroege refresh (ShellTopBar) haalt
             // dan nog het ANONIEME account op (geen Pro, 0 credits) → alle pro-

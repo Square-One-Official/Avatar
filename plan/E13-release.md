@@ -84,7 +84,7 @@ bewust** en geldt nu ook voor live v1. Rest: Payload `messages`-tabellen via ava
 (push:true) — apart, wacht-op-Thierry.
 
 ## 13.5 — Sparkle app-breed initialiseren + achtergrondcheck bij launch
-- status: ready
+- status: done
 - team: INFRA
 - blockedBy: —
 
@@ -102,4 +102,21 @@ via Environment); bij launch `checkForUpdatesInBackground()` aanroepen. About
 consumeert dezelfde instance i.p.v. een eigen.
 **DoD:** beide targets bouwen; een fresh launch triggert een achtergrond-update-check
 zonder dat About geopend hoeft te worden; tests groen; Result-regel.
+
+**Result:** Gedaan 2026-07-02 (branch v2/e13-5-sparkle). `Avatar2App` bezit nu dé
+app-brede `UpdateManager` (`@State`, gebouwd in `init`) en geeft hem via
+`.environment(updates)` door; `SettingsAboutPage` consumeert die via
+`@Environment(UpdateManager.self)` — geen per-view `SPUUpdater` meer (één per proces,
+zoals Sparkle eist). Bij launch roept een `.task` `checkForUpdatesInBackgroundAtLaunch()`
+aan: eenmalig per proces (guard tegen venster-heropen), respecteert de "Automatic
+updates"-toggle, en zet observeerbaar bewijs (`lastBackgroundCheckRequest`) + een
+`.notice`-logbreadcrumb ("Launch background update check requested (E13.5)",
+subsystem `nl.squareone.aaavatar2`). De echte `SPUUpdater` zit achter een nieuw
+`UpdaterEngine`-seam (SparkleUpdaterEngine in prod, no-op in de unit-test-host zodat
+`xcodebuild test` nooit een echte updater/netwerkcheck start, fake in tests). Nieuw:
+`Avatar2Tests/UpdateManagerTests.swift` (6 tests: één engine-start, launch-check
+precies één keer, toggle-uit → geen check, doorgeef-gedrag, canCheckForUpdates-mirror).
+Geverifieerd: beide targets bouwen; Avatar2-tests, AvatarKit (89) en AvatarUI (37)
+groen; fresh launch van de Debug-build logt de launch-check zonder dat About open was
+(via `/usr/bin/log stream`).
 
