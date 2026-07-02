@@ -83,7 +83,7 @@ geteste E12.2-engine; de meerwaarde hier is de board-multi-select-instap. **Figm
 + een referentie-keuze (welke node is de "studio"-referentie) tegen Figma/Thierry leggen.
 
 ## 29.4 — Board: cmd/shift-klik via expliciete gestures [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -101,6 +101,23 @@ cmd). Verifieer op een verse build (dual-instance/DerivedData-valkuil is hier ee
 gezien).
 **DoD:** beide targets bouwen; cmd-klik toggelt, shift-klik breidt een range uit,
 kale klik vervangt; tests groen; Result-regel.
+
+**Result:** `tapNode` (globale `NSEvent.modifierFlags`-lezing) is vervangen door drie
+expliciete gestures op de node: `TapGesture().modifiers(.command)` → `toggleNodeSelection`
+(insert/remove, macOS-conventie), `TapGesture().modifiers(.shift)` → `extendSelectionRange`
+(RANGE anker→node in board-volgorde, Finder-conventie — shift is geen toggle-alias van cmd
+meer), kale `TapGesture` → `selectOnly` (vervang; zet het range-anker). Nieuw
+`@State selectionAnchor` volgt de laatst kaal/cmd-geselecteerde node; valt het anker uit de
+selectie dan schuift het door. De range-logica zit in de pure statische helper
+`BoardView.rangeExtendedSelection(current:anchor:target:order:)` — unit-getest in het nieuwe
+`Avatar2Tests/BoardSelectionTests.swift` (6 tests: voorwaarts/achterwaarts, union met
+bestaande selectie, geen/onbekend anker → additief, anker==doel). Gesture-volgorde =
+prioriteit (modifier-varianten vóór de kale tap); dubbelklik-open ongewijzigd.
+
+**DoD/Verificatie:** Avatar (v1) + Avatar2 bouwen; `xcodebuild test -scheme Avatar2`
+100/100 groen (incl. de 6 nieuwe), `swift test` AvatarKit 89 + AvatarUI 37 groen.
+Bijvangst: flaky `EntitlementModelTests.testMonthlyResetInFutureIsUpcoming` gedeflaked
+(ISO8601 trunceert subseconden → `rounded(.down)` i.p.v. `rounded()`; was 1-op-3 rood).
 
 ## 29.5 — Board-panelen: dode chips + gedeelde kwaliteitsgate [FEAT]
 - status: ready
