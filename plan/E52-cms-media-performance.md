@@ -10,7 +10,7 @@ cache-headers, geen client-side cache/prefetch. Panels decoderen dus full-size
 bronnen voor grid-cellen van ~100–200 pt.
 
 ## 52.1 — Thumbnail-varianten server-side + client-cache
-- status: ready
+- status: done
 - team: INFRA + FEAT
 - blockedBy: —
 
@@ -29,6 +29,30 @@ bronnen voor grid-cellen van ~100–200 pt.
 **DoD:** koud panel-open toont thumbs < ~500 ms op normale verbinding (meetbaar
 gelogd), her-open instant uit cache; fallback naar `url` als `thumbnailUrl`
 ontbreekt (oude CMS-items); beide targets bouwen; tests groen; Result-regel.
+
+**Result (2026-07-02):** Supabase image-transformatie bleek op het prod-project
+beschikbaar (`/render/image/public/…?width=…&quality=…` → 200, CDN-HIT op de
+2e hit) — geen re-upload/Payload-`imageSizes` nodig. Server: `thumbnailVariant()`
+in `backend/lib/payload.ts` herschrijft de bestaande public-object-URL's naar
+render-varianten (backgrounds 160 px, effects/presets 320 px, banner-presets
+480 px); `/v1/backgrounds|effects|banner-presets|hair-|clothes-|face-presets`
+sturen nu `thumbnail_url` (presets: nieuw veld, depth=1) + gedeelde
+`Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600`.
+Client: nieuwe `ThumbnailCache` (AvatarKit) — memory (NSCache) + disk
+(`Caches/CMSThumbnails`, SHA-256-keyed) + in-flight-dedupe + CGImageSource-
+downsampled decode (max 640 px), latency per load + prefetch-batch gelogd via
+os.Logger/OSSignposter (`thumbnail.load`/`thumbnail.prefetch`). Panels
+(Background/Effects/FaceActions, Home/BannersGallery via `RemoteThumbnail`)
+prefetchen bij open, tonen de variant en halen het origineel pas bij toepassen;
+fallback `thumbnail_url ?? image_url` blijft client-side intact. Meting (4
+prod-effect-thumbs, parallel): origineel 33–163 KB / 0,19–0,38 s p.st. →
+variant 18–81 KB, koud (transform-miss) 0,39–0,56 s, CDN-warm 0,14–0,23 s;
+her-open memory/disk-instant. Tests: `ThumbnailCacheTests` (miss→hit, disk-hit
+over instanties, soft-fail, downsample-cap) + decode-fixtures voor
+`thumbnail_url` op hair-/face-presets en backgrounds — AvatarKit 100/100,
+AvatarUI 37/37, Avatar2 123/123 (1 skip), beide app-targets bouwen,
+`tsc --noEmit` schoon. Backend-wijzigingen liften mee op de volgende deploy
+(geen deploy gedaan).
 
 ## 52.2 — Prefetch/warming + metingen (backlog)
 - status: backlog
