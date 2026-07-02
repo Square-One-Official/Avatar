@@ -107,7 +107,7 @@ targets:
           NSAllowsArbitraryLoadsInWebContent: false
           NSAllowsLocalNetworking: false
         # Self-hosted Sparkle feed (audit HIGH #10). Old builds still
-        # point at https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml,
+        # point at https://raw.githubusercontent.com/Square-One-Official/Avatar/main/appcast.xml,
         # which release.sh keeps in lockstep, so existing installs keep
         # updating during the transition window.
         SUFeedURL: "https://api.aaavatar.nl/appcast.xml"
@@ -262,6 +262,7 @@ targets:
         ENABLE_PREVIEWS: YES
         COMBINE_HIDPI_IMAGES: YES
         CODE_SIGN_ENTITLEMENTS: Avatar2/Avatar2.entitlements
+        OTHER_LDFLAGS: "$(inherited) -weak_framework ImagePlayground"
     scheme:
       testTargets:
         - Avatar2Tests
