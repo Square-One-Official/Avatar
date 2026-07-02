@@ -6,6 +6,7 @@ import SwiftUI
 
 struct BannerBackgroundPanel: View {
     @Bindable var doc: BannerDoc
+    var entitlement: EntitlementModel?
     var subtitle: String?
 
     @State private var brand = BrandColorKit.shared
@@ -133,6 +134,19 @@ struct BannerBackgroundPanel: View {
             .buttonStyle(.plain)
             .dsHoverScale()
             .help("Upload image")
+
+            GenerateBackgroundSwatch(
+                context: .banner(
+                    width: Int(doc.canvasWidth.rounded()),
+                    height: Int(doc.canvasHeight.rounded())
+                ),
+                entitlement: entitlement,
+                swatchSize: swatch,
+                onSaved: { data in
+                    let stored = customImages.add(data) ?? data
+                    doc.applyFillImage(stored, resetFraming: true)
+                }
+            )
 
             if let data = doc.fillImageData,
                isImageFillActive,

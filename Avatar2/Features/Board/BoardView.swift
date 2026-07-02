@@ -1059,24 +1059,37 @@ struct BoardView: View {
                 .cgImage(forProposedRect: nil, context: nil, hints: nil),
               let refStats = SetLightingNormalizer.referenceStats(of: refCG) else { return }
         isMatchingLight = true
+        // Snapshot op de main-actor: (node, bron-bytes). De zware per-node match
+        // (decode + colorMatrix + PNG-encode) draait OFF-MAIN; alleen de SwiftData-
+        // mutaties + undo blijven op main. `Stats` is Sendable en de normalizer
+        // gebruikt een thread-safe CIContext. `selectedPortraits`-volgorde +
+        // reference blijven exact als voorheen (ordening behouden).
+        let work: [(node: Portrait2, before: Data)] = targets
+            .filter { $0.persistentModelID != reference.persistentModelID }
+            .map { ($0, $0.cutoutData) }
+        let inputs = work.map(\.before)
+        let stats = refStats
         Task { @MainActor in
             defer { isMatchingLight = false }
-            var items: [(Portrait2, Data, Data)] = []
-            for p in targets where p.persistentModelID != reference.persistentModelID {
-                guard let cg = NSImage(data: p.cutoutData)?
-                        .cgImage(forProposedRect: nil, context: nil, hints: nil),
-                      let outCG = SetLightingNormalizer.match(cg, to: refStats),
-                      let png = NSBitmapImageRep(cgImage: outCG).representation(using: .png, properties: [:])
-                else { continue }
-                items.append((p, p.cutoutData, png))
-            }
+            let outputs: [Data?] = await Task.detached(priority: .userInitiated) {
+                inputs.map { data -> Data? in
+                    guard let cg = NSImage(data: data)?
+                            .cgImage(forProposedRect: nil, context: nil, hints: nil),
+                          let outCG = SetLightingNormalizer.match(cg, to: stats),
+                          let png = NSBitmapImageRep(cgImage: outCG).representation(using: .png, properties: [:])
+                    else { return nil }
+                    return png
+                }
+            }.value
             undoManager?.beginUndoGrouping()
             undoManager?.setActionName("Match Lighting")
-            for (p, before, after) in items {
-                p.cutoutData = after
-                p.touch()
-                CutoutDataUndo.register(undoManager, portrait: p, undoTo: before, redoTo: after, actionName: "Match Lighting")
-                thumbs.invalidate(p)
+            for (i, item) in work.enumerated() {
+                guard let after = outputs[i] else { continue }
+                item.node.cutoutData = after
+                item.node.cutoutDerivesFromOriginal = false
+                item.node.touch()
+                CutoutDataUndo.register(undoManager, portrait: item.node, undoTo: item.before, redoTo: after, actionName: "Match Lighting")
+                thumbs.invalidate(item.node)
             }
             undoManager?.endUndoGrouping()
         }
@@ -1129,21 +1142,21 @@ struct BoardView: View {
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
-                                     onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Apply effect") })
+                                     onApply: { await undoableApplyToNode($0, node, actionName: "Apply effect") })
                             .id(node.persistentModelID)
                     case .clothing:
                         ClothesPanel(baseImage: base, entitlement: entitlement,
-                                     onApply: { undoableApplyToNode($0, node, actionName: "Change clothing") })
+                                     onApply: { await undoableApplyToNode($0, node, actionName: "Change clothing") })
                             .id(node.persistentModelID)
                     case .hair:
                         HairPanel(baseImage: base, entitlement: entitlement,
-                                  onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
+                                  onApply: { await undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
                     case .face:
                         FaceActionsPanel(
                             baseImage: base,
                             entitlement: entitlement,
-                            onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
+                            onApply: { await undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
                             isPro: entitlement.isProActive
                         )
                         .id(node.persistentModelID)
@@ -1162,54 +1175,53 @@ struct BoardView: View {
 
     /// E30.1: een cloud/flip-resultaat op de node toepassen via dezelfde pipeline
     /// als de editor (re-isolatie bij volle achtergrond) → cutoutData + thumbnail.
-    private func applyToNode(_ image: NSImage, _ node: Portrait2) {
+    private func applyToNode(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
-        model.applyEffectResult(image)
+        await model.applyEffectResult(image)
         thumbs.invalidate(node)
         editTool = nil
     }
 
-    /// Effects/face-edits: bewaart de cutout-alpha als masker i.p.v. Vision
-    /// opnieuw te draaien op een artistiek gestyled beeld.
-    private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) {
+    /// Face-edits: bewaart de cutout-alpha als masker i.p.v. Vision opnieuw.
+    private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
-        model.applyEffectResult(image, preserveSourceAlpha: true)
+        await model.applyEffectResult(image, preserveSourceAlpha: true)
         thumbs.invalidate(node)
         editTool = nil
     }
 
     /// Zelfde als applyToNode maar registreert ook een undo/redo-entry zodat
     /// Cmd+Z de bewerking terugdraait en Cmd+Shift+Z 'm hertoepast.
-    private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) {
+    private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) async {
         guard let before = NSImage(data: node.cutoutData) else {
-            applyToNode(image, node)
+            await applyToNode(image, node)
             return
         }
-        applyToNode(image, node)
+        await applyToNode(image, node)
         let cache = thumbs
         ImageEnhanceUndo.register(
             undoManager, target: node,
             apply: { [model, cache] img in
                 model.select(node)
-                model.applyEffectResult(img)
+                await model.applyEffectResult(img)
                 cache.invalidate(node)
             },
             undoTo: before, redoTo: image, actionName: actionName
         )
     }
 
-    private func undoableApplyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2, actionName: String) {
+    private func undoableApplyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2, actionName: String) async {
         guard let before = NSImage(data: node.cutoutData) else {
-            applyToNodePreservingAlpha(image, node)
+            await applyToNodePreservingAlpha(image, node)
             return
         }
-        applyToNodePreservingAlpha(image, node)
+        await applyToNodePreservingAlpha(image, node)
         let cache = thumbs
         ImageEnhanceUndo.register(
             undoManager, target: node,
             apply: { [model, cache] img in
                 model.select(node)
-                model.applyEffectResult(img, preserveSourceAlpha: true)
+                await model.applyEffectResult(img, preserveSourceAlpha: true)
                 cache.invalidate(node)
             },
             undoTo: before, redoTo: image, actionName: actionName
@@ -1217,28 +1229,47 @@ struct BoardView: View {
     }
 
     /// Spiegelt de cutout van de node horizontaal (zelfde transform als editor).
+    /// Decode + flip-render draaien off-main; alleen de apply (SwiftData) op main.
     private func flipNode(_ node: Portrait2) {
-        let base = NSImage(data: node.cutoutData) ?? NSImage()
-        guard let cg = base.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(
-                data: nil, width: cg.width, height: cg.height,
-                bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              ) else { return }
-        ctx.translateBy(x: CGFloat(cg.width), y: 0)
-        ctx.scaleBy(x: -1, y: 1)
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
-        guard let out = ctx.makeImage() else { return }
-        undoableApplyToNode(NSImage(cgImage: out, size: base.size), node, actionName: "Flip")
+        let data = node.cutoutData
+        Task {
+            let box = await Task.detached(priority: .userInitiated) { () -> SendableCGImage? in
+                guard let cg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                      let space = CGColorSpace(name: CGColorSpace.sRGB),
+                      let ctx = CGContext(
+                        data: nil, width: cg.width, height: cg.height,
+                        bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      ) else { return nil }
+                ctx.translateBy(x: CGFloat(cg.width), y: 0)
+                ctx.scaleBy(x: -1, y: 1)
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+                return ctx.makeImage().map(SendableCGImage.init)
+            }.value
+            guard let out = box?.cgImage else { return }
+            await undoableApplyToNode(
+                NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)),
+                node, actionName: "Flip"
+            )
+        }
     }
 
     /// One-click retouch op de node (lokaal, zelfde enhancer als de editor).
+    /// Decode + enhance draaien off-main; alleen de apply (SwiftData) op main.
     private func retouchNode(_ node: Portrait2) {
-        guard let cg = NSImage(data: node.cutoutData)?
-                .cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let out = PortraitEnhancer.magicRetouch(cg) else { return }
-        undoableApplyToNode(NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)), node, actionName: "One click retouch")
+        let data = node.cutoutData
+        Task {
+            let box = await Task.detached(priority: .userInitiated) { () -> SendableCGImage? in
+                guard let cg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                      let out = PortraitEnhancer.magicRetouch(cg) else { return nil }
+                return SendableCGImage(cgImage: out)
+            }.value
+            guard let out = box?.cgImage else { return }
+            await undoableApplyToNode(
+                NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)),
+                node, actionName: "One click retouch"
+            )
+        }
     }
 
     private var hud: some View {

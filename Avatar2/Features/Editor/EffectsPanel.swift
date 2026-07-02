@@ -50,7 +50,7 @@ final class EffectsModel {
         EffectsModel.sessionCache.isEmpty ? RemoteEffect.fallback : EffectsModel.sessionCache
 
     private let entitlement: EntitlementModel
-    private let onApply: (NSImage) -> Void
+    private let onApply: (NSImage) async -> Void
     private let portrait: Portrait2?
     private let coordinator: StylizeQualityCoordinator?
     private let cutoutImage: NSImage
@@ -68,7 +68,7 @@ final class EffectsModel {
         portrait: Portrait2?,
         cutoutImage: NSImage,
         coordinator: StylizeQualityCoordinator?,
-        onApply: @escaping (NSImage) -> Void
+        onApply: @escaping (NSImage) async -> Void
     ) {
         self.entitlement = entitlement
         self.onApply = onApply
@@ -168,9 +168,11 @@ final class EffectsModel {
         let prevSelected = selected
         selected = nil
         phase = .idle
-        onApply(base)
-        registerSelectionUndo(from: prevSelected, to: nil)
-        persist()
+        Task {
+            await onApply(base)
+            registerSelectionUndo(from: prevSelected, to: nil)
+            persist()
+        }
     }
 
     /// Tik op een effect-kaart: actief → None; gecachet → instant uit cache;
@@ -182,13 +184,21 @@ final class EffectsModel {
             return
         }
         if let cached = cache[effect.key] {
-            // Cache-hit: INSTANT, geen backend-call, geen credits (E24.33).
+            // Cache-hit: instant uit cache, maar her-isolatie kan even duren.
             let prevSelected = selected
             selected = effect
-            phase = .idle
-            onApply(cached)
-            registerSelectionUndo(from: prevSelected, to: effect)
-            persist()
+            Task {
+                phase = .working(effect)
+                entitlement.presentWorking(
+                    title: "Applying style",
+                    messages: ["Cutting out the subject…", "Almost there…"]
+                )
+                await onApply(cached)
+                phase = .idle
+                entitlement.dismissWorkingToast()
+                registerSelectionUndo(from: prevSelected, to: effect)
+                persist()
+            }
             return
         }
         Task { await generate(effect) }
@@ -197,18 +207,19 @@ final class EffectsModel {
     /// Refresh-icoon op de actieve kaart: bewust opnieuw genereren (kost credits).
     func regenerate(_ effect: RemoteEffect) {
         guard !isBusy else { return }
-        Task { await generate(effect) }
+        Task { await generate(effect, feature: .effectRegenerate) }
     }
 
-    private func generate(_ effect: RemoteEffect) async {
-        guard entitlement.allowCloudFeature() else { return }
+    private func generate(_ effect: RemoteEffect, feature: AIFeature = .effectGenerate) async {
+        guard entitlement.allowAIFeature(feature) else { return }
 
+        let defaultChoice = StylizeQuality.defaultEffectsSourceChoice(portrait: portrait)
         let (_, effectsChoice) = await coordinator?.gateBeforeStylize(
-            source: stylizeSource(choice: .original),
+            source: stylizeSource(choice: defaultChoice),
             portrait: portrait,
             cutout: cutoutImage,
             isEffects: true
-        ) ?? (.proceed, .original)
+        ) ?? (.proceed, defaultChoice)
         let source = stylizeSource(choice: effectsChoice)
         let cutoutBefore = NSImage(data: portrait?.cutoutData ?? Data()) ?? cutoutImage
 
@@ -230,9 +241,14 @@ final class EffectsModel {
             ]
         )
         do {
+            let softSource = StylizeQuality.requestsSoftSourcePrompt(for: source)
+            // Cutout én origineel: geen reframe — achtergrond zit los van het cutout.
+            let preserveFraming = true
             let result = try await entitlement.backend.stylize(
                 imagePNG: png, styleKey: effect.key,
-                cutoutWidth: cutoutW, cutoutHeight: cutoutH
+                cutoutWidth: cutoutW, cutoutHeight: cutoutH,
+                softSource: softSource,
+                preserveFraming: preserveFraming
             )
             guard let image = NSImage(data: result.data) else {
                 phase = .idle
@@ -245,10 +261,9 @@ final class EffectsModel {
             if let png = image.pngData() { pngCache[effect.key] = png }
             let prevSelected = selected
             selected = effect
+            await onApply(image)
             phase = .idle
             entitlement.dismissWorkingToast()
-            onApply(image)
-            coordinator?.offerPostBoostIfNeeded(result: image, cutoutBefore: cutoutBefore)
             registerSelectionUndo(from: prevSelected, to: effect)
             persist()
             await entitlement.refresh()
@@ -266,14 +281,18 @@ final class EffectsModel {
     /// Registreert selectie-undo naast de beeld-swap zodat Cmd+Z de badge én
     /// het canvas in één keer terugzet. Beide registraties vallen in hetzelfde
     /// NSUndoManager-auto-groepje (zelfde run-loop cyclus) → één Cmd+Z.
+    /// Target is het portret (SwiftData), niet `self`: EffectsModel leeft alleen
+    /// zolang het paneel open is — na sluiten crashte een tweede undo op een
+    /// dangling weak ref.
     private func registerSelectionUndo(from previous: RemoteEffect?, to next: RemoteEffect?) {
+        guard let portrait else { return }
         ReversibleChange.register(
-            undoManager, target: self,
+            undoManager, target: portrait,
             from: previous, to: next,
             actionName: "Apply effect"
-        ) { model, sel in
-            model.selected = sel
-            model.portrait?.effectActiveRaw = sel?.key
+        ) { [weak self] p, sel in
+            p.effectActiveRaw = sel?.key
+            self?.selected = sel
         }
     }
 
@@ -296,7 +315,7 @@ struct EffectsPanel: View {
     let entitlement: EntitlementModel
     var portrait: Portrait2?
     var coordinator: StylizeQualityCoordinator?
-    var onApply: (NSImage) -> Void = { _ in }
+    var onApply: (NSImage) async -> Void = { _ in }
 
     @State private var model: EffectsModel
     @Environment(\.undoManager) private var undoManager
@@ -306,7 +325,7 @@ struct EffectsPanel: View {
         entitlement: EntitlementModel,
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
-        onApply: @escaping (NSImage) -> Void = { _ in }
+        onApply: @escaping (NSImage) async -> Void = { _ in }
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement

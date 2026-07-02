@@ -89,7 +89,7 @@ struct ExportSheet: View {
         // Preview (256px) alléén opnieuw bij een vorm-wissel. De byte-grootte van
         // diezelfde PNG dient als referentie voor de grootteschatting per maat.
         .task(id: shape) {
-            let data = PortraitExporter.makePNG(for: portrait, watermark: watermark, side: 256, shape: shape)
+            let data = await PortraitExporter.makePNGAsync(for: portrait, watermark: watermark, side: 256, shape: shape)
             previewImage = data.flatMap { NSImage(data: $0) }
             referenceBytes = data?.count
         }

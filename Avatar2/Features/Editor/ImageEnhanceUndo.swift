@@ -14,6 +14,24 @@ enum ImageEnhanceUndo {
     /// levend (het portret-model). `before`/`after` zijn de hele beelden. Géén
     /// no-op-guard: NSImage is niet Equatable, dus gelijkheid is hier niet
     /// gedefinieerd (de aanroeper bepaalt of er iets te undo'en valt).
+    /// E18.4: async apply — wacht op her-isolatie vóór de toast weg mag.
+    @MainActor
+    static func register(
+        _ undoManager: UndoManager?,
+        target: AnyObject,
+        apply: @escaping (NSImage) async -> Void,
+        undoTo before: NSImage,
+        redoTo after: NSImage,
+        actionName: String
+    ) {
+        ReversibleChange.register(
+            undoManager, target: target, from: before, to: after, actionName: actionName
+        ) { _, image in
+            Task { await apply(image) }
+        }
+    }
+
+    /// Sync apply (flip/boost — geen her-isolatie).
     @MainActor
     static func register(
         _ undoManager: UndoManager?,

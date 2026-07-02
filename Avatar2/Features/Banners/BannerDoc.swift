@@ -29,6 +29,15 @@ final class BannerDoc {
     /// De lichtgewicht laag-stack als JSON (`BannerLayers`). externalStorage houdt
     /// de rij licht; zware beeld-bytes staan apart (hieronder).
     @Attribute(.externalStorage) var layersData: Data
+
+    /// In-memory decode-cache (NIET gepersisteerd, NIET geobserveerd): de canvas/
+    /// panels lezen `layers` tientallen keren per render/gesture-frame en elke
+    /// toegang JSON-decodete de hele stack. De cache geeft de gedecodeerde waarde
+    /// terug zolang `layersData` ongewijzigd is (byte-vergelijk is veel goedkoper
+    /// dan opnieuw decoderen). `@ObservationIgnored` houdt 'm buiten SwiftUI-
+    /// tracking zodat het vullen in de getter geen "state-tijdens-update" geeft.
+    @Transient @ObservationIgnored private var cachedLayers: BannerLayers? = nil
+    @Transient @ObservationIgnored private var cachedLayersKey: Data? = nil
     /// Bron-bytes voor `BannerFill.image` (upload/CMS/AI). nil tenzij de fill een
     /// afbeelding is.
     @Attribute(.externalStorage) var fillImageData: Data?
@@ -84,9 +93,19 @@ final class BannerDoc {
     /// De gedecodeerde laag-stack. Setter her-encodeert + `touch()`. Faalt een
     /// decode (corrupte/lege blob) dan valt 'ie terug op `.empty`.
     var layers: BannerLayers {
-        get { (try? JSONDecoder().decode(BannerLayers.self, from: layersData)) ?? .empty }
+        get {
+            if let cachedLayers, cachedLayersKey == layersData { return cachedLayers }
+            let decoded = (try? JSONDecoder().decode(BannerLayers.self, from: layersData)) ?? .empty
+            cachedLayers = decoded
+            cachedLayersKey = layersData
+            return decoded
+        }
         set {
-            if let encoded = try? JSONEncoder().encode(newValue) { layersData = encoded }
+            if let encoded = try? JSONEncoder().encode(newValue) {
+                layersData = encoded
+                cachedLayers = newValue
+                cachedLayersKey = encoded
+            }
             touch()
         }
     }
@@ -198,6 +217,10 @@ struct BannerTextLayer: Codable, Equatable, Sendable, Identifiable {
     var fontName: String?       // nil = systeemfont
     var fontSize: Double = 64   // in canvas-pixels
     var weightRaw: Int = 0      // mapt op NSFont.Weight (zie BannerTextLayer.weight)
+    /// Cursief/onderstreept. Optioneel zodat oudere documenten (zonder deze sleutels)
+    /// blijven decoderen; `nil` == uit.
+    var italic: Bool?
+    var underline: Bool?
     var colorHex: String = "#FFFFFF"
     var alignRaw: Int = 0       // 0=left 1=center 2=right
     var x: Double = 0.5         // genormaliseerd middelpunt
@@ -205,6 +228,14 @@ struct BannerTextLayer: Codable, Equatable, Sendable, Identifiable {
     var rotation: Double = 0    // graden
     var tracking: Double = 0
     var lineSpacing: Double = 0
+    /// Vaste box-breedte als fractie van de canvasbreedte (0…1). `nil` = auto-hug
+    /// (één regel, anker volgt de uitlijning). Zodra de gebruiker de blauwe
+    /// zij-handvatten versleept wordt dit gezet → de tekst word-wrapt binnen de box.
+    var width: Double?
+    /// Word-wrap binnen `width`. `true` = expliciet via zij-handvatten;
+    /// `false` = vaste kaderbreedte zonder wrap (bv. na hoek-schaal); `nil` =
+    /// legacy: `width != nil` impliceert wrap (oude documenten).
+    var wrapsLines: Bool?
 }
 
 /// Een logo/merkbeeld-laag; bytes in `BannerDoc.logoImageData`.

@@ -29,13 +29,13 @@ final class HairModel {
     private(set) var phase: Phase = .idle
 
     private let entitlement: EntitlementModel
-    private let onApply: (NSImage) -> Void
+    private let onApply: (NSImage) async -> Void
     private let coordinator: StylizeQualityCoordinator?
 
     init(
         entitlement: EntitlementModel,
         coordinator: StylizeQualityCoordinator? = nil,
-        onApply: @escaping (NSImage) -> Void
+        onApply: @escaping (NSImage) async -> Void
     ) {
         self.entitlement = entitlement
         self.coordinator = coordinator
@@ -52,7 +52,7 @@ final class HairModel {
         portrait: Portrait2? = nil
     ) async {
         guard !isBusy else { return }
-        guard entitlement.allowCloudFeature() else { return }
+        guard entitlement.allowAIFeature(.hairEdit) else { return }
 
         let source = StylizeQuality.editStylizeSource(cutout: base)
         _ = await coordinator?.gateBeforeStylize(
@@ -78,9 +78,11 @@ final class HairModel {
             ]
         )
         do {
+            let softSource = StylizeQuality.requestsSoftSourcePrompt(for: source)
             let result = try await entitlement.backend.editHair(
                 imagePNG: png, presetKey: presetKey, freeText: freeText,
-                cutoutWidth: cutoutW, cutoutHeight: cutoutH
+                cutoutWidth: cutoutW, cutoutHeight: cutoutH,
+                softSource: softSource
             )
             guard let image = NSImage(data: result.data) else {
                 phase = .idle
@@ -89,10 +91,9 @@ final class HairModel {
                 return
             }
             StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
+            await onApply(image)
             phase = .idle
             entitlement.dismissWorkingToast()
-            onApply(image)
-            coordinator?.offerPostBoostIfNeeded(result: image, cutoutBefore: cutoutBefore)
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
@@ -112,7 +113,7 @@ struct HairPanel: View {
     let entitlement: EntitlementModel
     var portrait: Portrait2?
     var coordinator: StylizeQualityCoordinator?
-    var onApply: (NSImage) -> Void = { _ in }
+    var onApply: (NSImage) async -> Void = { _ in }
 
     @State private var model: HairModel
     @State private var prompt = ""
@@ -133,7 +134,7 @@ struct HairPanel: View {
         entitlement: EntitlementModel,
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
-        onApply: @escaping (NSImage) -> Void = { _ in }
+        onApply: @escaping (NSImage) async -> Void = { _ in }
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement

@@ -15,6 +15,20 @@ import SwiftUI
 /// dropdown-menu op de Boost-chip.
 enum BoostMode: Equatable, Sendable { case local, online }
 
+/// Welke chip-dropdown momenteel open is. Eén tegelijk; nil = dicht.
+private enum ChipMenu: Hashable { case boost, removeBackground }
+
+/// Levert de scherm-bounds van elke menu-chip omhoog naar het paneel, zodat het
+/// dropdown-paneel BUITEN de gemaskeerde scroll-rij (en dus ongecliped) onder de
+/// juiste chip kan zweven.
+private struct ChipAnchorKey: PreferenceKey {
+    static let defaultValue: [ChipMenu: Anchor<CGRect>] = [:]
+    static func reduce(value: inout [ChipMenu: Anchor<CGRect>],
+                       nextValue: () -> [ChipMenu: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 struct EditColorPanel: View {
     /// E24.14: de RAUWE cutout (zonder Adjust-laag). De sliders renderen er live
     /// bovenop; de commit persisteert alléén de params (niet-destructief).
@@ -37,10 +51,14 @@ struct EditColorPanel: View {
     var onBoost: (BoostMode) -> Void = { _ in }
     // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
     var onRestoreBody: () -> Void = {}
-    /// Verwijder de achtergrond: her-isoleer het onderwerp (lokale cutout-engine)
-    /// zodat het beeld weer vrijstaand/transparant wordt. Herstelt o.a. een
-    /// achtergrond die na een Effect was achtergebleven.
+    /// Verwijder de achtergrond: her-isoleer het onderwerp (altijd on-device).
+    /// Draait met de actieve engine — ORMBG als "High quality" geïnstalleerd is,
+    /// anders Apple Vision ("Regular quality"). Nooit een credit.
     var onRemoveBackground: () -> Void = {}
+    /// Tier 2: Image Playground bewerken met huidige cutout als seed.
+    var entitlement: EntitlementModel? = nil
+    var onAppleEdit: (Data) -> Void = { _ in }
+    var showAppleEdit: Bool = false
     var isPro: Bool = false
     /// E24.28: of de lokale "Studio Light"-toggle momenteel AAN staat.
     var studioLightOn: Bool = false
@@ -58,10 +76,19 @@ struct EditColorPanel: View {
     /// dus dan tonen we alléén de sliders + Reset.
     var showAutoEnhance: Bool = true
 
-    // E41.2: Boost-modus-dropdown (lokaal/online) + onthouden laatste keuze.
-    @State private var showBoostMenu = false
+    // E41.2: Boost-/Remove background-modus-dropdown (lokaal/online) + onthouden
+    // laatste keuze. Welk menu open is wordt buiten de scroll-rij gerenderd (zie
+    // `chipMenuOverlay`), zodat de masker/clip van de horizontale rij het niet
+    // afkapt — anders zou de gebruiker een lege dropdown zien.
+    @State private var openMenu: ChipMenu?
     @State private var boostMode: BoostMode =
-        PrivacyPreferences2.shared.mode == .localOnly ? .local : .online
+        PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .online
+    /// Alléén de lopende download-voortgang van het High-quality-model (ORMBG).
+    /// Of het model áctief is lezen we reactief uit `PrivacyPreferences2.engine`
+    /// (zie `highQualityActive`) — niet uit een eigen snapshot — zodat een download
+    /// die elders is voltooid (Settings, haar-nudge) de chip meteen vereenvoudigt.
+    /// Eigen instance per paneel; deelt de onderliggende `OrmbgModelStore.shared`.
+    @State private var hiFiModel = HighFidelityModelState()
     @State private var seeded = false
     @State private var brightness = 0.0
     @State private var contrast = 1.0
@@ -75,6 +102,11 @@ struct EditColorPanel: View {
     /// Lopende off-main preview-render; bij elke nieuwe tik gecanceld zodat
     /// alleen de laatste stand landt (coalescing).
     @State private var previewTask: Task<Void, Never>?
+    @State private var showHybridCoachmark = false
+
+    private var advancedAllowed: Bool {
+        PrivacyPreferences2.shared.allowsThirdPartyCloud
+    }
 
     private var current: PortraitAdjust {
         PortraitAdjust(brightness: brightness, contrast: contrast,
@@ -121,30 +153,37 @@ struct EditColorPanel: View {
             // E24.27: één-tik AI-acties bovenin als compacte DS-chips (Pro/credit
             // waar van toepassing) → divider → de manuele sliders eronder.
             if showAutoEnhance {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DSSpacing.gap2) {
-                        // One-click retouch verhuisde hierheen uit Face — eerste chip.
-                        if showRetouch {
-                            quickAction("One click retouch", icon: "wand.and.stars", isOn: retouchOn, action: onRetouch)
+                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: DSSpacing.gap2) {
+                            if showRetouch {
+                                quickAction("One click retouch", icon: "wand.and.stars", isOn: retouchOn, action: onRetouch)
+                            }
+                            quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
+                            quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
+                            quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                            boostMenuChip
+                            quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                            if showRemoveBackground {
+                                removeBackgroundMenuChip
+                            }
+                            if showAppleEdit {
+                                ImagePlaygroundEditChip(
+                                    entitlement: entitlement,
+                                    sourceImage: source,
+                                    onEdited: onAppleEdit
+                                )
+                            }
                         }
-                        quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
-                        // Portrait: vervaagt de achtergrond (origineel/custom), onderwerp scherp.
-                        quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
-                        quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
-                        // E41.2: Boost met modus-dropdown (gratis on-device vs online).
-                        boostMenuChip
-                        // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
-                        quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
-                        // Remove background: lokale her-isolatie (gratis) → vrijstaand
-                        // beeld terug, ook na een Effect dat een achtergrond achterliet.
-                        if showRemoveBackground {
-                            quickAction("Remove background", icon: "scissors", action: onRemoveBackground)
-                        }
+                        .padding(.vertical, DSSpacing.gap1)
+                        .scrollRowTrailingInset()
                     }
-                    .padding(.vertical, DSSpacing.gap1)
-                    .scrollRowTrailingInset()
+                    .horizontalScrollEdgeFade()
+
+                    if showHybridCoachmark {
+                        hybridCoachmark
+                    }
                 }
-                .horizontalScrollEdgeFade()
                 Divider()
             }
 
@@ -160,7 +199,23 @@ struct EditColorPanel: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // De Boost-/Remove background-dropdowns leven BUITEN de gemaskeerde
+        // scroll-rij (zie comment bij `openMenu`); hier zwevend bovenop het
+        // paneel zodat ze niet door de rij-clip worden afgekapt.
+        .overlayPreferenceValue(ChipAnchorKey.self) { anchors in
+            chipMenuOverlay(anchors)
+        }
+        .onChange(of: hiFiModel.phase) { _, phase in
+            if phase == .failed {
+                entitlement?.presentError(
+                    "Couldn't download the High quality model. Check your connection and try again."
+                )
+            }
+        }
         .onAppear {
+            // Reflecteer of het High-quality-model al op schijf staat (bepaalt of
+            // de chip simpel is of een Regular/High-keuze toont).
+            hiFiModel.refreshInstalledState()
             if sourceCG == nil,
                let cg = source.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 sourceCG = SendableCGImage(cgImage: cg)
@@ -201,18 +256,43 @@ struct EditColorPanel: View {
         .fixedSize()
     }
 
-    /// E41.2: Boost-chip met dropdown — kies gratis (on-device) of online (1
-    /// credit). Het dropdown-menu is onze `DSContextMenuPanel` + `DSMenuRow` in
-    /// een popover (zelfde patroon als de DSColorPicker-popover). De chip toont de
-    /// laatst gekozen modus; een rij kiezen zet de modus én draait de Boost.
+    private var hybridCoachmark: some View {
+        HStack(alignment: .top, spacing: DSSpacing.gap2) {
+            Text(HybridFallbackCoachmark.message)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: DSSpacing.gap2)
+            Button {
+                HybridFallbackCoachmark.markShown()
+                showHybridCoachmark = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, DSSpacing.gap1)
+    }
+
+    private func noteHybridFallbackIfNeeded() {
+        guard !advancedAllowed, HybridFallbackCoachmark.shouldShow else { return }
+        showHybridCoachmark = true
+    }
+
+    /// E41.2: Boost-chip — alleen de knop; het dropdown-paneel rendert in
+    /// `chipMenuOverlay` (buiten de scroll-clip).
     private var boostMenuChip: some View {
-        let cloudAllowed = PrivacyPreferences2.shared.mode == .cloudAllowed
-        return Button { showBoostMenu = true } label: {
+        Button {
+            toggleMenu(.boost)
+        } label: {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: 12, weight: .medium))
                 Text("Boost").dsTextStyle(.labelSmall)
                 Text(boostMode == .local ? "Free" : "1 credit")
                     .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                DSPrivacyBadge(tier: boostMode == .local ? .onDevice : .thirdParty)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
@@ -224,23 +304,174 @@ struct EditColorPanel: View {
         .buttonStyle(.plain)
         .dsHoverScale()
         .fixedSize()
-        .popover(isPresented: $showBoostMenu, arrowEdge: .bottom) {
-            DSContextMenuPanel(minWidth: 230) {
-                DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free") {
-                    showBoostMenu = false
-                    boostMode = .local
-                    onBoost(.local)
-                }
-                DSMenuRow("Online", icon: "cloud",
-                          shortcut: cloudAllowed ? "Best · 1 credit" : "Enable online") {
-                    showBoostMenu = false
-                    boostMode = .online
-                    onBoost(.online)
+        .anchorPreference(key: ChipAnchorKey.self, value: .bounds) { [ChipMenu.boost: $0] }
+    }
+
+    /// Het Boost-dropdown-paneel (gerenderd in de overlay, niet op de chip).
+    private var boostMenu: some View {
+        DSContextMenuPanel(minWidth: 230) {
+            DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free · On device") {
+                openMenu = nil
+                boostMode = .local
+                noteHybridFallbackIfNeeded()
+                onBoost(.local)
+            }
+            onlineHybridMenuRow(
+                title: "Online",
+                shortcut: advancedAllowed ? "Best · 1 credit" : "Sharper · Advanced privacy"
+            ) {
+                openMenu = nil
+                boostMode = .online
+                onBoost(.online)
+            }
+        }
+    }
+
+    /// Remove background — altijd on-device, nooit een credit. Met het High-
+    /// quality-model (ORMBG) geïnstalleerd is dit één simpele knop; zonder het
+    /// model kiest de gebruiker per keer Regular (Vision, direct) of High
+    /// (eenmalige download). Tijdens downloaden toont de chip voortgang.
+    /// High quality (ORMBG) actief = de import/cutout draait er al op. Reactief op
+    /// de gedeelde voorkeur, dus consistent met welke engine de cutout écht kiest.
+    private var highQualityActive: Bool {
+        PrivacyPreferences2.shared.engine == .downloadedModel
+    }
+
+    @ViewBuilder
+    private var removeBackgroundMenuChip: some View {
+        if case .downloading(let fraction) = hiFiModel.phase {
+            cutoutDownloadingChip(fraction)
+        } else if highQualityActive {
+            cutoutSimpleChip
+        } else {
+            cutoutChoiceChip
+        }
+    }
+
+    /// Model actief → één gratis knop die meteen vrijstaand maakt (High quality).
+    private var cutoutSimpleChip: some View {
+        Button { onRemoveBackground() } label: {
+            cutoutChipLabel(trailingIcon: nil)
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
+        .fixedSize()
+    }
+
+    /// Model nog niet gedownload → chevron opent de Regular/High-keuze.
+    private var cutoutChoiceChip: some View {
+        Button { toggleMenu(.removeBackground) } label: {
+            cutoutChipLabel(trailingIcon: "chevron.down")
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
+        .fixedSize()
+        .anchorPreference(key: ChipAnchorKey.self, value: .bounds) { [ChipMenu.removeBackground: $0] }
+    }
+
+    private func cutoutDownloadingChip(_ fraction: Double) -> some View {
+        HStack(spacing: DSSpacing.gap1) {
+            Image(systemName: "arrow.down.circle").font(.system(size: 12, weight: .medium))
+            Text("Downloading… \(Int(fraction * 100))%")
+                .dsTextStyle(.labelSmall)
+                .monospacedDigit()
+                .foregroundStyle(DSColor.Foreground.muted)
+        }
+        .foregroundStyle(DSColor.Foreground.primary)
+        .padding(.horizontal, DSSpacing.gap2)
+        .frame(height: 32)
+        .background(DSColor.Background.neutral, in: Capsule())
+        .fixedSize()
+    }
+
+    private func cutoutChipLabel(trailingIcon: String?) -> some View {
+        HStack(spacing: DSSpacing.gap1) {
+            Image(systemName: "scissors").font(.system(size: 12, weight: .medium))
+            Text("Remove background").dsTextStyle(.labelSmall)
+            if let trailingIcon {
+                Image(systemName: trailingIcon).font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+        }
+        .foregroundStyle(DSColor.Foreground.primary)
+        .padding(.horizontal, DSSpacing.gap2)
+        .frame(height: 32)
+        .background(DSColor.Background.neutral, in: Capsule())
+    }
+
+    private var removeBackgroundMenu: some View {
+        DSContextMenuPanel(minWidth: 230) {
+            DSMenuRow("Regular quality", icon: "bolt", shortcut: "Instant") {
+                openMenu = nil
+                onRemoveBackground()
+            }
+            DSMenuRow("High quality", icon: "sparkles", shortcut: "Sharper hair · 78 MB") {
+                openMenu = nil
+                // Download het model (voortgang op de chip), zet het meteen als
+                // actieve engine — ook latere imports gebruiken het dan — en maak
+                // het beeld vrijstaand zodra het binnen is.
+                hiFiModel.download {
+                    PrivacyPreferences2.shared.engine = .downloadedModel
+                    onRemoveBackground()
                 }
             }
-            .padding(DSSpacing.gap1)
-            .appliedAppearancePreference()
         }
+    }
+
+    private func toggleMenu(_ menu: ChipMenu) {
+        openMenu = (openMenu == menu) ? nil : menu
+    }
+
+    /// Rendert het open dropdown-paneel zwevend onder de bijbehorende chip, plus
+    /// een transparante vanglaag die bij een tik erbuiten sluit. Leeft buiten de
+    /// gemaskeerde scroll-rij, dus wordt niet afgekapt.
+    @ViewBuilder
+    private func chipMenuOverlay(_ anchors: [ChipMenu: Anchor<CGRect>]) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                if openMenu != nil {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { openMenu = nil }
+                }
+                if openMenu == .boost, let anchor = anchors[.boost] {
+                    floatingMenu(boostMenu, at: proxy[anchor], in: proxy.size)
+                }
+                if openMenu == .removeBackground, let anchor = anchors[.removeBackground] {
+                    floatingMenu(removeBackgroundMenu, at: proxy[anchor], in: proxy.size)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        // Dicht: laat alle tikken door naar de sliders eronder. Open: vang ze
+        // (vanglaag sluit, menu-rijen reageren).
+        .allowsHitTesting(openMenu != nil)
+        .animation(DSMotion.fast, value: openMenu)
+    }
+
+    private func floatingMenu<Menu: View>(_ menu: Menu, at chip: CGRect, in size: CGSize) -> some View {
+        let menuWidth: CGFloat = 230
+        let x = max(0, min(chip.minX, size.width - menuWidth))
+        return menu
+            .fixedSize()
+            .offset(x: x, y: chip.maxY + DSSpacing.gap2)
+            .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
+    }
+
+    /// Online-pad altijd zichtbaar; muted wanneer Advanced tier nog niet actief is.
+    private func onlineHybridMenuRow(
+        title: String,
+        shortcut: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        DSMenuRow(title, icon: "cloud", shortcut: shortcut, action: action)
+            .opacity(advancedAllowed ? 1 : 0.55)
+            .overlay(alignment: .trailing) {
+                if !advancedAllowed {
+                    DSPrivacyBadge(tier: .thirdParty)
+                        .padding(.trailing, DSSpacing.gap2)
+                }
+            }
     }
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {

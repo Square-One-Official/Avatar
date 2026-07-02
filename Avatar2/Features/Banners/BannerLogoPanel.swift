@@ -9,7 +9,7 @@ import SwiftUI
 
 struct BannerLogoPanel: View {
     @Bindable var doc: BannerDoc
-    @Binding var selection: BannerCanvasSelection?
+    @Binding var selection: Set<BannerElementRef>
     var subtitle: String?
 
     @State private var brand = BrandColorKit.shared
@@ -158,7 +158,7 @@ struct BannerLogoPanel: View {
         var layers = doc.layers
         layers.logo = BannerLogoLayer(x: 0.5, y: 0.5, scale: 0.25)
         doc.layers = layers
-        selection = .logo
+        selection = [.logo]
     }
 
     private func removeLogo() {
@@ -166,6 +166,6 @@ struct BannerLogoPanel: View {
         var layers = doc.layers
         layers.logo = nil
         doc.layers = layers
-        if selection == .logo { selection = nil }
+        selection.remove(.logo)
     }
 }

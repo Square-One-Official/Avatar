@@ -33,7 +33,8 @@ public enum BannerCompositor {
     public static func composite(
         fill: Fill,
         size: CGSize,
-        imageFocal: CGPoint = CGPoint(x: 0.5, y: 0.5)
+        imageFocal: CGPoint = CGPoint(x: 0.5, y: 0.5),
+        imageZoom: CGFloat = 1
     ) throws -> CGImage {
         let w = max(1, Int(size.width.rounded()))
         let h = max(1, Int(size.height.rounded()))
@@ -44,7 +45,7 @@ public enum BannerCompositor {
         case let .color(r, g, b):
             content = CIImage(color: CIColor(red: r, green: g, blue: b)).cropped(to: rect)
         case let .image(image):
-            content = aspectFill(CIImage(cgImage: image), into: rect, focal: imageFocal)
+            content = aspectFill(CIImage(cgImage: image), into: rect, focal: imageFocal, zoom: imageZoom)
         }
 
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -59,10 +60,15 @@ public enum BannerCompositor {
     /// Schaalt en centreert een CIImage zodat hij `rect` volledig vult
     /// (aspect-fill), met hoge-kwaliteit resampling. Spiegelt
     /// `BackgroundCompositor.aspectFill`.
-    private static func aspectFill(_ image: CIImage, into rect: CGRect, focal: CGPoint) -> CIImage {
+    private static func aspectFill(
+        _ image: CIImage,
+        into rect: CGRect,
+        focal: CGPoint,
+        zoom: CGFloat = 1
+    ) -> CIImage {
         let ext = image.extent
         guard ext.width > 0, ext.height > 0 else { return image.cropped(to: rect) }
-        let scale = max(rect.width / ext.width, rect.height / ext.height)
+        let scale = max(rect.width / ext.width, rect.height / ext.height) * max(1, zoom)
         let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         let s = scaled.extent
         let focalX = s.minX + focal.x * s.width

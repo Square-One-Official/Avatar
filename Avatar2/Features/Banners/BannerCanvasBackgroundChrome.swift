@@ -5,7 +5,7 @@ import SwiftUI
 
 struct BannerCanvasBackgroundChrome: View {
     @Bindable var doc: BannerDoc
-    @Binding var selection: BannerCanvasSelection?
+    @Binding var backgroundSelected: Bool
     let activeTool: BannerTool?
     let canvasSize: CGSize
     let layout: BannerCanvasChromeMetrics.Layout
@@ -13,8 +13,11 @@ struct BannerCanvasBackgroundChrome: View {
     let filename: String
     var onReplace: () -> Void
 
+    @State private var toolbarMenuOpen = false
+    @State private var toolbarMenuDismissNonce = 0
+
     var body: some View {
-        if case .backgroundFill = selection,
+        if backgroundSelected,
            doc.layers.fill == .image,
            let data = doc.fillImageData {
             let rect = BannerCanvasChromeMetrics.fullCanvasScreenRect(
@@ -22,6 +25,11 @@ struct BannerCanvasBackgroundChrome: View {
                 layout: layout
             )
             ZStack {
+                if toolbarMenuOpen {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { toolbarMenuDismissNonce += 1 }
+                }
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .strokeBorder(Color.accentColor.opacity(0.85), lineWidth: 2)
                     .frame(width: rect.width - 4, height: rect.height - 4)
@@ -34,7 +42,9 @@ struct BannerCanvasBackgroundChrome: View {
                     byteCount: data.count,
                     imageData: data,
                     onReplace: onReplace,
-                    onRemove: removeBackgroundImage
+                    onRemove: removeBackgroundImage,
+                    menuDismissNonce: toolbarMenuDismissNonce,
+                    onMenusOpenChange: { toolbarMenuOpen = $0 }
                 )
                 .fixedSize()
                 .position(x: rect.midX, y: rect.maxY - 24)
@@ -51,6 +61,6 @@ struct BannerCanvasBackgroundChrome: View {
         doc.layers = layers
         let after = BannerDocUndo.snapshot(of: doc)
         BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: "Remove background")
-        if selection == .backgroundFill { selection = nil }
+        backgroundSelected = false
     }
 }

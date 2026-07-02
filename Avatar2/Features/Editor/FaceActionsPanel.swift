@@ -36,14 +36,14 @@ final class FaceEffectsModel {
     private let baseImage: NSImage
     private let portrait: Portrait2?
     private let coordinator: StylizeQualityCoordinator?
-    private let onApply: (NSImage) -> Void
+    private let onApply: (NSImage) async -> Void
 
     init(
         entitlement: EntitlementModel,
         baseImage: NSImage,
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
-        onApply: @escaping (NSImage) -> Void
+        onApply: @escaping (NSImage) async -> Void
     ) {
         self.entitlement = entitlement
         self.baseImage = baseImage
@@ -69,7 +69,7 @@ final class FaceEffectsModel {
     }
 
     private func generate(presetKey: String, label: String) async {
-        guard entitlement.allowCloudFeature() else { return }
+        guard entitlement.allowAIFeature(.faceEdit) else { return }
 
         let source = StylizeQuality.editStylizeSource(cutout: baseImage)
         _ = await coordinator?.gateBeforeStylize(
@@ -94,9 +94,11 @@ final class FaceEffectsModel {
             ]
         )
         do {
+            let softSource = StylizeQuality.requestsSoftSourcePrompt(for: source)
             let result = try await entitlement.backend.editFace(
                 imagePNG: png, presetKey: presetKey,
-                cutoutWidth: cutoutW, cutoutHeight: cutoutH
+                cutoutWidth: cutoutW, cutoutHeight: cutoutH,
+                softSource: softSource
             )
             guard let image = NSImage(data: result.data) else {
                 phase = .idle
@@ -105,10 +107,9 @@ final class FaceEffectsModel {
                 return
             }
             StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
+            await onApply(image)
             phase = .idle
             entitlement.dismissWorkingToast()
-            onApply(image)
-            coordinator?.offerPostBoostIfNeeded(result: image, cutoutBefore: cutoutBefore)
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
@@ -128,7 +129,7 @@ struct FaceActionsPanel: View {
     var portrait: Portrait2?
     var coordinator: StylizeQualityCoordinator?
     /// E32.1: resultaat van een generatieve face-edit toepassen (undo'baar).
-    var onApply: (NSImage) -> Void = { _ in }
+    var onApply: (NSImage) async -> Void = { _ in }
     var isPro: Bool = false
 
     @State private var model: FaceEffectsModel
@@ -159,7 +160,7 @@ struct FaceActionsPanel: View {
         entitlement: EntitlementModel,
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
-        onApply: @escaping (NSImage) -> Void = { _ in },
+        onApply: @escaping (NSImage) async -> Void = { _ in },
         isPro: Bool = false
     ) {
         self.baseImage = baseImage

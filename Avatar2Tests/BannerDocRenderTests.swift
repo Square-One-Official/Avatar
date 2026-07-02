@@ -85,9 +85,16 @@ final class BannerDocRenderTests: XCTestCase {
     }
 
     func testTextAlignmentLeftDrawsLeftOfCenter() {
+        let canvas = CGSize(width: 1500, height: 500)
         let center = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 1, x: 0.5, y: 0.5)
         let left = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 0, x: 0.5, y: 0.5)
         let right = BannerTextLayer(string: "Hi", fontSize: 48, colorHex: "#FFFFFF", alignRaw: 2, x: 0.5, y: 0.5)
+        // Kader blijft op dezelfde plek; alleen de tekst schuift binnen het kader.
+        let centerRect = BannerLayoutMetrics.textRect(layer: center, canvas: canvas)
+        let leftRect = BannerLayoutMetrics.textRect(layer: left, canvas: canvas)
+        XCTAssertEqual(centerRect.midX, leftRect.midX, accuracy: 0.5)
+        XCTAssertEqual(centerRect.midY, leftRect.midY, accuracy: 0.5)
+
         let base = BannerLayers(fill: .solid(hex: "#000000"))
         guard let centerImg = BannerDocRenderer.render(BannerDoc(layers: BannerLayers(fill: base.fill, texts: [center]))),
               let leftImg = BannerDocRenderer.render(BannerDoc(layers: BannerLayers(fill: base.fill, texts: [left]))),
@@ -98,8 +105,8 @@ final class BannerDocRenderTests: XCTestCase {
         let centerWhiteX = whiteCentroidX(centerImg)
         let leftWhiteX = whiteCentroidX(leftImg)
         let rightWhiteX = whiteCentroidX(rightImg)
-        XCTAssertGreaterThan(leftWhiteX, centerWhiteX)
-        XCTAssertLessThan(rightWhiteX, centerWhiteX)
+        XCTAssertLessThan(leftWhiteX, centerWhiteX)
+        XCTAssertGreaterThan(rightWhiteX, centerWhiteX)
     }
 
     private func whiteCentroidX(_ cg: CGImage) -> Double {
@@ -164,6 +171,54 @@ final class BannerDocRenderTests: XCTestCase {
         guard let cg = BannerDocRenderer.render(doc) else { return XCTFail("render gaf nil") }
         XCTAssertEqual(nearWhiteRatio(cg), 0, accuracy: 0.0005,
                        "placeholder-tekst mag niet meegebakken worden")
+    }
+
+    func testTextWidthWordWrapsIntoMoreLines() {
+        let long = "Wrapping text should span several lines on a narrow box"
+        let narrow = BannerTextLayer(string: long, fontSize: 56, colorHex: "#FFFFFF", alignRaw: 1, x: 0.5, y: 0.5, width: 0.22)
+        let auto = BannerTextLayer(string: long, fontSize: 56, colorHex: "#FFFFFF", alignRaw: 1, x: 0.5, y: 0.5)
+        let size = CGSize(width: 1200, height: 800)
+        guard let narrowImg = BannerDocRenderer.render(BannerDoc(canvasSize: size, layers: BannerLayers(fill: .solid(hex: "#000000"), texts: [narrow]))),
+              let autoImg = BannerDocRenderer.render(BannerDoc(canvasSize: size, layers: BannerLayers(fill: .solid(hex: "#000000"), texts: [auto]))) else {
+            return XCTFail("render gaf nil")
+        }
+        XCTAssertGreaterThan(nearWhiteRatio(narrowImg), 0.001, "gewrapte tekst tekende geen zichtbare pixels")
+        XCTAssertGreaterThan(whiteVerticalSpan(narrowImg), whiteVerticalSpan(autoImg),
+                             "een smalle box hoort de tekst over meer regels te wrappen (groter verticaal bereik)")
+    }
+
+    func testTextLayerWidthDefaultsToNilWhenAbsent() throws {
+        // Oudere docs hebben geen "width"-sleutel → moet nil decoderen (auto-hug).
+        let json = """
+        {"fill":{"solid":"#000000"},"texts":[{"id":"7B8D2F1E-0000-0000-0000-000000000001","string":"Hi","fontSize":48,"weightRaw":0,"colorHex":"#FFFFFF","alignRaw":1,"x":0.5,"y":0.5,"rotation":0,"tracking":0,"lineSpacing":0}],"shaders":[]}
+        """.data(using: .utf8)!
+        let layers = try JSONDecoder().decode(BannerLayers.self, from: json)
+        XCTAssertEqual(layers.texts.count, 1)
+        XCTAssertNil(layers.texts.first?.width)
+    }
+
+    private func whiteVerticalSpan(_ cg: CGImage) -> Int {
+        let w = cg.width, h = cg.height
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 0, count: bpr * h)
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: bpr,
+            space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return 0 }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var minY = h, maxY = -1
+        for y in 0..<h {
+            for x in 0..<w {
+                let i = y * bpr + x * 4
+                if buf[i] > 200 && buf[i + 1] > 200 && buf[i + 2] > 200 {
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                    break
+                }
+            }
+        }
+        return maxY >= minY ? maxY - minY : 0
     }
 
     func testLogoLayerDrawsVisiblePixels() {

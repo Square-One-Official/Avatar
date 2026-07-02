@@ -34,10 +34,9 @@ enum StylizeQuality {
         return size.longEdge < lowResLongEdge
     }
 
-    /// True when the stylize result has fewer pixels than the cutout before edit.
-    static func shouldOfferPostBoost(result: NSImage, cutoutBefore: NSImage) -> Bool {
-        guard let r = pixelSize(of: result), let c = pixelSize(of: cutoutBefore) else { return false }
-        return r.longEdge < c.longEdge
+    /// Stuur `soft_source` mee naar `/v1/stylize` zodat de server scherpte in de prompt vraagt.
+    static func requestsSoftSourcePrompt(for source: NSImage) -> Bool {
+        isLowResolution(source)
     }
 
     // MARK: - Stylize source (Effects + shared inspection)
@@ -46,6 +45,12 @@ enum StylizeQuality {
     enum EffectsSourceChoice: Equatable {
         case original
         case cutout
+    }
+
+    /// Prefer cutout for placement-stable styling; use original only when the
+    /// user wants the styled scene as Original backdrop.
+    static func defaultEffectsSourceChoice(portrait: Portrait2?) -> EffectsSourceChoice {
+        portrait?.useOriginalBackground == true ? .original : .cutout
     }
 
     /// Prefer the full original for scene styling; fall back to cutout when absent.
@@ -127,5 +132,42 @@ extension ShellModel {
     ) -> Double {
         guard oldWidth > 0, newWidth > 0, currentScale > 0 else { return currentScale }
         return currentScale * (Double(oldWidth) / Double(newWidth))
+    }
+
+    /// Mass centroid of opaque pixels (top-left origin, y down) for placement drift.
+    nonisolated static func alphaCentroid(of cg: CGImage, minOpaquePixels: Int = 100) -> CGPoint? {
+        let w = cg.width, h = cg.height
+        guard w > 0, h > 0 else { return nil }
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 0, count: bpr * h)
+        guard let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8,
+            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var sumX = 0.0, sumY = 0.0, count = 0.0
+        for y in 0..<h {
+            for x in 0..<w where buf[y * bpr + x * 4 + 3] > 8 {
+                sumX += Double(x)
+                sumY += Double(y)
+                count += 1
+            }
+        }
+        guard count >= Double(minOpaquePixels) else { return nil }
+        return CGPoint(x: sumX / count, y: sumY / count)
+    }
+
+    /// Shift canvas offset so the subject centroid stays put after a same-size cutout swap.
+    nonisolated static func placementOffsetCompensation(
+        oldCentroid: CGPoint,
+        newCentroid: CGPoint,
+        scale: Double,
+        minDriftPixels: CGFloat = 1.5
+    ) -> (dx: Double, dy: Double)? {
+        let dx = oldCentroid.x - newCentroid.x
+        let dy = oldCentroid.y - newCentroid.y
+        guard hypot(dx, dy) >= minDriftPixels else { return nil }
+        return (Double(dx) * scale, Double(dy) * scale)
     }
 }

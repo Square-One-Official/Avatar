@@ -12,8 +12,11 @@ import SwiftUI
 struct CanvasZoomActions {
     var zoomIn: () -> Void
     var zoomOut: () -> Void
-    var zoomTo100: () -> Void
     var zoomToFit: () -> Void
+    /// Optioneel: alleen een canvas met een ECHTE pixelmaat (Banner Studio) biedt
+    /// "Actual Size" (100%, 1 punt per pixel). De portret-editor is een cover-canvas
+    /// zonder exportpixels en laat 'm weg → het menu-item grijst daar uit.
+    var actualSize: (() -> Void)? = nil
 }
 
 private struct CanvasZoomKey: FocusedValueKey {
@@ -44,13 +47,16 @@ struct CanvasZoomCommands: View {
         Button("Zoom Out") { zoom?.zoomOut() }
             .keyboardShortcut("-", modifiers: .command)
             .disabled(zoom == nil)
-        Button("Zoom to 100%") { zoom?.zoomTo100() }
+        // ⌘0 = "alles in beeld": het hele frame/canvas volledig zichtbaar. Dit
+        // cover-canvas heeft geen pixel-echte 100% (1× laat de kaart juist buiten
+        // beeld lopen), dus ⌘0 is de fit — de natuurlijke betekenis van "reset zoom".
+        Button("Zoom to Fit") { zoom?.zoomToFit() }
             .keyboardShortcut("0", modifiers: .command)
             .disabled(zoom == nil)
-        Button("Zoom to Fit") { zoom?.zoomToFit() }
-            // ⇧⌘1 i.p.v. een shift-only ⇧1 — een shortcut zonder ⌘ zou "!" in
-            // tekstvelden (hernoemen/zoeken/e-mail) onderscheppen.
-            .keyboardShortcut("1", modifiers: [.command, .shift])
-            .disabled(zoom == nil)
+        // ⌘1 = "Actual Size" (100%, 1 punt per pixel). Alleen zinvol op een canvas
+        // met een echte exportmaat (Banner Studio); grijst uit op de portret-editor.
+        Button("Actual Size") { zoom?.actualSize?() }
+            .keyboardShortcut("1", modifiers: .command)
+            .disabled(zoom?.actualSize == nil)
     }
 }

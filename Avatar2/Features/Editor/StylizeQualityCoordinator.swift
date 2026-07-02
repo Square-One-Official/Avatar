@@ -1,6 +1,6 @@
-// Coordinates pre-stylize quality sheets and post-stylize boost offers across
-// Effects / Hair / Clothes / Face panels. Owned by EditorView; panels await
-// decisions before calling the backend.
+// Coordinates pre-stylize quality sheets across Effects / Hair / Clothes /
+// Face panels. Owned by EditorView; panels await decisions before calling
+// the backend.
 
 import AppKit
 import AvatarKit
@@ -24,16 +24,10 @@ struct PreStylizeGate: Identifiable {
     let kind: PreStylizeGateKind
 }
 
-struct PostStylizeBoostOffer: Identifiable {
-    let id = UUID()
-    let message: String
-}
-
 @MainActor
 @Observable
 final class StylizeQualityCoordinator {
     var preGate: PreStylizeGate?
-    var postBoostOffer: PostStylizeBoostOffer?
 
     /// Wired by EditorView — runs Real-ESRGAN on the current cutout (1 credit).
     var onBoostCutout: (() async -> Void)?
@@ -51,19 +45,6 @@ final class StylizeQualityCoordinator {
         preGate = nil
         preGateContinuation?.resume(returning: decision)
         preGateContinuation = nil
-    }
-
-    func offerPostBoostIfNeeded(result: NSImage, cutoutBefore: NSImage) {
-        guard StylizeQuality.shouldOfferPostBoost(result: result, cutoutBefore: cutoutBefore) else {
-            return
-        }
-        postBoostOffer = PostStylizeBoostOffer(
-            message: "The effect was generated at lower resolution. Sharpen the result? (1 credit)"
-        )
-    }
-
-    func dismissPostBoost() {
-        postBoostOffer = nil
     }
 
     /// Run the pre-stylize gate for a generative edit source image.
@@ -103,27 +84,27 @@ struct PreStylizeQualitySheet: View {
     let onDecision: (PreStylizeDecision) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+        VStack(alignment: .leading, spacing: DSSpacing.gap5) {
             Text(title)
                 .dsTextStyle(.h3)
+                .foregroundStyle(DSColor.Foreground.primary)
             Text(message)
                 .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.subtle)
+                .foregroundStyle(DSColor.Foreground.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: DSSpacing.gap2) {
+            VStack(spacing: DSSpacing.gap3) {
                 if gate.kind == .effectsLowResOriginal {
-                    Button("Use cutout instead") { onDecision(.useCutoutSource) }
-                        .buttonStyle(.bordered)
+                    DSGhostButton("Use cutout instead", fullWidth: true) { onDecision(.useCutoutSource) }
                 }
-                Button("Continue anyway") { onDecision(.proceed) }
-                    .buttonStyle(.bordered)
-                Button(boostLabel) { onDecision(.boostFirst) }
-                    .buttonStyle(.borderedProminent)
+                DSNeutralButton("Continue anyway", fullWidth: true) { onDecision(.proceed) }
+                DSPrimaryButton(boostLabel, fullWidth: true) { onDecision(.boostFirst) }
             }
         }
-        .padding(DSSpacing.gap6)
-        .frame(width: 380)
+        .padding(DSSpacing.gap8)
+        .frame(width: 420)
+        .background(DSColor.Background.app)
+        .appliedAppearancePreference()
     }
 
     private var title: String {
@@ -144,28 +125,5 @@ struct PreStylizeQualitySheet: View {
 
     private var boostLabel: String {
         "Boost resolution (\(CreditMeter.chipLabel(for: .upscale)))"
-    }
-}
-
-struct PostStylizeBoostBanner: View {
-    let offer: PostStylizeBoostOffer
-    let onSharpen: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        HStack(spacing: DSSpacing.gap3) {
-            Text(offer.message)
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.primary)
-            Spacer(minLength: DSSpacing.gap2)
-            Button("Not now", action: onDismiss)
-                .buttonStyle(.borderless)
-            Button("Sharpen (\(CreditMeter.chipLabel(for: .upscale)))", action: onSharpen)
-                .buttonStyle(.borderedProminent)
-        }
-        .padding(.horizontal, DSSpacing.gap4)
-        .padding(.vertical, DSSpacing.gap2)
-        .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
     }
 }

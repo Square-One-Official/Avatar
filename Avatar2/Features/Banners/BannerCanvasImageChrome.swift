@@ -6,7 +6,7 @@ import SwiftUI
 
 struct BannerCanvasImageChrome: View {
     @Bindable var doc: BannerDoc
-    @Binding var selection: BannerCanvasSelection?
+    @Binding var selection: Set<BannerElementRef>
     let activeTool: BannerTool?
     let canvasSize: CGSize
     let layout: BannerCanvasChromeMetrics.Layout
@@ -17,9 +17,11 @@ struct BannerCanvasImageChrome: View {
     @State private var scaleDragStart: Double?
     @State private var scaleDragStartDistance: CGFloat?
     @State private var layersBeforeScale: BannerLayers?
+    @State private var toolbarMenuOpen = false
+    @State private var toolbarMenuDismissNonce = 0
 
     var body: some View {
-        if case .logo = selection,
+        if selection.contains(.logo),
            let logo = doc.layers.logo,
            let data = doc.logoImageData,
            let cg = BannerDocRenderer.cgImage(from: data) {
@@ -28,6 +30,11 @@ struct BannerCanvasImageChrome: View {
                 layout: layout
             )
             ZStack {
+                if toolbarMenuOpen {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { toolbarMenuDismissNonce += 1 }
+                }
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .strokeBorder(Color.accentColor, lineWidth: 1.5)
                     .frame(width: rect.width, height: rect.height)
@@ -45,7 +52,9 @@ struct BannerCanvasImageChrome: View {
                     byteCount: data.count,
                     imageData: data,
                     onReplace: onReplace,
-                    onRemove: removeLogo
+                    onRemove: removeLogo,
+                    menuDismissNonce: toolbarMenuDismissNonce,
+                    onMenusOpenChange: { toolbarMenuOpen = $0 }
                 )
                 .fixedSize()
                 .position(x: rect.midX, y: rect.maxY + 36)
@@ -110,6 +119,6 @@ struct BannerCanvasImageChrome: View {
         doc.layers = layers
         let after = BannerDocUndo.snapshot(of: doc)
         BannerDocUndo.registerDocument(undoManager, doc: doc, from: before, to: after, actionName: "Remove logo")
-        if selection == .logo { selection = nil }
+        selection.remove(.logo)
     }
 }

@@ -15,6 +15,9 @@ struct BannerImageFloatingToolbar: View {
     let imageData: Data
     let onReplace: () -> Void
     let onRemove: () -> Void
+    /// Verhoog vanuit canvas-chrome om het info-menu te sluiten (tik buiten).
+    var menuDismissNonce: Int = 0
+    var onMenusOpenChange: ((Bool) -> Void)?
 
     @State private var showInfoMenu = false
 
@@ -50,6 +53,8 @@ struct BannerImageFloatingToolbar: View {
                 .fill(DSColor.Background.card)
                 .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
         )
+        .onChange(of: menuDismissNonce) { _, _ in showInfoMenu = false }
+        .onChange(of: showInfoMenu) { _, open in onMenusOpenChange?(open) }
     }
 
     private func toolButton(_ icon: String, active: Bool, action: @escaping () -> Void) -> some View {

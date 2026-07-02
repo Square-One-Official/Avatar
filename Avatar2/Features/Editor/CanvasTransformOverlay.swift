@@ -18,6 +18,8 @@ import SwiftUI
 struct CanvasTransformOverlay: View {
     /// Zijde van de (niet-gezoomde) canvas-vierkant-slot, in punten.
     let side: CGFloat
+    /// Midden van de kaart in viewport-coördinaten (default: vierkant gecentreerd).
+    var cardCenter: CGPoint?
     let image: NSImage
     let portrait: Portrait2
     /// De huidige camera (E27.1) — mapt canvas-punten naar het scherm.
@@ -44,7 +46,7 @@ struct CanvasTransformOverlay: View {
             y: (t.offsetY + image.size.height * t.scale / 2) * factor
         )
         // Camera-mapping: scherm = midden + scale·(p − midden) + offset.
-        let vp = CGPoint(x: side / 2, y: side / 2)
+        let vp = cardCenter ?? CGPoint(x: side / 2, y: side / 2)
         let center = CGPoint(
             x: vp.x + camera.scale * (centerCanvas.x - vp.x) + camera.offset.width,
             y: vp.y + camera.scale * (centerCanvas.y - vp.y) + camera.offset.height

@@ -26,17 +26,53 @@ enum BannerDocRenderer {
         watermark: Bool = false,
         excludingTextIDs: Set<UUID> = []
     ) -> CGImage? {
-        let target = size ?? doc.canvasSize
+        render(renderInput(from: doc, size: size), watermark: watermark, excludingTextIDs: excludingTextIDs)
+    }
+
+    /// Sendable momentopname van alles wat `render` nodig heeft. `BannerDoc` is
+    /// een SwiftData `@Model` (niet Sendable): snapshot op de main-actor, render
+    /// het daarna veilig off-main (`composedImageAsync`).
+    struct RenderInput: Sendable {
+        let targetSize: CGSize
+        let logicalCanvasWidth: Double
+        let layers: BannerLayers
+        let fillImageData: Data?
+        let fillFocal: CGPoint
+        let fillZoom: Double
+        let logoImageData: Data?
+    }
+
+    /// Leest het document synchroon → roep aan waar `doc` veilig is (de main-actor).
+    static func renderInput(from doc: BannerDoc, size: CGSize? = nil) -> RenderInput {
+        RenderInput(
+            targetSize: size ?? doc.canvasSize,
+            logicalCanvasWidth: doc.canvasWidth,
+            layers: doc.layers,
+            fillImageData: doc.fillImageData,
+            fillFocal: CGPoint(x: doc.fillImageFocalX, y: doc.fillImageFocalY),
+            fillZoom: doc.fillImageZoom,
+            logoImageData: doc.logoImageData
+        )
+    }
+
+    /// Pure, off-main render van een Sendable `RenderInput` — identiek beeld als
+    /// de doc-variant, maar zonder `BannerDoc`-toegang (dus thread-safe).
+    static func render(
+        _ input: RenderInput,
+        watermark: Bool = false,
+        excludingTextIDs: Set<UUID> = []
+    ) -> CGImage? {
+        let target = input.targetSize
         let w = max(1, Int(target.width.rounded()))
         let h = max(1, Int(target.height.rounded()))
         let canvas = CGSize(width: w, height: h)
-        let layers = doc.layers
+        let layers = input.layers
 
         guard let base = renderFill(
             layers.fill,
-            fillImageData: doc.fillImageData,
-            fillImageFocal: CGPoint(x: doc.fillImageFocalX, y: doc.fillImageFocalY),
-            fillImageZoom: doc.fillImageZoom,
+            fillImageData: input.fillImageData,
+            fillImageFocal: input.fillFocal,
+            fillImageZoom: input.fillZoom,
             size: canvas
         ) else {
             return nil
@@ -50,11 +86,16 @@ enum BannerDocRenderer {
 
         ctx.draw(base, in: CGRect(x: 0, y: 0, width: w, height: h))
 
-        if let logo = layers.logo, let data = doc.logoImageData, let cg = Self.cgImage(from: data) {
+        // Schaalfactor t.o.v. de logische canvasbreedte: bij supersampling (de
+        // on-screen preview wordt op displayresolutie gerenderd) of een andere
+        // exportmaat moeten absolute tekst-maten (fontgrootte, tracking) mee­schalen.
+        let renderScale = canvas.width / CGFloat(max(1, input.logicalCanvasWidth))
+
+        if let logo = layers.logo, let data = input.logoImageData, let cg = Self.cgImage(from: data) {
             drawLogo(cg, layer: logo, in: ctx, canvas: canvas)
         }
         for text in layers.texts where !excludingTextIDs.contains(text.id) {
-            drawText(text, in: ctx, canvas: canvas)
+            drawText(text, in: ctx, canvas: canvas, scale: renderScale)
         }
 
         if watermark { drawWatermark(in: ctx, canvas: canvas) }
@@ -158,40 +199,83 @@ enum BannerDocRenderer {
 
     // MARK: - Tekst
 
-    private static func drawText(_ layer: BannerTextLayer, in ctx: CGContext, canvas: CGSize) {
-        guard !BannerTextPresets.isEmptyOrPlaceholder(layer.string) else { return }
-        let weight = nsFontWeight(layer.weightRaw)
-        let font = layer.fontName.flatMap { NSFont(name: $0, size: layer.fontSize) }
-            ?? NSFont.systemFont(ofSize: layer.fontSize, weight: weight)
+    private static func drawText(_ rawLayer: BannerTextLayer, in ctx: CGContext, canvas: CGSize, scale: CGFloat) {
+        guard !BannerTextPresets.isEmptyOrPlaceholder(rawLayer.string) else { return }
+        // Absolute maten meeschalen met de doelresolutie (supersample/export).
+        var layer = rawLayer
+        layer.fontSize *= Double(scale)
+        layer.tracking *= Double(scale)
+        layer.lineSpacing *= Double(scale)
         let color = nsColor(hex: layer.colorHex)
 
-        let attrs: [NSAttributedString.Key: Any] = [
+        // Vaste breedte → word-wrap binnen een gecentreerde box (CTFramesetter).
+        if BannerLayoutMetrics.wrapsText(at: layer) {
+            drawWrappedText(layer, color: color, in: ctx, canvas: canvas)
+            return
+        }
+
+        let font = BannerLayoutMetrics.nsFont(for: layer)
+
+        var attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: color,
             .kern: layer.tracking,
         ]
+        if layer.underline == true { attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue }
         // Eén regel (37.1-foundation; meerregelig + alignering = 37.4).
         let single = layer.string.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? layer.string
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: single, attributes: attrs))
         let bounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
 
+        let boxW = BannerLayoutMetrics.textBoxWidth(for: layer, canvas: canvas)
+        let boxH = BannerLayoutMetrics.textBoxHeight(for: layer, canvas: canvas, boxW: boxW)
+
         // Genormaliseerd anker; y=0 = BOVEN → CG-bottom-left omrekenen.
         let anchorX = layer.x * canvas.width
         let cy = canvas.height * (1 - layer.y)
 
-        let textX: CGFloat
-        switch layer.alignRaw {
-        case 0: textX = -bounds.minX
-        case 2: textX = -bounds.width - bounds.minX
-        default: textX = -bounds.width / 2 - bounds.minX
-        }
+        let textX = BannerLayoutMetrics.lineXInCenteredBox(
+            bounds: bounds, boxW: boxW, alignRaw: layer.alignRaw
+        )
+        // Regel verticaal centreren binnen het kader (niet het kader verschuiven).
+        let textY = -boxH / 2 + (boxH - bounds.height) / 2 - bounds.minY
 
         ctx.saveGState()
         ctx.textMatrix = .identity
         ctx.translateBy(x: anchorX, y: cy)
         if layer.rotation != 0 { ctx.rotate(by: -layer.rotation * .pi / 180) }
-        ctx.textPosition = CGPoint(x: textX, y: -bounds.height / 2 - bounds.minY)
+        ctx.textPosition = CGPoint(x: textX, y: textY)
         CTLineDraw(line, ctx)
+        ctx.restoreGState()
+    }
+
+    /// Word-wrap render binnen een vaste, op het anker gecentreerde box.
+    private static func drawWrappedText(_ layer: BannerTextLayer, color: NSColor, in ctx: CGContext, canvas: CGSize) {
+        guard let widthFrac = layer.width else { return }
+        let boxW = max(20, CGFloat(widthFrac) * canvas.width)
+        let attr = BannerLayoutMetrics.attributedString(for: layer, color: color)
+        let framesetter = CTFramesetterCreateWithAttributedString(attr)
+        let suggested = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRange(location: 0, length: 0), nil,
+            CGSize(width: boxW, height: .greatestFiniteMagnitude), nil
+        )
+        let boxH = ceil(suggested.height)
+
+        // Anker (genormaliseerd, y boven) → CG bottom-left middelpunt.
+        let cx = layer.x * canvas.width
+        let cy = canvas.height * (1 - layer.y)
+        let boxRect = CGRect(x: cx - boxW / 2, y: cy - boxH / 2, width: boxW, height: boxH)
+        let path = CGPath(rect: boxRect, transform: nil)
+        let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
+
+        ctx.saveGState()
+        ctx.textMatrix = .identity
+        if layer.rotation != 0 {
+            ctx.translateBy(x: cx, y: cy)
+            ctx.rotate(by: -layer.rotation * .pi / 180)
+            ctx.translateBy(x: -cx, y: -cy)
+        }
+        CTFrameDraw(frame, ctx)
         ctx.restoreGState()
     }
 
@@ -212,18 +296,6 @@ enum BannerDocRenderer {
     static func cgImage(from data: Data) -> CGImage? {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateImageAtIndex(src, 0, nil)
-    }
-
-    private static func nsFontWeight(_ raw: Int) -> NSFont.Weight {
-        switch raw {
-        case ..<(-1): return .light
-        case -1: return .regular
-        case 0: return .regular
-        case 1: return .medium
-        case 2: return .semibold
-        case 3: return .bold
-        default: return .heavy
-        }
     }
 
     /// Parseert `#RRGGBB`/`#RRGGBBAA` (en zonder `#`) naar 0…1-componenten.
@@ -254,5 +326,40 @@ enum BannerDocRenderer {
     private static func nsColor(hex: String) -> NSColor {
         let (r, g, b, a) = rgba(hex: hex)
         return NSColor(srgbRed: r, green: g, blue: b, alpha: a)
+    }
+
+    /// Fill + tekst + logo + shader-stack — zelfde contract als de Studio-canvas
+    /// en export (E38.2). De zware CPU-render (`render`) en de PNG-vrije watermark-
+    /// stap draaien OFF-main via `Task.detached`; alleen de doc-snapshot en de
+    /// shader-bake (`BannerShaderRenderer.bake`, SwiftUI `ImageRenderer`) lopen op
+    /// de main-actor. Beeld identiek aan de oude synchrone variant.
+    @MainActor
+    static func composedImageAsync(
+        _ doc: BannerDoc,
+        size: CGSize? = nil,
+        watermark: Bool = false,
+        excludingTextIDs: Set<UUID> = []
+    ) async -> CGImage? {
+        let input = renderInput(from: doc, size: size)
+        let shaders = doc.layers.shaders
+        let exclude = excludingTextIDs
+
+        let baseTask = Task.detached(priority: .userInitiated) {
+            render(input, excludingTextIDs: exclude).map(SendableCGImage.init)
+        }
+        guard let baseBox = await baseTask.value else { return nil }
+        let base = baseBox.cgImage
+
+        let active = shaders.filter(\.enabled)
+        let shaded = active.isEmpty
+            ? base
+            : (BannerShaderRenderer.bake(base, shaders: shaders, size: CGSize(width: base.width, height: base.height)) ?? base)
+
+        guard watermark else { return shaded }
+        let shadedBox = SendableCGImage(cgImage: shaded)
+        let stampTask = Task.detached(priority: .userInitiated) {
+            SendableCGImage(cgImage: stampWatermark(on: shadedBox.cgImage) ?? shadedBox.cgImage)
+        }
+        return await stampTask.value.cgImage
     }
 }

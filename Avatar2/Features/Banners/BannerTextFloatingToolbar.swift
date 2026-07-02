@@ -1,5 +1,5 @@
 // E37.13 — Freeform-stijl floating tekst-toolbar: kleur · Aa · grootte direct
-// onder de selectie op het canvas (geen zware onderste panelen).
+// boven het tekstkader op het canvas (format/kleur-panelen stapelen omhoog).
 
 import AppKit
 import AvatarUI
@@ -26,18 +26,84 @@ struct BannerTextFloatingToolbar: View {
     @Bindable var doc: BannerDoc
     let layerID: UUID
     let undoManager: UndoManager?
+    /// Bovenrand van het tekstkader in scherm-coördinaten (midden X, top Y).
+    let anchorTextTop: CGPoint
     var onDelete: () -> Void
+    /// Verhoog vanuit de canvas-chrome om open submenu's te sluiten (tik buiten).
+    var menuDismissNonce: Int = 0
+    var onMenusOpenChange: ((Bool) -> Void)?
 
     @State private var showColorMenu = false
     @State private var showFormatMenu = false
     @State private var showSizeMenu = false
     @State private var layersBeforeEdit: BannerLayers?
+    @State private var pillHeight: CGFloat = 36
+
+    private let gapAboveText: CGFloat = 10
+
+    private var pillCenter: CGPoint {
+        CGPoint(
+            x: anchorTextTop.x,
+            y: anchorTextTop.y - gapAboveText - pillHeight / 2
+        )
+    }
 
     private var layerIndex: Int? {
         doc.layers.texts.firstIndex(where: { $0.id == layerID })
     }
 
     var body: some View {
+        // Pil blijft vast boven het tekstkader; panelen groeien omhoog (Freeform).
+        pillRow
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: ToolbarPillHeightKey.self, value: geo.size.height)
+                }
+            )
+            .overlay(alignment: .top) {
+                VStack(spacing: DSSpacing.gap2) {
+                    if showFormatMenu {
+                        formatMenu
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                    if showColorMenu {
+                        colorMenu
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+                .fixedSize()
+                .alignmentGuide(.top) { d in d[.bottom] + DSSpacing.gap2 }
+            }
+            .onPreferenceChange(ToolbarPillHeightKey.self) { pillHeight = $0 }
+            .position(pillCenter)
+            .animation(DSMotion.fast, value: showFormatMenu)
+            .animation(DSMotion.fast, value: showColorMenu)
+            .onDisappear {
+                BannerFontPanelController.shared.dismiss()
+                BannerColorPanelController.shared.dismiss()
+            }
+            .onChange(of: menuDismissNonce) { _, _ in closeSubmenus() }
+            .onChange(of: showColorMenu) { _, _ in reportMenusOpen() }
+            .onChange(of: showFormatMenu) { _, _ in reportMenusOpen() }
+            .onChange(of: showSizeMenu) { _, _ in reportMenusOpen() }
+    }
+
+    private var anySubmenuOpen: Bool {
+        showColorMenu || showFormatMenu || showSizeMenu
+    }
+
+    private func closeSubmenus() {
+        showColorMenu = false
+        showFormatMenu = false
+        showSizeMenu = false
+    }
+
+    private func reportMenusOpen() {
+        onMenusOpenChange?(anySubmenuOpen)
+    }
+
+    /// Compacte pil: kleur · Aa · grootte — altijd direct boven het tekstkader.
+    private var pillRow: some View {
         HStack(spacing: DSSpacing.gap3) {
             colorButton
             formatButton
@@ -50,10 +116,6 @@ struct BannerTextFloatingToolbar: View {
                 .fill(DSColor.Background.card)
                 .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
         )
-        .onDisappear {
-            BannerFontPanelController.shared.dismiss()
-            BannerColorPanelController.shared.dismiss()
-        }
     }
 
     // MARK: - Controls
@@ -72,9 +134,7 @@ struct BannerTextFloatingToolbar: View {
                 .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .dsDropdownMenu(isPresented: $showColorMenu, anchorHeight: 22) {
-            colorMenu
-        }
+        // Kleur-paneel zit in de VStack boven de pil (Freeform-stijl).
     }
 
     private var formatButton: some View {
@@ -90,9 +150,7 @@ struct BannerTextFloatingToolbar: View {
         }
         .buttonStyle(.plain)
         .simultaneousGesture(TapGesture(count: 2).onEnded { openFontPanel() })
-        .dsDropdownMenu(isPresented: $showFormatMenu, anchorHeight: 28) {
-            formatMenu
-        }
+        // Format-paneel zit in de VStack boven de pil (Freeform-stijl).
     }
 
     private func openFontPanel() {
@@ -121,7 +179,7 @@ struct BannerTextFloatingToolbar: View {
             .foregroundStyle(DSColor.Foreground.primary)
         }
         .buttonStyle(.plain)
-        .dsDropdownMenu(isPresented: $showSizeMenu, anchorHeight: 28) {
+        .dsDropdownMenu(isPresented: $showSizeMenu, anchorHeight: 28, placement: .below) {
             sizeMenu
         }
     }
@@ -135,19 +193,19 @@ struct BannerTextFloatingToolbar: View {
                     swatchButton(hex: hex)
                 }
             }
-            Button("More Text Colours") {
+            HoverFill(active: false, activeFill: .clear, baseFill: DSColor.Background.neutral, cornerRadius: DSRadius.md) {
                 showColorMenu = false
                 BannerColorPanelController.shared.show(hex: currentHex) { color in
                     guard let hex = Color(nsColor: color).hexRGB else { return }
                     mutateLayer { $0.colorHex = hex }
                 }
+            } label: {
+                Text("More Text Colours")
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, DSSpacing.gap2)
             }
-            .buttonStyle(.plain)
-            .dsTextStyle(.labelSmall)
-            .foregroundStyle(DSColor.Foreground.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DSSpacing.gap2)
-            .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.md))
         }
         .padding(DSSpacing.gap3)
         .frame(width: 220)
@@ -157,81 +215,124 @@ struct BannerTextFloatingToolbar: View {
 
     private var formatMenu: some View {
         VStack(spacing: DSSpacing.gap2) {
-            HStack(spacing: DSSpacing.gap1) {
-                formatChip("B", selected: isBold) { toggleBold() }
-                formatChip("I", selected: false) { } // italic — model heeft geen italic; visuele stub
-                    .opacity(0.35)
-                    .disabled(true)
-                formatChip("U", selected: false) { }
-                    .opacity(0.35)
-                    .disabled(true)
-                Button {
-                    showFormatMenu = false
-                    openFontPanel()
-                } label: {
-                    formatChipLabel("Fonts…", selected: false)
-                }
-                .buttonStyle(.plain)
+            HStack(spacing: DSSpacing.gap2) {
+                styleSegmented
+                fontsChip
             }
-            HStack(spacing: DSSpacing.gap1) {
+            HStack(spacing: DSSpacing.gap2) {
                 alignChip(0, icon: "text.alignleft")
                 alignChip(1, icon: "text.aligncenter")
                 alignChip(2, icon: "text.alignright")
             }
 
-            Divider()
+            Divider().padding(.vertical, 2)
 
-            Button("Delete Text") {
+            HoverRow {
                 showFormatMenu = false
                 onDelete()
+            } label: {
+                Text("Delete Text")
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(Color.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, DSSpacing.gap2)
+                    .padding(.vertical, DSSpacing.gap1)
             }
-            .buttonStyle(.plain)
-            .dsTextStyle(.labelBase)
-            .foregroundStyle(Color.red)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(DSSpacing.gap2)
+        .frame(width: 248)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
         .dsDropdownDismissOverlay(isPresented: $showFormatMenu)
     }
 
-    private var sizeMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            let current = doc.layers.texts.first(where: { $0.id == layerID })?.fontSize ?? 50
-            Button {
-                showSizeMenu = false
-            } label: {
-                HStack {
-                    Text("\(Int(current))")
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.primary)
-                .padding(.horizontal, DSSpacing.gap3)
-                .padding(.vertical, DSSpacing.gap2)
-            }
-            .buttonStyle(.plain)
-
-            Divider().padding(.horizontal, DSSpacing.gap2)
-
-            ForEach(BannerTextPresets.fontSizes, id: \.self) { size in
-                Button {
-                    mutateLayer { $0.fontSize = size }
-                    showSizeMenu = false
-                } label: {
-                    Text("\(Int(size))")
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, DSSpacing.gap3)
-                        .padding(.vertical, DSSpacing.gap1)
-                }
-                .buttonStyle(.plain)
-            }
+    /// Gesegmenteerde B | I | U met hairline-scheidingen (één grijze pil, actieve
+    /// cel als witte kaart) — zoals Freeform.
+    private var styleSegmented: some View {
+        HStack(spacing: 0) {
+            segmentCell("B", weight: .bold, italic: false, underline: false, active: isBold) { toggleBold() }
+            segmentDivider
+            segmentCell("I", weight: .regular, italic: true, underline: false, active: isItalic) { toggleItalic() }
+            segmentDivider
+            segmentCell("U", weight: .regular, italic: false, underline: true, active: isUnderline) { toggleUnderline() }
         }
-        .frame(width: 120)
-        .padding(.vertical, DSSpacing.gap2)
+        .frame(height: 40)
+        .background(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous).fill(DSColor.Background.neutral))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
+    }
+
+    private var segmentDivider: some View {
+        Rectangle().fill(DSColor.Foreground.primary.opacity(0.08)).frame(width: 1, height: 22)
+    }
+
+    private func segmentCell(
+        _ title: String,
+        weight: Font.Weight,
+        italic: Bool,
+        underline: Bool,
+        active: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        var text = Text(title).font(.system(size: 14, weight: weight))
+        if italic { text = text.italic() }
+        if underline { text = text.underline() }
+        return HoverFill(active: active, activeFill: DSColor.Background.card, cornerRadius: DSRadius.sm) {
+            action()
+        } label: {
+            text
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(width: 44, height: 36)
+        }
+        .padding(2)
+    }
+
+    private var fontsChip: some View {
+        HoverFill(active: false, activeFill: .clear, baseFill: DSColor.Background.neutral, cornerRadius: DSRadius.md) {
+            showFormatMenu = false
+            openFontPanel()
+        } label: {
+            VStack(spacing: 0) {
+                Text("Fonts")
+                    .font(.system(size: 13, weight: .medium))
+                Text("…")
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .foregroundStyle(DSColor.Foreground.primary)
+            .frame(width: 64, height: 40)
+        }
+    }
+
+    private var sizeMenu: some View {
+        let current = doc.layers.texts.first(where: { $0.id == layerID })?.fontSize ?? 50
+        // Scrollbaar + begrensd: de toolbar zweeft bovenaan de tekst en het menu
+        // opent omlaag — een volle, ongelimiteerde lijst liep onder de zwevende
+        // onderbalk door waardoor de grootste maten niet aanklikbaar waren.
+        return ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(BannerTextPresets.fontSizes, id: \.self) { size in
+                    HoverRow {
+                        mutateLayer { $0.fontSize = size }
+                        showSizeMenu = false
+                    } label: {
+                        HStack {
+                            Text("\(Int(size))")
+                                .dsTextStyle(.labelBase)
+                                .foregroundStyle(DSColor.Foreground.primary)
+                            Spacer()
+                            if Int(current) == Int(size) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(DSColor.Foreground.muted)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, DSSpacing.gap3)
+                        .padding(.vertical, DSSpacing.gap2)
+                    }
+                }
+            }
+            .padding(.vertical, DSSpacing.gap1)
+        }
+        .frame(width: 132, height: 220)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
         .dsDropdownDismissOverlay(isPresented: $showSizeMenu)
     }
@@ -244,6 +345,14 @@ struct BannerTextFloatingToolbar: View {
 
     private var isBold: Bool {
         (doc.layers.texts.first(where: { $0.id == layerID })?.weightRaw ?? 0) >= 3
+    }
+
+    private var isItalic: Bool {
+        doc.layers.texts.first(where: { $0.id == layerID })?.italic == true
+    }
+
+    private var isUnderline: Bool {
+        doc.layers.texts.first(where: { $0.id == layerID })?.underline == true
     }
 
     private var currentAlign: Int {
@@ -268,45 +377,36 @@ struct BannerTextFloatingToolbar: View {
         .buttonStyle(.plain)
     }
 
-    private func formatChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            formatChipLabel(title, selected: selected)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func formatChipLabel(_ title: String, selected: Bool) -> some View {
-        Text(title)
-            .font(.system(size: 14, weight: title == "B" ? .bold : .regular))
-            .foregroundStyle(selected ? DSColor.Action.primaryForeground : DSColor.Foreground.primary)
-            .frame(width: 36, height: 36)
-            .background(
-                RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                    .fill(selected ? DSColor.Action.primary : DSColor.Background.neutral)
-            )
-    }
-
     private func alignChip(_ align: Int, icon: String) -> some View {
         let selected = currentAlign == align
-        return Button {
+        return HoverFill(
+            active: selected,
+            activeFill: DSColor.Action.primary,
+            baseFill: DSColor.Background.neutral,
+            cornerRadius: DSRadius.md
+        ) {
             mutateLayer { $0.alignRaw = align }
         } label: {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(selected ? DSColor.Action.primaryForeground : DSColor.Foreground.primary)
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                        .fill(selected ? DSColor.Action.primary : DSColor.Background.neutral)
-                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
         }
-        .buttonStyle(.plain)
     }
 
     private func toggleBold() {
         mutateLayer { layer in
             layer.weightRaw = layer.weightRaw >= 3 ? 0 : 3
         }
+    }
+
+    private func toggleItalic() {
+        mutateLayer { $0.italic = !($0.italic ?? false) }
+    }
+
+    private func toggleUnderline() {
+        mutateLayer { $0.underline = !($0.underline ?? false) }
     }
 
     private func mutateLayer(_ edit: (inout BannerTextLayer) -> Void) {
@@ -316,5 +416,62 @@ struct BannerTextFloatingToolbar: View {
         edit(&layers.texts[index])
         doc.layers = layers
         BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Text")
+    }
+}
+
+private struct ToolbarPillHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 36
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// Knop met een afgeronde vulling die op hover lichtjes oplicht (en een actieve
+/// staat). Basis voor de B|I|U-cellen, uitlijnknoppen en Fonts-chip.
+private struct HoverFill<Label: View>: View {
+    var active: Bool
+    var activeFill: Color
+    var baseFill: Color = .clear
+    var cornerRadius: CGFloat
+    var action: () -> Void
+    @ViewBuilder var label: () -> Label
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            label()
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(active ? activeFill : baseFill)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .fill(Color.primary.opacity(hovering && !active ? 0.06 : 0))
+                        )
+                )
+                .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
+/// Een volledige-breedte menurij met hover-achtergrond (lijstitems).
+private struct HoverRow<Label: View>: View {
+    var action: () -> Void
+    @ViewBuilder var label: () -> Label
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            label()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }

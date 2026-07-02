@@ -115,7 +115,7 @@ struct BannerTextPanel: View {
 
             section("Size") {
                 HStack(spacing: DSSpacing.gap3) {
-                    DSSlider(value: layer.fontSize, in: 24...240)
+                    DSSlider(value: layer.fontSize, in: 24...max(240, value.fontSize))
                     Text("\(Int(value.fontSize))")
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.muted)
@@ -256,7 +256,13 @@ struct BannerTextPanel: View {
     }
 
     private func addText() {
-        let layer = BannerTextLayer(string: "Your text", fontSize: 96, colorHex: "#FFFFFF", x: 0.5, y: 0.5)
+        let canvas = doc.canvasSize
+        let stackIndex = BannerLayoutMetrics.nextTextStackIndex(in: texts, canvas: canvas)
+        let (nx, ny) = BannerLayoutMetrics.staggeredTextPosition(stackIndex: stackIndex, canvas: canvas)
+        let layer = BannerLayoutMetrics.withInitialFrame(
+            BannerTextLayer(string: "Your text", fontSize: 96, colorHex: "#FFFFFF", x: nx, y: ny),
+            canvas: canvas
+        )
         texts.append(layer)
         selectedLayerID = layer.id
     }
