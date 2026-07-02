@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * Messages (E17.1) — het VERENIGDE bericht-model: één document voedt zowel
@@ -23,10 +24,16 @@ export const Messages: CollectionConfig = {
     group: "Messaging",
   },
   access: {
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only. The backend reads with a valid Payload
+    // API key (`Authorization: users API-Key <key>`), which Payload resolves
+    // to `req.user` after validating the key — so `Boolean(req.user)` covers
+    // the macOS-app read path. Do NOT also allow on mere header presence: an
+    // unvalidated `Authorization: ...` header would have exposed
+    // targeting.audienceEmails (end-user PII) to any anonymous caller.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {

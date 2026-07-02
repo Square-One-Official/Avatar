@@ -1,4 +1,5 @@
 import type { CollectionConfig } from "payload";
+import { authed } from "../lib/access";
 
 /**
  * Append-only record of every admin mutation (audit MEDIUM #24). Each row
@@ -34,7 +35,7 @@ export const AuditLog: CollectionConfig = {
   },
   access: {
     // Read: any authenticated admin can see the trail.
-    read: ({ req }) => Boolean(req.user),
+    read: authed,
     // Write paths all refuse. Hooks bypass `access.create` because they
     // run server-side with `req.payload.create`, so this denial only
     // gates direct HTTP creates.

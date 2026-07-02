@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * Registry of components in the macOS app that can wear a "NEW" badge.
@@ -22,10 +23,15 @@ export const BadgeComponents: CollectionConfig = {
     description: "IDs the macOS app knows about. Don't add IDs that aren't wired in code — the badge will silently no-op.",
   },
   access: {
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only — the backend's validated API key
+    // (`Authorization: users API-Key <key>`) satisfies `req.user`, and
+    // Payload resolves the Announcements/Messages → badgeTargets relationship
+    // under that same authenticated request. Never trust mere
+    // Authorization-header presence.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     { name: "componentId", type: "text", required: true, unique: true },

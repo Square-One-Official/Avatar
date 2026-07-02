@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * CMS-driven Banner presets (E39). Each row is a starting point shown in the
@@ -23,10 +24,14 @@ export const BannerPresets: CollectionConfig = {
       "Starting points shown in the app's Banners empty-state. Add a row to ship a new preset without an app update — the app reads this list at runtime.",
   },
   access: {
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only — the backend's validated API key
+    // (`Authorization: users API-Key <key>`) satisfies `req.user`, so this
+    // covers the macOS-app read path. Never trust mere Authorization-header
+    // presence: that would expose this collection to anonymous callers.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {

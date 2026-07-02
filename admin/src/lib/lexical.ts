@@ -44,7 +44,7 @@ function renderNode(node: LexicalNode): string {
       const level = headingLevel(node.tag);
       return `<h${level} style="margin: 18px 0 10px; color: #FFFFFF;">${inner}</h${level}>`;
     }
-    case "link":     return `<a href="${escapeAttr(node.url ?? "")}" style="color: #9AB6F2;">${inner}</a>`;
+    case "link":     return `<a href="${escapeAttr(safeUrl(node.url))}" style="color: #9AB6F2;">${inner}</a>`;
     case "list":     return node.listType === "number" ? `<ol>${inner}</ol>` : `<ul>${inner}</ul>`;
     case "listitem": return `<li>${inner}</li>`;
     case "linebreak":return "<br/>";
@@ -56,6 +56,38 @@ function headingLevel(tag: string | undefined): number {
   if (!tag) return 2;
   const m = tag.match(/^h([1-6])$/);
   return m ? Number(m[1]) : 2;
+}
+
+// Schemes a newsletter link may legitimately use: web links, mail links, and
+// the app's own `aaavatar://` deep link. Everything else (javascript:, data:,
+// vbscript:, file:, …) is collapsed to a harmless anchor.
+const ALLOWED_URL_SCHEMES = new Set(["http:", "https:", "mailto:", "aaavatar:"]);
+
+/**
+ * Collapse any non-navigational URL scheme to a harmless anchor before it
+ * lands in an `href`. Admin authors are trusted, and the only render sink
+ * today is email HTML (clients strip active content) — but a `javascript:`
+ * or `data:` href in an author-supplied link would become stored XSS the
+ * moment this HTML is ever shown in a browser/webview.
+ *
+ * Resolved with the WHATWG `URL` parser (against a dummy base) so we read the
+ * exact scheme a browser would — this also neutralises the classic
+ * control-character smuggling (`java&#9;script:`), since the parser strips
+ * tab/newline before determining the scheme. Relative/scheme-less URLs resolve
+ * to the dummy base's `https:` and are allowed; the original (escaped) string
+ * is what we emit so legitimate relative links render unchanged.
+ */
+export function safeUrl(url: string | null | undefined): string {
+  if (typeof url !== "string") return "#";
+  const trimmed = url.trim();
+  if (!trimmed) return "#";
+  let scheme: string;
+  try {
+    scheme = new URL(trimmed, "https://aaavatar.invalid/").protocol;
+  } catch {
+    return "#";
+  }
+  return ALLOWED_URL_SCHEMES.has(scheme) ? trimmed : "#";
 }
 
 function escapeHtml(s: string): string {

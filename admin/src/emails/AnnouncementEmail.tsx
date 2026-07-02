@@ -12,6 +12,7 @@ import {
   Section,
   Text,
 } from "@react-email/components";
+import { safeUrl } from "../lib/lexical";
 
 type Props = {
   title: string;
@@ -61,7 +62,7 @@ export default function AnnouncementEmail({
 
             {cta ? (
               <Section style={ctaWrapperStyle}>
-                <Link href={cta.url} style={ctaButtonStyle}>
+                <Link href={safeUrl(cta.url)} style={ctaButtonStyle}>
                   {cta.label}
                 </Link>
               </Section>

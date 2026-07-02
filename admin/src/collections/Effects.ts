@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * CMS-driven Effects styles (E33). Each row is one card in the macOS Editor's
@@ -24,13 +25,16 @@ export const Effects: CollectionConfig = {
       "Styles shown in the macOS Editor's Effects panel. Add a row to ship a new effect without an app update — the app reads this list at runtime.",
   },
   access: {
-    // Authed admin OR any request carrying an Authorization header — the
-    // backend reads with `Authorization: users API-Key <key>`. Mirrors
-    // BadgeComponents so the macOS-app read path works.
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only. The backend reads with a valid Payload
+    // API key (`Authorization: users API-Key <key>`), which Payload resolves
+    // to `req.user` after validating the key — so `Boolean(req.user)` covers
+    // the macOS-app read path. Do NOT also allow on mere header presence: an
+    // unvalidated `Authorization: ...` header would have leaked the
+    // server-only `prompt` field to any anonymous caller.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {
