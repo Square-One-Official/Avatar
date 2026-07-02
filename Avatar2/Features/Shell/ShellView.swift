@@ -164,6 +164,46 @@ struct ShellView: View {
             // uit de proces-argumenten gelezen (geen race).
             // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.
             if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
+            // Drop-import-smoke: `--import-after <pad> [sec]` — simuleert een
+            // Finder-drop in de library (zelfde model-pad als handleDrop).
+            if let i = args.firstIndex(of: "--import-after"), args.indices.contains(i + 1) {
+                let path = args[i + 1]
+                let delay = (args.indices.contains(i + 2) ? TimeInterval(args[i + 2]) : nil) ?? 3
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(delay))
+                    await model.importImage(from: URL(fileURLWithPath: path))
+                }
+            }
+            // Drop-import-smoke: `--record-states <logpad>` — logt ~15s lang elke
+            // 50ms sectie + canvas-state + selectie, om de importflow-volgorde
+            // te verifiëren zonder screen-recording-permissie.
+            if let i = args.firstIndex(of: "--record-states"), args.indices.contains(i + 1) {
+                let logURL = URL(fileURLWithPath: args[i + 1])
+                Task { @MainActor in
+                    let t0 = Date()
+                    var lines: [String] = []
+                    var last = ""
+                    for _ in 0..<300 {
+                        let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                        let canvasDesc: String
+                        switch model.canvas {
+                        case .empty: canvasDesc = "empty"
+                        case .processing: canvasDesc = "processing"
+                        case .revealing: canvasDesc = "revealing"
+                        case .result: canvasDesc = "result"
+                        case .failed(let msg): canvasDesc = "failed(\(msg))"
+                        }
+                        let line = "section=\(model.section) canvas=\(canvasDesc) " +
+                            "selected=\(model.selectedPortrait?.name ?? "nil")"
+                        if line != last {
+                            lines.append(String(format: "%06dms %@", ms, line))
+                            last = line
+                            try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
+                        }
+                        try? await Task.sleep(for: .milliseconds(50))
+                    }
+                }
+            }
             // E05.7: `--seed-set` dupliceert het portret en opent de sidebar.
             if args.contains("--seed-set") { model.debugSeedSecondPortraitAndOpenSidebar() }
             // E24.14: `--seed-adjust` zet een zichtbare Adjust-laag (canvas +
@@ -494,22 +534,19 @@ struct ShellView: View {
     /// E-fix: het beeld + de isolating-fase die de persistente EditorView voedt.
     /// Niet-nil zodra er een portret te tonen is:
     ///   • `.result` → de cutout, geen isolating-fase (normale editor);
-    ///   • `.processing`/`.revealing` mét een al-geselecteerd portret (een
-    ///     VERVANGENDE import) → de vorige cutout als drager + de isolating-fase
-    ///     die ín het frame speelt.
-    /// Bij de éérste import is er nog geen selectie (`previousCutout == nil`) →
-    /// nil, zodat de full-screen IsolatingCanvas het overneemt ("alleen bij
-    /// vervangen", besluit Thierry).
+    ///   • `.processing`/`.revealing` → de isolating-fase speelt ín het frame.
+    ///     De drager is de vorige cutout (VERVANGENDE import in de editor) of —
+    ///     bij een library-import, die de selectie wist (runCutout) — het
+    ///     origineel zelf. De drager rendert niet zolang de isolating-laag
+    ///     speelt; hij houdt alleen de EditorView-identiteit stabiel.
     private var editorContent: (cutout: NSImage, isolating: EditorView.IsolatingPhase?)? {
         switch model.canvas {
         case .result(let cutout):
             return (cutout, nil)
         case .processing(let original):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .processing(original))
+            return (previousCutout ?? original, .processing(original))
         case .revealing(let original, let cutout):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .revealing(original: original, cutout: cutout))
+            return (previousCutout ?? original, .revealing(original: original, cutout: cutout))
         case .empty, .failed:
             return nil
         }

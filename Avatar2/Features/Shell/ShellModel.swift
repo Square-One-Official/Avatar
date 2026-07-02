@@ -416,6 +416,23 @@ final class ShellModel {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport() else { return }
+        // Drop/upload vanuit de library: open de editor METEEN met de nieuwe
+        // foto — niet pas ná de cutout (de library bleef ~2s staan en de editor
+        // popte laat in beeld). De vorige selectie gaat weg zodat niet eerst de
+        // laatste foto (als drager + naam) verschijnt; de reveal speelt ín het
+        // frame op fit-zoom, net als een portret openen vanuit de library
+        // (ShellView.editorContent gebruikt het origineel als drager). Een drop
+        // ín de editor (vervangende import, E-fix) blijft ongewijzigd.
+        if section != .editor {
+            leaveBannerStudioIfOpen()
+            clearPortraitSelection()
+            selectionLoadTask?.cancel()
+            selectedPortrait = nil
+            portraitName = ""
+            portraitRole = ""
+            openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
+            section = .editor
+        }
         // E02.5 (audit-B1): élke import éérst naar sRGB-RGBA. Grayscale-PNG's
         // (DeviceGray) en CMYK-JPEG's zijn incompatibel met de .RGBA8-render
         // van de engines (createCGImage → nil → renderFailed, in béide dus de
@@ -457,10 +474,8 @@ final class ShellModel {
         let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
         select(portrait)
-        // PoC (left-nav): een verse import opent meteen de editor (top-right-
-        // chrome verschijnt) i.p.v. op Home/Portraits te blijven; "terug" → Home.
-        openOrigin = .home
-        section = .editor
+        // De editor + openOrigin zijn al bij de import-start gezet (runCutout);
+        // een vervangende import in de editor houdt z'n bestaande herkomst.
     }
 
     /// Selectie uit de sidebar: portret op canvas, naam/rol in de header.

@@ -330,6 +330,14 @@ final class EntitlementModel {
     /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
     /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
     func claimImport() async -> Bool {
+        #if DEBUG
+        // Smoke-runs (`--smoke-store` e.d.) draaien op een geïsoleerde store maar
+        // delen het echte account; deze bypass houdt de gate uit de flow-smokes
+        // zonder server-claims te verbruiken.
+        if ProcessInfo.processInfo.arguments.contains("--bypass-import-gate") {
+            return true
+        }
+        #endif
         do {
             let resp = try await backend.claimImport()
             if !resp.allowed {
