@@ -256,6 +256,13 @@ final class EntitlementModel {
 
     // MARK: - E18.3 fout-toast
 
+    /// E44.1 (audit B2/B3): auto-dismiss-duur van de fout-toast. 4s was
+    /// makkelijk te missen — een gemiste colorise-fout oogde live als "er
+    /// gebeurt niets". Een échte fout moet minimaal 8s leesbaar blijven
+    /// (plan-DoD). Constante hier (niet inline in `Avatar2App`) zodat de
+    /// ondergrens testbaar is.
+    static let errorToastDuration: Duration = .seconds(8)
+
     func presentError(_ message: String) {
         errorToast = message
     }

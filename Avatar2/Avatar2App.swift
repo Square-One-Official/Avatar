@@ -146,11 +146,13 @@ struct Avatar2App: App {
                         }
                     } else if let message = entitlement.errorToast {
                         // E18.3: cloud-fout als toast i.p.v. inline tekst.
+                        // E44.1: duur uit het model (≥ 8s) — 4s was zo kort
+                        // dat een echte fout onopgemerkt bleef.
                         DSToast(title: "Something went wrong", description: message) {
                             entitlement.dismissErrorToast()
                         }
                         .task {
-                            try? await Task.sleep(for: .seconds(4))
+                            try? await Task.sleep(for: EntitlementModel.errorToastDuration)
                             entitlement.dismissErrorToast()
                         }
                     }

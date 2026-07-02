@@ -281,6 +281,18 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertTrue(model.isPaywallPresented)
         XCTAssertFalse(model.isShowingOutOfCreditsToast)
     }
+
+    // MARK: - E44.1/44.2 — cloud-actie foutafhandeling (audit B2/B3)
+
+    /// E44.1: een échte fout-toast moet minimaal 8 seconden leesbaar blijven.
+    /// De 4s-auto-dismiss maakte een colorise-fout onzichtbaar ("er gebeurt
+    /// niets"). `Avatar2App` leest deze constante; de test borgt de ondergrens.
+    func testErrorToastStaysVisibleAtLeastEightSeconds() {
+        XCTAssertGreaterThanOrEqual(
+            EntitlementModel.errorToastDuration, .seconds(8),
+            "fout-toasts moeten ≥ 8s zichtbaar blijven (E44.1-DoD)"
+        )
+    }
 }
 
 // MARK: - Stub-infra (kopie van AvatarKit's BackendStubURLProtocol — test-
