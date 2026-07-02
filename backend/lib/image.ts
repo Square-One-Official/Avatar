@@ -40,6 +40,75 @@ export async function flattenOnGrey(cutoutPng: Buffer): Promise<Buffer> {
 }
 
 /**
+ * E41.4: flatten voor de upscale-route, zónder de grijze halo die een naive
+ * flatten in zachte randen bakt.
+ *
+ * Een halfdoorzichtige haarpixel draagt zijn eigen kleur, maar
+ * `flatten({ background: grijs })` mengt hem met grijs. Na de RGB-upscale
+ * hangt reapplyAlpha het masker terug en blijft dat grijs in de RGB zitten —
+ * zichtbaar als een vale waas rond haar. Oplossing: bouw eerst een
+ * "edge-bleed"-veld door de gepremultipliceerde RGB en de alpha met dezelfde
+ * sigma te blurren en te delen (de klassieke solidify/push-pull-truc uit
+ * texture-pipelines). Elke (half)transparante pixel nabij het onderwerp krijgt
+ * zo de kleur van de dichtstbijzijnde opake pixels; de cutout daaroverheen
+ * componeren mengt haar met haarkleur i.p.v. met grijs. Buiten het
+ * blur-bereik valt de achtergrond terug op hetzelfde neutrale grijs als
+ * flattenOnGrey (studio-backdrop voor het model).
+ */
+export async function bleedFlatten(cutoutPng: Buffer): Promise<Buffer> {
+  const { data, info } = await sharp(cutoutPng)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const n = width * height;
+
+  // Premultiplied RGB + alpha als losse vlakken voor de blur. De alpha gaat
+  // als (a,a,a)-drieband door EXACT dezelfde 3-kanaals blur-pijplijn als de
+  // premult: sharp/vips blurt 1-kanaals ("b-w") beelden aantoonbaar anders
+  // dan 3-kanaals, en elke asymmetrie sloopt de premult/alpha-ratio waar de
+  // uitgesmeerde kleur uit komt. Identieke pijplijnen ⇒ exacte ratio.
+  const premult = Buffer.alloc(n * 3);
+  const alpha3 = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = data[i * 4 + 3];
+    alpha3[i * 3] = a;
+    alpha3[i * 3 + 1] = a;
+    alpha3[i * 3 + 2] = a;
+    premult[i * 3] = (data[i * 4] * a / 255) | 0;
+    premult[i * 3 + 1] = (data[i * 4 + 1] * a / 255) | 0;
+    premult[i * 3 + 2] = (data[i * 4 + 2] * a / 255) | 0;
+  }
+
+  // Bereik ~3σ ≈ 36px — ruim onder/rond een haarrand, klein t.o.v. het beeld.
+  const BLEED_SIGMA = 12;
+  const [blurredPremult, blurredAlpha] = await Promise.all([
+    sharp(premult, { raw: { width, height, channels: 3 } })
+      .blur(BLEED_SIGMA)
+      .raw()
+      .toBuffer(),
+    sharp(alpha3, { raw: { width, height, channels: 3 } })
+      .blur(BLEED_SIGMA)
+      .raw()
+      .toBuffer(),
+  ]);
+
+  const GREY = 200; // zelfde backdrop als flattenOnGrey
+  const out = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = data[i * 4 + 3] / 255;
+    const ba = blurredAlpha[i * 3];
+    for (let c = 0; c < 3; c++) {
+      // Unpremultiply van het geblurde veld = uitgesmeerde randkleur; bij
+      // (bijna) nul geblurde alpha is de deling ruis → neutraal grijs.
+      const ext = ba > 8 ? Math.min(255, (blurredPremult[i * 3 + c] * 255) / ba) : GREY;
+      out[i * 3 + c] = Math.round(data[i * 4 + c] * a + ext * (1 - a));
+    }
+  }
+  return sharp(out, { raw: { width, height, channels: 3 } }).png().toBuffer();
+}
+
+/**
  * Re-attach the alpha channel from `originalRgba` onto `colorizedRgb`,
  * resizing the alpha to match if dimensions disagree (DeOldify and other
  * RGB models occasionally return a slightly different size due to internal
@@ -51,9 +120,17 @@ export async function reapplyAlpha(
   colorizedRgb: Buffer,
   originalRgba: Buffer,
 ): Promise<Buffer> {
-  const colorMeta = await sharp(colorizedRgb).metadata();
-  const w = colorMeta.width;
-  const h = colorMeta.height;
+  // E41.4: NIET via sharp's joinChannel — die dropt in 0.33.5 stilletjes het
+  // aangeleverde kanaal (output blijft 3-kanaals, geen error) wanneer de
+  // alpha uit extractChannel komt. Gevolg in productie: /v1/colorize en
+  // /v1/upscale gaven een opaque grijs-backdrop-beeld terug en de client
+  // moest het onderwerp opnieuw uitknippen (zichtbaar slechtere haarranden).
+  // Daarom: kanalen zelf interleaven op raw buffers — bewijsbaar RGBA.
+  const color = await sharp(colorizedRgb)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = color.info;
   if (!w || !h) {
     throw new Error("reapplyAlpha: colorized image has no dimensions");
   }
@@ -61,10 +138,17 @@ export async function reapplyAlpha(
     .ensureAlpha()
     .extractChannel("alpha")
     .resize(w, h, { fit: "fill" })
+    .raw()
     .toBuffer();
-  return sharp(colorizedRgb)
-    .removeAlpha()
-    .joinChannel(alpha)
+  const n = w * h;
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    out[i * 4] = color.data[i * 3];
+    out[i * 4 + 1] = color.data[i * 3 + 1];
+    out[i * 4 + 2] = color.data[i * 3 + 2];
+    out[i * 4 + 3] = alpha[i];
+  }
+  return sharp(out, { raw: { width: w, height: h, channels: 4 } })
     .png()
     .toBuffer();
 }

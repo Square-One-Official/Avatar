@@ -127,23 +127,30 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3 + E41.1: Boost resolution. Bedoelde default is crystal-upscaler
-  // (portret-geoptimaliseerd) maar dat staat NOODGEDWONGEN uit: de hash
-  // gepind in E41.3 (audit D8, 2026-07-02) is nooit live getest en faalt in
-  // productie met 422 "Invalid version or not permitted" (zie /v1/upscale
-  // 500's rond 21:42 op 2026-07-02) — die hash bestaat niet of is niet
-  // toegankelijk. Terug op real-esrgan (bewezen default sinds E10.3,
-  // 2026-06-14) tot een geverifieerde hash is opgehaald via
-  // https://replicate.com/philz1337x/crystal-upscaler/versions (login
-  // vereist, niet fetchbaar door een agent) én live getest op een preview-
-  // deploy vóór de default weer om te zetten.
-  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix — een
-  // hash-wissel raakt de payload-vertaling niet.
+  // E10.3 + E41.1 + E41.4: Boost resolution. Default blijft real-esrgan tot
+  // de 41.4-bakeoff op een preview-deploy de beoogde winnaar (topaz, High
+  // Fidelity V2) visueel bevestigt — de crystal-les: nooit een default
+  // flippen zonder live test. Beoordeling: identiteit (sproeten/sieraden
+  // intact), haarranden, unit-billing van topaz.
+  // Crystal-422-naschrift (2026-07-03): de in E41.3 gepinde hash wás de
+  // huidige latest (zonder login verifieerbaar — `latest_version` staat in
+  // de HTML van de modelpagina). 422 "Invalid version or not permitted"
+  // betekent dat dit model geen versioned runs toestaat → unversioned ref,
+  // met een expliciete uitzondering op de pin-guard in models-smoke.ts.
+  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix.
   upscale: {
     defaultModel: "real-esrgan",
     models: {
+      topaz: {
+        ref: "topazlabs/image-upscale",
+        label: "Topaz Gigapixel (High Fidelity V2)",
+      },
+      "google-upscaler": {
+        ref: "google/upscaler",
+        label: "Google Upscaler (Imagen)",
+      },
       "crystal-upscaler": {
-        ref: "philz1337x/crystal-upscaler:5d917b1444c89ed91055f3052d27e1ad433a1218599a36544510e1dfa9ac26c8",
+        ref: "philz1337x/crystal-upscaler",
         label: "Crystal Upscaler (portrait)",
       },
       "real-esrgan": {

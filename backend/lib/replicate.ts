@@ -253,17 +253,36 @@ export async function upscale(input: {
 }
 
 /**
- * Per-model input-vertaling voor de upscaler (E41.1; spiegelt stylizeInputFor).
- * crystal-upscaler (default, portret) gebruikt `{ image, scale_factor }`;
- * Real-ESRGAN `{ image, scale, face_enhance }` — nu MÉT face_enhance zodat ook
- * de goedkope fallback gezichten verscherpt i.p.v. ze zacht te laten. Onbekende
- * refs vallen op de Real-ESRGAN-vorm terug.
+ * Per-model input-vertaling voor de upscaler (E41.1 + E41.4; spiegelt
+ * stylizeInputFor). Identiteit gaat vóór scherpte: geen generatieve
+ * gezichts-"verbetering" — GFPGAN-achtige reconstructie maakt huid glad en
+ * gumt sproeten/sieraden weg (kwaliteitsklacht 2026-07-03). Onbekende refs
+ * vallen op de Real-ESRGAN-vorm terug.
  */
 function upscaleInputFor(ref: string, imageDataUrl: string): Record<string, unknown> {
+  if (ref.startsWith("topazlabs/image-upscale")) {
+    // High Fidelity V2 = de detail-behoudende Gigapixel-variant;
+    // face_enhancement bewust uit. PNG voorkomt JPEG-randartefacten vlak
+    // vóór de alpha-reapply.
+    return {
+      image: imageDataUrl,
+      enhance_model: "High Fidelity V2",
+      upscale_factor: "2x",
+      face_enhancement: false,
+      output_format: "png",
+    };
+  }
+  if (ref.startsWith("google/upscaler")) {
+    // Output is JPEG; default compression_quality 80 bakt compressieruis in
+    // de haarranden → maximaal.
+    return { image: imageDataUrl, upscale_factor: "x2", compression_quality: 100 };
+  }
   if (ref.startsWith("philz1337x/crystal-upscaler")) {
     return { image: imageDataUrl, scale_factor: 2 };
   }
-  return { image: imageDataUrl, scale: 2, face_enhance: true };
+  // Real-ESRGAN (huidige default) & onbekend: face_enhance UIT — de E41.1-
+  // stand (aan) bleek de gladde-huid/weg-oorbellen-oorzaak.
+  return { image: imageDataUrl, scale: 2, face_enhance: false };
 }
 
 /**
