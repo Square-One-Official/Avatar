@@ -11,9 +11,10 @@ op de directe naming-fixes in `E36-home-gallery-ia.md` (36.5/36.6).
 ---
 
 ## 50.1 — Map-brede acties + ⌘A per lens
-- status: backlog
+- status: done
 - team: FEAT
 - blockedBy: —
+- note: gepromoveerd backlog → ready 2026-07-02, akkoord Thierry (alle epics afwerken)
 
 **Wat:** set-brede acties (Align/Match lighting/bulk-export) werken vandaag alleen
 op een handmatige multi-selectie; er is geen "hele map selecteren". ⌘A bestaat
@@ -23,6 +24,16 @@ alleen in de board-lens (`BoardView.swift:703`), niet in grid/list/gallery.
 huidige selectie-scope.
 **DoD:** vanuit elke lens is een hele map in één actie te selecteren en te
 bewerken; tests groen; Result-regel.
+**Result (2026-07-02):** map-rij-contextmenu in de left-nav heeft nu Select all
+in folder / Align set / Match lighting / Export set (zelfde `PortraitSetActions`
+als de handmatige multi-selectie, maar op de hele map; Match-referentie = het
+jongst bewerkte portret, disabled bij <2). Nieuwe pure helper `FolderSetScope`
+(map-filter + lens-volgorde) deelt de scope-logica; `ShellModel.
+selectAllPortraits` zet selectie + ⇧-anker. ⌘A geregistreerd in
+`PortraitsGalleryView` voor grid/list/gallery op de zichtbare scope (board hield
+z'n eigen ⌘A — bewust uitgesloten tegen dubbele registratie). 5 nieuwe tests
+(`FolderSetScopeTests`); beide targets bouwen, Avatar2- + AvatarKit- +
+AvatarUI-suites groen.
 
 ## 50.2 — Home met echte recent-secties
 - status: backlog

@@ -26,7 +26,11 @@ struct LeftNavView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // E50.1: map-brede acties (Select all/Align/Match/Export) werken op de
+    // portretten van de map; undoManager voor de undo-groepen van Align/Match.
+    @Environment(\.undoManager) private var undoManager
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
+    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
 
     /// Hoogte van de klikbare profielrij (zonder de omringende padding).
     private static let userRowHeight: CGFloat = 40
@@ -115,18 +119,7 @@ struct LeftNavView: View {
             if menuFolder != nil {
                 DSContextMenuOverlay(anchor: menuAnchor, onDismiss: { menuFolder = nil }) {
                     if let folder = menuFolder {
-                        DSContextMenuPanel {
-                            DSMenuRow("Rename", icon: "pencil") {
-                                menuFolder = nil
-                                draftName = folder.name
-                                renamingFolder = folder
-                            }
-                            Divider().padding(.vertical, 2)
-                            DSMenuRow("Delete", icon: "trash", destructive: true) {
-                                menuFolder = nil
-                                deletingFolder = folder
-                            }
-                        }
+                        folderMenu(folder)
                     }
                 }
             }
@@ -232,6 +225,50 @@ struct LeftNavView: View {
         .contextMenuTrigger(in: .named(Self.contextMenuSpace)) { frame in
             menuFolder = folder
             menuAnchor = frame
+        }
+    }
+
+    /// E50.1: rechtermuis-menu op een map-rij — map-brede set-acties (dezelfde
+    /// `PortraitSetActions` als de handmatige multi-selectie, maar op ALLE
+    /// portretten in de map) + de bestaande Rename/Delete.
+    private func folderMenu(_ folder: Folder2) -> some View {
+        let items = FolderSetScope.items(in: portraits, folderID: folder.persistentModelID)
+        return DSContextMenuPanel(minWidth: 210) {
+            DSMenuRow("Select all in folder", icon: "checkmark.circle", disabled: items.isEmpty) {
+                menuFolder = nil
+                // Eerst naar de map navigeren (wist de selectie), dán alles
+                // selecteren — de gebruiker ZIET meteen wat er geselecteerd is.
+                model.showPortraits(folderID: folder.persistentModelID)
+                model.selectAllPortraits(items.map(\.persistentModelID))
+            }
+            DSMenuRow("Align set", icon: "align.horizontal.left", disabled: items.isEmpty) {
+                menuFolder = nil
+                PortraitSetActions.align(items, undoManager: undoManager) { model.setBusyMessage = $0 }
+            }
+            // Match lighting heeft ≥2 portretten nodig (referentie + minstens één
+            // doel); referentie = het jongst bewerkte portret (bovenaan de lens).
+            DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
+                menuFolder = nil
+                guard let reference = FolderSetScope.matchLightingReference(items) else { return }
+                PortraitSetActions.matchLighting(
+                    items, reference: reference, undoManager: undoManager
+                ) { model.setBusyMessage = $0 }
+            }
+            DSMenuRow("Export set", icon: "square.and.arrow.up.on.square", disabled: items.isEmpty) {
+                menuFolder = nil
+                PortraitSetActions.export(items, isPro: model.isPro) { model.setBusyMessage = $0 }
+            }
+            Divider().padding(.vertical, 2)
+            DSMenuRow("Rename", icon: "pencil") {
+                menuFolder = nil
+                draftName = folder.name
+                renamingFolder = folder
+            }
+            Divider().padding(.vertical, 2)
+            DSMenuRow("Delete", icon: "trash", destructive: true) {
+                menuFolder = nil
+                deletingFolder = folder
+            }
         }
     }
 

@@ -75,6 +75,17 @@ struct PortraitsGalleryView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .onPreferenceChange(HeaderHeightKey.self) { headerHeight = $0 }
+        // E50.1: ⌘A selecteert de hele zichtbare scope (huidige map of alles) in
+        // de grid/list/gallery-lens — zelfde patroon als de board-lens, die z'n
+        // eigen ⌘A op de canvas-selectie registreert (BoardView; daarom hier
+        // uitgesloten, anders twee registraties op dezelfde shortcut).
+        .background {
+            if model.portraitsViewMode != .canvas && !items.isEmpty {
+                Button("") { model.selectAllPortraits(items.map(\.persistentModelID)) }
+                    .keyboardShortcut("a", modifiers: .command)
+                    .opacity(0)
+            }
+        }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
         .portraitContextMenuOverlay(
             target: $menuTarget,

@@ -249,6 +249,16 @@ final class ShellModel {
         selectionAnchorID = id
     }
 
+    /// E50.1: ⌘A / "Select all in folder" — vervang de selectie door de hele
+    /// zichtbare scope (`ordered` = de lens-volgorde). Het anker komt op het
+    /// eerste item zodat een ⇧-klik daarna zich Finder-achtig gedraagt.
+    /// Lege scope = no-op (selectie blijft zoals hij was).
+    func selectAllPortraits(_ ordered: [PersistentIdentifier]) {
+        guard !ordered.isEmpty else { return }
+        selectedPortraitIDs = Set(ordered)
+        selectionAnchorID = ordered.first
+    }
+
     /// Klik op een tegel/rij: plain = openen (single-click-open blijft); ⌘ =
     /// toggle; ⇧ = bereik vanaf het anker in `ordered` (de zichtbare volgorde).
     func handlePortraitClick(_ portrait: Portrait2, ordered: [PersistentIdentifier], mods: NSEvent.ModifierFlags) {
