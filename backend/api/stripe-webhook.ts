@@ -71,27 +71,81 @@ async function resolveUserForCustomer(customerId: string): Promise<string | null
   }
 }
 
+/**
+ * B8 (audit 2026-07-01): API-version drift guard.
+ *
+ * The live webhook endpoint is pinned to API version `2026-04-22.dahlia`
+ * while this codebase's Stripe SDK types are `2025-02-24.acacia`. From
+ * `2025-03-31.basil` onward Stripe REMOVED `current_period_start/end` from
+ * the top-level Subscription object (they live on each subscription item
+ * now). The old code did `new Date(undefined * 1000).toISOString()` →
+ * RangeError → 500 → FAILED delivery. That's exactly how the
+ * `customer.subscription.deleted` event of 4 Jun 2026 never landed and the
+ * `subscriptions` row went stale ("Refills on 4 Jun 2026" in the client).
+ * Read both shapes and never throw on a missing period.
+ */
+function subscriptionPeriod(
+  sub: Stripe.Subscription,
+): { start: number; end: number } | null {
+  const item = sub.items?.data?.[0] as
+    | { current_period_start?: number; current_period_end?: number }
+    | undefined;
+  const start = sub.current_period_start ?? item?.current_period_start;
+  const end = sub.current_period_end ?? item?.current_period_end;
+  if (typeof start !== "number" || typeof end !== "number") return null;
+  return { start, end };
+}
+
+/**
+ * B8: same drift guard for invoices. From `2025-03-31.basil` onward invoice
+ * line items carry `pricing.price_details.price` instead of `price`. The old
+ * `invoice.lines.data[0]?.price?.id` silently resolved to undefined → tier
+ * null → `break` → NO monthly credit grant for a paying subscriber.
+ */
+function invoiceLinePriceId(invoice: Stripe.Invoice): string | null {
+  const line = invoice.lines?.data?.[0] as
+    | {
+        price?: { id?: string } | null;
+        pricing?: { price_details?: { price?: string | null } | null } | null;
+      }
+    | undefined;
+  return line?.price?.id ?? line?.pricing?.price_details?.price ?? null;
+}
+
 async function upsertSubscription(sub: Stripe.Subscription, userId: string) {
   const priceId = sub.items.data[0]?.price.id;
   const resolved = await resolvePriceLive(priceId);
   const tier: Tier | null = resolved?.tier ?? null;
   if (!tier) {
-    console.warn("Unknown / unresolvable price ID on subscription", priceId);
+    // B8: loud alert instead of a warn — this path means the subscriptions
+    // row is NOT updated (stale period end / status in the client) and the
+    // monthly grant will also skip. Searchable marker for Vercel log alerts.
+    console.error(
+      "[ALERT] stripe-webhook: unresolvable price on subscription — subscriptions row NOT updated",
+      { subscriptionId: sub.id, priceId, eventStatus: sub.status },
+    );
     return;
   }
-  await supabase.from("subscriptions").upsert(
-    {
-      id: sub.id,
-      user_id: userId,
-      tier,
-      status: sub.status,
-      monthly_credits: creditsForTier(tier),
-      current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-      cancel_at_period_end: sub.cancel_at_period_end,
-    },
-    { onConflict: "id" },
-  );
+  const period = subscriptionPeriod(sub);
+  if (!period) {
+    console.error(
+      "[ALERT] stripe-webhook: subscription payload has no period fields (API-version drift?) — status still updated, period kept as-is",
+      { subscriptionId: sub.id },
+    );
+  }
+  const row: Record<string, unknown> = {
+    id: sub.id,
+    user_id: userId,
+    tier,
+    status: sub.status,
+    monthly_credits: creditsForTier(tier),
+    cancel_at_period_end: sub.cancel_at_period_end,
+  };
+  if (period) {
+    row.current_period_start = new Date(period.start * 1000).toISOString();
+    row.current_period_end = new Date(period.end * 1000).toISOString();
+  }
+  await supabase.from("subscriptions").upsert(row, { onConflict: "id" });
 }
 
 async function grantPeriodCredits(opts: {
@@ -254,10 +308,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userId = await resolveUserForCustomer(customerId);
         if (!userId) break;
 
-        const priceId = invoice.lines.data[0]?.price?.id;
+        const priceId = invoiceLinePriceId(invoice);
         const resolved = await resolvePriceLive(priceId);
         const tier = resolved?.tier ?? null;
-        if (!tier) break;
+        if (!tier) {
+          // B8: this used to be a bare `break` — a paying Pro whose price
+          // couldn't be resolved silently got NO monthly credits. Alert
+          // loudly; the 200 ack below still stands (Stripe retries won't
+          // fix a mapping problem, a human has to).
+          console.error(
+            "[ALERT] stripe-webhook: unresolvable price on invoice — monthly credit grant SKIPPED",
+            { invoiceId: invoice.id, priceId, customerId },
+          );
+          break;
+        }
 
         // For YEARLY subs we still only grant ONE month of credits up front.
         // The remaining 11 months are granted by the

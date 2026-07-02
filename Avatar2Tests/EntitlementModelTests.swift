@@ -32,14 +32,15 @@ final class EntitlementModelTests: XCTestCase {
         tier: String = "free",
         credits: Int = 0,
         freeImportsRemaining: Int = 3,
-        devUnlimited: Bool = false
+        devUnlimited: Bool = false,
+        monthlyResetAt: Date? = nil
     ) -> String {
         """
         {
           "tier": \(tier == "pro" ? "\"pro\"" : "null"),
           "credits_remaining": \(credits),
           "monthly_quota": \(tier == "pro" ? 200 : 0),
-          "monthly_reset_at": null,
+          "monthly_reset_at": \(monthlyResetAt.map { "\"\(ISO8601DateFormatter().string(from: $0))\"" } ?? "null"),
           "subscription_status": "\(tier == "pro" ? "active" : "none")",
           "subscription_renews_at": null,
           "free_cutouts_used": 0,
@@ -186,6 +187,68 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertTrue(model.featureFlags.effectsEnabled)
         XCTAssertFalse(model.featureFlags.hairEnabled)
         XCTAssertFalse(model.featureFlags.clothesEnabled)
+    }
+
+    // MARK: - Refill-datum-guard (14.7, audit B8)
+
+    /// Een stale `current_period_end` in het verleden (gemiste webhook-
+    /// delivery) mag nooit als refill-datum de UI in — "Refills on 4 Jun
+    /// 2026" was het productie-symptoom.
+    func testMonthlyResetInPastIsNotUpcoming() async {
+        let past = Date(timeIntervalSinceNow: -14 * 86_400)
+        EntitlementStubURLProtocol.setStub(
+            .json(200, accountJSON(tier: "pro", credits: 42, monthlyResetAt: past)),
+            forPath: "/v1/account"
+        )
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        let model = makeModel()
+
+        await model.refresh()
+
+        XCTAssertNotNil(model.monthlyResetAt, "de rauwe datum blijft beschikbaar")
+        XCTAssertNil(model.upcomingMonthlyResetAt, "verleden-datum → geen refill-datum in de UI")
+    }
+
+    /// Een toekomstige refill-datum passeert de guard ongewijzigd.
+    func testMonthlyResetInFutureIsUpcoming() async {
+        let future = Date(timeIntervalSinceNow: 14 * 86_400)
+        EntitlementStubURLProtocol.setStub(
+            .json(200, accountJSON(tier: "pro", credits: 42, monthlyResetAt: future)),
+            forPath: "/v1/account"
+        )
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        let model = makeModel()
+
+        await model.refresh()
+
+        let upcoming = try? XCTUnwrap(model.upcomingMonthlyResetAt)
+        XCTAssertNotNil(upcoming)
+        // ISO8601-roundtrip kapt subseconden af — vergelijk op de seconde.
+        XCTAssertEqual(
+            upcoming.map { $0.timeIntervalSince1970.rounded() },
+            future.timeIntervalSince1970.rounded()
+        )
+    }
+
+    // MARK: - Delete account (15.7, audit C7)
+
+    /// Faalt de server-side wipe (5xx uit delete.ts) of ontbreekt de sessie,
+    /// dan blijft er geen halve state achter: geen sign-out, wél een
+    /// fout-toast zodat de gebruiker weet dat een retry veilig is. Het
+    /// succes-pad (header/method/response-contract) zit in AvatarKitTests →
+    /// BackendClientDecodeTests; hier kan de sessie niet geforceerd worden
+    /// (AuthService.accessToken is private(set), echte Supabase-flow).
+    func testDeleteAccountFailureKeepsStateAndShowsErrorToast() async {
+        EntitlementStubURLProtocol.setStub(.json(500, """
+            { "deleted": false, "scope": { "errors": ["auth_delete: boom"] } }
+            """), forPath: "/v1/account/delete")
+        let model = makeModel()
+
+        let deleted = await model.deleteAccount()
+
+        XCTAssertFalse(deleted)
+        XCTAssertNotNil(model.errorToast, "fout moet zichtbaar zijn (toast)")
+        XCTAssertFalse(model.isDeletingAccount, "busy-vlag moet terugvallen")
     }
 
     // MARK: - Credits-refresh na gefaalde cloud-actie

@@ -262,6 +262,67 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertTrue(flags.backgroundsEnabled)
     }
 
+    // MARK: - POST /v1/account/delete (E15.7)
+
+    /// Contract met backend/api/v1/account/delete.ts: POST + Bearer + de
+    /// `X-Confirm-Delete: yes`-header (tweede consent). Zonder die header
+    /// weigert de server met 400 — de header is dus deel van het contract.
+    func testDeleteAccountSendsConfirmHeaderViaPost() async throws {
+        // 200-vorm uit delete.ts (scope-details genegeerd door de client).
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "deleted": true,
+              "scope": {
+                "stripe_subscriptions_cancelled": 1,
+                "stripe_customer_kept": true,
+                "storage_objects_removed": 0,
+                "auth_user_deleted": true,
+                "errors": []
+              }
+            }
+            """), forPath: "/v1/account/delete")
+
+        try await client.deleteAccount()
+
+        let req = try XCTUnwrap(
+            BackendStubURLProtocol.requestLog.last(where: { $0.url?.path == "/v1/account/delete" })
+        )
+        XCTAssertEqual(req.httpMethod, "POST")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Confirm-Delete"), "yes")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+    }
+
+    /// 500-pad uit delete.ts (auth-delete faalde): moet als serverfout
+    /// propageren zodat de UI een retry aanbiedt i.p.v. succes te veinzen.
+    func testDeleteAccountServerFailureThrows() async {
+        BackendStubURLProtocol.setStub(.json(500, """
+            { "deleted": false, "scope": { "errors": ["auth_delete: boom"] } }
+            """), forPath: "/v1/account/delete")
+
+        do {
+            try await client.deleteAccount()
+            XCTFail("verwachtte BackendError.server")
+        } catch BackendError.server(let status, _) {
+            XCTAssertEqual(status, 500)
+        } catch {
+            XCTFail("verkeerde fout: \(error)")
+        }
+    }
+
+    /// Delete vereist een sessie — de JWT ís het consent-signaal.
+    func testDeleteAccountWithoutSessionThrowsNotSignedIn() async {
+        auth.accessToken = nil
+
+        do {
+            try await client.deleteAccount()
+            XCTFail("verwachtte BackendError.notSignedIn")
+        } catch BackendError.notSignedIn {
+            // verwacht
+        } catch {
+            XCTFail("verkeerde fout: \(error)")
+        }
+    }
+
     // MARK: - Error-mapping
 
     func test402MapsToNoCredits() async {

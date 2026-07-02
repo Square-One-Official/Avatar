@@ -201,9 +201,22 @@ alle suites groen. Live request-param-wissel verifieerbaar tegen de Vercel-previ
 landt op productie bij de volgende E13.0-port samen met E09.2's stylize.ts).
 
 ## 15.7 — Delete-account-rij
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
+- Result: Delete-account is end-to-end bereikbaar (branch v2/e14-15-audit-fixes).
+  `BackendClient.deleteAccount()` toegevoegd (POST `/v1/account/delete` +
+  `X-Confirm-Delete: yes` via nieuwe `extraHeaders`-parameter op de request-pijplijn);
+  `EntitlementModel.deleteAccount()` (busy-vlag, bij succes `signOutAccount()`, bij
+  falen fout-toast — sessie blijft intact, endpoint is idempotent); destructieve
+  "Delete account"-rij in de Session-sectie van SettingsAccountPage achter een
+  confirmationDialog (zelfde patroon als portret-delete). Lokale bibliotheek blijft
+  bewust staan (dialog-copy zegt dat expliciet). E2E getest tegen prod met een
+  throwaway-account (aangemaakt via GoTrue admin, password-grant-token, delete →
+  `{deleted:true, auth_user_deleted:true}`, user daarna 404). Tests: 3 nieuwe
+  BackendClientDecodeTests (header/method-contract, 500-pad, notSignedIn) + 1
+  EntitlementModelTest (faalpad houdt state intact); alles groen, beide app-targets
+  bouwen. Geen backend-wijziging nodig — het endpoint stond al live.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C7).
 **Wat:** `SettingsAccountPage.swift` biedt alleen Email / Plan+Manage subscription /
