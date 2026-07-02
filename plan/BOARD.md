@@ -35,7 +35,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.7, incl. Stripe-webhook-shapefix); 14.8 backlog (credits-transparantie) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
-| [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | fase 1-2 done (27.1–27.8); **27.9–27.11 ready** (audit-fix: muiswiel-zoom, panel-toggle) |
+| [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | **done** (27.1–27.11) |
 | [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.3); **29.4–29.5 ready** (audit-fix: board-selectie, dode chips) |
 | [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.7); **31.8 ready** (audit-fix: fill-in-body naming) |
 | [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
