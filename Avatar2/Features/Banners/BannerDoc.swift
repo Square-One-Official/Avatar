@@ -110,6 +110,23 @@ final class BannerDoc {
         }
     }
 
+    /// 37.18 (audit-B6) — Document-brede sweep: verwijdert ALLE lege/literal-
+    /// placeholder-tekstlagen, behalve `keeping` (bv. de laag die de gebruiker nú
+    /// bewerkt). Vóór commit d1ec4e7 kon de placeholder-string als échte
+    /// `layer.string` persisteren; en de oude opruimroutines waren selectie-
+    /// gescoped, dus wie de Studio via breadcrumb/venster-sluiten verliet liet
+    /// lege lagen achter die de hit-test blokkeerden. Geeft (before, after) terug
+    /// voor undo-registratie; nil = niets te doen (geen `touch()`).
+    @discardableResult
+    func dropEmptyTextLayers(keeping: Set<UUID> = []) -> (before: BannerLayers, after: BannerLayers)? {
+        let before = layers
+        var after = before
+        after.texts.removeAll { !keeping.contains($0.id) && BannerTextPresets.isEmptyOrPlaceholder($0.string) }
+        guard after != before else { return nil }
+        layers = after
+        return (before, after)
+    }
+
     /// Migratiepad (E35→E37): open een bestaande platte `Banner2` als één
     /// image-fill-`BannerDoc` zonder dataverlies.
     static func from(banner2: Banner2) -> BannerDoc {

@@ -332,7 +332,8 @@ synchrone first-responder-claim zónder runloop-spin. DoD groen (Avatar + Avatar
 bouwen; Avatar2Tests 97 groen; AvatarKit 86 + AvatarUI 37 groen).
 
 ## 37.18 — Placeholder-tekstlagen: document-brede sweep + herbake [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -359,6 +360,27 @@ weergave.
 **DoD:** beide targets bouwen; een banner zonder ingevulde tekst laat na
 Studio-verlaten geen lege lagen na; hit-testing selecteert nooit meer een lege
 placeholder-laag vóór echte content; tests groen; Result-regel.
+
+**Result:** `BannerDoc.dropEmptyTextLayers(keeping:)`
+([BannerDoc.swift](Avatar2/Features/Banners/BannerDoc.swift)) — één document-brede
+sweep met keep-uitzondering en (before, after)-return voor undo; de drie
+selectie-gescopede routines (`BannerStudioView.finalizeEmptyText`,
+`BannerCanvasOverlay.finalizeEmptyTexts`/`cleanupUnselectedEmptyTexts`) zijn
+erop geconsolideerd. Sweep draait nu ook bij Studio-open (`onAppear` +
+doc-switch) én in `onDisappear` vóór `bakeThumbnail` — breadcrumb/venster-sluiten
+laat geen lege lagen meer na (touch() → herbake). Hit-test
+([BannerLayoutMetrics](Avatar2/Features/Banners/BannerLayoutMetrics.swift)):
+échte tekst → logo → lege tekst, dus een placeholder-breed kader dekt content
+nooit meer af. Eenmalige migratie
+([BannerPlaceholderMigration](Avatar2/Features/Banners/BannerPlaceholderMigration.swift),
+UserDefaults-stempel `banners.placeholderLayerSweep.v1`, aangeroepen uit
+BannersGalleryView.task) leegt literal-placeholder-lagen uit ALLE bestaande
+documenten en herbakt hun stale previews. Versie-stempel/`previewBakedAt` op
+BannerDoc bewust overgeslagen (schema-wijziging; de open/close-sweeps + migratie
+dekken de staleness-paden). 8 nieuwe tests
+([BannerPlaceholderSweepTests](Avatar2Tests/BannerPlaceholderSweepTests.swift)).
+DoD groen (Avatar + Avatar2 bouwen; Avatar2Tests 105 groen; AvatarKit 86 +
+AvatarUI 37 groen).
 
 ## 37.19 — Halftone-shader: blend/intensity-parameter [FEAT]
 - status: ready
