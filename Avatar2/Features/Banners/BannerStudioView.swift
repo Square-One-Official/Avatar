@@ -101,6 +101,8 @@ struct BannerStudioView: View {
             camera.reset()
         }
         .background { selectionKeyboardShortcuts }
+        // E27.10 (audit C2): ⌘= = ⌘⇧= — zelfde verborgen brug als editor/board.
+        .background { CanvasZoomEqualsShortcut(zoomIn: { zoomCamera(by: 1.25) }) }
         .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
             zoomIn: { zoomCamera(by: 1.25) },
             zoomOut: { zoomCamera(by: 0.8) },

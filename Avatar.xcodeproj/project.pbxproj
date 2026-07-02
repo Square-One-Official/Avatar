@@ -28,6 +28,7 @@
 		104F1209A40B98F024BE93C0 /* CanvasCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = 139D1EAC44083E60510A9644 /* CanvasCamera.swift */; };
 		10DCAA69B852FEE173360DEC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6345E6DEE84999748B5B8A0 /* HomeView.swift */; };
 		10DCB2E7CC5AB8F4436C193E /* PrivacyElevationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC28570953429FABB63D1572 /* PrivacyElevationSheet.swift */; };
+		1112E6591101919CB7257855 /* CanvasScrollScalingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E7AC72F7666A3B2D7C935FB /* CanvasScrollScalingTests.swift */; };
 		127B1D637DF29D44D413A879 /* NewBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E72EFC35F5B9213B9BD4C8 /* NewBadge.swift */; };
 		12ECF2B9A22C78607FD5A938 /* BannerGroupTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ABA86BEEBE586C1CEB2E03B /* BannerGroupTransform.swift */; };
 		14022758E747EEEE44C7592C /* EdgeBenchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F17C123521D20C3E207A5B /* EdgeBenchmark.swift */; };
@@ -461,6 +462,7 @@
 		8D4ED56B1FF8421CA09C1EA5 /* .gitignore */ = {isa = PBXFileReference; path = .gitignore; sourceTree = "<group>"; };
 		8DAB476FF9BEA4B6547CA1B5 /* PaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallSheet.swift; sourceTree = "<group>"; };
 		8DF6691A4EAE77341E894EDB /* Avatar2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Avatar2App.swift; sourceTree = "<group>"; };
+		8E7AC72F7666A3B2D7C935FB /* CanvasScrollScalingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollScalingTests.swift; sourceTree = "<group>"; };
 		8E9A6408E385E5758E8E0ABD /* BannerNativePanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerNativePanels.swift; sourceTree = "<group>"; };
 		9089B7FDAD2E88C8C2B1D0EA /* PortraitPickerPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitPickerPanel.swift; sourceTree = "<group>"; };
 		90CF904ACC055C13716E64D2 /* BannerCanvasSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasSelection.swift; sourceTree = "<group>"; };
@@ -872,6 +874,7 @@
 				807F74AA9ECC254783BE28B7 /* BannerCanvasChromeMetricsTests.swift */,
 				4D89C17CDCE1497AED107A5A /* BannerDeletionTests.swift */,
 				3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */,
+				8E7AC72F7666A3B2D7C935FB /* CanvasScrollScalingTests.swift */,
 				360B7554EDE4CCA44D8752A0 /* EditorCanvasChromeMetricsTests.swift */,
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
 				9BBB8EBCE6879F52226DEC57 /* EffectCutoutTests.swift */,
@@ -1465,6 +1468,7 @@
 				689F10CA89234488595FB627 /* BannerCanvasChromeMetricsTests.swift in Sources */,
 				DA6A89FA2CCAFABCA2120ED5 /* BannerDeletionTests.swift in Sources */,
 				B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */,
+				1112E6591101919CB7257855 /* CanvasScrollScalingTests.swift in Sources */,
 				8513D2AB34581596C0A23037 /* EditorCanvasChromeMetricsTests.swift in Sources */,
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,
 				DEBA4BDD4881DC5C0C5A4A1A /* EffectCutoutTests.swift in Sources */,

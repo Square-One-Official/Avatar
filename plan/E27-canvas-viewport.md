@@ -490,9 +490,19 @@ board-frame in Figma — node-kaart, spacing, lege-staat, modus-toggle en fit-ge
 Figma-referentie leggen vóór fase 3.
 
 ## 27.9 — Muiswiel: hasPreciseScrollingDeltas correct schalen · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
+
+**Result:** `CanvasInteractionCatcher` schaalt scroll-deltas nu per apparaat:
+trackpad (`hasPreciseScrollingDeltas`) blijft 1:1 (punten, gedrag ongewijzigd);
+muiswiel-line-deltas gaan ×`mouseWheelLineHeight` (24, binnen de plan-band
+20–40) voor pan én ⌘-scroll-zoom. De wiel-zoomfactor is geclampt op
+0.75–1.33/event zodat macOS-scroll-versnelling de zoom niet laat springen. De
+schaling leeft als pure statics (`scrollPanDelta`/`scrollZoomFactor`) op
+`CanvasInteractionCatcher`, gedekt door `Avatar2Tests/CanvasScrollScalingTests`
+(5 tests). Geldt automatisch voor editor én board (gedeelde catcher). Beide
+targets bouwen; AvatarKit (62) + AvatarUI (37) + Avatar2Tests groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C2).
 **Wat:** `CanvasInteractionCatcher.swift:100-113` behandelt elke scroll-delta als
@@ -507,9 +517,22 @@ dan met de regelhoogte. Resultaat: ~0,75px pan en ~1% zoom per tik — verklaart
 trackpad-gebruik; tests groen; Result-regel.
 
 ## 27.10 — ⌘= registreren + zoom bereikbaar voor muis-gebruikers · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: 27.9
+
+**Result:** één gedeeld zoom-mechanisme voor editor, board én Banner Studio:
+(1) nieuw `CanvasZoomEqualsShortcut` (in `CanvasZoomCommands.swift`) — een
+verborgen knop die ⌘= (de shift-loze ⌘+) registreert naast het View-menu-item
+(een menu-item voert maar één key-equivalent); alle drie de `canvasZoom`-
+publishers hangen 'm in hun hiërarchie, dus ⌘= en ⌘⇧= doen overal hetzelfde.
+(2) `BoardView` publiceert nu dezelfde `canvasZoom` focused-scene-value als de
+editor — de View-menu-items (⌘+/⌘−/⌘0) werken op de board en de eigen verborgen
++/=/−/0-knoppen zijn geschrapt (⌘A/organize blijven). (3) zoom-%-chip
+linksonder in de editor (lichte vervanging van de 27.2a-verwijderde HUD):
+klikbare capsule (board-Fit-recept), % relatief aan de fit-schaal (fit = 100%,
+zoals de oude HUD), klik = Zoom to Fit (⌘0), tooltip noemt de sneltoets. Beide
+targets bouwen; Avatar2Tests + AvatarKit (62) + AvatarUI (37) groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C3).
 **Wat:** `CanvasZoomCommands.swift:44-49` registreert alleen `"+"` (= ⌘⇧=), niet
@@ -525,9 +548,19 @@ kleine klikbare zoom-%-chip (→ fit) als lichte vervanging van de verwijderde H
 groen; Result-regel.
 
 ## 27.11 — Panel-toggle: scrim ligt óver de top-toolbar · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
+
+**Result:** de klik-buiten-sluit-scrim (`activeTool`/`isSidebarVisible`) is in
+`EditorView` verhuisd van de láátste `.overlay` op `canvasCard` naar de EERSTE
+screen-space overlay — direct na de camera-`scaleEffect/offset`, dus ónder de
+transform-handles-overlay (E27.3) én de frame-chrome-overlay (naam-chip +
+Frame/Background-toolbar, E33). Met een open bottom-paneel/sidebar opent een
+top-toolbar-knop (en een transform-handle) nu in één klik; een klik op de lege
+canvas sluit het paneel nog steeds (E18.17-gedrag intact, zelfde tap-actie).
+Zelfde recept als de eerdere `canvasMenu`-fix (catcher onder het menu). Beide
+targets bouwen; Avatar2Tests + AvatarKit (62) + AvatarUI (37) groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C3).
 **Wat:** de klik-buiten-sluit-overlay in `EditorView.swift:875-888`

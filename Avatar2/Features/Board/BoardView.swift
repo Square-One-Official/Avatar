@@ -266,6 +266,17 @@ struct BoardView: View {
                     editTool = nil
                 }
             }
+            // E27.10 (audit C2): één gedeeld zoom-mechanisme voor editor én
+            // board — de board publiceert dezelfde focused-scene-value, dus de
+            // View-menu-items (⌘+/⌘−/⌘0) werken hier nu ook; de eigen verborgen
+            // +/=/−/0-knoppen zijn uit `boardShortcutButtons` vervallen.
+            .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
+                zoomIn: { zoom(1.25) },
+                zoomOut: { zoom(0.8) },
+                zoomToFit: { fit() }
+            ))
+            // ⌘= (shift-loze ⌘+) — zelfde verborgen brug als de editor.
+            .background { CanvasZoomEqualsShortcut(zoomIn: { zoom(1.25) }) }
     }
 
     // MARK: - Board-canvas (absolute node-posities)
@@ -695,11 +706,10 @@ struct BoardView: View {
 
     @ViewBuilder
     private var boardShortcutButtons: some View {
+        // E27.10: de zoom-sneltoetsen (⌘+/⌘=/⌘−/⌘0) zijn hier weg — die lopen
+        // nu via het View-menu + `CanvasZoomEqualsShortcut` (zelfde mechanisme
+        // als de editor, zie `body`). Hier alleen nog selectie/organize.
         Group {
-            Button("") { zoom(1.25) }.keyboardShortcut("+", modifiers: .command)
-            Button("") { zoom(1.25) }.keyboardShortcut("=", modifiers: .command)
-            Button("") { zoom(0.8) }.keyboardShortcut("-", modifiers: .command)
-            Button("") { fit() }.keyboardShortcut("0", modifiers: .command)
             Button("") { selection = Set(portraits.map(\.persistentModelID)) }.keyboardShortcut("a", modifiers: .command)
             // Organize-snelkoppelingen (^⌥): de methodes guarden zelf op selectiegrootte.
             Button("") { tidyUpSelection() }.keyboardShortcut("t", modifiers: [.control, .option])
