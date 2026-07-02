@@ -430,6 +430,9 @@ struct EditorView: View {
                 zoomOut: { zoomCamera(by: 0.8) },
                 zoomToFit: { withAnimation(.spring(duration: 0.3)) { applyEditorOpenFit() } }
             ))
+            // E27.10 (audit C2): ⌘= = ⌘⇧= — het menu-item voert ⌘+; deze
+            // verborgen brug registreert de shift-loze variant.
+            .background { CanvasZoomEqualsShortcut(zoomIn: { zoomCamera(by: 1.25) }) }
             // E22.1: de sidebar (nu via de app-bar) en een open paneel sluiten
             // elkaar uit — opent de sidebar, dan klapt het paneel dicht.
             .onChange(of: isSidebarVisible) { _, visible in
@@ -653,6 +656,41 @@ struct EditorView: View {
         camera = c
     }
 
+    // MARK: - Zoom-%-chip (E27.10, audit C2)
+
+    /// De fit-schaal (⌘0-resultaat) voor de huidige viewport. Het chip-% is
+    /// relatief hieraan (fit = 100%): dit cover-canvas heeft geen pixel-echte
+    /// 100% (zie 27.2a), dus "100% = het hele frame in beeld" is de enige
+    /// zinvolle ankering — zoals de oude HUD (27.2) de fit op 100% legde.
+    private var editorFitScale: CGFloat {
+        let vp = editorViewportSize
+        guard vp.width > 0, vp.height > 0 else { return 1 }
+        var c = CanvasCamera()
+        c.fitEditorCard(cardSide: EditorCanvasChromeMetrics.coverLayout(viewport: vp).cardSide, in: vp)
+        return max(c.scale, 0.0001)
+    }
+
+    /// Klein klikbaar zoom-%-readout linksonder (lichte vervanging van de in
+    /// 27.2a verwijderde zoom-HUD) — klik = Zoom to Fit (⌘0). Zelfde capsule-
+    /// recept als de board-Fit-chip (.ultraThinMaterial + divider-rand).
+    private var zoomChip: some View {
+        Button {
+            withAnimation(.spring(duration: 0.3)) { applyEditorOpenFit() }
+        } label: {
+            Text("\(Int((camera.scale / editorFitScale * 100).rounded()))%")
+                .dsTextStyle(.labelSmall)
+                .monospacedDigit()
+                .foregroundStyle(DSColor.Foreground.primary)
+                .padding(.horizontal, DSSpacing.gap3)
+                .frame(height: 30)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+        }
+        .buttonStyle(.plain)
+        .help("Zoom to Fit (⌘0)")
+        .padding(DSSpacing.gap4)
+    }
+
     private var editorBody: some View {
         // E28.5: de toolbars zijn altijd zichtbaar in de editor (één portret =
         // altijd het actieve canvas).
@@ -681,6 +719,10 @@ struct EditorView: View {
             }
             .clipped()
             .ignoresSafeArea()
+            // E27.10 (audit C2): zoom-%-chip linksonder — vrij van de bottom-
+            // toolbar (midden) en de undo/redo-cluster (rechts), zoals de oude
+            // HUD-plek (27.2). Klik = fit.
+            .overlay(alignment: .bottomLeading) { zoomChip }
         } panel: { tool in
             canvasPanel(tool)
         } toolbarAccessory: {

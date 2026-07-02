@@ -517,9 +517,22 @@ dan met de regelhoogte. Resultaat: ~0,75px pan en ~1% zoom per tik — verklaart
 trackpad-gebruik; tests groen; Result-regel.
 
 ## 27.10 — ⌘= registreren + zoom bereikbaar voor muis-gebruikers · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: 27.9
+
+**Result:** één gedeeld zoom-mechanisme voor editor, board én Banner Studio:
+(1) nieuw `CanvasZoomEqualsShortcut` (in `CanvasZoomCommands.swift`) — een
+verborgen knop die ⌘= (de shift-loze ⌘+) registreert naast het View-menu-item
+(een menu-item voert maar één key-equivalent); alle drie de `canvasZoom`-
+publishers hangen 'm in hun hiërarchie, dus ⌘= en ⌘⇧= doen overal hetzelfde.
+(2) `BoardView` publiceert nu dezelfde `canvasZoom` focused-scene-value als de
+editor — de View-menu-items (⌘+/⌘−/⌘0) werken op de board en de eigen verborgen
++/=/−/0-knoppen zijn geschrapt (⌘A/organize blijven). (3) zoom-%-chip
+linksonder in de editor (lichte vervanging van de 27.2a-verwijderde HUD):
+klikbare capsule (board-Fit-recept), % relatief aan de fit-schaal (fit = 100%,
+zoals de oude HUD), klik = Zoom to Fit (⌘0), tooltip noemt de sneltoets. Beide
+targets bouwen; Avatar2Tests + AvatarKit (62) + AvatarUI (37) groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C3).
 **Wat:** `CanvasZoomCommands.swift:44-49` registreert alleen `"+"` (= ⌘⇧=), niet

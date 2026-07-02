@@ -60,3 +60,22 @@ struct CanvasZoomCommands: View {
             .disabled(zoom?.actualSize == nil)
     }
 }
+
+/// E27.10 (audit C2): ⌘= — de shift-loze variant van ⌘+ (op een US-toetsenbord
+/// is "+" shift+"=", dus wie "⌘+" typt zonder shift raakt "="). Een menu-item
+/// voert maar ÉÉN key-equivalent: het View-menu toont "Zoom In ⌘+"; deze
+/// onzichtbare knop registreert ⌘= ernaast, zodat beide hetzelfde doen. Elke
+/// view die `canvasZoom` publiceert hangt 'm in z'n hiërarchie (editor, board,
+/// Banner Studio) — samen met de focused-scene-value is dít het ene gedeelde
+/// zoom-mechanisme; de losse verborgen +/=/−/0-knoppen van de board zijn weg.
+struct CanvasZoomEqualsShortcut: View {
+    var zoomIn: () -> Void
+
+    var body: some View {
+        Button("") { zoomIn() }
+            .keyboardShortcut("=", modifiers: .command)
+            .opacity(0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
