@@ -466,14 +466,32 @@ struct BoardView: View {
     /// toegevoegde node wordt het nieuwe range-anker; valt het anker zelf uit de
     /// selectie, dan schuift het anker naar een resterende node.
     private func toggleNodeSelection(_ portrait: Portrait2) {
-        let id = portrait.persistentModelID
+        let result = Self.toggledSelection(
+            current: selection, anchor: selectionAnchor,
+            toggling: portrait.persistentModelID
+        )
+        selection = result.selection
+        selectionAnchor = result.anchor
+    }
+
+    /// Pure toggle-semantiek (E47.3-seam; unit-getest in `BoardSelectionTests`,
+    /// zelfde patroon als `rangeExtendedSelection`): cmd-klik voegt een node toe
+    /// (die wordt het nieuwe anker) of haalt 'm eruit; verdwijnt het anker zelf
+    /// uit de selectie, dan schuift het anker naar een resterende node (of nil
+    /// bij een lege selectie). Gedrag identiek aan de oude inline-variant.
+    static func toggledSelection<ID: Hashable>(
+        current: Set<ID>, anchor: ID?, toggling id: ID
+    ) -> (selection: Set<ID>, anchor: ID?) {
+        var selection = current
+        var anchor = anchor
         if selection.contains(id) {
             selection.remove(id)
-            if selectionAnchor == id { selectionAnchor = selection.first }
+            if anchor == id { anchor = selection.first }
         } else {
             selection.insert(id)
-            selectionAnchor = id
+            anchor = id
         }
+        return (selection, anchor)
     }
 
     /// Shift-klik — breid de selectie uit met de RANGE anker→node in

@@ -151,8 +151,14 @@ struct ExportSheet: View {
     /// 256px-referentie met de pixel-verhouding, licht gedempt (grotere renders
     /// comprimeren iets beter per pixel). Heuristiek — vandaar de "≈".
     private var estimatedBytes: Int? {
+        Self.estimatedBytes(referenceBytes: referenceBytes, side: size)
+    }
+
+    /// Pure schatting (E47.3-seam; unit-getest in `ExportSheetTests`): identiek
+    /// aan de oude inline-berekening, alleen zonder de view-state eraan.
+    static func estimatedBytes(referenceBytes: Int?, side: Int) -> Int? {
         guard let ref = referenceBytes else { return nil }
-        let ratio = Double(size) / 256.0
+        let ratio = Double(side) / 256.0
         return Int(Double(ref) * pow(ratio, 1.85))
     }
 
