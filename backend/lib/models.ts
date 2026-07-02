@@ -127,20 +127,20 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3 + E41.1: Boost resolution. Default = crystal-upscaler — portret-
-  // geoptimaliseerd (behoudt huidtextuur + identiteit, geen "plastic look"),
-  // ~$0,016/beeld, snel. Beste keuze voor een avatar-app (identiteit = product).
-  // Real-ESRGAN blijft als goedkoop alternatief, nu MÉT face_enhance (zie
-  // upscaleInputFor in replicate.ts) zodat ook de fallback gezichten verscherpt.
-  //
-  // crystal-upscaler is een community-model → gepind (E41.3, audit D8), zelfde
-  // patroon als birefnet/deoldify: de unversioned slug kan op replicate.run
-  // 404'en. Nieuwe hash bij een model-upgrade:
-  // https://replicate.com/philz1337x/crystal-upscaler/versions
+  // E10.3 + E41.1: Boost resolution. Bedoelde default is crystal-upscaler
+  // (portret-geoptimaliseerd) maar dat staat NOODGEDWONGEN uit: de hash
+  // gepind in E41.3 (audit D8, 2026-07-02) is nooit live getest en faalt in
+  // productie met 422 "Invalid version or not permitted" (zie /v1/upscale
+  // 500's rond 21:42 op 2026-07-02) — die hash bestaat niet of is niet
+  // toegankelijk. Terug op real-esrgan (bewezen default sinds E10.3,
+  // 2026-06-14) tot een geverifieerde hash is opgehaald via
+  // https://replicate.com/philz1337x/crystal-upscaler/versions (login
+  // vereist, niet fetchbaar door een agent) én live getest op een preview-
+  // deploy vóór de default weer om te zetten.
   // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix — een
   // hash-wissel raakt de payload-vertaling niet.
   upscale: {
-    defaultModel: "crystal-upscaler",
+    defaultModel: "real-esrgan",
     models: {
       "crystal-upscaler": {
         ref: "philz1337x/crystal-upscaler:5d917b1444c89ed91055f3052d27e1ad433a1218599a36544510e1dfa9ac26c8",
