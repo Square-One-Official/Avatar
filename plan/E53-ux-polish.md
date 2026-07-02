@@ -69,3 +69,19 @@ groen; Result-regel.
 De overige P1/P2-bevindingen uit `AUDIT-UX-2026-07-02.md` (UX8, UX12–UX27,
 UX31–UX33) — oppakken in een volgende polish-ronde; UX6 (update-flow
 relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
+
+## 53.6 — Shell-chrome & hover-fixes (UX34–UX36, meldingen Thierry 2026-07-02)
+- status: ready
+- team: FEAT+DS
+- blockedBy: —
+
+**Wat (volg UXS-27…29 in het PLAN-document):**
+- UX36/UXS-27 [DS]: chip-hover is een no-op — `DSColor.neutralSurface` geeft bij
+  hover de rustkleur terug; hover-trede relatief aan de base maken (één
+  DS-regel, fixt Name/Frame/Background/grid-chips tegelijk).
+- UX35/UXS-28: breadcrumb verspringt bij preview — `studioFullBleed`-flip wisselt
+  het referentiekader; band altijd venster-breed, leading alleen op
+  `isLeftNavVisible`.
+- UX34/UXS-29: traffic lights + sidebar-toggle zweven boven de sidebar-kaart —
+  sidebar-materiaal doortrekken tot de venstertop + toggle in de sidebar-header.
+**DoD:** beide targets bouwen, tests groen, visuele smoke dark+light; Result-regel.

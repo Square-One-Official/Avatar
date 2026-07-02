@@ -1,6 +1,7 @@
 # PLAN-UX-POLISH — story-ready uitwerking van AUDIT-UX-2026-07-02
 
-**Bron:** `plan/AUDIT-UX-2026-07-02.md` (33 bevindingen: 8×P0, 15×P1, 10×P2).
+**Bron:** `plan/AUDIT-UX-2026-07-02.md` (36 bevindingen: 8×P0, 18×P1, 10×P2 —
+UX34–UX36 nagemeld door Thierry tijdens live review, cluster E → stories UXS-27…29).
 Elke story hieronder is zelfstandig implementeerbaar: bevinding(en), waarom, bestanden,
 concrete aanpak, acceptatiecriteria (AC) en verificatie. Regelverwijzingen zijn
 geverifieerd op de werkboom van 2026-07-02. Afhankelijkheden op de CTO-audit
@@ -356,6 +357,72 @@ moet leeg zijn (of een SwiftLint custom rule).
 **Verificatie:** System Settings → Accessibility → Reduce motion aan, smoke door
 editor/board/studio; grep-check.
 
+### UXS-27 · Hover-trede relatief aan base — dode hovers op topchips (UX36) — S
+**Waarom:** de Name/Frame/Background/grid-chips boven de canvas hebben een hover die
+in code bestaat maar niets doet: `neutralSurface` geeft bij hover
+`Background.neutralStronger` terug en dat ís al de rustkleur van deze chips.
+**Bestanden:** `AvatarUI/Sources/AvatarUI/Tokens/DSSurfaceColor.swift:8-12` (de fix),
+consumenten ter controle: `DSBottomToolbar.swift:332-338` (CapsuleSurface,
+surface `.secondary` → base `neutralStronger`), `CanvasActionToolbar.swift:73`
+(headerRow = `.secondary`), `CanvasFrameChip.swift:30` (zelfde base).
+**Aanpak:** de ladder in `neutralSurface` base-bewust maken: bij `base == .clear`
+blijft het huidige gedrag (hover → neutralStronger, pressed → neutralStrongest); bij
+een gevulde base schuift alles één trede op (hover → neutralStrongest, pressed/active
+→ neutralStrongest + bestaande active-ring, of een nieuwe `neutralStrongest2`-token
+als de stap te klein blijkt). Oogtest in dark én light. Geen per-chip-fixes — dit is
+bewust één DS-regel zodat álle secondary-surface knoppen tegelijk genezen.
+**AC:** muis over Name-, Frame-, Background- en grid-chip geeft een zichtbaar
+kleurverschil (dark + light); ghost-knoppen (bottom-toolbar) onveranderd; pressed en
+active blijven onderscheidbaar van hover.
+**Verificatie:** live in de editor; kleursample rust vs hover moet verschillen; grep
+dat geen call site zelf ging compenseren.
+
+### UXS-28 · Breadcrumb pixelvast bij Edit ↔ Preview (UX35) — S/M
+**Waarom:** de breadcrumb verspringt horizontaal bij elke mode-toggle.
+**Root cause (geverifieerd):** `studioFullBleed` (`ShellView.swift:29-34`) is false
+zodra `isShowingSocialPreview`/`isShowingBannerPreview`; daardoor wisselt
+`shellEditorBreadcrumbLeading` (`ShellView.swift:388-396`) van
+`LeftNavView.layoutWidth + DSSpacing.gap3` (full-bleed: band spant het hele venster)
+naar `gap3` (preview: band leeft in de content-kolom). Twee referentiekaders die net
+niet op hetzelfde punt uitkomen → sprong.
+**Bestanden:** `Avatar2/Features/Shell/ShellView.swift:341-396`,
+`ShellMetrics.swift` (bestaande `editorBreadcrumbLeadingCollapsed`).
+**Aanpak:** de topchrome-band áltijd venster-breed leggen (ook in preview) en de
+breadcrumb-leading uit één formule laten komen die alleen van `isLeftNavVisible`
+afhangt: `leading = isLeftNavVisible ? LeftNavView.layoutWidth + gap3 :
+editorBreadcrumbLeadingCollapsed - windowEdgeInset` — onafhankelijk van
+`studioFullBleed`. De preview-content zelf blijft in z'n kolom; alleen de band
+verhuist naar window-space. Daarna de bestaande `dsMotion(springTransform)` op
+`isLeftNavVisible` laten staan (sidebar-toggle mág animeren; mode-toggle niet).
+**AC:** Edit↔Preview toggelen verplaatst de breadcrumb met 0px (screenshot-diff);
+sidebar in-/uitklappen animeert zoals nu; banner-preview idem.
+**Verificatie:** screenshots Edit en Preview over elkaar (pixel-diff op de
+breadcrumb-bbox); zelfde test met sidebar dicht.
+
+### UXS-29 · Traffic lights + toggle ín het sidebar-paneel (UX34) — M
+**Waarom:** met uitgeklapte sidebar zweven de vensterknoppen en de sidebar-toggle in
+een band bóven de afgeronde kaart — oogt als een render-bug (crops
+`…/crops/28-settings-about-tl.png`, `31-light-home-tl.png`).
+**Bestanden:** `Avatar2/Features/Shell/LeftNavView.swift`,
+`ShellSidebarChrome.swift`, `ShellMetrics.swift` (`windowEdgeInset`), venster-setup
+in `Avatar2App.swift` (hiddenTitleBar/fullSizeContentView staat al aan).
+**Aanpak:**
+1. Het sidebar-oppervlak (de kaart) tot `y = 0` van het venster laten lopen wanneer
+   de sidebar uitgeklapt is: top-inset van de kaart verwijderen en de bovenste
+   hoekradius alleen behouden als de kaart níet tegen de venstertop ligt (of: radius
+   behouden maar de titlebar-band meenemen in hetzelfde materiaal, zoals
+   Finder/Notes/Arc).
+2. De sidebar-toggle-knop verhuist ín de sidebar-header (zelfde rij als de traffic
+   lights, rechts uitgelijnd), zodat chrome en paneel één geheel zijn; bij
+   íngeklapte sidebar blijft de toggle op z'n huidige vrije plek.
+3. Content-padding binnenin compenseren (`ShellMetrics`) zodat "Home" op dezelfde
+   y blijft.
+**AC:** uitgeklapt: traffic lights + toggle liggen visueel óp het sidebar-materiaal
+(dark + light), geen zwarte/witte band erboven; ingeklapt: gedrag als nu; geen
+overlap met de eerste sidebar-rij bij smalle vensters.
+**Verificatie:** screenshots dark/light uit- én ingeklapt; vergelijk met
+Finder-sidebar als referentie.
+
 ---
 
 ## Sprint 3 — P2 DS-hygiëne (sweeps)
@@ -434,6 +501,9 @@ Features/Settings = 0; visueel identiek.
 | UXS-17 Hints & pill | P1 | S | — |
 | UXS-18 Banners-DS-kleuren | P1 | S | UXS-1/5/6 |
 | UXS-19 Reduce-motion-sweep | P1 | M | UXS-15 |
+| UXS-27 Hover-trede (dode hovers) | P1 | S | UXS-25 (zelfde surface-ladder) |
+| UXS-28 Breadcrumb pixelvast | P1 | S/M | UXS-29 (zelfde shell-chrome) |
+| UXS-29 Traffic lights in sidebar | P1 | M | UXS-28 |
 | UXS-20…26 | P2 | S–M | opportunistisch per file |
 
 **Definition of done (alle stories):** build + AvatarKit/AvatarUI `swift test` groen
