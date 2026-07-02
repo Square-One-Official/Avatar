@@ -581,7 +581,32 @@ final class BackgroundGenerationForm {
     }
 }
 
-// MARK: - Swatch
+// MARK: - Entrypoints (swatch + knop)
+
+/// Gedeelde privacy-gate + presentatie voor de generate-entrypoints
+/// (icon-swatch in het banner-paneel, gelabelde knop in het portret-paneel).
+@MainActor
+private func presentGenerateBackground(
+    context: BackgroundGenerationContext,
+    entitlement: EntitlementModel?,
+    applyAfterSave: Bool,
+    onSaved: @escaping (Data) -> Void
+) {
+    guard let entitlement else { return }
+    switch PrivacyPreferences2.shared.effectiveTier {
+    case .onDevice:
+        _ = entitlement.allowAIFeature(.backgroundGenerate)
+    case .appleCloud:
+        guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
+    case .thirdParty:
+        break
+    }
+    GenerateBackgroundPresenter.shared.present(
+        context: context,
+        applyAfterSave: applyAfterSave,
+        onSaved: onSaved
+    )
+}
 
 struct GenerateBackgroundSwatch: View {
     let context: BackgroundGenerationContext
@@ -616,19 +641,37 @@ struct GenerateBackgroundSwatch: View {
     }
 
     private func openSheet() {
-        guard let entitlement else { return }
-        switch PrivacyPreferences2.shared.effectiveTier {
-        case .onDevice:
-            _ = entitlement.allowAIFeature(.backgroundGenerate)
-        case .appleCloud:
-            guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
-        case .thirdParty:
-            break
-        }
-        GenerateBackgroundPresenter.shared.present(
-            context: context,
-            applyAfterSave: applyAfterSave,
-            onSaved: onSaved
+        presentGenerateBackground(
+            context: context, entitlement: entitlement,
+            applyAfterSave: applyAfterSave, onSaved: onSaved
         )
+    }
+}
+
+/// UX-audit background-paneel: generate als op-zichzelf-staande actie-knop —
+/// een icon-tile tussen de kiesbare swatches leest als preset, niet als actie.
+/// Vast sparkle-icoon (de privacy-tier-uitleg woont in de sheet zelf, niet in
+/// het entrypoint-icoon).
+struct GenerateBackgroundButton: View {
+    let context: BackgroundGenerationContext
+    var entitlement: EntitlementModel?
+    var applyAfterSave: Bool = true
+    var onSaved: (Data) -> Void
+
+    var body: some View {
+        if BackgroundGenerationCatalog.hasGenerationPath {
+            DSNeutralButton(
+                "Generate background",
+                icon: Image(systemName: "sparkles"),
+                size: .small,
+                fullWidth: true
+            ) {
+                presentGenerateBackground(
+                    context: context, entitlement: entitlement,
+                    applyAfterSave: applyAfterSave, onSaved: onSaved
+                )
+            }
+            .help("Generate a background with AI")
+        }
     }
 }
