@@ -13,10 +13,11 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsAboutPage: View {
-    /// E01.11: Sparkle-updater. Eigen instance voor de Settings-sessie; de
-    /// auto-check-voorkeur leeft in Sparkle's eigen store (niet langer in
-    /// settings2.autoUpdateCheck).
-    @State private var updater = UpdateManager()
+    /// E13.5 (audit-C1): consumeert dé app-brede Sparkle-updater die
+    /// Avatar2App bezit en via Environment doorgeeft — Sparkle verwacht één
+    /// SPUUpdater per proces, dus hier nooit meer een eigen instance maken.
+    /// De auto-check-voorkeur leeft in Sparkle's eigen store.
+    @Environment(UpdateManager.self) private var updater
 
     private var versionLabel: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–"
