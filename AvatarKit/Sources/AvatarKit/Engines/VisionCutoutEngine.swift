@@ -104,7 +104,7 @@ public struct VisionCutoutEngine: CutoutEngine {
             "inputMaskImage": alphaMatte
         ]).cropped(to: extent)
 
-        let outputColorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let outputColorSpace = EngineRendering.outputColorSpace(for: image)
         guard let result = Self.context.createCGImage(composed, from: extent,
                                                       format: .RGBA8,
                                                       colorSpace: outputColorSpace) else {
@@ -143,7 +143,7 @@ public struct VisionCutoutEngine: CutoutEngine {
             kCIInputScaleKey: scale,
             kCIInputAspectRatioKey: 1.0
         ])
-        let colorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let colorSpace = EngineRendering.outputColorSpace(for: image)
         // Bij renderfalen liever Vision op de originele resolutie dan de
         // hele import afbreken.
         guard let cg = context.createCGImage(resized, from: outRect,

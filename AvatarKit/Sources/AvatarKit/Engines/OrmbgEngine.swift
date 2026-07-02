@@ -80,7 +80,7 @@ public struct OrmbgEngine: CutoutEngine {
             "inputMaskImage": alphaMatte
         ]).cropped(to: extent)
 
-        let outputColorSpace = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let outputColorSpace = EngineRendering.outputColorSpace(for: image)
         guard let result = EngineRendering.linearContext.createCGImage(
             composed, from: extent, format: .RGBA8, colorSpace: outputColorSpace
         ) else {

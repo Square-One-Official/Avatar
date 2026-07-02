@@ -60,6 +60,52 @@ final class OrmbgEngineTests: XCTestCase {
         XCTAssertEqual(OrmbgEngine.float16BitsToFloat(0x0001), Float(exactly: pow(2.0, -24))!)
     }
 
+    // MARK: - Kleurruimte-robuustheid (E02.5, audit-B1)
+
+    /// Het echte ORMBG-model (~45 MB) hoort niet in git of in een download
+    /// tijdens een unit-test; deze fixture-tests draaien tegen een lokaal
+    /// al geïnstalleerd model (Application Support, of de app-container van
+    /// de dev-build) en slaan zichzelf over waar dat ontbreekt — de
+    /// kleurruimte-guard zelf wordt dan nog steeds geïsoleerd gedekt door
+    /// SRGBNormalizerTests (EngineRendering.outputColorSpace).
+    private func locallyInstalledStore() -> OrmbgModelStore? {
+        if OrmbgModelStore.shared.installedModelURL() != nil { return .shared }
+        let containerBase = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Containers/nl.squareone.aaavatar2/Data"
+                + "/Library/Application Support/AvatarKit/Models/ormbg", isDirectory: true)
+        let store = OrmbgModelStore(baseDirectory: containerBase)
+        return store.installedModelURL() != nil ? store : nil
+    }
+
+    /// Regressie B1: DeviceGray-bron gaf vóór de outputColorSpace-guard
+    /// `createCGImage(.RGBA8, grayCS)` = nil → renderFailed.
+    func testCutoutOnGrayscaleSourceSucceeds() async throws {
+        guard let store = locallyInstalledStore() else {
+            throw XCTSkip("ORMBG-model niet lokaal geïnstalleerd — guard gedekt via SRGBNormalizerTests")
+        }
+        let fixture = ColorSpaceFixtures.grayPortrait(width: 800, height: 1000)
+        XCTAssertEqual(fixture.colorSpace?.model, .monochrome) // premisse
+
+        let cutout = try await OrmbgEngine(store: store).cutout(fixture)
+        XCTAssertEqual(cutout.width, 800)
+        XCTAssertEqual(cutout.height, 1000)
+        XCTAssertEqual(cutout.colorSpace?.model, .rgb)
+    }
+
+    /// Regressie B1: idem voor een DeviceCMYK-bron (CMYK-JPEG).
+    func testCutoutOnCMYKSourceSucceeds() async throws {
+        guard let store = locallyInstalledStore() else {
+            throw XCTSkip("ORMBG-model niet lokaal geïnstalleerd — guard gedekt via SRGBNormalizerTests")
+        }
+        let fixture = ColorSpaceFixtures.cmykPortrait(width: 800, height: 1000)
+        XCTAssertEqual(fixture.colorSpace?.model, .cmyk) // premisse
+
+        let cutout = try await OrmbgEngine(store: store).cutout(fixture)
+        XCTAssertEqual(cutout.width, 800)
+        XCTAssertEqual(cutout.height, 1000)
+        XCTAssertEqual(cutout.colorSpace?.model, .rgb)
+    }
+
     // MARK: - Beschikbaarheid en store
 
     func testEngineUnavailableWithoutInstalledModel() async {

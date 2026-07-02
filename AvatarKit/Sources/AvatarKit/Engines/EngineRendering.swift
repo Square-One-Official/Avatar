@@ -22,6 +22,17 @@ enum EngineRendering {
     /// sRGB-bytes (de ×1/255-preprocessing zit in het model gebakken).
     static let standardContext = CIContext(options: [.useSoftwareRenderer: false])
 
+    /// E02.5 (audit-B1): render-doelkleurruimte voor `.RGBA8`-output.
+    /// Dat formaat is alleen compatibel met een RGB-kleurruimte; met de
+    /// bron-kleurruimte van een DeviceGray-PNG of CMYK-JPEG geeft
+    /// `createCGImage` nil → renderFailed. Niet-RGB-bron → sRGB.
+    /// Verdedigingslinie ónder de importnormalisatie (`SRGBNormalizer`),
+    /// voor engine-callers die daar niet doorheen komen.
+    static func outputColorSpace(for image: CGImage) -> CGColorSpace {
+        (image.colorSpace?.model == .rgb ? image.colorSpace : nil)
+            ?? CGColorSpace(name: CGColorSpace.sRGB)!
+    }
+
     /// Schaalt een masker naar de doel-extent (Vision/CoreML-maskers komen
     /// op model- of inputresolutie terug).
     static func scaled(_ mask: CIImage, to extent: CGRect) -> CIImage {
