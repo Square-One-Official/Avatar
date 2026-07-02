@@ -43,7 +43,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
 | [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **done** (36.1–36.5); 36.6 backlog (zoekveld) |
 | [E37 Banner Studio (editor)](E37-banner-studio.md) | FEAT+INFRA+DS | **done** (37.1–37.15, 37.17–37.19); 37.16 PaperKit backlog — **bannersEnabled-blocker opgeheven**, flag-flip = besluit Thierry |
-| [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **38.1 ready**, 38.2–38.4 backlog (Figma-stijl Metal-shaders) |
+| [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **done** (38.1–38.4, Figma-stijl Metal-shaders; DoD hergeverifieerd 2026-07-02 na E37.19) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **39.1 ready**, 39.2 backlog |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **40.1 ready**, 40.2 backlog |
 | [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.3) |

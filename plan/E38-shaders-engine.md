@@ -33,6 +33,10 @@ lokaal.
 ## 38.1 — Metal-shaderbibliotheek + ShaderEffect-model
 - status: done
 - owner: AI/INFRA (2026-06-26)
+- verified: 2026-07-02 — DoD opnieuw groen op v2-main ná de E37.19-merge (Halftone-intensity):
+  `swift test` AvatarKit 89/89 + AvatarUI 37/37, `xcodebuild test -scheme Avatar2` 119 tests
+  (1 skipped, 0 failures) incl. 6× `ShaderEffectTests`. Board-rij E38 stond nog op "38.1 ready"
+  (stale) en is gelijkgetrokken met dit epic-bestand; geen codewijziging nodig.
 - note: Metal Toolchain (17E188, ~688 MB) geïnstalleerd via `xcodebuild -downloadComponent
   MetalToolchain` (Thierry akkoord 2026-06-26) → `.metal` compileert. Deblokkeerde 38.x + 37.7.
 - team: AI/INFRA
