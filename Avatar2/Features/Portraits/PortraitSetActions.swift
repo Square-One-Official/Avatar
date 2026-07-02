@@ -66,6 +66,7 @@ enum PortraitSetActions {
             withAnimation(.spring(duration: 0.4)) {
                 for (portrait, before, after) in items {
                     portrait.cutoutData = after
+                    portrait.cutoutDerivesFromOriginal = false
                     portrait.touch()
                     CutoutDataUndo.register(
                         undoManager, portrait: portrait,

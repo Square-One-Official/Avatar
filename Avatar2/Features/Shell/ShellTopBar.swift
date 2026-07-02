@@ -71,6 +71,7 @@ struct ShellTopBar: View {
 
 /// Gelabelde segmented control — icoon + tekst per segment (pencil · eye).
 private struct EditorViewModeToggle: View {
+    @Namespace private var selectionNamespace
     let isPreview: Bool
     let height: CGFloat
     let onChange: (Bool) -> Void
@@ -78,15 +79,15 @@ private struct EditorViewModeToggle: View {
     var body: some View {
         HStack(spacing: 0) {
             segment(icon: "pencil", label: "Edit", selected: !isPreview) {
-                onChange(false)
+                DSMotion.animate(DSMotion.springSmall) { onChange(false) }
             }
             segment(icon: "eye", label: "Preview", selected: isPreview) {
-                onChange(true)
+                DSMotion.animate(DSMotion.springSmall) { onChange(true) }
             }
         }
         .padding(DSSpacing.gap0_5)
         .background(DSColor.Background.neutral, in: Capsule())
-        .dsMotion(DSMotion.base, value: isPreview)
+        .dsMotion(DSMotion.springSmall, value: isPreview)
     }
 
     private func segment(icon: String, label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -102,7 +103,9 @@ private struct EditorViewModeToggle: View {
             .frame(height: height)
             .background {
                 if selected {
-                    Capsule().fill(DSColor.Background.neutralStronger)
+                    Capsule()
+                        .fill(DSColor.Background.neutralStronger)
+                        .matchedGeometryEffect(id: "selection", in: selectionNamespace)
                 }
             }
             .contentShape(Capsule())

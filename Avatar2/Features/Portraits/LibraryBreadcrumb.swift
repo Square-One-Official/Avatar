@@ -21,6 +21,7 @@ struct LibraryBreadcrumb: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
             .help("Back")
 
             trail
@@ -58,8 +59,11 @@ struct LibraryBreadcrumb: View {
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.muted)
                 .lineLimit(1)
+                .padding(.horizontal, DSSpacing.gap1)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsHoverHighlight(cornerRadius: DSRadius.md)
         .help("Go to \(text)")
     }
 

@@ -44,6 +44,7 @@ public struct DSPrimaryButton: View {
     public var body: some View {
         Button(action: action) {
             DSButtonLabel(title: title, icon: icon, size: size)
+                .fixedSize(horizontal: !fullWidth, vertical: false)
                 .foregroundStyle(isEnabled ? DSColor.Action.onAction : DSColor.Foreground.muted)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
                 .padding(.horizontal, size.horizontalPadding)

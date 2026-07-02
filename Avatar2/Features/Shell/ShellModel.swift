@@ -476,7 +476,11 @@ final class ShellModel {
         }
         if preserveSourceAlpha {
             // Face-edits: vorm blijft gelijk, Vision op een gestyled gezicht is
-            // onbetrouwbaar → hergebruik de bestaande alpha-laag.
+            // onbetrouwbaar → hergebruik de bestaande alpha-laag. Geen vol bron-beeld
+            // om later te her-isoleren; wis een eventuele oude (stale) edit-bron zodat
+            // "Remove background" niet een vorige haar-edit terughaalt.
+            portrait.editSourceData = nil
+            portrait.editSourceCutoutSig = 0
             let sourceFreestanding = Self.hasTransparentCorners(NSImage(data: portrait.cutoutData))
             let resultHasBackground = !Self.hasTransparentCorners(image)
             if sourceFreestanding && resultHasBackground,
@@ -495,11 +499,40 @@ final class ShellModel {
         // haar tot de rand loopt (bron) of het model transparante hoeken maar een
         // grijze matte rond het onderwerp teruggeeft.
         if Self.isLikelyCutout(image) {
+            // Al een schone cutout (boost/flip/enhance) — geen vol bron-beeld.
+            portrait.editSourceData = nil
+            portrait.editSourceCutoutSig = 0
             storeEffectResult(image, on: portrait)
         } else {
+            // Vol AI-resultaat (onderwerp + toegevoegde achtergrond) → bewaar het
+            // ZODAT "Remove background" het later met ORMBG schoon kan her-isoleren
+            // (nieuw haar behouden, per-ongeluk-achtergrond weg). cutoutData krijgt
+            // de nu-geïsoleerde versie; stempel met die bytegrootte zodat een undo
+            // het edit-bronbeeld als stale herkent.
+            portrait.editSourceData = image.pngData()
             let restored = (try? await reIsolateSubject(image)) ?? image
             storeEffectResult(restored, on: portrait)
+            // Stempel op de nu-opgeslagen cutout; 0 als de PNG-encode faalde (dan is
+            // editSourceData ook nil → sowieso genegeerd door Remove background).
+            portrait.editSourceCutoutSig = portrait.editSourceData != nil
+                ? Portrait2.cutoutSignature(portrait.cutoutData)
+                : 0
         }
+    }
+
+    /// Slaat een AL geïsoleerd beeld (Remove background / Restore body) direct op,
+    /// mét de framing/resize-correctie van `storeEffectResult` maar ZONDER de
+    /// her-isolatie-pass van `applyEffectResult`. Die pass mat een al-uitgesneden
+    /// beeld een tweede keer (`isLikelyCutout` faalt zodra het haar tot de rand
+    /// loopt) → de zachte haarranden worden opaak en de achtergrond komt terug in
+    /// het haar. De import slaat de cutout ook direct op (`persist`); dit is het
+    /// equivalent voor het updaten van een bestaand portret.
+    func applyIsolatedResult(_ image: NSImage) async {
+        guard let portrait = selectedPortrait else {
+            setCanvas(.result(image))
+            return
+        }
+        storeEffectResult(image, on: portrait)
     }
 
     /// Past de alpha-laag van een bestaande cutout toe op een opaque (vol-achtergrond)
@@ -613,6 +646,10 @@ final class ShellModel {
         }
         if let png = stored.pngData() {
             portrait.cutoutData = png
+            // Een generatief resultaat verving de pixels → niet langer een schone
+            // isolatie van de originele foto (stuurt de bron-keuze van Remove
+            // background). Re-isolaties vanuit het origineel zetten 'm zelf terug.
+            portrait.cutoutDerivesFromOriginal = false
             portrait.touch()
         }
         setCanvas(.result(Self.adjustedImage(stored, portrait.adjust)))

@@ -21,51 +21,62 @@ struct ShellView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Gedeelde hero-morph-namespace (Portraits-tegel → editor-canvas). Zie
-    /// [[HeroMorph]]. Bij reduce-motion injecteren we 'm niet → kale fade.
-    @Namespace private var heroNS
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
     @State private var debugShowColorPicker = false
     @State private var debugPickerColor: Color = Color(hue: 0.55, saturation: 0.7, brightness: 0.9)
 
+    /// Portrait- + banner-editor: canvas full-bleed; sidebar/chrome als overlay.
+    private var studioFullBleed: Bool {
+        guard !model.isShowingSettings else { return false }
+        if model.section == .editor && !model.isShowingSocialPreview { return true }
+        if model.editingBanner != nil && !model.isShowingBannerPreview { return true }
+        return false
+    }
+
     var body: some View {
-        // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
-        // resterende ruimte (één spring, geen layoutshift).
-        HStack(spacing: 0) {
-            // Blijft in de hiërarchie; breedte clip van links i.p.v. insert/remove
-            // + opacity/move — één spring, geen desync aan de bovenkant.
-            leftNavSlot
-            mainArea
+        ZStack {
+            if studioFullBleed {
+                Group {
+                    if let doc = model.editingBanner {
+                        BannerStudioView(doc: doc, entitlement: entitlement)
+                    } else {
+                        canvas
+                            .opacity(model.isDropTargeted ? 0 : 1)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+            }
+
+            if studioFullBleed {
+                HStack(alignment: .top, spacing: 0) {
+                    leftNavSlot
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    Spacer(minLength: 0)
+                }
+            } else {
+                HStack(spacing: ShellMetrics.sidebarContentSpacing) {
+                    leftNavSlot
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    mainArea
+                        .padding(.trailing, ShellMetrics.windowEdgeInset)
+                }
+            }
         }
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-        .background(DSColor.Background.app)
+        .background(studioFullBleed ? Color.clear : DSColor.Background.app)
         .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
+        // ⌘, opent de in-venster Settings (zie SettingsCommands in het app-menu).
+        .focusedSceneValue(\.openSettings, OpenSettingsAction { model.isShowingSettings = true })
         // Vaste venster-chrome: traffic-light-strook + toggle schuiven niet mee
         // met de sidebar-animatie; de strip hoort visueel bij de nav wanneer open.
-        // Verborgen tijdens banner studio (full-screen); preview houdt de left-nav.
         .overlay(alignment: .topLeading) {
-            if model.editingBanner == nil {
-                ShellSidebarChrome(
-                    isSidebarVisible: model.isLeftNavVisible,
-                    onToggleSidebar: { model.toggleLeftNav() }
-                )
-                .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-            }
-        }
-        // E34.5: social-preview is een editor-modus in de content-kolom (geen overlay).
-        // E37.2: de Banner Studio is óók een full-screen crossfade-overlay op
-        // vensterniveau (over left-nav + content), gekoppeld aan het open BannerDoc.
-        .overlay {
-            if let doc = model.editingBanner {
-                BannerStudioView(doc: doc, isPro: entitlement.isProActive, onClose: { model.closeBannerStudio() })
-                    .transition(.opacity)
-            }
-        }
-        .dsMotion(DSMotion.base, value: model.editingBanner != nil)
-        // Editor-topbar + breadcrumb op vensterniveau, boven preview/banner-overlays.
-        .overlay(alignment: .top) {
-            editorTopChromeBand
-                .ignoresSafeArea(.container, edges: .top)
+            ShellSidebarChrome(
+                isSidebarVisible: model.isLeftNavVisible,
+                studioFullBleed: studioFullBleed,
+                onToggleSidebar: { model.toggleLeftNav() }
+            )
+            .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         }
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
@@ -92,8 +103,9 @@ struct ShellView: View {
         }
         // PoC (left-nav): "Manage backgrounds" vanuit het gebruikersmenu.
         .sheet(isPresented: $model.isShowingManageBackgrounds) {
-            ManageBackgroundsSheet()
+            ManageBackgroundsSheet(entitlement: entitlement)
         }
+        .generateBackgroundSheet(entitlement: entitlement)
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
@@ -110,6 +122,12 @@ struct ShellView: View {
             }
         }
         .dsMotion(DSMotion.enter, value: model.setBusyMessage)
+        .onChange(of: entitlement.openSettingsPage) { _, page in
+            if let page {
+                model.openSettings(page: page)
+                entitlement.openSettingsPage = nil
+            }
+        }
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
@@ -178,8 +196,7 @@ struct ShellView: View {
             }
             // E24.21: open de rename-modal voor de smoke.
             if args.contains("--show-rename") { model.isShowingRename = true }
-            // Smoke (hero-morph): toon de grid, drill na een marge in het jongste
-            // portret zodat de tegel→canvas-morph deterministisch speelt.
+            // Smoke: toon de grid, drill na een marge in het jongste portret.
             if args.contains("--drill-in-demo") {
                 model.section = .portraits
                 try? await Task.sleep(for: .seconds(3))
@@ -206,15 +223,47 @@ struct ShellView: View {
             }
             #endif
         }
+        .refreshAppleIntelligenceAvailability {
+            PrivacyPreferences2.shared.reapplyFingerprintPolicy()
+        }
+        .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
+            handleDrop(providers)
+        }
+        .overlay {
+            if model.isDropTargeted && !model.isShowingSettings && !model.isShowingSocialPreview && !model.isShowingBannerPreview {
+                DropzoneOverlay()
+                    .allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if let label = isolatingStatusLabel, !model.isShowingSocialPreview {
+                IsolatingStatusPill(label: label)
+                    .padding(DSSpacing.gap4)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if model.showHairNudge && !model.isShowingSettings && !model.isShowingSocialPreview {
+                HairNudgeBanner(
+                    onDownload: { model.acceptHairNudge() },
+                    onDismiss: { model.dismissHairNudge() }
+                )
+                .padding(.bottom, DSSpacing.gap4)
+                .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
+            }
+        }
+        .dsMotion(DSMotion.enter, value: model.showHairNudge)
+        .dsMotion(DSMotion.fast, value: model.isDropTargeted)
+        .overlay(alignment: .top) {
+            if showsEditorTopChrome {
+                editorTopChromeBand
+            }
+        }
     }
 
     /// Sidebar-slot: altijd gemonteerd, onthult via leading-clip (zelfde spring als chrome).
     private var leftNavSlot: some View {
         LeftNavView(model: model, entitlement: entitlement)
             .padding(.leading, LeftNavView.edgeInset)
-            .padding(.top, LeftNavView.edgeInset)
-            .padding(.bottom, LeftNavView.edgeInset)
-            .padding(.trailing, LeftNavView.edgeInset)
             .frame(width: LeftNavView.layoutWidth, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
             .frame(width: model.isLeftNavVisible ? LeftNavView.layoutWidth : 0, alignment: .leading)
@@ -228,13 +277,22 @@ struct ShellView: View {
             if model.isShowingSettings {
                 // Settings vervangt de hoofdweergave; Esc sluit (verborgen
                 // cancel-knop, venster-breed) of de ✕ in de topbar.
-                SettingsRootView(entitlement: entitlement)
+                SettingsRootView(entitlement: entitlement, page: $model.settingsPage)
                     .background(
                         Button("") { model.isShowingSettings = false }
                             .keyboardShortcut(.cancelAction)
                             .opacity(0)
                             .accessibilityHidden(true)
                     )
+            } else if let doc = model.editingBanner {
+                Group {
+                    if model.isShowingBannerPreview {
+                        BannerPreviewView(doc: doc, isPro: entitlement.isProActive)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .transition(.opacity)
             } else if model.section == .home {
                 // PoC (left-nav): Home — het overzicht (laatste + eerdere /
                 // first-use). De top-right-chrome blijft hier weg.
@@ -253,146 +311,88 @@ struct ShellView: View {
                 BannersGalleryView(model: model, entitlement: entitlement)
                     .transition(.opacity)
             } else {
-                // Editor-sectie: Edit en Preview zijn wisselende modi (geen overlay —
-                // de canvas leeft niet door onder de preview).
                 Group {
                     if model.isShowingSocialPreview {
                         SocialPreviewView(
                             model: model,
                             isPro: entitlement.isProActive
                         )
+                    } else if studioFullBleed {
+                        Color.clear
                     } else {
-                        ZStack {
-                            canvas
-                                // Tijdens een drag fade't de hele canvas-inhoud (foto +
-                                // Name/Role-chip + editor-toolbar) uit naar de app-
-                                // achtergrond, zodat alleen de dropzone-overlay overblijft —
-                                // een schone lei, net als first-use (bevinding: drag toont
-                                // dropzone óver de avatar i.p.v. leeg scherm).
-                                .opacity(model.isDropTargeted ? 0 : 1)
-                            // Hero-morph: de getikte tegel "groeit" naar het canvas. De
-                            // overlay leeft alleen tijdens de morph en crossfadet dan naar
-                            // de echte EditorView eronder. Zie [[HeroMorph]].
-                            heroMorphOverlay
-                        }
+                        canvas
+                            .opacity(model.isDropTargeted ? 0 : 1)
                     }
                 }
-                // Forward = hero-morph (overlay), back = kale fade → editor zelf
-                // faden, de overlay draagt de zoom. (reduce-motion: ook fade.)
                 .transition(.opacity)
             }
         }
-        // Phase 4 + follow-up: drill-in animeert als matchedGeometry-hero (tegel →
-        // canvas, zie [[HeroMorph]]); back-nav houdt de cross-fade. reduce-motion →
-        // kale fade (heroNS niet geïnjecteerd). Eén spring drijft de section-swap
-        // én de gematchte geometrie.
-        .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.85), value: model.section)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.section)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingSocialPreview)
-        // De hero-namespace zakt via de Environment naar de lens-tegels (geen
-        // threading door vier lens-views). nil bij reduce-motion → no-op.
-        .environment(\.heroNamespace, reduceMotion ? nil : heroNS)
-        // Laat de hero-overlay landen, crossfade 'm dan weg naar de echte editor.
-        .onChange(of: model.heroMorphID) { _, id in
-            guard id != nil else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-                withAnimation(.easeOut(duration: 0.22)) { model.clearHeroMorph() }
-            }
-        }
-        // Punt 19: top-uitlijning — de VStack centreerde verticaal,
-        // waardoor de kaart bij lage vensters onder de quota-rij kroop;
-        // header hoort vast bovenaan (Figma y=32), de foto is het enige
-        // flexibele element.
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingBannerPreview)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.editingBanner != nil)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // Heel het venster is droptarget (Fitts, review-besluit); de
-        // Figma-dropzone (App / Dropzone, 4017:1622) is puur visueel.
-        .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
-            handleDrop(providers)
-        }
-        .overlay {
-            // Geen dropzone bovenop Settings (punt 14): de drop zelf wordt
-            // in handleDrop genegeerd zolang Settings open staat.
-            if model.isDropTargeted && !model.isShowingSettings && !model.isShowingSocialPreview {
-                DropzoneOverlay()
-                    .allowsHitTesting(false)
-            }
-        }
-        // Status-pill op vensterniveau (bevinding 3): de frames zetten
-        // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
-        // Image added 4017:1849), niet aan de foto geplakt.
-        .overlay(alignment: .bottomTrailing) {
-            if let label = isolatingStatusLabel, !model.isShowingSocialPreview {
-                IsolatingStatusPill(label: label)
-                    .padding(DSSpacing.gap4)
-            }
-        }
-        // E05.6: eenmalige hifi-haar-nudge — subtiel onderin, geen modal.
-        .overlay(alignment: .bottom) {
-            if model.showHairNudge && !model.isShowingSettings && !model.isShowingSocialPreview {
-                HairNudgeBanner(
-                    onDownload: { model.acceptHairNudge() },
-                    onDismiss: { model.dismissHairNudge() }
-                )
-                .padding(.bottom, DSSpacing.gap4)
-                .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
-            }
-        }
-        .dsMotion(DSMotion.enter, value: model.showHairNudge)
-        .dsMotion(DSMotion.fast, value: model.isDropTargeted)
     }
 
-    /// Hero-morph-bestemming: een korte, niet-interactieve composiet van het
-    /// geopende portret die — via de gedeelde namespace — vanaf de tegelrect naar
-    /// het canvas morpht en daarna wegfadet (de echte EditorView staat eronder).
-    /// `isSource: false`: de tegel levert de bronrect, deze overlay morpht ernaar.
-    @ViewBuilder
-    private var heroMorphOverlay: some View {
-        if let heroID = model.heroMorphID, let portrait = model.selectedPortrait {
-            PortraitComposite(portrait: portrait, maxDimension: 700)
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-                .heroPortrait(heroID, isSource: false)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(DSSpacing.gap8)
-                .allowsHitTesting(false)
-                .transition(.opacity)
-        }
+    private var showsEditorTopChrome: Bool {
+        model.section == .editor || model.isShowingSettings || model.editingBanner != nil
     }
 
-    /// Eén compacte topband: breadcrumb links, Edit/Preview + Share rechts —
-    /// gedeelde top-inset zodat beide dezelfde afstand tot de vensterrand houden.
-    @ViewBuilder
     private var editorTopChromeBand: some View {
-        if model.section == .editor || model.isShowingSettings {
-            HStack(alignment: .top, spacing: DSSpacing.gap2) {
-                if model.section == .editor && !model.isShowingSettings {
-                    LibraryBreadcrumb(model: model)
-                        .padding(.leading, shellEditorBreadcrumbLeading)
-                        .transition(.opacity)
-                        .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-                }
-                Spacer(minLength: DSSpacing.gap2)
-                ShellTopBar(
-                    isSettingsActive: model.isShowingSettings,
-                    onToggleSettings: { model.isShowingSettings.toggle() },
-                    isEditing: model.section == .editor,
-                    canExport: model.canExport,
-                    onExport: { model.exportCurrentPortrait() },
-                    canPreview: model.canPreview,
-                    isPreviewActive: model.isShowingSocialPreview,
-                    onPreviewActiveChange: { active in
-                        if active { model.showSocialPreview() }
-                        else { model.isShowingSocialPreview = false }
-                    }
-                )
+        HStack(alignment: .top, spacing: DSSpacing.gap2) {
+            if model.editingBanner != nil && !model.isShowingSettings {
+                BannerBreadcrumb(model: model)
+                    .padding(.leading, shellEditorBreadcrumbLeading)
+                    .transition(.opacity)
+                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+            } else if model.section == .editor && !model.isShowingSettings {
+                LibraryBreadcrumb(model: model)
+                    .padding(.leading, shellEditorBreadcrumbLeading)
+                    .transition(.opacity)
+                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
             }
-            .padding(.top, ShellMetrics.topBarTopInset)
-            .frame(maxWidth: .infinity, alignment: .top)
-            .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
+            Spacer(minLength: DSSpacing.gap2)
+            ShellTopBar(
+                isSettingsActive: model.isShowingSettings,
+                onToggleSettings: { model.isShowingSettings.toggle() },
+                isEditing: model.section == .editor || model.editingBanner != nil,
+                canExport: model.editingBanner != nil ? model.canExportBanner : model.canExport,
+                onExport: {
+                    if model.editingBanner != nil {
+                        model.exportCurrentBanner(isPro: entitlement.isProActive)
+                    } else {
+                        model.exportCurrentPortrait()
+                    }
+                },
+                canPreview: model.editingBanner != nil ? model.canPreviewBanner : model.canPreview,
+                isPreviewActive: model.editingBanner != nil
+                    ? model.isShowingBannerPreview
+                    : model.isShowingSocialPreview,
+                onPreviewActiveChange: { active in
+                    if model.editingBanner != nil {
+                        model.isShowingBannerPreview = active
+                    } else if active {
+                        model.showSocialPreview()
+                    } else {
+                        model.isShowingSocialPreview = false
+                    }
+                }
+            )
         }
+        .padding(.top, ShellMetrics.topBarTopInset)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
     }
 
+    /// Leading t.o.v. de content-kolom (mainArea). Bij full-bleed editor: ná sidebar.
     private var shellEditorBreadcrumbLeading: CGFloat {
-        (model.isLeftNavVisible ? LeftNavView.layoutWidth : 0) + DSSpacing.gap3
+        if model.isLeftNavVisible {
+            if studioFullBleed {
+                return LeftNavView.layoutWidth + DSSpacing.gap3
+            }
+            return DSSpacing.gap3
+        }
+        return ShellMetrics.editorBreadcrumbLeadingCollapsed - ShellMetrics.windowEdgeInset
     }
 
     private var isolatingStatusLabel: String? {
@@ -425,8 +425,9 @@ struct ShellView: View {
                 portrait: content.cutout,
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
-                onApplyResult: { model.applyEffectResult($0) },
-                onApplyAlphaPreserving: { model.applyEffectResult($0, preserveSourceAlpha: true) },
+                onApplyResult: { await model.applyEffectResult($0) },
+                onApplyAlphaPreserving: { await model.applyEffectResult($0, preserveSourceAlpha: true) },
+                onApplyIsolated: { await model.applyIsolatedResult($0) },
                 onIsolateSubject: { try await model.isolateSubject($0) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
@@ -551,5 +552,37 @@ struct ShellView: View {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Settings menu command (⌘,)
+
+/// Door `ShellView` gepubliceerde actie om de in-venster Settings te openen;
+/// nil tijdens onboarding (shell niet in beeld) → het menu-item grijst uit.
+struct OpenSettingsAction {
+    var open: () -> Void
+}
+
+private struct OpenSettingsKey: FocusedValueKey {
+    typealias Value = OpenSettingsAction
+}
+
+extension FocusedValues {
+    var openSettings: OpenSettingsAction? {
+        get { self[OpenSettingsKey.self] }
+        set { self[OpenSettingsKey.self] = newValue }
+    }
+}
+
+/// Vervangt het (standaard uitgegrijsde) "Settings…"-item in het app-menu door
+/// ⌘, → opent de in-venster Settings. Mirror van `CanvasZoomCommands`:
+/// een `View` met `@FocusedValue` zodat het item enable/disablet met de shell.
+struct SettingsCommands: View {
+    @FocusedValue(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Settings…") { openSettings?.open() }
+            .keyboardShortcut(",", modifiers: .command)
+            .disabled(openSettings == nil)
     }
 }

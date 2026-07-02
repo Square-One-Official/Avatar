@@ -23,6 +23,28 @@ final class Portrait2 {
     /// dit i.p.v. de cutout. Optioneel + externalStorage; bestaande rijen
     /// (migratie default nil) verbergen de compare-knop.
     @Attribute(.externalStorage) var originalData: Data?
+    /// Of `cutoutData` nog een schone isolatie van de originele foto is (zo ja:
+    /// true) of dat een generatieve edit de pixels heeft vervangen (false). Stuurt
+    /// "Remove background": bij true her-isoleren we de ORIGINELE foto (volle
+    /// kleurcontext = scherpste haar-matte, gelijk aan de import), bij false het
+    /// huidige beeld zelf (anders zou je de edit weggooien). Default true (verse
+    /// import); elke generatieve cutout-overschrijving zet 'm op false.
+    var cutoutDerivesFromOriginal: Bool = true
+    /// Het laatste VOLLE generatieve resultaat (onderwerp + door de AI toegevoegde
+    /// achtergrond), vóór isolatie — bewaard zodat "Remove background" het later met
+    /// ORMBG schoon kan her-isoleren (nieuw haar behouden, per-ongeluk-achtergrond
+    /// weg). Niet voor Face-edits (die hergebruiken de alpha). nil = geen generatieve
+    /// edit te her-isoleren; wordt gewist zodra de cutout weer een schone
+    /// origineel-isolatie is. ~1 vol beeld per generatief-bewerkt portret.
+    @Attribute(.externalStorage) var editSourceData: Data?
+    /// Stabiele signature (`Portrait2.cutoutSignature`) van de `cutoutData` waarvan
+    /// `editSourceData` de bron is. Stempel om staleness te detecteren: wijkt de
+    /// signature van de huidige `cutoutData` hiervan af (bv. na een undo/redo of een
+    /// Match Lighting die de cutout terugzette/verving), dan hoort `editSourceData`
+    /// niet meer bij dit beeld → "Remove background" negeert het (geen edit-resurrectie).
+    /// Een content-signature i.p.v. alleen `count` zodat twee verschillende cutouts met
+    /// toevallig gelijke grootte niet vals matchen.
+    var editSourceCutoutSig: Int = 0
 
     /// Canvas-transform (E06.4) in 1024-units canvasruimte (v1-conventie):
     /// het cutout-beeld tekent op (offsetX, offsetY) × scale binnen het
@@ -100,9 +122,32 @@ final class Portrait2 {
     /// effect past. Sinds effects de volle originele foto styleren (i.p.v. de
     /// cutout) ÍS de `effectCache`-waarde dat volle beeld. nil = geen actief effect
     /// → val terug op de rauwe originele foto.
+    /// In-memory cache (niet gepersisteerd/geobserveerd) zodat herhaalde reads
+    /// niet telkens de hele effect-cache-JSON parsen — zelfde patroon als
+    /// `BannerDoc.layers`. Sleutel = actief effect + bron-bytes; bij wijziging mist
+    /// de cache en herberekent.
+    @Transient @ObservationIgnored private var cachedEffectBg: Data? = nil
+    @Transient @ObservationIgnored private var cachedEffectBgActive: String? = nil
+    @Transient @ObservationIgnored private var cachedEffectBgSource: Data? = nil
+
     var effectBackgroundData: Data? {
-        guard let key = effectActiveRaw else { return nil }
-        return effectCache[key]
+        guard let key = effectActiveRaw, let effectCacheData else { return nil }
+        if cachedEffectBgActive == key, cachedEffectBgSource == effectCacheData {
+            return cachedEffectBg
+        }
+        // Alleen de ACTIEVE entry uitpakken i.p.v. via `effectCache` de héle
+        // [key: PNG]-dict te decoderen (dat base64-decodeert élke gecachte PNG).
+        // JSONEncoder schrijft `Data` als base64-string, dus JSONSerialization
+        // geeft [key: base64].
+        var decoded: Data?
+        if let object = try? JSONSerialization.jsonObject(with: effectCacheData) as? [String: String],
+           let base64 = object[key] {
+            decoded = Data(base64Encoded: base64)
+        }
+        cachedEffectBg = decoded
+        cachedEffectBgActive = key
+        cachedEffectBgSource = effectCacheData
+        return decoded
     }
 
     /// E24.31: "Original"-achtergrond. Sinds 2026-06-23 (Thierry) = gebruik de
@@ -237,6 +282,27 @@ final class Portrait2 {
         }
         touch()
     }
+
+    /// Stabiele, launch-onafhankelijke content-signature van cutout-bytes voor de
+    /// `editSourceCutoutSig`-staleness-stempel. Swift's `Hasher` is per-launch
+    /// gerandomiseerd → onbruikbaar om te persisteren; deze FNV-1a over grootte +
+    /// ~256 verspreide bytes is deterministisch en botst vrijwel nooit tussen twee
+    /// verschillende cutouts. Goedkoop (constante samples), alleen op knop-tik/edit.
+    static func cutoutSignature(_ data: Data) -> Int {
+        var h: UInt64 = 1469598103934665603
+        let prime: UInt64 = 1099511628211
+        h = (h ^ UInt64(truncatingIfNeeded: data.count)) &* prime
+        data.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
+            guard buf.count > 0 else { return }
+            let step = max(1, buf.count / 256)
+            var i = 0
+            while i < buf.count {
+                h = (h ^ UInt64(buf[i])) &* prime
+                i += step
+            }
+        }
+        return Int(bitPattern: UInt(truncatingIfNeeded: h))
+    }
 }
 
 /// Audit-cleanup (DDD): de achtergrond-modus van een portret. Precies één van:
@@ -262,7 +328,7 @@ enum BannerBackground: Equatable {
 
 /// E24.14: niet-destructieve Adjust-laag (brightness/contrast/saturation/
 /// temperature) als waarde-object. Neutraal = identiteit.
-struct PortraitAdjust: Equatable {
+struct PortraitAdjust: Equatable, Sendable {
     var brightness: Double = 0
     var contrast: Double = 1
     var saturation: Double = 1

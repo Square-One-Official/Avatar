@@ -5,6 +5,11 @@
 
 import SwiftUI
 
+public enum DSDropdownPlacement: Sendable {
+    case below
+    case above
+}
+
 public extension View {
     /// Toont `menu` als caret-loze, zwevende kaart direct onder deze view.
     /// Sluit bij een tik buiten het anker+menu (via `dismissOverlay` op een
@@ -13,12 +18,14 @@ public extension View {
         isPresented: Binding<Bool>,
         anchorHeight: CGFloat = 32,
         gap: CGFloat = DSSpacing.gap2,
+        placement: DSDropdownPlacement = .below,
         @ViewBuilder menu: @escaping () -> Menu
     ) -> some View {
         modifier(DSDropdownMenuModifier(
             isPresented: isPresented,
             anchorHeight: anchorHeight,
             gap: gap,
+            placement: placement,
             menu: menu
         ))
     }
@@ -34,6 +41,7 @@ private struct DSDropdownMenuModifier<Menu: View>: ViewModifier {
     @Binding var isPresented: Bool
     let anchorHeight: CGFloat
     let gap: CGFloat
+    let placement: DSDropdownPlacement
     @ViewBuilder let menu: () -> Menu
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -43,9 +51,15 @@ private struct DSDropdownMenuModifier<Menu: View>: ViewModifier {
                 if isPresented {
                     menu()
                         .fixedSize()
-                        .offset(y: anchorHeight + gap)
+                        .offset(y: placement == .below ? anchorHeight + gap : 0)
+                        .alignmentGuide(.top) { d in
+                            placement == .above ? d[.bottom] + gap : d[.top]
+                        }
                         .zIndex(10)
-                        .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
+                        .transition(.dsScaleFade(
+                            anchor: placement == .below ? .top : .bottom,
+                            reduceMotion: reduceMotion
+                        ))
                 }
             }
             .zIndex(isPresented ? 10 : 0)

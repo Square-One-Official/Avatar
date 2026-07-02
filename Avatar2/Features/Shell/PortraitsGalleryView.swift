@@ -194,9 +194,6 @@ struct PortraitGridTile: View {
             .aspectRatio(1, contentMode: .fit)
             .overlay { composed }
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
-            // Hero-morph-bron: deze geclipte tegel levert de bronrect waaruit de
-            // editor-overlay groeit bij het openen. Zie [[HeroMorph]].
-            .heroPortrait(portrait.persistentModelID, isSource: true)
             .overlay(
                 RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
                     .strokeBorder(
@@ -231,7 +228,7 @@ struct PortraitGridTile: View {
     @ViewBuilder
     private var composed: some View {
         ZStack(alignment: .bottomLeading) {
-            PortraitComposite(portrait: portrait, maxDimension: 280)
+            PortraitCompositeMeasured(portrait: portrait)
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.55)],
@@ -248,6 +245,44 @@ struct PortraitGridTile: View {
             .padding(DSSpacing.gap3)
         }
     }
+}
+
+/// Rendert `PortraitComposite` op retina-resolutie passend bij de container —
+/// zelfde visuele maat, scherp op 2×/3× schermen.
+struct PortraitCompositeMeasured: View {
+    let portrait: Portrait2
+
+    @Environment(\.displayScale) private var displayScale
+    @State private var sidePoints: CGFloat = 0
+
+    private var pixelSide: CGFloat {
+        ceil(sidePoints * displayScale)
+    }
+
+    var body: some View {
+        Group {
+            if sidePoints > 0 {
+                PortraitComposite(portrait: portrait, maxDimension: pixelSide)
+            } else {
+                DSColor.Background.inset
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: PortraitCompositeMeasuredSideKey.self,
+                    value: max(geo.size.width, geo.size.height)
+                )
+            }
+        }
+        .onPreferenceChange(PortraitCompositeMeasuredSideKey.self) { sidePoints = $0 }
+    }
+}
+
+private struct PortraitCompositeMeasuredSideKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// Gedeelde portret-compositie. Rendert via dezelfde `PortraitExporter`-pijplijn
@@ -285,9 +320,12 @@ struct PortraitComposite: View {
         // (zware) compositie OFF-MAIN renderen — anders blokkeert elke nieuwe
         // tegel tijdens het scrollen de main-thread. Resultaat wordt gecachet, dus
         // het is effectief een snapshot dat één keer berekend wordt.
+        // Achtergrondlaag: bij actief effect de gestylede volle foto (zodat de
+        // backdrop bij het effect past), anders de rauwe import — zelfde als
+        // PortraitExporter / EditorView.originalBackdropImage.
         let spec = PortraitThumbnailRenderer.Spec(
             cutoutData: portrait.cutoutData,
-            originalData: portrait.originalData,
+            originalData: portrait.effectBackgroundData ?? portrait.originalData,
             backgroundImageData: portrait.backgroundImageData,
             backgroundColorHex: portrait.backgroundColorHex,
             useOriginalBackground: portrait.useOriginalBackground,
@@ -317,6 +355,8 @@ private struct SendableImage: @unchecked Sendable { let image: NSImage }
 enum PortraitThumbnailRenderer {
     struct Spec: Sendable {
         let cutoutData: Data
+        /// Backdrop-bron: `effectBackgroundData ?? originalData` (niet rauw
+        /// `originalData` alleen — anders dubbel beeld bij actief effect).
         let originalData: Data?
         let backgroundImageData: Data?
         let backgroundColorHex: String?

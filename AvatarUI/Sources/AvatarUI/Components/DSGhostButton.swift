@@ -30,6 +30,7 @@ public struct DSGhostButton: View {
     public var body: some View {
         Button(action: action) {
             DSButtonLabel(title: title, icon: icon, size: size)
+                .fixedSize(horizontal: !fullWidth, vertical: false)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
                 .padding(.horizontal, size.horizontalPadding)
                 .padding(.vertical, size.verticalPadding)

@@ -15,7 +15,7 @@ struct SidebarToggleButton: View {
             Image(systemName: "sidebar.left")
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(DSColor.Foreground.muted)
-                .frame(width: 28, height: 28)
+                .frame(width: ShellMetrics.sidebarToggleWidth, height: ShellMetrics.sidebarToggleWidth)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -25,10 +25,24 @@ struct SidebarToggleButton: View {
 
 struct ShellSidebarChrome: View {
     let isSidebarVisible: Bool
+    var studioFullBleed: Bool = false
     let onToggleSidebar: () -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
+            if studioFullBleed {
+                LinearGradient(
+                    colors: [DSColor.Background.card, DSColor.Background.card.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(
+                    width: ShellMetrics.topBarLeadingAfterWindowControls + ShellMetrics.sidebarToggleWidth,
+                    height: LeftNavView.windowChromeHeight
+                )
+                .allowsHitTesting(false)
+            }
+
             ShellSidebarChromeStrip()
                 .padding(.leading, LeftNavView.edgeInset)
                 .padding(.top, LeftNavView.edgeInset)
@@ -51,10 +65,10 @@ private struct ShellSidebarChromeStrip: View {
             .frame(width: LeftNavView.width, height: LeftNavView.windowChromeHeight)
             .clipShape(
                 UnevenRoundedRectangle(
-                    topLeadingRadius: DSRadius.concentric(inset: LeftNavView.edgeInset),
+                    topLeadingRadius: ShellMetrics.panelCornerRadius,
                     bottomLeadingRadius: 0,
                     bottomTrailingRadius: 0,
-                    topTrailingRadius: DSRadius.concentric(inset: LeftNavView.edgeInset),
+                    topTrailingRadius: ShellMetrics.panelCornerRadius,
                     style: .continuous
                 )
             )

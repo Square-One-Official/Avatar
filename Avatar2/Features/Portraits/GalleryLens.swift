@@ -62,9 +62,6 @@ struct GalleryLens: View {
             PortraitComposite(portrait: p, maxDimension: 1200)
                 .aspectRatio(1, contentMode: .fit)
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-                // Hero-morph-bron: de grote preview is de open-trigger (zie de tap
-                // hieronder), dus de morph vertrekt vanaf deze rect. Zie [[HeroMorph]].
-                .heroPortrait(p.persistentModelID, isSource: true)
                 .frame(maxWidth: 520)
             VStack(spacing: 2) {
                 Text(p.name.isEmpty ? "Untitled" : p.name)

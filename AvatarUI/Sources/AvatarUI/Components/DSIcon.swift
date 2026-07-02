@@ -24,6 +24,8 @@ public struct DSIcon: View {
         case crop, autoFrame, fixAngle, flip, restoreBody
         // Overig
         case check, sparkle, colorize, boost
+        // Privacy tiers (Privacy Tier Picker)
+        case privacyOnDevice, privacyAppleCloud, privacyAdvanced
     }
 
     public enum Weight {
@@ -80,6 +82,9 @@ public struct DSIcon: View {
         case .sparkle:     return "sparkles"            // Ph.sparkle
         case .colorize:    return "paintpalette"        // Ph.palette
         case .boost:       return "arrow.up.left.and.arrow.down.right" // upscale
+        case .privacyOnDevice:  return "lock.shield"           // Ph.shieldCheck
+        case .privacyAppleCloud: return "sparkles"             // Ph.sparkle
+        case .privacyAdvanced: return "cloud.fill"            // Ph.cloud
         }
     }
 }
