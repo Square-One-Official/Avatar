@@ -271,6 +271,18 @@ final class EntitlementModel {
         errorToast = nil
     }
 
+    /// E44.2 (audit B2): zichtbaar faalpad voor een geslaagde server-call
+    /// (HTTP 200) waarvan de bytes niet tot een afbeelding decoderen. De
+    /// server kan op dat pad al een credit hebben afgeschreven, dus naast de
+    /// fout-toast hoort er een `refresh()` zodat het saldo in de QuotaBadge
+    /// klopt — het stille `guard … else { return }`-pad produceerde alle
+    /// Colorise-symptomen tegelijk (geen resultaat, geen zichtbare fout,
+    /// saldo lijkt onveranderd terwijl er wél afgeschreven kan zijn).
+    func presentCloudResultFailure(_ message: String) async {
+        presentError(message)
+        await refresh()
+    }
+
     func presentWorking(title: String, messages: [String]) {
         workingContext = WorkingContext(title: title, messages: messages)
     }

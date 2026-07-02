@@ -37,7 +37,7 @@ borgt de ondergrens. `tsc --noEmit` OK; AvatarKit 89 + AvatarUI 37 + Avatar2-sch
 groen. Backend-wijziging NIET gedeployed — lift mee op de volgende deploy.
 
 ## 44.2 — Stille guard-paden na een geslaagde server-call
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -52,6 +52,14 @@ tegelijk kan produceren.
 een kale `return`.
 **DoD:** alle drie de genoemde call-sites hebben een zichtbaar faalpad; tests groen;
 Result-regel.
+**Result:** nieuwe helper `EntitlementModel.presentCloudResultFailure(_:)` =
+`presentError` + `await refresh()` (saldo kan al afgeschreven zijn). Alle drie de
+guard-sites in `EditorView.swift` (Boost `performBoostResolution`, Colorise
+`runColorise`, Fill-in-body `runFillBody`) roepen 'm aan met hun bestaande
+feature-copy i.p.v. een kaal `return`. Tests (stub-sessie, E47-patroon):
+`testPresentCloudResultFailureShowsToastAndRefreshesBalance` +
+`testPresentCloudResultFailureKeepsToastWhenRefreshFails`. Alle suites groen.
+De helper is meteen de kiem voor het 44.3-contract (backlog).
 
 ## 44.3 — Eén presentError-contract voor alle cloud-acties (backlog)
 - status: backlog

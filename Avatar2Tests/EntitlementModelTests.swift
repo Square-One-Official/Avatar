@@ -293,6 +293,45 @@ final class EntitlementModelTests: XCTestCase {
             "fout-toasts moeten ≥ 8s zichtbaar blijven (E44.1-DoD)"
         )
     }
+
+    /// E44.2: een 200-response met onbruikbare bytes (guard-pad in
+    /// EditorView's Boost/Colorise/Fill-in-body) moet een zichtbare fout
+    /// tonen ÉN het saldo verversen — de server kan op dat pad al een credit
+    /// hebben afgeschreven.
+    func testPresentCloudResultFailureShowsToastAndRefreshesBalance() async {
+        EntitlementStubURLProtocol.setStub(
+            .json(200, accountJSON(tier: "pro", credits: 7)), forPath: "/v1/account"
+        )
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        let model = makeModel()
+
+        await model.presentCloudResultFailure("Couldn't colorise this portrait. Please try again.")
+
+        XCTAssertEqual(
+            model.errorToast, "Couldn't colorise this portrait. Please try again.",
+            "guard-pad moet een zichtbare fout opleveren, geen stil return"
+        )
+        XCTAssertEqual(
+            model.creditsRemaining, 7,
+            "saldo moet ná de fout meteen vers van de server komen"
+        )
+    }
+
+    /// E44.2 offline-variant: faalt de refresh (transportfout), dan blijft
+    /// de fout-toast gewoon staan — refresh() slikt zijn eigen fouten.
+    func testPresentCloudResultFailureKeepsToastWhenRefreshFails() async {
+        EntitlementStubURLProtocol.setStub(
+            .failure(URLError(.notConnectedToInternet)), forPath: "/v1/account"
+        )
+        EntitlementStubURLProtocol.setStub(
+            .failure(URLError(.notConnectedToInternet)), forPath: "/v1/feature-flags"
+        )
+        let model = makeModel()
+
+        await model.presentCloudResultFailure("Couldn't boost the resolution. Please try again.")
+
+        XCTAssertEqual(model.errorToast, "Couldn't boost the resolution. Please try again.")
+    }
 }
 
 // MARK: - Stub-infra (kopie van AvatarKit's BackendStubURLProtocol — test-
