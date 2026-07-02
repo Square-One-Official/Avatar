@@ -344,6 +344,36 @@ function stylizeInputFor(
   throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
 }
 
+const BACKGROUND_TIMEOUT_MS = 80_000;
+
+/**
+ * Text-to-background via neutral canvas + instruction-edit models
+ * (E42). Caller supplies the composed prompt and a grey canvas data URL
+ * at the target aspect ratio.
+ */
+export async function generateBackgroundImage(input: {
+  prompt: string;
+  imageDataUrl: string;
+  width: number;
+  height: number;
+  model?: string | null;
+}): Promise<string> {
+  const ref = input.model ?? defaultModelRef("generate_background");
+  const payload = stylizeInputFor(ref, {
+    imageDataUrl: input.imageDataUrl,
+    prompt: input.prompt,
+    width: input.width,
+    height: input.height,
+  });
+  const output = (await runWithRetry(
+    "generateBackgroundImage",
+    () => replicate.run(ref as `${string}/${string}`, { input: payload }),
+    BACKGROUND_TIMEOUT_MS,
+  )) as unknown;
+
+  return extractUrl(output, "generateBackgroundImage");
+}
+
 function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" {
   if (width <= 0 || height <= 0) return "1:1";
   const ratio = width / height;

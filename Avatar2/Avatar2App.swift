@@ -154,19 +154,23 @@ struct Avatar2App: App {
             .animation(.spring(duration: 0.3), value: entitlement.errorToast)
             .animation(.spring(duration: 0.3), value: entitlement.workingContext != nil)
             .animation(.spring(duration: 0.3), value: entitlement.isShowingOutOfCreditsToast)
-            // E18.2: contextuele cloud-feature-gate — online aanzetten.
-            .alert(
-                "Turn on online models?",
-                isPresented: Binding(
-                    get: { entitlement.cloudGate == .enableOnline },
-                    set: { if !$0 { entitlement.dismissCloudGate() } }
-                )
-            ) {
-                Button("Turn on") { entitlement.enableOnlineModels() }
-                Button("Not now", role: .cancel) { entitlement.dismissCloudGate() }
-            } message: {
-                Text("Effects, Hair and Clothing use secure online models. Turn them on to continue — your photos are processed securely and never stored.")
+            // Privacy Tier Picker: elevation modal → Settings.
+            .overlay {
+                if let request = entitlement.privacyElevation {
+                    ZStack {
+                        Color.black.opacity(0.45)
+                            .ignoresSafeArea()
+                            .onTapGesture { entitlement.dismissPrivacyElevation() }
+                        PrivacyElevationSheet(
+                            request: request,
+                            onOpenSettings: { entitlement.openPrivacySettings() },
+                            onDismiss: { entitlement.dismissPrivacyElevation() }
+                        )
+                    }
+                    .transition(.opacity)
+                }
             }
+            .animation(.easeOut(duration: 0.18), value: entitlement.privacyElevation)
             // E18.2: gate — inloggen om Pro te checken.
             .sheet(isPresented: Binding(
                 get: { entitlement.cloudGate == .signIn },
@@ -184,6 +188,10 @@ struct Avatar2App: App {
         // eigen `CommandMenu("View")` — dat laatste maakte een TWEEDE menu met
         // dezelfde titel naast het AppKit-View-menu (Enter Full Screen/tabs).
         .commands {
+            // ⌘, → in-venster Settings (vervangt het standaard uitgegrijsde item).
+            CommandGroup(replacing: .appSettings) {
+                SettingsCommands()
+            }
             CommandGroup(after: .sidebar) {
                 Divider()
                 CanvasZoomCommands()

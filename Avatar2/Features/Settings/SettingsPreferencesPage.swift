@@ -37,8 +37,6 @@ struct SettingsPreferencesPage: View {
                 }
             }
             .padding(.top, DSSpacing.gap8)
-
-            Spacer()
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)

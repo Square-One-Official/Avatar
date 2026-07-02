@@ -103,6 +103,11 @@ public final class AuthService {
     }
 
     public func signOut() {
+        // Eager-clear, spiegelt de eager-flip in `verifyCode`: de UI reflecteert
+        // direct "uitgelogd" i.p.v. te wachten op de async `authStateChanges`-
+        // stream (zelfde race-les). De stream bevestigt het daarna idempotent.
+        accessToken = nil
+        email = nil
         Task {
             try? await supabase.auth.signOut()
         }

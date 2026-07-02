@@ -9,6 +9,8 @@ import AvatarUI
 import SwiftUI
 
 struct ManageBackgroundsSheet: View {
+    var entitlement: EntitlementModel? = nil
+
     @Environment(\.dismiss) private var dismiss
 
     enum Tab: String, CaseIterable, Identifiable { case backgrounds, effects; var id: String { rawValue } }
@@ -88,7 +90,14 @@ struct ManageBackgroundsSheet: View {
     private var backgroundsTab: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             sectionHeader("Your uploads") {
-                DSNeutralButton("Upload", icon: Image(systemName: "arrow.up.doc")) { upload() }
+                HStack(spacing: DSSpacing.gap2) {
+                    if BackgroundGenerationCatalog.hasGenerationPath {
+                        DSNeutralButton("Generate", icon: Image(systemName: "sparkles")) {
+                            openGenerate()
+                        }
+                    }
+                    DSNeutralButton("Upload", icon: Image(systemName: "arrow.up.doc")) { upload() }
+                }
             }
             if imageKit.imageIDs.isEmpty {
                 hint("No uploads yet. Add an image to reuse it as a background.")
@@ -195,6 +204,24 @@ struct ManageBackgroundsSheet: View {
                 }
                 .buttonStyle(.plain)
             }
+    }
+
+    private func openGenerate() {
+        let tier = PrivacyPreferences2.shared.effectiveTier
+        if tier == .onDevice {
+            if let entitlement {
+                _ = entitlement.allowAIFeature(.backgroundGenerate)
+            }
+            return
+        }
+        if tier == .appleCloud, let entitlement {
+            guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
+        }
+        GenerateBackgroundPresenter.shared.present(
+            context: .portrait,
+            applyAfterSave: false,
+            onSaved: { _ in }
+        )
     }
 
     private func upload() {

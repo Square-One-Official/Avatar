@@ -14,6 +14,15 @@ import sharp from "sharp";
 export const MAX_DECODED_IMAGE_BYTES = 12 * 1024 * 1024;
 
 /**
+ * Pixel-count ceiling for any image we hand to `sharp`. A small payload can
+ * still decode to an enormous raster (a "decompression bomb"), so the byte
+ * cap above is not sufficient on its own. 50 MP is ~7000×7000 — far above any
+ * legitimate portrait the app produces (the outpaint canvas is 768×1024),
+ * while still rejecting pathological inputs before sharp allocates for them.
+ */
+export const MAX_INPUT_IMAGE_PIXELS = 50_000_000;
+
+/**
  * Flatten a transparent-background cutout PNG onto a neutral grey
  * background so identity-preserving instruction editors (Nano Banana,
  * Flux Kontext, etc.) get a normal RGB photo to work with.

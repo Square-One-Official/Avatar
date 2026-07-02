@@ -83,12 +83,6 @@ public final class BackendClient {
         return production
     }
 
-    /// Of er een sessie is (Bearer-token aanwezig). Gebruikt door
-    /// CloudCutoutEngine.isAvailable (E02.4) zodat de router het cloud-pad
-    /// niet kiest voor uitgelogde gebruikers; zegt niets over credits of
-    /// entitlement. (Eén-regel-toevoeging buiten Engines/ — INFRA-review.)
-    public var hasSession: Bool { auth.accessToken != nil }
-
     // MARK: GET /v1/account
     /// Current tier, credits, and subscription state. Drives `ProEntitlement`.
     /// Anonymous-friendly: when no Bearer token is available the server
@@ -359,6 +353,8 @@ public final class BackendClient {
         let clothesPreset: String?
         let clothesPrompt: String?
         let facePreset: String?
+        let softSource: Bool?
+        let preserveFraming: Bool?
 
         enum CodingKeys: String, CodingKey {
             case storageKey = "storage_key"
@@ -372,6 +368,8 @@ public final class BackendClient {
             case clothesPreset = "clothes_preset"
             case clothesPrompt = "clothes_prompt"
             case facePreset = "face_preset"
+            case softSource = "soft_source"
+            case preserveFraming = "preserve_framing"
         }
     }
 
@@ -384,7 +382,9 @@ public final class BackendClient {
         hairPrompt: String? = nil,
         clothesPreset: String? = nil,
         clothesPrompt: String? = nil,
-        facePreset: String? = nil
+        facePreset: String? = nil,
+        softSource: Bool = false,
+        preserveFraming: Bool = false
     ) async throws -> StylizeCallResult {
         let storageKey = try await uploadInputPNG(imagePNG)
         let body = try JSONEncoder().encode(
@@ -399,7 +399,9 @@ public final class BackendClient {
                 hairPrompt: hairPrompt,
                 clothesPreset: clothesPreset,
                 clothesPrompt: clothesPrompt,
-                facePreset: facePreset
+                facePreset: facePreset,
+                softSource: softSource ? true : nil,
+                preserveFraming: preserveFraming ? true : nil
             )
         )
         let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
@@ -423,12 +425,132 @@ public final class BackendClient {
         imagePNG: Data,
         styleKey: String,
         cutoutWidth: Int? = nil,
-        cutoutHeight: Int? = nil
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false,
+        preserveFraming: Bool = false
     ) async throws -> StylizeCallResult {
         try await runStylize(
             imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
-            style: styleKey
+            style: styleKey, softSource: softSource, preserveFraming: preserveFraming
         )
+    }
+
+    // MARK: POST /v1/generate-background (E42)
+    /// Text-to-background voor portret/banner-achtergronden. Stuurt stijl/view-
+    /// keys + beschrijving; de server bouwt de prompt. Geen upload nodig.
+    public struct GenerateBackgroundCallResult: Sendable {
+        public let imageData: Data
+        public let creditsRemaining: Int
+    }
+
+    public func generateBackground(
+        userPrompt: String,
+        styleKey: String,
+        customStyleText: String?,
+        viewKey: String,
+        targetWidth: Int,
+        targetHeight: Int,
+        generationModel: String?
+    ) async throws -> GenerateBackgroundCallResult {
+        struct Body: Encodable {
+            let userPrompt: String
+            let styleKey: String
+            let customStyleText: String?
+            let viewKey: String
+            let targetWidth: Int
+            let targetHeight: Int
+            let generationModel: String?
+            let modelOverride: String?
+
+            enum CodingKeys: String, CodingKey {
+                case userPrompt = "user_prompt"
+                case styleKey = "style_key"
+                case customStyleText = "custom_style_text"
+                case viewKey = "view_key"
+                case targetWidth = "target_width"
+                case targetHeight = "target_height"
+                case generationModel = "generation_model"
+                case modelOverride = "model_override"
+            }
+        }
+
+        struct Response: Decodable {
+            let imageUrl: String
+            let creditsRemaining: Int
+        }
+
+        let modelKey = generationModel ?? GenerationModelStore.shared.current.rawValue
+        let body = try JSONEncoder().encode(
+            Body(
+                userPrompt: userPrompt,
+                styleKey: styleKey,
+                customStyleText: customStyleText,
+                viewKey: viewKey,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                generationModel: modelKey,
+                modelOverride: DevModelOverrides.shared.override(for: .generateBackground)
+            )
+        )
+        let resp: Response = try await request("/v1/generate-background", method: "POST", body: body)
+        guard let url = URL(string: resp.imageUrl) else {
+            throw BackendError.decode
+        }
+        let data = try await Self.downloadResultImage(from: url)
+        return GenerateBackgroundCallResult(imageData: data, creditsRemaining: resp.creditsRemaining)
+    }
+
+    /// Downloads a generated RESULT image from the short-lived signed Supabase
+    /// Storage URL returned by `/v1/generate-background`. The result is handed
+    /// over as a URL rather than inline base64 because a full-frame background
+    /// can exceed Vercel's ~4.5 MB response body cap (which would truncate the
+    /// body and leave the user charged with no image).
+    ///
+    /// Uses a plain session, not `TLSPinning.pinnedShared`: the host is
+    /// `*.supabase.co`, which is deliberately not pinned (Supabase rotates
+    /// certs across tenants — see `TLSPinning`), and the signed token already
+    /// authorizes the fetch. Retries a few times so a transient CDN hiccup on
+    /// this second hop doesn't waste the (already-charged) generation.
+    private static let resultDownloadSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 120
+        config.tlsMinimumSupportedProtocolVersion = .TLSv12
+        return URLSession(configuration: config)
+    }()
+
+    private static func downloadResultImage(from url: URL) async throws -> Data {
+        var lastError: Error?
+        for attempt in 0..<3 {
+            // Honour cooperative cancellation: if the user cancelled the
+            // generation, bail immediately instead of burning retries. Both
+            // checkCancellation and a cancelled URLSession task surface as
+            // CancellationError so the caller's `catch is CancellationError`
+            // path returns silently (no error banner, no wasted refresh).
+            try Task.checkCancellation()
+            if attempt > 0 {
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 400_000_000)
+            }
+            do {
+                let (data, response) = try await resultDownloadSession.data(from: url)
+                guard
+                    let http = response as? HTTPURLResponse,
+                    (200...299).contains(http.statusCode),
+                    !data.isEmpty
+                else {
+                    lastError = BackendError.decode
+                    continue
+                }
+                return data
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError ?? BackendError.decode
     }
 
     // MARK: POST /v1/upscale (Boost resolution, E10.3)
@@ -473,11 +595,13 @@ public final class BackendClient {
         presetKey: String? = nil,
         freeText: String? = nil,
         cutoutWidth: Int? = nil,
-        cutoutHeight: Int? = nil
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
     ) async throws -> StylizeCallResult {
         try await runStylize(
             imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
-            hairPreset: presetKey, hairPrompt: freeText
+            hairPreset: presetKey, hairPrompt: freeText, softSource: softSource,
+            preserveFraming: true
         )
     }
 
@@ -492,11 +616,13 @@ public final class BackendClient {
         presetKey: String? = nil,
         freeText: String? = nil,
         cutoutWidth: Int? = nil,
-        cutoutHeight: Int? = nil
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
     ) async throws -> StylizeCallResult {
         try await runStylize(
             imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
-            clothesPreset: presetKey, clothesPrompt: freeText
+            clothesPreset: presetKey, clothesPrompt: freeText, softSource: softSource,
+            preserveFraming: true
         )
     }
 
@@ -510,11 +636,12 @@ public final class BackendClient {
         imagePNG: Data,
         presetKey: String,
         cutoutWidth: Int? = nil,
-        cutoutHeight: Int? = nil
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
     ) async throws -> StylizeCallResult {
         try await runStylize(
             imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
-            facePreset: presetKey
+            facePreset: presetKey, softSource: softSource
         )
     }
 

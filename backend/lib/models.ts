@@ -20,7 +20,7 @@
  * adapter in lib/replicate.ts first and only then register it.
  */
 
-export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale";
+export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale" | "generate_background";
 
 export interface ModelEntry {
   /** Replicate ref: unversioned `owner/slug` or pinned `owner/slug:version`. */
@@ -152,6 +152,21 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 1,
     requiresCloud: true,
   },
+  generate_background: {
+    defaultModel: "nano-banana",
+    models: {
+      "nano-banana": {
+        ref: "google/nano-banana",
+        label: "Nano Banana (Gemini 2.5 Flash Image)",
+      },
+      "gpt-image-1.5": {
+        ref: "openai/gpt-image-1.5",
+        label: "GPT Image 1.5",
+      },
+    },
+    credits: 2,
+    requiresCloud: true,
+  },
 };
 
 /** Resolve a feature's default model ref. */
@@ -169,6 +184,7 @@ export function defaultModelRef(feature: CloudFeature): string {
  */
 export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
   stylize: ["nano-banana", "gpt-image-1.5"],
+  generate_background: ["nano-banana", "gpt-image-1.5"],
 };
 
 /**

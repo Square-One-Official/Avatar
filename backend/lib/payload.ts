@@ -223,6 +223,27 @@ function lexicalToMarkdown(raw: unknown): string {
   return children.map(renderNode).join("\n\n").trim();
 }
 
+// Schemes a link in the in-app Markdown body may use. The macOS client renders
+// this body via `AttributedString(markdown:)` and taps go through SwiftUI's
+// default openURL with no scheme guard, so a `file:`/other hostile scheme in an
+// author-supplied link must not survive into a navigable link. Mirrors the
+// email renderer's `safeUrl` (admin/src/lib/lexical.ts). The WHATWG URL parser
+// also neutralises control-char scheme smuggling (`java&#9;script:`).
+const ALLOWED_LINK_SCHEMES = new Set(["http:", "https:", "mailto:", "aaavatar:"]);
+
+function safeLinkUrl(url: string | undefined): string | null {
+  if (typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  let scheme: string;
+  try {
+    scheme = new URL(trimmed, "https://aaavatar.invalid/").protocol;
+  } catch {
+    return null;
+  }
+  return ALLOWED_LINK_SCHEMES.has(scheme) ? trimmed : null;
+}
+
 function renderNode(node: unknown): string {
   if (typeof node !== "object" || node === null) return "";
   const n = node as { type?: string; tag?: string; text?: string; format?: number; url?: string; children?: unknown[]; listType?: string };
@@ -241,7 +262,10 @@ function renderNode(node: unknown): string {
   switch (n.type) {
     case "paragraph": return inner;
     case "heading":   return `${"#".repeat(headingLevel(n.tag))} ${inner}`;
-    case "link":      return `[${inner}](${n.url ?? ""})`;
+    case "link": {
+      const href = safeLinkUrl(n.url);
+      return href ? `[${inner}](${href})` : inner;
+    }
     case "list":      return inner;
     case "listitem": {
       const bullet = n.listType === "number" ? "1." : "-";

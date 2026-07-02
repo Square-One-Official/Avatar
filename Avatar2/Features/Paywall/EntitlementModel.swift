@@ -34,8 +34,13 @@ final class EntitlementModel {
     private(set) var workingContext: WorkingContext?
 
     /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
-    enum CloudGate: Equatable { case enableOnline, signIn }
+    enum CloudGate: Equatable { case signIn }
     var cloudGate: CloudGate?
+
+    /// Privacy Tier Picker: elevation modal wanneer feature hogere tier vereist.
+    var privacyElevation: PrivacyElevationRequest?
+    /// Deep-link naar Settings (ShellView opent deze pagina).
+    var openSettingsPage: SettingsPage?
 
     /// Jaar als default-anker ("2 months free") — zelfde besluit als v1:
     /// het betere-waardepad is het pad zonder kliks.
@@ -227,31 +232,33 @@ final class EntitlementModel {
         workingContext = nil
     }
 
-    // MARK: - E18.2 contextuele cloud-feature-gate
+    // MARK: - Privacy Tier Picker gate
 
-    /// Mag een cloud-/Pro-feature draaien? Zo niet, toont de juiste pop-up in
-    /// volgorde: (1) online-modellen uit → vraag aanzetten; (2) niet ingelogd
-    /// → sign-in; (3) ingelogd zonder Pro/credits → upgrade. Dev-unlimited en
-    /// credit-houders mogen door.
-    func allowCloudFeature() -> Bool {
-        if PrivacyPreferences2.shared.mode == .localOnly {
-            cloudGate = .enableOnline
+    /// Mag een AI-feature draaien? Zo niet: elevation modal, sign-in of paywall.
+    @discardableResult
+    func allowAIFeature(_ feature: AIFeature) -> Bool {
+        switch PrivacyGate.evaluate(feature, entitlement: self) {
+        case .allowed:
+            return true
+        case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
             return false
-        }
-        if !isSignedIn {
+        case .needsSignIn:
             cloudGate = .signIn
             return false
+        case .needsCredits:
+            requestUpgrade()
+            return false
         }
-        if isProActive || isDevUnlimited || creditsRemaining > 0 {
-            return true
-        }
-        requestUpgrade()
-        return false
     }
 
-    func enableOnlineModels() {
-        PrivacyPreferences2.shared.mode = .cloudAllowed
-        cloudGate = nil
+    func dismissPrivacyElevation() {
+        privacyElevation = nil
+    }
+
+    func openPrivacySettings() {
+        privacyElevation = nil
+        openSettingsPage = .aiModels
     }
 
     func dismissCloudGate() {

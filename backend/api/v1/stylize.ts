@@ -30,6 +30,14 @@ export const config = {
 const IDENTITY_CLAUSE =
   "Keep the person's facial features, expression, hairstyle and clothing clearly recognizable so the person remains identifiable.";
 
+/** Client-flag `soft_source`: bron is laag-res/soft → vraag scherpte in het resultaat. */
+const SHARPNESS_CLAUSE =
+  "If the source image is soft, blurry or low-resolution, render the styled result with crisp sharp detail — do not reproduce blur or softness from the input.";
+
+/** Client-flag `preserve_framing`: stylize op volle origineel → geen reframe. */
+const FRAMING_CLAUSE =
+  "Keep the exact same crop, zoom, and position of the person in the frame — do not reframe, recenter, or change the composition.";
+
 const STYLE_PROMPTS: Record<string, string> = {
   clay:
     "Transform this portrait into a claymation-style clay sculpture character: smooth modelling-clay skin with subtle hand-sculpted texture, soft studio lighting. " +
@@ -245,6 +253,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Niet-dev zonder geldige intent, of dev zonder enige prompt.
     res.status(400).json({ error: "unknown_style" });
     return;
+  }
+
+  if (req.body?.soft_source === true) {
+    prompt = `${prompt} ${SHARPNESS_CLAUSE}`;
+  }
+  if (req.body?.preserve_framing === true) {
+    prompt = `${prompt} ${FRAMING_CLAUSE}`;
   }
 
   // Input image: inline base64 (legacy) of een Storage-upload (storage_key,

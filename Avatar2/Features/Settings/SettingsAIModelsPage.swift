@@ -39,18 +39,18 @@ struct SettingsAIModelsPage: View {
                 .foregroundStyle(DSColor.Foreground.primary)
 
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                onlineModelsCard
+                privacyTierCard
                 localModelsCard
-                // E15.6: generatie-modelkeuze (nano / OpenAI), alle gebruikers.
-                generationModelCard
+                privacyFeatureMatrixCard
+                if prefs.allowsThirdPartyCloud {
+                    generationModelCard
+                }
                 // E15.5: alléén voor dev-accounts.
                 if entitlement?.isDevUnlimited == true {
                     advancedCard
                 }
             }
             .padding(.top, DSSpacing.gap8)
-
-            Spacer()
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)
@@ -58,7 +58,64 @@ struct SettingsAIModelsPage: View {
         .task { model.refreshInstalledState() }
     }
 
-    // MARK: Generation model (E15.6, user-facing nano / OpenAI)
+    private var disabledTiers: Set<AIPrivacyTier> {
+        AppleIntelligenceAvailability.supportsApplePrivateCloud ? [] : [.appleCloud]
+    }
+
+    // MARK: Privacy tier (Privacy Tier Picker)
+
+    private var privacyTierCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("AI privacy")
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+            Text("Choose how far your photos travel for AI edits")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+
+            PrivacyTierRadioGroup(
+                selection: Binding(
+                    get: { prefs.tier },
+                    set: { prefs.tier = $0 }
+                ),
+                disabledTiers: disabledTiers,
+                showsAxisHint: true
+            )
+            .padding(.top, DSSpacing.gap4)
+
+            if AppleIntelligenceAvailability.supportsApplePrivateCloud {
+                Text("Use the sparkle button in Background to generate images with Apple Intelligence.")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .padding(.top, DSSpacing.gap3)
+            } else if let summary = AppleIntelligenceAvailability.settingsSummary {
+                Text(summary)
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, DSSpacing.gap3)
+            }
+        }
+        .padding(DSSpacing.gap6)
+        .frame(maxWidth: 608, alignment: .leading)
+        .background(DSColor.Background.card)
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+        .refreshAppleIntelligenceAvailability {
+            PrivacyPreferences2.shared.reapplyFingerprintPolicy()
+        }
+    }
+
+    // MARK: Feature matrix
+
+    private var privacyFeatureMatrixCard: some View {
+        PrivacyFeatureMatrix()
+            .padding(DSSpacing.gap6)
+            .frame(maxWidth: 608, alignment: .leading)
+            .background(DSColor.Background.card)
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+    }
+
+    // MARK: Generation model (E15.6, Advanced tier only)
 
     private var generationModelCard: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -126,10 +183,10 @@ struct SettingsAIModelsPage: View {
                 // Lokale cutout-engine (Vision / gedownload model) — chips
                 // i.p.v. Menu (Menu's blokkeerden de first-render-window).
                 pickerColumn(title: "Cut out engine (local)") {
-                    optionChip("Apple Vision", selected: prefs.engine == .appleVision) {
+                    optionChip("Regular quality", selected: prefs.engine == .appleVision) {
                         prefs.engine = .appleVision
                     }
-                    optionChip("High-fidelity", selected: prefs.engine == .downloadedModel) {
+                    optionChip("High quality", selected: prefs.engine == .downloadedModel) {
                         prefs.engine = .downloadedModel
                     }
                 }
@@ -192,38 +249,6 @@ struct SettingsAIModelsPage: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Allow online models (frame "row-system-audio", h94)
-
-    private var onlineModelsCard: some View {
-        HStack(spacing: DSSpacing.gap3) {
-            Circle()
-                .fill(DSColor.Background.action)
-                .frame(width: 28, height: 28)
-                .overlay {
-                    Image(systemName: "cloud.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DSColor.Action.onAction)
-                }
-            VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
-                Text("Allow online models")
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                Text("This will give you more advanced editing features")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-            }
-            Spacer(minLength: DSSpacing.gap4)
-            DSToggle(isOn: Binding(
-                get: { prefs.mode == .cloudAllowed },
-                set: { prefs.mode = $0 ? .cloudAllowed : .localOnly }
-            ))
-        }
-        .padding(DSSpacing.gap6)
-        .frame(maxWidth: 608, alignment: .leading)
-        .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-    }
-
     // MARK: Local models (frame "list")
 
     private var localModelsCard: some View {
@@ -235,13 +260,13 @@ struct SettingsAIModelsPage: View {
             HStack(spacing: DSSpacing.gap3) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: DSSpacing.gap2) {
-                        Text("Cut out")
+                        Text("Remove background")
                             .dsTextStyle(.labelBase)
                             .foregroundStyle(DSColor.Foreground.primary)
                         Text("•")
                             .dsTextStyle(.bodySmall)
                             .foregroundStyle(DSColor.Foreground.muted)
-                        Text("High-fidelity edges")
+                        Text("High quality · sharper hair")
                             .dsTextStyle(.bodySmall)
                             .foregroundStyle(DSColor.Foreground.muted)
                         Text("•")
@@ -297,12 +322,14 @@ struct SettingsAIModelsPage: View {
     private var trailingControls: some View {
         switch model.phase {
         case .installed:
-            HStack(spacing: DSSpacing.gap2) {
-                if prefs.engine == .downloadedModel {
-                    Text("Active")
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Action.primaryForeground)
-                }
+            HStack(spacing: DSSpacing.gap3) {
+                // Aan/uit zonder te verwijderen: model blijft gedownload, maar
+                // de cutout draait op Apple Vision (uit) of dit model (aan).
+                DSToggle(isOn: Binding(
+                    get: { prefs.engine == .downloadedModel },
+                    set: { prefs.engine = $0 ? .downloadedModel : .appleVision }
+                ))
+                .accessibilityLabel("Use High quality cutout model")
                 DSIconButton(Image(systemName: "trash")) {
                     model.delete()
                     prefs.engine = .appleVision
