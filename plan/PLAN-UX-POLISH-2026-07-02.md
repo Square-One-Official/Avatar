@@ -399,11 +399,13 @@ sidebar in-/uitklappen animeert zoals nu; banner-preview idem.
 **Verificatie:** screenshots Edit en Preview over elkaar (pixel-diff op de
 breadcrumb-bbox); zelfde test met sidebar dicht.
 
-### UXS-29 · Traffic lights + toggle ín het sidebar-paneel (UX34) — M — ✅ DONE `4350f62`
-*(Implementatie: kaart dokt aan de venstertop met vierkante tophoeken/ronde
-onderhoeken; chrome-strip vanaf y=0; traffic-lights naar native x=20; toggle bleef op
-z'n plek. Bijvangst: DEBUG-smoke-haak `--open-editor` — de kaarten zijn nog niet
-AX-bedienbaar (UX28), dus editor-smokes konden de editor anders niet in.)*
+### UXS-29 · Traffic lights + toggle ín het sidebar-paneel (UX34) — M — ✅ DONE `e2dff74` (v2)
+*(v1 `4350f62` dokte de kaart aan de venstertop — afgekeurd door Thierry: de zwevende
+gap3-inset moet blijven. v2: lege unified NSToolbar maakt de titelbalk hoog genoeg dat
+AppKit de lights native lager centreert (~26pt), ín de kaart; toggle op dezelfde
+middellijn; shell-root negeert de toolbar-safe-area en content/band pinnen op de oude
+28pt-lijn (`contentTopSafeArea`) zodat de rest van de layout identiek bleef. Bijvangst:
+DEBUG-smoke-haak `--open-editor` — de kaarten zijn nog niet AX-bedienbaar (UX28).)*
 **Waarom:** met uitgeklapte sidebar zweven de vensterknoppen en de sidebar-toggle in
 een band bóven de afgeronde kaart — oogt als een render-bug (crops
 `…/crops/28-settings-about-tl.png`, `31-light-home-tl.png`).
