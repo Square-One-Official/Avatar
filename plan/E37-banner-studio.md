@@ -383,7 +383,8 @@ DoD groen (Avatar + Avatar2 bouwen; Avatar2Tests 105 groen; AvatarKit 86 +
 AvatarUI 37 groen).
 
 ## 37.19 — Halftone-shader: blend/intensity-parameter [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -399,3 +400,17 @@ achtergrond houden ("ink op source", zoals Figma's halftone). Arg-volgorde in de
 catalogus en de Metal-kernel synchroon houden.
 **DoD:** beide targets bouwen; Halftone op default-instellingen laat de
 achtergrond/tekst herkenbaar; tests groen; Result-regel.
+
+**Result:** `bannerHalftone` ([BannerShaders.metal](Avatar2/Features/Banners/BannerShaders.metal))
+kreeg een `intensity`-arg: het zwart/wit-stippenpatroon wordt met
+`mix(color.rgb, halftone, clamp(intensity, 0, 1))` over de bron geblend — 0 =
+bron ongemoeid, 1 = puur zwart/wit. Catalogus
+([ShaderEffect.swift](Avatar2/Features/Banners/ShaderEffect.swift)): param
+`intensity` ("Amount", 0…1, default 0.6) ná `scale` — arg-volgorde spiegelt de
+Metal-signatuur; oudere persistente lagen (alleen `scale`) vallen via
+`shader(values:)` op de default terug. Slider verschijnt automatisch in
+BannerShaderPanel (params-gedreven). 3 nieuwe tests in
+[ShaderEffectTests](Avatar2Tests/ShaderEffectTests.swift): param-contract,
+pixel-blend (intensity 0 = bron; default houdt bronkleur dominant; 1 =
+kanaal-neutraal zwart/wit) en legacy-laag-compat. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 108 groen; AvatarKit 86 + AvatarUI 37 groen).
