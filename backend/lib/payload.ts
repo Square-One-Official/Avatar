@@ -338,6 +338,7 @@ export type PayloadEffect = {
   label: string;
   prompt: string;
   thumbnailUrl: string | null;
+  styleReferenceUrl: string | null;
   order: number;
 };
 
@@ -384,8 +385,10 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
   const thumb = r.thumbnail as { url?: string } | null | undefined;
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const styleRef = r.styleReference as { url?: string } | null | undefined;
+  const styleReferenceUrl = styleRef && typeof styleRef.url === "string" ? styleRef.url : null;
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, thumbnailUrl, order };
+  return { key, label, prompt, thumbnailUrl, styleReferenceUrl, order };
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +455,293 @@ function normalizeBannerPreset(raw: unknown): PayloadBannerPreset | null {
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
   const order = typeof r.order === "number" ? r.order : 99;
   return { key, label, category, thumbnailUrl, config, order };
+}
+
+// ---------------------------------------------------------------------------
+// Backgrounds — CMS-gestuurde achtergronden (E33+). Elke rij is één swatch in
+// het Background-paneel van de macOS Editor, gegroepeerd op `category`.
+// De volledige afbeelding (`imageUrl`) dient voor compositing; `thumbnailUrl`
+// is de kleine swatch voor de panel-preview (valt terug op imageUrl).
+// ---------------------------------------------------------------------------
+
+export type PayloadBackground = {
+  key: string;
+  label: string;
+  category: string;
+  imageUrl: string;
+  thumbnailUrl: string | null;
+  order: number;
+};
+
+let backgroundCache: { expiresAt: number; payload: PayloadBackground[] } | null = null;
+
+export async function fetchActiveBackgrounds(): Promise<PayloadBackground[]> {
+  const now = Date.now();
+  if (backgroundCache && backgroundCache.expiresAt > now) {
+    return backgroundCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — backgrounds disabled");
+    return [];
+  }
+
+  const url = new URL(`${base}/backgrounds`);
+  url.searchParams.set("limit", "200");
+  url.searchParams.set("depth", "1");
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "category,order");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload backgrounds fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const backgrounds = docs.map(normalizeBackground).filter((b): b is PayloadBackground => b !== null);
+  backgroundCache = { expiresAt: now + CACHE_TTL_MS, payload: backgrounds };
+  return backgrounds;
+}
+
+function normalizeBackground(raw: unknown): PayloadBackground | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const category = typeof r.category === "string" ? r.category.trim() : null;
+  const img = r.image as { url?: string } | null | undefined;
+  const imageUrl = img && typeof img.url === "string" ? img.url : null;
+  if (!key || !category || !imageUrl) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, category, imageUrl, thumbnailUrl, order };
+}
+
+// ---------------------------------------------------------------------------
+// AppConfig — singleton Global voor app-brede visuele configuratie (E33+).
+// Payload-endpoint: GET /api/globals/app-config?depth=1
+//
+// splashBackgroundUrl — achtergrond Onboarding Splash-scherm (was hardcoded gradient)
+// emptyStateAvatarUrls — maximaal 6 portret-voorbeelden in de lege-canvas-cirkels
+//
+// Beide vallen terug op de ingebouwde placeholder als het veld leeg is.
+// ---------------------------------------------------------------------------
+
+export type PayloadAppConfig = {
+  splashBackgroundUrl: string | null;
+  emptyStateAvatarUrls: string[];
+  gradientPresets: Array<{ label: string; fromHex: string; toHex: string }>;
+  paywallProFeatures: string[];
+};
+
+let appConfigCache: { expiresAt: number; payload: PayloadAppConfig } | null = null;
+
+export async function fetchAppConfig(): Promise<PayloadAppConfig> {
+  const now = Date.now();
+  if (appConfigCache && appConfigCache.expiresAt > now) {
+    return appConfigCache.payload;
+  }
+  const base = payloadBase();
+  const empty: PayloadAppConfig = {
+    splashBackgroundUrl: null,
+    emptyStateAvatarUrls: [],
+    gradientPresets: [],
+    paywallProFeatures: [],
+  };
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL/KEY missing — app-config disabled");
+    return empty;
+  }
+
+  const url = new URL(`${base}/globals/app-config`);
+  url.searchParams.set("depth", "1");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload app-config fetch failed", res.status, await res.text().catch(() => ""));
+    return empty;
+  }
+  const doc = (await res.json()) as Record<string, unknown>;
+
+  const splashRef = doc.splashBackground as { url?: string } | null | undefined;
+  const splashBackgroundUrl = splashRef && typeof splashRef.url === "string" ? splashRef.url : null;
+
+  const rawAvatars = Array.isArray(doc.emptyStateAvatars) ? doc.emptyStateAvatars : [];
+  const emptyStateAvatarUrls: string[] = rawAvatars
+    .map((item: unknown) => {
+      if (typeof item !== "object" || item === null) return null;
+      const img = (item as Record<string, unknown>).image as { url?: string } | null | undefined;
+      return img && typeof img.url === "string" ? img.url : null;
+    })
+    .filter((u): u is string => u !== null);
+
+  const rawGradients = Array.isArray(doc.gradientPresets) ? doc.gradientPresets : [];
+  const gradientPresets: Array<{ label: string; fromHex: string; toHex: string }> = rawGradients
+    .map((g: unknown) => {
+      if (typeof g !== "object" || g === null) return null;
+      const o = g as Record<string, unknown>;
+      const label = typeof o.label === "string" ? o.label.trim() : "";
+      const fromHex = typeof o.fromHex === "string" ? o.fromHex.trim() : "";
+      const toHex = typeof o.toHex === "string" ? o.toHex.trim() : "";
+      if (!fromHex || !toHex) return null;
+      return { label: label || "Gradient", fromHex, toHex };
+    })
+    .filter((g): g is { label: string; fromHex: string; toHex: string } => g !== null);
+
+  const rawBullets = Array.isArray(doc.paywallProFeatures) ? doc.paywallProFeatures : [];
+  const paywallProFeatures: string[] = rawBullets
+    .map((b: unknown) => {
+      if (typeof b !== "object" || b === null) return null;
+      const text = (b as Record<string, unknown>).text;
+      return typeof text === "string" && text.trim() ? text.trim() : null;
+    })
+    .filter((t): t is string => t !== null);
+
+  const payload: PayloadAppConfig = {
+    splashBackgroundUrl,
+    emptyStateAvatarUrls,
+    gradientPresets,
+    paywallProFeatures,
+  };
+  appConfigCache = { expiresAt: now + CACHE_TTL_MS, payload };
+  return payload;
+}
+
+// ---------------------------------------------------------------------------
+// Hair / Clothes / Face presets — CMS-gestuurde preset-collecties (E33+).
+// Elke rij is één chip/kaart in het paneel. De `prompt` zit in het type maar
+// wordt NIET geëxporteerd naar de client — alleen /v1/stylize gebruikt hem.
+// ---------------------------------------------------------------------------
+
+export type PayloadHairPreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadClothesPreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadFacePreset = { key: string; label: string; prompt: string; order: number };
+
+let hairCache: { expiresAt: number; payload: PayloadHairPreset[] } | null = null;
+let clothesCache: { expiresAt: number; payload: PayloadClothesPreset[] } | null = null;
+let faceCache: { expiresAt: number; payload: PayloadFacePreset[] } | null = null;
+
+function normalizePreset(raw: unknown): { key: string; label: string; prompt: string; order: number } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const prompt = typeof r.prompt === "string" ? r.prompt.trim() : null;
+  if (!key || !prompt) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, prompt, order };
+}
+
+async function fetchPresets(
+  slug: string,
+  cache: { expiresAt: number; payload: unknown[] } | null,
+  setCache: (c: { expiresAt: number; payload: unknown[] }) => void,
+): Promise<Array<{ key: string; label: string; prompt: string; order: number }>> {
+  const now = Date.now();
+  if (cache && cache.expiresAt > now) {
+    return cache.payload as Array<{ key: string; label: string; prompt: string; order: number }>;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn(`PAYLOAD_API_URL/KEY missing — ${slug} disabled`);
+    return [];
+  }
+  const url = new URL(`${base}/${slug}`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "0");
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "order");
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error(`Payload ${slug} fetch failed`, res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const presets = docs.map(normalizePreset).filter((p): p is { key: string; label: string; prompt: string; order: number } => p !== null);
+  setCache({ expiresAt: now + CACHE_TTL_MS, payload: presets });
+  return presets;
+}
+
+export async function fetchActiveHairPresets(): Promise<PayloadHairPreset[]> {
+  return fetchPresets("hair-presets", hairCache, (c) => {
+    hairCache = c as { expiresAt: number; payload: PayloadHairPreset[] };
+  });
+}
+
+export async function fetchActiveClothesPresets(): Promise<PayloadClothesPreset[]> {
+  return fetchPresets("clothes-presets", clothesCache, (c) => {
+    clothesCache = c as { expiresAt: number; payload: PayloadClothesPreset[] };
+  });
+}
+
+export async function fetchActiveFacePresets(): Promise<PayloadFacePreset[]> {
+  return fetchPresets("face-presets", faceCache, (c) => {
+    faceCache = c as { expiresAt: number; payload: PayloadFacePreset[] };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Feature flags — singleton Global in Payload (E33+). Alle flags default
+// naar `true` zodat de app nooit kapot gaat bij een CMS-storing.
+// ---------------------------------------------------------------------------
+
+export type PayloadFeatureFlags = {
+  effectsEnabled: boolean;
+  hairEnabled: boolean;
+  clothesEnabled: boolean;
+  faceEnabled: boolean;
+  backgroundsEnabled: boolean;
+};
+
+const FEATURE_FLAGS_DEFAULT: PayloadFeatureFlags = {
+  effectsEnabled: true,
+  hairEnabled: true,
+  clothesEnabled: true,
+  faceEnabled: true,
+  backgroundsEnabled: true,
+};
+
+let featureFlagsCache: { expiresAt: number; payload: PayloadFeatureFlags } | null = null;
+
+export async function fetchFeatureFlags(): Promise<PayloadFeatureFlags> {
+  const now = Date.now();
+  if (featureFlagsCache && featureFlagsCache.expiresAt > now) {
+    return featureFlagsCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL/KEY missing — feature-flags defaulting to all enabled");
+    return FEATURE_FLAGS_DEFAULT;
+  }
+  const url = new URL(`${base}/globals/feature-flags`);
+  url.searchParams.set("depth", "0");
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload feature-flags fetch failed", res.status, await res.text().catch(() => ""));
+    return FEATURE_FLAGS_DEFAULT;
+  }
+  const doc = (await res.json()) as Record<string, unknown>;
+  const flag = (name: string) => (doc[name] === false ? false : true);
+  const payload: PayloadFeatureFlags = {
+    effectsEnabled: flag("effectsEnabled"),
+    hairEnabled: flag("hairEnabled"),
+    clothesEnabled: flag("clothesEnabled"),
+    faceEnabled: flag("faceEnabled"),
+    backgroundsEnabled: flag("backgroundsEnabled"),
+  };
+  featureFlagsCache = { expiresAt: now + CACHE_TTL_MS, payload };
+  return payload;
 }
 
 // ---------------------------------------------------------------------------

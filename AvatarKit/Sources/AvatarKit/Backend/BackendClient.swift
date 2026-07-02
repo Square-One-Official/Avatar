@@ -443,6 +443,17 @@ public final class BackendClient {
         public let creditsRemaining: Int
     }
 
+    /// Response-vorm van `POST /v1/generate-background` (200). Internal (niet
+    /// function-local) zodat de contract-test in AvatarKitTests hem tegen een
+    /// fixture van de letterlijke endpoint-JSON kan decoden — E43.2, na de
+    /// "Unexpected server response"-outage waarin client en backend stilletjes
+    /// een verschillend contract spraken. Moet 1-op-1 blijven sporen met
+    /// `backend/api/v1/generate-background.ts` (res.status(200).json).
+    struct GenerateBackgroundResponse: Decodable {
+        let imageUrl: String
+        let creditsRemaining: Int
+    }
+
     public func generateBackground(
         userPrompt: String,
         styleKey: String,
@@ -474,11 +485,6 @@ public final class BackendClient {
             }
         }
 
-        struct Response: Decodable {
-            let imageUrl: String
-            let creditsRemaining: Int
-        }
-
         let modelKey = generationModel ?? GenerationModelStore.shared.current.rawValue
         let body = try JSONEncoder().encode(
             Body(
@@ -492,7 +498,7 @@ public final class BackendClient {
                 modelOverride: DevModelOverrides.shared.override(for: .generateBackground)
             )
         )
-        let resp: Response = try await request("/v1/generate-background", method: "POST", body: body)
+        let resp: GenerateBackgroundResponse = try await request("/v1/generate-background", method: "POST", body: body)
         guard let url = URL(string: resp.imageUrl) else {
             throw BackendError.decode
         }

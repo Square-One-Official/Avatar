@@ -19,7 +19,7 @@ achtergrond-generatie terwijl er wél 2 credits worden afgeschreven.
 ---
 
 ## 43.1 — Eén deploy-bron voor api.aaavatar.nl
-- status: ready
+- status: in_progress
 - team: INFRA
 - blockedBy: —
 
@@ -35,8 +35,37 @@ Sparkle-updatefeed van **v1-gebruikers**; niet per ongeluk mee laten wisselen.
 **DoD:** beide targets bouwen; alle eerder-404'ende endpoints geven op prod weer 200;
 Result-regel met de gekozen aanpak (merge vs. loskoppelen) + motivatie.
 
+**Status-notitie (2026-07-02):** merge klaar + preview groen; **wacht op prod-akkoord**
+(prod-deploy + loskoppelen v1-autodeploy zijn bewust niet door de agent uitgevoerd).
+
+**Result:** aanpak = **merge én loskoppelen**: v2-boom is canoniek gemaakt (beide
+kanten van de divergentie verenigd), en het loskoppelen van de v1-GitHub-autodeploy
+is uitgeschreven als prod-stap (zie hieronder) — motivatie: v1 is bevroren
+(memory `project_v1_frozen`), dus de GitHub-integratie op de v1-repo is puur een
+clobber-risico zonder functie; de CLI vanaf v2 blijft dan als enige deploy-kanaal.
+Uitgevoerd op branch `v2/e43-deploy-sanering`:
+- Uit v1 overgenomen (ontbraken in v2): `api/v1/app-config.ts`, `backgrounds.ts`,
+  `hair-presets.ts`, `clothes-presets.ts`, `face-presets.ts`, `feature-flags.ts`
+  én `api/v1/auth/send-recovery-email.ts` (Restore-Pro-flow van v1-gebruikers;
+  alle lib-deps bestonden al in v2).
+- `lib/payload.ts`: fetchers toegevoegd (fetchAppConfig, fetchActiveBackgrounds,
+  fetchActiveHair/Clothes/FacePresets, fetchFeatureFlags) + `styleReferenceUrl`
+  op `PayloadEffect` — bovenop v2's nieuwere basis (payloadBase-hardening,
+  safeLinkUrl) zodat niets van v2 verloren ging.
+- `api/v1/stylize.ts` + `lib/replicate.ts`: E33-CMS-gedrag teruggeplaatst
+  (CMS-first preset-lookup voor hair/clothes/face + style-reference-image),
+  gecombineerd mét v2's nieuwere soft_source/preserve_framing/dims-logging.
+- Appcast expliciet vergeleken: v2-variant is byte-identiek aan de live feed
+  behálve de 16 enclosure-URL's (`thierrzz/Avatar` → `Square-One-Official/Avatar`,
+  de repo-transfer van 2026-07-01); versies/edSignatures/lengths identiek en de
+  nieuwe org-URL geverifieerd (HTTP 200). v1-gebruikers blijven dezelfde feed zien.
+- Preview-deploy `avatars-ex3niwdao-square-one-69d6814b.vercel.app`: alle 30
+  `/v1/*`-endpoints + `/appcast.xml` bestaan (200/401/405/400 — géén enkele 404);
+  de 6 eerder-404'ende CMS-endpoints geven 200 met valide JSON.
+- `tsc --noEmit` groen; beide app-targets bouwen; AvatarKit `swift test` 62/0.
+
 ## 43.2 — sql/014 toepassen + generate-background live deployen + credit-refund
-- status: ready
+- status: in_progress
 - team: INFRA
 - blockedBy: 43.1 (dezelfde deploy-bron moet eerst vaststaan)
 
@@ -53,6 +82,29 @@ van de laatste 48 uur (reason-tag zodat het traceerbaar blijft).
 **DoD:** een live generate-background-call (portret + banner) levert een zichtbaar
 resultaat op zonder decode-fout; refund-script gedraaid en resultaat in de
 Result-regel gemeld (aantal refunds, totaal credits).
+
+**Status-notitie (2026-07-02):** voorbereiding compleet; **wacht op prod-akkoord**
+(migratie 014, prod-deploy en refund zijn bewust niet door de agent uitgevoerd —
+volgorde staat in de Result-regel).
+
+**Result (voorbereiding):**
+- `sql/014_generated_results_bucket.sql` geverifieerd: idempotent
+  (`on conflict (id) do update`), private bucket, juiste mime-whitelist + 10 MB-cap.
+  ⚠️ nummer-collision met `014_newsletter_double_optin.sql` (beide idempotent,
+  beide toepassen) — gedocumenteerd in `sql/README.md`.
+- Contract-test toegevoegd: `AvatarKitTests/GenerateBackgroundContractTests.swift`
+  decodeert de létterlijke 200-JSON van `generate-background.ts` met exact de
+  decoder-config van `BackendClient.request` (snake_case+iso8601); de oude
+  inline-base64-vorm (de A2-outage) moet expliciet fálen. Daarvoor is de
+  function-local `Response` gepromoveerd tot internal
+  `BackendClient.GenerateBackgroundResponse`. Tests: 62/0 groen.
+- Refund-script: `sql/016_refund_e43_generate_background_outage.sql` — stap 1 =
+  dry-run (aantal charges / totaal credits / users), stap 2 = uitgecommentarieerd
+  refund-INSERT, idempotent via `ref = charge-id` + NOT EXISTS, reason
+  `refund_e43_generate_background_outage`. NIET gedraaid.
+- Prod-volgorde ná akkoord: (1) migratie 014 in Supabase SQL-editor + bucket-check;
+  (2) `vercel deploy --prod` vanaf de canonieke v2-bron; (3) live smoke
+  (generate-background portret + banner); (4) refund: dry-run → INSERT-blok.
 
 ## 43.3 — Endpoint-inventaris-smoketest in CI (backlog)
 - status: backlog
