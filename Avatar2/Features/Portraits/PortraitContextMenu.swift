@@ -23,6 +23,7 @@ struct PortraitDSContextMenu: View {
     let undoManager: UndoManager?
     let onDismiss: () -> Void
     let onRequestDelete: ([Portrait2]) -> Void
+    let onRequestNewFolder: ([Portrait2]) -> Void
 
     @State private var moveFlyoutOpen = false
 
@@ -105,16 +106,15 @@ struct PortraitDSContextMenu: View {
                 }
             }
             Divider().padding(.vertical, 2)
+            // E36.5 (audit-B5): geen stille "Untitled folder N" meer — vraag
+            // altijd een naam (zelfde prompt als de left-nav-flow); de overlay
+            // toont de alert en maakt de map pas na bevestiging.
             DSMenuRow("New folder…", icon: "folder.badge.plus") {
                 onDismiss()
-                let f = Folder2(name: "Untitled folder \(folders.count + 1)", order: folders.count + 1)
-                modelContext.insert(f)
-                for p in targets { p.folder = f }
+                onRequestNewFolder(targets)
             }
         }
     }
-
-    @Environment(\.modelContext) private var modelContext
 }
 
 // MARK: - Overlay helper
@@ -129,6 +129,11 @@ struct PortraitContextMenuOverlay: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.undoManager) private var undoManager
     @State private var deleteTargets: [Portrait2] = []
+    // E36.5 (audit-B5): "New folder…" vraagt eerst een naam (zelfde prompt als
+    // de left-nav-flow) i.p.v. stil "Untitled folder N" te maken. De targets
+    // worden vastgehouden tot de alert bevestigd/geannuleerd is.
+    @State private var newFolderTargets: [Portrait2] = []
+    @State private var newFolderName = ""
 
     var body: some View {
         Group {
@@ -141,10 +146,22 @@ struct PortraitContextMenuOverlay: View {
                         selectedTargets: selectedTargets,
                         undoManager: undoManager,
                         onDismiss: { target = nil },
-                        onRequestDelete: { deleteTargets = $0 }
+                        onRequestDelete: { deleteTargets = $0 },
+                        onRequestNewFolder: {
+                            newFolderName = ""
+                            newFolderTargets = $0
+                        }
                     )
                 }
             }
+        }
+        .alert("Create folder", isPresented: Binding(
+            get: { !newFolderTargets.isEmpty },
+            set: { if !$0 { newFolderTargets = [] } }
+        )) {
+            TextField("Folder name", text: $newFolderName)
+            Button("Create") { confirmCreateFolder() }
+            Button("Cancel", role: .cancel) { newFolderTargets = [] }
         }
         .confirmationDialog(
             deleteTargets.count >= 2
@@ -165,6 +182,18 @@ struct PortraitContextMenuOverlay: View {
         } message: {
             Text("This can't be undone.")
         }
+    }
+
+    /// Maakt de map met de opgegeven naam (spiegelt `LeftNavView.
+    /// confirmCreateFolder`) en verplaatst de vastgehouden portretten erin.
+    /// Lege naam = niets doen (alert sluit; geen stille "Untitled folder").
+    private func confirmCreateFolder() {
+        defer { newFolderTargets = [] }
+        let name = newFolderName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let folder = Folder2(name: name, order: folders.count + 1)
+        modelContext.insert(folder)
+        for p in newFolderTargets { p.folder = folder }
     }
 }
 

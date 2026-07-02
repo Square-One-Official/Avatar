@@ -374,7 +374,10 @@ final class ShellModel {
             setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
-        await runCutout(on: cgImage)
+        // E36.5 (audit-B5): de bron-bestandsnaam reist mee tot in `persist` als
+        // default-portretnaam — anders heet álles "Untitled" (Home, lenzen,
+        // breadcrumb, Name-veld).
+        await runCutout(on: cgImage, defaultName: Self.defaultPortraitName(from: url))
     }
 
     func importImage(data: Data) async {
@@ -383,10 +386,23 @@ final class ShellModel {
             setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
+        // Dropped Data zonder bron-URL: geen zinvolle naam beschikbaar → leeg
+        // (UI toont "Untitled" tot de gebruiker een naam invult).
         await runCutout(on: cgImage)
     }
 
-    private func runCutout(on importedImage: CGImage) async {
+    /// E36.5 (audit-B5): default-portretnaam uit de bron-URL — bestandsnaam
+    /// zonder extensie, gehumaniseerd: `-`/`_` → spatie, dubbele spaties
+    /// samengevouwen. `p1-man-beard.png` → "p1 man beard".
+    static func defaultPortraitName(from url: URL) -> String {
+        url.deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
+
+    private func runCutout(on importedImage: CGImage, defaultName: String = "") async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport() else { return }
@@ -412,7 +428,7 @@ final class ShellModel {
             setCanvas(.result(cutout))
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
-            persist(cutout: cutout, original: original)
+            persist(cutout: cutout, original: original, name: defaultName)
             // E05.6: eenmalige nudge als de Vision-rand rafelig oogt en het
             // hifi-model nog niet binnen is.
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
@@ -424,10 +440,11 @@ final class ShellModel {
     // MARK: - Set/sidebar (E05.4)
 
     /// Geslaagde cutout → nieuw portret in de set; wordt meteen de selectie.
-    /// De originele importfoto gaat mee voor hold-to-compare (E06.2).
-    private func persist(cutout: NSImage, original: NSImage) {
+    /// De originele importfoto gaat mee voor hold-to-compare (E06.2); de
+    /// bron-bestandsnaam (E36.5) als default-naam — leeg bij naamloze drops.
+    private func persist(cutout: NSImage, original: NSImage, name: String = "") {
         guard let modelContext, let png = cutout.pngData() else { return }
-        let portrait = Portrait2(cutoutData: png, originalData: original.pngData())
+        let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
         select(portrait)
         // PoC (left-nav): een verse import opent meteen de editor (top-right-

@@ -113,9 +113,19 @@ Kleine afronding van navigatie nu Home een overzicht is:
 - DoD: beide targets bouwen, tests groen, Result-regel.
 
 ## 36.5 — Bestandsnaam als default-portretnaam
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
+
+**Result:** `ShellModel.defaultPortraitName(from:)` — bestandsnaam zonder extensie,
+gehumaniseerd (`-`/`_` → spatie, dubbele separators samengevouwen) — reist mee van
+`importImage(from:)` via `runCutout(defaultName:)` tot `persist(name:)` →
+`Portrait2(name:)`; open-panel én file-drops krijgen dus een zinvolle naam, naamloze
+`Data`-drops blijven leeg. "New folder…" uit het portret-contextmenu
+([PortraitContextMenu](Avatar2/Features/Portraits/PortraitContextMenu.swift)) maakt geen
+stille "Untitled folder N" meer maar vraagt eerst een naam (zelfde alert-prompt als de
+left-nav-flow; lege naam = annuleren). 4 nieuwe naam-tests in `ShellModelTests`. DoD groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
