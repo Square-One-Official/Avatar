@@ -23,4 +23,26 @@ final class ShellModelTests: XCTestCase {
             XCTFail("verwacht .failed bij onleesbare data")
         }
     }
+
+    // MARK: - E36.5 (audit-B5): bestandsnaam → default-portretnaam
+
+    func testDefaultNaamHumaniseertKoppeltekensEnUnderscores() {
+        let url = URL(fileURLWithPath: "/tmp/p1-man_beard.png")
+        XCTAssertEqual(ShellModel.defaultPortraitName(from: url), "p1 man beard")
+    }
+
+    func testDefaultNaamStriptAlleenDeLaatsteExtensie() {
+        let url = URL(fileURLWithPath: "/Users/x/Photos/team.profile.jpeg")
+        XCTAssertEqual(ShellModel.defaultPortraitName(from: url), "team.profile")
+    }
+
+    func testDefaultNaamVouwtDubbeleSeparatorsSamen() {
+        let url = URL(fileURLWithPath: "/tmp/anna--de_-winter.HEIC")
+        XCTAssertEqual(ShellModel.defaultPortraitName(from: url), "anna de winter")
+    }
+
+    func testDefaultNaamBlijftIntactZonderSeparators() {
+        let url = URL(fileURLWithPath: "/tmp/Portrait.png")
+        XCTAssertEqual(ShellModel.defaultPortraitName(from: url), "Portrait")
+    }
 }
