@@ -45,7 +45,6 @@ struct ShellSidebarChrome: View {
 
             ShellSidebarChromeStrip()
                 .padding(.leading, LeftNavView.edgeInset)
-                .padding(.top, LeftNavView.edgeInset)
                 .mask(alignment: .leading) {
                     Rectangle()
                         .frame(width: isSidebarVisible ? LeftNavView.chromeRevealWidth : 0)
@@ -54,24 +53,21 @@ struct ShellSidebarChrome: View {
                 .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
                 .frame(height: ShellMetrics.windowControlsRowHeight)
         }
-        .frame(height: LeftNavView.windowChromeHeight, alignment: .topLeading)
+        .frame(height: ShellSidebarChromeStrip.height, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
     }
 }
 
 private struct ShellSidebarChromeStrip: View {
+    /// UXS-29: de strip loopt vanaf de venstertop (y = 0) t/m de oude
+    /// top-inset, zodat de traffic-lights + toggle óp kaartmateriaal liggen.
+    /// Vierkante hoeken: de kaart dokt aan de venstertop (LeftNavView clipt
+    /// zelf alleen de onderhoeken nog).
+    static var height: CGFloat { LeftNavView.windowChromeHeight + LeftNavView.edgeInset }
+
     var body: some View {
         DSColor.Background.card
-            .frame(width: LeftNavView.width, height: LeftNavView.windowChromeHeight)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: ShellMetrics.panelCornerRadius,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: ShellMetrics.panelCornerRadius,
-                    style: .continuous
-                )
-            )
+            .frame(width: LeftNavView.width, height: Self.height)
             .allowsHitTesting(false)
     }
 }
@@ -103,7 +99,9 @@ private final class TrafficLightAnchorView: NSView {
         guard let window else { return }
         window.titlebarAppearsTransparent = true
 
-        let leading: CGFloat = 12
+        // UXS-29: 20pt (native macOS-positie) — geeft de rode knop ademruimte
+        // t.o.v. de kaartrand op x = windowEdgeInset (12).
+        let leading: CGFloat = 20
         let spacing: CGFloat = 8
         var x = leading
         for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {

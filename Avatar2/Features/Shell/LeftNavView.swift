@@ -51,8 +51,11 @@ struct LeftNavView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Placeholder onder de vaste venster-chrome (ShellSidebarChrome).
+            // UXS-29: de kaart dokt aan de venstertop (ShellView geeft alleen
+            // nog bottom-inset), dus de chrome-band + de oude top-inset horen
+            // beide bij deze placeholder — de eerste rij blijft op dezelfde y.
             Color.clear
-                .frame(height: Self.windowChromeHeight)
+                .frame(height: Self.windowChromeHeight + Self.edgeInset)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {
@@ -97,11 +100,19 @@ struct LeftNavView: View {
         }
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
-        // Inset kaart: dunne marge links + boven/onder via ShellView; rechts flush
-        // op de content-kolom. macOS floating-panel hoekradius.
+        // Inset kaart: dunne marge links + onder via ShellView; rechts flush op
+        // de content-kolom. UXS-29: bovenkant dokt aan de venstertop (traffic-
+        // lights + toggle liggen óp het paneel) → vierkante top-hoeken, alleen
+        // onderaan de macOS floating-panel hoekradius.
         .background(DSColor.Background.card)
         .clipShape(
-            RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: ShellMetrics.panelCornerRadius,
+                bottomTrailingRadius: ShellMetrics.panelCornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            )
         )
         .overlay {
             if showUserMenu {

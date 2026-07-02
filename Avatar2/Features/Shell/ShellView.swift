@@ -48,16 +48,19 @@ struct ShellView: View {
                 .ignoresSafeArea()
             }
 
+            // UXS-29/UX34: de sidebar-kaart dokt aan de venstertop (alleen
+            // bottom-inset) zodat traffic-lights + toggle óp het paneel liggen
+            // i.p.v. in een losse band erboven.
             if studioFullBleed {
                 HStack(alignment: .top, spacing: 0) {
                     leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                        .padding(.bottom, ShellMetrics.windowEdgeInset)
                     Spacer(minLength: 0)
                 }
             } else {
                 HStack(spacing: ShellMetrics.sidebarContentSpacing) {
                     leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                        .padding(.bottom, ShellMetrics.windowEdgeInset)
                     mainArea
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
                 }
@@ -134,6 +137,13 @@ struct ShellView: View {
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
             #if DEBUG
+            // UXS-28 smoke-haak: open het herstelde portret direct in de editor
+            // (de kaarten zijn nog niet AX-bedienbaar — zie UX28/UXS-7 — dus
+            // smokes kunnen de editor anders niet bereiken).
+            if ProcessInfo.processInfo.arguments.contains("--open-editor"),
+               let portrait = model.selectedPortrait {
+                model.openPortrait(portrait)
+            }
             // E19.1 smoke-haak: open de export-popup ná de selectie-restore.
             if ProcessInfo.processInfo.arguments.contains("--show-export") {
                 model.exportCurrentPortrait()
@@ -384,13 +394,14 @@ struct ShellView: View {
         .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
     }
 
-    /// Leading t.o.v. de content-kolom (mainArea). Bij full-bleed editor: ná sidebar.
+    /// Leading in vénster-space (de top-chrome-band overlayt de root-ZStack) —
+    /// bewust onafhankelijk van `studioFullBleed` (UXS-28/UX35): de oude
+    /// `gap3`-tak rekende alsof de band in de content-kolom leefde, waardoor de
+    /// breadcrumb bij Edit↔Preview ~248pt versprong (tot óver de sidebar).
+    /// Sidebar open → ná de sidebar-kaart; dicht → ná traffic-lights + toggle.
     private var shellEditorBreadcrumbLeading: CGFloat {
         if model.isLeftNavVisible {
-            if studioFullBleed {
-                return LeftNavView.layoutWidth + DSSpacing.gap3
-            }
-            return DSSpacing.gap3
+            return LeftNavView.layoutWidth + DSSpacing.gap3
         }
         return ShellMetrics.editorBreadcrumbLeadingCollapsed - ShellMetrics.windowEdgeInset
     }
