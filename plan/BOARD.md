@@ -22,7 +22,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E01 Fundament](E01-fundament.md) | INFRA | **done** (1.1–1.15) |
 | [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); 2.6 backlog (audit-fix: randkwaliteit lage resolutie) |
 | [E03 Design system](E03-design-system.md) | DS | **done** (3.1–3.19) |
-| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.7); **4.8 ready** (audit-fix: privacystap ingelogd pad) |
+| [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.8) |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | **done** (5.1–5.8) |
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | **done** (6.1–6.6) |
 | [E07 Background](E07-background.md) | FEAT | **done** (7.1–7.2) |
@@ -46,7 +46,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **38.1 ready**, 38.2–38.4 backlog (Figma-stijl Metal-shaders) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **39.1 ready**, 39.2 backlog |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **40.1 ready**, 40.2 backlog |
-| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2); **41.3 ready** (audit-fix: model-pin) |
+| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.3) |
 | [E42 AI background generation](E42-ai-background-generation.md) | FEAT+INFRA+AI | **done** (42.1–42.3, 42.5–42.7); 42.4 backlog (wide T2I bakeoff) |
 | [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **43.5 done**; 43.1–43.2 voorbereid, **wachten op prod-akkoord** (migratie 014 + prod-deploy + refund); 43.3–43.4 backlog |
 | [E44 Cloud-actie betrouwbaarheid](E44-cloud-betrouwbaarheid.md) | FEAT+INFRA | **44.1–44.2 ready**, 44.3 backlog |
