@@ -293,3 +293,72 @@ alleen kleur/gradient; image via canvas. `BannerCanvasSelection.backgroundFill`.
 **Scope:** Evaluate [PaperKit](https://developer.apple.com/documentation/paperkit) (`PaperMarkupViewController`,
 `ImageMarkup`, `MarkupAdornment`) as optional canvas engine when deployment target ≥ macOS 27.
 Huidige implementatie blijft `BannerDoc` + Freeform-chrome op macOS 14+. Geen implementatie tot OS-besluit.
+
+## 37.17 — Type-to-edit: keystroke-verlies door async first-responder-handoff [FEAT]
+- status: ready
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6). Blocker
+vóór `AppFeatureFlags.bannersEnabled` op `true` kan.
+**Wat:** de selectiebox vangt de eerste toetsaanslag via `onKeyPress`
+(`BannerCanvasTextChrome.swift:314-326`, `handleTypeToEdit`) en zet
+`draftString`/`isEditing = true` — die eerste toets overleeft. Maar
+`BannerInlineTextField.swift:36-46` doet `DispatchQueue.main.async { view.window?.
+makeFirstResponder(view) }` — minimaal één runloop-cyclus later. In dat gat is de
+box niet meer focusable (`guard !isEditing` → `.ignored`) en de NSTextView nog geen
+first responder: toets 2 en verder vallen in het niets. Empirisch: "One look for
+every team" getypt → canvas toont "O look for every team". Commit 5e91f28
+(E37.13-15) heeft `BannerInlineTextField` niet aangeraakt.
+**Voorstel:** blijf toetsen bufferen in de chrome zolang de editor nog geen first
+responder is (append aan `draftString` i.p.v. `.ignored`), óf maak de textview
+synchroon first responder (`viewDidMoveToWindow`-override, geen async-hop).
+**DoD:** beide targets bouwen; een keystroke-burst direct na het Text-tool-klikken
+verliest geen tekens; tests groen; Result-regel.
+
+## 37.18 — Placeholder-tekstlagen: document-brede sweep + herbake [FEAT]
+- status: ready
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6). Blocker
+vóór `AppFeatureFlags.bannersEnabled` op `true` kan.
+**Wat:** vóór commit d1ec4e7 werd de placeholder-string als échte `layer.string`
+opgeslagen en meegebakken in `previewImageData` — bestaande banners dragen die lagen
+nog. Bovendien zijn alle drie de huidige opruimroutines **selectie-gescoped**
+(`BannerStudioView.finalizeEmptyText:432`, `BannerCanvasOverlay.
+finalizeEmptyTexts:376` + `cleanupUnselectedEmptyTexts:392`) — wie de Studio verlaat
+via breadcrumb/venster-sluiten raakt geen enkele sweep (`onDisappear`,
+`BannerStudioView.swift:98-102`, bakt alleen de thumbnail). Lege lagen accumuleren
+dus over sessies en blijven hit-testbaar met placeholder-brede kaders
+(`BannerLayoutMetrics.textBoxWidth:75-84`) — nieuwste lege laag wint de hit-test
+vóór een echte tekstlaag, het banner voelt "bedekt". Preview-staleness: er is
+sowieso geen invalidatiepad buiten een open Studio-sessie (`previewBakedAt`
+ontbreekt) — gallery/chooser/E40-achtergrond kunnen een verouderde bake tonen.
+**Voorstel:** één document-brede `BannerDoc.dropEmptyTextLayers()` aanroepen bij
+Studio-open én in `onDisappear` (vóór `bakeThumbnail`), de drie bestaande routines
+daarop consolideren; eenmalige migratie die literal-placeholder-strings uit
+bestaande documenten leegt en de preview herbakt; overweeg een
+versie-stempel op `BannerDoc` zodat een stale preview lazy herbakt bij eerste
+weergave.
+**DoD:** beide targets bouwen; een banner zonder ingevulde tekst laat na
+Studio-verlaten geen lege lagen na; hit-testing selecteert nooit meer een lege
+placeholder-laag vóór echte content; tests groen; Result-regel.
+
+## 37.19 — Halftone-shader: blend/intensity-parameter [FEAT]
+- status: ready
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6).
+**Wat:** `BannerShaders.metal:96-103` (`bannerHalftone`) gebruikt de bronkleur
+alleen voor de stipradius (`luma`) en schrijft daarna `mix(half3(1.0h), half3(0.0h),
+ink)` — de gradient/fill wordt 100% weggegooid, tekst wordt onleesbaar. Er is geen
+blend-parameter; de catalogus (`ShaderEffect.swift:73-75`) kent alleen `scale`
+(Dot size). Default-aanzetten = een wit banner met stippen.
+**Voorstel:** een `intensity`-param toevoegen (default ±0,6) en `mix(color.rgb,
+halftoneRGB, intensity)` blenden, of de stippen in de bronkleur op de bron-
+achtergrond houden ("ink op source", zoals Figma's halftone). Arg-volgorde in de
+catalogus en de Metal-kernel synchroon houden.
+**DoD:** beide targets bouwen; Halftone op default-instellingen laat de
+achtergrond/tekst herkenbaar; tests groen; Result-regel.

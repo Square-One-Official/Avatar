@@ -1,0 +1,100 @@
+# E43 — Backend-deploy-sanering & CMS/AI-achtergrond-herstel
+
+Team: **INFRA**
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevindingen A1–A3, D2).
+Kern: `Avatars/backend` (v1, main) én `Avatars-v2/backend` (v2) hebben allebei
+`.vercel/project.json` → hetzelfde Vercel-project (`avatars-api`,
+`prj_QbOJAhKjHdoG8luOBhtntXE2KKMN`). Prod (`api.aaavatar.nl`) draait momenteel een
+4 dagen oude CLI-deploy vanaf de v2-werkdirectory: `/v1/app-config`,
+`/v1/feature-flags`, `/v1/backgrounds`, `/v1/{hair,clothes,face}-presets` geven live
+**404** (geprobed 2026-07-01). De client soft-failt overal naar hardcoded fallbacks,
+dus dit was onzichtbaar. Omgekeerd mist de v1-repo `generate-background.ts` en
+`banner-presets.ts` — de volgende GitHub-autodeploy vanaf v1-main wist die weer.
+`generate-background.ts` + `BackendClient.generateBackground` zijn bovendien
+**untracked** op schijf (vandaag herschreven naar het signed-URL-contract) — prod
+draait nog de oudere iteratie, vandaar "Unexpected server response." bij élke
+achtergrond-generatie terwijl er wél 2 credits worden afgeschreven.
+
+---
+
+## 43.1 — Eén deploy-bron voor api.aaavatar.nl
+- status: ready
+- team: INFRA
+- blockedBy: —
+
+**Wat:** twee repo's (`Avatars/backend` en `Avatars-v2/backend`) deployen naar
+hetzelfde Vercel-project en clobberen elkaars `api/v1/*`-bestanden bij elke deploy.
+**Voorstel:** de `api/v1`-bomen van beide repo's mergen tot één bron-van-waarheid
+(voorstel: v2-repo als canoniek, de ontbrekende CMS-endpoints
+`app-config.ts`/`backgrounds.ts`/`hair-presets.ts`/`clothes-presets.ts`/
+`face-presets.ts`/`feature-flags.ts` uit v1 overnemen), óf de v1-main-autodeploy
+loskoppelen van dit Vercel-project zodat alleen v2 nog deployt. Check ook
+`api/appcast.ts`/`api/_appcast.xml` — die verschillen per repo en sturen de
+Sparkle-updatefeed van **v1-gebruikers**; niet per ongeluk mee laten wisselen.
+**DoD:** beide targets bouwen; alle eerder-404'ende endpoints geven op prod weer 200;
+Result-regel met de gekozen aanpak (merge vs. loskoppelen) + motivatie.
+
+## 43.2 — sql/014 toepassen + generate-background live deployen + credit-refund
+- status: ready
+- team: INFRA
+- blockedBy: 43.1 (dezelfde deploy-bron moet eerst vaststaan)
+
+**Wat:** `backend/sql/014_generated_results_bucket.sql` (untracked) is vermoedelijk
+niet toegepast op de prod-Supabase; `generate-background.ts` + `BackendClient.
+generateBackground` (untracked, signed-URL-contract) staan niet live. Resultaat:
+beide modellen (OpenAI/Gemini) falen met "Unexpected server response.", 2 credits per
+poging afgeschreven zonder resultaat.
+**Voorstel:** (1) migratie 014 toepassen en verifiëren (bucket `generated-results`
+bestaat); (2) `generate-background.ts` + de Swift-decoder committen en deployen;
+(3) contract-test die de Swift-decoder tegen de live endpoint-respons draait vóór
+merge; (4) credit-refund via `credit_ledger` voor alle `generate_background`-charges
+van de laatste 48 uur (reason-tag zodat het traceerbaar blijft).
+**DoD:** een live generate-background-call (portret + banner) levert een zichtbaar
+resultaat op zonder decode-fout; refund-script gedraaid en resultaat in de
+Result-regel gemeld (aantal refunds, totaal credits).
+
+## 43.3 — Endpoint-inventaris-smoketest in CI (backlog)
+- status: backlog
+- team: INFRA
+- blockedBy: 43.1
+
+**Wat:** dit soort divergentie (A1) was 4 dagen onzichtbaar omdat niemand de
+endpoint-inventaris tegen prod verifieerde.
+**Voorstel:** een CI-stap (of losse cronjob) die na elke deploy alle bekende
+`/v1/*`-endpoints probeert (GET/HEAD volstaat voor bestaan) en bij een onverwachte
+404 een melding stuurt. Lijst met verwachte endpoints kan uit `BackendClient.swift`
+worden afgeleid.
+**DoD:** smoketest draait tegen een preview-deploy en faalt zichtbaar bij een
+ontbrekend endpoint; Result-regel.
+
+## 43.4 — Remote kill-switches voor Banners & generate-background (backlog)
+- status: backlog
+- team: INFRA
+- blockedBy: —
+
+**Wat:** `RemoteFeatureFlags` kent 5 flags (effects/hair/clothes/face/backgrounds,
+fail-open bij CMS-uitval) — maar geen kill-switch voor de banners-suite of voor
+`generate_background`, juist de twee jongste/gevoeligste paden.
+**Voorstel:** twee flags toevoegen aan `/v1/feature-flags`
+(`banners_enabled`/`background_generate_enabled`, default `true` fail-open) en de
+bestaande call sites (`AppFeatureFlags.bannersEnabled`, `GenerateBackgroundSheet`)
+ermee laten samenwerken zodat een server-side noodstop mogelijk is zonder
+app-release.
+**DoD:** flag omzetten op een preview-deploy schakelt de feature client-side
+zichtbaar uit; Result-regel.
+
+## 43.5 — Untracked werk committen
+- status: ready
+- team: INFRA (coördineert; elk team staget zijn eigen paden)
+- blockedBy: —
+
+**Wat:** `git status` toont ±30 untracked source-files die de app wél compileert
+(heel `Features/Background/`, de AI-privacy-tier-stack in `Features/Settings/`,
+7 Banner-files, `backend/api/v1/generate-background.ts`, `backend/sql/014_*.sql`) plus
+gestagede deletes (`CloudCutoutEngine.swift` + test) en een unstaged delete
+(`HeroMorph.swift`). Eén verkeerde `git clean` en dit werk is weg.
+**Voorstel:** per pad stagen en committen (nooit `git add -A` op `v2-main` — memory
+`v2_main_concurrent_sessions`); de twee deletes in dezelfde beurt meenemen.
+**DoD:** `git status` toont geen onverwachte untracked/uncommitted bestanden meer die
+al in productie-gebruik zijn; Result-regel met de commit-hashes.

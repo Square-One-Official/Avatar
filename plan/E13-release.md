@@ -83,3 +83,23 @@ DB-migraties 013 + 014 door Thierry in Supabase gedraaid (2026-06-14). **fill_bo
 bewust** en geldt nu ook voor live v1. Rest: Payload `messages`-tabellen via avatar-admin-deploy
 (push:true) — apart, wacht-op-Thierry.
 
+## 13.5 — Sparkle app-breed initialiseren + achtergrondcheck bij launch
+- status: ready
+- team: INFRA
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C1).
+**Wat:** `UpdateManager` (en dus `SPUUpdater.start()`) wordt uitsluitend
+geconstrueerd als `@State` van `SettingsAboutPage.swift:19` — bij app-launch bestaat
+er géén updater, dus de "Automatic updates"-toggle belooft iets dat alleen gebeurt
+terwijl het About-scherm zichtbaar is. `checkForUpdatesInBackground()` heeft nul
+call sites (dood). Elk About-bezoek maakt bovendien een **nieuwe** `SPUUpdater` aan
+op dezelfde bundle — Sparkle verwacht er één per proces; een tweede `start()` kan
+falen (belandt stil in `state = .error`). Voor een DMG-only app is dit het enige
+update-kanaal → release-kritisch.
+**Voorstel:** één app-brede `UpdateManager` (bv. `@State` in `Avatar2App`, doorgeven
+via Environment); bij launch `checkForUpdatesInBackground()` aanroepen. About
+consumeert dezelfde instance i.p.v. een eigen.
+**DoD:** beide targets bouwen; een fresh launch triggert een achtergrond-update-check
+zonder dat About geopend hoeft te worden; tests groen; Result-regel.
+

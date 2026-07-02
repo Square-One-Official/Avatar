@@ -68,3 +68,19 @@ commit-/chat-historie.
   `(BoostMode) -> Void`; `runBoostResolution(_:)` vertakt op de gekozen modus i.p.v. op de
   privacymodus. De chip onthoudt de laatste keuze. Geen auto-spend: de gebruiker kiest per keer.
   DoD groen.
+
+## 41.3 — Crystal-upscaler versie-hash pinnen
+- status: ready
+- team: INFRA
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding D8).
+**Wat:** `backend/lib/models.ts:143-146` heeft `philz1337x/crystal-upscaler` als
+cloud-default staan **zonder** gepinde versie-hash — tegen de eigen
+41.1-waarschuwing in ("community-model → unversioned slug kan 404'en; PIN de
+versie-hash vóór productie"). BiRefNet/DeOldify/Real-ESRGAN zijn wél gepind.
+**Voorstel:** de huidige crystal-upscaler-versie opzoeken op Replicate en de hash
+pinnen, net als de andere modellen in de registry; verifiëren op een Vercel
+preview-deploy.
+**DoD:** `/v1/upscale` met crystal-upscaler werkt op een preview-deploy met de
+gepinde hash; Result-regel.

@@ -199,3 +199,20 @@ model"-kaart in SettingsAIModelsPage met Nano Banana (default, checkmark) / Open
 Smoke (`--show-settings aiModels`): kaart rendert met nano geselecteerd. Beide targets groen,
 alle suites groen. Live request-param-wissel verifieerbaar tegen de Vercel-preview (port-only;
 landt op productie bij de volgende E13.0-port samen met E09.2's stylize.ts).
+
+## 15.7 — Delete-account-rij
+- status: ready
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C7).
+**Wat:** `SettingsAccountPage.swift` biedt alleen Email / Plan+Manage subscription /
+Credits / Sign out. De backend heeft al `/v1/account/delete` (cancelt Stripe-subs,
+wist de Supabase-user, incl. `x-confirm-delete`-header), maar er is géén
+client-methode of UI die dit endpoint bereikt. GDPR art. 17-frictie, en bij een
+latere Mac App Store-route een harde afwijzing op guideline 5.1.1(v).
+**Voorstel:** `BackendClient.deleteAccount()` toevoegen; een destructieve rij in de
+Session-sectie met bevestigingsdialoog; na succes `signOutAccount()` + eventueel de
+optie de lokale bibliotheek te bewaren of te wissen aanbieden.
+**DoD:** beide targets bouwen; delete-account is bereikbaar en werkt end-to-end tegen
+een test-account; tests groen; Result-regel.

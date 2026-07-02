@@ -111,3 +111,39 @@ Kleine afronding van navigatie nu Home een overzicht is:
 - "Make banner" vanuit nav/home/empty-state komt consistent in de Studio (E37) uit.
 - **Geen Figma-ref** — DS-tokens.
 - DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 36.5 — Bestandsnaam als default-portretnaam
+- status: ready
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
+**Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
+alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een
+`Portrait2(name: "")` aanmaakt. Terwijl de bron-URL (bv. `p1-man-beard.png`) op dat
+moment gewoon beschikbaar is. Dit is de root cause dat alles "Untitled" heet — op
+Home, in alle lenzen, in de breadcrumb en het lege Name-veld in de editor. Voor de
+HR-usecase ("vind portret van collega X terug") is dit een kern-gap. Los daarvan
+maakt "New folder…" uit het portret-contextmenu (`PortraitContextMenu.swift:108-113`)
+stil een "Untitled folder N" — de left-nav-flow vraagt wél een naam
+(`LeftNavView.swift:151-155`).
+**Voorstel:** geef de bron-`url` door tot in `persist` en zet
+`name = url.deletingPathExtension().lastPathComponent` (gehumaniseerd: `-`/`_` →
+spatie); dropped `Data` zonder URL blijft leeg. Hergebruik dezelfde naam-prompt van
+de left-nav-flow voor "New folder…" uit het contextmenu.
+**DoD:** beide targets bouwen; een import via bestandsdialoog krijgt een
+zinvolle default-naam i.p.v. "Untitled"; "New folder…" vraagt altijd een naam;
+tests groen; Result-regel.
+
+## 36.6 — Zoekveld in Portraits (backlog)
+- status: backlog
+- team: FEAT
+- blockedBy: 36.5
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
+**Wat:** er is nul `searchable`-gebruik in Shell/Portraits — terugvinden leunt
+volledig op namen (die vóór 36.5 niet eens gezet werden).
+**Voorstel:** een zoekveld in de Portraits-header dat filtert op `Portrait2.name`
+(en eventueel later op rol/team-veld).
+**DoD:** beide targets bouwen; typen in het zoekveld filtert de actieve lens
+live; tests groen; Result-regel.
