@@ -548,9 +548,19 @@ kleine klikbare zoom-%-chip (→ fit) als lichte vervanging van de verwijderde H
 groen; Result-regel.
 
 ## 27.11 — Panel-toggle: scrim ligt óver de top-toolbar · FEAT
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
+
+**Result:** de klik-buiten-sluit-scrim (`activeTool`/`isSidebarVisible`) is in
+`EditorView` verhuisd van de láátste `.overlay` op `canvasCard` naar de EERSTE
+screen-space overlay — direct na de camera-`scaleEffect/offset`, dus ónder de
+transform-handles-overlay (E27.3) én de frame-chrome-overlay (naam-chip +
+Frame/Background-toolbar, E33). Met een open bottom-paneel/sidebar opent een
+top-toolbar-knop (en een transform-handle) nu in één klik; een klik op de lege
+canvas sluit het paneel nog steeds (E18.17-gedrag intact, zelfde tap-actie).
+Zelfde recept als de eerdere `canvasMenu`-fix (catcher onder het menu). Beide
+targets bouwen; Avatar2Tests + AvatarKit (62) + AvatarUI (37) groen.
 
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C3).
 **Wat:** de klik-buiten-sluit-overlay in `EditorView.swift:875-888`

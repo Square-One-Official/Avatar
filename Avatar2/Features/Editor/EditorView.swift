@@ -814,6 +814,25 @@ struct EditorView: View {
             // om het midden.
             .scaleEffect(camera.scale, anchor: .center)
             .offset(camera.offset)
+            // E18.17/E27.11 (audit C3): staat er een paneel/sidebar open, dan
+            // sluit een klik buiten dat paneel (op de foto/canvas) het — net als
+            // een dropdown. De scrim hangt hier als EERSTE screen-space overlay,
+            // dus ÓNDER de transform-handles en de frame-chrome (naam-chip +
+            // Frame/Background-toolbar) hieronder: die blijven in één klik
+            // bedienbaar terwijl het paneel openstaat. Eerder hing deze scrim
+            // als láátste overlay óver de top-toolbar en at hij de eerste klik
+            // (paneel dicht, knop pas bij klik 2) — zelfde bug als destijds bij
+            // `canvasMenu` (zie de catcher in de chrome-overlay).
+            .overlay {
+                if activeTool != nil || isSidebarVisible {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            toolSelection.wrappedValue = nil
+                            canvasMenu = nil
+                        }
+                }
+            }
             // E27.3: de selectie-handles + kader als SCREEN-SPACE overlay op de
             // (camera-getransformeerde) kaart — vaste schermgrootte, en doordat ze
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
@@ -912,22 +931,8 @@ struct EditorView: View {
             }
             // Geen top/bottom-marge: het canvas loopt door tot de vensterrand;
             // breadcrumb, naam-chip en bottom-toolbar zweven eroverheen.
-            // E18.17: staat er een paneel/sidebar open, dan sluit een klik
-            // buiten dat paneel (op de foto/canvas) het — net als een dropdown.
-            .overlay {
-                // E-fix: het frame-menu (canvasMenu) sluit nu via een catcher die
-                // ÓNDER het menu ligt (in de frame-chrome-overlay hieronder) — deze
-                // blanket-overlay lag eróver en at de menu-klikken op. Hier nog
-                // alléén het bottom-paneel/sidebar (die buiten deze overlay leven).
-                if activeTool != nil || isSidebarVisible {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            toolSelection.wrappedValue = nil
-                            canvasMenu = nil
-                        }
-                }
-            }
+            // (E27.11: de paneel-sluit-scrim die hier hing is verhuisd naar VÓÓR
+            // de chrome-overlays hierboven — hij dekte de top-toolbar af.)
             // E27.1: een vers portret opent op de fit-camera (1×, geen pan).
             // Onderwerp start gedeselecteerd (handles weg).
             .onChange(of: portraitModel?.persistentModelID) { _, _ in
