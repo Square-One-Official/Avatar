@@ -199,9 +199,22 @@ struct FaceActionsPanel: View {
                             tileSize: cardWidth,
                             tileHeight: cardHeight
                         ) {
-                            icon(for: preset.key).regular
-                                .scaledToFit()
-                                .frame(width: 36, height: 36)
+                            // E52.1: optionele CMS-thumbnail (verkleinde
+                            // render-variant, gedeelde disk-cache); zonder
+                            // thumbnail blijft het bekende preset-icoon staan.
+                            if let url = preset.thumbnailUrl {
+                                RemoteThumbnail(url: url) {
+                                    icon(for: preset.key).regular
+                                        .scaledToFit()
+                                        .frame(width: 36, height: 36)
+                                }
+                                .frame(width: cardWidth, height: cardHeight)
+                                .clipped()
+                            } else {
+                                icon(for: preset.key).regular
+                                    .scaledToFit()
+                                    .frame(width: 36, height: 36)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
@@ -220,6 +233,8 @@ struct FaceActionsPanel: View {
             if let fetched = try? await entitlement.backend.facePresets(), !fetched.isEmpty {
                 FaceActionsPanel.sessionCache = fetched
                 cmsPresets = fetched
+                // E52.1: warm de gedeelde thumbnail-cache voor presets mét preview.
+                ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
             }
         }
     }

@@ -38,11 +38,6 @@ final class EffectsModel {
     /// Sessie-cache: gedeeld over alle instanties zodat herhaaldelijk openen van
     /// het paneel niet terugvalt op de hardgecodeerde fallback. Leeg = eerste open.
     private static var sessionCache: [RemoteEffect] = []
-    /// Thumbnail-afbeeldingen gedownload na de eerste fetch; gedeeld over instanties.
-    private static let imageCache = NSCache<NSURL, NSImage>()
-    /// Teller die oploopt telkens een thumbnail in de cache belandt, zodat de
-    /// SwiftUI-view herrendert en de gecachede afbeelding meteen toont.
-    private(set) var thumbnailVersion: Int = 0
 
     /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de sessie-cache als
     /// die al gevuld is (eerder geladen in dezelfde sessie), anders op de fallback.
@@ -134,32 +129,10 @@ final class EffectsModel {
         if let activeKey {
             selected = fetched.first { $0.key == activeKey } ?? selected
         }
-        prefetchThumbnails(for: fetched)
-    }
-
-    /// Downloads thumbnail URLs in the background and caches them as NSImages.
-    /// Each successful download bumps `thumbnailVersion` so the view re-renders.
-    private func prefetchThumbnails(for effects: [RemoteEffect]) {
-        let urls = effects.compactMap(\.thumbnailUrl)
-            .filter { EffectsModel.imageCache.object(forKey: $0 as NSURL) == nil }
-        guard !urls.isEmpty else { return }
-        Task.detached(priority: .utility) { [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                for url in urls {
-                    group.addTask {
-                        guard let (data, _) = try? await URLSession.shared.data(from: url),
-                              let image = NSImage(data: data) else { return }
-                        EffectsModel.imageCache.setObject(image, forKey: url as NSURL)
-                        await MainActor.run { self?.thumbnailVersion += 1 }
-                    }
-                }
-            }
-        }
-    }
-
-    func cachedThumbnail(for effect: RemoteEffect) -> NSImage? {
-        guard let url = effect.thumbnailUrl else { return nil }
-        return EffectsModel.imageCache.object(forKey: url as NSURL)
+        // E52.1: warm de gedeelde thumbnail-cache (memory + disk, downsampled
+        // decode). De kaarten renderen via `RemoteThumbnail`, dus geen eigen
+        // NSCache/thumbnailVersion-boekhouding meer.
+        ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
     }
 
     /// None-kaart: terug naar het basisbeeld (instant, geen credits).
@@ -413,31 +386,17 @@ struct EffectsPanel: View {
     }
 
     /// CMS-thumbnail (E33) die de tile vult; valt terug op het sparkles-icoon
-    /// terwijl 'ie laadt of als het effect geen thumbnail heeft.
+    /// terwijl 'ie laadt of als het effect geen thumbnail heeft. E52.1: via de
+    /// gedeelde `ThumbnailCache` (memory + disk + downsampled decode) i.p.v.
+    /// AsyncImage — her-opens zijn instant, ook na een app-herstart.
     @ViewBuilder
     private func thumbnail(for effect: RemoteEffect) -> some View {
-        // thumbnailVersion registreert bij @Observable tracking zodat de view
-        // herrendert zodra prefetchThumbnails een afbeelding in de cache zet.
-        // `let _` (geen kale `_ =`) — een ViewBuilder accepteert geen Void-expressie.
-        let _ = model.thumbnailVersion
-        if let image = model.cachedThumbnail(for: effect) {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFill()
-                .frame(width: cardWidth, height: cardHeight)
-                .clipped()
-        } else if let url = effect.thumbnailUrl {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: cardWidth, height: cardHeight)
-                    .clipped()
-            } placeholder: {
+        if let url = effect.thumbnailUrl {
+            RemoteThumbnail(url: url) {
                 placeholderIcon
             }
+            .frame(width: cardWidth, height: cardHeight)
+            .clipped()
         } else {
             placeholderIcon
         }

@@ -39,7 +39,6 @@ struct BackgroundPanel: View {
 
     private static var sessionCache: [RemoteBackground] = []
     private static var gradientCache: [RemoteGradientPreset] = []
-    private static let imageCache = NSCache<NSURL, NSImage>()
 
     private let swatch: CGFloat = 36
 
@@ -77,7 +76,9 @@ struct BackgroundPanel: View {
         if !fetched.isEmpty {
             BackgroundPanel.sessionCache = fetched
             cmsBackgrounds = fetched
-            prefetchThumbnails(for: fetched)
+            // E52.1: warm de gedeelde thumbnail-cache (memory + disk) zodat de
+            // swatches vullen terwijl het paneel opent; her-opens zijn instant.
+            ThumbnailCache.shared.prefetch(fetched.map(\.thumbnailUrl))
         }
         let config = (try? await configFetch) ?? .empty
         if !config.gradientPresets.isEmpty {
@@ -86,43 +87,20 @@ struct BackgroundPanel: View {
         }
     }
 
-    private func prefetchThumbnails(for items: [RemoteBackground]) {
-        let urls = items.map(\.thumbnailUrl)
-            .filter { BackgroundPanel.imageCache.object(forKey: $0 as NSURL) == nil }
-        guard !urls.isEmpty else { return }
-        Task.detached(priority: .utility) {
-            await withTaskGroup(of: Void.self) { group in
-                for url in urls {
-                    group.addTask {
-                        guard let (data, _) = try? await URLSession.shared.data(from: url),
-                              let image = NSImage(data: data) else { return }
-                        BackgroundPanel.imageCache.setObject(image, forKey: url as NSURL)
-                    }
-                }
-            }
-        }
-    }
-
     @ViewBuilder
     private func cmsRow(for category: String) -> some View {
         scrollRow {
             ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
                 Button { selectCMSBackground(bg) } label: {
-                    let cached = BackgroundPanel.imageCache.object(forKey: bg.thumbnailUrl as NSURL)
                     RoundedRectangle(cornerRadius: DSRadius.lg)
                         .fill(DSColor.Background.neutral)
                         .frame(width: swatch, height: swatch)
                         .overlay {
-                            if let img = cached {
-                                Image(nsImage: img)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                AsyncImage(url: bg.thumbnailUrl) { img in
-                                    img.resizable().scaledToFill()
-                                } placeholder: {
-                                    Color(white: 0.85)
-                                }
+                            // E52.1: gedeelde memory/disk-cache + downsampled
+                            // decode i.p.v. AsyncImage (URLCache helpt niet:
+                            // Supabase stuurt `Cache-Control: no-cache`).
+                            RemoteThumbnail(url: bg.thumbnailUrl) {
+                                Color(white: 0.85)
                             }
                         }
                         .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
@@ -135,16 +113,11 @@ struct BackgroundPanel: View {
     }
 
     private func selectCMSBackground(_ bg: RemoteBackground) {
+        // E52.1: het paneel toont alleen nog de verkleinde thumbnail-variant;
+        // het volle origineel wordt pas bij daadwerkelijk toepassen opgehaald
+        // (export-compositing verdient de volledige resolutie).
         Task {
-            let url = bg.imageUrl
-            let cached = BackgroundPanel.imageCache.object(forKey: url as NSURL)
-            let data: Data?
-            if let img = cached {
-                data = img.pngData()
-            } else {
-                data = try? await URLSession.shared.data(from: url).0
-            }
-            guard let png = data else { return }
+            guard let png = try? await URLSession.shared.data(from: bg.imageUrl).0 else { return }
             await MainActor.run { apply(.image(png)) }
         }
     }

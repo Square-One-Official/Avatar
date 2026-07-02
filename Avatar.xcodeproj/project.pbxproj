@@ -180,6 +180,7 @@
 		8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */; };
 		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
+		8F3C474B398803948710AE4F /* RemoteThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104DC6671647D23FFB03532A /* RemoteThumbnail.swift */; };
 		907825C4E49476725FA34C78 /* Mesh 05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5DE64240C8D2B68EB34AA721 /* Mesh 05.png */; };
 		90B4834B1029881FE5011BEE /* AppleBackgroundPlaygroundModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3EAC3355AA9C45702F1C37 /* AppleBackgroundPlaygroundModifier.swift */; };
 		921AAEAC18B164193A5B0C2E /* LocalUpscale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E2DEEC1EC0C83C7E12F490 /* LocalUpscale.swift */; };
@@ -341,6 +342,7 @@
 		0ED61BA47F9EEBF8B65EBD9D /* OnboardingDownloadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingDownloadView.swift; sourceTree = "<group>"; };
 		0F7453266932AB3B263A665E /* Mesh 06.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 06.png"; sourceTree = "<group>"; };
 		0FF5244B77EE121141D48309 /* FramingConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FramingConstants.swift; sourceTree = "<group>"; };
+		104DC6671647D23FFB03532A /* RemoteThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteThumbnail.swift; sourceTree = "<group>"; };
 		12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepAuth.swift; sourceTree = "<group>"; };
 		130A60B0BF158CAEE0CB1E30 /* ProUpgradeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProUpgradeSheet.swift; sourceTree = "<group>"; };
 		130B694AC7ED3AF581DFAEB1 /* LibraryViewSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewSwitcher.swift; sourceTree = "<group>"; };
@@ -647,6 +649,7 @@
 		25450612C0A547C1E86969AE /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				104DC6671647D23FFB03532A /* RemoteThumbnail.swift */,
 				DD5144A00B0FE56D48BFED3B /* ThumbnailRenderer.swift */,
 				3E381F6622B4D1F0E8B88A50 /* ThumbnailStore.swift */,
 				D7F0C232F29D34C390EAED00 /* URL+ExternalScheme.swift */,
@@ -1439,6 +1442,7 @@
 				DBE85F64A64931D1427EB3B3 /* PrivacyGate.swift in Sources */,
 				D7CFDCF65F3FA907C6C87990 /* PrivacyPreferences2.swift in Sources */,
 				5B4B6E3C65AF66624D3D328D /* PrivacyTierRadioGroup.swift in Sources */,
+				8F3C474B398803948710AE4F /* RemoteThumbnail.swift in Sources */,
 				A18F996918674D38830D05D8 /* RenameSheet.swift in Sources */,
 				DB96EB8FBA87155B22F9E247 /* ReversibleChange.swift in Sources */,
 				C5951D47684AA02FD27B0BCA /* ScrollRowEdgeFade.swift in Sources */,

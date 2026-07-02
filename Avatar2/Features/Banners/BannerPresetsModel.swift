@@ -49,16 +49,10 @@ final class BannerPresetsModel {
     /// Banners-tab/home niet terugvalt op de fallback. Leeg = nog niet geladen.
     private static var sessionCache: [BannerPresetItem] = []
 
-    /// Gedeelde thumbnail-cache (key = preview-URL), zoals EffectsModel.
-    private static let imageCache = NSCache<NSURL, NSImage>()
-
     /// De getoonde presets: start op de sessie-cache als die al gevuld is,
     /// anders op de lokale fallback.
     private(set) var presets: [BannerPresetItem] =
         BannerPresetsModel.sessionCache.isEmpty ? BannerPresetItem.fallback : BannerPresetsModel.sessionCache
-
-    /// Loopt op telkens een thumbnail in de cache belandt → view herrendert.
-    private(set) var thumbnailVersion = 0
 
     private let backend: BackendClient
 
@@ -67,14 +61,16 @@ final class BannerPresetsModel {
     /// CMS-presets laden; soft-fail → behoud de fallback (zoals
     /// `EffectsModel.loadEffects`). Een preset waarvan `config` niet naar
     /// `BannerLayers` decodeert, wordt overgeslagen i.p.v. de hele lijst te laten
-    /// vallen.
+    /// vallen. E52.1: thumbnails via de gedeelde `ThumbnailCache` (memory + disk
+    /// + downsampled decode); de kaarten renderen via `RemoteThumbnail`, dus de
+    /// eigen NSCache/thumbnailVersion-boekhouding is vervallen.
     func load() async {
         let remote = (try? await backend.bannerPresets()) ?? []
         let items = remote.compactMap(Self.item(from:))
         guard !items.isEmpty else { return }
         BannerPresetsModel.sessionCache = items
         presets = items
-        prefetchThumbnails(for: items)
+        ThumbnailCache.shared.prefetch(items.compactMap(\.thumbnailURL))
     }
 
     /// Decodeert de opake CMS-`config`-JSON naar de app's `BannerLayers`.
@@ -83,30 +79,5 @@ final class BannerPresetsModel {
               let layers = try? JSONDecoder().decode(BannerLayers.self, from: json)
         else { return nil }
         return BannerPresetItem(id: remote.key, label: remote.label, layers: layers, thumbnailURL: remote.thumbnailUrl)
-    }
-
-    func cachedThumbnail(for item: BannerPresetItem) -> NSImage? {
-        guard let url = item.thumbnailURL else { return nil }
-        return BannerPresetsModel.imageCache.object(forKey: url as NSURL)
-    }
-
-    /// Downloadt preview-URLs op de achtergrond en cachet ze; elke hit bumpt
-    /// `thumbnailVersion` zodat de view herrendert.
-    private func prefetchThumbnails(for items: [BannerPresetItem]) {
-        let urls = items.compactMap(\.thumbnailURL)
-            .filter { BannerPresetsModel.imageCache.object(forKey: $0 as NSURL) == nil }
-        guard !urls.isEmpty else { return }
-        Task.detached(priority: .utility) { [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                for url in urls {
-                    group.addTask {
-                        guard let (data, _) = try? await URLSession.shared.data(from: url),
-                              let image = NSImage(data: data) else { return }
-                        BannerPresetsModel.imageCache.setObject(image, forKey: url as NSURL)
-                        await MainActor.run { self?.thumbnailVersion += 1 }
-                    }
-                }
-            }
-        }
     }
 }
