@@ -369,13 +369,6 @@ struct BackgroundPanel: View {
 
     // MARK: Banners-rij (E40.1/E40.2) — een gemaakte banner als portret-achtergrond
 
-    /// Stabiele sleutel voor een banner (encoded `PersistentIdentifier`), zodat
-    /// E40.2 een portret aan z'n bron-banner kan koppelen, ook nadat de banner
-    /// (en dus z'n bytes) in de Studio wijzigt.
-    private func bannerKey(_ doc: BannerDoc) -> String? {
-        (try? JSONEncoder().encode(doc.persistentModelID))?.base64EncodedString()
-    }
-
     private var bannersRow: some View {
         scrollRow {
             ForEach(savedBanners) { doc in
@@ -383,7 +376,10 @@ struct BackgroundPanel: View {
                     // Gekoppeld = dit portret nam z'n achtergrond van déze banner
                     // (E40.2). Stale = de banner is sindsdien in de Studio gewijzigd
                     // (opgeslagen bytes ≠ huidige preview) → "Update background".
-                    let linked = portrait?.backgroundBannerID != nil && portrait?.backgroundBannerID == bannerKey(doc)
+                    // Vergelijk via BannerDeletion.isLinked (gedecodeerde
+                    // PersistentIdentifier) — de encoded sleutel-string zelf is
+                    // niet byte-stabiel (E46-les), dus nooit string == string.
+                    let linked = BannerDeletion.isLinked(portrait?.backgroundBannerID, to: doc)
                     let isCurrent = linked || portrait?.backgroundImageData == data
                     let isStale = linked && portrait?.backgroundImageData != data
                     Button { applyBanner(doc) } label: {
@@ -432,7 +428,7 @@ struct BackgroundPanel: View {
     private func applyBanner(_ doc: BannerDoc) {
         guard let data = doc.previewImageData else { return }
         apply(.image(data))
-        if onApply == nil { portrait?.backgroundBannerID = bannerKey(doc) }
+        if onApply == nil { portrait?.backgroundBannerID = BannerDeletion.linkKey(for: doc) }
     }
 
     // MARK: Acties
