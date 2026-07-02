@@ -104,9 +104,50 @@ final class OnboardingModelTests: XCTestCase {
         XCTAssertTrue(revived.hasCompleted)
     }
 
-    func testFinishSignedInMarksCompleted() {
+    // MARK: ingelogd pad (E04.8 — audit B4)
+
+    // Sign-in mídden in de flow (verifyCode flipt isSignedIn in hetzelfde
+    // frame als step = .privacy) mag de flow niet unmounten: privacy en
+    // download moeten óók in het ingelogde pad verschijnen.
+    func testSignInMidFlowKeepsOnboardingActiveThroughPrivacyAndDownload() {
         let (model, _) = makeModel()
-        model.finishSignedIn()
+        model.advanceFromSplash()
+        // Simuleer de eager-flip van AuthService.verifyCode.
+        model.auth.debugSetSession(accessToken: "token", email: "t@sq.nl")
+        model.skipOnboarding() // zelfde landing als verifyCode: step = .privacy
+        XCTAssertEqual(model.step, .privacy)
+        XCTAssertTrue(model.isActive, "ingelogd mídden in de flow → flow blijft gemount")
+        model.finishFromPrivacy()
+        XCTAssertEqual(model.step, .download)
+        XCTAssertTrue(model.isActive)
+        model.finishFromDownload()
         XCTAssertTrue(model.hasCompleted)
+        XCTAssertFalse(model.isActive)
+    }
+
+    // Een uit de Keychain herstelde sessie (flow nog op splash) slaat de
+    // onboarding wél over — dat gedrag moet blijven.
+    func testRestoredSessionAtSplashSkipsOnboarding() {
+        let (model, _) = makeModel()
+        XCTAssertEqual(model.step, .splash)
+        model.auth.debugSetSession(accessToken: "restored-token")
+        XCTAssertFalse(model.isActive)
+    }
+
+    // Sign-out: als de onboarding daarna weer actief wordt, begint die op
+    // splash met schone invoer — niet op een verweesde tussenstap.
+    func testResetToSplashReturnsToSplashWithCleanState() {
+        let (model, _) = makeModel()
+        model.advanceFromSplash()
+        model.emailInput = "t@sq.nl"
+        model.otpCode = "123456"
+        model.skipOnboarding()
+        XCTAssertEqual(model.step, .privacy)
+        model.resetToSplash()
+        XCTAssertEqual(model.step, .splash)
+        XCTAssertEqual(model.emailInput, "")
+        XCTAssertEqual(model.otpCode, "")
+        XCTAssertFalse(model.didResendCode)
+        XCTAssertTrue(model.isActive, "niet afgerond + uitgelogd → flow actief op splash")
     }
 }

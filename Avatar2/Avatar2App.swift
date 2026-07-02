@@ -112,7 +112,14 @@ struct Avatar2App: App {
             // features vielen in de paywall. Her-fetch het account zodra het token
             // er is (isSignedIn flipt) zodat Pro/credits kloppen.
             .onChange(of: entitlement.isSignedIn) { _, signedIn in
-                if signedIn { Task { await entitlement.refresh() } }
+                if signedIn {
+                    Task { await entitlement.refresh() }
+                } else {
+                    // E04.8: sign-out → als de onboarding weer actief wordt
+                    // (hasCompleted == false), begint die op splash i.p.v.
+                    // een verweesde tussenstap.
+                    onboarding.resetToSplash()
+                }
             }
             // E17.5: in-app bericht-sheet (overlay → geen layoutshift).
             .overlay { messageOverlay }

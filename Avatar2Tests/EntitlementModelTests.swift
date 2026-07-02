@@ -223,10 +223,11 @@ final class EntitlementModelTests: XCTestCase {
 
         let upcoming = try? XCTUnwrap(model.upcomingMonthlyResetAt)
         XCTAssertNotNil(upcoming)
-        // ISO8601-roundtrip kapt subseconden af — vergelijk op de seconde.
+        // ISO8601-roundtrip kapt subseconden af (truncatie, geen afronding) —
+        // trunceer dus beide kanten; .rounded() flakete bij fractie ≥ 0.5.
         XCTAssertEqual(
-            upcoming.map { $0.timeIntervalSince1970.rounded() },
-            future.timeIntervalSince1970.rounded()
+            upcoming.map { $0.timeIntervalSince1970.rounded(.down) },
+            future.timeIntervalSince1970.rounded(.down)
         )
     }
 
