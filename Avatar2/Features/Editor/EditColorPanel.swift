@@ -74,7 +74,17 @@ struct EditColorPanel: View {
     var showRemoveBackground: Bool = false
     /// E24.3: in de Adjust-popover staat de AI-dropdown apart (canvas-toolbar),
     /// dus dan tonen we alléén de sliders + Reset.
+    /// E29.5 (audit C6): dit gate ALLEEN de vijf AI-één-tik-chips (Studio Light/
+    /// Portrait/Colorise/Boost/Restore body) — de board-call-sites zetten 'm op
+    /// `false` omdat ze die closures niet bedraden (default-leeg = dode chips);
+    /// `showRetouch`/`showRemoveBackground` houden hun eigen chip zichtbaar.
     var showAutoEnhance: Bool = true
+
+    /// E29.5: de chip-rij rendert zodra er minstens één ECHT bedrade chip is —
+    /// nooit meer een rij met alleen dode default-closures.
+    private var showsQuickActions: Bool {
+        showAutoEnhance || showRetouch || showRemoveBackground || showAppleEdit
+    }
 
     // E41.2: Boost-/Remove background-modus-dropdown (lokaal/online) + onthouden
     // laatste keuze. Welk menu open is wordt buiten de scroll-rij gerenderd (zie
@@ -152,18 +162,20 @@ struct EditColorPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             // E24.27: één-tik AI-acties bovenin als compacte DS-chips (Pro/credit
             // waar van toepassing) → divider → de manuele sliders eronder.
-            if showAutoEnhance {
+            if showsQuickActions {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DSSpacing.gap2) {
                             if showRetouch {
                                 quickAction("One click retouch", icon: "wand.and.stars", isOn: retouchOn, action: onRetouch)
                             }
-                            quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
-                            quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
-                            quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
-                            boostMenuChip
-                            quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                            if showAutoEnhance {
+                                quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
+                                quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
+                                quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                                boostMenuChip
+                                quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                            }
                             if showRemoveBackground {
                                 removeBackgroundMenuChip
                             }

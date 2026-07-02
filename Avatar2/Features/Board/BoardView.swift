@@ -847,7 +847,11 @@ struct BoardView: View {
                     EditColorPanel(
                         source: img,
                         initial: first.adjust,
-                        onCommit: { _, after in applyAdjustToAll(after) }
+                        onCommit: { _, after in applyAdjustToAll(after) },
+                        // E29.5 (audit C6): de AI-één-tik-chips zijn hier niet
+                        // bedraad (default-lege closures = dode chips) → uit.
+                        // Batch-Adjust = alleen de sliders.
+                        showAutoEnhance: false
                     )
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
@@ -1201,7 +1205,14 @@ struct BoardView: View {
                             initial: node.adjust,
                             onCommit: { _, after in applyAdjustToAll(after) },
                             onRetouch: { retouchNode(node) },
-                            showRetouch: true
+                            showRetouch: true,
+                            // E29.5 (audit C6): Studio Light/Portrait/Colorise/
+                            // Boost/Restore body zijn op de board niet bedraad
+                            // (default-lege closures) → verberg ze; alleen de
+                            // wél-werkende retouch-chip + sliders blijven. Echt
+                            // bedraden kan pas met de gedeelde apply/undo/gate-
+                            // service (editor+board) — zie de story-Result.
+                            showAutoEnhance: false
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,

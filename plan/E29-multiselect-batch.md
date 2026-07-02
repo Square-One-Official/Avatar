@@ -120,7 +120,7 @@ Bijvangst: flaky `EntitlementModelTests.testMonthlyResetInFutureIsUpcoming` gede
 (ISO8601 trunceert subseconden → `rounded(.down)` i.p.v. `rounded()`; was 1-op-3 rood).
 
 ## 29.5 — Board-panelen: dode chips + gedeelde kwaliteitsgate [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -140,3 +140,19 @@ echt bedraden; op termijn één gedeelde apply/undo/gate-service die editor én 
 injecteren i.p.v. twee parallelle implementaties.
 **DoD:** beide targets bouwen; geen chip op de board doet meer niets bij een klik;
 tests groen; Result-regel.
+
+**Result:** beide board-call-sites zetten nu expliciet `showAutoEnhance: false`. In
+`EditColorPanel` gate die vlag voortaan ALLEEN de vijf onbedrade AI-één-tik-chips
+(Studio Light/Portrait/Colorise/Boost/Restore body); de chip-rij zelf rendert op het
+nieuwe `showsQuickActions` (`showAutoEnhance || showRetouch || showRemoveBackground ||
+showAppleEdit`) — zo blijft op de board-single-select de wél-bedrade "One click
+retouch"-chip (`retouchNode`) staan terwijl de dode chips verdwijnen; de batch-Adjust
+toont alleen nog de sliders + Reset. Editor-call-site ongewijzigd (alles expliciet
+bedraad). **Bewust niet in deze story:** de `StylizeQualityCoordinator`-injectie op de
+board-panelen (Effects/Hair/Clothes/Face) — de gates hangen aan editor-hooks
+(`onBoostCutout`/pre-gate-sheet) die de board niet heeft; dat hoort bij de "één
+gedeelde apply/undo/gate-service voor editor én board" uit het voorstel (aparte
+follow-up-story, samen met het `applyToNode`/`undoableApplyToNode`-duplicaat).
+
+**DoD/Verificatie:** Avatar (v1) + Avatar2 bouwen; `xcodebuild test -scheme Avatar2`
+100/100 groen; `swift test` AvatarKit 89 + AvatarUI 37 groen.
