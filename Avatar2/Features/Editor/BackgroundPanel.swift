@@ -1,11 +1,14 @@
-// Background-paneel (E07.1, Figma App / Choose Background 4017:1099).
-// UX-audit 2026-07: bovenaan een gelabelde modus-rij (Original / None, met
-// checkerboard voor transparant), daaronder "Image" (upload + eigen uploads +
-// gradient-presets, 56pt-tegels) met een op-zichzelf-staande "Generate
-// background"-knop, dan de CMS-categorieën en "Color" (36pt-rondjes + brand
-// colors + DSColorPicker). Een keuze schrijft op het Portrait2 (kleur xor
-// afbeelding); het canvas toont de achtergrond live (E07.2 doet de
-// exportkwaliteit-compositing). Elke kiesbare tegel toont zijn selected-state.
+// Background-paneel (E07.1) — Notion-cover-picker-model (besluit Thierry,
+// 2026-07-03): een tab-header (Gallery · Upload · Generate, "Remove" rechts)
+// boven een verticaal scrollend grid met sectiekoppen en brede 16:10-tegels.
+//   - Gallery: Original (als de foto bewaard is) → Color & Gradient (picker,
+//     DS-kleuren, brand colors, gradient-presets) → CMS-categorieën.
+//   - Upload: "+"-tegel + de persistente eigen uploads (E24.24).
+//   - Generate: entrypoint naar de E42-generatie-sheet (Notion AI-equivalent).
+//   - Remove: de vrijstaande cutout zonder achtergrond (E24.31-"None").
+// Een keuze schrijft op het Portrait2 (kleur xor afbeelding); het canvas toont
+// de achtergrond live (E07.2 doet de exportkwaliteit-compositing). Elke tegel
+// toont zijn selected-state.
 
 import AppKit
 import AvatarKit
@@ -29,10 +32,13 @@ struct BackgroundPanel: View {
     /// editor en het board doen dat niet.
     var showsBanners: Bool = false
 
+    private enum PickerTab: Hashable { case gallery, upload, generate }
+    @State private var tab: PickerTab = .gallery
+
     @State private var brand = BrandColorKit.shared
-    // E24.24: persistente custom-achtergrond-uploads (herbruikbare swatches).
+    // E24.24: persistente custom-achtergrond-uploads (herbruikbare tegels).
     @State private var customImages = BackgroundImageKit.shared
-    // E25.2: DSColorPicker vanuit de "+"-knop in de Color-rij.
+    // E25.2: DSColorPicker vanuit de "+"-tegel in Color & Gradient.
     @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
     // CMS-achtergronden (E33+). Sessie-cache zodat herhaalbaar openen
@@ -57,56 +63,270 @@ struct BackgroundPanel: View {
     // opgeslagen PNG, één keer per id berekend (scheelt disk-reads per render).
     private static var customImageSignatures: [String: Int] = [:]
 
-    /// Beeld-tegels (Original/None, uploads, gradients, CMS): groot genoeg om
-    /// de inhoud te beoordelen. Kleuren blijven 36 — het maatverschil
-    /// communiceert meteen het type.
-    private let imageTile: CGFloat = 56
-    private let colorSwatch: CGFloat = 36
+    /// Brede Notion-achtige tegels: 3 kolommen, 16:10.
+    private let gridColumns = Array(
+        repeating: GridItem(.flexible(), spacing: DSSpacing.gap2),
+        count: 3
+    )
+    private let tileAspect: CGFloat = 16.0 / 10.0
+    /// Vaste content-hoogte zodat het paneel niet verspringt bij tab-wissel
+    /// (zelfde geest als de pixelvaste breadcrumb, UXS-28).
+    private let contentHeight: CGFloat = 340
+
+    private var showsGenerateTab: Bool {
+        entitlement != nil && BackgroundGenerationCatalog.hasGenerationPath
+    }
 
     var body: some View {
         // E24-fix: in de canvas-toolbar-popover tonen we de inhoud direct
         // (zoals de Adjust-popover), niet in een tweede DSEditPanel-kaart —
-        // de popover ís de kaart. Rijen scrollen met rand-inset + fade.
-        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            // Modus-rij zonder sectiekop: de tegels dragen hun eigen label
-            // (Original / None) — een kop "Background" ín het Background-
-            // paneel voegde niets toe.
-            backgroundModeRow
-            section("Image") { imageSection }
-            if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
-                section("Banners") { bannersRow }
+        // de popover ís de kaart.
+        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+            header
+            switch tab {
+            case .gallery: galleryTab
+            case .upload: uploadTab
+            case .generate: generateTab
             }
-            ForEach(cmsCategories, id: \.self) { cat in
-                section(cat) { cmsRow(for: cat) }
-            }
-            section("Color") { colorRow }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await loadCMSBackgrounds() }
     }
 
-    private var cmsCategories: [String] {
-        var seen = Set<String>()
-        return cmsBackgrounds.compactMap { seen.insert($0.category).inserted ? $0.category : nil }
+    // MARK: Header — tabs links, Remove rechts (Notion-model)
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .bottom, spacing: DSSpacing.gap4) {
+                tabButton("Gallery", .gallery)
+                tabButton("Upload", .upload)
+                if showsGenerateTab { tabButton("Generate", .generate) }
+                Spacer()
+                Button { selectTransparent() } label: {
+                    Text("Remove")
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .padding(.bottom, DSSpacing.gap2)
+                }
+                .buttonStyle(.plain)
+                .help("Remove the background (transparent cut-out)")
+            }
+            Rectangle()
+                .fill(DSColor.Foreground.divider)
+                .frame(height: DSBorderWidth.thin)
+        }
     }
 
-    private func loadCMSBackgrounds() async {
-        guard let backend = entitlement?.backend else { return }
-        async let bgFetch = backend.backgrounds()
-        async let configFetch = backend.appConfig()
-        let fetched = (try? await bgFetch) ?? []
-        if !fetched.isEmpty {
-            BackgroundPanel.sessionCache = fetched
-            cmsBackgrounds = fetched
-            // E52.1: warm de gedeelde thumbnail-cache (memory + disk) zodat de
-            // swatches vullen terwijl het paneel opent; her-opens zijn instant.
-            ThumbnailCache.shared.prefetch(fetched.map(\.thumbnailUrl))
+    /// Tab-knop met Notion-achtige actieve underline die op de divider ligt.
+    private func tabButton(_ title: String, _ value: PickerTab) -> some View {
+        let isActive = tab == value
+        return Button { tab = value } label: {
+            Text(title)
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(isActive ? DSColor.Foreground.primary
+                                          : DSColor.Foreground.muted)
+                .padding(.bottom, DSSpacing.gap2)
+                .overlay(alignment: .bottom) {
+                    Capsule()
+                        .fill(isActive ? DSColor.Foreground.primary : .clear)
+                        .frame(height: 2)
+                }
         }
-        let config = (try? await configFetch) ?? .empty
-        if !config.gradientPresets.isEmpty {
-            BackgroundPanel.gradientCache = config.gradientPresets
-            cmsGradients = config.gradientPresets
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Gallery-tab — Original · Color & Gradient · CMS-categorieën
+
+    private var galleryTab: some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                if let original = originalImage {
+                    gridSection("Original") {
+                        tile(isSelected: portrait?.useOriginalBackground == true) {
+                            Image(nsImage: original).resizable().scaledToFill()
+                        } action: { selectOriginal() }
+                        .help("Show the original photo background")
+                    }
+                }
+                gridSection("Color & Gradient") { colorAndGradientTiles }
+                if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
+                    gridSection("Banners") { bannerTiles }
+                }
+                ForEach(cmsCategories, id: \.self) { cat in
+                    gridSection(cat) { cmsTiles(for: cat) }
+                }
+            }
+            .padding(DSSpacing.gap1)
         }
+        .frame(height: contentHeight)
+    }
+
+    @ViewBuilder
+    private var colorAndGradientTiles: some View {
+        // E25.2: "+"-tegel opent de DSColorPicker (met eigen eyedropper); live
+        // bijwerken terwijl de picker open is, bij sluiten als brand-swatch
+        // bewaren.
+        tile(isSelected: false) {
+            Image(systemName: "plus")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.subtle)
+        } action: {
+            if let hex = portrait?.backgroundColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
+            showColorPicker = true
+        }
+        .help("Pick a colour")
+        .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+            DSColorPicker(color: $pickerColor, supportsAlpha: false)
+                .appliedAppearancePreference()
+        }
+        .onChange(of: pickerColor) { _, c in
+            guard showColorPicker, let hex = c.hexRGB else { return }
+            selectColor(hex)
+        }
+        .onChange(of: showColorPicker) { _, open in
+            if !open, let hex = pickerColor.hexRGB { brand.add(hex) }
+        }
+
+        ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
+            colorTile(color)
+        }
+        ForEach(brand.hexColors, id: \.self) { hex in
+            if let color = Color(hexRGB: hex) { colorTile(color, hex: hex) }
+        }
+
+        // Gradient-presets: CMS-gestuurd als aanwezig, anders hardgecodeerde fallback.
+        if cmsGradients.isEmpty {
+            ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
+                gradientTile(colors)
+            }
+        } else {
+            ForEach(cmsGradients, id: \.label) { g in
+                if let from = Color(hexRGB: g.fromHex), let to = Color(hexRGB: g.toHex) {
+                    gradientTile([from, to])
+                }
+            }
+        }
+    }
+
+    private func colorTile(_ color: Color, hex providedHex: String? = nil) -> some View {
+        let hex = providedHex ?? color.hexRGB
+        let isSelected = hex != nil && portrait?.backgroundColorHex == hex
+        return tile(isSelected: isSelected) {
+            Rectangle().fill(color)
+        } action: { if let hex { selectColor(hex) } }
+    }
+
+    private func gradientTile(_ colors: [Color]) -> some View {
+        tile(isSelected: isAppliedSource(gradientKey(colors))) {
+            Rectangle().fill(BackgroundKit.gradient(colors))
+        } action: { selectGradient(colors) }
+    }
+
+    @ViewBuilder
+    private func cmsTiles(for category: String) -> some View {
+        ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
+            tile(isSelected: isAppliedSource(cmsKey(bg))) {
+                // E52.1: gedeelde memory/disk-cache + downsampled decode
+                // i.p.v. AsyncImage (URLCache helpt niet: Supabase stuurt
+                // `Cache-Control: no-cache`).
+                RemoteThumbnail(url: bg.thumbnailUrl) {
+                    Color(white: 0.85)
+                }
+            } action: { selectCMSBackground(bg) }
+            .help(bg.label)
+        }
+    }
+
+    // MARK: Upload-tab — "+" + persistente eigen uploads (E24.24)
+
+    private var uploadTab: some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                gridSection("Your images") {
+                    tile(isSelected: false) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    } action: { uploadCustom() }
+                    .help("Upload an image")
+
+                    ForEach(customImages.imageIDs, id: \.self) { id in
+                        if let image = customImages.image(for: id) {
+                            tile(
+                                isSelected: currentImageSignature != nil
+                                    && currentImageSignature == customSignature(id)
+                            ) {
+                                Image(nsImage: image).resizable().scaledToFill()
+                            } action: { selectCustomImage(id) }
+                        }
+                    }
+                }
+            }
+            .padding(DSSpacing.gap1)
+        }
+        .frame(height: contentHeight)
+    }
+
+    // MARK: Generate-tab — entrypoint naar de E42-sheet (Notion AI-equivalent)
+
+    private var generateTab: some View {
+        VStack(spacing: DSSpacing.gap4) {
+            Spacer()
+            DSIcon(.sparkle, size: 28)
+            Text("Generate a custom background with AI based on your description")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DSSpacing.gap6)
+            GenerateBackgroundButton(
+                context: .portrait,
+                entitlement: entitlement,
+                onSaved: { data in
+                    // Bewaren als herbruikbare upload-tegel + meteen toepassen.
+                    let stored = customImages.add(data) ?? data
+                    apply(.image(stored))
+                }
+            )
+            .padding(.horizontal, DSSpacing.gap8)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: contentHeight)
+    }
+
+    // MARK: Grid-bouwstenen
+
+    @ViewBuilder
+    private func gridSection(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            Text(title)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+            LazyVGrid(columns: gridColumns, spacing: DSSpacing.gap2) {
+                content()
+            }
+        }
+    }
+
+    /// Gedeelde brede tegel (16:10, Notion-model) met een consistente
+    /// 2pt selected-rand voor alle bronnen (kleur, gradient, CMS, upload).
+    private func tile(
+        isSelected: Bool,
+        @ViewBuilder content: () -> some View, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            RoundedRectangle(cornerRadius: DSRadius.lg)
+                .fill(DSColor.Background.neutral)
+                .aspectRatio(tileAspect, contentMode: .fit)
+                .overlay { content() }
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                .overlay {
+                    RoundedRectangle(cornerRadius: DSRadius.lg)
+                        .strokeBorder(DSColor.Foreground.primary, lineWidth: isSelected ? 2 : 0)
+                }
+        }
+        .buttonStyle(.plain)
+        .dsHoverScale()
     }
 
     // MARK: Selectie-state
@@ -143,26 +363,29 @@ struct BackgroundPanel: View {
         "cms:" + bg.imageUrl.absoluteString
     }
 
-    // MARK: CMS-rijen
+    // MARK: CMS-data
 
-    @ViewBuilder
-    private func cmsRow(for category: String) -> some View {
-        scrollRow {
-            ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
-                Button { selectCMSBackground(bg) } label: {
-                    imageTileSurface(isSelected: isAppliedSource(cmsKey(bg))) {
-                        // E52.1: gedeelde memory/disk-cache + downsampled
-                        // decode i.p.v. AsyncImage (URLCache helpt niet:
-                        // Supabase stuurt `Cache-Control: no-cache`).
-                        RemoteThumbnail(url: bg.thumbnailUrl) {
-                            Color(white: 0.85)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .dsHoverScale()
-                .help(bg.label)
-            }
+    private var cmsCategories: [String] {
+        var seen = Set<String>()
+        return cmsBackgrounds.compactMap { seen.insert($0.category).inserted ? $0.category : nil }
+    }
+
+    private func loadCMSBackgrounds() async {
+        guard let backend = entitlement?.backend else { return }
+        async let bgFetch = backend.backgrounds()
+        async let configFetch = backend.appConfig()
+        let fetched = (try? await bgFetch) ?? []
+        if !fetched.isEmpty {
+            BackgroundPanel.sessionCache = fetched
+            cmsBackgrounds = fetched
+            // E52.1: warm de gedeelde thumbnail-cache (memory + disk) zodat de
+            // tegels vullen terwijl het paneel opent; her-opens zijn instant.
+            ThumbnailCache.shared.prefetch(fetched.map(\.thumbnailUrl))
+        }
+        let config = (try? await configFetch) ?? .empty
+        if !config.gradientPresets.isEmpty {
+            BackgroundPanel.gradientCache = config.gradientPresets
+            cmsGradients = config.gradientPresets
         }
     }
 
@@ -179,276 +402,35 @@ struct BackgroundPanel: View {
         }
     }
 
-    // MARK: Background-modus — Original + None (E24.31, UX-audit: gelabeld)
+    // MARK: Banners (E40.1/E40.2) — een gemaakte banner als portret-achtergrond
 
     private var originalImage: NSImage? {
         guard let data = portrait?.originalData else { return nil }
         return NSImage(data: data)
     }
 
-    /// Transparant geselecteerd = cutout zonder achtergrond (geen Original,
-    /// geen kleur/afbeelding).
-    private var isTransparentSelected: Bool {
-        guard let portrait else { return false }
-        return !portrait.useOriginalBackground
-            && portrait.backgroundColorHex == nil
-            && portrait.backgroundImageData == nil
-    }
-
-    private var backgroundModeRow: some View {
-        HStack(alignment: .top, spacing: DSSpacing.gap2) {
-            // "Original" — alleen als de originele foto bewaard is.
-            if let original = originalImage {
-                modeTile("Original",
-                         isSelected: portrait?.useOriginalBackground == true,
-                         help: "Show the original photo background") {
-                    Image(nsImage: original).resizable().scaledToFill()
-                } action: { selectOriginal() }
-            }
-            // "None" — de vrijstaande cutout (default). Checkerboard is dé
-            // transparantie-conventie (Photoshop/Figma/PNG-preview).
-            modeTile("None", isSelected: isTransparentSelected,
-                     help: "No background (transparent cut-out)") {
-                TransparencyCheckerboard()
-            } action: { selectTransparent() }
-        }
-        .padding(.vertical, DSSpacing.gap2)
-        .padding(.leading, DSSpacing.gap1)
-    }
-
-    private func modeTile(
-        _ label: String, isSelected: Bool, help: String,
-        @ViewBuilder content: () -> some View, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            VStack(spacing: DSSpacing.gap1) {
-                imageTileSurface(isSelected: isSelected) { content() }
-                Text(label)
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(isSelected ? DSColor.Foreground.primary
-                                                : DSColor.Foreground.muted)
-            }
-        }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-        .help(help)
-    }
-
-    /// Gedeeld tegel-oppervlak voor alle beeld-bronnen: afgeronde tegel met
-    /// een consistente 2pt selected-rand (zelfde taal als de kleur-rondjes).
-    private func imageTileSurface(
-        isSelected: Bool, @ViewBuilder content: () -> some View
-    ) -> some View {
-        RoundedRectangle(cornerRadius: DSRadius.lg)
-            .fill(DSColor.Background.neutral)
-            .frame(width: imageTile, height: imageTile)
-            .overlay { content() }
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-            .overlay {
-                RoundedRectangle(cornerRadius: DSRadius.lg)
-                    .strokeBorder(DSColor.Foreground.primary, lineWidth: isSelected ? 2 : 0)
-            }
-    }
-
-    /// E24-fix: rechter-rand-fade als scroll-affordance + trailing-inset zodat
-    /// geen swatch hard tegen de rand wordt afgesneden. E24.10: verticale +
-    /// leading-padding zodat de hover-scale van een swatch niet wordt afgekapt
-    /// door de scroll-/mask-grens.
-    private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: DSSpacing.gap2) { content() }
-                .padding(.vertical, DSSpacing.gap2)
-                .padding(.leading, DSSpacing.gap1)
-                .scrollRowTrailingInset()
-        }
-        // Gedeeld met de andere editor-panelen (zie ScrollRowEdgeFade).
-        .horizontalScrollEdgeFade()
-    }
-
     @ViewBuilder
-    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text(title)
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-            content()
-        }
-    }
-
-    // MARK: Image-sectie — upload + eigen uploads + gradients + generate-knop
-
-    private var imageSection: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            imageRow
-            // UX-audit: generate is een actie (kost een sheet/credits), geen
-            // kiesbare swatch — dus een gelabelde knop los onder de rij.
-            GenerateBackgroundButton(
-                context: .portrait,
-                entitlement: entitlement,
-                onSaved: { data in
-                    let stored = customImages.add(data) ?? data
-                    apply(.image(stored))
-                }
-            )
-            .padding(.horizontal, DSSpacing.gap1)
-        }
-    }
-
-    private var imageRow: some View {
-        scrollRow {
-            Button(action: uploadCustom) {
-                imageTileSurface(isSelected: false) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                }
-            }
-            .buttonStyle(.plain)
-            .dsHoverScale()
-            .help("Upload an image")
-
-            // E24.24: persistente custom-uploads als herbruikbare swatches.
-            ForEach(customImages.imageIDs, id: \.self) { id in
-                if let image = customImages.image(for: id) {
-                    Button { selectCustomImage(id) } label: {
-                        imageTileSurface(
-                            isSelected: currentImageSignature != nil
-                                && currentImageSignature == customSignature(id)
-                        ) {
-                            Image(nsImage: image)
-                                .resizable()
-                                .scaledToFill()
+    private var bannerTiles: some View {
+        ForEach(savedBanners) { doc in
+            if let data = doc.previewImageData, let img = NSImage(data: data) {
+                // Gekoppeld = dit portret nam z'n achtergrond van déze banner
+                // (E40.2). Stale = de banner is sindsdien in de Studio gewijzigd
+                // (opgeslagen bytes ≠ huidige preview) → "Update background".
+                // Vergelijk via BannerDeletion.isLinked (gedecodeerde
+                // PersistentIdentifier) — de encoded sleutel-string zelf is
+                // niet byte-stabiel (E46-les), dus nooit string == string.
+                let linked = BannerDeletion.isLinked(portrait?.backgroundBannerID, to: doc)
+                let isCurrent = linked || portrait?.backgroundImageData == data
+                let isStale = linked && portrait?.backgroundImageData != data
+                tile(isSelected: isCurrent) {
+                    Image(nsImage: img).resizable().scaledToFill()
+                        .overlay(alignment: .topTrailing) {
+                            if isStale { updateBadge }
                         }
-                    }
-                    .buttonStyle(.plain)
-                    .dsHoverScale()
-                }
-            }
-
-            // Gradient-presets: CMS-gestuurd als aanwezig, anders hardgecodeerde fallback.
-            if cmsGradients.isEmpty {
-                ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
-                    gradientTile(colors)
-                }
-            } else {
-                ForEach(cmsGradients, id: \.label) { g in
-                    if let from = Color(hexRGB: g.fromHex), let to = Color(hexRGB: g.toHex) {
-                        gradientTile([from, to])
-                    }
-                }
-            }
-        }
-    }
-
-    private func gradientTile(_ colors: [Color]) -> some View {
-        Button { selectGradient(colors) } label: {
-            imageTileSurface(isSelected: isAppliedSource(gradientKey(colors))) {
-                Rectangle().fill(BackgroundKit.gradient(colors))
-            }
-        }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-    }
-
-    // MARK: Color-rij — "+" (DSColorPicker) + presets + brand
-
-    private var colorRow: some View {
-        scrollRow {
-            // E25.2: "+"-knop HELEMAAL LINKS opent de DSColorPicker (met eigen
-            // eyedropper). De losse eyedropper-knop is vervallen.
-            Button {
-                if let hex = portrait?.backgroundColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
-                showColorPicker = true
-            } label: {
-                Circle()
-                    .fill(DSColor.Background.neutral)
-                    .frame(width: colorSwatch, height: colorSwatch)
-                    .overlay {
-                        Image(systemName: "plus")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(DSColor.Foreground.subtle)
-                    }
-            }
-            .buttonStyle(.plain)
-            .dsHoverScale()
-            .help("Pick a colour")
-            .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
-                DSColorPicker(color: $pickerColor, supportsAlpha: false)
-                    .appliedAppearancePreference()
-            }
-
-            ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
-                colorSwatchView(color)
-            }
-            ForEach(brand.hexColors, id: \.self) { hex in
-                if let color = Color(hexRGB: hex) { colorSwatchView(color, hex: hex) }
-            }
-        }
-        // E25.2: live de achtergrond bijwerken terwijl de picker open is.
-        .onChange(of: pickerColor) { _, c in
-            guard showColorPicker, let hex = c.hexRGB else { return }
-            selectColor(hex)
-        }
-        // Bij sluiten: de gekozen kleur als persistente brand-swatch bewaren.
-        .onChange(of: showColorPicker) { _, open in
-            if !open, let hex = pickerColor.hexRGB { brand.add(hex) }
-        }
-    }
-
-    private func colorSwatchView(_ color: Color, hex providedHex: String? = nil) -> some View {
-        let hex = providedHex ?? color.hexRGB
-        let isSelected = hex != nil && portrait?.backgroundColorHex == hex
-        return Button { if let hex { selectColor(hex) } } label: {
-            Circle()
-                .fill(color)
-                .frame(width: colorSwatch, height: colorSwatch)
-                .overlay {
-                    Circle().strokeBorder(DSColor.Foreground.primary,
-                                          lineWidth: isSelected ? 2 : 0)
-                }
-        }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-    }
-
-    // MARK: Banners-rij (E40.1/E40.2) — een gemaakte banner als portret-achtergrond
-
-    private var bannersRow: some View {
-        scrollRow {
-            ForEach(savedBanners) { doc in
-                if let data = doc.previewImageData, let img = NSImage(data: data) {
-                    // Gekoppeld = dit portret nam z'n achtergrond van déze banner
-                    // (E40.2). Stale = de banner is sindsdien in de Studio gewijzigd
-                    // (opgeslagen bytes ≠ huidige preview) → "Update background".
-                    // Vergelijk via BannerDeletion.isLinked (gedecodeerde
-                    // PersistentIdentifier) — de encoded sleutel-string zelf is
-                    // niet byte-stabiel (E46-les), dus nooit string == string.
-                    let linked = BannerDeletion.isLinked(portrait?.backgroundBannerID, to: doc)
-                    let isCurrent = linked || portrait?.backgroundImageData == data
-                    let isStale = linked && portrait?.backgroundImageData != data
-                    Button { applyBanner(doc) } label: {
-                        RoundedRectangle(cornerRadius: DSRadius.lg)
-                            .fill(DSColor.Background.neutral)
-                            .frame(width: imageTile * 3, height: imageTile)
-                            .overlay { Image(nsImage: img).resizable().scaledToFill() }
-                            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: DSRadius.lg)
-                                    .strokeBorder(
-                                        isCurrent ? DSColor.Foreground.primary : .clear,
-                                        lineWidth: isCurrent ? 2 : 0
-                                    )
-                            )
-                            .overlay(alignment: .topTrailing) {
-                                if isStale { updateBadge }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .dsHoverScale()
-                    .help(isStale
-                          ? "This banner changed — click to update the background"
-                          : (doc.name.isEmpty ? "Untitled banner" : doc.name))
-                }
+                } action: { applyBanner(doc) }
+                .help(isStale
+                      ? "This banner changed — click to update the background"
+                      : (doc.name.isEmpty ? "Untitled banner" : doc.name))
             }
         }
     }
@@ -488,7 +470,7 @@ struct BackgroundPanel: View {
         apply(.original)
     }
 
-    /// E24.31: terug naar de vrijstaande cutout zonder achtergrond.
+    /// E24.31: terug naar de vrijstaande cutout zonder achtergrond ("Remove").
     private func selectTransparent() {
         apply(.transparent)
     }
@@ -509,38 +491,16 @@ struct BackgroundPanel: View {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url,
               let data = try? Data(contentsOf: url) else { return }
-        // E24.24: persistent opslaan als herbruikbare swatch (+ downscale, 24.23);
+        // E24.24: persistent opslaan als herbruikbare tegel (+ downscale, 24.23);
         // de teruggegeven PNG wordt meteen de achtergrond.
         let stored = customImages.add(data) ?? data
         apply(.image(stored))
     }
 
-    /// E24.24: kies een eerder geüploade (persistente) achtergrond-swatch.
+    /// E24.24: kies een eerder geüploade (persistente) achtergrond-tegel.
     private func selectCustomImage(_ id: String) {
         guard let data = customImages.data(for: id) else { return }
         apply(.image(data))
     }
 
-}
-
-/// Dambord-vlak voor de "None"-tegel — de universele transparantie-conventie
-/// (Photoshop/Figma/PNG-preview) i.p.v. het eerdere `circle.dotted`-icoon.
-private struct TransparencyCheckerboard: View {
-    var body: some View {
-        Canvas { ctx, size in
-            let s: CGFloat = 7
-            var y: CGFloat = 0, row = 0
-            while y < size.height {
-                var x: CGFloat = 0, col = 0
-                while x < size.width {
-                    if (row + col) % 2 == 0 {
-                        ctx.fill(Path(CGRect(x: x, y: y, width: s, height: s)),
-                                 with: .color(.gray.opacity(0.35)))
-                    }
-                    x += s; col += 1
-                }
-                y += s; row += 1
-            }
-        }
-    }
 }
