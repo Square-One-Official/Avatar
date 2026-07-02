@@ -10,9 +10,9 @@
  *     CreditMeter expose per action (E03.7 cloud-glyph).
  *
  * Refs are either a pinned `slug:versionhash` (community models whose
- * unversioned slug 404s on `replicate.run` — BiRefNet, DeOldify) or an
- * unversioned official slug (flux-fill-pro). Upgrading a model = changing
- * one line here.
+ * unversioned slug 404s on `replicate.run` — BiRefNet, DeOldify,
+ * Real-ESRGAN, Crystal Upscaler) or an unversioned official slug
+ * (flux-fill-pro). Upgrading a model = changing one line here.
  *
  * NOTE for E09.1 (bakeoff) / E15.5 (dev model-picker): alternative models
  * register here as extra `models` entries. An alternative must accept the
@@ -133,15 +133,17 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
   // Real-ESRGAN blijft als goedkoop alternatief, nu MÉT face_enhance (zie
   // upscaleInputFor in replicate.ts) zodat ook de fallback gezichten verscherpt.
   //
-  // ⚠️ crystal-upscaler is een community-model → de unversioned slug kan op
-  // replicate.run 404'en (zelfde patroon als birefnet/deoldify). PIN de versie-
-  // hash en verifieer het endpoint op een preview-deploy vóór productie:
+  // crystal-upscaler is een community-model → gepind (E41.3, audit D8), zelfde
+  // patroon als birefnet/deoldify: de unversioned slug kan op replicate.run
+  // 404'en. Nieuwe hash bij een model-upgrade:
   // https://replicate.com/philz1337x/crystal-upscaler/versions
+  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix — een
+  // hash-wissel raakt de payload-vertaling niet.
   upscale: {
     defaultModel: "crystal-upscaler",
     models: {
       "crystal-upscaler": {
-        ref: "philz1337x/crystal-upscaler",
+        ref: "philz1337x/crystal-upscaler:5d917b1444c89ed91055f3052d27e1ad433a1218599a36544510e1dfa9ac26c8",
         label: "Crystal Upscaler (portrait)",
       },
       "real-esrgan": {

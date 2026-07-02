@@ -102,6 +102,16 @@ public final class AuthService {
         lastError = nil
     }
 
+    #if DEBUG
+    /// Test-seam (E04.8): laat unit-tests een sessie simuleren zonder
+    /// Supabase-netwerk — spiegelt alleen de eager-flip van `verifyCode`/
+    /// `signOut`. Alleen in DEBUG-builds aanwezig.
+    public func debugSetSession(accessToken: String?, email: String? = nil) {
+        self.accessToken = accessToken
+        self.email = email
+    }
+    #endif
+
     public func signOut() {
         // Eager-clear, spiegelt de eager-flip in `verifyCode`: de UI reflecteert
         // direct "uitgelogd" i.p.v. te wachten op de async `authStateChanges`-

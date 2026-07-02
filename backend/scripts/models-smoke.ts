@@ -33,4 +33,25 @@ assert.ok(
     return r.requiresCloud && r.credits >= 1 && !!r.models[r.defaultModel];
   }),
 );
+// E41.3 (audit D8): community-modellen MOETEN op een 64-hex versie-hash gepind
+// zijn — een unversioned community-slug kan op replicate.run 404'en. Officiële
+// slugs (google/, openai/, black-forest-labs/, bytedance/) mogen unversioned.
+{
+  const OFFICIAL_OWNERS = ["google", "openai", "black-forest-labs", "bytedance"];
+  const PINNED = /^[a-z0-9_-]+\/[a-z0-9_.-]+:[a-f0-9]{64}$/;
+  for (const f of Object.keys(MODEL_REGISTRY) as Array<keyof typeof MODEL_REGISTRY>) {
+    for (const [key, entry] of Object.entries(MODEL_REGISTRY[f].models)) {
+      const owner = entry.ref.split("/")[0];
+      if (OFFICIAL_OWNERS.includes(owner)) continue;
+      assert.match(
+        entry.ref,
+        PINNED,
+        `community-model ${f}/${key} (${entry.ref}) mist een gepinde versie-hash`,
+      );
+    }
+  }
+  // De Boost-default zelf: crystal-upscaler gepind én prefix intact voor
+  // upscaleInputFor (lib/replicate.ts matcht op het slug-prefix).
+  assert.match(defaultModelRef("upscale"), /^philz1337x\/crystal-upscaler:[a-f0-9]{64}$/);
+}
 console.log("models.ts smoke OK");

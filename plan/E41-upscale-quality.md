@@ -70,7 +70,7 @@ commit-/chat-historie.
   DoD groen.
 
 ## 41.3 — Crystal-upscaler versie-hash pinnen
-- status: ready
+- status: done
 - team: INFRA
 - blockedBy: —
 
@@ -84,3 +84,15 @@ pinnen, net als de andere modellen in de registry; verifiëren op een Vercel
 preview-deploy.
 **DoD:** `/v1/upscale` met crystal-upscaler werkt op een preview-deploy met de
 gepinde hash; Result-regel.
+
+**Result:** `philz1337x/crystal-upscaler` gepind op versie-hash
+`5d917b1444c89ed91055f3052d27e1ad433a1218599a36544510e1dfa9ac26c8` (huidige
+latest op replicate.com/philz1337x/crystal-upscaler, 2026-07-02) in
+`backend/lib/models.ts`; `upscaleInputFor` (lib/replicate.ts) matcht op het
+slug-prefix, dus de `{ image, scale_factor }`-payload blijft intact.
+`scripts/models-smoke.ts` (lokaal, geen netwerk) uitgebreid met een generieke
+guard — élk community-model (niet-officiële owner) moet `slug:64-hex` gepind
+zijn — plus een expliciete check op de Boost-default; smoke OK, `npx tsc
+--noEmit` groen. Verificatie bewust statisch i.p.v. live (Replicate-ratelimit-
+regel: geen echte inference-calls); runtime-verificatie lift mee op de
+eerstvolgende preview/prod-deploy (E43-akkoord loopt).
