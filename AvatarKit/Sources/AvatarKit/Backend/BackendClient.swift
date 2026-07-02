@@ -519,7 +519,15 @@ public final class BackendClient {
         return URLSession(configuration: config)
     }()
 
+    /// Test-seam (E47.1): laat tests de result-download door hun stub-sessie
+    /// leiden. `resultDownloadSession` is bewust privé/statisch (aparte
+    /// niet-gepinde sessie voor *.supabase.co), dus zonder deze haak is
+    /// `generateBackground` niet integraal testbaar. Internal — alleen
+    /// bereikbaar via `@testable import`; blijft `nil` in productie.
+    static var resultDownloadSessionOverride: URLSession?
+
     private static func downloadResultImage(from url: URL) async throws -> Data {
+        let session = resultDownloadSessionOverride ?? resultDownloadSession
         var lastError: Error?
         for attempt in 0..<3 {
             // Honour cooperative cancellation: if the user cancelled the
@@ -532,7 +540,7 @@ public final class BackendClient {
                 try await Task.sleep(nanoseconds: UInt64(attempt) * 400_000_000)
             }
             do {
-                let (data, response) = try await resultDownloadSession.data(from: url)
+                let (data, response) = try await session.data(from: url)
                 guard
                     let http = response as? HTTPURLResponse,
                     (200...299).contains(http.statusCode),

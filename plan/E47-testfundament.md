@@ -12,9 +12,20 @@ Board, SocialPreview, Share hebben **nul** tests.
 ---
 
 ## 47.1 — BackendClient protocol-seam + fixture-decode-tests per endpoint
-- status: ready
+- status: done
 - team: INFRA
 - blockedBy: —
+- Result: URLProtocol-stub als seam (BackendClient's `session`-init-parameter
+  bestond al; enige productiewijziging is de interne
+  `resultDownloadSessionOverride`-testhaak voor de generate-background-
+  result-download). Nieuw: `BackendStubURLProtocol.swift` (routetabel op pad,
+  dekt óók de Storage-PUT van uploadInputPNG) + `BackendClientDecodeTests`
+  met 12 tests: account (incl. dev-unlimited), import-claim (incl. pro-
+  short-circuit), stylize (incl. dimensieloze respons — A2-les), upscale,
+  colorize, generate-background (incl. tweede-hop-download), en de error-
+  mappings 402→noCredits, 403 pro_required→proRequired, 401→unauthorized.
+  Fixtures 1:1 op de 200/402-vormen uit backend/api/v1/*.ts.
+  `swift test` AvatarKit: 71 tests groen.
 
 **Wat:** `BackendClient` is een concrete `final class` zonder protocol-seam →
 niet stub-baar in tests; de enige bestaande test
