@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchActiveEffects } from "../../lib/payload.js";
+import { CMS_LIST_CACHE_CONTROL, fetchActiveEffects, thumbnailVariant } from "../../lib/payload.js";
 
 /**
  * GET /v1/effects (E33)
@@ -28,11 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const effects = await fetchActiveEffects();
+    res.setHeader("Cache-Control", CMS_LIST_CACHE_CONTROL);
     res.status(200).json({
       effects: effects.map((e) => ({
         key: e.key,
         label: e.label,
-        thumbnail_url: e.thumbnailUrl,
+        // E52.1: verkleinde variant voor de 112×152 pt stijl-kaart (@2x → 320 px).
+        thumbnail_url: thumbnailVariant(e.thumbnailUrl, 320),
         order: e.order,
       })),
     });

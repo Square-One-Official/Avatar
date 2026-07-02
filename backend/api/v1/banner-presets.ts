@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchActiveBannerPresets } from "../../lib/payload.js";
+import { CMS_LIST_CACHE_CONTROL, fetchActiveBannerPresets, thumbnailVariant } from "../../lib/payload.js";
 
 /**
  * GET /v1/banner-presets (E39)
@@ -26,12 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const presets = await fetchActiveBannerPresets();
+    res.setHeader("Cache-Control", CMS_LIST_CACHE_CONTROL);
     res.status(200).json({
       banner_presets: presets.map((p) => ({
         key: p.key,
         label: p.label,
         category: p.category,
-        thumbnail_url: p.thumbnailUrl,
+        // E52.1: verkleinde variant voor de 240×80 pt preset-kaart (@2x → 480 px).
+        thumbnail_url: thumbnailVariant(p.thumbnailUrl, 480),
         config: p.config,
         order: p.order,
       })),

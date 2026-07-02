@@ -35,6 +35,43 @@ function payloadBase(): string | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// E52.1 — thumbnail-varianten via Supabase image-transformatie.
+//
+// Media wordt (sinds 837498f) als ORIGINEEL via directe Supabase Storage-URL's
+// geserveerd; panels decodeerden dus full-size bronnen voor ~100–200 pt
+// grid-cellen. Supabase's image-transformation-API levert een verkleinde,
+// CDN-gecachete variant door `/object/public/…` te herschrijven naar
+// `/render/image/public/…?width=…&quality=…` — geen re-upload nodig.
+// Geverifieerd op het productie-project (2026-07-02): 200 OK, geldige JPEG,
+// cf-cache-status HIT op de tweede hit.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrite a Supabase Storage public-object URL into its image-transformation
+ * (thumbnail) variant. Non-Supabase URLs (or URLs that already carry a query)
+ * are returned unchanged so a future CDN swap degrades gracefully.
+ */
+export function thumbnailVariant(
+  url: string | null,
+  width = 320,
+  quality = 75,
+): string | null {
+  if (!url) return null;
+  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)$/);
+  if (!m) return url;
+  return `${m[1]}/render/image/public/${m[2]}?width=${width}&quality=${quality}`;
+}
+
+/**
+ * Shared Cache-Control for the anonymous CMS-list endpoints (E52.1). The
+ * lists change rarely (Thierry seeds content); a 60s browser-cache plus a
+ * 5-minute CDN-cache with stale-while-revalidate keeps panel-opens off the
+ * Payload round-trip without making CMS edits feel laggy.
+ */
+export const CMS_LIST_CACHE_CONTROL =
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+
 /** What the backend needs from one Payload announcement document. */
 export type PayloadAnnouncement = {
   slug: string;
@@ -619,33 +656,39 @@ export async function fetchAppConfig(): Promise<PayloadAppConfig> {
 // wordt NIET geëxporteerd naar de client — alleen /v1/stylize gebruikt hem.
 // ---------------------------------------------------------------------------
 
-export type PayloadHairPreset = { key: string; label: string; prompt: string; order: number };
-export type PayloadClothesPreset = { key: string; label: string; prompt: string; order: number };
-export type PayloadFacePreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadHairPreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+export type PayloadClothesPreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+export type PayloadFacePreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+
+type PresetDoc = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
 
 let hairCache: { expiresAt: number; payload: PayloadHairPreset[] } | null = null;
 let clothesCache: { expiresAt: number; payload: PayloadClothesPreset[] } | null = null;
 let faceCache: { expiresAt: number; payload: PayloadFacePreset[] } | null = null;
 
-function normalizePreset(raw: unknown): { key: string; label: string; prompt: string; order: number } | null {
+function normalizePreset(raw: unknown): PresetDoc | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const key = typeof r.key === "string" ? r.key.trim() : null;
   const prompt = typeof r.prompt === "string" ? r.prompt.trim() : null;
   if (!key || !prompt) return null;
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  // E52.1: optionele CMS-thumbnail (upload-referentie, resolved via depth=1).
+  // Collecties zonder thumbnail-veld leveren gewoon `null` — geen schema-eis.
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, order };
+  return { key, label, prompt, thumbnailUrl, order };
 }
 
 async function fetchPresets(
   slug: string,
   cache: { expiresAt: number; payload: unknown[] } | null,
   setCache: (c: { expiresAt: number; payload: unknown[] }) => void,
-): Promise<Array<{ key: string; label: string; prompt: string; order: number }>> {
+): Promise<PresetDoc[]> {
   const now = Date.now();
   if (cache && cache.expiresAt > now) {
-    return cache.payload as Array<{ key: string; label: string; prompt: string; order: number }>;
+    return cache.payload as PresetDoc[];
   }
   const base = payloadBase();
   if (!base || !PAYLOAD_API_KEY) {
@@ -654,7 +697,8 @@ async function fetchPresets(
   }
   const url = new URL(`${base}/${slug}`);
   url.searchParams.set("limit", "100");
-  url.searchParams.set("depth", "0");
+  // depth=1 (E52.1): resolve een eventuele thumbnail-upload → { url }.
+  url.searchParams.set("depth", "1");
   url.searchParams.set("where[active][equals]", "true");
   url.searchParams.set("sort", "order");
   const res = await fetch(url, {
@@ -666,7 +710,7 @@ async function fetchPresets(
   }
   const json = (await res.json()) as { docs?: unknown[] };
   const docs = Array.isArray(json.docs) ? json.docs : [];
-  const presets = docs.map(normalizePreset).filter((p): p is { key: string; label: string; prompt: string; order: number } => p !== null);
+  const presets = docs.map(normalizePreset).filter((p): p is PresetDoc => p !== null);
   setCache({ expiresAt: now + CACHE_TTL_MS, payload: presets });
   return presets;
 }
