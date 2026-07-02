@@ -17,6 +17,18 @@ toont upload + CMS-backgrounds + presets. Een banner is een wijde PNG → past i
 - owner: FEAT (2026-06-26)
 
 **Result:** [BackgroundPanel](Avatar2/Features/Editor/BackgroundPanel.swift) kreeg een **"Banners"**-sectie (alleen zichtbaar als er ≥1 banner met preview is): wijde tegels van `BannerDoc.previewImageData` → `apply(.image(data))` (undo'baar via het bestaande apply-pad; geselecteerde banner krijgt een ring). Sluit de cirkel — een in de Studio gemaakte banner is herbruikbaar als portret-achtergrond. DoD groen.
+- Result (hardening 2026-07-02, branch `v2/e39-1-e40-1`, E46-les): de linked/isStale-check in
+  `bannersRow` vergeleek de rauwe encoded `PersistentIdentifier`-strings
+  (`backgroundBannerID == bannerKey(doc)`) — maar die JSON-encoding is NIET byte-stabiel, dus een
+  gekoppeld portret kon z'n selectie-ring/"Update"-vaantje stilletjes verliezen. Gefixt op de
+  BannerDeletion-manier: nieuw `BannerDeletion.isLinked(_:to:)` (vergelijkt gedecodeerde
+  `PersistentIdentifier`s via `bannerID(from:)`), `bannersRow` en `applyBanner` gebruiken nu
+  `BannerDeletion.linkKey/isLinked` (de private duplicate `bannerKey(_:)`-encoder is weg — één
+  encode/decode-plek). Regressietest
+  `testIsLinkedVergelijktOpGedecodeerdeIdentiteitNietOpBytes` in
+  [BannerDeletionTests](../Avatar2Tests/BannerDeletionTests.swift) (match op eigen doc, mismatch
+  op andere doc, her-encode van dezelfde identiteit blijft matchen, nil/corrupt koppelt nooit).
+  DoD groen: Avatar + Avatar2 bouwen, Avatar2-tests 120/0, AvatarKit 92/0, AvatarUI 37/0.
 - team: FEAT
 - blockedBy: 37.1
 

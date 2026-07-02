@@ -104,4 +104,33 @@ final class BannerDeletionTests: XCTestCase {
         XCTAssertNil(BannerDeletion.bannerID(from: "geen-base64"))
         XCTAssertNil(BannerDeletion.bannerID(from: Data([1, 2, 3]).base64EncodedString()))
     }
+
+    /// E40.1/E40.2-regressie (E46-les): de linked-check in `BackgroundPanel`
+    /// loopt via `isLinked`, dat op de gedecodeerde `PersistentIdentifier`
+    /// vergelijkt — nooit op de rauwe string, want `JSONEncoder` is niet
+    /// byte-stabiel: een her-encode van dezélfde identiteit kan andere bytes
+    /// opleveren en zou een string-vergelijking stilletjes laten mismatchen.
+    func testIsLinkedVergelijktOpGedecodeerdeIdentiteitNietOpBytes() throws {
+        let context = try makeContext()
+        let a = BannerDoc(name: "A")
+        let b = BannerDoc(name: "B")
+        context.insert(a)
+        context.insert(b)
+        try context.save()
+
+        let keyA = try XCTUnwrap(BannerDeletion.linkKey(for: a))
+        XCTAssertTrue(BannerDeletion.isLinked(keyA, to: a))
+        XCTAssertFalse(BannerDeletion.isLinked(keyA, to: b))
+
+        // Zelfde identiteit, mogelijk andere bytes: een her-encode van de
+        // gedecodeerde ID moet blijven matchen, ongeacht sleutelvolgorde.
+        let decoded = try XCTUnwrap(BannerDeletion.bannerID(from: keyA))
+        let reencoded = try JSONEncoder().encode(decoded).base64EncodedString()
+        XCTAssertTrue(BannerDeletion.isLinked(reencoded, to: a))
+        XCTAssertFalse(BannerDeletion.isLinked(reencoded, to: b))
+
+        // nil/corrupte sleutels koppelen nooit (en crashen nooit).
+        XCTAssertFalse(BannerDeletion.isLinked(nil, to: a))
+        XCTAssertFalse(BannerDeletion.isLinked("geen-base64", to: a))
+    }
 }
