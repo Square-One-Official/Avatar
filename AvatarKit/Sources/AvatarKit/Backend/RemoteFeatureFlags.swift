@@ -32,11 +32,11 @@ public struct RemoteFeatureFlags: Decodable, Sendable {
         self.backgroundsEnabled = backgroundsEnabled
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case effectsEnabled = "effects_enabled"
-        case hairEnabled = "hair_enabled"
-        case clothesEnabled = "clothes_enabled"
-        case faceEnabled = "face_enabled"
-        case backgroundsEnabled = "backgrounds_enabled"
-    }
+    // GEEN expliciete snake_case-CodingKeys hier: BackendClient decodeert al
+    // met `.convertFromSnakeCase`, dus `effects_enabled` → `effectsEnabled`
+    // gebeurt door de decoder. De vorige expliciete keys ("effects_enabled")
+    // werden dáárna nooit meer gematcht — dubbele mapping — waardoor élke
+    // /v1/feature-flags-decode faalde en de app stil op de allEnabled-
+    // fallback bleef hangen (CMS-flags deden dus niets). Gevonden door
+    // EntitlementModelTests.testFeatureFlagsFetchAppliesRemoteValues (E47.2).
 }

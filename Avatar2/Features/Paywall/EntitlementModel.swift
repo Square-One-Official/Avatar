@@ -68,9 +68,13 @@ final class EntitlementModel {
     /// BackendClient houdt `auth` unowned vast; dit model borgt de levensduur.
     private let auth: AuthService
 
-    init(auth: AuthService) {
+    /// `backendSession` is de E47.1-testseam: tests injecteren een
+    /// URLProtocol-stub-sessie zodat elke backend-call stubbaar is. De
+    /// default is exact wat `BackendClient` zelf zou kiezen — geen
+    /// gedragsverandering voor bestaande call sites.
+    init(auth: AuthService, backendSession: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
-        self.backend = BackendClient(auth: auth)
+        self.backend = BackendClient(auth: auth, session: backendSession)
         #if DEBUG
         // Smoke-run-haak (E15.5): zet de dev-vlag vóór de first render i.p.v.
         // in een .task — twee post-render state-writes in hetzelfde frame

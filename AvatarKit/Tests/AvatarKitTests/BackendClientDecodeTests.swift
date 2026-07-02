@@ -237,6 +237,31 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertEqual(result.creditsRemaining, 7)
     }
 
+    // MARK: - GET /v1/feature-flags
+
+    func testFeatureFlagsDecodesBackendShape() async throws {
+        // Vorm uit backend/api/v1/feature-flags.ts. Deze test ving de
+        // dubbele-mapping-bug: expliciete snake_case-CodingKeys bovenop
+        // .convertFromSnakeCase lieten élke decode falen → app bleef stil
+        // op de allEnabled-fallback (fix: E47.2).
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "effects_enabled": true,
+              "hair_enabled": false,
+              "clothes_enabled": true,
+              "face_enabled": false,
+              "backgrounds_enabled": true
+            }
+            """), forPath: "/v1/feature-flags")
+
+        let flags = try await client.featureFlags()
+        XCTAssertTrue(flags.effectsEnabled)
+        XCTAssertFalse(flags.hairEnabled)
+        XCTAssertTrue(flags.clothesEnabled)
+        XCTAssertFalse(flags.faceEnabled)
+        XCTAssertTrue(flags.backgroundsEnabled)
+    }
+
     // MARK: - Error-mapping
 
     func test402MapsToNoCredits() async {
