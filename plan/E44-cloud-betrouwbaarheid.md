@@ -11,7 +11,7 @@ story 2.5 — dat is een engine-bug in `AvatarKit/Engines/`, geen app-laag-fouta
 ---
 
 ## 44.1 — Colorise-timeout te krap + fouttoast te kort zichtbaar
-- status: ready
+- status: done
 - team: INFRA + FEAT
 - blockedBy: —
 
@@ -28,9 +28,16 @@ maken of minimaal ≥ 8s.
 **DoD:** een colorize-call op een grote/trage input faalt niet meer voortijdig; de
 foutmelding (bij een resterende timeout) is minimaal 8s zichtbaar; tests groen;
 Result-regel.
+**Result:** `COLORIZE_TIMEOUT_MS = 80_000` in `backend/lib/replicate.ts` (zelfde
+80s/90s-verhouding als STYLIZE/BACKGROUND) + stale "default ceiling"-comment op de
+50s-default herschreven naar het per-feature-budgetmodel. Client: fout-toast
+auto-dismiss 4s → `EntitlementModel.errorToastDuration` (8s, testbare constante;
+`Avatar2App.swift` leest 'm). Test: `testErrorToastStaysVisibleAtLeastEightSeconds`
+borgt de ondergrens. `tsc --noEmit` OK; AvatarKit 89 + AvatarUI 37 + Avatar2-scheme
+groen. Backend-wijziging NIET gedeployed — lift mee op de volgende deploy.
 
 ## 44.2 — Stille guard-paden na een geslaagde server-call
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -45,6 +52,14 @@ tegelijk kan produceren.
 een kale `return`.
 **DoD:** alle drie de genoemde call-sites hebben een zichtbaar faalpad; tests groen;
 Result-regel.
+**Result:** nieuwe helper `EntitlementModel.presentCloudResultFailure(_:)` =
+`presentError` + `await refresh()` (saldo kan al afgeschreven zijn). Alle drie de
+guard-sites in `EditorView.swift` (Boost `performBoostResolution`, Colorise
+`runColorise`, Fill-in-body `runFillBody`) roepen 'm aan met hun bestaande
+feature-copy i.p.v. een kaal `return`. Tests (stub-sessie, E47-patroon):
+`testPresentCloudResultFailureShowsToastAndRefreshesBalance` +
+`testPresentCloudResultFailureKeepsToastWhenRefreshFails`. Alle suites groen.
+De helper is meteen de kiem voor het 44.3-contract (backlog).
 
 ## 44.3 — Eén presentError-contract voor alle cloud-acties (backlog)
 - status: backlog

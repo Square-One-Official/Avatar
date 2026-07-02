@@ -1273,7 +1273,15 @@ struct EditorView: View {
         }
         do {
             let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
-            guard let after = NSImage(data: data) else { return }
+            guard let after = NSImage(data: data) else {
+                // E44.2: 200 met onbruikbare bytes — de server kan al een
+                // credit hebben afgeschreven. Zichtbare fout + saldo-refresh
+                // i.p.v. een stil return (audit B2).
+                await entitlement.presentCloudResultFailure(
+                    "Couldn't boost the resolution. Please try again."
+                )
+                return
+            }
             await onApplyResult(after)
             ImageEnhanceUndo.register(
                 undoManager, target: portraitModel, apply: onApplyResult,
@@ -1340,7 +1348,13 @@ struct EditorView: View {
             do {
                 let (data, _) = try await entitlement.backend.colorize(imagePNG: png)
                 guard let after = NSImage(data: data) else {
+                    // E44.2: 200 met onbruikbare bytes — mogelijk wél een
+                    // credit afgeschreven. Zichtbare fout + saldo-refresh
+                    // i.p.v. een stil return (audit B2).
                     entitlement.dismissWorkingToast()
+                    await entitlement.presentCloudResultFailure(
+                        "Couldn't colorise this portrait. Please try again."
+                    )
                     return
                 }
                 entitlement.dismissWorkingToast()
@@ -1383,7 +1397,13 @@ struct EditorView: View {
             do {
                 let (data, _) = try await entitlement.backend.fillBody(imagePNG: png)
                 guard let after = NSImage(data: data) else {
+                    // E44.2: 200 met onbruikbare bytes — mogelijk wél credits
+                    // afgeschreven (2 per call). Zichtbare fout + saldo-
+                    // refresh i.p.v. een stil return (audit B2).
                     entitlement.dismissWorkingToast()
+                    await entitlement.presentCloudResultFailure(
+                        "Couldn't fill in the body. Please try again."
+                    )
                     return
                 }
                 entitlement.dismissWorkingToast()

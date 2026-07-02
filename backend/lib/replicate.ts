@@ -6,12 +6,17 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 /**
  * Hard timeout for any single `replicate.run()` call (audit MEDIUM #17).
  * The SDK has no built-in client-side timeout; a hung Replicate prediction
- * would otherwise let the Vercel function run to its 60s `maxDuration`,
+ * would otherwise let the Vercel function run to its `maxDuration`,
  * costing the user a full timeout instead of a clean 504.
  *
- * 50s leaves ~10s of headroom under Vercel's default function ceiling so
- * the handler can still finalise (free-trial counter, response write)
- * after we surface the timeout.
+ * 50s is the DEFAULT budget, sized for the endpoints on a 60s `maxDuration`
+ * (vercel.json: cutout) — ~10s headroom so the handler can still finalise
+ * (free-trial counter, response write) after we surface the timeout.
+ * Features whose model legitimately runs longer get a per-feature budget
+ * instead: `STYLIZE_TIMEOUT_MS`, `BACKGROUND_TIMEOUT_MS` and
+ * `COLORIZE_TIMEOUT_MS` (80s, under their 90s `maxDuration`). E44.1: don't
+ * reuse this default for a slow model — DeOldify cold starts sat right at
+ * the 50s edge and died as silent 504s.
  */
 const REPLICATE_TIMEOUT_MS = 50_000;
 
@@ -197,7 +202,16 @@ export async function outpaintPortrait(input: {
  * The ref (incl. pinned version) lives in MODEL_REGISTRY (lib/models.ts);
  * `model` accepts a whitelisted override ref from `resolveModelOverride`
  * (E01.10) with the same input contract.
+ *
+ * Ruimere timeout dan de 50s-default (E44.1, audit B2): DeOldify op
+ * `render_factor: 35` + een cold start zit geregeld tegen/over de 50s,
+ * waardoor legitieme runs als 504 stierven — geen resultaat, geen credit,
+ * maar ook geen zichtbare fout. vercel.json geeft colorize 90s
+ * `maxDuration`; 80s laat 10s marge voor het afronden van de response
+ * (zelfde verhouding als STYLIZE_TIMEOUT_MS).
  */
+const COLORIZE_TIMEOUT_MS = 80_000;
+
 export async function colorize(input: {
   imageDataUrl: string;
   model?: string | null;
@@ -211,6 +225,7 @@ export async function colorize(input: {
         render_factor: 35,
       },
     }),
+    COLORIZE_TIMEOUT_MS,
   )) as unknown;
 
   return extractUrl(output, "colorize");

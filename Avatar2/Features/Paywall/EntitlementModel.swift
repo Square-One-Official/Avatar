@@ -256,12 +256,31 @@ final class EntitlementModel {
 
     // MARK: - E18.3 fout-toast
 
+    /// E44.1 (audit B2/B3): auto-dismiss-duur van de fout-toast. 4s was
+    /// makkelijk te missen — een gemiste colorise-fout oogde live als "er
+    /// gebeurt niets". Een échte fout moet minimaal 8s leesbaar blijven
+    /// (plan-DoD). Constante hier (niet inline in `Avatar2App`) zodat de
+    /// ondergrens testbaar is.
+    static let errorToastDuration: Duration = .seconds(8)
+
     func presentError(_ message: String) {
         errorToast = message
     }
 
     func dismissErrorToast() {
         errorToast = nil
+    }
+
+    /// E44.2 (audit B2): zichtbaar faalpad voor een geslaagde server-call
+    /// (HTTP 200) waarvan de bytes niet tot een afbeelding decoderen. De
+    /// server kan op dat pad al een credit hebben afgeschreven, dus naast de
+    /// fout-toast hoort er een `refresh()` zodat het saldo in de QuotaBadge
+    /// klopt — het stille `guard … else { return }`-pad produceerde alle
+    /// Colorise-symptomen tegelijk (geen resultaat, geen zichtbare fout,
+    /// saldo lijkt onveranderd terwijl er wél afgeschreven kan zijn).
+    func presentCloudResultFailure(_ message: String) async {
+        presentError(message)
+        await refresh()
     }
 
     func presentWorking(title: String, messages: [String]) {
