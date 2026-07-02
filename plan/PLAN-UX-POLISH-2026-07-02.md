@@ -377,7 +377,7 @@ active blijven onderscheidbaar van hover.
 **Verificatie:** live in de editor; kleursample rust vs hover moet verschillen; grep
 dat geen call site zelf ging compenseren.
 
-### UXS-28 · Breadcrumb pixelvast bij Edit ↔ Preview (UX35) — S/M
+### UXS-28 · Breadcrumb pixelvast bij Edit ↔ Preview (UX35) — S/M — ✅ DONE `4350f62`
 **Waarom:** de breadcrumb verspringt horizontaal bij elke mode-toggle.
 **Root cause (geverifieerd):** `studioFullBleed` (`ShellView.swift:29-34`) is false
 zodra `isShowingSocialPreview`/`isShowingBannerPreview`; daardoor wisselt
@@ -399,7 +399,11 @@ sidebar in-/uitklappen animeert zoals nu; banner-preview idem.
 **Verificatie:** screenshots Edit en Preview over elkaar (pixel-diff op de
 breadcrumb-bbox); zelfde test met sidebar dicht.
 
-### UXS-29 · Traffic lights + toggle ín het sidebar-paneel (UX34) — M
+### UXS-29 · Traffic lights + toggle ín het sidebar-paneel (UX34) — M — ✅ DONE `4350f62`
+*(Implementatie: kaart dokt aan de venstertop met vierkante tophoeken/ronde
+onderhoeken; chrome-strip vanaf y=0; traffic-lights naar native x=20; toggle bleef op
+z'n plek. Bijvangst: DEBUG-smoke-haak `--open-editor` — de kaarten zijn nog niet
+AX-bedienbaar (UX28), dus editor-smokes konden de editor anders niet in.)*
 **Waarom:** met uitgeklapte sidebar zweven de vensterknoppen en de sidebar-toggle in
 een band bóven de afgeronde kaart — oogt als een render-bug (crops
 `…/crops/28-settings-about-tl.png`, `31-light-home-tl.png`).
