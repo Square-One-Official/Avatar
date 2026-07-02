@@ -92,11 +92,21 @@ struct BannerStudioView: View {
             guard let tool else { return }
             autoSelectForTool(tool)
         }
+        // 37.18: document-brede sweep bij openen én verlaten van de Studio —
+        // legacy-documenten (literal-placeholder-lagen van vóór d1ec4e7) en
+        // sessies die via breadcrumb/venster-sluiten eindigen laten geen lege
+        // lagen na. Een sweep die iets verwijdert bumpt `updatedAt` → de
+        // debounced bake (of de onDisappear-bake) herbakt de preview.
+        .onAppear {
+            doc.dropEmptyTextLayers()
+        }
         .onChange(of: doc.persistentModelID) { _, _ in
+            doc.dropEmptyTextLayers()
             applyBannerOpenFit()
         }
         .onDisappear {
             thumbnailBakeTask?.cancel()
+            doc.dropEmptyTextLayers()
             Task { await bakeThumbnail() }
             camera.reset()
         }
@@ -429,23 +439,17 @@ struct BannerStudioView: View {
         textToolbarVisible = false
     }
 
-    /// Ruimt nog-lege/placeholder tekstlagen op (alle geselecteerde) wanneer de
-    /// Text-tool verlaten wordt zonder dat er iets is getypt.
+    /// Ruimt nog-lege/placeholder tekstlagen op wanneer de Text-tool of de
+    /// selectie verlaten wordt zonder dat er iets is getypt. Sinds 37.18
+    /// document-breed (`BannerDoc.dropEmptyTextLayers`) — niet alleen de
+    /// geselecteerde lagen, zodat er nooit lege lagen accumuleren.
     private func finalizeEmptyText() {
-        let emptyIDs = selection.textIDs.filter { id in
-            doc.layers.texts.first(where: { $0.id == id }).map {
-                BannerTextPresets.isEmptyOrPlaceholder($0.string)
-            } ?? false
-        }
-        guard !emptyIDs.isEmpty else { return }
-        let before = doc.layers
-        var layers = doc.layers
-        layers.texts.removeAll { emptyIDs.contains($0.id) }
-        doc.layers = layers
-        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+        guard let change = doc.dropEmptyTextLayers() else { return }
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: change.before, to: change.after, actionName: "Delete text")
+        let removed = Set(change.before.texts.map(\.id)).subtracting(change.after.texts.map(\.id))
         selection = selection.filter { ref in
             guard let id = ref.textID else { return true }
-            return !emptyIDs.contains(id)
+            return !removed.contains(id)
         }
         isEditingText = false
     }

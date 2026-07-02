@@ -70,8 +70,12 @@ enum ShaderCatalog {
         ShaderEffect(key: "dither", displayName: "Dither", functionName: "bannerDither", stage: .color, args: [
             .param(ShaderParam(key: "levels", label: "Levels", range: 2...16, defaultValue: 4)),
         ]),
+        // 37.19: `intensity` (arg-volgorde = Metal-signatuur: scale, intensity)
+        // blendt de stippen over de bron; default 0.6 laat achtergrond/tekst
+        // herkenbaar. Oudere lagen zonder de key vallen terug op de default.
         ShaderEffect(key: "halftone", displayName: "Halftone", functionName: "bannerHalftone", stage: .color, args: [
             .param(ShaderParam(key: "scale", label: "Dot size", range: 4...40, defaultValue: 12)),
+            .param(ShaderParam(key: "intensity", label: "Amount", range: 0...1, defaultValue: 0.6)),
         ]),
         ShaderEffect(key: "lens", displayName: "Lens", functionName: "bannerLens", stage: .distortion, args: [
             .bounds,

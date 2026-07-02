@@ -295,7 +295,8 @@ alleen kleur/gradient; image via canvas. `BannerCanvasSelection.backgroundFill`.
 Huidige implementatie blijft `BannerDoc` + Freeform-chrome op macOS 14+. Geen implementatie tot OS-besluit.
 
 ## 37.17 — Type-to-edit: keystroke-verlies door async first-responder-handoff [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -316,8 +317,23 @@ synchroon first responder (`viewDidMoveToWindow`-override, geen async-hop).
 **DoD:** beide targets bouwen; een keystroke-burst direct na het Text-tool-klikken
 verliest geen tekens; tests groen; Result-regel.
 
+**Result:** beide voorstel-sporen geïmplementeerd (belt-and-braces).
+(1) [BannerInlineTextField](Avatar2/Features/Banners/BannerInlineTextField.swift):
+async `makeFirstResponder`-hop vervangen door een synchrone claim in
+`PlaceholderTextView.viewDidMoveToWindow` (tijdens de render-commit, vóór het
+volgende key-event; caret achteraan of select-all). (2)
+[BannerCanvasTextChrome](Avatar2/Features/Banners/BannerCanvasTextChrome.swift):
+`handleTypeToEdit` buffert toetsen die tijdens de handoff nog in de chrome landen
+(`BannerTypeToEdit.appendToDraft` i.p.v. `.ignored`) en synct de draft direct naar
+de doc-laag (`syncDraftToDoc` — de editor-`onChange` hangt dan nog niet in de
+boom). Besluitlogica als testbaar `BannerTypeToEdit`-enum; 6 nieuwe tests
+([BannerTypeToEditTests](Avatar2Tests/BannerTypeToEditTests.swift)) incl.
+synchrone first-responder-claim zónder runloop-spin. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 97 groen; AvatarKit 86 + AvatarUI 37 groen).
+
 ## 37.18 — Placeholder-tekstlagen: document-brede sweep + herbake [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -345,8 +361,30 @@ weergave.
 Studio-verlaten geen lege lagen na; hit-testing selecteert nooit meer een lege
 placeholder-laag vóór echte content; tests groen; Result-regel.
 
+**Result:** `BannerDoc.dropEmptyTextLayers(keeping:)`
+([BannerDoc.swift](Avatar2/Features/Banners/BannerDoc.swift)) — één document-brede
+sweep met keep-uitzondering en (before, after)-return voor undo; de drie
+selectie-gescopede routines (`BannerStudioView.finalizeEmptyText`,
+`BannerCanvasOverlay.finalizeEmptyTexts`/`cleanupUnselectedEmptyTexts`) zijn
+erop geconsolideerd. Sweep draait nu ook bij Studio-open (`onAppear` +
+doc-switch) én in `onDisappear` vóór `bakeThumbnail` — breadcrumb/venster-sluiten
+laat geen lege lagen meer na (touch() → herbake). Hit-test
+([BannerLayoutMetrics](Avatar2/Features/Banners/BannerLayoutMetrics.swift)):
+échte tekst → logo → lege tekst, dus een placeholder-breed kader dekt content
+nooit meer af. Eenmalige migratie
+([BannerPlaceholderMigration](Avatar2/Features/Banners/BannerPlaceholderMigration.swift),
+UserDefaults-stempel `banners.placeholderLayerSweep.v1`, aangeroepen uit
+BannersGalleryView.task) leegt literal-placeholder-lagen uit ALLE bestaande
+documenten en herbakt hun stale previews. Versie-stempel/`previewBakedAt` op
+BannerDoc bewust overgeslagen (schema-wijziging; de open/close-sweeps + migratie
+dekken de staleness-paden). 8 nieuwe tests
+([BannerPlaceholderSweepTests](Avatar2Tests/BannerPlaceholderSweepTests.swift)).
+DoD groen (Avatar + Avatar2 bouwen; Avatar2Tests 105 groen; AvatarKit 86 +
+AvatarUI 37 groen).
+
 ## 37.19 — Halftone-shader: blend/intensity-parameter [FEAT]
-- status: ready
+- status: done
+- owner: FEAT (2026-07-02)
 - team: FEAT
 - blockedBy: —
 
@@ -362,3 +400,17 @@ achtergrond houden ("ink op source", zoals Figma's halftone). Arg-volgorde in de
 catalogus en de Metal-kernel synchroon houden.
 **DoD:** beide targets bouwen; Halftone op default-instellingen laat de
 achtergrond/tekst herkenbaar; tests groen; Result-regel.
+
+**Result:** `bannerHalftone` ([BannerShaders.metal](Avatar2/Features/Banners/BannerShaders.metal))
+kreeg een `intensity`-arg: het zwart/wit-stippenpatroon wordt met
+`mix(color.rgb, halftone, clamp(intensity, 0, 1))` over de bron geblend — 0 =
+bron ongemoeid, 1 = puur zwart/wit. Catalogus
+([ShaderEffect.swift](Avatar2/Features/Banners/ShaderEffect.swift)): param
+`intensity` ("Amount", 0…1, default 0.6) ná `scale` — arg-volgorde spiegelt de
+Metal-signatuur; oudere persistente lagen (alleen `scale`) vallen via
+`shader(values:)` op de default terug. Slider verschijnt automatisch in
+BannerShaderPanel (params-gedreven). 3 nieuwe tests in
+[ShaderEffectTests](Avatar2Tests/ShaderEffectTests.swift): param-contract,
+pixel-blend (intensity 0 = bron; default houdt bronkleur dominant; 1 =
+kanaal-neutraal zwart/wit) en legacy-laag-compat. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 108 groen; AvatarKit 86 + AvatarUI 37 groen).

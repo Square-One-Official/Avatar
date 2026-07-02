@@ -93,12 +93,17 @@ float luma(half3 rgb) {
 }
 
 // Halftone: zwarte stippen op wit, dichtheid ~ helderheid (krant-look).
-[[stitchable]] half4 bannerHalftone(float2 pos, half4 color, float scale) {
+// 37.19 (audit-B6): `intensity` blendt het stippenpatroon over de bronkleur —
+// 0 = bron ongemoeid, 1 = puur zwart/wit. Zonder blend gooide de kernel de
+// gradient/fill volledig weg en werd tekst onleesbaar (wit banner met stippen).
+[[stitchable]] half4 bannerHalftone(float2 pos, half4 color, float scale, float intensity) {
     float s = max(scale, 2.0);
     float2 g = fract(pos / s) - 0.5;
     float radius = sqrt(max(0.0, 1.0 - luma(color.rgb))) * 0.5;
     half ink = length(g) < radius ? 1.0h : 0.0h;
-    half3 rgb = mix(half3(1.0h), half3(0.0h), ink);
+    half3 halftone = mix(half3(1.0h), half3(0.0h), ink);
+    half t = half(clamp(intensity, 0.0, 1.0));
+    half3 rgb = mix(color.rgb, halftone, t);
     return half4(rgb, color.a);
 }
 

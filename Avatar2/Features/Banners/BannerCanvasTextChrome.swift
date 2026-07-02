@@ -312,17 +312,40 @@ struct BannerCanvasTextChrome: View {
     }
 
     private func handleTypeToEdit(_ press: KeyPress) -> KeyPress.Result {
-        guard !isEditing else { return .ignored }
-        guard !press.modifiers.contains(.command), !press.modifiers.contains(.control) else { return .ignored }
-        let chars = press.characters
-        guard let first = chars.first,
-              first.isLetter || first.isNumber || first.isPunctuation || first.isSymbol || first == " " else {
+        let action = BannerTypeToEdit.action(
+            for: press.characters,
+            hasCommandOrControl: press.modifiers.contains(.command) || press.modifiers.contains(.control),
+            isEditing: isEditing
+        )
+        switch action {
+        case .ignore:
             return .ignored
+        case let .begin(draft):
+            draftString = draft
+            toolbarVisible = true
+            isEditing = true
+            syncDraftToDoc()
+            return .handled
+        case let .appendToDraft(chars):
+            // 37.17 (audit-B6): toets 2+ kan hier nog binnenkomen vóórdat de
+            // inline NSTextView first responder is (de box heeft dan nog focus).
+            // Bufferen in de draft i.p.v. `.ignored` — geen keystroke-verlies.
+            draftString += chars
+            syncDraftToDoc()
+            return .handled
         }
-        draftString = chars
-        toolbarVisible = true
-        isEditing = true
-        return .handled
+    }
+
+    /// Schrijft de live draft naar de doc-laag. Tijdens de first-responder-handoff
+    /// (37.17) hangt de inline editor — en dus z'n `onChange(of: draftString)` —
+    /// nog niet in de boom; zonder deze sync zou een commit direct na het typen
+    /// de gebufferde tekens verliezen.
+    private func syncDraftToDoc() {
+        guard let index = doc.layers.texts.firstIndex(where: { $0.id == layerID }),
+              doc.layers.texts[index].string != draftString else { return }
+        var layers = doc.layers
+        layers.texts[index].string = draftString
+        doc.layers = layers
     }
 
     private func textAlignment(_ alignRaw: Int) -> NSTextAlignment {
@@ -371,5 +394,27 @@ struct BannerCanvasTextChrome: View {
         doc.layers = layers
         BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
         selection.remove(.text(layerID))
+    }
+}
+
+/// 37.17 (audit-B6) — Pure besluitlogica voor type-to-edit op de selectiebox.
+/// Toets 1 start de editor (`begin`); toetsen die daarna nog in de chrome landen
+/// — het gat tot de NSTextView first responder is — worden aan de draft geplakt
+/// (`appendToDraft`) i.p.v. genegeerd. Los getrokken uit de view zodat het
+/// contract unit-testbaar is.
+enum BannerTypeToEdit {
+    enum Action: Equatable {
+        case ignore
+        case begin(draft: String)
+        case appendToDraft(String)
+    }
+
+    static func action(for characters: String, hasCommandOrControl: Bool, isEditing: Bool) -> Action {
+        guard !hasCommandOrControl else { return .ignore }
+        guard let first = characters.first,
+              first.isLetter || first.isNumber || first.isPunctuation || first.isSymbol || first == " " else {
+            return .ignore
+        }
+        return isEditing ? .appendToDraft(characters) : .begin(draft: characters)
     }
 }

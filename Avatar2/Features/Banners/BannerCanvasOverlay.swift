@@ -371,34 +371,21 @@ struct BannerCanvasOverlay: View {
         endDrag()
     }
 
-    /// Verwijdert lege/placeholder tekstlagen die momenteel geselecteerd zijn (bij
-    /// het wisselen van selectie), behalve `keeping`.
+    /// Verwijdert lege/placeholder tekstlagen bij het wisselen van selectie —
+    /// sinds 37.18 document-breed (`BannerDoc.dropEmptyTextLayers`), behalve
+    /// `keeping` (het net aangeklikte element).
     private func finalizeEmptyTexts(keeping: BannerElementRef?) {
-        let keepID = keeping?.textID
-        let toRemove = selection.textIDs.filter { id in
-            id != keepID
-                && (doc.layers.texts.first(where: { $0.id == id }).map { BannerTextPresets.isEmptyOrPlaceholder($0.string) } ?? false)
-        }
-        guard !toRemove.isEmpty else { return }
-        let before = doc.layers
-        var layers = doc.layers
-        layers.texts.removeAll { toRemove.contains($0.id) }
-        doc.layers = layers
-        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+        var keep = Set<UUID>()
+        if let keepID = keeping?.textID { keep.insert(keepID) }
+        guard let change = doc.dropEmptyTextLayers(keeping: keep) else { return }
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: change.before, to: change.after, actionName: "Delete text")
     }
 
-    /// Na een marquee: ruim placeholder-tekstlagen op die NIET geselecteerd zijn
-    /// (bv. een net toegevoegde lege tekst waar de gebruiker omheen sleepte).
+    /// Na een marquee: ruim lege/placeholder-tekstlagen op die NIET geselecteerd
+    /// zijn (bv. een net toegevoegde lege tekst waar de gebruiker omheen sleepte).
     private func cleanupUnselectedEmptyTexts() {
-        let toRemove = doc.layers.texts
-            .filter { !selection.contains(.text($0.id)) && BannerTextPresets.isEmptyOrPlaceholder($0.string) }
-            .map(\.id)
-        guard !toRemove.isEmpty else { return }
-        let before = doc.layers
-        var layers = doc.layers
-        layers.texts.removeAll { toRemove.contains($0.id) }
-        doc.layers = layers
-        BannerDocUndo.registerLayers(undoManager, doc: doc, from: before, to: layers, actionName: "Delete text")
+        guard let change = doc.dropEmptyTextLayers(keeping: Set(selection.textIDs)) else { return }
+        BannerDocUndo.registerLayers(undoManager, doc: doc, from: change.before, to: change.after, actionName: "Delete text")
     }
 
     // MARK: Mutations

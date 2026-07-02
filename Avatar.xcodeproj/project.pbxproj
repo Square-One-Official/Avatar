@@ -101,6 +101,7 @@
 		4D196EDCF34D022689B5109E /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 051B298A2948690FF14EB935 /* OnboardingModel.swift */; };
 		4E0EE3A70A4F2A48E9334B9A /* SignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81677C85F6BBC1623B3AF210 /* SignInSheet.swift */; };
 		4EEF7EBE6FC696C28CCC83EB /* PortraitSetActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499AFD3440A49F0D511B668B /* PortraitSetActions.swift */; };
+		4FD3743A8B3F587FC230891E /* BannerPlaceholderSweepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */; };
 		50B817781B5090A200CE1A51 /* BannerTextFloatingToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8C2D2C00CF4175DA0F1BF9 /* BannerTextFloatingToolbar.swift */; };
 		51481357AD84A6C1F270498B /* PhosphorSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2EA013076753B0525BADB705 /* PhosphorSwift */; };
 		524B6A85C7C4B12BA53B9ED0 /* PillSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */; };
@@ -207,6 +208,7 @@
 		A1D6FAC34EC1F42CBF2F1F97 /* OnboardingOTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA1D618559461FE8CE56E1C /* OnboardingOTPView.swift */; };
 		A1E353BDAA9015DDD351BC85 /* BannerCanvasSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CF904ACC055C13716E64D2 /* BannerCanvasSelection.swift */; };
 		A2C2A0E0C02533145D30943D /* BackgroundGenerationCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AB900A5D43BB7E244E30871 /* BackgroundGenerationCatalog.swift */; };
+		A3F1F43ECAB748C0532B2535 /* BannerPlaceholderMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D92DDFD8511D28A1534D5184 /* BannerPlaceholderMigration.swift */; };
 		A4595011162E8E75689EB453 /* HairNudgeBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCC71547FA68BD97E340BCB /* HairNudgeBanner.swift */; };
 		A467B165881557A4E0CD4FA1 /* PortraitPickerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9089B7FDAD2E88C8C2B1D0EA /* PortraitPickerPanel.swift */; };
 		A4D8BAE9F6A6CCE3F1DDB9FE /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
@@ -299,6 +301,7 @@
 		EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */; };
 		EC7A1D866680F10A21325569 /* AlphaHitTestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 952C9B6AE02D2195F2903AC3 /* AlphaHitTestTests.swift */; };
 		EC8A1EBF5958B99CAC29D58C /* ShellSidebarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE7F2A8D942B0AE34DE7F17 /* ShellSidebarChrome.swift */; };
+		ED2A635DE89916E514EBC5FF /* BannerTypeToEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */; };
 		EDCEBBF69658512E9483D13B /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
 		EF3242B26CABF53CBB9ADB04 /* CanvasActionToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5C01D2E42D529DBA66A8E7 /* CanvasActionToolbar.swift */; };
 		EFC4BDABE456456A7CAF3939 /* StylizeQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82575791940C04DCA96509C9 /* StylizeQualityTests.swift */; };
@@ -359,6 +362,7 @@
 		22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerLogoPanel.swift; sourceTree = "<group>"; };
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
 		2B9319A21481EA22D57BC2DA /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerPlaceholderSweepTests.swift; sourceTree = "<group>"; };
 		2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPreferences.swift; sourceTree = "<group>"; };
 		2DA1D618559461FE8CE56E1C /* OnboardingOTPView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingOTPView.swift; sourceTree = "<group>"; };
 		2DA344343F0EF03C724D5743 /* LibraryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryArchive.swift; sourceTree = "<group>"; };
@@ -494,6 +498,7 @@
 		A7F4BBC106F461A04908F03F /* PrivacyGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyGateTests.swift; sourceTree = "<group>"; };
 		ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTextPanel.swift; sourceTree = "<group>"; };
 		AE3A8D0A82AF96EE53F5E3EE /* BannerCanvasChromeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasChromeMetrics.swift; sourceTree = "<group>"; };
+		B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTypeToEditTests.swift; sourceTree = "<group>"; };
 		B313E53EBD6AC732524D4690 /* ImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
 		B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingStatusView.swift; sourceTree = "<group>"; };
 		B7BCA2980295BDFE9BD1D1C9 /* BannerCanvasOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasOverlay.swift; sourceTree = "<group>"; };
@@ -526,6 +531,7 @@
 		D689B89995FD3E13AC8C9B95 /* AppFeatureFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureFlags.swift; sourceTree = "<group>"; };
 		D7F0C232F29D34C390EAED00 /* URL+ExternalScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ExternalScheme.swift"; sourceTree = "<group>"; };
 		D90DA3703F9048567A6F98A1 /* BannerCanvasBackgroundChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasBackgroundChrome.swift; sourceTree = "<group>"; };
+		D92DDFD8511D28A1534D5184 /* BannerPlaceholderMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerPlaceholderMigration.swift; sourceTree = "<group>"; };
 		DB0C0C9C43AFC1383D6C54E2 /* logo.svg */ = {isa = PBXFileReference; path = logo.svg; sourceTree = "<group>"; };
 		DB27F4466B9F8B7276CA5796 /* AppleIntelligenceAvailabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceAvailabilityTests.swift; sourceTree = "<group>"; };
 		DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnouncementSheet.swift; sourceTree = "<group>"; };
@@ -874,6 +880,8 @@
 				807F74AA9ECC254783BE28B7 /* BannerCanvasChromeMetricsTests.swift */,
 				4D89C17CDCE1497AED107A5A /* BannerDeletionTests.swift */,
 				3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */,
+				2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */,
+				B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */,
 				8E7AC72F7666A3B2D7C935FB /* CanvasScrollScalingTests.swift */,
 				360B7554EDE4CCA44D8752A0 /* EditorCanvasChromeMetricsTests.swift */,
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
@@ -957,6 +965,7 @@
 				22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */,
 				CB769E884515EA6882D0FB2E /* BannerMultiSelectToolbar.swift */,
 				8E9A6408E385E5758E8E0ABD /* BannerNativePanels.swift */,
+				D92DDFD8511D28A1534D5184 /* BannerPlaceholderMigration.swift */,
 				F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */,
 				667E5781D3DD43972DEFF15C /* BannerPreviewView.swift */,
 				8107E7D73B5AE0665817AC7B /* BannersGalleryView.swift */,
@@ -1350,6 +1359,7 @@
 				2B838283E6C8C22441E9345E /* BannerLogoPanel.swift in Sources */,
 				46DEE01208FC59EE824753E7 /* BannerMultiSelectToolbar.swift in Sources */,
 				B2A00A2C86EA8DBD9E2C546A /* BannerNativePanels.swift in Sources */,
+				A3F1F43ECAB748C0532B2535 /* BannerPlaceholderMigration.swift in Sources */,
 				8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */,
 				E3F7A65CBFDADA94915AEAEA /* BannerPreviewView.swift in Sources */,
 				46CBEA767006A962ADCC3C8D /* BannerResolver.swift in Sources */,
@@ -1468,6 +1478,8 @@
 				689F10CA89234488595FB627 /* BannerCanvasChromeMetricsTests.swift in Sources */,
 				DA6A89FA2CCAFABCA2120ED5 /* BannerDeletionTests.swift in Sources */,
 				B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */,
+				4FD3743A8B3F587FC230891E /* BannerPlaceholderSweepTests.swift in Sources */,
+				ED2A635DE89916E514EBC5FF /* BannerTypeToEditTests.swift in Sources */,
 				1112E6591101919CB7257855 /* CanvasScrollScalingTests.swift in Sources */,
 				8513D2AB34581596C0A23037 /* EditorCanvasChromeMetricsTests.swift in Sources */,
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,

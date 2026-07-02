@@ -177,15 +177,16 @@ enum BannerLayoutMetrics {
     /// Hit-test in canvas-pixels (top-left). Tekst boven logo (paint order).
     /// Alleen punten binnen het banner-vlak (0…canvas) tellen mee — anders kan
     /// overflow-tekst klikken buiten de banner onbereikbaar maken voor deselect.
+    /// 37.18 (audit-B6): échte content wint altijd van lege/placeholder-lagen —
+    /// een (nog) lege laag heeft een placeholder-breed kader en mag daarmee nooit
+    /// een echte tekstlaag of het logo afdekken. Volgorde: niet-lege tekst →
+    /// logo → lege tekst (die laatste blijft klikbaar, alleen met laagste prio).
     static func hitTest(at point: CGPoint, doc: BannerDoc, canvas: CGSize) -> BannerElementRef? {
         let canvasBounds = CGRect(origin: .zero, size: canvas)
         guard canvasBounds.contains(point) else { return nil }
         let layers = doc.layers
-        for text in layers.texts.reversed() {
-            let rect = textRect(layer: text, canvas: canvas).insetBy(dx: -8, dy: -8)
-            let visible = rect.intersection(canvasBounds)
-            guard visible.width > 0, visible.height > 0, visible.contains(point) else { continue }
-            return .text(text.id)
+        if let id = hitTestTexts(layers.texts, at: point, canvas: canvas, canvasBounds: canvasBounds, empty: false) {
+            return .text(id)
         }
         if let logo = layers.logo,
            let data = doc.logoImageData,
@@ -194,6 +195,27 @@ enum BannerLayoutMetrics {
             if rect.insetBy(dx: -8, dy: -8).contains(point) {
                 return .logo
             }
+        }
+        if let id = hitTestTexts(layers.texts, at: point, canvas: canvas, canvasBounds: canvasBounds, empty: true) {
+            return .text(id)
+        }
+        return nil
+    }
+
+    /// Eén hit-test-pass over de tekstlagen (bovenste eerst), beperkt tot lege
+    /// (`empty: true`) óf gevulde (`empty: false`) lagen.
+    private static func hitTestTexts(
+        _ texts: [BannerTextLayer],
+        at point: CGPoint,
+        canvas: CGSize,
+        canvasBounds: CGRect,
+        empty: Bool
+    ) -> UUID? {
+        for text in texts.reversed() where BannerTextPresets.isEmptyOrPlaceholder(text.string) == empty {
+            let rect = textRect(layer: text, canvas: canvas).insetBy(dx: -8, dy: -8)
+            let visible = rect.intersection(canvasBounds)
+            guard visible.width > 0, visible.height > 0, visible.contains(point) else { continue }
+            return text.id
         }
         return nil
     }

@@ -56,7 +56,12 @@ struct BannersGalleryView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .onPreferenceChange(BannersHeaderHeightKey.self) { headerHeight = $0 }
-        .task { await presetsModel.load() }
+        .task {
+            // 37.18: eenmalige sweep van legacy placeholder-lagen + herbake
+            // van hun stale previews, vóór de tegels renderen.
+            await BannerPlaceholderMigration.runIfNeeded(context: modelContext)
+            await presetsModel.load()
+        }
         .coordinateSpace(name: Self.contextMenuSpace)
         .overlay { contextMenu }
         .alert("Rename banner", isPresented: Binding(
