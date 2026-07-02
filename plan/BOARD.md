@@ -36,13 +36,13 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
 | [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | **done** (27.1–27.11) |
-| [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.3); **29.4–29.5 ready** (audit-fix: board-selectie, dode chips) |
-| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.7); **31.8 ready** (audit-fix: fill-in-body naming) |
+| [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.5) |
+| [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.8); follow-up: 2 "Restore body"-strings in Settings-matrix → E49 |
 | [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
 | [E34 Social Preview & Banner](E34-social-preview.md) | FEAT+AI+INFRA | **done** (34.1–34.7); 34.8–34.10 AI-generatie backlog |
 | [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
 | [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **done** (36.1–36.5); 36.6 backlog (zoekveld) |
-| [E37 Banner Studio (editor)](E37-banner-studio.md) | FEAT+INFRA+DS | **done** (37.1–37.15); 37.16 PaperKit backlog; **37.17–37.19 ready** (audit-fix: keystroke-verlies, placeholder-lagen, Halftone) — **blocker vóór `bannersEnabled` aan** |
+| [E37 Banner Studio (editor)](E37-banner-studio.md) | FEAT+INFRA+DS | **done** (37.1–37.15, 37.17–37.19); 37.16 PaperKit backlog — **bannersEnabled-blocker opgeheven**, flag-flip = besluit Thierry |
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **38.1 ready**, 38.2–38.4 backlog (Figma-stijl Metal-shaders) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **39.1 ready**, 39.2 backlog |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **40.1 ready**, 40.2 backlog |
