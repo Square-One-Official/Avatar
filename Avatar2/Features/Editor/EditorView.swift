@@ -110,12 +110,12 @@ struct EditorView: View {
     var onApplyResult: (NSImage) async -> Void = { _ in }
     /// Face-edits: bewaart de cutout-alpha als masker i.p.v. Vision opnieuw.
     var onApplyAlphaPreserving: (NSImage) async -> Void = { _ in }
-    /// Remove background / Restore body: het beeld is AL geïsoleerd → direct
-    /// opslaan zonder de her-isolatie-pass van `onApplyResult` (die zou een
+    /// Remove background / Restore to original: het beeld is AL geïsoleerd →
+    /// direct opslaan zonder de her-isolatie-pass van `onApplyResult` (die zou een
     /// al-uitgesneden beeld een tweede keer matten → achtergrond terug in het haar).
     var onApplyIsolated: (NSImage) async -> Void = { _ in }
-    /// Restore body: re-run cutout engine on the original photo; throws so the
-    /// caller can show an error rather than silently leaking the background.
+    /// Restore to original: re-run cutout engine on the original photo; throws so
+    /// the caller can show an error rather than silently leaking the background.
     var onIsolateSubject: (NSImage) async throws -> NSImage = { $0 }
     /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
     var onPreview: (NSImage) -> Void = { _ in }
@@ -485,10 +485,13 @@ struct EditorView: View {
         ]
     }
 
-    /// Restore body: re-run cutout engine on the original photo so that body parts
-    /// clipped during initial segmentation are recovered. Uses a dedicated async path
-    /// (onIsolateSubject) instead of routing through applyEffectResult, which has a
-    /// silent ?? fallback that would leak the original background on failure.
+    /// Restore to original: re-run cutout engine on the original photo so that body
+    /// parts clipped during initial segmentation are recovered. Uses a dedicated async
+    /// path (onIsolateSubject) instead of routing through applyEffectResult, which has
+    /// a silent ?? fallback that would leak the original background on failure.
+    /// E31.8 (audit C4): eigen undo-naam "Restore to original" — registreerde eerst
+    /// per ongeluk "Restore body" (de oude chip-naam van fill-in-body, een ándere
+    /// actie), waardoor het undo-menu over de actie loog.
     private func restoreToOriginal() {
         guard let original = originalImage, let portraitModel else { return }
         let before = NSImage(data: portraitModel.cutoutData)
@@ -500,11 +503,11 @@ struct EditorView: View {
                 if let before {
                     ImageEnhanceUndo.register(
                         undoManager, target: portraitModel, apply: onApplyIsolated,
-                        undoTo: before, redoTo: restored, actionName: "Restore body"
+                        undoTo: before, redoTo: restored, actionName: "Restore to original"
                     )
                 }
             } catch {
-                entitlement?.presentError("Could not restore body — subject isolation failed.")
+                entitlement?.presentError("Could not restore to the original — subject isolation failed.")
             }
         }
     }
@@ -622,9 +625,10 @@ struct EditorView: View {
             onPortrait: { togglePortraitBlur() },
             onColorise: runColorise,
             onBoost: runBoostResolution,
-            // E31.3: Restore body → FLUX.1 Fill Pro outpaints missing body parts
-            // (arms, shoulders) into the current cutout; BiRefNet re-extracts alpha.
-            onRestoreBody: runFillBody,
+            // E31.3/E31.8: Fill in body → FLUX.1 Fill Pro outpaints missing body
+            // parts (arms, shoulders) into the current cutout; BiRefNet re-extracts
+            // alpha.
+            onFillBody: runFillBody,
             onRemoveBackground: runRemoveBackground,
             entitlement: entitlement,
             onAppleEdit: runAppleIntelligenceEdit,
@@ -1386,7 +1390,9 @@ struct EditorView: View {
                 await onApplyResult(after)
                 ImageEnhanceUndo.register(
                     undoManager, target: portraitModel, apply: onApplyResult,
-                    undoTo: before, redoTo: after, actionName: "Fill body"
+                    // E31.8: canonieke naam — zelfde als de chip ("Fill in body")
+                    // en de werk-toast ("Filling in body").
+                    undoTo: before, redoTo: after, actionName: "Fill in body"
                 )
                 await entitlement.refresh()
             } catch BackendError.noCredits {

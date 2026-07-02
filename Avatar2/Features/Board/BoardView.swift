@@ -87,6 +87,9 @@ struct BoardView: View {
 
     // E29.1: multi-select op de board.
     @State private var selection: Set<PersistentIdentifier> = []
+    /// E29.4: range-anker voor shift-klik — de laatst kaal/cmd-geselecteerde
+    /// node; shift-klik selecteert alles tussen dit anker en de aangeklikte node.
+    @State private var selectionAnchor: PersistentIdentifier?
     /// Marquee-rechthoek (board-space) tijdens een sleep op de lege board.
     @State private var marquee: CGRect?
     /// Basis-selectie vastgelegd bij de start van een marquee-sleep, zodat
@@ -398,10 +401,18 @@ struct BoardView: View {
         .equatable()
         .contentShape(Rectangle())
         .dsHoverHighlight(cornerRadius: DSRadius.xl4)
-        // Dubbelklik = openen in de editor; enkelklik = selecteren (cmd/shift =
-        // toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
+        // Dubbelklik = openen in de editor; enkelklik = selecteren. Sleep = node
+        // verplaatsen (E27.4).
+        // E29.4 (audit C5): expliciete modifier-gestures i.p.v. de globale
+        // `NSEvent.modifierFlags` onder een tap (fragiel — cmd/shift-klik verving
+        // live de selectie i.p.v. te toggelen). Cmd = toggle, shift = range
+        // uitbreiden (macOS/Finder-conventie), kale klik = vervang. Volgorde is
+        // prioriteit: eerder-attached gestures winnen, dus de modifier-varianten
+        // vóór de kale tap.
         .onTapGesture(count: 2) { onOpen(p) }
-        .onTapGesture { tapNode(p) }
+        .gesture(TapGesture().modifiers(.command).onEnded { toggleNodeSelection(p) })
+        .gesture(TapGesture().modifiers(.shift).onEnded { extendSelectionRange(to: p) })
+        .gesture(TapGesture().onEnded { selectOnly(p) })
         // Rechtermuis → DS-menu; selecteert de node eerst als 'ie nog niet in de
         // selectie zit (Finder), zodat "Export N…" alleen bij een echte multi-
         // selectie verschijnt; binnen een bestaande ≥2-selectie blijft die staan.
@@ -441,15 +452,57 @@ struct BoardView: View {
         return CGRect(x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y)
     }
 
-    /// E29.1: enkelklik op een node — cmd/shift togglet 'm in/uit de selectie;
-    /// anders selecteer alléén deze node.
-    private func tapNode(_ portrait: Portrait2) {
+    // MARK: - E29.4 selectie-semantiek (audit C5)
+
+    /// Kale klik — vervang de selectie door alléén deze node; de node wordt het
+    /// range-anker voor een latere shift-klik.
+    private func selectOnly(_ portrait: Portrait2) {
         let id = portrait.persistentModelID
-        if NSEvent.modifierFlags.contains(.command) || NSEvent.modifierFlags.contains(.shift) {
-            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        selection = [id]
+        selectionAnchor = id
+    }
+
+    /// Cmd-klik — toggle de node in/uit de selectie (macOS-conventie). Een
+    /// toegevoegde node wordt het nieuwe range-anker; valt het anker zelf uit de
+    /// selectie, dan schuift het anker naar een resterende node.
+    private func toggleNodeSelection(_ portrait: Portrait2) {
+        let id = portrait.persistentModelID
+        if selection.contains(id) {
+            selection.remove(id)
+            if selectionAnchor == id { selectionAnchor = selection.first }
         } else {
-            selection = [id]
+            selection.insert(id)
+            selectionAnchor = id
         }
+    }
+
+    /// Shift-klik — breid de selectie uit met de RANGE anker→node in
+    /// board-volgorde (Finder-conventie: shift = range, cmd = toggle; shift is
+    /// dus géén toggle-alias van cmd meer). Zonder (geldig) anker: additief.
+    private func extendSelectionRange(to portrait: Portrait2) {
+        let id = portrait.persistentModelID
+        selection = Self.rangeExtendedSelection(
+            current: selection,
+            anchor: selectionAnchor,
+            target: id,
+            order: portraits.map(\.persistentModelID)
+        )
+        if selectionAnchor == nil { selectionAnchor = id }
+    }
+
+    /// Pure range-uitbreiding (unit-getest in `BoardSelectionTests`): union van
+    /// de bestaande selectie met alle nodes tussen anker en doel (inclusief,
+    /// beide richtingen) in de gegeven volgorde. Geen/onbekend anker → alleen
+    /// het doel erbij (additief).
+    static func rangeExtendedSelection<ID: Hashable>(
+        current: Set<ID>, anchor: ID?, target: ID, order: [ID]
+    ) -> Set<ID> {
+        guard let anchor,
+              let anchorIndex = order.firstIndex(of: anchor),
+              let targetIndex = order.firstIndex(of: target) else {
+            return current.union([target])
+        }
+        return current.union(order[min(anchorIndex, targetIndex)...max(anchorIndex, targetIndex)])
     }
 
     // MARK: - Rechtermuis-context-menu (pariteit met de sidebar, E24.22)
@@ -794,7 +847,11 @@ struct BoardView: View {
                     EditColorPanel(
                         source: img,
                         initial: first.adjust,
-                        onCommit: { _, after in applyAdjustToAll(after) }
+                        onCommit: { _, after in applyAdjustToAll(after) },
+                        // E29.5 (audit C6): de AI-één-tik-chips zijn hier niet
+                        // bedraad (default-lege closures = dode chips) → uit.
+                        // Batch-Adjust = alleen de sliders.
+                        showAutoEnhance: false
                     )
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
@@ -1148,7 +1205,14 @@ struct BoardView: View {
                             initial: node.adjust,
                             onCommit: { _, after in applyAdjustToAll(after) },
                             onRetouch: { retouchNode(node) },
-                            showRetouch: true
+                            showRetouch: true,
+                            // E29.5 (audit C6): Studio Light/Portrait/Colorise/
+                            // Boost/Fill in body zijn op de board niet bedraad
+                            // (default-lege closures) → verberg ze; alleen de
+                            // wél-werkende retouch-chip + sliders blijven. Echt
+                            // bedraden kan pas met de gedeelde apply/undo/gate-
+                            // service (editor+board) — zie de story-Result.
+                            showAutoEnhance: false
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
