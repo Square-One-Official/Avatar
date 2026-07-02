@@ -32,8 +32,8 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
 | [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4 done — 13.1–13.3 backlog (gedeblokkeerd); **13.5 ready** (audit-fix: Sparkle app-breed) |
-| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.6); **14.7 ready**, 14.8 backlog (audit-fix: refill-datum, credits-transparantie) |
-| [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.6); **15.7 ready** (audit-fix: delete-account) |
+| [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.7, incl. Stripe-webhook-shapefix); 14.8 backlog (credits-transparantie) |
+| [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
 | [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | fase 1-2 done (27.1–27.8); **27.9–27.11 ready** (audit-fix: muiswiel-zoom, panel-toggle) |
 | [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.3); **29.4–29.5 ready** (audit-fix: board-selectie, dode chips) |
