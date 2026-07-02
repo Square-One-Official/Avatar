@@ -68,10 +68,32 @@ override, feature-flags-fetch faalt → `allEnabled`-fallback, credits-refresh n
 gefaalde cloud-actie.
 **DoD:** nieuwe testsuite groen, gebruikt de 47.1-seam; Result-regel.
 
-## 47.3 — ShellModel/Board/SocialPreview/Share-tests (backlog)
-- status: backlog
+## 47.3 — ShellModel/Board/SocialPreview/Share-tests
+- status: done
 - team: FEAT
-- blockedBy: 47.2
+- blockedBy: 47.2 (done)
+- promotie: gepromoveerd 2026-07-02, 47.2 done
+- Result: alle vier gebieden ≥3 tests, op pure/statische paden of de
+  47.1/47.2-stub-sessie (geen UI-tests). **ShellModel** (+6 in
+  `ShellModelTests`): cutoutSignature deterministisch/content-gevoelig,
+  import-gate op de cap (402-stub → paywall, canvas+store ongemoeid), select
+  (directe selectie-state + async canvas-decode), effect-apply met
+  cutout-resultaat (edit-bron gewist), vol resultaat (edit-bron + verse
+  stempel → stale na cutout-terugdraai), applyIsolatedResult (geen tweede
+  matting-pass; oude stempel vanzelf stale). **Board** (+5 in
+  `BoardSelectionTests`): cmd-klik-toggle-semantiek incl. anker-verschuiving,
+  via nieuwe pure seam `BoardView.toggledSelection` (gedragsgelijke extractie
+  van `toggleNodeSelection`, patroon `rangeExtendedSelection`).
+  **SocialPreview** (nieuw `SocialPreviewTests`, 8): PreviewTab→platforms-
+  switch (enkel/All/uniek-per-tab), Instagram-zonder-cover, cover-ratios
+  4:1/3:1, BannerResolver match-kleur + neutrale fallbacks. **ExportSheet**
+  (nieuw `ExportSheetTests`, 6): álle vorm×maat-combinaties → exacte
+  pixelmaat, circle/rounded-maskers (hoeken transparant, midden/rand opaak),
+  square opaak-met-kleur en transparant-zonder-achtergrond, grootteschatting
+  via tweede seam `ExportSheet.estimatedBytes` (pure extractie van de
+  inline-berekening). Beide seams gedragsvrij en gedocumenteerd. Builds
+  Avatar/Avatar2 groen; `xcodebuild test -scheme Avatar2` 154 tests groen
+  (1 pre-existing skip); `swift test` AvatarKit 92 + AvatarUI 37 groen.
 
 **Wat:** `ShellModelTests` heeft slechts 2 tests voor het drukste model van de app
 (import, selectie, effect-apply, re-isolate, edit-source-staleness); Board,

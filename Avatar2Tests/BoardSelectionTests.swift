@@ -53,4 +53,46 @@ final class BoardSelectionTests: XCTestCase {
         )
         XCTAssertEqual(result, ["c"])
     }
+
+    // MARK: - E47.3 — cmd-klik-toggle (de andere helft van de Finder-semantiek)
+
+    func testToggleVoegtNodeToeEnMaaktHemAnker() {
+        let result = BoardView.toggledSelection(
+            current: ["a"], anchor: "a", toggling: "c"
+        )
+        XCTAssertEqual(result.selection, ["a", "c"])
+        XCTAssertEqual(result.anchor, "c", "toegevoegde node wordt het nieuwe range-anker")
+    }
+
+    func testToggleVerwijdertNietAnkerNodeEnLaatAnkerStaan() {
+        let result = BoardView.toggledSelection(
+            current: ["a", "b", "c"], anchor: "a", toggling: "c"
+        )
+        XCTAssertEqual(result.selection, ["a", "b"])
+        XCTAssertEqual(result.anchor, "a", "anker blijft staan als een ándere node uit de selectie valt")
+    }
+
+    func testToggleVerwijdertAnkerSchuiftAnkerNaarResterendeNode() {
+        let result = BoardView.toggledSelection(
+            current: ["a", "b"], anchor: "a", toggling: "a"
+        )
+        XCTAssertEqual(result.selection, ["b"])
+        XCTAssertEqual(result.anchor, "b", "valt het anker zelf uit de selectie → resterende node")
+    }
+
+    func testToggleLaatsteNodeLeegtSelectieEnAnker() {
+        let result = BoardView.toggledSelection(
+            current: ["a"], anchor: "a", toggling: "a"
+        )
+        XCTAssertTrue(result.selection.isEmpty)
+        XCTAssertNil(result.anchor)
+    }
+
+    func testToggleOpLegeSelectieStartNieuweSelectie() {
+        let result = BoardView.toggledSelection(
+            current: Set<String>(), anchor: nil, toggling: "b"
+        )
+        XCTAssertEqual(result.selection, ["b"])
+        XCTAssertEqual(result.anchor, "b")
+    }
 }
