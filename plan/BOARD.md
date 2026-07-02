@@ -54,6 +54,6 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E47 Testfundament kritieke paden](E47-testfundament.md) | INFRA+FEAT | **done** (47.1–47.3, incl. RemoteFeatureFlags-decode-fix) |
 | [E48 Swift 6-concurrency-pad](E48-swift6-concurrency.md) | INFRA | backlog (48.1–48.3) |
 | [E49 Opruimronde 2026-07](E49-opruimronde-2026-07.md) | FEAT+AI+DS | **ready** (49.1–49.4) |
-| [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | backlog (50.1–50.2) |
+| [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 ready** (thumbnail-varianten + client-cache), 52.2 backlog |
