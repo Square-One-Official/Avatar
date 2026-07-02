@@ -8,7 +8,7 @@ import path from "node:path";
  *
  * Sparkle feed for the macOS app, served from infrastructure we control
  * (audit HIGH #10). Previously the feed lived at
- *   https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml
+ *   https://raw.githubusercontent.com/Square-One-Official/Avatar/main/appcast.xml
  * which means GitHub holds the trust root for our update channel — a
  * compromised GitHub account or a BGP-hijack of `raw.githubusercontent.com`
  * could push a malicious appcast to every install. Sparkle's per-item
