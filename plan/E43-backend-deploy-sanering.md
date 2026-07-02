@@ -19,9 +19,17 @@ achtergrond-generatie terwijl er wél 2 credits worden afgeschreven.
 ---
 
 ## 43.1 — Eén deploy-bron voor api.aaavatar.nl
-- status: in_progress
+- status: done
+- owner: INFRA-agent + hoofdsessie (prod-uitvoering 2026-07-02, na akkoord Thierry)
 - team: INFRA
 - blockedBy: —
+
+**Result (prod-uitvoering 2026-07-02):** prod-deploy vanaf gemergde v2-bron
+(`vercel deploy --prod` vanaf repo-root, deployment Ready): alle 8 CMS/preset-
+endpoints → 200, generate-background → 401 (auth-gated, bestaat), appcast 200 met
+Square-One-Official-URLs. GitHub-autodeploy losgekoppeld (`vercel git disconnect`,
+"Disconnected Square-One-Official/Avatar") — CLI vanaf v2 is nu het enige
+deploy-kanaal; rootDirectory=backend ongemoeid.
 
 **Wat:** twee repo's (`Avatars/backend` en `Avatars-v2/backend`) deployen naar
 hetzelfde Vercel-project en clobberen elkaars `api/v1/*`-bestanden bij elke deploy.
@@ -65,9 +73,21 @@ Uitgevoerd op branch `v2/e43-deploy-sanering`:
 - `tsc --noEmit` groen; beide app-targets bouwen; AvatarKit `swift test` 62/0.
 
 ## 43.2 — sql/014 toepassen + generate-background live deployen + credit-refund
-- status: in_progress
+- status: done
+- owner: INFRA-agent + hoofdsessie (prod-uitvoering 2026-07-02, na akkoord Thierry)
 - team: INFRA
 - blockedBy: 43.1 (dezelfde deploy-bron moet eerst vaststaan)
+
+**Result (prod-uitvoering 2026-07-02):** bucket `generated-results` bleek al op
+prod te bestaan (aangemaakt 2026-06-30, config exact conform 014 — geverifieerd via
+Storage API; outage zat dus puur in de oude functie-code). Signed-URL-contract live
+via de 43.1-deploy. Refund gedraaid via PostgREST (dry-run eerst): **3 charges,
+6 credits terug, 1 gebruiker** (ledger-rijen 53–55, reason
+`refund_e43_generate_background_outage`, idempotent via ref=charge-id).
+Bijvangst zelfde beurt: gefaald Stripe-event `evt_1TeVNm…` (subscription.deleted
+4 jun) geresend via Stripe CLI naar het gefixte webhook → subscriptions-rij
+`sub_1TTGaP…` staat nu correct op `canceled`. Live app-smoke (portret + banner
+generate) staat nog open voor Thierry.
 
 **Wat:** `backend/sql/014_generated_results_bucket.sql` (untracked) is vermoedelijk
 niet toegepast op de prod-Supabase; `generate-background.ts` + `BackendClient.
