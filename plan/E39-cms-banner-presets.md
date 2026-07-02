@@ -29,6 +29,16 @@ genormaliseerd `/v1/*`-endpoint → getypeerd AvatarKit-model → soft-fail-fall
   `BackendClient.bannerPresets()` via `requestAllowingAnonymous`; envelope-key `banner_presets`
   → `bannerPresets` onder `.convertFromSnakeCase`. DoD groen: beide targets bouwen, alle
   AvatarKit/AvatarUI-tests groen (build-v2.sh exit 0).
+- Result (afronding 2026-07-02, branch `v2/e39-1-e40-1`): de uitgestelde preview-/prod-verificatie
+  is gedaan: `GET https://api.aaavatar.nl/v1/banner-presets` → 200 `{"banner_presets":[]}` —
+  geldige envelope; lijst is leeg totdat Thierry presets seedt (hetzelfde Payload-fetchpad
+  serveert `/v1/effects` mét content, dus de CMS-koppeling werkt). Ontbrekende testdekking
+  aangevuld: 3 fixture-decode-tests in
+  [BackendClientDecodeTests](../AvatarKit/Tests/AvatarKitTests/BackendClientDecodeTests.swift)
+  (E47.1-patroon, door de echte request-pijplijn): backend-vorm 1:1 uit `banner-presets.ts`,
+  lenient defaults (label←key, lege category→"default", lege thumbnail/config→nil, order→0) en
+  het lege-lijst-soft-fail-pad. `npx tsc --noEmit` groen in `backend/` én `admin/` (geen
+  TS-wijzigingen nodig); AvatarKit-suite groen. Geen deploy gedaan — endpoint draait al op prod.
 
 Backend (`admin/` + `backend/`):
 - `admin/src/collections/BannerPresets.ts` (slug `banner-presets`): velden `key` (uniek, =

@@ -262,6 +262,81 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertTrue(flags.backgroundsEnabled)
     }
 
+    // MARK: - GET /v1/banner-presets (E39.1)
+
+    func testBannerPresetsDecodesBackendShape() async throws {
+        // Vorm uit backend/api/v1/banner-presets.ts (200-pad): snake_case-
+        // envelope `banner_presets` + per item key/label/category/
+        // thumbnail_url/config/order. `config` is een opake JSON-string die
+        // de app zelf naar `BannerLayers` decodeert.
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "banner_presets": [
+                {
+                  "key": "mesh-sunset",
+                  "label": "Sunset",
+                  "category": "mesh",
+                  "thumbnail_url": "https://cdn.example.test/banners/mesh-sunset.png",
+                  "config": "{\\"fill\\":{\\"kind\\":\\"meshGradient\\"}}",
+                  "order": 1
+                },
+                {
+                  "key": "solid-ink",
+                  "label": "Ink",
+                  "category": "solid",
+                  "thumbnail_url": null,
+                  "config": "{\\"fill\\":{\\"kind\\":\\"solid\\"}}",
+                  "order": 2
+                }
+              ]
+            }
+            """), forPath: "/v1/banner-presets")
+
+        let presets = try await client.bannerPresets()
+        XCTAssertEqual(presets.count, 2)
+        let first = try XCTUnwrap(presets.first)
+        XCTAssertEqual(first.key, "mesh-sunset")
+        XCTAssertEqual(first.label, "Sunset")
+        XCTAssertEqual(first.category, "mesh")
+        XCTAssertEqual(first.thumbnailUrl,
+                       URL(string: "https://cdn.example.test/banners/mesh-sunset.png"))
+        XCTAssertEqual(first.configJSON, "{\"fill\":{\"kind\":\"meshGradient\"}}")
+        XCTAssertEqual(first.order, 1)
+        XCTAssertNil(presets[1].thumbnailUrl)
+    }
+
+    func testBannerPresetsAppliesLenientDefaults() async throws {
+        // Kale/lege CMS-velden mogen nooit de hele lijst laten falen (soft-
+        // fail-semantiek): label ← key, lege category → "default", lege
+        // thumbnail_url/config → nil, ontbrekende order → 0.
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "banner_presets": [
+                { "key": "bare", "category": "", "thumbnail_url": "", "config": "" }
+              ]
+            }
+            """), forPath: "/v1/banner-presets")
+
+        let presets = try await client.bannerPresets()
+        let bare = try XCTUnwrap(presets.first)
+        XCTAssertEqual(bare.label, "bare")
+        XCTAssertEqual(bare.category, "default")
+        XCTAssertNil(bare.thumbnailUrl)
+        XCTAssertNil(bare.configJSON)
+        XCTAssertEqual(bare.order, 0)
+    }
+
+    func testBannerPresetsEmptyListDecodes() async throws {
+        // Het soft-fail-pad van het endpoint (CMS-hik → lege lijst i.p.v.
+        // 5xx); de app valt dan terug op z'n lokale fallback-presets.
+        BackendStubURLProtocol.setStub(.json(200, """
+            { "banner_presets": [] }
+            """), forPath: "/v1/banner-presets")
+
+        let presets = try await client.bannerPresets()
+        XCTAssertTrue(presets.isEmpty)
+    }
+
     // MARK: - POST /v1/account/delete (E15.7)
 
     /// Contract met backend/api/v1/account/delete.ts: POST + Bearer + de
