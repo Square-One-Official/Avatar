@@ -12,9 +12,20 @@ Board, SocialPreview, Share hebben **nul** tests.
 ---
 
 ## 47.1 — BackendClient protocol-seam + fixture-decode-tests per endpoint
-- status: ready
+- status: done
 - team: INFRA
 - blockedBy: —
+- Result: URLProtocol-stub als seam (BackendClient's `session`-init-parameter
+  bestond al; enige productiewijziging is de interne
+  `resultDownloadSessionOverride`-testhaak voor de generate-background-
+  result-download). Nieuw: `BackendStubURLProtocol.swift` (routetabel op pad,
+  dekt óók de Storage-PUT van uploadInputPNG) + `BackendClientDecodeTests`
+  met 12 tests: account (incl. dev-unlimited), import-claim (incl. pro-
+  short-circuit), stylize (incl. dimensieloze respons — A2-les), upscale,
+  colorize, generate-background (incl. tweede-hop-download), en de error-
+  mappings 402→noCredits, 403 pro_required→proRequired, 401→unauthorized.
+  Fixtures 1:1 op de 200/402-vormen uit backend/api/v1/*.ts.
+  `swift test` AvatarKit: 71 tests groen.
 
 **Wat:** `BackendClient` is een concrete `final class` zonder protocol-seam →
 niet stub-baar in tests; de enige bestaande test
@@ -30,9 +41,24 @@ testMessageDecodesBackendShape`.
 decode-test; `swift test --package-path AvatarKit` groen; Result-regel.
 
 ## 47.2 — EntitlementModel-testsuite
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: 47.1 (heeft de protocol-seam nodig om te stubben)
+- Result: `EntitlementModel.init` kreeg de minimale seam `backendSession:
+  URLSession = TLSPinning.pinnedShared` (default = exact wat BackendClient
+  zelf al koos → geen gedragsverandering, call sites ongemoeid). Nieuw:
+  `Avatar2Tests/EntitlementModelTests.swift` met 8 tests: free-cap
+  (allowed:false én het echte 402-pad) → paywall, allowed → account-refresh
+  + quotaSummary, transportfout blokkeert niet, dev-unlimited via
+  `is_dev_unlimited`, flags-fetch faalt → allEnabled-fallback, flags-fetch
+  slaagt → remote waardes, credits-refresh na gefaalde cloud-actie (5→0 +
+  toast→paywall). **Bijvangst-bugfix:** `RemoteFeatureFlags` had expliciete
+  snake_case-CodingKeys bovenop `.convertFromSnakeCase` (dubbele mapping) —
+  élke /v1/feature-flags-decode faalde stil, dus CMS-flags deden nooit
+  iets; CodingKeys verwijderd + decode-test in AvatarKit erbij.
+  `xcodebuild test -scheme Avatar2`: 84 tests groen (1 pre-existing skip);
+  builds Avatar/Avatar2 groen; `swift test` AvatarKit (72) + AvatarUI (37)
+  groen.
 
 **Wat:** de monetisatie-kern (`EntitlementModel.claimImport()`, 402-routing naar de
 paywall, dev-unlimited, feature-flags-fetch) heeft 0% dekking; alleen AvatarKit's
