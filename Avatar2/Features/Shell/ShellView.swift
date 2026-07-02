@@ -48,24 +48,28 @@ struct ShellView: View {
                 .ignoresSafeArea()
             }
 
-            // UXS-29/UX34: de sidebar-kaart dokt aan de venstertop (alleen
-            // bottom-inset) zodat traffic-lights + toggle óp het paneel liggen
-            // i.p.v. in een losse band erboven.
             if studioFullBleed {
                 HStack(alignment: .top, spacing: 0) {
                     leftNavSlot
-                        .padding(.bottom, ShellMetrics.windowEdgeInset)
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
                     Spacer(minLength: 0)
                 }
             } else {
                 HStack(spacing: ShellMetrics.sidebarContentSpacing) {
                     leftNavSlot
-                        .padding(.bottom, ShellMetrics.windowEdgeInset)
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
                     mainArea
+                        .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
                 }
             }
         }
+        // UXS-29(v2): de unified toolbar (stabilise) geeft het venster een hoge
+        // top-safe-area. De shell negeert die op root-niveau zodat de zwevende
+        // sidebar-kaart op z'n gap3-inset vanaf de vénstertop blijft (met de
+        // traffic-lights native gecentreerd ín de kaart); de content-kolom
+        // krijgt de titelbalk-hoogte expliciet terug via safeAreaPadding.
+        .ignoresSafeArea(.container, edges: .top)
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(studioFullBleed ? Color.clear : DSColor.Background.app)
         .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
@@ -389,9 +393,13 @@ struct ShellView: View {
                 }
             )
         }
-        .padding(.top, ShellMetrics.topBarTopInset)
+        // UXS-29(v2): de band negeert de toolbar-safe-area en pint op de oude
+        // contentTop-lijn — identiek aan vóór de toolbar (de editor-canvas-
+        // chips rekenen op deze vrije hoogte).
+        .padding(.top, ShellMetrics.contentTopSafeArea + ShellMetrics.topBarTopInset)
         .frame(maxWidth: .infinity, alignment: .top)
-        .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
+        .frame(height: ShellMetrics.contentTopSafeArea + ShellMetrics.topBarBandHeight, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
     }
 
     /// Leading in vénster-space (de top-chrome-band overlayt de root-ZStack) —

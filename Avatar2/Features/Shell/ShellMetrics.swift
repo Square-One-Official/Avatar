@@ -45,6 +45,20 @@ enum ShellMetrics {
     /// (top-uitgelijnd i.p.v. gecentreerd → "touching the top", feedback Thierry).
     static let windowControlsRowHeight: CGFloat = 32
 
+    /// UXS-29(v2)/UX34: middellijn van de traffic-lights vanaf de venstertop
+    /// mét de lege unified toolbar (ShellSidebarChrome.stabilise) — AppKit
+    /// centreert de knoppen in de hogere titelbalk, dus ín de zwevende
+    /// sidebar-kaart (top-inset gap3). De sidebar-toggle lijnt op dezelfde
+    /// middellijn uit. Empirisch geverifieerd op de unified-toolbar-titelbalk.
+    static let windowControlsCenterFromTop: CGFloat = 26
+
+    /// Top-inset van de content-kolom en de top-chrome-band. Dit was vóór de
+    /// unified toolbar (UXS-29(v2)) de impliciete titelbalk-safe-area (~28pt);
+    /// de shell-root negeert de (nu hogere) safe-area en geeft content + band
+    /// deze ontwerpwaarde expliciet terug zodat hun layout identiek blijft aan
+    /// vóór de toolbar — alleen de traffic-lights + sidebar-chrome liggen lager.
+    static let contentTopSafeArea: CGFloat = 28
+
     /// Editor-topbar (breadcrumb + view-toggle + Share): control-hoogte.
     static let topBarRowHeight: CGFloat = 28
 

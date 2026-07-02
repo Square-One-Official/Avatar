@@ -45,29 +45,36 @@ struct ShellSidebarChrome: View {
 
             ShellSidebarChromeStrip()
                 .padding(.leading, LeftNavView.edgeInset)
+                .padding(.top, LeftNavView.edgeInset)
                 .mask(alignment: .leading) {
                     Rectangle()
                         .frame(width: isSidebarVisible ? LeftNavView.chromeRevealWidth : 0)
                 }
+            // UXS-29(v2): de toggle centreert op de verlaagde traffic-light-lijn
+            // (native unified-toolbar-hoogte) — dezelfde rij, ín de kaart.
             SidebarToggleButton(isSidebarVisible: isSidebarVisible, action: onToggleSidebar)
-                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
                 .frame(height: ShellMetrics.windowControlsRowHeight)
+                .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
+                .padding(.top, ShellMetrics.windowControlsCenterFromTop - ShellMetrics.windowControlsRowHeight / 2)
         }
-        .frame(height: ShellSidebarChromeStrip.height, alignment: .topLeading)
+        .frame(height: LeftNavView.windowChromeHeight, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
     }
 }
 
 private struct ShellSidebarChromeStrip: View {
-    /// UXS-29: de strip loopt vanaf de venstertop (y = 0) t/m de oude
-    /// top-inset, zodat de traffic-lights + toggle óp kaartmateriaal liggen.
-    /// Vierkante hoeken: de kaart dokt aan de venstertop (LeftNavView clipt
-    /// zelf alleen de onderhoeken nog).
-    static var height: CGFloat { LeftNavView.windowChromeHeight + LeftNavView.edgeInset }
-
     var body: some View {
         DSColor.Background.card
-            .frame(width: LeftNavView.width, height: Self.height)
+            .frame(width: LeftNavView.width, height: LeftNavView.windowChromeHeight)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: ShellMetrics.panelCornerRadius,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: ShellMetrics.panelCornerRadius,
+                    style: .continuous
+                )
+            )
             .allowsHitTesting(false)
     }
 }
@@ -98,17 +105,18 @@ private final class TrafficLightAnchorView: NSView {
     func stabilise() {
         guard let window else { return }
         window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
 
-        // UXS-29: 20pt (native macOS-positie) — geeft de rode knop ademruimte
-        // t.o.v. de kaartrand op x = windowEdgeInset (12).
-        let leading: CGFloat = 20
-        let spacing: CGFloat = 8
-        var x = leading
-        for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-            guard let button = window.standardWindowButton(type) else { continue }
-            let origin = button.frame.origin
-            button.setFrameOrigin(NSPoint(x: x, y: origin.y))
-            x += button.frame.width + spacing
+        // UXS-29(v2)/UX34: native verlaagde traffic-lights. Een lege unified
+        // toolbar maakt de titelbalk hoog genoeg dat AppKit de knoppen zélf
+        // lager centreert — ín de zwevende sidebar-kaart (top-inset gap3).
+        // Geen frame-hacks: positie, hover én hit-testing blijven van het OS.
+        if window.toolbar == nil {
+            window.toolbarStyle = .unified
+            let toolbar = NSToolbar(identifier: "ShellWindowChrome")
+            toolbar.showsBaselineSeparator = false
+            toolbar.allowsUserCustomization = false
+            window.toolbar = toolbar
         }
     }
 }
