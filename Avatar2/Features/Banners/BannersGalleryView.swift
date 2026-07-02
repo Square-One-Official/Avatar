@@ -300,15 +300,10 @@ private struct BannersEmptyState: View {
 
     @ViewBuilder private func presetCard(_ preset: BannerPresetItem) -> some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            ZStack {
-                // thumbnailVersion observeren zodat een net-binnengekomen CMS-preview
-                // de kaart herrendert (de cache zelf is statisch/niet-geobserveerd).
-                let _ = presetsModel.thumbnailVersion
-                if let img = presetsModel.cachedThumbnail(for: preset) {
-                    Image(nsImage: img).resizable().scaledToFill()
-                } else {
-                    fillPreview(preset.layers.fill)
-                }
+            // E52.1: gedeelde ThumbnailCache (memory/disk + downsampled decode);
+            // zolang de CMS-preview laadt rendert de fill als placeholder.
+            RemoteThumbnail(url: preset.thumbnailURL) {
+                fillPreview(preset.layers.fill)
             }
             .aspectRatio(1500.0 / 500.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))

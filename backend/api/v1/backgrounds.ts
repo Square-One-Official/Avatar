@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchActiveBackgrounds } from "../../lib/payload.js";
+import { CMS_LIST_CACHE_CONTROL, fetchActiveBackgrounds, thumbnailVariant } from "../../lib/payload.js";
 
 /**
  * GET /v1/backgrounds (E33+)
@@ -25,13 +25,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const backgrounds = await fetchActiveBackgrounds();
+    res.setHeader("Cache-Control", CMS_LIST_CACHE_CONTROL);
     res.status(200).json({
       backgrounds: backgrounds.map((b) => ({
         key: b.key,
         label: b.label,
         category: b.category,
         image_url: b.imageUrl,
-        thumbnail_url: b.thumbnailUrl ?? b.imageUrl,
+        // E52.1: verkleinde variant (Supabase image-transformatie) voor de
+        // ~36 pt panel-swatch; valt terug op het origineel bij niet-Supabase-URL's.
+        thumbnail_url: thumbnailVariant(b.thumbnailUrl ?? b.imageUrl, 160) ?? b.imageUrl,
         order: b.order,
       })),
     });

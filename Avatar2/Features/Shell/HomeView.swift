@@ -149,7 +149,6 @@ struct HomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap4) {
                         makeBannerTile
-                        let _ = presetsModel.thumbnailVersion
                         ForEach(presetsModel.presets) { preset in
                             homePresetCard(preset)
                         }
@@ -195,12 +194,10 @@ struct HomeView: View {
     private func homePresetCard(_ preset: BannerPresetItem) -> some View {
         Button { makeBanner(from: preset.layers) } label: {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                ZStack {
-                    if let img = presetsModel.cachedThumbnail(for: preset) {
-                        Image(nsImage: img).resizable().scaledToFill()
-                    } else {
-                        presetFill(preset.layers.fill)
-                    }
+                // E52.1: gedeelde ThumbnailCache (memory/disk + downsampled
+                // decode); zolang de preview laadt rendert de fill als placeholder.
+                RemoteThumbnail(url: preset.thumbnailURL) {
+                    presetFill(preset.layers.fill)
                 }
                 .frame(width: 240, height: 80)
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))

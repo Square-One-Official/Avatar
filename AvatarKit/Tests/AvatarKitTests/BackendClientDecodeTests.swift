@@ -337,6 +337,97 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertTrue(presets.isEmpty)
     }
 
+    // MARK: - GET /v1/hair-presets (E52.1 — thumbnail_url)
+
+    func testHairPresetsDecodesBackendShapeWithThumbnail() async throws {
+        // Vorm uit backend/api/v1/hair-presets.ts ná E52.1: naast key/label/
+        // order een optionele `thumbnail_url` (Supabase render-variant). Oude
+        // CMS-items zonder thumbnail sturen null → nil, en een item zónder het
+        // veld (oude backend-deploy) decodeert ook.
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "presets": [
+                {
+                  "key": "buzz-cut",
+                  "label": "Buzz cut",
+                  "thumbnail_url": "https://cdn.example.test/storage/v1/render/image/public/media/buzz.jpg?width=320&quality=75",
+                  "order": 1
+                },
+                { "key": "long-waves", "label": "Long waves", "thumbnail_url": null, "order": 2 },
+                { "key": "legacy", "label": "Legacy", "order": 3 }
+              ]
+            }
+            """), forPath: "/v1/hair-presets")
+
+        let presets = try await client.hairPresets()
+        XCTAssertEqual(presets.count, 3)
+        XCTAssertEqual(presets[0].key, "buzz-cut")
+        XCTAssertEqual(
+            presets[0].thumbnailUrl,
+            URL(string: "https://cdn.example.test/storage/v1/render/image/public/media/buzz.jpg?width=320&quality=75")
+        )
+        XCTAssertNil(presets[1].thumbnailUrl)
+        XCTAssertNil(presets[2].thumbnailUrl, "ontbrekend veld hoort nil te zijn, geen decode-fout")
+    }
+
+    func testFacePresetsLenientDefaultsDecode() async throws {
+        // Lege thumbnail_url ("") → nil; ontbrekend label ← key; ontbrekende
+        // order → 99 (sorteert achteraan, zoals de server-default).
+        BackendStubURLProtocol.setStub(.json(200, """
+            { "presets": [ { "key": "whiten-teeth", "thumbnail_url": "" } ] }
+            """), forPath: "/v1/face-presets")
+
+        let presets = try await client.facePresets()
+        let bare = try XCTUnwrap(presets.first)
+        XCTAssertEqual(bare.label, "whiten-teeth")
+        XCTAssertNil(bare.thumbnailUrl)
+        XCTAssertEqual(bare.order, 99)
+    }
+
+    // MARK: - GET /v1/backgrounds (E52.1 — thumbnail_url-variant)
+
+    func testBackgroundsDecodesBackendShape() async throws {
+        // Vorm uit backend/api/v1/backgrounds.ts: image_url = origineel (voor
+        // export-compositing), thumbnail_url = verkleinde render-variant voor
+        // de panel-swatch. Ontbreekt thumbnail_url (oude backend), dan valt de
+        // client terug op image_url.
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "backgrounds": [
+                {
+                  "key": "studio-grey",
+                  "label": "Studio grey",
+                  "category": "Studio",
+                  "image_url": "https://cdn.example.test/storage/v1/object/public/media/studio.jpg",
+                  "thumbnail_url": "https://cdn.example.test/storage/v1/render/image/public/media/studio.jpg?width=160&quality=75",
+                  "order": 1
+                },
+                {
+                  "key": "legacy-beach",
+                  "category": "Outdoor",
+                  "image_url": "https://cdn.example.test/storage/v1/object/public/media/beach.jpg"
+                }
+              ]
+            }
+            """), forPath: "/v1/backgrounds")
+
+        let backgrounds = try await client.backgrounds()
+        XCTAssertEqual(backgrounds.count, 2)
+        let first = try XCTUnwrap(backgrounds.first)
+        XCTAssertEqual(first.key, "studio-grey")
+        XCTAssertEqual(
+            first.thumbnailUrl,
+            URL(string: "https://cdn.example.test/storage/v1/render/image/public/media/studio.jpg?width=160&quality=75")
+        )
+        XCTAssertEqual(
+            first.imageUrl,
+            URL(string: "https://cdn.example.test/storage/v1/object/public/media/studio.jpg")
+        )
+        // Fallback-pad: zonder thumbnail_url wordt image_url de swatch-bron.
+        XCTAssertEqual(backgrounds[1].thumbnailUrl, backgrounds[1].imageUrl)
+        XCTAssertEqual(backgrounds[1].label, "legacy-beach")
+    }
+
     // MARK: - POST /v1/account/delete (E15.7)
 
     /// Contract met backend/api/v1/account/delete.ts: POST + Bearer + de
