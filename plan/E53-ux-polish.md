@@ -2,10 +2,10 @@
 
 Team: **FEAT + DS**
 
-Bron: `plan/AUDIT-UX-2026-07-02.md` (33 bevindingen: 8×P0, 15×P1, 10×P2; Product
-Designer-audit, live + statisch). Dit epic operationaliseert de top-10
-polish-sprint + de P0's; de overige P1/P2's blijven in het audit-document staan
-tot een volgende ronde.
+Bron: `plan/AUDIT-UX-2026-07-02.md` (33 bevindingen: 8×P0, 15×P1, 10×P2) +
+`plan/PLAN-UX-POLISH-2026-07-02.md` (story-ready uitwerking: UXS-1…UXS-26 met
+exacte bestanden/regels, code-aanpak en acceptatiecriteria — gebruik dát als
+implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.5.
 
 ---
 
@@ -44,8 +44,10 @@ en de Studio past in het venster; tests groen; Result-regel.
 - blockedBy: —
 
 **Wat:** portret-/bannerkaarten exposen geen AX-elementen (VoiceOver kan de kern
-van de app niet bedienen — live geverifieerd) + hover-state-verbetering. Aanpak in
-DSThumbnailCard (AvatarUI) zodat alle kaart-consumers meeliften.
+van de app niet bedienen — live geverifieerd). LET OP (correctie uit de
+uitwerking): DSThumbnailCard heeft al scrim + dsHoverScale; het contrast-/AX-werk
+zit in de gallery-kaart (PortraitsGalleryView.swift:244-253) — volg UXS-7 in het
+PLAN-document, incl. DSIconButton-verplicht-label.
 **DoD:** kaarten zijn met VoiceOver/AX-inspector bereikbaar en activeerbaar
 (open/selecteer/contextmenu); tests groen; Result-regel.
 
