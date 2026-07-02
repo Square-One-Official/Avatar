@@ -41,7 +41,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
 | [E34 Social Preview & Banner](E34-social-preview.md) | FEAT+AI+INFRA | **done** (34.1–34.7); 34.8–34.10 AI-generatie backlog |
 | [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
-| [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **36.1–36.4 ready** (unified home, banners-grid, empty-state); **36.5 ready**, 36.6 backlog (audit-fix: naming/zoeken) |
+| [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **done** (36.1–36.5); 36.6 backlog (zoekveld) |
 | [E37 Banner Studio (editor)](E37-banner-studio.md) | FEAT+INFRA+DS | **done** (37.1–37.15); 37.16 PaperKit backlog; **37.17–37.19 ready** (audit-fix: keystroke-verlies, placeholder-lagen, Halftone) — **blocker vóór `bannersEnabled` aan** |
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **38.1 ready**, 38.2–38.4 backlog (Figma-stijl Metal-shaders) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **39.1 ready**, 39.2 backlog |
