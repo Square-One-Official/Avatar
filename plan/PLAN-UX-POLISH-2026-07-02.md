@@ -429,6 +429,31 @@ overlap met de eerste sidebar-rij bij smalle vensters.
 **Verificatie:** screenshots dark/light uit- én ingeklapt; vergelijk met
 Finder-sidebar als referentie.
 
+### UXS-30 · Library-drop opent editor direct met de nieuwe foto (UX37, nabrander 2026-07-02) — S — ✅ DONE `2c61ea5`
+**Waarom (melding Thierry):** drop in de library → eerst opent/blijft de laatste
+afbeelding in beeld, dan flitst de nieuwe ingezoomd, wordt vrijstaand gemaakt en
+zoomt weer uit. Verwacht: direct de nieuwe foto op het canvas, op fit-zoom, net
+als een portret openen vanuit de library.
+**Root cause (geverifieerd via state-log):** `runCutout` liet `section` op
+Home/Portraits staan tijdens de hele cutout (~1,5–2s alleen de status-pill; de
+reveal speelde onzichtbaar) en pas `persist()` — ná cutout + reveal-sleep —
+navigeerde naar de editor. In de overgang fungeerde de vórige selectie als
+drager/naam (`editorContent` eiste `previousCutout`).
+**Fix:** `runCutout` navigeert bij import-start (na de importgate) meteen naar de
+editor: selectie + multi-select gewist, `openOrigin` uit de huidige sectie; de
+isolating-reveal speelt ín het frame op fit-zoom. `ShellView.editorContent` valt
+zonder selectie terug op het origineel als identiteits-drager (rendert niet
+tijdens de reveal). `persist()` zet sectie/herkomst niet meer — een vervangende
+import ín de editor (E-fix) is ongewijzigd en houdt nu ook z'n
+Portraits-herkomst. Bijvangst: mislukte cutout is nu zichtbaar (failed-canvas in
+de editor i.p.v. stil op Home); DEBUG-smoke-haken `--import-after <pad> [sec]`,
+`--record-states <log>`, `--bypass-import-gate`.
+**Verificatie:** state-log smoke (`--smoke-store --bypass-import-gate
+--import-after … --record-states …`): drop vanuit Home → zelfde tick
+`section=editor canvas=processing selected=nil` → `revealing` →
+`result selected=<nieuw>`; met `--open-editor` (vervangende import) blijft de
+oude selectie drager tot `result`. `build-v2.sh` volledig groen.
+
 ---
 
 ## Sprint 3 — P2 DS-hygiëne (sweeps)
@@ -510,6 +535,7 @@ Features/Settings = 0; visueel identiek.
 | UXS-27 Hover-trede (dode hovers) | P1 | S | UXS-25 (zelfde surface-ladder) |
 | UXS-28 Breadcrumb pixelvast | P1 | S/M | UXS-29 (zelfde shell-chrome) |
 | UXS-29 Traffic lights in sidebar | P1 | M | UXS-28 |
+| UXS-30 Library-drop → editor direct | P0 | S | — (✅ done `2c61ea5`) |
 | UXS-20…26 | P2 | S–M | opportunistisch per file |
 
 **Definition of done (alle stories):** build + AvatarKit/AvatarUI `swift test` groen
