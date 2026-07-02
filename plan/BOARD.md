@@ -56,4 +56,5 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E49 Opruimronde 2026-07](E49-opruimronde-2026-07.md) | FEAT+AI+DS | **ready** (49.1–49.4) |
 | [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
-| [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 ready** (thumbnail-varianten + client-cache), 52.2 backlog |
+| [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
+| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1–53.4 ready** (uit AUDIT-UX-2026-07-02: 8×P0 + top-10 sprint); 53.5 backlog |
