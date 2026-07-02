@@ -265,9 +265,11 @@
 		D5239F6F44EDD048CCD08D5F /* Mesh 03.png in Resources */ = {isa = PBXBuildFile; fileRef = 947924202C732493D553BD14 /* Mesh 03.png */; };
 		D56BE5D31CB70F1184FFDCC3 /* CanvasZoomCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50588A3B4DA898B3891C3FE3 /* CanvasZoomCommands.swift */; };
 		D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED61BA47F9EEBF8B65EBD9D /* OnboardingDownloadView.swift */; };
+		D70AFE22A4DC82FC3EC07C0B /* BannerDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A47E8CD140B09EF6650C70B /* BannerDeletion.swift */; };
 		D79FDF2EDB07AAE954B9C38C /* OnboardingPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA52AF8F365805B303AC7D9 /* OnboardingPrivacyView.swift */; };
 		D7CFDCF65F3FA907C6C87990 /* PrivacyPreferences2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60E31735EC49E308BA808F7F /* PrivacyPreferences2.swift */; };
 		D84A73DA71CEC5D750C30163 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */; };
+		DA6A89FA2CCAFABCA2120ED5 /* BannerDeletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D89C17CDCE1497AED107A5A /* BannerDeletionTests.swift */; };
 		DB0889FAB8E596CBB8840E1E /* OnboardingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13C5179AB5B02A7876331062 /* OnboardingProgress.swift */; };
 		DB690C1184BCE6FB12816273 /* StylizeIdentityRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2F0A18556B0261D8E6AF09 /* StylizeIdentityRegressionTests.swift */; };
 		DB96EB8FBA87155B22F9E247 /* ReversibleChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF217BE4C824910EAD866B8 /* ReversibleChange.swift */; };
@@ -387,6 +389,7 @@
 		48EF633AE84A1D2EF9412998 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		499AFD3440A49F0D511B668B /* PortraitSetActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitSetActions.swift; sourceTree = "<group>"; };
 		4A2F0A18556B0261D8E6AF09 /* StylizeIdentityRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylizeIdentityRegressionTests.swift; sourceTree = "<group>"; };
+		4D89C17CDCE1497AED107A5A /* BannerDeletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDeletionTests.swift; sourceTree = "<group>"; };
 		4DBD86C6755AD4FDA5BA4D6A /* WindowAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAppearance.swift; sourceTree = "<group>"; };
 		50588A3B4DA898B3891C3FE3 /* CanvasZoomCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomCommands.swift; sourceTree = "<group>"; };
 		509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolTests.swift; sourceTree = "<group>"; };
@@ -452,6 +455,7 @@
 		86F687FF9D2FCFD8F72505C3 /* OnboardingStepEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepEngine.swift; sourceTree = "<group>"; };
 		877D5A42F98746FCC7A61452 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		89B6546E0BE313C07BC46399 /* BannerBreadcrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerBreadcrumb.swift; sourceTree = "<group>"; };
+		8A47E8CD140B09EF6650C70B /* BannerDeletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerDeletion.swift; sourceTree = "<group>"; };
 		8D4ED56B1FF8421CA09C1EA5 /* .gitignore */ = {isa = PBXFileReference; path = .gitignore; sourceTree = "<group>"; };
 		8DAB476FF9BEA4B6547CA1B5 /* PaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallSheet.swift; sourceTree = "<group>"; };
 		8DF6691A4EAE77341E894EDB /* Avatar2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Avatar2App.swift; sourceTree = "<group>"; };
@@ -864,6 +868,7 @@
 				14DD51E68A2A1951BA1990DD /* AutoFramerTests.swift */,
 				E7FCF40ADE1A014274997158 /* BackgroundGenerationCatalogTests.swift */,
 				807F74AA9ECC254783BE28B7 /* BannerCanvasChromeMetricsTests.swift */,
+				4D89C17CDCE1497AED107A5A /* BannerDeletionTests.swift */,
 				3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */,
 				360B7554EDE4CCA44D8752A0 /* EditorCanvasChromeMetricsTests.swift */,
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
@@ -933,6 +938,7 @@
 				B7BCA2980295BDFE9BD1D1C9 /* BannerCanvasOverlay.swift */,
 				90CF904ACC055C13716E64D2 /* BannerCanvasSelection.swift */,
 				C24A55F90274C7644FA81CB3 /* BannerCanvasTextChrome.swift */,
+				8A47E8CD140B09EF6650C70B /* BannerDeletion.swift */,
 				5BBD5CC7F946D7FE2415EDF2 /* BannerDoc.swift */,
 				9237B6709ED2E22CF7A92CE1 /* BannerDocRenderer.swift */,
 				6E87FD1E67FDD5DA7A08AF30 /* BannerDocUndo.swift */,
@@ -1325,6 +1331,7 @@
 				A1E353BDAA9015DDD351BC85 /* BannerCanvasSelection.swift in Sources */,
 				70DDC7010AAD7A0197FFAAA4 /* BannerCanvasTextChrome.swift in Sources */,
 				65EF36B5643AA2E984D829EE /* BannerChooser.swift in Sources */,
+				D70AFE22A4DC82FC3EC07C0B /* BannerDeletion.swift in Sources */,
 				859C66B111A1FAF0A05D91AA /* BannerDoc.swift in Sources */,
 				325AEEFBF45E9315C8A96A88 /* BannerDocRenderer.swift in Sources */,
 				7E12D547F38001F6E103685A /* BannerDocUndo.swift in Sources */,
@@ -1453,6 +1460,7 @@
 				CE49AA0F4C494B5D4D81E589 /* AutoFramerTests.swift in Sources */,
 				3D1E774327ADF3EC8ADA3E02 /* BackgroundGenerationCatalogTests.swift in Sources */,
 				689F10CA89234488595FB627 /* BannerCanvasChromeMetricsTests.swift in Sources */,
+				DA6A89FA2CCAFABCA2120ED5 /* BannerDeletionTests.swift in Sources */,
 				B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */,
 				8513D2AB34581596C0A23037 /* EditorCanvasChromeMetricsTests.swift in Sources */,
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,
