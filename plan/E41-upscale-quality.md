@@ -115,7 +115,7 @@ uitzondering op de models-smoke-guard) of vervalt. Zie 41.4: crystal is als
 default sowieso ingehaald. 41.3 gaat op in 41.4.
 
 ## 41.4 — "Perfect vrijstaand" upscale-pipeline + model-bakeoff
-- status: in_progress
+- status: done
 - owner: INFRA (2026-07-03)
 - team: INFRA
 - blockedBy: —
@@ -206,3 +206,22 @@ groen (`npx tsc --noEmit`, `scripts/models-smoke.ts`, nieuw
 real-esrgan, E09-portretset) → default-flip + Topaz-unitprijs verifiëren →
 models-smoke-assert omzetten. NB: de reapplyAlpha-fix alleen al zou de
 haarklacht grotendeels moeten verhelpen — óók op de huidige default.
+
+**Result (deel 2, bakeoff + default — 2026-07-03):** bakeoff gedraaid met
+`scripts/upscale-bakeoff.ts`: 4 armen × 5 E09-portretten, live Replicate-runs
+door de échte pipeline (bleedFlatten → upscale → reapplyAlpha, directe
+lib-calls met eigen token; het HTTP-endpoint zelf zit achter Vercel-
+deployment-protection en is codepad-identiek). 20/20 geslaagd (1 google-
+timeout, retry OK); throttle 11s conform de Replicate-regel. Sheets + 100%-
+crops (donker/licht): **topaz wint** — scherpste mét natuurlijke huidtextuur
+en intacte identiteit; google nipt tweede (hardere contrast-look, 1×
+50s-timeout); crystal goed maar diffusie-look; real-esrgan óók zonder
+face_enhance de gladde verliezer. Haarranden overal schoon op beide
+achtergronden — bleed + alpha-fix bevestigd; crystal-unversioned live
+bevestigd (41.3 definitief gesloten). Default → `topaz`
+(topazlabs/image-upscale, unversioned officieel), models-smoke-assert
+omgezet; tsc + beide smokes groen. Preview-deploy avatars-qgghat2yg (en
+herdeployed na de flip). Sheets: scratchpad `e41-bakeoff/sheets/`.
+**Follow-up Thierry:** (1) Topaz-unitprijs verifiëren op
+replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid);
+(2) prod-deploy van de backend (E43-flow) om de fix live te zetten.

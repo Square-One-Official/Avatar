@@ -127,19 +127,20 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3 + E41.1 + E41.4: Boost resolution. Default blijft real-esrgan tot
-  // de 41.4-bakeoff op een preview-deploy de beoogde winnaar (topaz, High
-  // Fidelity V2) visueel bevestigt — de crystal-les: nooit een default
-  // flippen zonder live test. Beoordeling: identiteit (sproeten/sieraden
-  // intact), haarranden, unit-billing van topaz.
+  // E10.3 + E41.1 + E41.4: Boost resolution. Default = topaz (Gigapixel High
+  // Fidelity V2): won de E41.4-bakeoff (2026-07-03, 4 armen × 5 E09-
+  // portretten, live Replicate-runs door de echte pipeline) op detailbehoud
+  // + natuurlijke huidtextuur zonder identiteitsdrift; 8–15s per run.
+  // real-esrgan bleef ook zonder face_enhance de "plastic" verliezer.
   // Crystal-422-naschrift (2026-07-03): de in E41.3 gepinde hash wás de
   // huidige latest (zonder login verifieerbaar — `latest_version` staat in
   // de HTML van de modelpagina). 422 "Invalid version or not permitted"
   // betekent dat dit model geen versioned runs toestaat → unversioned ref,
-  // met een expliciete uitzondering op de pin-guard in models-smoke.ts.
+  // met een expliciete uitzondering op de pin-guard in models-smoke.ts;
+  // unversioned live bevestigd in de bakeoff.
   // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix.
   upscale: {
-    defaultModel: "real-esrgan",
+    defaultModel: "topaz",
     models: {
       topaz: {
         ref: "topazlabs/image-upscale",
