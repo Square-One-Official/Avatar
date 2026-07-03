@@ -58,13 +58,12 @@ struct BackgroundPanel: View {
     @State private var unsplashResults: [UnsplashPhoto] = BackgroundPanel.unsplashCache
     @State private var unsplashEnabled: Bool? = BackgroundPanel.unsplashEnabledCache
     @State private var unsplashLoading = false
-    // Inline generate-composer (audit #3).
-    @State private var generateType: GenerateType = .general
-    @State private var generatePrompt = ""
+    // Inline generate-composer (audit #3). De sessie-state leeft BUITEN de
+    // view (BackgroundGenerateSession.shared): de popover wordt bij sluiten
+    // vernietigd, maar een lopende generatie moet doorlopen én zichtbaar
+    // blijven wanneer de gebruiker terugkomt (UX-audit ronde 4).
+    @State private var generateSession = BackgroundGenerateSession.shared
     @State private var showTypeMenu = false
-    @State private var isGenerating = false
-    @State private var generateError: String?
-    @State private var generateCoordinator = BackgroundGenerationCoordinator()
     // E40.1: gemaakte banners als achtergrond-bron (BannerDoc-previews).
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
     private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
@@ -115,6 +114,9 @@ struct BackgroundPanel: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await loadCMSBackgrounds() }
+        // Ronde 4: opent het paneel terwijl er nog gegenereerd wordt, toon
+        // dan direct de Generate-tab met de lopende status i.p.v. Gallery.
+        .onAppear { if generateSession.isGenerating { tab = .generate } }
     }
 
     // MARK: Header — tabs links, Original/None-pills rechts (audit #4)
@@ -124,7 +126,12 @@ struct BackgroundPanel: View {
             HStack(alignment: .bottom, spacing: DSSpacing.gap4) {
                 tabButton("Gallery", .gallery)
                 if entitlement != nil { tabButton("Unsplash", .unsplash) }
-                if showsGenerateTab { tabButton("Generate", .generate) }
+                if showsGenerateTab {
+                    // Mini-spinner in de tab zelf: ook vanuit Gallery/Unsplash
+                    // zichtbaar dat er een generatie loopt.
+                    tabButton("Generate", .generate,
+                              showsProgress: generateSession.isGenerating)
+                }
                 Spacer()
                 modePills.padding(.bottom, DSSpacing.gap1)
             }
@@ -135,19 +142,27 @@ struct BackgroundPanel: View {
     }
 
     /// Tab-knop met Notion-achtige actieve underline die op de divider ligt.
-    private func tabButton(_ title: String, _ value: PickerTab) -> some View {
+    /// `showsProgress` toont een mini-spinner vóór het label (lopende generatie).
+    private func tabButton(
+        _ title: String, _ value: PickerTab, showsProgress: Bool = false
+    ) -> some View {
         let isActive = tab == value
         return Button { tab = value } label: {
-            Text(title)
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(isActive ? DSColor.Foreground.primary
-                                          : DSColor.Foreground.muted)
-                .padding(.bottom, DSSpacing.gap2)
-                .overlay(alignment: .bottom) {
-                    Capsule()
-                        .fill(isActive ? DSColor.Foreground.primary : .clear)
-                        .frame(height: 2)
+            HStack(spacing: DSSpacing.gap1) {
+                if showsProgress {
+                    ProgressView().controlSize(.mini)
                 }
+                Text(title)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(isActive ? DSColor.Foreground.primary
+                                              : DSColor.Foreground.muted)
+            }
+            .padding(.bottom, DSSpacing.gap2)
+            .overlay(alignment: .bottom) {
+                Capsule()
+                    .fill(isActive ? DSColor.Foreground.primary : .clear)
+                    .frame(height: 2)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -438,43 +453,6 @@ struct BackgroundPanel: View {
 
     // MARK: Generate-tab (audit #3) — inline composer à la Notion AI
 
-    /// Prompt-type dat de server-side promptcompositie aanstuurt: Photo mapt
-    /// op de bestaande photorealistic-stijl; General/Pattern sturen via de
-    /// custom-styletekst (≤120 tekens, zie /v1/generate-background).
-    private enum GenerateType: String, CaseIterable, Identifiable {
-        case general, photo, pattern
-
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .general: "General"
-            case .photo: "Photo"
-            case .pattern: "Pattern"
-            }
-        }
-
-        var iconName: String {
-            switch self {
-            case .general: "sparkles"
-            case .photo: "photo"
-            case .pattern: "infinity"
-            }
-        }
-
-        var styleKey: BackgroundGenerationStyle {
-            self == .photo ? .photorealistic : .custom
-        }
-
-        var customStyleText: String {
-            switch self {
-            case .general: "high quality, cohesive style that best fits the description"
-            case .photo: ""
-            case .pattern: "seamless repeating pattern, flat all-over graphic texture, no perspective"
-            }
-        }
-    }
-
     private var generateTab: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap3) {
             if BackgroundGenerationCatalog.defaultModel() == .apple {
@@ -483,8 +461,15 @@ struct BackgroundPanel: View {
                 appleGenerateFallback
             } else {
                 composer
-                if let generateError {
-                    Text(generateError)
+                if generateSession.isGenerating {
+                    HStack(spacing: DSSpacing.gap2) {
+                        ProgressView().controlSize(.small)
+                        Text("Generating background…")
+                            .dsTextStyle(.labelSmall)
+                            .foregroundStyle(DSColor.Foreground.muted)
+                    }
+                } else if let message = generateSession.errorMessage {
+                    Text(message)
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.destructive)
                 }
@@ -500,10 +485,11 @@ struct BackgroundPanel: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+        @Bindable var session = generateSession
+        return VStack(alignment: .leading, spacing: DSSpacing.gap3) {
             TextField(
                 "",
-                text: $generatePrompt,
+                text: $session.prompt,
                 prompt: Text("Generate a pattern, artwork, photo…")
                     .foregroundStyle(DSColor.Foreground.muted),
                 axis: .vertical
@@ -513,6 +499,9 @@ struct BackgroundPanel: View {
             .foregroundStyle(DSColor.Foreground.primary)
             .lineLimit(3...5)
             .onSubmit(runInlineGenerate)
+            // Tijdens een lopende generatie: prompt vast (hij hoort bij de
+            // run) — stoppen kan via de knop rechts.
+            .disabled(generateSession.isGenerating)
             HStack {
                 typeChip
                 Spacer()
@@ -532,9 +521,9 @@ struct BackgroundPanel: View {
     private var typeChip: some View {
         Button { showTypeMenu.toggle() } label: {
             HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: generateType.iconName)
+                Image(systemName: generateSession.type.iconName)
                     .font(.system(size: 11, weight: .medium))
-                Text(generateType.label).dsTextStyle(.labelSmall)
+                Text(generateSession.type.label).dsTextStyle(.labelSmall)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
             }
@@ -544,18 +533,19 @@ struct BackgroundPanel: View {
             .background(DSColor.Background.neutral, in: Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(generateSession.isGenerating)
         .help("Choose what to generate")
         // Caret-loos DS-dropdown (geen systeem-popover), boven de chip zoals
         // Notion — onder de chip zit alleen nog de paneel-voet.
         .dsDropdownMenu(isPresented: $showTypeMenu, anchorHeight: 28, placement: .above) {
             DSContextMenuPanel(minWidth: 150) {
-                ForEach(GenerateType.allCases) { type in
+                ForEach(BackgroundGenerateType.allCases) { type in
                     DSMenuRow(
                         type.label,
                         icon: type.iconName,
-                        shortcut: type == generateType ? "✓" : nil
+                        shortcut: type == generateSession.type ? "✓" : nil
                     ) {
-                        generateType = type
+                        generateSession.type = type
                         showTypeMenu = false
                     }
                 }
@@ -564,13 +554,19 @@ struct BackgroundPanel: View {
     }
 
     private var submitButton: some View {
-        let promptEmpty = generatePrompt
+        let isGenerating = generateSession.isGenerating
+        let promptEmpty = generateSession.prompt
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return Button(action: runInlineGenerate) {
+        return Button {
+            if isGenerating { generateSession.cancel() } else { runInlineGenerate() }
+        } label: {
             ZStack {
                 Circle().fill(DSColor.Action.primary)
                 if isGenerating {
-                    ProgressView().controlSize(.small)
+                    // Klikbaar tijdens de run: stop-teken bovenop de spinner.
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(DSColor.Action.onAction)
                 } else {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 12, weight: .bold))
@@ -580,9 +576,9 @@ struct BackgroundPanel: View {
             .frame(width: 28, height: 28)
         }
         .buttonStyle(.plain)
-        .disabled(isGenerating || promptEmpty)
+        .disabled(promptEmpty && !isGenerating)
         .opacity(promptEmpty && !isGenerating ? 0.4 : 1)
-        .help("Generate")
+        .help(isGenerating ? "Stop generating" : "Generate")
     }
 
     private var appleGenerateFallback: some View {
@@ -609,35 +605,14 @@ struct BackgroundPanel: View {
     }
 
     private func runInlineGenerate() {
-        guard let entitlement, !isGenerating else { return }
-        let prompt = generatePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
-        isGenerating = true
-        generateError = nil
-        let type = generateType
-        Task {
-            defer { isGenerating = false }
-            do {
-                let raw = try await generateCoordinator.generate(
-                    model: BackgroundGenerationCatalog.defaultModel(),
-                    context: .portrait,
-                    style: type.styleKey,
-                    customStyleText: type.customStyleText,
-                    view: .any,
-                    prompt: prompt,
-                    entitlement: entitlement
-                )
-                // Bewaren als herbruikbare upload-tegel + meteen toepassen.
-                let stored = customImages.add(raw) ?? raw
-                apply(.image(stored))
-                generatePrompt = ""
-            } catch is CancellationError {
-                // Geannuleerd (nieuwe generate of paneel dicht) — geen melding.
-            } catch let error as BackgroundGenerationError {
-                if let message = error.errorDescription { generateError = message }
-            } catch {
-                generateError = error.localizedDescription
-            }
+        guard let entitlement else { return }
+        // De apply-closure bindt het NU actieve portret (via `apply`): het
+        // resultaat landt goed, óók als het paneel intussen gesloten is of
+        // de gebruiker ergens anders heen genavigeerd is.
+        generateSession.start(entitlement: entitlement) { raw in
+            // Bewaren als herbruikbare upload-tegel + meteen toepassen.
+            let stored = BackgroundImageKit.shared.add(raw) ?? raw
+            apply(.image(stored))
         }
     }
 
@@ -894,4 +869,99 @@ struct BackgroundPanel: View {
         apply(.image(data))
     }
 
+}
+
+// MARK: - Inline generate: type + sessie (UX-audit ronde 4)
+
+/// Prompt-type dat de server-side promptcompositie aanstuurt: Photo mapt op
+/// de bestaande photorealistic-stijl; General/Pattern sturen via de
+/// custom-styletekst (≤120 tekens, zie /v1/generate-background).
+enum BackgroundGenerateType: String, CaseIterable, Identifiable {
+    case general, photo, pattern
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .general: "General"
+        case .photo: "Photo"
+        case .pattern: "Pattern"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .general: "sparkles"
+        case .photo: "photo"
+        case .pattern: "infinity"
+        }
+    }
+
+    var styleKey: BackgroundGenerationStyle {
+        self == .photo ? .photorealistic : .custom
+    }
+
+    var customStyleText: String {
+        switch self {
+        case .general: "high quality, cohesive style that best fits the description"
+        case .photo: ""
+        case .pattern: "seamless repeating pattern, flat all-over graphic texture, no perspective"
+        }
+    }
+}
+
+/// Sessie-state + uitvoering van de inline generate-composer, bewust BUITEN
+/// de view: de Background-popover wordt bij sluiten/tab-wissel van de toolbar
+/// vernietigd, maar een lopende generatie moet doorlopen en haar status
+/// (prompt, spinner, foutmelding) tonen wanneer de gebruiker terugkomt —
+/// niet resetten naar een lege composer (UX-audit ronde 4).
+@MainActor
+@Observable
+final class BackgroundGenerateSession {
+    static let shared = BackgroundGenerateSession()
+
+    var prompt = ""
+    var type: BackgroundGenerateType = .general
+    private(set) var isGenerating = false
+    private(set) var errorMessage: String?
+
+    @ObservationIgnored private let coordinator = BackgroundGenerationCoordinator()
+
+    /// Start een generatie. De apply-closure wordt op startmoment gebonden
+    /// (portret/batch-target van dat moment), dus het resultaat landt goed
+    /// óók als het paneel intussen weg is.
+    func start(entitlement: EntitlementModel, apply: @escaping @MainActor (Data) -> Void) {
+        let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isGenerating else { return }
+        isGenerating = true
+        errorMessage = nil
+        let type = type
+        Task {
+            defer { isGenerating = false }
+            do {
+                let raw = try await coordinator.generate(
+                    model: BackgroundGenerationCatalog.defaultModel(),
+                    context: .portrait,
+                    style: type.styleKey,
+                    customStyleText: type.customStyleText,
+                    view: .any,
+                    prompt: text,
+                    entitlement: entitlement
+                )
+                apply(raw)
+                prompt = ""
+            } catch is CancellationError {
+                // Gestopt door de gebruiker — geen melding.
+            } catch let error as BackgroundGenerationError {
+                if let message = error.errorDescription { errorMessage = message }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Stop-knop in de composer: annuleert de lopende cloud-call.
+    func cancel() {
+        coordinator.cancel()
+    }
 }
