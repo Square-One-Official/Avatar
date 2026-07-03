@@ -150,7 +150,8 @@ struct PlatformChrome<Banner: View, Avatar: View>: View {
                 .contentShape(Rectangle())
                 .previewTapTarget(
                     in: coordinateSpace,
-                    enabled: onBannerTap != nil
+                    enabled: onBannerTap != nil,
+                    hoverShape: .rectangle
                 ) { onBannerTap?($0) }
 
             ringedAvatar(diameter: d)
