@@ -57,29 +57,3 @@ enum SocialPlatform: String, CaseIterable, Identifiable {
         }
     }
 }
-
-/// E34: de keuze in de preview-segmented-control — één platform of alles tegelijk.
-enum PreviewTab: String, CaseIterable, Identifiable {
-    case linkedIn, x, instagram, all
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .linkedIn: "LinkedIn"
-        case .x: "X"
-        case .instagram: "Instagram"
-        case .all: "All"
-        }
-    }
-
-    /// De platforms die deze tab toont (All = alle drie).
-    var platforms: [SocialPlatform] {
-        switch self {
-        case .linkedIn: [.linkedIn]
-        case .x: [.x]
-        case .instagram: [.instagram]
-        case .all: SocialPlatform.allCases
-        }
-    }
-}
