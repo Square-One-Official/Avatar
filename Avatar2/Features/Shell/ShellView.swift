@@ -393,19 +393,24 @@ struct ShellView: View {
     }
 
     private var editorTopChromeBand: some View {
-        HStack(alignment: .top, spacing: DSSpacing.gap2) {
-            if model.editingBanner != nil && !model.isShowingSettings {
-                BannerBreadcrumb(model: model)
-                    .padding(.leading, shellEditorBreadcrumbLeading)
-                    .transition(.opacity)
-                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
-            } else if model.section == .editor && !model.isShowingSettings {
-                LibraryBreadcrumb(model: model)
-                    .padding(.leading, shellEditorBreadcrumbLeading)
-                    .transition(.opacity)
-                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+        ZStack(alignment: .topLeading) {
+            HStack(alignment: .top, spacing: DSSpacing.gap2) {
+                Group {
+                    if model.editingBanner != nil && !model.isShowingSettings {
+                        BannerBreadcrumb(model: model)
+                            .transition(.opacity)
+                    } else if model.section == .editor && !model.isShowingSettings {
+                        LibraryBreadcrumb(model: model)
+                            .transition(.opacity)
+                    }
+                }
+                .padding(.leading, shellEditorBreadcrumbLeading)
+                .padding(.top, ShellMetrics.breadcrumbTopInset)
+                .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+
+                Spacer(minLength: DSSpacing.gap2)
             }
-            Spacer(minLength: DSSpacing.gap2)
+
             ShellTopBar(
                 isSettingsActive: model.isShowingSettings,
                 onToggleSettings: { model.isShowingSettings.toggle() },
@@ -432,13 +437,11 @@ struct ShellView: View {
                     }
                 }
             )
+            .padding(.top, ShellMetrics.shellTopBarControlTopInset)
+            .frame(maxWidth: .infinity, alignment: .topTrailing)
         }
-        // UXS-29(v2): de band negeert de toolbar-safe-area en pint op de oude
-        // contentTop-lijn — identiek aan vóór de toolbar (de editor-canvas-
-        // chips rekenen op deze vrije hoogte).
-        .padding(.top, ShellMetrics.contentTopSafeArea + ShellMetrics.topBarTopInset)
         .frame(maxWidth: .infinity, alignment: .top)
-        .frame(height: ShellMetrics.contentTopSafeArea + ShellMetrics.topBarBandHeight, alignment: .top)
+        .frame(height: ShellMetrics.editorTopChromeBandHeight, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
     }
 
@@ -446,12 +449,13 @@ struct ShellView: View {
     /// bewust onafhankelijk van `studioFullBleed` (UXS-28/UX35): de oude
     /// `gap3`-tak rekende alsof de band in de content-kolom leefde, waardoor de
     /// breadcrumb bij Edit↔Preview ~248pt versprong (tot óver de sidebar).
-    /// Sidebar open → ná de sidebar-kaart; dicht → ná traffic-lights + toggle.
+    /// Sidebar open → ná de sidebar-kaart; dicht → panel-inset (breadcrumb zit
+    /// onder de traffic-light-rij, dus geen ruimte nodig voor toggle).
     private var shellEditorBreadcrumbLeading: CGFloat {
         if model.isLeftNavVisible {
             return LeftNavView.layoutWidth + DSSpacing.gap3
         }
-        return ShellMetrics.editorBreadcrumbLeadingCollapsed - ShellMetrics.windowEdgeInset
+        return ShellMetrics.editorBreadcrumbLeadingCollapsed
     }
 
     private var isolatingStatusLabel: String? {

@@ -32,10 +32,11 @@ enum ShellMetrics {
     /// Sidebar-toggle breedte (ShellSidebarChrome) — sync met SidebarToggleButton.
     static let sidebarToggleWidth: CGFloat = 28
 
-    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is: ná traffic-
-    /// lights + sidebar-toggle + ademruimte (niet onder vensterknoppen).
+    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is. De breadcrumb
+    /// zit op een lagere rij (onder traffic-lights), dus mag hij op panel-inset
+    /// starten i.p.v. ná de sidebar-toggle.
     static var editorBreadcrumbLeadingCollapsed: CGFloat {
-        topBarLeadingAfterWindowControls + sidebarToggleWidth + DSSpacing.gap3
+        windowEdgeInset
     }
 
     /// Hoogte van de band waarin de quota-teller verticaal centreert zodat
@@ -62,9 +63,21 @@ enum ShellMetrics {
     /// Editor-topbar (breadcrumb + view-toggle + Share): control-hoogte.
     static let topBarRowHeight: CGFloat = 28
 
-    /// Verticale offset van breadcrumb/Share t.o.v. de top-chrome-band — centreert
-    /// de 28pt-controls op de traffic-light-middellijn (32pt band).
-    static let topBarTopInset: CGFloat = (windowControlsRowHeight - topBarRowHeight) / 2
+    /// Top-inset van Share / Edit / Preview — centreert de 28pt-controls op de
+    /// traffic-light-middellijn (zelfde hoogte als de vensterknoppen).
+    static var shellTopBarControlTopInset: CGFloat {
+        windowControlsCenterFromTop - topBarRowHeight / 2
+    }
+
+    /// Top-inset van de breadcrumb — onder de traffic-light-rij zodat geen overlap.
+    static var breadcrumbTopInset: CGFloat {
+        windowControlsCenterFromTop + windowControlsRowHeight / 2 + DSSpacing.gap1_5
+    }
+
+    /// Totale overlay-hoogte van de editor-top-chrome (breadcrumb + controls).
+    static var editorTopChromeBandHeight: CGFloat {
+        max(shellTopBarControlTopInset + topBarRowHeight, breadcrumbTopInset + topBarRowHeight)
+    }
 
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }
