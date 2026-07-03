@@ -31,6 +31,16 @@ als `prompt`).
   groen in `backend/` én `admin/`; `build-v2.sh` "alles groen" (beide targets + Avatar2-tests +
   AvatarKit/AvatarUI-suites). Port-only: backend- én admin-deploy nog niet gedaan — expliciet
   besluit Thierry; daarna referenties seeden in het CMS (→ 54.2-bakeoff).
+- Result (deploy 2026-07-04, op verzoek Thierry): SQL-migratie
+  [017](../backend/sql/017_payload_effects_style_references.sql) door Thierry toegepast
+  (Supabase SQL-editor; DDL 1:1 uit offline `payload migrate:create`-snapshot). Backend
+  (avatars-api) én admin (avatar-admin) naar prod via Vercel CLI — beide vanaf repo-root
+  (rootDirectory-setting; admin vergde een tijdelijke `.vercelignore`-swap, direct teruggezet).
+  Keten geverifieerd: admin 307→/mfa, `/v1/effects` 200 met gevulde lijst (= join op de nieuwe
+  tabel werkt), `/v1/banner-presets` 200. Bijvangst gefixt (5c38834): de nieuwe Payload-build
+  hangt `?prefix=media` aan media-URLs waardoor de geankerde `thumbnailVariant`-regex (E52.1)
+  elke thumbnail ongetransformeerd doorliet — query wordt nu genegeerd; render-variant
+  prod-geverifieerd. Klaar voor gebruik: referenties per effect uploaden in het CMS.
 
 Scope:
 - `admin/src/collections/Effects.ts`: array-veld `styleReferences` (1–4 rijen, elk een
