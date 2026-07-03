@@ -32,11 +32,10 @@ enum ShellMetrics {
     /// Sidebar-toggle breedte (ShellSidebarChrome) — sync met SidebarToggleButton.
     static let sidebarToggleWidth: CGFloat = 28
 
-    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is. De breadcrumb
-    /// zit op een lagere rij (onder traffic-lights), dus mag hij op panel-inset
-    /// starten i.p.v. ná de sidebar-toggle.
+    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is: direct ná de
+    /// sidebar-toggle, op dezelfde rij als traffic-lights + toggle.
     static var editorBreadcrumbLeadingCollapsed: CGFloat {
-        windowEdgeInset
+        topBarLeadingAfterWindowControls + sidebarToggleWidth + DSSpacing.gap2
     }
 
     /// Hoogte van de band waarin de quota-teller verticaal centreert zodat
@@ -63,20 +62,15 @@ enum ShellMetrics {
     /// Editor-topbar (breadcrumb + view-toggle + Share): control-hoogte.
     static let topBarRowHeight: CGFloat = 28
 
-    /// Top-inset van Share / Edit / Preview — centreert de 28pt-controls op de
-    /// traffic-light-middellijn (zelfde hoogte als de vensterknoppen).
+    /// Top-inset van breadcrumb + Share/Edit/Preview — centreert de 28pt-controls
+    /// op de traffic-light-middellijn (zelfde hoogte als vensterknoppen + toggle).
     static var shellTopBarControlTopInset: CGFloat {
         windowControlsCenterFromTop - topBarRowHeight / 2
     }
 
-    /// Top-inset van de breadcrumb — onder de traffic-light-rij zodat geen overlap.
-    static var breadcrumbTopInset: CGFloat {
-        windowControlsCenterFromTop + windowControlsRowHeight / 2 + DSSpacing.gap1_5
-    }
-
     /// Totale overlay-hoogte van de editor-top-chrome (breadcrumb + controls).
     static var editorTopChromeBandHeight: CGFloat {
-        max(shellTopBarControlTopInset + topBarRowHeight, breadcrumbTopInset + topBarRowHeight)
+        shellTopBarControlTopInset + topBarRowHeight
     }
 
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
