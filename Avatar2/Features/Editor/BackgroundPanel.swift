@@ -1,14 +1,19 @@
 // Background-paneel (E07.1) — Notion-cover-picker-model (besluit Thierry,
-// 2026-07-03): een tab-header (Gallery · Upload · Generate, "Remove" rechts)
-// boven een verticaal scrollend grid met sectiekoppen en brede 16:10-tegels.
-//   - Gallery: Original (als de foto bewaard is) → Color & Gradient (picker,
-//     DS-kleuren, brand colors, gradient-presets) → CMS-categorieën.
+// 2026-07-03, aangescherpt met audit-ronde 2):
+//   - Tab-header: Gallery · Unsplash · Upload · Generate; rechts twee
+//     modus-pills "Original" / "None" (de vage "Remove" is vervallen).
+//   - Gallery: verticaal scrollend 4-koloms grid met sectiekoppen — Color &
+//     Gradient (picker-"+", DS-kleuren, brand colors met hover-verwijderen,
+//     gradients) en de CMS-categorieën mét tegel-labels (Notion-stijl).
+//   - Unsplash: zoekveld + editorial/zoek-grid via de /v1/unsplash-proxy
+//     (attributie onder elke tegel, download-registratie bij apply).
 //   - Upload: "+"-tegel + de persistente eigen uploads (E24.24).
-//   - Generate: entrypoint naar de E42-generatie-sheet (Notion AI-equivalent).
-//   - Remove: de vrijstaande cutout zonder achtergrond (E24.31-"None").
-// Een keuze schrijft op het Portrait2 (kleur xor afbeelding); het canvas toont
-// de achtergrond live (E07.2 doet de exportkwaliteit-compositing). Elke tegel
-// toont zijn selected-state.
+//   - Generate: inline composer à la Notion AI — promptveld + type-dropdown
+//     (General/Photo/Pattern) die de server-side promptcompositie écht
+//     aanstuurt; Apple-tier valt terug op de E42-sheet (Image Playground).
+// Een keuze schrijft op het Portrait2 (kleur xor afbeelding); het canvas
+// toont de achtergrond live (E07.2 doet de exportkwaliteit-compositing).
+// Elke tegel toont zijn selected-state.
 
 import AppKit
 import AvatarKit
@@ -23,8 +28,8 @@ struct BackgroundPanel: View {
     /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
     /// `portrait` blijft de bron voor display/selectie-state (Original/custom).
     var onApply: ((PortraitBackground) -> Void)? = nil
-    /// Benodigd voor de CMS-achtergronden-fetch; optioneel zodat bestaande
-    /// aanroeplocaties zonder entitlement blijven werken.
+    /// Benodigd voor de CMS/Unsplash-fetches en de generatie; optioneel zodat
+    /// bestaande aanroeplocaties zonder entitlement blijven werken.
     var entitlement: EntitlementModel? = nil
     /// UX-audit: banners-als-achtergrond (E40) is een matched-background-
     /// concept (Social Preview), geen generieke achtergrond-keuze. De sectie
@@ -32,7 +37,7 @@ struct BackgroundPanel: View {
     /// editor en het board doen dat niet.
     var showsBanners: Bool = false
 
-    private enum PickerTab: Hashable { case gallery, upload, generate }
+    private enum PickerTab: Hashable { case gallery, unsplash, upload, generate }
     @State private var tab: PickerTab = .gallery
 
     @State private var brand = BrandColorKit.shared
@@ -41,37 +46,53 @@ struct BackgroundPanel: View {
     // E25.2: DSColorPicker vanuit de "+"-tegel in Color & Gradient.
     @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
+    // Hover-state voor het verwijder-kruisje op brand-kleuren (audit #1).
+    @State private var hoveredBrandHex: String?
     // CMS-achtergronden (E33+). Sessie-cache zodat herhaalbaar openen
     // geen flits geeft; leeg = nog niet geladen (geen fallback nodig).
     @State private var cmsBackgrounds: [RemoteBackground] = BackgroundPanel.sessionCache
     // CMS-gradient-presets (E33+). Leeg = fallback op BackgroundKit.gradientPresets.
     @State private var cmsGradients: [RemoteGradientPreset] = BackgroundPanel.gradientCache
+    // Unsplash (audit #5). Editorial feed sessie-gecachet; zoeken is live.
+    @State private var unsplashQuery = ""
+    @State private var unsplashResults: [UnsplashPhoto] = BackgroundPanel.unsplashCache
+    @State private var unsplashEnabled: Bool? = BackgroundPanel.unsplashEnabledCache
+    @State private var unsplashLoading = false
+    // Inline generate-composer (audit #3).
+    @State private var generateType: GenerateType = .general
+    @State private var generatePrompt = ""
+    @State private var showTypeMenu = false
+    @State private var isGenerating = false
+    @State private var generateError: String?
+    @State private var generateCoordinator = BackgroundGenerationCoordinator()
     // E40.1: gemaakte banners als achtergrond-bron (BannerDoc-previews).
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
     private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
 
     private static var sessionCache: [RemoteBackground] = []
     private static var gradientCache: [RemoteGradientPreset] = []
+    private static var unsplashCache: [UnsplashPhoto] = []
+    private static var unsplashEnabledCache: Bool?
 
-    // UX-audit: welke bron (gradient/CMS) de huidige `.image`-bytes leverde,
-    // vastgelegd op apply-moment (bron-key → content-signature). Nodig omdat
-    // een CMS-keuze de vólle resolutie toepast (≠ thumbnail-bytes) en een
-    // gradient pas bij keuze gerenderd wordt. Sessie-scope: na een herstart is
-    // alleen deze highlight kwijt, de achtergrond zelf niet.
+    // UX-audit: welke bron (gradient/CMS/Unsplash) de huidige `.image`-bytes
+    // leverde, vastgelegd op apply-moment (bron-key → content-signature).
+    // Nodig omdat die bronnen de volle resolutie toepassen (≠ thumbnail-bytes)
+    // of pas bij keuze renderen. Sessie-scope: na een herstart is alleen deze
+    // highlight kwijt, de achtergrond zelf niet.
     private static var appliedSourceSignatures: [String: Int] = [:]
     // Custom uploads zijn wél persistent vergelijkbaar: signature van de
     // opgeslagen PNG, één keer per id berekend (scheelt disk-reads per render).
     private static var customImageSignatures: [String: Int] = [:]
 
-    /// Brede Notion-achtige tegels: 3 kolommen, 16:10.
+    /// Brede Notion-achtige tegels: 4 kolommen, 16:10 (paneel is 440pt).
     private let gridColumns = Array(
         repeating: GridItem(.flexible(), spacing: DSSpacing.gap2),
-        count: 3
+        count: 4
     )
     private let tileAspect: CGFloat = 16.0 / 10.0
     /// Vaste content-hoogte zodat het paneel niet verspringt bij tab-wissel
     /// (zelfde geest als de pixelvaste breadcrumb, UXS-28).
-    private let contentHeight: CGFloat = 340
+    private let contentHeight: CGFloat = 360
 
     private var showsGenerateTab: Bool {
         entitlement != nil && BackgroundGenerationCatalog.hasGenerationPath
@@ -85,6 +106,7 @@ struct BackgroundPanel: View {
             header
             switch tab {
             case .gallery: galleryTab
+            case .unsplash: unsplashTab
             case .upload: uploadTab
             case .generate: generateTab
             }
@@ -93,23 +115,17 @@ struct BackgroundPanel: View {
         .task { await loadCMSBackgrounds() }
     }
 
-    // MARK: Header — tabs links, Remove rechts (Notion-model)
+    // MARK: Header — tabs links, Original/None-pills rechts (audit #4)
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .bottom, spacing: DSSpacing.gap4) {
                 tabButton("Gallery", .gallery)
+                if entitlement != nil { tabButton("Unsplash", .unsplash) }
                 tabButton("Upload", .upload)
                 if showsGenerateTab { tabButton("Generate", .generate) }
                 Spacer()
-                Button { selectTransparent() } label: {
-                    Text("Remove")
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                        .padding(.bottom, DSSpacing.gap2)
-                }
-                .buttonStyle(.plain)
-                .help("Remove the background (transparent cut-out)")
+                modePills.padding(.bottom, DSSpacing.gap1)
             }
             Rectangle()
                 .fill(DSColor.Foreground.divider)
@@ -135,19 +151,44 @@ struct BackgroundPanel: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Gallery-tab — Original · Color & Gradient · CMS-categorieën
+    /// De achtergrond-modus als expliciete, gelabelde toggle: Original (foto
+    /// terug) of None (vrijstaande cutout). Actief = gevulde pill. Een keuze
+    /// uit de tabs eronder overschrijft beide (geen van beide actief).
+    private var modePills: some View {
+        HStack(spacing: DSSpacing.gap1) {
+            if originalImage != nil {
+                modePill("Original",
+                         isActive: portrait?.useOriginalBackground == true,
+                         help: "Show the original photo background") { selectOriginal() }
+            }
+            modePill("None", isActive: isTransparentSelected,
+                     help: "No background (transparent cut-out)") { selectTransparent() }
+        }
+    }
+
+    private func modePill(
+        _ label: String, isActive: Bool, help: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(isActive ? DSColor.Foreground.primary
+                                          : DSColor.Foreground.muted)
+                .padding(.horizontal, DSSpacing.gap2)
+                .padding(.vertical, DSSpacing.gap1)
+                .background {
+                    Capsule().fill(isActive ? DSColor.Background.neutralStronger : .clear)
+                }
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    // MARK: Gallery-tab — Color & Gradient · (Banners) · CMS-categorieën
 
     private var galleryTab: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                if let original = originalImage {
-                    gridSection("Original") {
-                        tile(isSelected: portrait?.useOriginalBackground == true) {
-                            Image(nsImage: original).resizable().scaledToFill()
-                        } action: { selectOriginal() }
-                        .help("Show the original photo background")
-                    }
-                }
                 gridSection("Color & Gradient") { colorAndGradientTiles }
                 if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
                     gridSection("Banners") { bannerTiles }
@@ -164,8 +205,7 @@ struct BackgroundPanel: View {
     @ViewBuilder
     private var colorAndGradientTiles: some View {
         // E25.2: "+"-tegel opent de DSColorPicker (met eigen eyedropper); live
-        // bijwerken terwijl de picker open is, bij sluiten als brand-swatch
-        // bewaren.
+        // bijwerken terwijl de picker open is.
         tile(isSelected: false) {
             Image(systemName: "plus")
                 .font(.system(size: 15, weight: .semibold))
@@ -183,15 +223,32 @@ struct BackgroundPanel: View {
             guard showColorPicker, let hex = c.hexRGB else { return }
             selectColor(hex)
         }
+        // Audit #1 (random shades): bewaar bij sluiten alléén de kleur die
+        // daadwerkelijk als achtergrond is toegepast — voorheen groeide de
+        // brand-rij met élke picker-sessie een willekeurige tussenstand.
         .onChange(of: showColorPicker) { _, open in
-            if !open, let hex = pickerColor.hexRGB { brand.add(hex) }
+            guard !open, let hex = pickerColor.hexRGB,
+                  portrait?.backgroundColorHex == hex else { return }
+            brand.add(hex)
         }
 
         ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
             colorTile(color)
         }
-        ForEach(brand.hexColors, id: \.self) { hex in
-            if let color = Color(hexRGB: hex) { colorTile(color, hex: hex) }
+
+        // Audit #1: toon maximaal de 8 recentste brand colors (de kit blijft
+        // alles bewaren); hover toont een verwijder-kruisje per kleur.
+        ForEach(Array(brand.hexColors.suffix(8)), id: \.self) { hex in
+            if let color = Color(hexRGB: hex) {
+                colorTile(color, hex: hex)
+                    .overlay(alignment: .topTrailing) {
+                        if hoveredBrandHex == hex { brandRemoveBadge(hex) }
+                    }
+                    .onHover { inside in
+                        if inside { hoveredBrandHex = hex }
+                        else if hoveredBrandHex == hex { hoveredBrandHex = nil }
+                    }
+            }
         }
 
         // Gradient-presets: CMS-gestuurd als aanwezig, anders hardgecodeerde fallback.
@@ -206,6 +263,23 @@ struct BackgroundPanel: View {
                 }
             }
         }
+    }
+
+    private func brandRemoveBadge(_ hex: String) -> some View {
+        Button { brand.remove(hex) } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(DSColor.Foreground.primary)
+                .padding(4)
+                .background(DSColor.Background.card, in: Circle())
+                .overlay {
+                    Circle().strokeBorder(DSColor.Foreground.divider,
+                                          lineWidth: DSBorderWidth.thin)
+                }
+        }
+        .buttonStyle(.plain)
+        .padding(DSSpacing.gap1)
+        .help("Remove this brand colour")
     }
 
     private func colorTile(_ color: Color, hex providedHex: String? = nil) -> some View {
@@ -224,16 +298,107 @@ struct BackgroundPanel: View {
 
     @ViewBuilder
     private func cmsTiles(for category: String) -> some View {
+        // Audit #2: CMS-tegels dragen hun label zichtbaar (Notion-stijl),
+        // niet alleen als hover-tooltip.
         ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
-            tile(isSelected: isAppliedSource(cmsKey(bg))) {
-                // E52.1: gedeelde memory/disk-cache + downsampled decode
-                // i.p.v. AsyncImage (URLCache helpt niet: Supabase stuurt
-                // `Cache-Control: no-cache`).
-                RemoteThumbnail(url: bg.thumbnailUrl) {
-                    Color(white: 0.85)
+            captioned(bg.label) {
+                tile(isSelected: isAppliedSource(cmsKey(bg))) {
+                    // E52.1: gedeelde memory/disk-cache + downsampled decode
+                    // i.p.v. AsyncImage (URLCache helpt niet: Supabase stuurt
+                    // `Cache-Control: no-cache`).
+                    RemoteThumbnail(url: bg.thumbnailUrl) {
+                        Color(white: 0.85)
+                    }
+                } action: { selectCMSBackground(bg) }
+            }
+        }
+    }
+
+    // MARK: Unsplash-tab (audit #5) — zoeken + editorial feed via backend-proxy
+
+    private var unsplashTab: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            DSSearchField(placeholder: "Search for an image…", text: $unsplashQuery)
+            Group {
+                if unsplashEnabled == false {
+                    unsplashHint("Unsplash is not configured yet — add an UNSPLASH_ACCESS_KEY to the backend.")
+                } else if unsplashResults.isEmpty {
+                    if unsplashLoading {
+                        ProgressView().controlSize(.small)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        unsplashHint(unsplashQuery.isEmpty
+                                     ? "Photos from Unsplash appear here."
+                                     : "No results for “\(unsplashQuery)”.")
+                    }
+                } else {
+                    ScrollView(.vertical) {
+                        LazyVGrid(columns: gridColumns, spacing: DSSpacing.gap2) {
+                            ForEach(unsplashResults) { photo in
+                                captioned(photo.authorName.map { "by \($0)" }) {
+                                    tile(isSelected: isAppliedSource("unsplash:" + photo.id)) {
+                                        RemoteThumbnail(url: photo.thumbUrl) {
+                                            Color(white: 0.85)
+                                        }
+                                    } action: { selectUnsplash(photo) }
+                                }
+                            }
+                        }
+                        .padding(DSSpacing.gap1)
+                    }
                 }
-            } action: { selectCMSBackground(bg) }
-            .help(bg.label)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(height: contentHeight)
+        .task(id: unsplashQuery) { await loadUnsplash() }
+    }
+
+    private func unsplashHint(_ text: String) -> some View {
+        Text(text)
+            .dsTextStyle(.bodySmall)
+            .foregroundStyle(DSColor.Foreground.muted)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, DSSpacing.gap6)
+    }
+
+    private func loadUnsplash() async {
+        guard let backend = entitlement?.backend else { return }
+        let query = unsplashQuery.trimmingCharacters(in: .whitespaces)
+        if query.isEmpty, !Self.unsplashCache.isEmpty {
+            unsplashResults = Self.unsplashCache
+            unsplashEnabled = Self.unsplashEnabledCache
+            return
+        }
+        if !query.isEmpty {
+            // Debounce: wacht even op verder typen (task(id:) annuleert de vorige).
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+        }
+        unsplashLoading = true
+        defer { unsplashLoading = false }
+        guard let feed = try? await backend.unsplashPhotos(query: query.isEmpty ? nil : query),
+              !Task.isCancelled else { return }
+        unsplashEnabled = feed.enabled
+        unsplashResults = feed.photos
+        if query.isEmpty {
+            Self.unsplashCache = feed.photos
+            Self.unsplashEnabledCache = feed.enabled
+        }
+    }
+
+    private func selectUnsplash(_ photo: UnsplashPhoto) {
+        Task {
+            guard let data = try? await URLSession.shared.data(from: photo.fullUrl).0 else { return }
+            await MainActor.run {
+                recordAppliedSource("unsplash:" + photo.id, data: data)
+                apply(.image(data))
+            }
+            // Unsplash-guideline: download registreren bij daadwerkelijk gebruik.
+            if let location = photo.downloadLocation {
+                await entitlement?.backend.unsplashTrackDownload(location)
+            }
         }
     }
 
@@ -267,9 +432,156 @@ struct BackgroundPanel: View {
         .frame(height: contentHeight)
     }
 
-    // MARK: Generate-tab — entrypoint naar de E42-sheet (Notion AI-equivalent)
+    // MARK: Generate-tab (audit #3) — inline composer à la Notion AI
+
+    /// Prompt-type dat de server-side promptcompositie aanstuurt: Photo mapt
+    /// op de bestaande photorealistic-stijl; General/Pattern sturen via de
+    /// custom-styletekst (≤120 tekens, zie /v1/generate-background).
+    private enum GenerateType: String, CaseIterable, Identifiable {
+        case general, photo, pattern
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .general: "General"
+            case .photo: "Photo"
+            case .pattern: "Pattern"
+            }
+        }
+
+        var iconName: String {
+            switch self {
+            case .general: "sparkles"
+            case .photo: "photo"
+            case .pattern: "infinity"
+            }
+        }
+
+        var styleKey: BackgroundGenerationStyle {
+            self == .photo ? .photorealistic : .custom
+        }
+
+        var customStyleText: String {
+            switch self {
+            case .general: "high quality, cohesive style that best fits the description"
+            case .photo: ""
+            case .pattern: "seamless repeating pattern, flat all-over graphic texture, no perspective"
+            }
+        }
+    }
 
     private var generateTab: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+            if BackgroundGenerationCatalog.defaultModel() == .apple {
+                // Apple-tier genereert via de native Image Playground-flow —
+                // die heeft de E42-sheet nodig, geen inline composer.
+                appleGenerateFallback
+            } else {
+                composer
+                if let generateError {
+                    Text(generateError)
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.destructive)
+                }
+                Spacer()
+                Text("Generate a custom image using AI based on your description · \(BackgroundGenerationContext.portrait.creditCost) credits")
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+        .frame(height: contentHeight)
+        .dsDropdownDismissOverlay(isPresented: $showTypeMenu)
+    }
+
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+            TextField(
+                "",
+                text: $generatePrompt,
+                prompt: Text("Generate a pattern, artwork, photo…")
+                    .foregroundStyle(DSColor.Foreground.muted),
+                axis: .vertical
+            )
+            .textFieldStyle(.plain)
+            .dsTextStyle(.bodySmall)
+            .foregroundStyle(DSColor.Foreground.primary)
+            .lineLimit(3...5)
+            .onSubmit(runInlineGenerate)
+            HStack {
+                typeChip
+                Spacer()
+                submitButton
+            }
+        }
+        .padding(DSSpacing.gap3)
+        .background {
+            RoundedRectangle(cornerRadius: DSRadius.lg).fill(DSColor.Background.neutral)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: DSRadius.lg)
+                .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+        }
+    }
+
+    private var typeChip: some View {
+        Button { showTypeMenu.toggle() } label: {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: generateType.iconName)
+                    .font(.system(size: 11, weight: .medium))
+                Text(generateType.label).dsTextStyle(.labelSmall)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .foregroundStyle(DSColor.Foreground.subtle)
+            .padding(.horizontal, DSSpacing.gap2)
+            .frame(height: 28)
+            .background(DSColor.Background.neutral, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Choose what to generate")
+        // Caret-loos DS-dropdown (geen systeem-popover), boven de chip zoals
+        // Notion — onder de chip zit alleen nog de paneel-voet.
+        .dsDropdownMenu(isPresented: $showTypeMenu, anchorHeight: 28, placement: .above) {
+            DSContextMenuPanel(minWidth: 150) {
+                ForEach(GenerateType.allCases) { type in
+                    DSMenuRow(
+                        type.label,
+                        icon: type.iconName,
+                        shortcut: type == generateType ? "✓" : nil
+                    ) {
+                        generateType = type
+                        showTypeMenu = false
+                    }
+                }
+            }
+        }
+    }
+
+    private var submitButton: some View {
+        let promptEmpty = generatePrompt
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return Button(action: runInlineGenerate) {
+            ZStack {
+                Circle().fill(DSColor.Action.primary)
+                if isGenerating {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(DSColor.Action.onAction)
+                }
+            }
+            .frame(width: 28, height: 28)
+        }
+        .buttonStyle(.plain)
+        .disabled(isGenerating || promptEmpty)
+        .opacity(promptEmpty && !isGenerating ? 0.4 : 1)
+        .help("Generate")
+    }
+
+    private var appleGenerateFallback: some View {
         VStack(spacing: DSSpacing.gap4) {
             Spacer()
             DSIcon(.sparkle, size: 28)
@@ -282,7 +594,6 @@ struct BackgroundPanel: View {
                 context: .portrait,
                 entitlement: entitlement,
                 onSaved: { data in
-                    // Bewaren als herbruikbare upload-tegel + meteen toepassen.
                     let stored = customImages.add(data) ?? data
                     apply(.image(stored))
                 }
@@ -291,7 +602,39 @@ struct BackgroundPanel: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .frame(height: contentHeight)
+    }
+
+    private func runInlineGenerate() {
+        guard let entitlement, !isGenerating else { return }
+        let prompt = generatePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return }
+        isGenerating = true
+        generateError = nil
+        let type = generateType
+        Task {
+            defer { isGenerating = false }
+            do {
+                let raw = try await generateCoordinator.generate(
+                    model: BackgroundGenerationCatalog.defaultModel(),
+                    context: .portrait,
+                    style: type.styleKey,
+                    customStyleText: type.customStyleText,
+                    view: .any,
+                    prompt: prompt,
+                    entitlement: entitlement
+                )
+                // Bewaren als herbruikbare upload-tegel + meteen toepassen.
+                let stored = customImages.add(raw) ?? raw
+                apply(.image(stored))
+                generatePrompt = ""
+            } catch is CancellationError {
+                // Geannuleerd (nieuwe generate of paneel dicht) — geen melding.
+            } catch let error as BackgroundGenerationError {
+                if let message = error.errorDescription { generateError = message }
+            } catch {
+                generateError = error.localizedDescription
+            }
+        }
     }
 
     // MARK: Grid-bouwstenen
@@ -302,8 +645,23 @@ struct BackgroundPanel: View {
             Text(title)
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
-            LazyVGrid(columns: gridColumns, spacing: DSSpacing.gap2) {
+            LazyVGrid(columns: gridColumns, alignment: .leading, spacing: DSSpacing.gap2) {
                 content()
+            }
+        }
+    }
+
+    /// Tegel met zichtbaar label eronder (Notion-stijl, audit #2).
+    private func captioned<Content: View>(
+        _ caption: String?, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            content()
+            if let caption {
+                Text(caption)
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(DSColor.Foreground.muted)
+                    .lineLimit(1)
             }
         }
     }
@@ -337,7 +695,7 @@ struct BackgroundPanel: View {
         portrait?.backgroundImageData.map(Portrait2.cutoutSignature)
     }
 
-    /// Is de bron met deze key (gradient/CMS) de huidige achtergrond?
+    /// Is de bron met deze key (gradient/CMS/Unsplash) de huidige achtergrond?
     private func isAppliedSource(_ key: String) -> Bool {
         guard let sig = currentImageSignature else { return false }
         return Self.appliedSourceSignatures[key] == sig
@@ -409,6 +767,15 @@ struct BackgroundPanel: View {
         return NSImage(data: data)
     }
 
+    /// Transparant geselecteerd = cutout zonder achtergrond (geen Original,
+    /// geen kleur/afbeelding).
+    private var isTransparentSelected: Bool {
+        guard let portrait else { return false }
+        return !portrait.useOriginalBackground
+            && portrait.backgroundColorHex == nil
+            && portrait.backgroundImageData == nil
+    }
+
     @ViewBuilder
     private var bannerTiles: some View {
         ForEach(savedBanners) { doc in
@@ -422,12 +789,14 @@ struct BackgroundPanel: View {
                 let linked = BannerDeletion.isLinked(portrait?.backgroundBannerID, to: doc)
                 let isCurrent = linked || portrait?.backgroundImageData == data
                 let isStale = linked && portrait?.backgroundImageData != data
-                tile(isSelected: isCurrent) {
-                    Image(nsImage: img).resizable().scaledToFill()
-                        .overlay(alignment: .topTrailing) {
-                            if isStale { updateBadge }
-                        }
-                } action: { applyBanner(doc) }
+                captioned(doc.name.isEmpty ? "Untitled banner" : doc.name) {
+                    tile(isSelected: isCurrent) {
+                        Image(nsImage: img).resizable().scaledToFill()
+                            .overlay(alignment: .topTrailing) {
+                                if isStale { updateBadge }
+                            }
+                    } action: { applyBanner(doc) }
+                }
                 .help(isStale
                       ? "This banner changed — click to update the background"
                       : (doc.name.isEmpty ? "Untitled banner" : doc.name))
@@ -470,7 +839,7 @@ struct BackgroundPanel: View {
         apply(.original)
     }
 
-    /// E24.31: terug naar de vrijstaande cutout zonder achtergrond ("Remove").
+    /// E24.31: terug naar de vrijstaande cutout zonder achtergrond ("None").
     private func selectTransparent() {
         apply(.transparent)
     }
