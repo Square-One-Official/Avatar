@@ -49,8 +49,10 @@ function payloadBase(): string | null {
 
 /**
  * Rewrite a Supabase Storage public-object URL into its image-transformation
- * (thumbnail) variant. Non-Supabase URLs (or URLs that already carry a query)
- * are returned unchanged so a future CDN swap degrades gracefully.
+ * (thumbnail) variant. Non-Supabase URLs are returned unchanged so a future
+ * CDN swap degrades gracefully. Een eventuele querystring op de object-URL
+ * (Payload's S3-plugin hangt er sinds de E54-admin-deploy `?prefix=media`
+ * aan) wordt genegeerd: het pad identificeert het object volledig.
  */
 export function thumbnailVariant(
   url: string | null,
@@ -58,7 +60,7 @@ export function thumbnailVariant(
   quality = 75,
 ): string | null {
   if (!url) return null;
-  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)$/);
+  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)/);
   if (!m) return url;
   return `${m[1]}/render/image/public/${m[2]}?width=${width}&quality=${quality}`;
 }
