@@ -20,7 +20,7 @@ struct SocialPreviewView: View {
     private static let pickerSpace = "socialPreviewPicker"
 
     private var portrait: Portrait2? { model.selectedPortrait }
-    private let cardWidth: CGFloat = 380
+    private let cardWidth: CGFloat = 600
 
     var body: some View {
         ZStack(alignment: .top) {

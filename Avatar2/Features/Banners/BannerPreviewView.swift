@@ -12,7 +12,7 @@ struct BannerPreviewView: View {
 
     @State private var bannerImage: NSImage?
 
-    private let cardWidth: CGFloat = 380
+    private let cardWidth: CGFloat = 600
 
     var body: some View {
         ZStack(alignment: .top) {
