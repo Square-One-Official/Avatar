@@ -222,6 +222,8 @@ bevestigd (41.3 definitief gesloten). Default → `topaz`
 (topazlabs/image-upscale, unversioned officieel), models-smoke-assert
 omgezet; tsc + beide smokes groen. Preview-deploy avatars-qgghat2yg (en
 herdeployed na de flip). Sheets: scratchpad `e41-bakeoff/sheets/`.
-**Follow-up Thierry:** (1) Topaz-unitprijs verifiëren op
-replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid);
-(2) prod-deploy van de backend (E43-flow) om de fix live te zetten.
+**Follow-up Thierry:** Topaz-unitprijs verifiëren op
+replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid).
+**Prod-deploy:** uitgevoerd 2026-07-03 met expliciet akkoord Thierry
+(avatars-ja3k8daeg, Ready; api.aaavatar.nl/v1/upscale live geverifieerd
+401-zonder-auth) — Boost online draait nu Topaz met de anti-halo-pipeline.
