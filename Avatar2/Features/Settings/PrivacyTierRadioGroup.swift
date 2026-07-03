@@ -6,22 +6,9 @@ import SwiftUI
 struct PrivacyTierRadioGroup: View {
     @Binding var selection: AIPrivacyTier
     var disabledTiers: Set<AIPrivacyTier> = []
-    var showsAxisHint: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            if showsAxisHint {
-                HStack {
-                    Text("Most private")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                    Spacer()
-                    Text("Most advanced")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-            }
-
             ForEach(AIPrivacyTier.allCases, id: \.self) { tier in
                 PrivacyTierRadioRow(
                     tier: tier,
@@ -47,6 +34,14 @@ private struct PrivacyTierRadioRow: View {
     let isDisabled: Bool
     var disabledFootnote: String?
     let onSelect: () -> Void
+
+    @State private var isHovering = false
+
+    private var rowBackground: Color {
+        if isSelected { return DSColor.Background.neutral }
+        guard !isDisabled else { return .clear }
+        return DSColor.neutralSurface(pressed: false, hovering: isHovering)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
@@ -82,19 +77,36 @@ private struct PrivacyTierRadioRow: View {
                 }
                 .padding(DSSpacing.gap4)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(isSelected ? DSColor.Background.neutral : Color.clear)
+                .background(rowBackground)
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(isDisabled)
+            .onHover { isHovering = $0 && !isDisabled }
+            .animation(DSMotion.micro, value: isHovering)
 
             if isDisabled, let disabledFootnote {
-                Text(disabledFootnote)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .padding(.leading, 28 + DSSpacing.gap3)
+                disabledFootnoteBlock(disabledFootnote)
             }
         }
+    }
+
+    @ViewBuilder
+    private func disabledFootnoteBlock(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            Text(text)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if tier == .appleCloud,
+               AppleIntelligenceAvailability.status.offersSystemSettingsShortcut {
+                DSGhostButton("Open System Settings", size: .small) {
+                    AppleIntelligenceAvailability.openAppleIntelligenceSettings()
+                }
+            }
+        }
+        .padding(.leading, 28 + DSSpacing.gap3)
     }
 }

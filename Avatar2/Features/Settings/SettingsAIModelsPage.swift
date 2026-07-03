@@ -79,8 +79,7 @@ struct SettingsAIModelsPage: View {
                     get: { prefs.tier },
                     set: { prefs.tier = $0 }
                 ),
-                disabledTiers: disabledTiers,
-                showsAxisHint: true
+                disabledTiers: disabledTiers
             )
             .padding(.top, DSSpacing.gap4)
 
