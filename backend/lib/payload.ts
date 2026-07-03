@@ -375,7 +375,8 @@ export type PayloadEffect = {
   label: string;
   prompt: string;
   thumbnailUrl: string | null;
-  styleReferenceUrl: string | null;
+  /** E54: server-only stijlvoorbeelden, in CMS-volgorde (max 4 rijen). */
+  styleReferenceUrls: string[];
   order: number;
 };
 
@@ -422,10 +423,18 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
   const thumb = r.thumbnail as { url?: string } | null | undefined;
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
-  const styleRef = r.styleReference as { url?: string } | null | undefined;
-  const styleReferenceUrl = styleRef && typeof styleRef.url === "string" ? styleRef.url : null;
+  // E54: `styleReferences` is een Payload-array van { image: upload }; depth=1
+  // resolvet elke upload naar { url }. Rijen zonder bruikbare url slaan we over.
+  const refRows = Array.isArray(r.styleReferences) ? r.styleReferences : [];
+  const styleReferenceUrls = refRows
+    .map((row) => {
+      if (typeof row !== "object" || row === null) return null;
+      const image = (row as Record<string, unknown>).image as { url?: string } | null | undefined;
+      return image && typeof image.url === "string" ? image.url : null;
+    })
+    .filter((u): u is string => u !== null);
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, thumbnailUrl, styleReferenceUrl, order };
+  return { key, label, prompt, thumbnailUrl, styleReferenceUrls, order };
 }
 
 // ---------------------------------------------------------------------------

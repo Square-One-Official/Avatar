@@ -310,9 +310,10 @@ export async function stylizeEdit(input: {
   width: number;
   height: number;
   model?: string | null;
-  /** Optioneel: data-URL van een voorbeeld-output die het model als visuele
-   *  stijlreferentie meekrijgt naast de prompt. Alleen voor Effects (E33). */
-  styleReferenceDataUrl?: string | null;
+  /** Optioneel: data-URLs van voorbeeld-outputs die het model als visuele
+   *  stijlreferenties meekrijgt naast de prompt. Alleen voor Effects (E54);
+   *  de prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
+  styleReferenceDataUrls?: string[] | null;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
@@ -332,12 +333,11 @@ function stylizeInputFor(
     prompt: string;
     width: number;
     height: number;
-    styleReferenceDataUrl?: string | null;
+    styleReferenceDataUrls?: string[] | null;
   },
 ): Record<string, unknown> {
   if (ref.startsWith("google/nano-banana")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -351,8 +351,7 @@ function stylizeInputFor(
     // `aspect_ratio: "match_input_image"` zodat het kader niet herkadert.
     // Schema controleren vóór de eerste bakeoff-run (replicate.com/bytedance/
     // seedream-4); bij een veld-mismatch faalt de dev-only call zichtbaar.
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -361,8 +360,7 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("black-forest-labs/flux-2")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       input_images: images,
@@ -375,8 +373,7 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("openai/gpt-image")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       input_images: images,
