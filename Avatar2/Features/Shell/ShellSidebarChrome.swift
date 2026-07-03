@@ -28,6 +28,11 @@ struct ShellSidebarChrome: View {
     var studioFullBleed: Bool = false
     let onToggleSidebar: () -> Void
 
+    /// Chrome-band = gap3 top-inset + traffic-light-strook (UXS-29 v2).
+    private static var chromeBandHeight: CGFloat {
+        LeftNavView.windowChromeHeight + LeftNavView.edgeInset
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             if studioFullBleed {
@@ -40,12 +45,12 @@ struct ShellSidebarChrome: View {
                     width: ShellMetrics.topBarLeadingAfterWindowControls + ShellMetrics.sidebarToggleWidth,
                     height: LeftNavView.windowChromeHeight
                 )
+                .offset(x: LeftNavView.edgeInset, y: LeftNavView.edgeInset)
                 .allowsHitTesting(false)
             }
 
             ShellSidebarChromeStrip()
-                .padding(.leading, LeftNavView.edgeInset)
-                .padding(.top, LeftNavView.edgeInset)
+                .offset(x: LeftNavView.edgeInset, y: LeftNavView.edgeInset)
                 .mask(alignment: .leading) {
                     Rectangle()
                         .frame(width: isSidebarVisible ? LeftNavView.chromeRevealWidth : 0)
@@ -57,7 +62,7 @@ struct ShellSidebarChrome: View {
                 .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
                 .padding(.top, ShellMetrics.windowControlsCenterFromTop - ShellMetrics.windowControlsRowHeight / 2)
         }
-        .frame(height: LeftNavView.windowChromeHeight, alignment: .topLeading)
+        .frame(height: Self.chromeBandHeight, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
     }
 }

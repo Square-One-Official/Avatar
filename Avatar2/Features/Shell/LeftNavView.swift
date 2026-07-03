@@ -98,10 +98,17 @@ struct LeftNavView: View {
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
         // Inset kaart: dunne marge links + boven/onder via ShellView; rechts flush
-        // op de content-kolom. macOS floating-panel hoekradius.
+        // op de content-kolom. Bovenhoeken rondt ShellSidebarChromeStrip af —
+        // hier alleen onderhoeken, anders dubbele anti-alias aan de kaarttop.
         .background(DSColor.Background.card)
         .clipShape(
-            RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: ShellMetrics.panelCornerRadius,
+                bottomTrailingRadius: ShellMetrics.panelCornerRadius,
+                topTrailingRadius: 0,
+                style: .continuous
+            )
         )
         .overlay {
             if showUserMenu {
