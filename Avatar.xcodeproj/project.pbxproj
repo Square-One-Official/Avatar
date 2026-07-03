@@ -113,6 +113,7 @@
 		583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 547B38BE8ADECFDF8042BD64 /* CutoutDataUndo.swift */; };
 		586DA2974FA6C2E92F0888A1 /* BannerTextPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */; };
 		58A132E1A87DB573598AF991 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363170BAE87D782CD9CDDB50 /* SettingsRootView.swift */; };
+		58AC878946DA80619C58FD87 /* BrandColorKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C0051780A4DF6A2ED5FB85 /* BrandColorKitTests.swift */; };
 		58BC823E9AD033A9C17F7636 /* SettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D40E681885CB6D731F70EDA /* SettingsModel.swift */; };
 		58C7C65381A278B69B016DDB /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877D5A42F98746FCC7A61452 /* MainWindow.swift */; };
 		598E5AA5D1B64C6A66AE5249 /* ProEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */; };
@@ -488,6 +489,7 @@
 		943E8CCEC9CCEFB639805EF6 /* CanvasFrameChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFrameChip.swift; sourceTree = "<group>"; };
 		944A04C42B02792DA0CA60F7 /* BackgroundBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundBlur.swift; sourceTree = "<group>"; };
 		947924202C732493D553BD14 /* Mesh 03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 03.png"; sourceTree = "<group>"; };
+		94C0051780A4DF6A2ED5FB85 /* BrandColorKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandColorKitTests.swift; sourceTree = "<group>"; };
 		952C9B6AE02D2195F2903AC3 /* AlphaHitTestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaHitTestTests.swift; sourceTree = "<group>"; };
 		957551E62840A0AAD27DF491 /* BoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
 		9633D488AE5B4BD05D81FC26 /* BannerCanvasImageChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasImageChrome.swift; sourceTree = "<group>"; };
@@ -899,6 +901,7 @@
 				2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */,
 				B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */,
 				57DDA9AA35FF6DB61BD3C30C /* BoardSelectionTests.swift */,
+				94C0051780A4DF6A2ED5FB85 /* BrandColorKitTests.swift */,
 				8E7AC72F7666A3B2D7C935FB /* CanvasScrollScalingTests.swift */,
 				360B7554EDE4CCA44D8752A0 /* EditorCanvasChromeMetricsTests.swift */,
 				509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */,
@@ -1504,6 +1507,7 @@
 				4FD3743A8B3F587FC230891E /* BannerPlaceholderSweepTests.swift in Sources */,
 				ED2A635DE89916E514EBC5FF /* BannerTypeToEditTests.swift in Sources */,
 				AD81DDF070642AAF46E77DA6 /* BoardSelectionTests.swift in Sources */,
+				58AC878946DA80619C58FD87 /* BrandColorKitTests.swift in Sources */,
 				1112E6591101919CB7257855 /* CanvasScrollScalingTests.swift in Sources */,
 				8513D2AB34581596C0A23037 /* EditorCanvasChromeMetricsTests.swift in Sources */,
 				0FFA76FDAF477170C9835FBC /* EditorToolTests.swift in Sources */,

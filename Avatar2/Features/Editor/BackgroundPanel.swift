@@ -37,7 +37,7 @@ struct BackgroundPanel: View {
     /// editor en het board doen dat niet.
     var showsBanners: Bool = false
 
-    private enum PickerTab: Hashable { case gallery, unsplash, upload, generate }
+    private enum PickerTab: Hashable { case gallery, unsplash, generate }
     @State private var tab: PickerTab = .gallery
 
     @State private var brand = BrandColorKit.shared
@@ -84,12 +84,15 @@ struct BackgroundPanel: View {
     // opgeslagen PNG, één keer per id berekend (scheelt disk-reads per render).
     private static var customImageSignatures: [String: Int] = [:]
 
-    /// Brede Notion-achtige tegels: 4 kolommen, 16:10 (paneel is 440pt).
+    /// Brede Notion-achtige tegels, 16:10. Unsplash wrapt in 4 kolommen
+    /// (paneel is 440pt); de Gallery-rijen scrollen horizontaal met een
+    /// vaste tegelbreedte.
     private let gridColumns = Array(
         repeating: GridItem(.flexible(), spacing: DSSpacing.gap2),
         count: 4
     )
     private let tileAspect: CGFloat = 16.0 / 10.0
+    private let rowTileWidth: CGFloat = 96
     /// Vaste content-hoogte zodat het paneel niet verspringt bij tab-wissel
     /// (zelfde geest als de pixelvaste breadcrumb, UXS-28).
     private let contentHeight: CGFloat = 360
@@ -107,7 +110,6 @@ struct BackgroundPanel: View {
             switch tab {
             case .gallery: galleryTab
             case .unsplash: unsplashTab
-            case .upload: uploadTab
             case .generate: generateTab
             }
         }
@@ -122,7 +124,6 @@ struct BackgroundPanel: View {
             HStack(alignment: .bottom, spacing: DSSpacing.gap4) {
                 tabButton("Gallery", .gallery)
                 if entitlement != nil { tabButton("Unsplash", .unsplash) }
-                tabButton("Upload", .upload)
                 if showsGenerateTab { tabButton("Generate", .generate) }
                 Spacer()
                 modePills.padding(.bottom, DSSpacing.gap1)
@@ -172,6 +173,9 @@ struct BackgroundPanel: View {
         Button(action: action) {
             Text(label)
                 .dsTextStyle(.labelSmall)
+                // Nooit wrappen ("Origi/nal") — de pill houdt z'n eigen breedte.
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(isActive ? DSColor.Foreground.primary
                                           : DSColor.Foreground.muted)
                 .padding(.horizontal, DSSpacing.gap2)
@@ -184,29 +188,55 @@ struct BackgroundPanel: View {
         .help(help)
     }
 
-    // MARK: Gallery-tab — Color & Gradient · (Banners) · CMS-categorieën
+    // MARK: Gallery-tab — Color & Gradient · Uploaded · (Banners) · CMS
 
+    /// Secties stapelen verticaal; elke sectie is een horizontaal scrollende
+    /// rij (besluit Thierry: opzij-scrollen behouden, nieuwste uploads links).
     private var galleryTab: some View {
         ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                gridSection("Color & Gradient") { colorAndGradientTiles }
+            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                rowSection("Color & Gradient") { colorAndGradientTiles }
+                rowSection("Uploaded") { uploadedTiles }
                 if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
-                    gridSection("Banners") { bannerTiles }
+                    rowSection("Banners") { bannerTiles }
                 }
                 ForEach(cmsCategories, id: \.self) { cat in
-                    gridSection(cat) { cmsTiles(for: cat) }
+                    rowSection(cat) { cmsTiles(for: cat) }
                 }
             }
-            .padding(DSSpacing.gap1)
         }
         .frame(height: contentHeight)
+    }
+
+    /// Uploads als Gallery-sectie (Upload-tab vervallen): "+"-tegel als
+    /// upload-entry, daarna de persistente uploads met de nieuwste links.
+    @ViewBuilder
+    private var uploadedTiles: some View {
+        tile(isSelected: false, width: rowTileWidth) {
+            Image(systemName: "plus")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.subtle)
+        } action: { uploadCustom() }
+        .help("Upload an image")
+
+        ForEach(customImages.imageIDs.reversed(), id: \.self) { id in
+            if let image = customImages.image(for: id) {
+                tile(
+                    isSelected: currentImageSignature != nil
+                        && currentImageSignature == customSignature(id),
+                    width: rowTileWidth
+                ) {
+                    Image(nsImage: image).resizable().scaledToFill()
+                } action: { selectCustomImage(id) }
+            }
+        }
     }
 
     @ViewBuilder
     private var colorAndGradientTiles: some View {
         // E25.2: "+"-tegel opent de DSColorPicker (met eigen eyedropper); live
         // bijwerken terwijl de picker open is.
-        tile(isSelected: false) {
+        tile(isSelected: false, width: rowTileWidth) {
             Image(systemName: "plus")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.subtle)
@@ -236,9 +266,10 @@ struct BackgroundPanel: View {
             colorTile(color)
         }
 
-        // Audit #1: toon maximaal de 8 recentste brand colors (de kit blijft
-        // alles bewaren); hover toont een verwijder-kruisje per kleur.
-        ForEach(Array(brand.hexColors.suffix(8)), id: \.self) { hex in
+        // Audit #1: de kit saneert en capt zelf (near-duplicates samengevouwen,
+        // max 12) — toon alles zodat het hover-kruisje zichtbaar effect heeft
+        // (geen verborgen voorraad die een verwijderde tint stilletjes vervangt).
+        ForEach(brand.hexColors, id: \.self) { hex in
             if let color = Color(hexRGB: hex) {
                 colorTile(color, hex: hex)
                     .overlay(alignment: .topTrailing) {
@@ -276,6 +307,9 @@ struct BackgroundPanel: View {
                     Circle().strokeBorder(DSColor.Foreground.divider,
                                           lineWidth: DSBorderWidth.thin)
                 }
+                // Expliciete hit-shape: het kruisje ligt bovenop de tegel-knop;
+                // zonder eigen contentShape wint de tegel de click te makkelijk.
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .padding(DSSpacing.gap1)
@@ -285,13 +319,13 @@ struct BackgroundPanel: View {
     private func colorTile(_ color: Color, hex providedHex: String? = nil) -> some View {
         let hex = providedHex ?? color.hexRGB
         let isSelected = hex != nil && portrait?.backgroundColorHex == hex
-        return tile(isSelected: isSelected) {
+        return tile(isSelected: isSelected, width: rowTileWidth) {
             Rectangle().fill(color)
         } action: { if let hex { selectColor(hex) } }
     }
 
     private func gradientTile(_ colors: [Color]) -> some View {
-        tile(isSelected: isAppliedSource(gradientKey(colors))) {
+        tile(isSelected: isAppliedSource(gradientKey(colors)), width: rowTileWidth) {
             Rectangle().fill(BackgroundKit.gradient(colors))
         } action: { selectGradient(colors) }
     }
@@ -302,7 +336,7 @@ struct BackgroundPanel: View {
         // niet alleen als hover-tooltip.
         ForEach(cmsBackgrounds.filter { $0.category == category }) { bg in
             captioned(bg.label) {
-                tile(isSelected: isAppliedSource(cmsKey(bg))) {
+                tile(isSelected: isAppliedSource(cmsKey(bg)), width: rowTileWidth) {
                     // E52.1: gedeelde memory/disk-cache + downsampled decode
                     // i.p.v. AsyncImage (URLCache helpt niet: Supabase stuurt
                     // `Cache-Control: no-cache`).
@@ -400,36 +434,6 @@ struct BackgroundPanel: View {
                 await entitlement?.backend.unsplashTrackDownload(location)
             }
         }
-    }
-
-    // MARK: Upload-tab — "+" + persistente eigen uploads (E24.24)
-
-    private var uploadTab: some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                gridSection("Your images") {
-                    tile(isSelected: false) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(DSColor.Foreground.subtle)
-                    } action: { uploadCustom() }
-                    .help("Upload an image")
-
-                    ForEach(customImages.imageIDs, id: \.self) { id in
-                        if let image = customImages.image(for: id) {
-                            tile(
-                                isSelected: currentImageSignature != nil
-                                    && currentImageSignature == customSignature(id)
-                            ) {
-                                Image(nsImage: image).resizable().scaledToFill()
-                            } action: { selectCustomImage(id) }
-                        }
-                    }
-                }
-            }
-            .padding(DSSpacing.gap1)
-        }
-        .frame(height: contentHeight)
     }
 
     // MARK: Generate-tab (audit #3) — inline composer à la Notion AI
@@ -637,18 +641,33 @@ struct BackgroundPanel: View {
         }
     }
 
-    // MARK: Grid-bouwstenen
+    // MARK: Rij/grid-bouwstenen
 
+    /// Gallery-sectie: kop + horizontaal scrollende tegel-rij.
     @ViewBuilder
-    private func gridSection(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+    private func rowSection(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
-            LazyVGrid(columns: gridColumns, alignment: .leading, spacing: DSSpacing.gap2) {
-                content()
-            }
+                .padding(.leading, DSSpacing.gap1)
+            scrollRow { content() }
         }
+    }
+
+    /// E24-fix: rechter-rand-fade als scroll-affordance + trailing-inset zodat
+    /// geen tegel hard tegen de rand wordt afgesneden. E24.10: verticale +
+    /// leading-padding zodat de hover-scale niet wordt afgekapt door de
+    /// scroll-/mask-grens.
+    private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: DSSpacing.gap2) { content() }
+                .padding(.vertical, DSSpacing.gap2)
+                .padding(.leading, DSSpacing.gap1)
+                .scrollRowTrailingInset()
+        }
+        // Gedeeld met de andere editor-panelen (zie ScrollRowEdgeFade).
+        .horizontalScrollEdgeFade()
     }
 
     /// Tegel met zichtbaar label eronder (Notion-stijl, audit #2).
@@ -668,14 +687,17 @@ struct BackgroundPanel: View {
 
     /// Gedeelde brede tegel (16:10, Notion-model) met een consistente
     /// 2pt selected-rand voor alle bronnen (kleur, gradient, CMS, upload).
+    /// `width` gezet = vaste rij-tegel (horizontale Gallery-rijen);
+    /// nil = flexibel in een grid (Unsplash).
     private func tile(
-        isSelected: Bool,
+        isSelected: Bool, width: CGFloat? = nil,
         @ViewBuilder content: () -> some View, action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             RoundedRectangle(cornerRadius: DSRadius.lg)
                 .fill(DSColor.Background.neutral)
                 .aspectRatio(tileAspect, contentMode: .fit)
+                .frame(width: width)
                 .overlay { content() }
                 .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
                 .overlay {
@@ -790,7 +812,7 @@ struct BackgroundPanel: View {
                 let isCurrent = linked || portrait?.backgroundImageData == data
                 let isStale = linked && portrait?.backgroundImageData != data
                 captioned(doc.name.isEmpty ? "Untitled banner" : doc.name) {
-                    tile(isSelected: isCurrent) {
+                    tile(isSelected: isCurrent, width: rowTileWidth * 2) {
                         Image(nsImage: img).resizable().scaledToFill()
                             .overlay(alignment: .topTrailing) {
                                 if isStale { updateBadge }
