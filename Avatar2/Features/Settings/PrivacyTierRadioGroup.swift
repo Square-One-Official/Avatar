@@ -35,18 +35,14 @@ private struct PrivacyTierRadioRow: View {
     var disabledFootnote: String?
     let onSelect: () -> Void
 
-    @State private var isHovering = false
-
-    private var rowBackground: Color {
-        if isSelected { return DSColor.Background.neutral }
-        guard !isDisabled else { return .clear }
-        return DSColor.neutralSurface(pressed: false, hovering: isHovering)
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            Button(action: onSelect) {
-                HStack(alignment: .top, spacing: DSSpacing.gap3) {
+            SettingsCheckmarkRow(
+                title: tier.title,
+                subtitle: tier.description,
+                isSelected: isSelected,
+                isDisabled: isDisabled,
+                leading: {
                     Circle()
                         .fill(DSColor.Background.action)
                         .frame(width: 28, height: 28)
@@ -55,36 +51,9 @@ private struct PrivacyTierRadioRow: View {
                                 .foregroundStyle(DSColor.Action.onAction)
                         }
                         .opacity(isDisabled ? 0.45 : 1)
-
-                    VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
-                        Text(tier.title)
-                            .dsTextStyle(.labelBase)
-                            .foregroundStyle(isDisabled ? DSColor.Foreground.muted : DSColor.Foreground.primary)
-                        Text(tier.description)
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: DSSpacing.gap2)
-
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(
-                            isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted
-                        )
-                        .opacity(isDisabled ? 0.4 : 1)
-                }
-                .padding(DSSpacing.gap4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(rowBackground)
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
-            .onHover { isHovering = $0 && !isDisabled }
-            .animation(DSMotion.micro, value: isHovering)
+                },
+                action: onSelect
+            )
 
             if isDisabled, let disabledFootnote {
                 disabledFootnoteBlock(disabledFootnote)

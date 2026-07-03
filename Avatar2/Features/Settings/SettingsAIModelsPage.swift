@@ -134,32 +134,14 @@ struct SettingsAIModelsPage: View {
     }
 
     private func generationOptionRow(_ option: GenerationModel) -> some View {
-        let isSelected = generationModel == option
-        return Button {
+        SettingsCheckmarkRow(
+            title: option.label,
+            subtitle: option.detail,
+            isSelected: generationModel == option
+        ) {
             generationModel = option
             GenerationModelStore.shared.current = option
-        } label: {
-            HStack(spacing: DSSpacing.gap3) {
-                VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
-                    Text(option.label)
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                    Text(option.detail)
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-                Spacer(minLength: DSSpacing.gap4)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted)
-            }
-            .padding(DSSpacing.gap3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? DSColor.Background.neutral : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: Advanced (E15.5, dev-only model-picker)
@@ -230,17 +212,7 @@ struct SettingsAIModelsPage: View {
     }
 
     private func optionChip(_ text: String, selected: Bool, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(text)
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
-                .lineLimit(1)
-                .padding(.horizontal, DSSpacing.gap3)
-                .frame(height: 30)
-                .background(selected ? DSColor.Action.primary : DSColor.Background.neutral)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
+        OptionChipButton(text: text, selected: selected, action: action)
     }
 
     // MARK: Local models (frame "list")
@@ -333,8 +305,6 @@ struct SettingsAIModelsPage: View {
         switch model.phase {
         case .installed:
             HStack(spacing: DSSpacing.gap3) {
-                // Aan/uit zonder te verwijderen: model blijft gedownload, maar
-                // de cutout draait op Apple Vision (uit) of dit model (aan).
                 DSToggle(isOn: Binding(
                     get: { prefs.engine == .downloadedModel },
                     set: { prefs.engine = $0 ? .downloadedModel : .appleVision }
@@ -355,6 +325,36 @@ struct SettingsAIModelsPage: View {
             }
             .accessibilityLabel("Download model")
         }
+    }
+}
+
+private struct OptionChipButton: View {
+    let text: String
+    let selected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    private var background: Color {
+        if selected { return DSColor.Action.primary }
+        if isHovering { return DSColor.Background.neutralStronger }
+        return DSColor.Background.neutral
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
+                .lineLimit(1)
+                .padding(.horizontal, DSSpacing.gap3)
+                .frame(height: 30)
+                .background(background)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 && !selected }
+        .animation(DSMotion.micro, value: isHovering)
     }
 }
 

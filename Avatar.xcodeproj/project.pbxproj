@@ -66,6 +66,7 @@
 		2BF00FB85FDB9DB07C4F8B93 /* AnnouncementSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5AD232EAB7DB2267CFA5AA /* AnnouncementSheet.swift */; };
 		2CC00BB877BB10A664982FB7 /* ModelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D09CA2450C106801EAD77 /* ModelManager.swift */; };
 		2CC54C74A8C5D55DDC7414F1 /* SidebarUpdateCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D997F6414EDD2CF3ED01B3 /* SidebarUpdateCard.swift */; };
+		2DDED147F4320BEA08AE7516 /* SettingsCheckmarkRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE002256F664727C1749A0E6 /* SettingsCheckmarkRow.swift */; };
 		2EF7F8EB149CAEE9A964786A /* GalleryLens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A994817DBF1F697B602C11 /* GalleryLens.swift */; };
 		3197AE4B5A4D58A48431FC55 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957551E62840A0AAD27DF491 /* BoardView.swift */; };
 		31DAF9F07220B9D4B393328C /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
@@ -513,6 +514,7 @@
 		A781DB69220F07CD4C7450BC /* Portrait.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Portrait.swift; sourceTree = "<group>"; };
 		A7F4BBC106F461A04908F03F /* PrivacyGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyGateTests.swift; sourceTree = "<group>"; };
 		ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTextPanel.swift; sourceTree = "<group>"; };
+		AE002256F664727C1749A0E6 /* SettingsCheckmarkRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCheckmarkRow.swift; sourceTree = "<group>"; };
 		AE3A8D0A82AF96EE53F5E3EE /* BannerCanvasChromeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasChromeMetrics.swift; sourceTree = "<group>"; };
 		B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTypeToEditTests.swift; sourceTree = "<group>"; };
 		B313E53EBD6AC732524D4690 /* ImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
@@ -846,6 +848,7 @@
 				FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */,
 				63EB8AB21396622AB916B788 /* SettingsAccountPage.swift */,
 				3FE4A6E054F04E9AF5422E8D /* SettingsAIModelsPage.swift */,
+				AE002256F664727C1749A0E6 /* SettingsCheckmarkRow.swift */,
 				1D40E681885CB6D731F70EDA /* SettingsModel.swift */,
 				18A2A30C157ECE416A5F149E /* SettingsPreferencesPage.swift */,
 				363170BAE87D782CD9CDDB50 /* SettingsRootView.swift */,
@@ -1472,6 +1475,7 @@
 				AB116BF57A42F4C1EC0CA933 /* SettingsAIModelsPage.swift in Sources */,
 				8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */,
 				CCA2BEDFD96893E3A58ECA03 /* SettingsAccountPage.swift in Sources */,
+				2DDED147F4320BEA08AE7516 /* SettingsCheckmarkRow.swift in Sources */,
 				58BC823E9AD033A9C17F7636 /* SettingsModel.swift in Sources */,
 				4136DDEA29ECC6C5D4896AAB /* SettingsPreferencesPage.swift in Sources */,
 				58A132E1A87DB573598AF991 /* SettingsRootView.swift in Sources */,

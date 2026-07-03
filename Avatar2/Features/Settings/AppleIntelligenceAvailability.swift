@@ -93,11 +93,14 @@ enum AppleIntelligenceAvailability {
         return version.minorVersion >= minor
     }
 
-    /// Opent het Apple Intelligence-paneel in System Settings (Tier 2 uit).
+    /// Opent het Apple Intelligence & Siri-paneel in System Settings (Tier 2 uit).
     static func openAppleIntelligenceSettings() {
+        // macOS Sequoia+: "Apple Intelligence & Siri" = Siri-Settings extension
+        // (zie sigo/macos-settings-urls). Oudere kandidaten openen alleen Settings
+        // root — NSWorkspace.open retourneert dan alsnog true.
         let candidates = [
-            "x-apple.systempreferences:com.apple.AppleIntelligence-Settings.extension",
-            "x-apple.systempreferences:com.apple.settings.AppleIntelligence",
+            "x-apple.systempreferences:com.apple.Siri-Settings.extension",
+            "x-apple.systempreferences:com.apple.Siri",
         ]
         for raw in candidates {
             guard let url = URL(string: raw), NSWorkspace.shared.open(url) else { continue }
