@@ -306,7 +306,12 @@ final class ShellModel {
     }
 
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
-    var isShowingExport = false
+    /// Snapshot van het portret op open-moment — stabiele `.sheet(item:)`-identiteit
+    /// (layout-wissels zoals Edit↔Preview flikkeren anders de modal).
+    struct ExportSession: Identifiable, Equatable {
+        let id: PersistentIdentifier
+    }
+    var exportSession: ExportSession?
 
     /// E34.5: social-preview-modus (LinkedIn/X/Instagram-in-context + banner).
     /// Vervangt de editor-canvas in de content-kolom; terug via Edit in de topbar.
@@ -1031,8 +1036,8 @@ final class ShellModel {
     /// het share sheet. Free-tier krijgt een watermerk.
     /// E19.1: opent de DS-export-popup (vorm/maat + Save/Share).
     func exportCurrentPortrait() {
-        guard selectedPortrait != nil else { return }
-        isShowingExport = true
+        guard let portrait = selectedPortrait else { return }
+        exportSession = ExportSession(id: portrait.persistentModelID)
     }
 
     // MARK: - Launch-selectie (visuele pass punt 13)

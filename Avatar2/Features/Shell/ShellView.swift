@@ -96,11 +96,10 @@ struct ShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
         }
-        // E19.1: Share/export-popup (DS).
-        .sheet(isPresented: $model.isShowingExport) {
-            if let portrait = model.selectedPortrait {
-                ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
-            }
+        // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
+        // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
+        .sheet(item: $model.exportSession) { session in
+            ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
         .sheet(isPresented: $model.isShowingRename) {
