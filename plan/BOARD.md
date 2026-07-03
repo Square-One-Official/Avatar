@@ -58,3 +58,4 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
 | [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1–53.4 + 53.6 ready** (36 bevindingen, 29 UXS-stories); 53.5 backlog |
+| [E54 CMS-stijlreferenties voor Effects](E54-effect-stijlreferenties.md) | INFRA+AI | **54.1 in_progress** (2026-07-04); 54.2–54.4 backlog |
