@@ -16,9 +16,21 @@ als `prompt`).
 ---
 
 ## 54.1 — CMS-veld `styleReferences` + backend multi-referentie + prompt-rolclausule
-- status: in_progress
+- status: done
 - owner: INFRA (2026-07-04)
 - team: INFRA
+- Result: volledig CMS→model-pad voor stijlreferenties (branch `v2/e54-54.1`, merge 886c262).
+  `Effects.ts`: array-veld `styleReferences` (max 4 upload-rijen) met admin-uitleg over goede
+  referenties + identity-bleed-waarschuwing. `payload.ts`: `styleReferenceUrls: string[]`
+  (dood enkelvoudig `styleReference`-pad verwijderd), rijen zonder url geskipt. `stylize.ts`:
+  `fetchStyleReferences()` — cap 3, parallel, verkleind via `thumbnailVariant(…, 1024, 85)`,
+  10-min in-process data-URL-cache, soft-fail per referentie; `STYLE_REFERENCE_CLAUSE` wordt
+  alléén aan de prompt geplakt als er echt referenties meegaan. `replicate.ts`:
+  `styleReferenceDataUrls: string[]` in alle vier adapters (nano-banana, seedream, flux-2,
+  gpt-image). `/v1/effects`-contract ongewijzigd → geen app-wijziging. DoD: `npx tsc --noEmit`
+  groen in `backend/` én `admin/`; `build-v2.sh` "alles groen" (beide targets + Avatar2-tests +
+  AvatarKit/AvatarUI-suites). Port-only: backend- én admin-deploy nog niet gedaan — expliciet
+  besluit Thierry; daarna referenties seeden in het CMS (→ 54.2-bakeoff).
 
 Scope:
 - `admin/src/collections/Effects.ts`: array-veld `styleReferences` (1–4 rijen, elk een
