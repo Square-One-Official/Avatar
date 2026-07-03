@@ -28,11 +28,6 @@ struct ShellSidebarChrome: View {
     var studioFullBleed: Bool = false
     let onToggleSidebar: () -> Void
 
-    /// Chrome-band = gap3 top-inset + traffic-light-strook (UXS-29 v2).
-    private static var chromeBandHeight: CGFloat {
-        LeftNavView.windowChromeHeight + LeftNavView.edgeInset
-    }
-
     var body: some View {
         ZStack(alignment: .topLeading) {
             if studioFullBleed {
@@ -45,16 +40,11 @@ struct ShellSidebarChrome: View {
                     width: ShellMetrics.topBarLeadingAfterWindowControls + ShellMetrics.sidebarToggleWidth,
                     height: LeftNavView.windowChromeHeight
                 )
-                .offset(x: LeftNavView.edgeInset, y: LeftNavView.edgeInset)
+                .padding(.leading, LeftNavView.edgeInset)
+                .padding(.top, LeftNavView.edgeInset)
                 .allowsHitTesting(false)
             }
 
-            ShellSidebarChromeStrip()
-                .offset(x: LeftNavView.edgeInset, y: LeftNavView.edgeInset)
-                .mask(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: isSidebarVisible ? LeftNavView.chromeRevealWidth : 0)
-                }
             // UXS-29(v2): de toggle centreert op de verlaagde traffic-light-lijn
             // (native unified-toolbar-hoogte) — dezelfde rij, ín de kaart.
             SidebarToggleButton(isSidebarVisible: isSidebarVisible, action: onToggleSidebar)
@@ -62,25 +52,8 @@ struct ShellSidebarChrome: View {
                 .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
                 .padding(.top, ShellMetrics.windowControlsCenterFromTop - ShellMetrics.windowControlsRowHeight / 2)
         }
-        .frame(height: Self.chromeBandHeight, alignment: .topLeading)
+        .frame(height: LeftNavView.windowChromeHeight, alignment: .topLeading)
         .ignoresSafeArea(.container, edges: .top)
-    }
-}
-
-private struct ShellSidebarChromeStrip: View {
-    var body: some View {
-        DSColor.Background.card
-            .frame(width: LeftNavView.width, height: LeftNavView.windowChromeHeight)
-            .clipShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: ShellMetrics.panelCornerRadius,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: ShellMetrics.panelCornerRadius,
-                    style: .continuous
-                )
-            )
-            .allowsHitTesting(false)
     }
 }
 

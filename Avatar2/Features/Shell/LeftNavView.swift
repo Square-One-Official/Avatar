@@ -19,8 +19,6 @@ struct LeftNavView: View {
     static let edgeInset: CGFloat = ShellMetrics.windowEdgeInset
     /// Totale breedte van de sidebar-slot (kaart + leading inset).
     static var layoutWidth: CGFloat { width + edgeInset }
-    /// Breedte van de vaste chrome-strook t.o.v. de vensterrand (leading inset + kaart).
-    static var chromeRevealWidth: CGFloat { width + edgeInset }
 
     static let windowChromeHeight: CGFloat = 44
 
@@ -98,17 +96,11 @@ struct LeftNavView: View {
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
         // Inset kaart: dunne marge links + boven/onder via ShellView; rechts flush
-        // op de content-kolom. Bovenhoeken rondt ShellSidebarChromeStrip af —
-        // hier alleen onderhoeken, anders dubbele anti-alias aan de kaarttop.
+        // op de content-kolom. Eén clipShape op de hele kaart — bovenhoeken komen
+        // niet uit een aparte overlay (ShellSidebarChrome), dat patroon brak telkens.
         .background(DSColor.Background.card)
         .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: ShellMetrics.panelCornerRadius,
-                bottomTrailingRadius: ShellMetrics.panelCornerRadius,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
+            RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
         )
         .overlay {
             if showUserMenu {
