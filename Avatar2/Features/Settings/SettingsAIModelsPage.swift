@@ -9,7 +9,8 @@
 // - waveform-icoon is per het bord een placeholder → cloud-glyph;
 // - modelnaam/grootte zijn echte waarden: High-fidelity edges, 78 MB
 //   (manifest-zip; de ±175 MB uit figma-design-review.md klopte niet).
-//   "8 GB RAM" uit het frame blijft: elke ondersteunde Mac haalt dat.
+// - "8 GB RAM" uit het Figma-frame weggelaten: elke ondersteunde Mac haalt
+//   dat; voegt geen keuze-informatie toe in Settings.
 
 import AvatarKit
 import AvatarUI
@@ -87,12 +88,6 @@ struct SettingsAIModelsPage: View {
                 Text("Use the sparkle button in Background to generate images with Apple Intelligence.")
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
-                    .padding(.top, DSSpacing.gap3)
-            } else if let summary = AppleIntelligenceAvailability.settingsSummary {
-                Text(summary)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DSSpacing.gap3)
             }
         }
@@ -251,37 +246,19 @@ struct SettingsAIModelsPage: View {
 
     // MARK: Local models (frame "list")
 
+    private static let modelSizeMB = 78
+
     private var localModelsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Local models")
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
+            Text("Optional downloads for sharper on-device results")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
 
-            HStack(spacing: DSSpacing.gap3) {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: DSSpacing.gap2) {
-                        Text("Remove background")
-                            .dsTextStyle(.labelBase)
-                            .foregroundStyle(DSColor.Foreground.primary)
-                        Text("•")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("High quality · sharper hair")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("•")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("8 GB RAM")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    subtitleLine
-                }
-                Spacer(minLength: DSSpacing.gap4)
-                trailingControls
-            }
-            .padding(.top, DSSpacing.gap6)
+            localModelRow
+                .padding(.top, DSSpacing.gap4)
         }
         .padding(DSSpacing.gap6)
         .frame(maxWidth: 608, alignment: .leading)
@@ -289,32 +266,66 @@ struct SettingsAIModelsPage: View {
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
     }
 
+    private var localModelRow: some View {
+        HStack(spacing: DSSpacing.gap3) {
+            RoundedRectangle(cornerRadius: DSRadius.md)
+                .fill(DSColor.Background.neutral)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Image(systemName: "person.crop.rectangle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                }
+
+            VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
+                Text("Remove background")
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                localModelSubtitle
+            }
+
+            Spacer(minLength: DSSpacing.gap4)
+            trailingControls
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+    }
+
     @ViewBuilder
-    private var subtitleLine: some View {
+    private var localModelSubtitle: some View {
         switch model.phase {
         case .downloading(let fraction):
-            // Downloadvoortgang (E04.6/E15.2-besluit: zichtbaar in deze
-            // kaart, ook wanneer de download in onboarding gestart is —
-            // zelfde store, dus zodra E04.6 bestaat deelt hij deze state).
-            HStack(spacing: DSSpacing.gap2) {
-                ProgressView(value: fraction)
-                    .progressViewStyle(.linear)
-                    .tint(DSColor.Action.primary)
-                    .frame(width: 160)
-                Text("\(Int(fraction * 100))%")
-                    .dsTextStyle(.labelSmall)
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                Text("Downloading high-quality model")
+                    .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
-                    .monospacedDigit()
+                HStack(spacing: DSSpacing.gap2) {
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.linear)
+                        .tint(DSColor.Action.primary)
+                        .frame(width: 160)
+                    Text("\(Int(fraction * 100))%")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .monospacedDigit()
+                }
             }
-            .frame(minHeight: 20)
+        default:
+            Text(localModelSubtitleText)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+        }
+    }
+
+    private var localModelSubtitleText: String {
+        switch model.phase {
         case .failed:
-            Text("Download failed — check your connection and try again")
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-        case .idle, .installed:
-            Text("78 MB")
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
+            return "Download failed — check your connection and try again"
+        case .installed where prefs.engine == .downloadedModel:
+            return "High quality · sharper hair · \(Self.modelSizeMB) MB"
+        case .installed:
+            return "Installed · using built-in engine"
+        case .idle, .downloading:
+            return "Sharper hair edges · \(Self.modelSizeMB) MB download"
         }
     }
 
