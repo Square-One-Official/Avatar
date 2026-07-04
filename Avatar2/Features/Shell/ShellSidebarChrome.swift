@@ -25,26 +25,10 @@ struct SidebarToggleButton: View {
 
 struct ShellSidebarChrome: View {
     let isSidebarVisible: Bool
-    var studioFullBleed: Bool = false
     let onToggleSidebar: () -> Void
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if studioFullBleed {
-                LinearGradient(
-                    colors: [DSColor.Background.card, DSColor.Background.card.opacity(0)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(
-                    width: ShellMetrics.topBarLeadingAfterWindowControls + ShellMetrics.sidebarToggleWidth,
-                    height: LeftNavView.windowChromeHeight
-                )
-                .padding(.leading, LeftNavView.edgeInset)
-                .padding(.top, LeftNavView.edgeInset)
-                .allowsHitTesting(false)
-            }
-
             // UXS-29(v2): de toggle centreert op de verlaagde traffic-light-lijn
             // (native unified-toolbar-hoogte) — dezelfde rij, ín de kaart.
             SidebarToggleButton(isSidebarVisible: isSidebarVisible, action: onToggleSidebar)
@@ -84,6 +68,7 @@ private final class TrafficLightAnchorView: NSView {
         guard let window else { return }
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
 
         // UXS-29(v2)/UX34: native verlaagde traffic-lights. Een lege unified
         // toolbar maakt de titelbalk hoog genoeg dat AppKit de knoppen zélf

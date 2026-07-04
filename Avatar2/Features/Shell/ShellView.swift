@@ -50,14 +50,20 @@ struct ShellView: View {
 
             if studioFullBleed {
                 HStack(alignment: .top, spacing: 0) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     Spacer(minLength: 0)
                 }
             } else {
                 HStack(spacing: ShellMetrics.sidebarContentSpacing) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     mainArea
                         .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
@@ -80,7 +86,6 @@ struct ShellView: View {
         .overlay(alignment: .topLeading) {
             ShellSidebarChrome(
                 isSidebarVisible: model.isLeftNavVisible,
-                studioFullBleed: studioFullBleed,
                 onToggleSidebar: { model.toggleLeftNav() }
             )
             .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
@@ -313,16 +318,13 @@ struct ShellView: View {
         }
     }
 
-    /// Sidebar-slot: altijd gemonteerd, onthult via leading-clip (zelfde spring als chrome).
+    /// Sidebar-slot: insert/remove met slide — géén leading-width-clip (dat liet
+    /// de top-leading hoekradius als los vlekje achter).
     private var leftNavSlot: some View {
         LeftNavView(model: model, entitlement: entitlement)
             .padding(.leading, LeftNavView.edgeInset)
             .frame(width: LeftNavView.layoutWidth, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
-            .frame(width: model.isLeftNavVisible ? LeftNavView.layoutWidth : 0, alignment: .leading)
-            .clipped()
-            .allowsHitTesting(model.isLeftNavVisible)
-            .accessibilityHidden(!model.isLeftNavVisible)
     }
 
     private var mainArea: some View {
