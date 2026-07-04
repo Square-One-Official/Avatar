@@ -105,6 +105,8 @@ final class ShellModel {
 
     /// Welke map de Portraits-grid toont (nil = alle beelden).
     var selectedFolderID: PersistentIdentifier?
+    /// E55: contextmenu "Default background…" opent de picker in de folder-header.
+    var folderBackgroundPickerID: PersistentIdentifier?
 
     /// Of de Portraits-sectie in de nav is uitgeklapt (toont de mappen).
     var isPortraitsExpanded = true
@@ -146,6 +148,12 @@ final class ShellModel {
         clearPortraitSelection()
         selectedFolderID = folderID
         section = .portraits
+    }
+
+    /// Opent de standaardachtergrond-picker in de folder-header (via contextmenu).
+    func showFolderBackgroundPicker(folderID: PersistentIdentifier) {
+        showPortraits(folderID: folderID)
+        folderBackgroundPickerID = folderID
     }
 
     /// E35.2: naar de Banners-bibliotheek.
@@ -478,6 +486,12 @@ final class ShellModel {
         guard let modelContext, let png = cutout.pngData() else { return }
         let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
+        FolderImportSupport.attachImport(
+            portrait: portrait,
+            section: section,
+            selectedFolderID: selectedFolderID,
+            modelContext: modelContext
+        )
         select(portrait)
         // De editor + openOrigin zijn al bij de import-start gezet (runCutout);
         // een vervangende import in de editor houdt z'n bestaande herkomst.

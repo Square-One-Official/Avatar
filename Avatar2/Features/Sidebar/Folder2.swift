@@ -18,6 +18,12 @@ final class Folder2 {
     /// Optionele tag-kleur (Riverside-stijl), hex #RRGGBB. nil = neutraal.
     var colorHex: String?
 
+    /// Standaardachtergrond voor nieuwe imports in deze map (kleur xor
+    /// afbeelding). Beide nil = geen default — imports blijven transparant.
+    /// Lichtgewicht migratie via nil-defaults.
+    var defaultBackgroundColorHex: String?
+    @Attribute(.externalStorage) var defaultBackgroundImageData: Data?
+
     /// De portretten in deze map. `nullify` zodat het verwijderen van een map
     /// de portretten zelf niet wist — ze vallen terug naar "Unfiled".
     @Relationship(deleteRule: .nullify, inverse: \Portrait2.folder)
@@ -28,5 +34,29 @@ final class Folder2 {
         self.createdAt = createdAt
         self.order = order
         self.colorHex = colorHex
+    }
+
+    /// De geconfigureerde standaardachtergrond, of nil wanneer geen default is
+    /// ingesteld (imports in deze map krijgen dan geen achtergrond).
+    var defaultBackground: PortraitBackground? {
+        if let defaultBackgroundColorHex { return .color(defaultBackgroundColorHex) }
+        if let defaultBackgroundImageData { return .image(defaultBackgroundImageData) }
+        return nil
+    }
+
+    /// Zet of wist de map-default (`.transparent` = geen default). `.original`
+    /// is op mapniveau geen zinvolle keuze en wordt genegeerd.
+    func setDefaultBackground(_ background: PortraitBackground) {
+        switch background {
+        case .transparent, .original:
+            defaultBackgroundColorHex = nil
+            defaultBackgroundImageData = nil
+        case .color(let hex):
+            defaultBackgroundColorHex = hex
+            defaultBackgroundImageData = nil
+        case .image(let data):
+            defaultBackgroundColorHex = nil
+            defaultBackgroundImageData = data
+        }
     }
 }

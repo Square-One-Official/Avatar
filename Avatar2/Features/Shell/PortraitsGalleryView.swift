@@ -22,6 +22,7 @@ struct PortraitsGalleryView: View {
     @State private var headerHeight: CGFloat = 0
     @State private var menuTarget: Portrait2?
     @State private var menuAnchor: CGRect = .zero
+    @State private var folderBackgroundPickerOpen = false
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
@@ -95,6 +96,12 @@ struct PortraitsGalleryView: View {
             selectedTargets: { items.filter { model.isPortraitSelected($0) } }
         )
         .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
+        .dsDropdownDismissOverlay(isPresented: $folderBackgroundPickerOpen)
+        .onChange(of: model.folderBackgroundPickerID) { _, id in
+            guard id == model.selectedFolderID else { return }
+            folderBackgroundPickerOpen = true
+            model.folderBackgroundPickerID = nil
+        }
     }
 
     @ViewBuilder private var lensContent: some View {
@@ -145,6 +152,14 @@ struct PortraitsGalleryView: View {
                 Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.muted)
+                if let folder = selectedFolder {
+                    FolderDefaultBackgroundControl(
+                        folder: folder,
+                        entitlement: entitlement,
+                        isPickerOpen: $folderBackgroundPickerOpen
+                    )
+                    .padding(.top, 2)
+                }
             }
             Spacer(minLength: 0)
             // Finder-stijl lens-switcher — de header rendert 'm, dus alleen op
@@ -167,8 +182,14 @@ struct PortraitsGalleryView: View {
                 .foregroundStyle(DSColor.Foreground.muted)
             Text(model.selectedFolderID == nil ? "No portraits yet" : "This folder is empty")
                 .dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
-            Text("Right-click a portrait to move it into a folder.")
-                .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+            if selectedFolder?.defaultBackground != nil, model.selectedFolderID != nil {
+                Text("Drop a portrait here — it will use this folder's default background.")
+                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Right-click a portrait to move it into a folder.")
+                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

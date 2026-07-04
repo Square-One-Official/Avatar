@@ -23,6 +23,9 @@ import SwiftUI
 
 struct BackgroundPanel: View {
     let portrait: Portrait2?
+    /// Map-default-modus: toont Gallery-only, geen Original-pill; schrijft via
+    /// `onApply` naar `folder.setDefaultBackground` i.p.v. het portret.
+    var folder: Folder2? = nil
     /// E31.7: optionele apply-target. Default schrijft op `portrait` (single
     /// editor + board single-select). De board-batch geeft hier een closure die
     /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
@@ -97,7 +100,20 @@ struct BackgroundPanel: View {
     private let contentHeight: CGFloat = 360
 
     private var showsGenerateTab: Bool {
-        entitlement != nil && BackgroundGenerationCatalog.hasGenerationPath
+        !isFolderMode && entitlement != nil && BackgroundGenerationCatalog.hasGenerationPath
+    }
+
+    private var isFolderMode: Bool { folder != nil }
+
+    private var showsUnsplashTab: Bool { !isFolderMode && entitlement != nil }
+
+    /// Actieve kleur-achtergrond (portret of map-default).
+    private var activeColorHex: String? {
+        if let folder {
+            if case .color(let hex) = folder.defaultBackground { return hex }
+            return nil
+        }
+        return portrait?.backgroundColorHex
     }
 
     var body: some View {
@@ -125,7 +141,7 @@ struct BackgroundPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .bottom, spacing: DSSpacing.gap4) {
                 tabButton("Gallery", .gallery)
-                if entitlement != nil { tabButton("Unsplash", .unsplash) }
+                if showsUnsplashTab { tabButton("Unsplash", .unsplash) }
                 if showsGenerateTab {
                     // Mini-spinner in de tab zelf: ook vanuit Gallery/Unsplash
                     // zichtbaar dat er een generatie loopt.
@@ -172,13 +188,15 @@ struct BackgroundPanel: View {
     /// uit de tabs eronder overschrijft beide (geen van beide actief).
     private var modePills: some View {
         HStack(spacing: DSSpacing.gap1) {
-            if originalImage != nil {
+            if !isFolderMode, originalImage != nil {
                 modePill("Original",
                          isActive: portrait?.useOriginalBackground == true,
                          help: "Show the original photo background") { selectOriginal() }
             }
             modePill("None", isActive: isTransparentSelected,
-                     help: "No background (transparent cut-out)") { selectTransparent() }
+                     help: isFolderMode
+                         ? "No default background for new imports"
+                         : "No background (transparent cut-out)") { selectTransparent() }
         }
     }
 
@@ -256,7 +274,7 @@ struct BackgroundPanel: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.subtle)
         } action: {
-            if let hex = portrait?.backgroundColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
+            if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
             showColorPicker = true
         }
         .help("Pick a colour")
@@ -273,7 +291,7 @@ struct BackgroundPanel: View {
         // brand-rij met élke picker-sessie een willekeurige tussenstand.
         .onChange(of: showColorPicker) { _, open in
             guard !open, let hex = pickerColor.hexRGB,
-                  portrait?.backgroundColorHex == hex else { return }
+                  activeColorHex == hex else { return }
             brand.add(hex)
         }
 
@@ -333,7 +351,7 @@ struct BackgroundPanel: View {
 
     private func colorTile(_ color: Color, hex providedHex: String? = nil) -> some View {
         let hex = providedHex ?? color.hexRGB
-        let isSelected = hex != nil && portrait?.backgroundColorHex == hex
+        let isSelected = hex != nil && activeColorHex == hex
         return tile(isSelected: isSelected, width: rowTileWidth) {
             Rectangle().fill(color)
         } action: { if let hex { selectColor(hex) } }
@@ -689,7 +707,10 @@ struct BackgroundPanel: View {
     /// Content-signature van de huidige `.image`-achtergrond (nil bij een
     /// andere modus). FNV over ~256 verspreide bytes — goedkoop per render.
     private var currentImageSignature: Int? {
-        portrait?.backgroundImageData.map(Portrait2.cutoutSignature)
+        if let folder, case .image(let data) = folder.defaultBackground {
+            return Portrait2.cutoutSignature(data)
+        }
+        return portrait?.backgroundImageData.map(Portrait2.cutoutSignature)
     }
 
     /// Is de bron met deze key (gradient/CMS/Unsplash) de huidige achtergrond?
@@ -767,6 +788,7 @@ struct BackgroundPanel: View {
     /// Transparant geselecteerd = cutout zonder achtergrond (geen Original,
     /// geen kleur/afbeelding).
     private var isTransparentSelected: Bool {
+        if let folder { return folder.defaultBackground == nil }
         guard let portrait else { return false }
         return !portrait.useOriginalBackground
             && portrait.backgroundColorHex == nil
@@ -827,7 +849,9 @@ struct BackgroundPanel: View {
 
     /// E31.7: één apply-punt — naar de injected closure (batch) of het portret.
     private func apply(_ background: PortraitBackground) {
-        if let onApply { onApply(background) } else { portrait?.setBackground(background) }
+        if let onApply { onApply(background) }
+        else if let folder { folder.setDefaultBackground(background) }
+        else { portrait?.setBackground(background) }
     }
 
     /// E24.31: toon de originele foto vol (omkeerbaar).

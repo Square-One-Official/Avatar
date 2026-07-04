@@ -258,6 +258,11 @@ struct LeftNavView: View {
                 PortraitSetActions.export(items, isPro: model.isPro) { model.setBusyMessage = $0 }
             }
             Divider().padding(.vertical, 2)
+            DSMenuRow("Default background…", icon: "photo.on.rectangle") {
+                menuFolder = nil
+                model.showFolderBackgroundPicker(folderID: folder.persistentModelID)
+            }
+            Divider().padding(.vertical, 2)
             DSMenuRow("Rename", icon: "pencil") {
                 menuFolder = nil
                 draftName = folder.name
