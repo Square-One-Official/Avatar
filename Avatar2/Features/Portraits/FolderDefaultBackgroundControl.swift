@@ -43,7 +43,6 @@ struct FolderDefaultBackgroundControl: View {
                 folder: folder,
                 onApply: { background in
                     folder.setDefaultBackground(background)
-                    isPickerOpen = false
                 },
                 entitlement: entitlement
             )
@@ -88,7 +87,14 @@ private struct FolderDefaultBackgroundThumbnail: View {
                     DSColor.Background.inset
                 }
             case .transparent, .original, .none:
-                DSColor.Background.inset
+                ZStack {
+                    DSColor.Background.inset
+                    Text("Set default background")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, DSSpacing.gap4)
+                }
             }
         }
     }

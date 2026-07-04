@@ -67,6 +67,12 @@ struct PortraitsGalleryView: View {
                            alignment: .top)
                     .clipped()
                     .padding(.top, headerHeight)
+                if folderBackgroundPickerOpen {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .onTapGesture { folderBackgroundPickerOpen = false }
+                }
                 header
                     .background(
                         GeometryReader { hGeo in
@@ -98,7 +104,6 @@ struct PortraitsGalleryView: View {
         )
         .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
-        .dsDropdownDismissOverlay(isPresented: $folderBackgroundPickerOpen)
         .onChange(of: model.folderBackgroundPickerID) { _, id in
             guard id == model.selectedFolderID else { return }
             folderBackgroundPickerOpen = true
