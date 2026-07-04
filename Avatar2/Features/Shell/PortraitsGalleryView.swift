@@ -61,6 +61,7 @@ struct PortraitsGalleryView: View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 lensContent
+                    .opacity(model.isDropTargeted ? 0 : 1)
                     .frame(width: geo.size.width,
                            height: max(0, geo.size.height - headerHeight),
                            alignment: .top)
@@ -96,6 +97,7 @@ struct PortraitsGalleryView: View {
             selectedTargets: { items.filter { model.isPortraitSelected($0) } }
         )
         .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
+        .dsMotion(DSMotion.fast, value: model.isDropTargeted)
         .dsDropdownDismissOverlay(isPresented: $folderBackgroundPickerOpen)
         .onChange(of: model.folderBackgroundPickerID) { _, id in
             guard id == model.selectedFolderID else { return }
