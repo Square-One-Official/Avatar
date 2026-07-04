@@ -146,21 +146,22 @@ struct PortraitsGalleryView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: DSSpacing.gap4) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(selectedFolder?.name ?? "All portraits")
-                    .dsTextStyle(.h3)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+        HStack(alignment: .top, spacing: DSSpacing.gap4) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap5) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                    Text(selectedFolder?.name ?? "All portraits")
+                        .dsTextStyle(.h3)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                }
                 if let folder = selectedFolder {
                     FolderDefaultBackgroundControl(
                         folder: folder,
                         entitlement: entitlement,
                         isPickerOpen: $folderBackgroundPickerOpen
                     )
-                    .padding(.top, 2)
                 }
             }
             Spacer(minLength: 0)
@@ -171,7 +172,7 @@ struct PortraitsGalleryView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DSSpacing.gap6)
         .padding(.top, DSSpacing.gap8)
-        .padding(.bottom, DSSpacing.gap4)
+        .padding(.bottom, DSSpacing.gap6)
         // Eigen dekvlak: als top-inset zweeft de header over de lens-inhoud
         // (de canvas, of een gescrollde grid), dus hij heeft een achtergrond nodig.
         .background(DSColor.Background.app)
