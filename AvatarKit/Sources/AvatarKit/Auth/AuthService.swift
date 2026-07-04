@@ -27,6 +27,12 @@ public final class AuthService {
 
     public var isSignedIn: Bool { accessToken != nil }
 
+    /// Wordt aangeroepen zodra een sessie async hersteld wordt (nil → token).
+    /// EntitlementModel hangt hieraan om /v1/account opnieuw te fetchen —
+    /// `.onChange(of: isSignedIn)` op een computed property via een nested
+    /// @Observable triggert niet betrouwbaar bij launch.
+    public var onSignedIn: (@MainActor () -> Void)?
+
     /// The shared Supabase client. Exposed zodat andere services (bv. een
     /// toekomstige realtime-feature) dezelfde sessiestore hergebruiken.
     @ObservationIgnored
@@ -88,8 +94,12 @@ public final class AuthService {
         do {
             let response = try await supabase.auth.verifyOTP(email: email, token: code, type: .email)
             if let session = response.session {
+                let hadToken = accessToken != nil
                 accessToken = session.accessToken
                 self.email = session.user.email
+                if !hadToken && accessToken != nil {
+                    onSignedIn?()
+                }
             }
         } catch {
             lastError = friendlyMessage(error)
@@ -132,8 +142,13 @@ public final class AuthService {
             guard let self else { return }
             for await (_, session) in self.supabase.auth.authStateChanges {
                 await MainActor.run {
+                    let hadToken = self.accessToken != nil
                     self.accessToken = session?.accessToken
                     self.email = session?.user.email
+                    let hasToken = self.accessToken != nil
+                    if !hadToken && hasToken {
+                        self.onSignedIn?()
+                    }
                 }
             }
         }
