@@ -84,7 +84,7 @@ een aparte story per regel te hoeven claimen.
 **Result:** ✅ OrmbgModelStore-downloadprogress via `URLSessionDownloadDelegate` (`didWriteData`-fractie per chunk, geen per-byte-`AsyncBytes`-lus meer; SHA-256-gate erná onveranderd); ✅ `ShellModel.applyAlphaMask` op gedeelde `AlphaMaskRendering.context` i.p.v. verse `CIContext` per aanroep; ✅ undo-cap: `.undoHistoryCap()` (default 20) op de WindowGroup-root in Avatar2App — `levelsOfUndo` was NSUndoManager-default onbegrensd met volle PNG-payloads in de closures; ✅ `Portrait2.effectCache` → binaire plist (Data rauw i.p.v. base64-JSON, −33% opslag; leesfallback voor oude JSON-blobs, `effectBackgroundData` pakt de actieve entry via PropertyListSerialization) + 2 nieuwe tests (roundtrip + JSON-fallback) in Portrait2Tests. build-v2.sh volledig groen.
 
 ## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
-- status: in_progress
+- status: done
 - owner: DS (2026-07-12)
 - team: DS
 - blockedBy: —
@@ -103,3 +103,4 @@ SF Symbols te blijven en verwijder de PhosphorSwift-dependency + de 2 losse
 call-sites.
 **DoD:** `swift test --package-path AvatarUI` blijft groen; DECISIONS-PENDING.md
 bijgewerkt naar "Beslist"; Result-regel.
+**Result:** ✅ besluit: bewust bij SF Symbols; PhosphorSwift uit project.yml (package-def + Avatar2-dependency) en beide imports weg. ✅ LET OP — dit wijzigt wél zichtbare glyphs: CanvasActionToolbar rendert 9 Phosphor-iconen (Frame-pil `frameCorners`, Background-pil `image`, grid-chip `gridNine`, dropdown-rijen `cornersOut`/`crop`/`perspective`/`flipHorizontal`, shape-rijen `circle`/`square`) en FaceActionsPanel 3 preset-fallbacks (`tooth`/`palette`/`smiley`) — alle 12 nu via de DSIcon-seam op SF-equivalenten (nieuwe Symbol-cases: frame/grid/shapeCircle/shapeSquare + whitenTeeth/applyMakeup/reduceWrinkles); Phosphor-naam per case in commentaar. ✅ Nieuw `DSIcon.image(_:)` (kaal SF-Image, erft omgevings-tint) zodat active-lime op capsule-pillen blijft werken — de DSIcon-víew zet een vaste primary-tint; pill-maatvoering via gedeelde `_DSFontSizedIcon` (zelfde gewicht als de onderste toolbar). ✅ DECISIONS-PENDING.md → "BESLIST 2026-07-12 (E49.4)" incl. terugdraai-route (font-optie). build-v2.sh volledig groen; `swift test --package-path AvatarUI` groen.
