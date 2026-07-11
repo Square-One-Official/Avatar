@@ -293,7 +293,10 @@ struct PaywallSheet: View {
             }
             .padding(.horizontal, DSSpacing.gap4)
             .padding(.vertical, DSSpacing.gap3)
-            .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.lg))
+            .settingsSelectableRowHoverSurface(
+                isSelected: isSelected,
+                idleBackground: DSColor.Background.neutral
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg).strokeBorder(
                     isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,

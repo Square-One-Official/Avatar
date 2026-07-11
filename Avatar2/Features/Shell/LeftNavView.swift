@@ -19,8 +19,6 @@ struct LeftNavView: View {
     static let edgeInset: CGFloat = ShellMetrics.windowEdgeInset
     /// Totale breedte van de sidebar-slot (kaart + leading inset).
     static var layoutWidth: CGFloat { width + edgeInset }
-    /// Breedte van de vaste chrome-strook t.o.v. de vensterrand (leading inset + kaart).
-    static var chromeRevealWidth: CGFloat { width + edgeInset }
 
     static let windowChromeHeight: CGFloat = 44
 
@@ -98,7 +96,8 @@ struct LeftNavView: View {
         .frame(width: Self.width)
         .frame(maxHeight: .infinity, alignment: .top)
         // Inset kaart: dunne marge links + boven/onder via ShellView; rechts flush
-        // op de content-kolom. macOS floating-panel hoekradius.
+        // op de content-kolom. Eén clipShape op de hele kaart — bovenhoeken komen
+        // niet uit een aparte overlay (ShellSidebarChrome), dat patroon brak telkens.
         .background(DSColor.Background.card)
         .clipShape(
             RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
@@ -257,6 +256,11 @@ struct LeftNavView: View {
             DSMenuRow("Export set", icon: "square.and.arrow.up.on.square", disabled: items.isEmpty) {
                 menuFolder = nil
                 PortraitSetActions.export(items, isPro: model.isPro) { model.setBusyMessage = $0 }
+            }
+            Divider().padding(.vertical, 2)
+            DSMenuRow("Default background…", icon: "photo.on.rectangle") {
+                menuFolder = nil
+                model.showFolderBackgroundPicker(folderID: folder.persistentModelID)
             }
             Divider().padding(.vertical, 2)
             DSMenuRow("Rename", icon: "pencil") {

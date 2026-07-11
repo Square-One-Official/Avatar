@@ -9,7 +9,8 @@
 // - waveform-icoon is per het bord een placeholder → cloud-glyph;
 // - modelnaam/grootte zijn echte waarden: High-fidelity edges, 78 MB
 //   (manifest-zip; de ±175 MB uit figma-design-review.md klopte niet).
-//   "8 GB RAM" uit het frame blijft: elke ondersteunde Mac haalt dat.
+// - "8 GB RAM" uit het Figma-frame weggelaten: elke ondersteunde Mac haalt
+//   dat; voegt geen keuze-informatie toe in Settings.
 
 import AvatarKit
 import AvatarUI
@@ -78,8 +79,7 @@ struct SettingsAIModelsPage: View {
                     get: { prefs.tier },
                     set: { prefs.tier = $0 }
                 ),
-                disabledTiers: disabledTiers,
-                showsAxisHint: true
+                disabledTiers: disabledTiers
             )
             .padding(.top, DSSpacing.gap4)
 
@@ -87,12 +87,6 @@ struct SettingsAIModelsPage: View {
                 Text("Use the sparkle button in Background to generate images with Apple Intelligence.")
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
-                    .padding(.top, DSSpacing.gap3)
-            } else if let summary = AppleIntelligenceAvailability.settingsSummary {
-                Text(summary)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, DSSpacing.gap3)
             }
         }
@@ -140,32 +134,14 @@ struct SettingsAIModelsPage: View {
     }
 
     private func generationOptionRow(_ option: GenerationModel) -> some View {
-        let isSelected = generationModel == option
-        return Button {
+        SettingsCheckmarkRow(
+            title: option.label,
+            subtitle: option.detail,
+            isSelected: generationModel == option
+        ) {
             generationModel = option
             GenerationModelStore.shared.current = option
-        } label: {
-            HStack(spacing: DSSpacing.gap3) {
-                VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
-                    Text(option.label)
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                    Text(option.detail)
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-                Spacer(minLength: DSSpacing.gap4)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted)
-            }
-            .padding(DSSpacing.gap3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? DSColor.Background.neutral : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: Advanced (E15.5, dev-only model-picker)
@@ -236,52 +212,24 @@ struct SettingsAIModelsPage: View {
     }
 
     private func optionChip(_ text: String, selected: Bool, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(text)
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
-                .lineLimit(1)
-                .padding(.horizontal, DSSpacing.gap3)
-                .frame(height: 30)
-                .background(selected ? DSColor.Action.primary : DSColor.Background.neutral)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
+        OptionChipButton(text: text, selected: selected, action: action)
     }
 
     // MARK: Local models (frame "list")
+
+    private static let modelSizeMB = 78
 
     private var localModelsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Local models")
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
+            Text("Optional downloads for sharper on-device results")
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
 
-            HStack(spacing: DSSpacing.gap3) {
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(spacing: DSSpacing.gap2) {
-                        Text("Remove background")
-                            .dsTextStyle(.labelBase)
-                            .foregroundStyle(DSColor.Foreground.primary)
-                        Text("•")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("High quality · sharper hair")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("•")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                        Text("8 GB RAM")
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    subtitleLine
-                }
-                Spacer(minLength: DSSpacing.gap4)
-                trailingControls
-            }
-            .padding(.top, DSSpacing.gap6)
+            localModelRow
+                .padding(.top, DSSpacing.gap4)
         }
         .padding(DSSpacing.gap6)
         .frame(maxWidth: 608, alignment: .leading)
@@ -289,32 +237,66 @@ struct SettingsAIModelsPage: View {
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
     }
 
+    private var localModelRow: some View {
+        HStack(spacing: DSSpacing.gap3) {
+            RoundedRectangle(cornerRadius: DSRadius.md)
+                .fill(DSColor.Background.neutral)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Image(systemName: "person.crop.rectangle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                }
+
+            VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
+                Text("Remove background")
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                localModelSubtitle
+            }
+
+            Spacer(minLength: DSSpacing.gap4)
+            trailingControls
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+    }
+
     @ViewBuilder
-    private var subtitleLine: some View {
+    private var localModelSubtitle: some View {
         switch model.phase {
         case .downloading(let fraction):
-            // Downloadvoortgang (E04.6/E15.2-besluit: zichtbaar in deze
-            // kaart, ook wanneer de download in onboarding gestart is —
-            // zelfde store, dus zodra E04.6 bestaat deelt hij deze state).
-            HStack(spacing: DSSpacing.gap2) {
-                ProgressView(value: fraction)
-                    .progressViewStyle(.linear)
-                    .tint(DSColor.Action.primary)
-                    .frame(width: 160)
-                Text("\(Int(fraction * 100))%")
-                    .dsTextStyle(.labelSmall)
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                Text("Downloading high-quality model")
+                    .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
-                    .monospacedDigit()
+                HStack(spacing: DSSpacing.gap2) {
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.linear)
+                        .tint(DSColor.Action.primary)
+                        .frame(width: 160)
+                    Text("\(Int(fraction * 100))%")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .monospacedDigit()
+                }
             }
-            .frame(minHeight: 20)
+        default:
+            Text(localModelSubtitleText)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+        }
+    }
+
+    private var localModelSubtitleText: String {
+        switch model.phase {
         case .failed:
-            Text("Download failed — check your connection and try again")
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-        case .idle, .installed:
-            Text("78 MB")
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
+            return "Download failed — check your connection and try again"
+        case .installed where prefs.engine == .downloadedModel:
+            return "High quality · sharper hair · \(Self.modelSizeMB) MB"
+        case .installed:
+            return "Installed · using built-in engine"
+        case .idle, .downloading:
+            return "Sharper hair edges · \(Self.modelSizeMB) MB download"
         }
     }
 
@@ -323,8 +305,6 @@ struct SettingsAIModelsPage: View {
         switch model.phase {
         case .installed:
             HStack(spacing: DSSpacing.gap3) {
-                // Aan/uit zonder te verwijderen: model blijft gedownload, maar
-                // de cutout draait op Apple Vision (uit) of dit model (aan).
                 DSToggle(isOn: Binding(
                     get: { prefs.engine == .downloadedModel },
                     set: { prefs.engine = $0 ? .downloadedModel : .appleVision }
@@ -343,6 +323,36 @@ struct SettingsAIModelsPage: View {
                 model.download { prefs.engine = .downloadedModel }
             }
         }
+    }
+}
+
+private struct OptionChipButton: View {
+    let text: String
+    let selected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    private var background: Color {
+        if selected { return DSColor.Action.primary }
+        if isHovering { return DSColor.Background.neutralStronger }
+        return DSColor.Background.neutral
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
+                .lineLimit(1)
+                .padding(.horizontal, DSSpacing.gap3)
+                .frame(height: 30)
+                .background(background)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 && !selected }
+        .animation(DSMotion.micro, value: isHovering)
     }
 }
 

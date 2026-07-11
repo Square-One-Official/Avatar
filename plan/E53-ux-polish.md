@@ -39,7 +39,8 @@ fit-to-window bij open + zoom-chip (hergebruik E27.10-recept).
 en de Studio past in het venster; tests groen; Result-regel.
 
 ## 53.3 — DSThumbnailCard: AX + hover als één DS-story (UX28 + UX26, P0)
-- status: ready
+- status: in_progress
+- owner: DS (2026-07-12, hervat op branch v2/e53-3-kaart-ax)
 - team: DS
 - blockedBy: —
 

@@ -105,6 +105,8 @@ final class ShellModel {
 
     /// Welke map de Portraits-grid toont (nil = alle beelden).
     var selectedFolderID: PersistentIdentifier?
+    /// E55: contextmenu "Default background…" opent de picker in de folder-header.
+    var folderBackgroundPickerID: PersistentIdentifier?
 
     /// Of de Portraits-sectie in de nav is uitgeklapt (toont de mappen).
     var isPortraitsExpanded = true
@@ -146,6 +148,12 @@ final class ShellModel {
         clearPortraitSelection()
         selectedFolderID = folderID
         section = .portraits
+    }
+
+    /// Opent de standaardachtergrond-picker in de folder-header (via contextmenu).
+    func showFolderBackgroundPicker(folderID: PersistentIdentifier) {
+        showPortraits(folderID: folderID)
+        folderBackgroundPickerID = folderID
     }
 
     /// E35.2: naar de Banners-bibliotheek.
@@ -306,7 +314,12 @@ final class ShellModel {
     }
 
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
-    var isShowingExport = false
+    /// Snapshot van het portret op open-moment — stabiele `.sheet(item:)`-identiteit
+    /// (layout-wissels zoals Edit↔Preview flikkeren anders de modal).
+    struct ExportSession: Identifiable, Equatable {
+        let id: PersistentIdentifier
+    }
+    var exportSession: ExportSession?
 
     /// E34.5: social-preview-modus (LinkedIn/X/Instagram-in-context + banner).
     /// Vervangt de editor-canvas in de content-kolom; terug via Edit in de topbar.
@@ -473,6 +486,12 @@ final class ShellModel {
         guard let modelContext, let png = cutout.pngData() else { return }
         let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
+        FolderImportSupport.attachImport(
+            portrait: portrait,
+            section: section,
+            selectedFolderID: selectedFolderID,
+            modelContext: modelContext
+        )
         select(portrait)
         // De editor + openOrigin zijn al bij de import-start gezet (runCutout);
         // een vervangende import in de editor houdt z'n bestaande herkomst.
@@ -1031,8 +1050,8 @@ final class ShellModel {
     /// het share sheet. Free-tier krijgt een watermerk.
     /// E19.1: opent de DS-export-popup (vorm/maat + Save/Share).
     func exportCurrentPortrait() {
-        guard selectedPortrait != nil else { return }
-        isShowingExport = true
+        guard let portrait = selectedPortrait else { return }
+        exportSession = ExportSession(id: portrait.persistentModelID)
     }
 
     // MARK: - Launch-selectie (visuele pass punt 13)

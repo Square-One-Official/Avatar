@@ -33,15 +33,17 @@ final class EntitlementModelTests: XCTestCase {
         credits: Int = 0,
         freeImportsRemaining: Int = 3,
         devUnlimited: Bool = false,
-        monthlyResetAt: Date? = nil
+        monthlyResetAt: Date? = nil,
+        subscriptionStatus: String? = nil
     ) -> String {
-        """
+        let status = subscriptionStatus ?? (tier == "pro" ? "active" : "none")
+        return """
         {
           "tier": \(tier == "pro" ? "\"pro\"" : "null"),
           "credits_remaining": \(credits),
           "monthly_quota": \(tier == "pro" ? 200 : 0),
           "monthly_reset_at": \(monthlyResetAt.map { "\"\(ISO8601DateFormatter().string(from: $0))\"" } ?? "null"),
-          "subscription_status": "\(tier == "pro" ? "active" : "none")",
+          "subscription_status": "\(status)",
           "subscription_renews_at": null,
           "free_cutouts_used": 0,
           "free_cutouts_remaining": 3,
@@ -50,6 +52,22 @@ final class EntitlementModelTests: XCTestCase {
           "needs_account_link": false\(devUnlimited ? ",\n  \"is_dev_unlimited\": true" : "")
         }
         """
+    }
+
+    /// Grace-period (past_due → `lapsed`) telt als Pro — zelfde als v1
+    /// `ProEntitlement.isPro` en server-side import-claim short-circuit.
+    func testLapsedProTierCountsAsProActive() async {
+        EntitlementStubURLProtocol.setStub(
+            .json(200, accountJSON(tier: "pro", credits: 12, subscriptionStatus: "lapsed")),
+            forPath: "/v1/account"
+        )
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        let model = makeModel()
+
+        await model.refresh()
+
+        XCTAssertTrue(model.isProActive)
+        XCTAssertFalse(model.showsTopup, "top-up alleen bij actief abonnement")
     }
 
     private let allFlagsOnJSON = """
