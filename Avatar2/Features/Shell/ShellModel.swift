@@ -600,8 +600,9 @@ final class ShellModel {
             "inputMaskImage": cutoutCI
         ])
 
-        let ctx = CIContext(options: [.useSoftwareRenderer: false])
-        guard let out = ctx.createCGImage(masked, from: outRect) else { return nil }
+        // E49.3: gedeelde context — dit is het Effects-/Face-edit-hot-path;
+        // een verse CIContext per aanroep is duur (GPU-pipeline-setup).
+        guard let out = AlphaMaskRendering.context.createCGImage(masked, from: outRect) else { return nil }
         return NSImage(cgImage: out, size: NSSize(width: outW, height: outH))
     }
 
@@ -1066,4 +1067,11 @@ final class ShellModel {
 /// gedeelde mutatie) → veilig over de actor-grens onder `targeted` strict-concurrency.
 private struct SendableNSImage: @unchecked Sendable {
     let image: NSImage
+}
+
+/// E49.3: gedeelde GPU-CIContext voor `ShellModel.applyAlphaMask` — zelfde
+/// patroon als `BackgroundBlur.context`/`LocalUpscale.context` (één context
+/// per proces i.p.v. één per render).
+private enum AlphaMaskRendering {
+    static let context = CIContext(options: [.useSoftwareRenderer: false])
 }

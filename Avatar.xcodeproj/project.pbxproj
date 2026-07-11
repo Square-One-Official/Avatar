@@ -172,6 +172,7 @@
 		867313BD6DC51163C952CA94 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		86A30C768747A50D4DA2F0AF /* BannerCanvasImageChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9633D488AE5B4BD05D81FC26 /* BannerCanvasImageChrome.swift */; };
 		86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
+		87C53410B0B2087017B84516 /* UndoHistoryCap.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */; };
 		88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		88F219E35BB48BDC77DA3BAF /* AutoFramer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483B0B526A772D660C1ECB8 /* AutoFramer.swift */; };
 		890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1658094DC9377C3D97B55BF /* ClothesPanel.swift */; };
@@ -531,6 +532,7 @@
 		C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepPrivacy.swift; sourceTree = "<group>"; };
 		C447017F67D767535688965F /* Avatar2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Avatar2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C504E7ED42D59197C3971A3A /* LeftNavView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftNavView.swift; sourceTree = "<group>"; };
+		C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoHistoryCap.swift; sourceTree = "<group>"; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
 		C8E28085965A8F0A7E153144 /* BannerShaderRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerShaderRenderer.swift; sourceTree = "<group>"; };
@@ -665,6 +667,7 @@
 				104DC6671647D23FFB03532A /* RemoteThumbnail.swift */,
 				DD5144A00B0FE56D48BFED3B /* ThumbnailRenderer.swift */,
 				3E381F6622B4D1F0E8B88A50 /* ThumbnailStore.swift */,
+				C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */,
 				D7F0C232F29D34C390EAED00 /* URL+ExternalScheme.swift */,
 			);
 			path = Shared;
@@ -1487,6 +1490,7 @@
 				65088B7D5AF83EF42399D109 /* ThumbnailStore.swift in Sources */,
 				31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */,
 				1516320AF8E8CED7840BCEAD /* URL+ExternalScheme.swift in Sources */,
+				87C53410B0B2087017B84516 /* UndoHistoryCap.swift in Sources */,
 				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
 				CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */,
 				98AB53571B09A54CAC6D4E9F /* WindowAppearance.swift in Sources */,

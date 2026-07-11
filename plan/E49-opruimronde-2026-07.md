@@ -62,7 +62,8 @@ een aparte story per regel te hoeven claimen.
 **Result:** ✅ export-/share-naam volgt `portrait.name` (sanitized, lege naam → oude "Aaavatar-portrait"-fallback) in ExportSheet; ✅ bulk-export op `makePNGAsync` (render off-main) + batch-dedupe `-2`/`-3` (case-insensitive) i.p.v. stil overschrijven; ✅ privacy-/terms-URL's naar één `AppLinks`-constante (`/privacy-policy` is live, `/privacy` was 404 — Settings/About gefixt; PaywallSheet + OnboardingEmailView mee); ✅ ⌘U app-breed als File-menu-command (`UploadPortraitCommands` + focused-scene-value uit ShellView, zelfde patroon als SettingsCommands/CanvasZoomCommands; view-scoped shortcut van de Home-knop af, ⌘U-badge blijft); ✅ `GenerateBackgroundSwatch.openSheet` `.onDevice`-tak kreeg de missende `return` (geen elevation-modal + sheet tegelijk meer, gelijk aan `ManageBackgroundsSheet.openGenerate`); ✅ onboarding-fouten in `DSColor.Signal.error` + veld-validation `.error` (OnboardingEmailView/OnboardingOTPView, in lijn met SignInSheet; resend-bevestiging blijft subtle); ✅ follow-ups: "Restore body"→"Fill in body" (AIFeatureRegistry.uiLabel + PrivacyFeatureMatrix) en dev-label "Fill body"→"Fill in body" (DevModelOverrides). build-v2.sh volledig groen.
 
 ## 49.3 — Perf-restjes [AI]
-- status: ready
+- status: done
+- owner: AI (2026-07-12)
 - team: AI
 - blockedBy: —
 
@@ -80,6 +81,7 @@ een aparte story per regel te hoeven claimen.
   herschreven per nieuwe entry) — overweeg losse `externalStorage`-velden per entry
   via een kind-entiteit, of minimaal binaire plist i.p.v. JSON.
 **DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ OrmbgModelStore-downloadprogress via `URLSessionDownloadDelegate` (`didWriteData`-fractie per chunk, geen per-byte-`AsyncBytes`-lus meer; SHA-256-gate erná onveranderd); ✅ `ShellModel.applyAlphaMask` op gedeelde `AlphaMaskRendering.context` i.p.v. verse `CIContext` per aanroep; ✅ undo-cap: `.undoHistoryCap()` (default 20) op de WindowGroup-root in Avatar2App — `levelsOfUndo` was NSUndoManager-default onbegrensd met volle PNG-payloads in de closures; ✅ `Portrait2.effectCache` → binaire plist (Data rauw i.p.v. base64-JSON, −33% opslag; leesfallback voor oude JSON-blobs, `effectBackgroundData` pakt de actieve entry via PropertyListSerialization) + 2 nieuwe tests (roundtrip + JSON-fallback) in Portrait2Tests. build-v2.sh volledig groen.
 
 ## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
 - status: ready

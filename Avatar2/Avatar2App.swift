@@ -75,6 +75,9 @@ struct Avatar2App: App {
             // Punt 18a: minimum waarbij de layout nooit kapot kan (de
             // first-use-ring schaalt mee, 18b); default-opening hieronder.
             .frame(minWidth: 800, minHeight: 600)
+            // E49.3: beeld-edits houden volledige PNG-Data in undo-closures;
+            // zonder cap groeit de venster-history onbegrensd.
+            .undoHistoryCap()
             #if DEBUG
             .task {
                 // Smoke-run-haak (--onboarding-step <stap>): forceer de flow

@@ -37,4 +37,38 @@ final class Portrait2Tests: XCTestCase {
         XCTAssertEqual(portrait.name, "Jan van den Berg")
         XCTAssertEqual(portrait.role, "CTO")
     }
+
+    // E49.3: effectCache slaat op als binaire plist (Data rauw, geen base64)
+    // en blijft pre-E49.3-JSON (base64-Data) lezen.
+    func testEffectCachePlistRoundtrip() throws {
+        let context = try makeContext()
+        let portrait = Portrait2(cutoutData: Data([1]))
+        context.insert(portrait)
+
+        let png = Data([0x89, 0x50, 0x4E, 0x47])
+        portrait.effectCache = ["mono": png]
+
+        XCTAssertEqual(portrait.effectCache, ["mono": png])
+        // Opslagformaat is plist, niet JSON.
+        let raw = try XCTUnwrap(portrait.effectCacheData)
+        XCTAssertNoThrow(try PropertyListSerialization.propertyList(from: raw, options: [], format: nil))
+        XCTAssertThrowsError(try JSONSerialization.jsonObject(with: raw))
+        // effectBackgroundData pakt de actieve entry uit de plist.
+        portrait.effectActiveRaw = "mono"
+        XCTAssertEqual(portrait.effectBackgroundData, png)
+    }
+
+    func testEffectCacheLeestOudeJSONOpslag() throws {
+        let context = try makeContext()
+        let portrait = Portrait2(cutoutData: Data([1]))
+        context.insert(portrait)
+
+        let png = Data([0x89, 0x50, 0x4E, 0x47])
+        // Pre-E49.3-formaat: JSONEncoder schreef Data als base64-string.
+        portrait.effectCacheData = try JSONEncoder().encode(["mono": png])
+
+        XCTAssertEqual(portrait.effectCache, ["mono": png])
+        portrait.effectActiveRaw = "mono"
+        XCTAssertEqual(portrait.effectBackgroundData, png)
+    }
 }
