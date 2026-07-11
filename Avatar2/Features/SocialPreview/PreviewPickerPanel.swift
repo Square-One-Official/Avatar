@@ -72,9 +72,15 @@ struct PreviewPickerPanel<Content: View, Footer: View>: View {
 
 // MARK: - Tap target (mockup avatar / banner)
 
+enum PreviewTapHoverShape {
+    case circle
+    case rectangle
+}
+
 struct PreviewTapTarget: ViewModifier {
     let coordinateSpace: CoordinateSpace
     let enabled: Bool
+    var hoverShape: PreviewTapHoverShape = .circle
     let onTap: (CGRect) -> Void
 
     @State private var bounds: CGRect = .zero
@@ -88,8 +94,7 @@ struct PreviewTapTarget: ViewModifier {
             content
                 .overlay {
                     if enabled && hovering {
-                        Circle()
-                            .strokeBorder(DSColor.Action.primary.opacity(0.55), lineWidth: 2)
+                        hoverOverlay
                     }
                 }
         }
@@ -105,14 +110,38 @@ struct PreviewTapTarget: ViewModifier {
             }
         }
     }
+
+    @ViewBuilder
+    private var hoverOverlay: some View {
+        switch hoverShape {
+        case .circle:
+            Circle()
+                .strokeBorder(DSColor.Action.primary.opacity(0.55), lineWidth: 2)
+        case .rectangle:
+            ZStack {
+                Rectangle()
+                    .fill(DSColor.Action.primary.opacity(0.08))
+                Rectangle()
+                    .strokeBorder(DSColor.Action.primary.opacity(0.55), lineWidth: 2)
+            }
+        }
+    }
 }
 
 extension View {
     func previewTapTarget(
         in coordinateSpace: CoordinateSpace,
         enabled: Bool = true,
+        hoverShape: PreviewTapHoverShape = .circle,
         onTap: @escaping (CGRect) -> Void
     ) -> some View {
-        modifier(PreviewTapTarget(coordinateSpace: coordinateSpace, enabled: enabled, onTap: onTap))
+        modifier(
+            PreviewTapTarget(
+                coordinateSpace: coordinateSpace,
+                enabled: enabled,
+                hoverShape: hoverShape,
+                onTap: onTap
+            )
+        )
     }
 }

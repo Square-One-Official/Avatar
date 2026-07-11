@@ -127,23 +127,31 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3 + E41.1: Boost resolution. Default = crystal-upscaler — portret-
-  // geoptimaliseerd (behoudt huidtextuur + identiteit, geen "plastic look"),
-  // ~$0,016/beeld, snel. Beste keuze voor een avatar-app (identiteit = product).
-  // Real-ESRGAN blijft als goedkoop alternatief, nu MÉT face_enhance (zie
-  // upscaleInputFor in replicate.ts) zodat ook de fallback gezichten verscherpt.
-  //
-  // crystal-upscaler is een community-model → gepind (E41.3, audit D8), zelfde
-  // patroon als birefnet/deoldify: de unversioned slug kan op replicate.run
-  // 404'en. Nieuwe hash bij een model-upgrade:
-  // https://replicate.com/philz1337x/crystal-upscaler/versions
-  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix — een
-  // hash-wissel raakt de payload-vertaling niet.
+  // E10.3 + E41.1 + E41.4: Boost resolution. Default = topaz (Gigapixel High
+  // Fidelity V2): won de E41.4-bakeoff (2026-07-03, 4 armen × 5 E09-
+  // portretten, live Replicate-runs door de echte pipeline) op detailbehoud
+  // + natuurlijke huidtextuur zonder identiteitsdrift; 8–15s per run.
+  // real-esrgan bleef ook zonder face_enhance de "plastic" verliezer.
+  // Crystal-422-naschrift (2026-07-03): de in E41.3 gepinde hash wás de
+  // huidige latest (zonder login verifieerbaar — `latest_version` staat in
+  // de HTML van de modelpagina). 422 "Invalid version or not permitted"
+  // betekent dat dit model geen versioned runs toestaat → unversioned ref,
+  // met een expliciete uitzondering op de pin-guard in models-smoke.ts;
+  // unversioned live bevestigd in de bakeoff.
+  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix.
   upscale: {
-    defaultModel: "crystal-upscaler",
+    defaultModel: "topaz",
     models: {
+      topaz: {
+        ref: "topazlabs/image-upscale",
+        label: "Topaz Gigapixel (High Fidelity V2)",
+      },
+      "google-upscaler": {
+        ref: "google/upscaler",
+        label: "Google Upscaler (Imagen)",
+      },
       "crystal-upscaler": {
-        ref: "philz1337x/crystal-upscaler:5d917b1444c89ed91055f3052d27e1ad433a1218599a36544510e1dfa9ac26c8",
+        ref: "philz1337x/crystal-upscaler",
         label: "Crystal Upscaler (portrait)",
       },
       "real-esrgan": {

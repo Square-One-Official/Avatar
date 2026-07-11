@@ -17,11 +17,13 @@
 import AppKit
 import AvatarKit
 import AvatarUI
+import SwiftData
 import SwiftUI
 
 struct ExportSheet: View {
-    let portrait: Portrait2
+    let portraitID: PersistentIdentifier
     var isPro: Bool = false
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     // E33: standaard Square — dat is wat de meeste platforms nodig hebben (zij
@@ -36,9 +38,27 @@ struct ExportSheet: View {
     /// Wordt gezet bij Share → triggert de verankerde native share-picker.
     @State private var shareURL: URL?
 
+    private var portrait: Portrait2? {
+        modelContext.model(for: portraitID) as? Portrait2
+    }
+
     private var watermark: Bool { !isPro }
 
     var body: some View {
+        Group {
+            if let portrait {
+                sheetContent(portrait: portrait)
+            } else {
+                Color.clear
+            }
+        }
+        .onAppear {
+            if portrait == nil { dismiss() }
+        }
+    }
+
+    @ViewBuilder
+    private func sheetContent(portrait: Portrait2) -> some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap5) {
             HStack {
                 Text("Export").dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
@@ -77,8 +97,8 @@ struct ExportSheet: View {
             }
 
             HStack(spacing: DSSpacing.gap3) {
-                DSNeutralButton("Save…", fullWidth: true) { save() }
-                DSPrimaryButton("Share", fullWidth: true) { share() }
+                DSNeutralButton("Save…", fullWidth: true) { save(portrait: portrait) }
+                DSPrimaryButton("Share", fullWidth: true) { share(portrait: portrait) }
                     .background(SharePresenter(shareURL: $shareURL))
             }
         }
@@ -121,18 +141,22 @@ struct ExportSheet: View {
         HStack(spacing: DSSpacing.gap1_5) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(DSColor.Foreground.muted)
-            Text(platformHintText)
+            Text(Self.platformHintText(for: shape))
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
         }
         .frame(maxWidth: .infinity)
     }
 
-    private var platformHintText: String {
+    /// Passieve "waar past dit"-regel per export-vorm (unit-getest).
+    static func platformHintText(for shape: ExportShape) -> String {
         switch shape {
-        case .square: return "Works everywhere — most apps crop a square to fit."
-        case .circle: return "Looks right on LinkedIn, Instagram, WhatsApp & X."
-        case .rounded: return "Matches Slack, Discord & Teams."
+        case .square:
+            return "Upload this — LinkedIn, Instagram and most apps crop it to a circle."
+        case .circle:
+            return "Already circular — transparent corners. For when the file itself should look round."
+        case .rounded:
+            return "Matches Slack, Discord & Teams."
         }
     }
 
@@ -178,33 +202,33 @@ struct ExportSheet: View {
 
     // MARK: - Actions
 
-    private func data() -> Data? {
+    private func data(portrait: Portrait2) -> Data? {
         PortraitExporter.makePNG(for: portrait, watermark: watermark, side: size, shape: shape)
     }
 
     /// Export-/share-bestandsnaam op basis van de portretnaam (zoals de
     /// bulk-export); lege naam valt terug op het oude "Aaavatar-portrait".
-    private var exportFileName: String {
+    private func exportFileName(for portrait: Portrait2) -> String {
         let trimmed = portrait.name.trimmingCharacters(in: .whitespaces)
         let base = trimmed.isEmpty ? "Aaavatar-portrait" : trimmed.replacingOccurrences(of: "/", with: "-")
         return base + ".png"
     }
 
-    private func share() {
-        guard let data = data() else { return }
+    private func share(portrait: Portrait2) {
+        guard let data = data(portrait: portrait) else { return }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent(exportFileName)
+            .appendingPathComponent(exportFileName(for: portrait))
         try? data.write(to: url)
         // Sheet NIET sluiten: de native picker is verankerd aan de Share-knop;
         // de sheet wegtrekken zou ook de picker meenemen (de oude bug).
         shareURL = url
     }
 
-    private func save() {
-        guard let data = data() else { return }
+    private func save(portrait: Portrait2) {
+        guard let data = data(portrait: portrait) else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = exportFileName
+        panel.nameFieldStringValue = exportFileName(for: portrait)
         if panel.runModal() == .OK, let url = panel.url {
             try? data.write(to: url)
         }

@@ -6,22 +6,9 @@ import SwiftUI
 struct PrivacyTierRadioGroup: View {
     @Binding var selection: AIPrivacyTier
     var disabledTiers: Set<AIPrivacyTier> = []
-    var showsAxisHint: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            if showsAxisHint {
-                HStack {
-                    Text("Most private")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                    Spacer()
-                    Text("Most advanced")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-            }
-
             ForEach(AIPrivacyTier.allCases, id: \.self) { tier in
                 PrivacyTierRadioRow(
                     tier: tier,
@@ -50,8 +37,12 @@ private struct PrivacyTierRadioRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            Button(action: onSelect) {
-                HStack(alignment: .top, spacing: DSSpacing.gap3) {
+            SettingsCheckmarkRow(
+                title: tier.title,
+                subtitle: tier.description,
+                isSelected: isSelected,
+                isDisabled: isDisabled,
+                leading: {
                     Circle()
                         .fill(DSColor.Background.action)
                         .frame(width: 28, height: 28)
@@ -60,41 +51,31 @@ private struct PrivacyTierRadioRow: View {
                                 .foregroundStyle(DSColor.Action.onAction)
                         }
                         .opacity(isDisabled ? 0.45 : 1)
-
-                    VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
-                        Text(tier.title)
-                            .dsTextStyle(.labelBase)
-                            .foregroundStyle(isDisabled ? DSColor.Foreground.muted : DSColor.Foreground.primary)
-                        Text(tier.description)
-                            .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: DSSpacing.gap2)
-
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(
-                            isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted
-                        )
-                        .opacity(isDisabled ? 0.4 : 1)
-                }
-                .padding(DSSpacing.gap4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(isSelected ? DSColor.Background.neutral : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
+                },
+                action: onSelect
+            )
 
             if isDisabled, let disabledFootnote {
-                Text(disabledFootnote)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .padding(.leading, 28 + DSSpacing.gap3)
+                disabledFootnoteBlock(disabledFootnote)
             }
         }
+    }
+
+    @ViewBuilder
+    private func disabledFootnoteBlock(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            Text(text)
+                .dsTextStyle(.bodySmall)
+                .foregroundStyle(DSColor.Foreground.muted)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if tier == .appleCloud,
+               AppleIntelligenceAvailability.status.offersSystemSettingsShortcut {
+                DSGhostButton("Open System Settings", size: .small) {
+                    AppleIntelligenceAvailability.openAppleIntelligenceSettings()
+                }
+            }
+        }
+        .padding(.leading, 28 + DSSpacing.gap3)
     }
 }

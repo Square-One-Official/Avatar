@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
 import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { flattenOnGrey, reapplyAlpha } from "../../lib/image.js";
+import { bleedFlatten, reapplyAlpha } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, upscale } from "../../lib/replicate.js";
 
@@ -21,11 +21,13 @@ export const config = {
  *          402 insufficient_credits · 401 · 429 · 504
  *
  * Pipeline (zoals colorize, met credit-gate):
- *   1. Flatten de cutout op grijs — Real-ESRGAN negeert alpha.
+ *   1. bleedFlatten (E41.4): edge-bleed + flatten — upscalers negeren alpha,
+ *      en een naive grijs-flatten bakt een grijze halo in zachte haarranden.
  *   2. Credit-gate (402 als leeg; alleen niet-dev betaalt).
- *   3. Real-ESRGAN 2× upscale op de RGB.
+ *   3. 2× fidelity-upscale op de RGB (model uit MODEL_REGISTRY.upscale).
  *   4. Hang het oorspronkelijke alfa er weer aan, herschaald naar de nieuwe
- *      maat (reapplyAlpha) — resultaat blijft een transparante cutout.
+ *      maat (reapplyAlpha, lanczos3, zacht) — resultaat blijft een
+ *      transparante cutout.
  *   5. Log 1 credit, geef de grotere cutout terug.
  *
  * Fouten vóór de billable Replicate-call rekenen nooit af.
@@ -65,9 +67,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureUser(user.id);
 
-    // Step 1: flatten op grijs (Real-ESRGAN negeert alpha). Pure server-side
-    // beeldbewerking — veilig vóór de credit-gate.
-    const flattened = await flattenOnGrey(inputBytes);
+    // Step 1: edge-bleed + flatten (upscalers negeren alpha; E41.4). Pure
+    // server-side beeldbewerking — veilig vóór de credit-gate.
+    const flattened = await bleedFlatten(inputBytes);
     const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
 
     // Step 2: credit-gate (alleen niet-dev).

@@ -50,19 +50,32 @@ struct ShellView: View {
 
             if studioFullBleed {
                 HStack(alignment: .top, spacing: 0) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     Spacer(minLength: 0)
                 }
             } else {
                 HStack(spacing: ShellMetrics.sidebarContentSpacing) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     mainArea
+                        .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
                 }
             }
         }
+        // UXS-29(v2): de unified toolbar (stabilise) geeft het venster een hoge
+        // top-safe-area. De shell negeert die op root-niveau zodat de zwevende
+        // sidebar-kaart op z'n gap3-inset vanaf de vénstertop blijft (met de
+        // traffic-lights native gecentreerd ín de kaart); de content-kolom
+        // krijgt de titelbalk-hoogte expliciet terug via safeAreaPadding.
+        .ignoresSafeArea(.container, edges: .top)
         .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
         .background(studioFullBleed ? Color.clear : DSColor.Background.app)
         .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
@@ -75,7 +88,6 @@ struct ShellView: View {
         .overlay(alignment: .topLeading) {
             ShellSidebarChrome(
                 isSidebarVisible: model.isLeftNavVisible,
-                studioFullBleed: studioFullBleed,
                 onToggleSidebar: { model.toggleLeftNav() }
             )
             .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
@@ -91,11 +103,10 @@ struct ShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
         }
-        // E19.1: Share/export-popup (DS).
-        .sheet(isPresented: $model.isShowingExport) {
-            if let portrait = model.selectedPortrait {
-                ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
-            }
+        // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
+        // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
+        .sheet(item: $model.exportSession) { session in
+            ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
         .sheet(isPresented: $model.isShowingRename) {
@@ -136,6 +147,13 @@ struct ShellView: View {
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
             #if DEBUG
+            // UXS-28 smoke-haak: open het herstelde portret direct in de editor
+            // (de kaarten zijn nog niet AX-bedienbaar — zie UX28/UXS-7 — dus
+            // smokes kunnen de editor anders niet bereiken).
+            if ProcessInfo.processInfo.arguments.contains("--open-editor"),
+               let portrait = model.selectedPortrait {
+                model.openPortrait(portrait)
+            }
             // E19.1 smoke-haak: open de export-popup ná de selectie-restore.
             if ProcessInfo.processInfo.arguments.contains("--show-export") {
                 model.exportCurrentPortrait()
@@ -152,6 +170,46 @@ struct ShellView: View {
             // uit de proces-argumenten gelezen (geen race).
             // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.
             if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
+            // Drop-import-smoke: `--import-after <pad> [sec]` — simuleert een
+            // Finder-drop in de library (zelfde model-pad als handleDrop).
+            if let i = args.firstIndex(of: "--import-after"), args.indices.contains(i + 1) {
+                let path = args[i + 1]
+                let delay = (args.indices.contains(i + 2) ? TimeInterval(args[i + 2]) : nil) ?? 3
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(delay))
+                    await model.importImage(from: URL(fileURLWithPath: path))
+                }
+            }
+            // Drop-import-smoke: `--record-states <logpad>` — logt ~15s lang elke
+            // 50ms sectie + canvas-state + selectie, om de importflow-volgorde
+            // te verifiëren zonder screen-recording-permissie.
+            if let i = args.firstIndex(of: "--record-states"), args.indices.contains(i + 1) {
+                let logURL = URL(fileURLWithPath: args[i + 1])
+                Task { @MainActor in
+                    let t0 = Date()
+                    var lines: [String] = []
+                    var last = ""
+                    for _ in 0..<300 {
+                        let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                        let canvasDesc: String
+                        switch model.canvas {
+                        case .empty: canvasDesc = "empty"
+                        case .processing: canvasDesc = "processing"
+                        case .revealing: canvasDesc = "revealing"
+                        case .result: canvasDesc = "result"
+                        case .failed(let msg): canvasDesc = "failed(\(msg))"
+                        }
+                        let line = "section=\(model.section) canvas=\(canvasDesc) " +
+                            "selected=\(model.selectedPortrait?.name ?? "nil")"
+                        if line != last {
+                            lines.append(String(format: "%06dms %@", ms, line))
+                            last = line
+                            try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
+                        }
+                        try? await Task.sleep(for: .milliseconds(50))
+                    }
+                }
+            }
             // E05.7: `--seed-set` dupliceert het portret en opent de sidebar.
             if args.contains("--seed-set") { model.debugSeedSecondPortraitAndOpenSidebar() }
             // E24.14: `--seed-adjust` zet een zichtbare Adjust-laag (canvas +
@@ -262,16 +320,13 @@ struct ShellView: View {
         }
     }
 
-    /// Sidebar-slot: altijd gemonteerd, onthult via leading-clip (zelfde spring als chrome).
+    /// Sidebar-slot: insert/remove met slide — géén leading-width-clip (dat liet
+    /// de top-leading hoekradius als los vlekje achter).
     private var leftNavSlot: some View {
         LeftNavView(model: model, entitlement: entitlement)
             .padding(.leading, LeftNavView.edgeInset)
             .frame(width: LeftNavView.layoutWidth, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
-            .frame(width: model.isLeftNavVisible ? LeftNavView.layoutWidth : 0, alignment: .leading)
-            .clipped()
-            .allowsHitTesting(model.isLeftNavVisible)
-            .accessibilityHidden(!model.isLeftNavVisible)
     }
 
     private var mainArea: some View {
@@ -381,20 +436,23 @@ struct ShellView: View {
                 }
             )
         }
-        .padding(.top, ShellMetrics.topBarTopInset)
+        .padding(.top, ShellMetrics.shellTopBarControlTopInset)
         .frame(maxWidth: .infinity, alignment: .top)
-        .frame(height: ShellMetrics.topBarBandHeight, alignment: .top)
+        .frame(height: ShellMetrics.editorTopChromeBandHeight, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
     }
 
-    /// Leading t.o.v. de content-kolom (mainArea). Bij full-bleed editor: ná sidebar.
+    /// Leading in vénster-space (de top-chrome-band overlayt de root-ZStack) —
+    /// bewust onafhankelijk van `studioFullBleed` (UXS-28/UX35): de oude
+    /// `gap3`-tak rekende alsof de band in de content-kolom leefde, waardoor de
+    /// breadcrumb bij Edit↔Preview ~248pt versprong (tot óver de sidebar).
+    /// Sidebar open → ná de sidebar-kaart; dicht → ná sidebar-toggle (zelfde rij
+    /// als traffic-lights).
     private var shellEditorBreadcrumbLeading: CGFloat {
         if model.isLeftNavVisible {
-            if studioFullBleed {
-                return LeftNavView.layoutWidth + DSSpacing.gap3
-            }
-            return DSSpacing.gap3
+            return LeftNavView.layoutWidth + DSSpacing.gap3
         }
-        return ShellMetrics.editorBreadcrumbLeadingCollapsed - ShellMetrics.windowEdgeInset
+        return ShellMetrics.editorBreadcrumbLeadingCollapsed
     }
 
     private var isolatingStatusLabel: String? {
@@ -477,22 +535,19 @@ struct ShellView: View {
     /// E-fix: het beeld + de isolating-fase die de persistente EditorView voedt.
     /// Niet-nil zodra er een portret te tonen is:
     ///   • `.result` → de cutout, geen isolating-fase (normale editor);
-    ///   • `.processing`/`.revealing` mét een al-geselecteerd portret (een
-    ///     VERVANGENDE import) → de vorige cutout als drager + de isolating-fase
-    ///     die ín het frame speelt.
-    /// Bij de éérste import is er nog geen selectie (`previousCutout == nil`) →
-    /// nil, zodat de full-screen IsolatingCanvas het overneemt ("alleen bij
-    /// vervangen", besluit Thierry).
+    ///   • `.processing`/`.revealing` → de isolating-fase speelt ín het frame.
+    ///     De drager is de vorige cutout (VERVANGENDE import in de editor) of —
+    ///     bij een library-import, die de selectie wist (runCutout) — het
+    ///     origineel zelf. De drager rendert niet zolang de isolating-laag
+    ///     speelt; hij houdt alleen de EditorView-identiteit stabiel.
     private var editorContent: (cutout: NSImage, isolating: EditorView.IsolatingPhase?)? {
         switch model.canvas {
         case .result(let cutout):
             return (cutout, nil)
         case .processing(let original):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .processing(original))
+            return (previousCutout ?? original, .processing(original))
         case .revealing(let original, let cutout):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .revealing(original: original, cutout: cutout))
+            return (previousCutout ?? original, .revealing(original: original, cutout: cutout))
         case .empty, .failed:
             return nil
         }

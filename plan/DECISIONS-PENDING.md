@@ -20,6 +20,11 @@
 
 ## Beslist
 
+### Banners-feature-flag: blijft uit tot gebruikersvraag (E37) — BESLIST 2026-07-12
+- **Besluit (Thierry):** `AppFeatureFlags.bannersEnabled` blijft default **uit**, ook nu alle
+  technische blockers (37.17–37.19) zijn opgelost. Flip pas wanneer er aantoonbare gebruikersvraag
+  naar banners is. De matched-background banner-export in Social Preview blijft wél live.
+
 ### Upscale-model voor "Boost resolution" (E10.3) — BESLIST 2026-06-14
 - **Besluit:** **Real-ESRGAN** (`nightmareai/real-esrgan`, gepind op versie) als default-upscaler,
   scale 2. Robuust en goedkoop (~$0,002–0,005/call, ruim binnen het 1-credit-tarief). Clarity

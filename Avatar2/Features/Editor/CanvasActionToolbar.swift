@@ -80,7 +80,9 @@ struct CanvasActionToolbar<Background: View>: View {
             toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
                 frameMenu
             }
-            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
+            // 440: het Notion-stijl tab-paneel (4 tabs + Original/None-pills,
+            // 4-koloms grid) heeft meer breedte nodig dan de oude swatch-rijen.
+            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 440, padding: DSSpacing.gap4) {
                 background()
             }
             // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen

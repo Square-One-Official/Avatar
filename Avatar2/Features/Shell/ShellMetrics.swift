@@ -32,10 +32,10 @@ enum ShellMetrics {
     /// Sidebar-toggle breedte (ShellSidebarChrome) — sync met SidebarToggleButton.
     static let sidebarToggleWidth: CGFloat = 28
 
-    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is: ná traffic-
-    /// lights + sidebar-toggle + ademruimte (niet onder vensterknoppen).
+    /// Editor-breadcrumb leading wanneer de left-nav ingeklapt is: direct ná de
+    /// sidebar-toggle, op dezelfde rij als traffic-lights + toggle.
     static var editorBreadcrumbLeadingCollapsed: CGFloat {
-        topBarLeadingAfterWindowControls + sidebarToggleWidth + DSSpacing.gap3
+        topBarLeadingAfterWindowControls + sidebarToggleWidth + DSSpacing.gap2
     }
 
     /// Hoogte van de band waarin de quota-teller verticaal centreert zodat
@@ -45,12 +45,33 @@ enum ShellMetrics {
     /// (top-uitgelijnd i.p.v. gecentreerd → "touching the top", feedback Thierry).
     static let windowControlsRowHeight: CGFloat = 32
 
+    /// UXS-29(v2)/UX34: middellijn van de traffic-lights vanaf de venstertop
+    /// mét de lege unified toolbar (ShellSidebarChrome.stabilise) — AppKit
+    /// centreert de knoppen in de hogere titelbalk, dus ín de zwevende
+    /// sidebar-kaart (top-inset gap3). De sidebar-toggle lijnt op dezelfde
+    /// middellijn uit. Empirisch geverifieerd op de unified-toolbar-titelbalk.
+    static let windowControlsCenterFromTop: CGFloat = 26
+
+    /// Top-inset van de content-kolom en de top-chrome-band. Dit was vóór de
+    /// unified toolbar (UXS-29(v2)) de impliciete titelbalk-safe-area (~28pt);
+    /// de shell-root negeert de (nu hogere) safe-area en geeft content + band
+    /// deze ontwerpwaarde expliciet terug zodat hun layout identiek blijft aan
+    /// vóór de toolbar — alleen de traffic-lights + sidebar-chrome liggen lager.
+    static let contentTopSafeArea: CGFloat = 28
+
     /// Editor-topbar (breadcrumb + view-toggle + Share): control-hoogte.
     static let topBarRowHeight: CGFloat = 28
 
-    /// Verticale offset van breadcrumb/Share t.o.v. de top-chrome-band — centreert
-    /// de 28pt-controls op de traffic-light-middellijn (32pt band).
-    static let topBarTopInset: CGFloat = (windowControlsRowHeight - topBarRowHeight) / 2
+    /// Top-inset van breadcrumb + Share/Edit/Preview — centreert de 28pt-controls
+    /// op de traffic-light-middellijn (zelfde hoogte als vensterknoppen + toggle).
+    static var shellTopBarControlTopInset: CGFloat {
+        windowControlsCenterFromTop - topBarRowHeight / 2
+    }
+
+    /// Totale overlay-hoogte van de editor-top-chrome (breadcrumb + controls).
+    static var editorTopChromeBandHeight: CGFloat {
+        shellTopBarControlTopInset + topBarRowHeight
+    }
 
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }

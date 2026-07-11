@@ -128,7 +128,7 @@ struct Avatar2App: App {
             // dan nog het ANONIEME account op (geen Pro, 0 credits) → alle pro-
             // features vielen in de paywall. Her-fetch het account zodra het token
             // er is (isSignedIn flipt) zodat Pro/credits kloppen.
-            .onChange(of: entitlement.isSignedIn) { _, signedIn in
+            .onChange(of: auth.isSignedIn) { _, signedIn in
                 if signedIn {
                     Task { await entitlement.refresh() }
                 } else {

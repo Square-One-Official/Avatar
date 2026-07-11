@@ -1,6 +1,7 @@
 // Apple Intelligence / Image Playground beschikbaarheid (Tier 2 gate).
 // Herkennt macOS-versie, Apple Silicon en Image Playground runtime-status.
 
+import AppKit
 import Foundation
 
 enum AppleIntelligenceSupportStatus: Equatable, Sendable {
@@ -18,8 +19,13 @@ enum AppleIntelligenceSupportStatus: Equatable, Sendable {
         case .unsupportedHardware:
             return "Requires Apple Silicon"
         case .appleIntelligenceUnavailable:
-            return "Turn on Apple Intelligence in System Settings, or check language and region"
+            return "Apple Intelligence is off or unavailable in your language or region."
         }
+    }
+
+    /// Tier 2-footnote kan een directe link naar System Settings krijgen.
+    var offersSystemSettingsShortcut: Bool {
+        self == .appleIntelligenceUnavailable
     }
 }
 
@@ -85,5 +91,23 @@ enum AppleIntelligenceAvailability {
         if version.majorVersion > major { return true }
         if version.majorVersion < major { return false }
         return version.minorVersion >= minor
+    }
+
+    /// Opent het Apple Intelligence & Siri-paneel in System Settings (Tier 2 uit).
+    static func openAppleIntelligenceSettings() {
+        // macOS Sequoia+: "Apple Intelligence & Siri" = Siri-Settings extension
+        // (zie sigo/macos-settings-urls). Oudere kandidaten openen alleen Settings
+        // root — NSWorkspace.open retourneert dan alsnog true.
+        let candidates = [
+            "x-apple.systempreferences:com.apple.Siri-Settings.extension",
+            "x-apple.systempreferences:com.apple.Siri",
+        ]
+        for raw in candidates {
+            guard let url = URL(string: raw), NSWorkspace.shared.open(url) else { continue }
+            return
+        }
+        if let url = URL(string: "x-apple.systempreferences:") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

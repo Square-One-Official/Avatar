@@ -75,6 +75,9 @@ final class EntitlementModel {
     init(auth: AuthService, backendSession: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
         self.backend = BackendClient(auth: auth, session: backendSession)
+        auth.onSignedIn = { [weak self] in
+            Task { await self?.refresh() }
+        }
         #if DEBUG
         // Smoke-run-haak (E15.5): zet de dev-vlag vóór de first render i.p.v.
         // in een .task — twee post-render state-writes in hetzelfde frame
@@ -87,7 +90,15 @@ final class EntitlementModel {
     }
 
     var isProActive: Bool {
-        account?.tier == .pro && account?.subscriptionStatus == .active
+        // Spiegelt v1 `ProEntitlement.isPro` (tier != nil) én de server-
+        // short-circuit in /v1/import-claim (`if (sub)` — past_due telt mee).
+        // Alleen `.active` eisen maakte grace-period (`.lapsed`) onterecht Starter.
+        account?.tier == .pro
+    }
+
+    /// Top-up-ladder in de paywall: alleen bij actief betaald abonnement.
+    var showsTopupRoute: Bool {
+        isProActive && account?.subscriptionStatus == .active
     }
 
     /// E15.5: dev-allowlisted account → toont de Advanced model-picker.
@@ -109,7 +120,7 @@ final class EntitlementModel {
         #if DEBUG
         if debugForceTopup { return true }
         #endif
-        return isProActive
+        return showsTopupRoute
     }
 
     #if DEBUG
@@ -330,6 +341,14 @@ final class EntitlementModel {
     /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
     /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
     func claimImport() async -> Bool {
+        #if DEBUG
+        // Smoke-runs (`--smoke-store` e.d.) draaien op een geïsoleerde store maar
+        // delen het echte account; deze bypass houdt de gate uit de flow-smokes
+        // zonder server-claims te verbruiken.
+        if ProcessInfo.processInfo.arguments.contains("--bypass-import-gate") {
+            return true
+        }
+        #endif
         do {
             let resp = try await backend.claimImport()
             if !resp.allowed {

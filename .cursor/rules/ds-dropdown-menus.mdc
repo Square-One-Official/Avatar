@@ -1,0 +1,17 @@
+---
+description: Caret-loze DS dropdown-menu's — geen systeem-popover met pijl/rand
+globs: Avatar2/**/*.swift,AvatarUI/**/*.swift
+alwaysApply: false
+---
+
+# DS dropdown-menu's — geen popover-pijl of dubbele rand
+
+Voor zwevende menu's, keuzelijsten en panelen in Aaavatar 2.0:
+
+- **Niet** `.popover(isPresented:arrowEdge:)` gebruiken wanneer de inhoud al `dsPanelSurface`, `DSContextMenuPanel`, `DSColorPicker`-chrome of vergelijkbare DS-kaartstijl heeft. macOS voegt dan een **pijltje (tail)** en een **extra buitenrand** toe rond ons paneel → dubbele rand + verkeerde look.
+- **Wel** het caret-loze patroon:
+  - `dsDropdownMenu(isPresented:)` op het anker (chip/knop) + optioneel `dsDropdownDismissOverlay` op de container (zie `DSDropdownMenu.swift`, zelfde idee als `CanvasActionToolbar`).
+  - Rechtermuismenu's / vrije positie: `DSContextMenuOverlay` + `DSContextMenuPanel`.
+  - Toolbar-dropdowns: overlay onder knop (E24.12 in `CanvasActionToolbar`).
+
+Systeem-`.popover` is OK voor **eenvoudige, niet-gestylde** inhoud zonder `dsPanelSurface` (bv. korte uitleg-tekst), mits expliciet gewenst.

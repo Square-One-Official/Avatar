@@ -84,7 +84,8 @@ een aparte story per regel te hoeven claimen.
 **Result:** ✅ OrmbgModelStore-downloadprogress via `URLSessionDownloadDelegate` (`didWriteData`-fractie per chunk, geen per-byte-`AsyncBytes`-lus meer; SHA-256-gate erná onveranderd); ✅ `ShellModel.applyAlphaMask` op gedeelde `AlphaMaskRendering.context` i.p.v. verse `CIContext` per aanroep; ✅ undo-cap: `.undoHistoryCap()` (default 20) op de WindowGroup-root in Avatar2App — `levelsOfUndo` was NSUndoManager-default onbegrensd met volle PNG-payloads in de closures; ✅ `Portrait2.effectCache` → binaire plist (Data rauw i.p.v. base64-JSON, −33% opslag; leesfallback voor oude JSON-blobs, `effectBackgroundData` pakt de actieve entry via PropertyListSerialization) + 2 nieuwe tests (roundtrip + JSON-fallback) in Portrait2Tests. build-v2.sh volledig groen.
 
 ## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
-- status: ready
+- status: in_progress
+- owner: DS (2026-07-12)
 - team: DS
 - blockedBy: —
 

@@ -49,8 +49,10 @@ function payloadBase(): string | null {
 
 /**
  * Rewrite a Supabase Storage public-object URL into its image-transformation
- * (thumbnail) variant. Non-Supabase URLs (or URLs that already carry a query)
- * are returned unchanged so a future CDN swap degrades gracefully.
+ * (thumbnail) variant. Non-Supabase URLs are returned unchanged so a future
+ * CDN swap degrades gracefully. Een eventuele querystring op de object-URL
+ * (Payload's S3-plugin hangt er sinds de E54-admin-deploy `?prefix=media`
+ * aan) wordt genegeerd: het pad identificeert het object volledig.
  */
 export function thumbnailVariant(
   url: string | null,
@@ -58,7 +60,7 @@ export function thumbnailVariant(
   quality = 75,
 ): string | null {
   if (!url) return null;
-  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)$/);
+  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)/);
   if (!m) return url;
   return `${m[1]}/render/image/public/${m[2]}?width=${width}&quality=${quality}`;
 }
@@ -375,7 +377,8 @@ export type PayloadEffect = {
   label: string;
   prompt: string;
   thumbnailUrl: string | null;
-  styleReferenceUrl: string | null;
+  /** E54: server-only stijlvoorbeelden, in CMS-volgorde (max 4 rijen). */
+  styleReferenceUrls: string[];
   order: number;
 };
 
@@ -422,10 +425,18 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
   const thumb = r.thumbnail as { url?: string } | null | undefined;
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
-  const styleRef = r.styleReference as { url?: string } | null | undefined;
-  const styleReferenceUrl = styleRef && typeof styleRef.url === "string" ? styleRef.url : null;
+  // E54: `styleReferences` is een Payload-array van { image: upload }; depth=1
+  // resolvet elke upload naar { url }. Rijen zonder bruikbare url slaan we over.
+  const refRows = Array.isArray(r.styleReferences) ? r.styleReferences : [];
+  const styleReferenceUrls = refRows
+    .map((row) => {
+      if (typeof row !== "object" || row === null) return null;
+      const image = (row as Record<string, unknown>).image as { url?: string } | null | undefined;
+      return image && typeof image.url === "string" ? image.url : null;
+    })
+    .filter((u): u is string => u !== null);
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, thumbnailUrl, styleReferenceUrl, order };
+  return { key, label, prompt, thumbnailUrl, styleReferenceUrls, order };
 }
 
 // ---------------------------------------------------------------------------

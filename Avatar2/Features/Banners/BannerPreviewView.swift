@@ -10,20 +10,16 @@ struct BannerPreviewView: View {
     let doc: BannerDoc
     var isPro: Bool = false
 
-    @State private var tab: PreviewTab = .linkedIn
     @State private var bannerImage: NSImage?
 
-    private var cardWidth: CGFloat { tab == .all ? 380 : 540 }
+    private let cardWidth: CGFloat = 600
 
     var body: some View {
         ZStack(alignment: .top) {
             DSColor.Background.app
                 .ignoresSafeArea(edges: [.horizontal, .bottom])
 
-            VStack(spacing: 0) {
-                header
-                previewArea
-            }
+            previewArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: previewRefreshKey) { await refresh() }
@@ -41,22 +37,10 @@ struct BannerPreviewView: View {
         return "\(doc.updatedAt.timeIntervalSinceReferenceDate)-\(fillTag)-\(doc.layers.shaders.count)-\(doc.layers.texts.count)-\(doc.fillImageData?.count ?? 0)"
     }
 
-    private var header: some View {
-        DSSegmentedControl(
-            selection: $tab,
-            segments: PreviewTab.allCases.map { .init(tag: $0, label: $0.label) },
-            equalWidth: true
-        )
-        .frame(width: 420)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, DSSpacing.gap5)
-        .padding(.vertical, DSSpacing.gap3)
-    }
-
     private var previewArea: some View {
         ScrollView {
             VStack(spacing: DSSpacing.gap8) {
-                ForEach(tab.platforms) { platform in
+                ForEach(SocialPlatform.allCases) { platform in
                     PlatformChrome(
                         platform: platform,
                         width: cardWidth
