@@ -43,8 +43,7 @@ struct ExportSheet: View {
             HStack {
                 Text("Export").dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
-                    .accessibilityLabel("Close")
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
             }
 
             preview

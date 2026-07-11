@@ -22,7 +22,7 @@ struct PrivacyElevationSheet: View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small, action: onDismiss)
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small, action: onDismiss)
             }
             .padding(.bottom, DSSpacing.gap2)
 

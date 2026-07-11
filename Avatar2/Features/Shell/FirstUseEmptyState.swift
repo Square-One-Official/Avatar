@@ -87,7 +87,7 @@ struct FirstUseEmptyState: View {
 
     private var centerContent: some View {
         VStack(spacing: DSSpacing.gap4) {
-                DSIconButton(Image(systemName: "plus"), style: .fillBrand) {
+                DSIconButton(Image(systemName: "plus"), label: "Add a portrait", style: .fillBrand) {
                     onChooseFile()
                 }
                 VStack(spacing: 0) {

@@ -330,20 +330,18 @@ struct SettingsAIModelsPage: View {
                     set: { prefs.engine = $0 ? .downloadedModel : .appleVision }
                 ))
                 .accessibilityLabel("Use High quality cutout model")
-                DSIconButton(Image(systemName: "trash")) {
+                DSIconButton(Image(systemName: "trash"), label: "Delete model") {
                     model.delete()
                     prefs.engine = .appleVision
                 }
-                .accessibilityLabel("Delete model")
             }
         case .downloading:
             ProgressView()
                 .controlSize(.small)
         case .idle, .failed:
-            DSIconButton(Image(systemName: "arrow.down.circle")) {
+            DSIconButton(Image(systemName: "arrow.down.circle"), label: "Download model") {
                 model.download { prefs.engine = .downloadedModel }
             }
-            .accessibilityLabel("Download model")
         }
     }
 }

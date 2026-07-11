@@ -24,19 +24,25 @@ public struct DSIconButton: View {
     }
 
     private let icon: Image
+    private let label: String
     private let style: Style
     private let size: Size
     private let isActive: Bool
     private let action: () -> Void
 
+    /// UXS-7: `label` is verplicht (geen default) — een icoon-knop zonder
+    /// AX-naam bestaat niet voor VoiceOver. Het label voedt zowel
+    /// `accessibilityLabel` als de `.help`-tooltip.
     public init(
         _ icon: Image,
+        label: String,
         style: Style = .ghostNeutral,
         size: Size = .default,
         isActive: Bool = false,
         action: @escaping () -> Void
     ) {
         self.icon = icon
+        self.label = label
         self.style = style
         self.size = size
         self.isActive = isActive
@@ -51,6 +57,8 @@ public struct DSIconButton: View {
                 .frame(width: size.iconSize, height: size.iconSize)
         }
         .buttonStyle(SurfaceStyle(style: style, size: size, isActive: isActive))
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     private struct SurfaceStyle: ButtonStyle {

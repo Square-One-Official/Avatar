@@ -232,6 +232,11 @@ struct PortraitGridTile: View {
             // Een klik zonder beweging blijft 'open'; pas bij verslepen start de drag.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))
             .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace, onTrigger: onContextMenu)
+            // UXS-7 (UX28): de tegel als één AX-element met open/selecteer/menu.
+            .portraitCardAccessibility(
+                portrait: portrait, model: model, isSelected: isSelected,
+                ordered: ordered, onContextMenu: onContextMenu
+            )
     }
 
     // De compositie binnen het vierkant: de gedeelde achtergrond+onderwerp-
@@ -255,6 +260,69 @@ struct PortraitGridTile: View {
             }
             .padding(DSSpacing.gap3)
         }
+    }
+}
+
+// MARK: - Kaart-accessibility (UXS-7 / UX28)
+
+/// Maakt een portret-kaart (grid-tegel, Home-hero) één VoiceOver-element:
+/// naam+rol als label, button-trait (+selected), en drie acties — activeren
+/// = openen (zelfde pad als de plain klik), "Select"/"Deselect" (zelfde pad
+/// als ⌘-klik) en "Show Context Menu" (zelfde pad als rechtsklik, verankerd
+/// op de gemeten kaart-frame in de context-menu-coordinate-space). Zonder dit
+/// bestonden de kaarten niet voor de AX-boom (audit UX28, live geverifieerd).
+struct PortraitCardAccessibility: ViewModifier {
+    let portrait: Portrait2
+    let model: ShellModel
+    let isSelected: Bool
+    let ordered: () -> [PersistentIdentifier]
+    let onContextMenu: (CGRect) -> Void
+
+    /// Kaart-frame in `PortraitContextMenuSpace` — anker voor de AX-menu-actie.
+    @State private var frame: CGRect = .zero
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                GeometryReader { geo in
+                    Color.clear.onChange(
+                        of: geo.frame(in: PortraitContextMenuSpace.coordinateSpace),
+                        initial: true
+                    ) { _, new in frame = new }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(axLabel)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityHint("Opens the portrait in the editor")
+            .accessibilityAction { model.openPortrait(portrait) }
+            .accessibilityAction(named: isSelected ? "Deselect" : "Select") {
+                model.handlePortraitClick(portrait, ordered: ordered(), mods: .command)
+            }
+            .accessibilityAction(named: "Show Context Menu") {
+                // Punt-anker (zoals rechtsklik) op de kaart-oorsprong.
+                onContextMenu(CGRect(origin: frame.origin, size: .zero))
+            }
+    }
+
+    private var axLabel: String {
+        let name = portrait.name.isEmpty ? "Untitled portrait" : portrait.name
+        return portrait.role.isEmpty ? name : "\(name), \(portrait.role)"
+    }
+}
+
+extension View {
+    func portraitCardAccessibility(
+        portrait: Portrait2,
+        model: ShellModel,
+        isSelected: Bool,
+        ordered: @escaping () -> [PersistentIdentifier],
+        onContextMenu: @escaping (CGRect) -> Void
+    ) -> some View {
+        modifier(PortraitCardAccessibility(
+            portrait: portrait, model: model, isSelected: isSelected,
+            ordered: ordered, onContextMenu: onContextMenu
+        ))
     }
 }
 

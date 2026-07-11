@@ -29,8 +29,7 @@ struct SignInSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
-                    .accessibilityLabel("Close")
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
             }
             Group {
                 switch phase {
