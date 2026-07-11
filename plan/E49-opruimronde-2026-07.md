@@ -80,7 +80,8 @@ een aparte story per regel te hoeven claimen.
 **DoD:** beide targets bouwen, tests groen, Result-regel per punt.
 
 ## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
-- status: ready
+- status: in_progress
+- owner: DS (2026-07-12)
 - team: DS
 - blockedBy: —
 
