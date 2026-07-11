@@ -55,20 +55,24 @@
 - **Historie:** symptoom was "Token expired" bij verify; E18.21 probeerde `.email`+`.signup`-fallback
   (later teruggedraaid naar enkel `.email`, wat correct is). App-kant (verify + foutweergave) klaar.
 
-### Phosphor-iconen: SPM-package incompatibel met CLI-DoD (2026-06-14)
-- **Probleem:** `phosphor-icons/swift` (2.1.0) bevat een **asset-catalog**. CLI `swift build`/
-  `swift test` heeft geen `actool`, dus de resource-bundle-accessor wordt niet gegenereerd →
-  `type 'Bundle?' has no member 'module'` in PhosphorSwift.swift. De DoD-stap
-  `swift test --package-path AvatarUI` faalt daardoor. Onder xcodebuild (app-target) zou het
-  wél bouwen.
-- **Interim (gedaan):** `DSIcon`-laag draait op SF Symbols met de bedoelde Phosphor-naam per case
-  in commentaar; één plek om later om te zetten.
-- **Opties voor Thierry (kies één):**
-  1. AvatarUI-unittests vía xcodebuild draaien (scheme/host opzetten) i.p.v. `swift test`, dan kan
-     de Phosphor-package mee. Build-v2.sh aanpassen.
-  2. Een font-gebaseerde Phosphor-bron gebruiken (geen asset-catalog → CLI-vriendelijk).
+### Phosphor-iconen: SPM-package incompatibel met CLI-DoD (2026-06-14) — BESLIST 2026-07-12 (E49.4)
+- **Besluit (E49.4, DS):** **bewust bij SF Symbols blijven**; de PhosphorSwift-dependency is
+  verwijderd (project.yml + beide imports). Let op: dit wijzigt wél 12 zichtbare glyphs — de
+  CanvasActionToolbar-pillen/dropdowns (frameCorners/image/gridNine/cornersOut/crop/perspective/
+  flipHorizontal/circle/square) en de 3 FaceActionsPanel-preset-fallbacks (tooth/palette/smiley)
+  renderden nog écht Phosphor en staan nu op SF-equivalenten via de DSIcon-seam.
+  `DSIcon` blijft de enige icon-seam en houdt de bedoelde Phosphor-naam per case in commentaar —
+  later alsnog omschakelen (via optie 2/3 hieronder) is één file. Terugdraaien kan Thierry
+  altijd besluiten; dan is optie 2 (font-gebaseerde bron, CLI-vriendelijk) de aangewezen route.
+- **Oorspronkelijk probleem:** `phosphor-icons/swift` (2.1.0) bevat een **asset-catalog**. CLI
+  `swift build`/`swift test` heeft geen `actool`, dus de resource-bundle-accessor wordt niet
+  gegenereerd → `type 'Bundle?' has no member 'module'`. De DoD-stap
+  `swift test --package-path AvatarUI` faalt daardoor; alleen xcodebuild kon de package aan.
+- **Destijds geïnventariseerde opties (voor het register):**
+  1. AvatarUI-unittests vía xcodebuild i.p.v. `swift test` (raakt build-v2.sh en de vaste
+     test-runner-afspraak).
+  2. Een font-gebaseerde Phosphor-bron (geen asset-catalog → CLI-vriendelijk).
   3. Phosphor-SVG's als eigen resources vendoren zonder asset-catalog.
-- Tot dan blijft DSIcon op SF Symbols (visueel benaderend, niet 1-op-1 Figma).
 
 ### E24.8 — canvas-zoom vs afbeelding-schaling via selectie-handles (2026-06-14)
 - **Status:** DEFAULT GEBOUWD (24.8 done). De keuzes hieronder blijven open ter bevestiging/iteratie

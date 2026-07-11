@@ -53,7 +53,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E46 Undo & bevestiging bij destructieve acties](E46-destructieve-acties.md) | FEAT | **done** (46.1–46.2); 46.3 backlog (undo/prullenbak bulk-delete) |
 | [E47 Testfundament kritieke paden](E47-testfundament.md) | INFRA+FEAT | **done** (47.1–47.3, incl. RemoteFeatureFlags-decode-fix) |
 | [E48 Swift 6-concurrency-pad](E48-swift6-concurrency.md) | INFRA | backlog (48.1–48.3) |
-| [E49 Opruimronde 2026-07](E49-opruimronde-2026-07.md) | FEAT+AI+DS | 49.1–49.3 ready; **49.4 in_progress** (DS) |
+| [E49 Opruimronde 2026-07](E49-opruimronde-2026-07.md) | FEAT+AI+DS | **done** (49.1–49.4, DoD groen op branch `v2/e49-opruimronde` @ bfe953f — merge naar v2-main wacht tot de werkboom vrij is van het lopende E53.7-werk) |
 | [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
