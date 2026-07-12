@@ -7,6 +7,7 @@ struct BannerCanvasBackgroundChrome: View {
     @Bindable var doc: BannerDoc
     @Binding var backgroundSelected: Bool
     let activeTool: BannerTool?
+    var presentation: UIPresentationStore
     let canvasSize: CGSize
     let layout: BannerCanvasChromeMetrics.Layout
     let undoManager: UndoManager?
@@ -38,6 +39,7 @@ struct BannerCanvasBackgroundChrome: View {
 
                 BannerImageFloatingToolbar(
                     kind: .backgroundFill,
+                    presentation: presentation,
                     filename: filename,
                     byteCount: data.count,
                     imageData: data,

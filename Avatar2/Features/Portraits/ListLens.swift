@@ -14,9 +14,6 @@ struct ListLens: View {
     let model: ShellModel
     let folders: [Folder2]
 
-    @State private var menuTarget: Portrait2?
-    @State private var menuAnchor: CGRect = .zero
-
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
@@ -36,7 +33,7 @@ struct ListLens: View {
                         }
                     )
                     .portraitContextMenuTrigger(
-                        portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor
+                        portrait: p, model: model, scope: .portraitsList
                     )
                 }
             }
@@ -44,12 +41,5 @@ struct ListLens: View {
             .padding(.bottom, DSSpacing.gap6)
         }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
-        .portraitContextMenuOverlay(
-            target: $menuTarget,
-            anchor: menuAnchor,
-            model: model,
-            folders: folders,
-            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
-        )
     }
 }

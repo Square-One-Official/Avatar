@@ -26,12 +26,6 @@ struct BannersGalleryView: View {
     }
 
     @State private var headerHeight: CGFloat = 0
-    @State private var renaming: BannerDoc?
-    @State private var draftName = ""
-    @State private var menuBanner: BannerDoc?
-    @State private var menuAnchor: CGRect = .zero
-    /// E46.1: delete vraagt eerst bevestiging (zelfde patroon als portret-delete).
-    @State private var deleting: BannerDoc?
 
     private static let contextMenuSpace = "bannersContextMenu"
 
@@ -63,40 +57,6 @@ struct BannersGalleryView: View {
             await presetsModel.load()
         }
         .coordinateSpace(name: Self.contextMenuSpace)
-        .overlay { contextMenu }
-        .alert("Rename banner", isPresented: Binding(
-            get: { renaming != nil }, set: { if !$0 { renaming = nil } }
-        )) {
-            TextField("Banner name", text: $draftName)
-            Button("Save") {
-                if let b = renaming, !draftName.trimmingCharacters(in: .whitespaces).isEmpty {
-                    b.name = draftName; b.touch()
-                }
-                renaming = nil
-            }
-            Button("Cancel", role: .cancel) { renaming = nil }
-        }
-        // E46.1: delete met bevestiging (zelfde toon als portret-delete,
-        // PortraitContextMenu/BoardView). Verwijderen loopt via BannerDeletion
-        // zodat ook de E40.2-portretkoppeling wordt opgeruimd (E46.2).
-        .confirmationDialog(
-            "Delete this banner?",
-            isPresented: Binding(
-                get: { deleting != nil },
-                set: { if !$0 { deleting = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let banner = deleting {
-                    BannerDeletion.delete(banner, in: modelContext)
-                }
-                deleting = nil
-            }
-            Button("Cancel", role: .cancel) { deleting = nil }
-        } message: {
-            Text("This can't be undone.")
-        }
     }
 
     // MARK: Grid
@@ -113,8 +73,13 @@ struct BannersGalleryView: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: DSSpacing.gap4) {
                     ForEach(banners) { banner in
                         BannerGridTile(banner: banner) { frame in
-                            menuBanner = banner
-                            menuAnchor = frame
+                            model.presentation.bannerGalleryMenu = ContextMenuRequest(
+                                portraitID: nil,
+                                folderID: nil,
+                                bannerID: banner.persistentModelID,
+                                anchor: frame,
+                                scope: .home
+                            )
                         } onOpen: {
                             model.openBannerStudio(banner)
                         }
@@ -146,33 +111,6 @@ struct BannersGalleryView: View {
         .padding(.top, DSSpacing.gap8)
         .padding(.bottom, DSSpacing.gap4)
         .background(DSColor.Background.app)
-    }
-
-    // MARK: Context menu
-
-    @ViewBuilder private var contextMenu: some View {
-        if menuBanner != nil {
-            DSContextMenuOverlay(anchor: menuAnchor, onDismiss: { menuBanner = nil }) {
-                if let banner = menuBanner {
-                    DSContextMenuPanel {
-                        DSMenuRow("Rename", icon: "pencil") {
-                            menuBanner = nil
-                            draftName = banner.name
-                            renaming = banner
-                        }
-                        DSMenuRow("Duplicate", icon: "plus.square.on.square") {
-                            menuBanner = nil
-                            duplicate(banner)
-                        }
-                        Divider().padding(.vertical, 2)
-                        DSMenuRow("Delete", icon: "trash", destructive: true) {
-                            menuBanner = nil
-                            deleting = banner
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // MARK: Acties

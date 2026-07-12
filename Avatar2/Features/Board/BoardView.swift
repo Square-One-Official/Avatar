@@ -42,9 +42,6 @@ struct BoardView: View {
     // editen op de board). Dezelfde `EditorTool` als de single-editor zodat de
     // board exact dezelfde capsule-items/labels/iconen toont.
     @State private var editTool: EditorTool?
-    // E31.7: stuurt de Frame/Background-dropdowns van de gedeelde
-    // `CanvasActionToolbar` in de board single-select top-bar.
-    @State private var canvasMenu: CanvasToolbarMenu?
 
     /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
     private var boardToolbarItems: [DSToolbarItem<EditorTool>] {
@@ -63,6 +60,13 @@ struct BoardView: View {
     private var selectedNode: Portrait2? {
         guard selection.count == 1, let id = selection.first else { return nil }
         return portraits.first { $0.persistentModelID == id }
+    }
+
+    private var boardCanvasMenuBinding: Binding<CanvasToolbarMenu?> {
+        Binding(
+            get: { model.presentation.boardCanvasMenu },
+            set: { model.presentation.boardCanvasMenu = $0 }
+        )
     }
 
     /// E27.6 (Tier 3): off-main thumbnail-store — decodeert elke cutout één keer
@@ -101,20 +105,23 @@ struct BoardView: View {
     // ons eigen DS-menu (zie de overlay onder in `body`), gepositioneerd onder de
     // aangeklikte node. Bij een multi-selectie (≥2) werken Rename/Export/Delete op
     // de hele selectie — vandaar lijsten i.p.v. één target.
-    @State private var menuTarget: Portrait2?
-    @State private var renameTargets: [Portrait2] = []
-    @State private var deleteTargets: [Portrait2] = []
     /// Bulk-export-status (board heeft geen shell-toast) → getoond in de HUD.
     @State private var exportStatus: String?
 
-    // E29.2: batch-toolbar (open dropdown) + de geselecteerde portretten.
-    @State private var batchMenu: BatchMenu?
     // E29.3: loopt tijdens de "Match lighting"-normalisatie over de selectie.
     @State private var isMatchingLight = false
-    private enum BatchMenu: Hashable { case background, adjust, align, organize }
 
     private var selectedPortraits: [Portrait2] {
         portraits.filter { selection.contains($0.persistentModelID) }
+    }
+
+    private var boardMenuTarget: Portrait2? {
+        guard let id = model.presentation.boardPortraitMenuID else { return nil }
+        return portraits.first { $0.persistentModelID == id }
+    }
+
+    private func dismissBoardMenu() {
+        model.presentation.boardPortraitMenuID = nil
     }
 
     // Node-/cel-maten (board-space).
@@ -168,7 +175,8 @@ struct BoardView: View {
                         .background {
                             CanvasInteractionCatcher(
                                 camera: $camera,
-                                chromeHovered: batchMenu != nil || canvasMenu != nil
+                                chromeHovered: model.presentation.boardBatchMenu != nil
+                                    || model.presentation.boardCanvasMenu != nil
                             )
                             boardShortcutButtons
                         }
@@ -210,38 +218,9 @@ struct BoardView: View {
             // Rechtermuis-menu — gepositioneerd onder de aangeklikte node; een
             // transparante scrim eronder sluit bij een klik buiten het menu.
             .overlay {
-                if let target = menuTarget {
+                if let target = boardMenuTarget {
                     contextMenuOverlay(target)
                 }
-            }
-            // Rename-modal (gedeelde RenameSheet) — bij ≥2 targets zet Save dezelfde
-            // naam + rol op álle geselecteerde portretten.
-            .sheet(isPresented: Binding(
-                get: { !renameTargets.isEmpty },
-                set: { if !$0 { renameTargets = [] } }
-            )) {
-                if !renameTargets.isEmpty { RenameSheet(portraits: renameTargets) }
-            }
-            // Delete met bevestiging (zelfde modelContext-pad als de sidebar);
-            // bij ≥2 targets verwijdert het de hele selectie.
-            .confirmationDialog(
-                deleteTargets.count >= 2 ? "Delete \(deleteTargets.count) portraits?" : "Delete this portrait?",
-                isPresented: Binding(
-                    get: { !deleteTargets.isEmpty },
-                    set: { if !$0 { deleteTargets = [] } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    for target in deleteTargets {
-                        selection.remove(target.persistentModelID)
-                        modelContext.delete(target)
-                    }
-                    deleteTargets = []
-                }
-                Button("Cancel", role: .cancel) { deleteTargets = [] }
-            } message: {
-                Text("This can't be undone.")
             }
             // Viewport-maat meten zónder gulzige top-level GeometryReader: een
             // .background(GeometryReader) matcht de inhoudsmaat en raakt de layout niet.
@@ -260,8 +239,8 @@ struct BoardView: View {
             .onChange(of: selection) { _, sel in
                 // Sluit altijd alle dropdowns bij selectie-wissel — anders
                 // heropen de batch-bar met een nog-open dropdown.
-                batchMenu = nil
-                canvasMenu = nil
+                model.presentation.boardBatchMenu = nil
+                model.presentation.boardCanvasMenu = nil
                 if sel.count == 1, let id = sel.first,
                    let node = portraits.first(where: { $0.persistentModelID == id }) {
                     model.select(node)
@@ -418,7 +397,8 @@ struct BoardView: View {
         // selectie verschijnt; binnen een bestaande ≥2-selectie blijft die staan.
         .onRightClick {
             if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
-            menuTarget = p
+            model.presentation.boardPortraitMenuID = p.persistentModelID
+            model.presentation.boardPortraitMenuAnchor = menuAnchor(for: p)
         }
         .gesture(dragGesture(for: p))
         .position(x: item.center.x, y: item.center.y)
@@ -532,7 +512,7 @@ struct BoardView: View {
         ZStack(alignment: .topLeading) {
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { menuTarget = nil }
+                .onTapGesture { dismissBoardMenu() }
             nodeContextMenu(for: target)
                 .fixedSize()
                 .offset(x: anchor.x, y: anchor.y)
@@ -550,22 +530,32 @@ struct BoardView: View {
         DSContextMenuPanel {
             if bulk {
                 DSMenuRow("Rename \(n) portraits", icon: "pencil") {
-                    menuTarget = nil; renameTargets = selectedPortraits
+                    dismissBoardMenu()
+                    model.renamePortraitIDs = selectedPortraits.map(\.persistentModelID)
                 }
                 DSMenuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
-                    menuTarget = nil; bulkExport()
+                    dismissBoardMenu(); bulkExport()
                 }
                 Divider().padding(.vertical, 2)
                 DSMenuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
-                    menuTarget = nil; deleteTargets = selectedPortraits
+                    dismissBoardMenu()
+                    model.presentation.confirm = .deletePortraits(
+                        ids: selectedPortraits.map(\.persistentModelID)
+                    )
                 }
             } else {
-                DSMenuRow("Rename", icon: "pencil") { menuTarget = nil; renameTargets = [portrait] }
+                DSMenuRow("Rename", icon: "pencil") {
+                    dismissBoardMenu()
+                    model.renamePortraitIDs = [portrait.persistentModelID]
+                }
                 DSMenuRow("Export…", icon: "square.and.arrow.up") {
-                    menuTarget = nil; model.select(portrait); model.exportCurrentPortrait()
+                    dismissBoardMenu(); model.select(portrait); model.exportCurrentPortrait()
                 }
                 Divider().padding(.vertical, 2)
-                DSMenuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
+                DSMenuRow("Delete", icon: "trash", destructive: true) {
+                    dismissBoardMenu()
+                    model.presentation.confirm = .deletePortraits(ids: [portrait.persistentModelID])
+                }
             }
         }
     }
@@ -717,7 +707,10 @@ struct BoardView: View {
             if args.contains("--board-match-light") { matchLightingSelection() }
         }
         // Smoke: forceer het rechtermuis-menu op de eerste node (los van --board-select).
-        if args.contains("--show-board-menu") { menuTarget = menuTarget ?? portraits.first }
+        if args.contains("--show-board-menu") {
+            model.presentation.boardPortraitMenuID = model.presentation.boardPortraitMenuID
+                ?? portraits.first?.persistentModelID
+        }
         #endif
     }
 
@@ -819,8 +812,8 @@ struct BoardView: View {
             // E31.7: Background = dezelfde volledige BackgroundPanel als de
             // single-editor (besluit Thierry: geen aparte inline-swatches),
             // toegepast op ALLE geselecteerde.
-            backgroundMenuButton(isOpen: batchMenu == .background,
-                                  toggle: { batchMenu = (batchMenu == .background) ? nil : .background },
+            backgroundMenuButton(isOpen: model.presentation.boardBatchMenu == .background,
+                                  toggle: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .background) ? nil : .background },
                                   display: selectedPortraits.first)
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
@@ -855,12 +848,12 @@ struct BoardView: View {
             DSCapsuleToolButton(
                 Image(systemName: "slider.horizontal.3"),
                 label: "Adjust",
-                isActive: batchMenu == .adjust,
+                isActive: model.presentation.boardBatchMenu == .adjust,
                 size: .compact,
-                action: { batchMenu = (batchMenu == .adjust) ? nil : .adjust }
+                action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .adjust) ? nil : .adjust }
             )
             .overlay(alignment: .top) {
-                if batchMenu == .adjust, let first = selectedPortraits.first,
+                if model.presentation.boardBatchMenu == .adjust, let first = selectedPortraits.first,
                    let img = NSImage(data: first.cutoutData) {
                     EditColorPanel(
                         source: img,
@@ -898,12 +891,12 @@ struct BoardView: View {
         DSCapsuleToolButton(
             Image(systemName: "align.horizontal.left.fill"),
             showChevron: true,
-            isActive: batchMenu == .align,
+            isActive: model.presentation.boardBatchMenu == .align,
             size: .compact,
-            action: { batchMenu = (batchMenu == .align) ? nil : .align }
+            action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .align) ? nil : .align }
         )
         .overlay(alignment: .top) {
-            if batchMenu == .align {
+            if model.presentation.boardBatchMenu == .align {
                 HStack(spacing: DSToolbarSize.compact.itemSpacing) {
                     alignIcon("align.horizontal.left", .left)
                     alignIcon("align.horizontal.center", .centerH)
@@ -933,23 +926,23 @@ struct BoardView: View {
             Image(systemName: "square.grid.2x2"),
             label: "Organize",
             showChevron: true,
-            isActive: batchMenu == .organize,
+            isActive: model.presentation.boardBatchMenu == .organize,
             size: .compact,
-            action: { batchMenu = (batchMenu == .organize) ? nil : .organize }
+            action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .organize) ? nil : .organize }
         )
         .overlay(alignment: .top) {
-            if batchMenu == .organize {
+            if model.presentation.boardBatchMenu == .organize {
                 DSContextMenuPanel(minWidth: 240) {
                     DSMenuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
-                        batchMenu = nil; tidyUpSelection()
+                        model.presentation.boardBatchMenu = nil; tidyUpSelection()
                     }
                     DSMenuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
                               shortcut: "⌃⌥V", disabled: selection.count < 3) {
-                        batchMenu = nil; distributeSelection(.vertical)
+                        model.presentation.boardBatchMenu = nil; distributeSelection(.vertical)
                     }
                     DSMenuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
                               shortcut: "⌃⌥H", disabled: selection.count < 3) {
-                        batchMenu = nil; distributeSelection(.horizontal)
+                        model.presentation.boardBatchMenu = nil; distributeSelection(.horizontal)
                     }
                 }
                 .fixedSize()
@@ -978,7 +971,7 @@ struct BoardView: View {
         )
         .overlay(alignment: .top) {
             if isOpen {
-                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, entitlement: entitlement)
+                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, presentation: model.presentation, entitlement: entitlement)
                     .padding(DSSpacing.gap4)
                     // 440: zelfde breedte als de editor-popover (Notion-stijl
                     // tab-paneel, 4-koloms grid).
@@ -1194,11 +1187,11 @@ struct BoardView: View {
             onFlip: { flipNode(node) },
             frameShape: node.frameShape,
             onSetFrameShape: { setNodeFrameShape($0, node) },
-            activeMenu: $canvasMenu,
+            activeMenu: boardCanvasMenuBinding,
             gridEnabled: .constant(false),
             showFramingActions: false,
             showGrid: false,
-            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }, entitlement: entitlement) }
+            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }, presentation: model.presentation, entitlement: entitlement) }
         )
     }
 

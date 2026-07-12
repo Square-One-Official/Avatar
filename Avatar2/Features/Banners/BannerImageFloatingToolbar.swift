@@ -10,6 +10,7 @@ enum BannerImageToolbarKind {
 
 struct BannerImageFloatingToolbar: View {
     let kind: BannerImageToolbarKind
+    var presentation: UIPresentationStore
     let filename: String
     let byteCount: Int
     let imageData: Data
@@ -19,14 +20,19 @@ struct BannerImageFloatingToolbar: View {
     var menuDismissNonce: Int = 0
     var onMenusOpenChange: ((Bool) -> Void)?
 
-    @State private var showInfoMenu = false
+    private var infoMenuOpen: Binding<Bool> {
+        Binding(
+            get: { presentation.bannerFloatingMenu == .imageInfo },
+            set: { presentation.bannerFloatingMenu = $0 ? .imageInfo : nil }
+        )
+    }
 
     var body: some View {
         HStack(spacing: DSSpacing.gap4) {
-            toolButton("photo", active: showInfoMenu) {
-                showInfoMenu.toggle()
+            toolButton("photo", active: presentation.bannerFloatingMenu == .imageInfo) {
+                presentation.bannerFloatingMenu = presentation.bannerFloatingMenu == .imageInfo ? nil : .imageInfo
             }
-            .dsDropdownMenu(isPresented: $showInfoMenu, anchorHeight: 32) {
+            .dsDropdownMenu(isPresented: infoMenuOpen, anchorHeight: 32) {
                 infoMenu
             }
 
@@ -53,8 +59,10 @@ struct BannerImageFloatingToolbar: View {
                 .fill(DSColor.Background.card)
                 .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
         )
-        .onChange(of: menuDismissNonce) { _, _ in showInfoMenu = false }
-        .onChange(of: showInfoMenu) { _, open in onMenusOpenChange?(open) }
+        .onChange(of: menuDismissNonce) { _, _ in presentation.bannerFloatingMenu = nil }
+        .onChange(of: presentation.bannerFloatingMenu) { _, menu in
+            onMenusOpenChange?(menu == .imageInfo)
+        }
     }
 
     private func toolButton(_ icon: String, active: Bool, action: @escaping () -> Void) -> some View {
@@ -85,13 +93,13 @@ struct BannerImageFloatingToolbar: View {
 
             Divider()
 
-            Button("Replace image") { showInfoMenu = false; onReplace() }
+            Button("Replace image") { presentation.bannerFloatingMenu = nil; onReplace() }
                 .buttonStyle(.plain)
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button("Remove") { showInfoMenu = false; onRemove() }
+            Button("Remove") { presentation.bannerFloatingMenu = nil; onRemove() }
                 .buttonStyle(.plain)
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.muted)
@@ -100,7 +108,7 @@ struct BannerImageFloatingToolbar: View {
         .padding(DSSpacing.gap3)
         .frame(width: 240)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
-        .dsDropdownDismissOverlay(isPresented: $showInfoMenu)
+        .dsDropdownDismissOverlay(isPresented: infoMenuOpen)
     }
 
     private var truncatedFilename: String {

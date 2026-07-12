@@ -15,6 +15,7 @@ struct BannerCanvasOverlay: View {
     @Binding var logoFilename: String
     @Binding var backgroundFilename: String
     let activeTool: BannerTool?
+    var presentation: UIPresentationStore
     let canvasSize: CGSize
     @Binding var camera: CanvasCamera
     let undoManager: UndoManager?
@@ -90,6 +91,7 @@ struct BannerCanvasOverlay: View {
                 doc: doc,
                 backgroundSelected: $backgroundSelected,
                 activeTool: activeTool,
+                presentation: presentation,
                 canvasSize: canvasSize,
                 layout: layout,
                 undoManager: undoManager,
@@ -111,6 +113,7 @@ struct BannerCanvasOverlay: View {
                     doc: doc,
                     selection: $selection,
                     layerID: id,
+                    presentation: presentation,
                     canvasSize: canvasSize,
                     layout: layout,
                     undoManager: undoManager,
@@ -123,6 +126,7 @@ struct BannerCanvasOverlay: View {
                     doc: doc,
                     selection: $selection,
                     activeTool: activeTool,
+                    presentation: presentation,
                     canvasSize: canvasSize,
                     layout: layout,
                     undoManager: undoManager,

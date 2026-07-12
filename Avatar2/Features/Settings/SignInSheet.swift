@@ -2,6 +2,7 @@
 // uitgelogde gebruiker overal kan inloggen (Account-pagina + later de
 // cloud-feature-gate E18.2). Hergebruikt AuthService via EntitlementModel
 // (requestCode/verifyCode). DS-stijl gespiegeld op de onboarding-stappen.
+// E53.7: flow-state leeft in EntitlementModel.signInFlow.
 
 import AvatarKit
 import AvatarUI
@@ -12,28 +13,17 @@ struct SignInSheet: View {
     /// Aangeroepen ná een geslaagde login (bv. om de gate-actie te hervatten).
     var onSignedIn: () -> Void = {}
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private enum Phase { case email, otp }
-    @State private var phase: Phase = .email
-    @State private var email = ""
-    @State private var code = ""
-    // E18.24: error/success-states op de inputvelden i.p.v. een losse toast.
-    @State private var emailValidation: DSValidationState = .normal
-    @State private var otpValidation: DSValidationState = .normal
-
-    private static let otpLength = 6
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
+                DSIconButton(Image(systemName: "xmark"), size: .small) { close() }
                     .accessibilityLabel("Close")
             }
             Group {
-                switch phase {
+                switch entitlement.signInFlow.phase {
                 case .email: emailStep
                 case .otp: otpStep
                 }
@@ -44,8 +34,6 @@ struct SignInSheet: View {
         .frame(width: 420)
         .background(DSColor.Background.app)
         .appliedAppearancePreference()
-        // E18.24/18.21: de fout-REDEN als toast onderin (zodat zichtbaar is
-        // wáárom het misging), naast de rode input-state. Auto-dismiss.
         .overlay(alignment: .bottom) {
             if let error = entitlement.authError {
                 DSToast(title: "Couldn't sign you in", description: error) {
@@ -60,7 +48,6 @@ struct SignInSheet: View {
             }
         }
         .dsMotion(DSMotion.enter, value: entitlement.authError)
-        // Schone start: geen oude fout van een vorige poging.
         .onAppear { entitlement.dismissAuthError() }
     }
 
@@ -75,12 +62,13 @@ struct SignInSheet: View {
             DSTextField(
                 placeholder: "Email address",
                 icon: Image(systemName: "envelope"),
-                validation: emailValidation,
-                text: $email
+                validation: entitlement.signInFlow.emailValidation,
+                text: $entitlement.signInFlow.email
             )
             .onSubmit { sendCode() }
-            // Bij bewerken terug naar normaal (E18.24).
-            .onChange(of: email) { _, _ in emailValidation = .normal }
+            .onChange(of: entitlement.signInFlow.email) { _, _ in
+                entitlement.signInFlow.emailValidation = .normal
+            }
             DSPrimaryButton("Send code", fullWidth: true) { sendCode() }
                 .disabled(!canSubmitEmail || entitlement.authBusy)
         }
@@ -92,25 +80,31 @@ struct SignInSheet: View {
                 Text("Check your email")
                     .dsTextStyle(.h3)
                     .foregroundStyle(DSColor.Foreground.primary)
-                Text("We've sent a code to \(email)")
+                Text("We've sent a code to \(entitlement.signInFlow.email)")
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
             }
-            DSOTPField(code: $code, length: Self.otpLength, validation: otpValidation)
-                // E18.24-fix: GEEN auto-verify meer op het 6e cijfer (dat gaf
-                // een "error" vóór de gebruiker op Verify klikte). Bewerken
-                // wist wél de error-state.
-                .onChange(of: code) { _, _ in
-                    if otpValidation == .error { otpValidation = .normal }
+            DSOTPField(
+                code: $entitlement.signInFlow.code,
+                length: SignInFlowState.otpLength,
+                validation: entitlement.signInFlow.otpValidation
+            )
+            .onChange(of: entitlement.signInFlow.code) { _, _ in
+                if entitlement.signInFlow.otpValidation == .error {
+                    entitlement.signInFlow.otpValidation = .normal
                 }
+            }
             DSPrimaryButton("Verify", fullWidth: true) { verify() }
-                .disabled(code.count != Self.otpLength || entitlement.authBusy)
+                .disabled(
+                    entitlement.signInFlow.code.count != SignInFlowState.otpLength
+                        || entitlement.authBusy
+                )
             DSGhostButton("Resend code", fullWidth: true) { sendCode() }
                 .disabled(entitlement.authBusy)
             Button("Wrong email? Go back") {
-                phase = .email
-                code = ""
-                otpValidation = .normal
+                entitlement.signInFlow.phase = .email
+                entitlement.signInFlow.code = ""
+                entitlement.signInFlow.otpValidation = .normal
                 entitlement.dismissAuthError()
             }
             .buttonStyle(.plain)
@@ -120,43 +114,47 @@ struct SignInSheet: View {
     }
 
     private var canSubmitEmail: Bool {
-        let t = email.trimmingCharacters(in: .whitespaces)
+        let t = entitlement.signInFlow.email.trimmingCharacters(in: .whitespaces)
         return t.contains("@") && t.contains(".")
+    }
+
+    private func close() {
+        entitlement.closeSignIn()
     }
 
     private func sendCode() {
         guard canSubmitEmail else { return }
-        let address = email.trimmingCharacters(in: .whitespaces)
+        let address = entitlement.signInFlow.email.trimmingCharacters(in: .whitespaces)
         Task {
             await entitlement.sendSignInCode(address)
             if entitlement.authError == nil {
-                emailValidation = .normal
-                phase = .otp
+                entitlement.signInFlow.emailValidation = .normal
+                entitlement.signInFlow.phase = .otp
             } else {
-                // E18.24: e-mailveld licht rood op (de toast toont de reden);
-                // auto-herstel van de rode rand na enkele sec.
-                emailValidation = .error
+                entitlement.signInFlow.emailValidation = .error
                 try? await Task.sleep(for: .seconds(3))
-                if emailValidation == .error { emailValidation = .normal }
+                if entitlement.signInFlow.emailValidation == .error {
+                    entitlement.signInFlow.emailValidation = .normal
+                }
             }
         }
     }
 
     private func verify() {
-        let address = email.trimmingCharacters(in: .whitespaces)
+        let address = entitlement.signInFlow.email.trimmingCharacters(in: .whitespaces)
+        let code = entitlement.signInFlow.code
         Task {
             if await entitlement.verifySignInCode(address, code: code) {
-                // E18.24: success-state kort tonen vóór het sluiten.
-                otpValidation = .success
+                entitlement.signInFlow.otpValidation = .success
                 try? await Task.sleep(for: .seconds(0.7))
                 onSignedIn()
-                dismiss()
+                entitlement.closeSignIn()
             } else {
-                // Fout: code-veld licht rood op (de toast toont de reden);
-                // auto-herstel van de rode rand na enkele seconden.
-                otpValidation = .error
+                entitlement.signInFlow.otpValidation = .error
                 try? await Task.sleep(for: .seconds(3))
-                if otpValidation == .error { otpValidation = .normal }
+                if entitlement.signInFlow.otpValidation == .error {
+                    entitlement.signInFlow.otpValidation = .normal
+                }
             }
         }
     }

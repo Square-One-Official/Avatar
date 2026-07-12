@@ -16,8 +16,6 @@ struct GalleryLens: View {
     let folders: [Folder2]
 
     @State private var focusID: PersistentIdentifier?
-    @State private var menuTarget: Portrait2?
-    @State private var menuAnchor: CGRect = .zero
 
     private var focused: Portrait2? {
         items.first { $0.persistentModelID == focusID } ?? items.first
@@ -40,13 +38,6 @@ struct GalleryLens: View {
             filmstrip
         }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
-        .portraitContextMenuOverlay(
-            target: $menuTarget,
-            anchor: menuAnchor,
-            model: model,
-            folders: folders,
-            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
-        )
         // ←/→ bladeren door de gallery (cyclisch). Onzichtbare knoppen — alleen
         // actief zolang de gallery-lens zichtbaar is.
         .background {
@@ -80,7 +71,7 @@ struct GalleryLens: View {
         // dus ze openen het portret niet.
         .overlay(alignment: .leading) { navArrow("chevron.left") { cycle(-1) } }
         .overlay(alignment: .trailing) { navArrow("chevron.right") { cycle(1) } }
-        .portraitContextMenuTrigger(portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor)
+        .portraitContextMenuTrigger(portrait: p, model: model, scope: .portraitsGallery)
     }
 
     private func navArrow(_ symbol: String, action: @escaping () -> Void) -> some View {
@@ -155,6 +146,6 @@ struct GalleryLens: View {
                 }
             }
             .dsMotion(DSMotion.micro, value: isFocus)
-            .portraitContextMenuTrigger(portrait: p, model: model, target: $menuTarget, anchor: $menuAnchor)
+            .portraitContextMenuTrigger(portrait: p, model: model, scope: .portraitsGallery)
     }
 }

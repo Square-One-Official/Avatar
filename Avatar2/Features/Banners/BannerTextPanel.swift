@@ -8,12 +8,11 @@ import SwiftUI
 struct BannerTextPanel: View {
     @Bindable var doc: BannerDoc
     @Binding var selectedLayerID: UUID?
+    var presentation: UIPresentationStore
     var subtitle: String?
 
     @State private var texts: [BannerTextLayer] = []
     @State private var didLoad = false
-    @State private var colorPickerLayerID: UUID?
-    @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
 
     private static let weights: [(Int, String)] = [(0, "Regular"), (1, "Medium"), (2, "Semibold"), (3, "Bold")]
@@ -37,12 +36,8 @@ struct BannerTextPanel: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
-            DSColorPicker(color: $pickerColor, supportsAlpha: false)
-                .appliedAppearancePreference()
-        }
         .onChange(of: pickerColor) { _, c in
-            guard showColorPicker, let id = colorPickerLayerID else { return }
+            guard case .bannerText(let id) = presentation.colorPicker else { return }
             guard let hex = c.hexRGB,
                   let index = texts.firstIndex(where: { $0.id == id }) else { return }
             texts[index].colorHex = hex
@@ -242,8 +237,7 @@ struct BannerTextPanel: View {
         let color = Color(hexRGB: layer.wrappedValue.colorHex) ?? .white
         return Button {
             pickerColor = color
-            colorPickerLayerID = id
-            showColorPicker = true
+            presentation.colorPicker = .bannerText(layerID: id)
         } label: {
             Circle()
                 .fill(color)
@@ -253,6 +247,16 @@ struct BannerTextPanel: View {
         .buttonStyle(.plain)
         .dsHoverScale()
         .help("Text colour")
+        .dsDropdownMenu(
+            isPresented: Binding(
+                get: { presentation.colorPicker == .bannerText(layerID: id) },
+                set: { presentation.colorPicker = $0 ? .bannerText(layerID: id) : nil }
+            ),
+            anchorHeight: swatch
+        ) {
+            DSColorPicker(color: $pickerColor, supportsAlpha: false)
+                .appliedAppearancePreference()
+        }
     }
 
     private func addText() {
@@ -269,9 +273,8 @@ struct BannerTextPanel: View {
 
     private func delete(_ id: UUID) {
         texts.removeAll { $0.id == id }
-        if colorPickerLayerID == id {
-            showColorPicker = false
-            colorPickerLayerID = nil
+        if case .bannerText(let pickerID) = presentation.colorPicker, pickerID == id {
+            presentation.colorPicker = nil
         }
         if selectedLayerID == id {
             selectedLayerID = texts.first?.id

@@ -117,116 +117,20 @@ struct PortraitDSContextMenu: View {
     }
 }
 
-// MARK: - Overlay helper
-
-struct PortraitContextMenuOverlay: View {
-    @Binding var target: Portrait2?
-    let anchor: CGRect
-    let model: ShellModel
-    let folders: [Folder2]
-    let selectedTargets: () -> [Portrait2]
-
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.undoManager) private var undoManager
-    @State private var deleteTargets: [Portrait2] = []
-    // E36.5 (audit-B5): "New folder…" vraagt eerst een naam (zelfde prompt als
-    // de left-nav-flow) i.p.v. stil "Untitled folder N" te maken. De targets
-    // worden vastgehouden tot de alert bevestigd/geannuleerd is.
-    @State private var newFolderTargets: [Portrait2] = []
-    @State private var newFolderName = ""
-
-    var body: some View {
-        Group {
-            if let portrait = target {
-                DSContextMenuOverlay(anchor: anchor, onDismiss: { target = nil }) {
-                    PortraitDSContextMenu(
-                        portrait: portrait,
-                        model: model,
-                        folders: folders,
-                        selectedTargets: selectedTargets,
-                        undoManager: undoManager,
-                        onDismiss: { target = nil },
-                        onRequestDelete: { deleteTargets = $0 },
-                        onRequestNewFolder: {
-                            newFolderName = ""
-                            newFolderTargets = $0
-                        }
-                    )
-                }
-            }
-        }
-        .alert("Create folder", isPresented: Binding(
-            get: { !newFolderTargets.isEmpty },
-            set: { if !$0 { newFolderTargets = [] } }
-        )) {
-            TextField("Folder name", text: $newFolderName)
-            Button("Create") { confirmCreateFolder() }
-            Button("Cancel", role: .cancel) { newFolderTargets = [] }
-        }
-        .confirmationDialog(
-            deleteTargets.count >= 2
-                ? "Delete \(deleteTargets.count) portraits?"
-                : "Delete this portrait?",
-            isPresented: Binding(
-                get: { !deleteTargets.isEmpty },
-                set: { if !$0 { deleteTargets = [] } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                for p in deleteTargets { modelContext.delete(p) }
-                model.clearPortraitSelection()
-                deleteTargets = []
-            }
-            Button("Cancel", role: .cancel) { deleteTargets = [] }
-        } message: {
-            Text("This can't be undone.")
-        }
-    }
-
-    /// Maakt de map met de opgegeven naam (spiegelt `LeftNavView.
-    /// confirmCreateFolder`) en verplaatst de vastgehouden portretten erin.
-    /// Lege naam = niets doen (alert sluit; geen stille "Untitled folder").
-    private func confirmCreateFolder() {
-        defer { newFolderTargets = [] }
-        let name = newFolderName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let folder = Folder2(name: name, order: folders.count + 1)
-        modelContext.insert(folder)
-        for p in newFolderTargets { p.folder = folder }
-    }
-}
-
 // MARK: - View extensions
 
 extension View {
     func portraitContextMenuTrigger(
         portrait: Portrait2,
         model: ShellModel,
-        target: Binding<Portrait2?>,
-        anchor: Binding<CGRect>
+        scope: ContextMenuScope
     ) -> some View {
         contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
             model.preparePortraitContextMenu(on: portrait)
-            target.wrappedValue = portrait
-            anchor.wrappedValue = frame
-        }
-    }
-
-    func portraitContextMenuOverlay(
-        target: Binding<Portrait2?>,
-        anchor: CGRect,
-        model: ShellModel,
-        folders: [Folder2],
-        selectedTargets: @escaping () -> [Portrait2]
-    ) -> some View {
-        overlay {
-            PortraitContextMenuOverlay(
-                target: target,
-                anchor: anchor,
-                model: model,
-                folders: folders,
-                selectedTargets: selectedTargets
+            model.presentation.openPortraitContextMenu(
+                portraitID: portrait.persistentModelID,
+                anchor: frame,
+                scope: scope
             )
         }
     }

@@ -8,6 +8,7 @@ struct BannerCanvasImageChrome: View {
     @Bindable var doc: BannerDoc
     @Binding var selection: Set<BannerElementRef>
     let activeTool: BannerTool?
+    var presentation: UIPresentationStore
     let canvasSize: CGSize
     let layout: BannerCanvasChromeMetrics.Layout
     let undoManager: UndoManager?
@@ -48,6 +49,7 @@ struct BannerCanvasImageChrome: View {
 
                 BannerImageFloatingToolbar(
                     kind: .logo,
+                    presentation: presentation,
                     filename: filename,
                     byteCount: data.count,
                     imageData: data,

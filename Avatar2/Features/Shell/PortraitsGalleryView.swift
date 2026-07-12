@@ -20,8 +20,6 @@ struct PortraitsGalleryView: View {
 
     /// Gemeten hoogte van de zwevende header → top-inset voor elke lens.
     @State private var headerHeight: CGFloat = 0
-    @State private var menuTarget: Portrait2?
-    @State private var menuAnchor: CGRect = .zero
     @State private var folderBackgroundPickerOpen = false
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
@@ -95,13 +93,6 @@ struct PortraitsGalleryView: View {
             }
         }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
-        .portraitContextMenuOverlay(
-            target: $menuTarget,
-            anchor: menuAnchor,
-            model: model,
-            folders: folders,
-            selectedTargets: { items.filter { model.isPortraitSelected($0) } }
-        )
         .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
         .onChange(of: model.folderBackgroundPickerID) { _, id in
@@ -139,8 +130,11 @@ struct PortraitsGalleryView: View {
                         selectedTargets: { items.filter { model.isPortraitSelected($0) } },
                         onContextMenu: { frame in
                             model.preparePortraitContextMenu(on: portrait)
-                            menuTarget = portrait
-                            menuAnchor = frame
+                            model.presentation.openPortraitContextMenu(
+                                portraitID: portrait.persistentModelID,
+                                anchor: frame,
+                                scope: .portraitsGallery
+                            )
                         }
                     )
                 }
@@ -165,6 +159,7 @@ struct PortraitsGalleryView: View {
                     FolderDefaultBackgroundControl(
                         folder: folder,
                         entitlement: entitlement,
+                        presentation: model.presentation,
                         isPickerOpen: $folderBackgroundPickerOpen
                     )
                 }

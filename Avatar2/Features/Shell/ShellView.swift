@@ -38,7 +38,7 @@ struct ShellView: View {
             if studioFullBleed {
                 Group {
                     if let doc = model.editingBanner {
-                        BannerStudioView(doc: doc, entitlement: entitlement)
+                        BannerStudioView(doc: doc, model: model, entitlement: entitlement)
                     } else {
                         canvas
                             .opacity(model.isDropTargeted ? 0 : 1)
@@ -103,20 +103,38 @@ struct ShellView: View {
         }
         // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
         // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
-        .sheet(item: $model.exportSession) { session in
+        .dsPersistentSheet(item: $model.exportSession) { session in
             ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
-        .sheet(isPresented: $model.isShowingRename) {
+        .dsPersistentSheet(isPresented: $model.isShowingRename) {
             if let portrait = model.selectedPortrait {
                 RenameSheet(portrait: portrait)
             }
         }
+        // E53.7: board bulk-rename op stabiele host.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { !model.renamePortraitIDs.isEmpty },
+            set: { if !$0 { model.renamePortraitIDs = [] } }
+        )) {
+            RenameSheet(portraitIDs: model.renamePortraitIDs)
+        }
         // PoC (left-nav): "Manage backgrounds" vanuit het gebruikersmenu.
-        .sheet(isPresented: $model.isShowingManageBackgrounds) {
+        .dsPersistentSheet(isPresented: $model.isShowingManageBackgrounds) {
             ManageBackgroundsSheet(entitlement: entitlement)
         }
+        // E53.7: pre-stylize gate — leeft op ShellModel, niet op EditorView.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { model.stylizeQuality.preGate != nil },
+            set: { _ in }
+        )) {
+            if let gate = model.stylizeQuality.preGate {
+                PreStylizeQualitySheet(gate: gate) { model.stylizeQuality.resolvePreGate($0) }
+            }
+        }
         .generateBackgroundSheet(entitlement: entitlement)
+        // E53.7: contextmenu's + store-gedreven alerts/confirms.
+        .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
@@ -332,7 +350,7 @@ struct ShellView: View {
             if model.isShowingSettings {
                 // Settings vervangt de hoofdweergave; Esc sluit (verborgen
                 // cancel-knop, venster-breed) of de ✕ in de topbar.
-                SettingsRootView(entitlement: entitlement, page: $model.settingsPage)
+                SettingsRootView(entitlement: entitlement, model: model, page: $model.settingsPage)
                     .background(
                         Button("") { model.isShowingSettings = false }
                             .keyboardShortcut(.cancelAction)
@@ -481,6 +499,7 @@ struct ShellView: View {
         if let content = editorContent {
             EditorView(
                 portrait: content.cutout,
+                model: model,
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
                 onApplyResult: { await model.applyEffectResult($0) },

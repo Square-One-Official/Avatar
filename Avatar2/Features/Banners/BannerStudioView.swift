@@ -45,11 +45,11 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
 
 struct BannerStudioView: View {
     let doc: BannerDoc
+    let model: ShellModel
     var entitlement: EntitlementModel?
 
     @Environment(\.undoManager) private var undoManager
 
-    @State private var activeTool: BannerTool?
     @State private var preview: NSImage?
     @State private var selection: Set<BannerElementRef> = []
     @State private var backgroundSelected = false
@@ -68,8 +68,9 @@ struct BannerStudioView: View {
     /// Viewport-camera (E27): zoom/pan over de banner-kaart, sessie-only.
     @State private var camera = CanvasCamera()
 
-    init(doc: BannerDoc, entitlement: EntitlementModel? = nil) {
+    init(doc: BannerDoc, model: ShellModel, entitlement: EntitlementModel? = nil) {
         self.doc = doc
+        self.model = model
         self.entitlement = entitlement
     }
 
@@ -87,7 +88,7 @@ struct BannerStudioView: View {
         .onChange(of: isEditingText) { _, _ in Task { await refreshPreview() } }
         .onChange(of: isManipulatingText) { _, _ in Task { await refreshPreview() } }
         .onChange(of: canvasPixelSize) { _, _ in Task { await refreshPreview() } }
-        .onChange(of: activeTool) { _, tool in
+        .onChange(of: model.presentation.bannerActiveTool) { _, tool in
             Task { await refreshPreview() }
             guard let tool else { return }
             autoSelectForTool(tool)
@@ -217,14 +218,14 @@ struct BannerStudioView: View {
     /// paneel-tool laat de huidige tekstselectie los (#2).
     private var toolSelection: Binding<BannerTool?> {
         Binding(
-            get: { activeTool },
+            get: { model.presentation.bannerActiveTool },
             set: { newValue in
                 if newValue == .text {
                     addTextLayer()
                     return
                 }
                 deselectText()
-                activeTool = newValue
+                model.presentation.bannerActiveTool = newValue
             }
         )
     }
@@ -244,7 +245,7 @@ struct BannerStudioView: View {
     /// Bottom-panelen (Background/Effects/Size) sluiten bij canvas-tik; Logo niet
     /// (geen paneel — canvas-tik opent Finder).
     private var closesPanelOnCanvasTap: Bool {
-        switch activeTool {
+        switch model.presentation.bannerActiveTool {
         case .background, .shaders, .size: true
         case .text, .logo, .none: false
         }
@@ -291,7 +292,8 @@ struct BannerStudioView: View {
                     isManipulatingText: $isManipulatingText,
                     logoFilename: $logoFilename,
                     backgroundFilename: $backgroundFilename,
-                    activeTool: activeTool,
+                    activeTool: model.presentation.bannerActiveTool,
+                    presentation: model.presentation,
                     canvasSize: doc.canvasSize,
                     camera: $camera,
                     undoManager: undoManager,
@@ -304,7 +306,7 @@ struct BannerStudioView: View {
                     camera: $camera,
                     // Alleen zijpaneel-scroll blokkeert canvas-zoom — niet de
                     // floating tekst-toolbar bij selectie (zoom moet blijven werken).
-                    chromeHovered: activeTool != nil
+                    chromeHovered: model.presentation.bannerActiveTool != nil
                 )
             }
             .clipped()
@@ -373,6 +375,7 @@ struct BannerStudioView: View {
                 BannerBackgroundPanel(
                     doc: doc,
                     entitlement: entitlement,
+                    presentation: model.presentation,
                     subtitle: showHint ? tool.summary : nil
                 )
             case .text:

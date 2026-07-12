@@ -9,6 +9,7 @@ import SwiftUI
 struct FolderDefaultBackgroundControl: View {
     @Bindable var folder: Folder2
     let entitlement: EntitlementModel
+    var presentation: UIPresentationStore
     @Binding var isPickerOpen: Bool
 
     private static let thumbWidth: CGFloat = 220
@@ -44,6 +45,7 @@ struct FolderDefaultBackgroundControl: View {
                 onApply: { background in
                     folder.setDefaultBackground(background)
                 },
+                presentation: presentation,
                 entitlement: entitlement
             )
             .padding(DSSpacing.gap4)

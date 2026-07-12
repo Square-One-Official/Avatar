@@ -142,9 +142,9 @@ struct Avatar2App: App {
             // WindowGroup persisteert het venster-frame zelf (defaultSize bij
             // eerste start, daarna de gebruikersmaat). Twee autosave-bronnen
             // op één NSWindow lieten het hiddenTitleBar-venster inklappen.
-            .sheet(isPresented: Binding(
+            .dsPersistentSheet(isPresented: Binding(
                 get: { entitlement.isPaywallPresented },
-                set: { entitlement.isPaywallPresented = $0 }
+                set: { if $0 { entitlement.isPaywallPresented = true } }
             )) {
                 PaywallSheet(model: entitlement)
             }
@@ -194,10 +194,10 @@ struct Avatar2App: App {
                 }
             }
             .animation(.easeOut(duration: 0.18), value: entitlement.privacyElevation)
-            // E18.2: gate — inloggen om Pro te checken.
-            .sheet(isPresented: Binding(
+            // E18.2 + E53.7: sign-in op app-root; geen auto-dismiss bij focusverlies.
+            .dsPersistentSheet(isPresented: Binding(
                 get: { entitlement.cloudGate == .signIn },
-                set: { if !$0 { entitlement.dismissCloudGate() } }
+                set: { _ in }
             )) {
                 SignInSheet(entitlement: entitlement)
             }

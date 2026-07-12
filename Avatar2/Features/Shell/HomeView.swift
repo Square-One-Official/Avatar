@@ -23,8 +23,6 @@ struct HomeView: View {
     // E39.2: CMS-presets voor de "start from preset"-rij (soft-fail → fallback).
     @State private var presetsModel: BannerPresetsModel
     @State private var featuredHovering = false
-    @State private var menuTarget: Portrait2?
-    @State private var menuAnchor: CGRect = .zero
 
     init(model: ShellModel, entitlement: EntitlementModel) {
         self.model = model
@@ -92,8 +90,11 @@ struct HomeView: View {
                                     selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
                                     onContextMenu: { frame in
                                         model.preparePortraitContextMenu(on: portrait)
-                                        menuTarget = portrait
-                                        menuAnchor = frame
+                                        model.presentation.openPortraitContextMenu(
+                                            portraitID: portrait.persistentModelID,
+                                            anchor: frame,
+                                            scope: .home
+                                        )
                                     }
                                 )
                             }
@@ -118,13 +119,6 @@ struct HomeView: View {
         // CMS-banner-presets alleen laden als de Banners-suite aan staat.
         .task { if AppFeatureFlags.bannersEnabled { await presetsModel.load() } }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
-        .portraitContextMenuOverlay(
-            target: $menuTarget,
-            anchor: menuAnchor,
-            model: model,
-            folders: folders,
-            selectedTargets: { portraits.filter { model.isPortraitSelected($0) } }
-        )
     }
 
     // MARK: - Banners-sectie (E36.3)
@@ -314,8 +308,11 @@ struct HomeView: View {
             }
             .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
                 model.preparePortraitContextMenu(on: portrait)
-                menuTarget = portrait
-                menuAnchor = frame
+                model.presentation.openPortraitContextMenu(
+                    portraitID: portrait.persistentModelID,
+                    anchor: frame,
+                    scope: .home
+                )
             }
             // Ook de uitgelichte Recent-kaart is naar een map sleepbaar.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))

@@ -6,8 +6,30 @@
 
 import AppKit
 import AvatarKit
+import AvatarUI
 import Foundation
 import Observation
+
+/// E53.7: multi-step sign-in state (e-mail → OTP) buiten de sheet-view.
+@MainActor
+struct SignInFlowState: Equatable {
+    enum Phase: Equatable { case email, otp }
+    var phase: Phase = .email
+    var email = ""
+    var code = ""
+    var emailValidation: DSValidationState = .normal
+    var otpValidation: DSValidationState = .normal
+
+    static let otpLength = 6
+
+    mutating func reset() {
+        phase = .email
+        email = ""
+        code = ""
+        emailValidation = .normal
+        otpValidation = .normal
+    }
+}
 
 @MainActor
 @Observable
@@ -36,6 +58,10 @@ final class EntitlementModel {
     /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
     enum CloudGate: Equatable { case signIn }
     var cloudGate: CloudGate?
+
+    /// E53.7: sign-in flow-state op het model — overleeft sheet-recreatie bij
+    /// tab-/vensterwissel (OTP + e-mail blijven staan).
+    var signInFlow = SignInFlowState()
 
     /// Privacy Tier Picker: elevation modal wanneer feature hogere tier vereist.
     var privacyElevation: PrivacyElevationRequest?
@@ -333,6 +359,17 @@ final class EntitlementModel {
 
     func dismissCloudGate() {
         cloudGate = nil
+    }
+
+    /// E53.7: open de gedeelde sign-in sheet (Account + cloud-gate).
+    func presentSignIn() {
+        cloudGate = .signIn
+    }
+
+    /// Expliciet sluiten — wis ook flow-state.
+    func closeSignIn() {
+        cloudGate = nil
+        signInFlow.reset()
     }
 
     /// E14.2: free-tier importgate (3 lifetime-afbeeldingen, source-agnostic).

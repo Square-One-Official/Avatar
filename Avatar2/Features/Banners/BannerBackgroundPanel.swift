@@ -7,11 +7,11 @@ import SwiftUI
 struct BannerBackgroundPanel: View {
     @Bindable var doc: BannerDoc
     var entitlement: EntitlementModel?
+    var presentation: UIPresentationStore
     var subtitle: String?
 
     @State private var brand = BrandColorKit.shared
     @State private var customImages = BackgroundImageKit.shared
-    @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
 
     private let swatch: CGFloat = 30
@@ -57,7 +57,7 @@ struct BannerBackgroundPanel: View {
         scrollRow {
             Button {
                 if let c = currentSolidColor { pickerColor = c }
-                showColorPicker = true
+                presentation.colorPicker = .bannerBackground
             } label: {
                 Circle()
                     .fill(DSColor.Background.neutral)
@@ -71,7 +71,13 @@ struct BannerBackgroundPanel: View {
             .buttonStyle(.plain)
             .dsHoverScale()
             .help("Pick a colour")
-            .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+            .dsDropdownMenu(
+                isPresented: Binding(
+                    get: { presentation.colorPicker == .bannerBackground },
+                    set: { presentation.colorPicker = $0 ? .bannerBackground : nil }
+                ),
+                anchorHeight: swatch
+            ) {
                 DSColorPicker(color: $pickerColor, supportsAlpha: false)
                     .appliedAppearancePreference()
             }
@@ -86,11 +92,12 @@ struct BannerBackgroundPanel: View {
             }
         }
         .onChange(of: pickerColor) { _, c in
-            guard showColorPicker else { return }
+            guard presentation.colorPicker == .bannerBackground else { return }
             applySolid(c)
         }
-        .onChange(of: showColorPicker) { _, open in
-            if !open, let hex = pickerColor.hexRGB { brand.add(hex) }
+        .onChange(of: presentation.colorPicker) { _, picker in
+            guard picker != .bannerBackground, let hex = pickerColor.hexRGB else { return }
+            brand.add(hex)
         }
     }
 

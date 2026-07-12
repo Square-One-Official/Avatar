@@ -98,6 +98,8 @@ struct EditorView: View {
     }
 
     let portrait: NSImage
+    /// E53.7: shell-model voor presentatiestate + stylize-coordinator.
+    let model: ShellModel
     /// Model-referentie voor de persistente canvas-transform (E06.4);
     /// nil = transform alleen in-memory (komt in de praktijk niet voor).
     var portraitModel: Portrait2?
@@ -131,10 +133,7 @@ struct EditorView: View {
     /// Images-tool is geen bottom-paneel maar de sidebar-toggle (E05.4):
     /// de lime ring volgt de sidebar-staat, het paneel blijft leeg.
     @Binding var isSidebarVisible: Bool
-    @State private var activeTool: EditorTool?
-    /// E24.12: open canvas-toolbar-dropdown (caret-loze DS-kaart). Hier zodat
-    /// een klik op de canvas 'm sluit — net als de bottom-panelen.
-    @State private var canvasMenu: CanvasToolbarMenu?
+    /// E24.12: open canvas-toolbar-dropdown — leeft op ShellModel.presentation.
     // Perf (P2): cutout/original/achtergrond één keer gedecodeerd per edit
     // (gekeyd op updatedAt + id) i.p.v. bij élke body-pass — zie refreshDecodedImages().
     @State private var decodedCutout: NSImage?
@@ -177,8 +176,6 @@ struct EditorView: View {
     @State private var isFillingBody = false
     /// E06.5: Vision-detectie voor auto-frame.
     @State private var isAutoFraming = false
-    /// Stylize quality: pre-gate sheets + post-stylize sharpen offer.
-    @State private var stylizeQuality = StylizeQualityCoordinator()
     /// E18.12: lokale (gratis, omkeerbare) enhances zijn aan/uit-knoppen —
     /// One-click retouch + Studio Light. Key = actietitel; waarde = de foto
     /// van vóór het toepassen (om naar terug te keren). Aanwezig = aan. 2e klik
@@ -399,20 +396,27 @@ struct EditorView: View {
     /// eerste paneel-open sprong/snelde (de tweede was wél goed).
     private var toolSelection: Binding<EditorTool?> {
         Binding(
-            get: { isSidebarVisible ? .images : activeTool },
+            get: { isSidebarVisible ? .images : model.presentation.editorActiveTool },
             set: { newValue in
                 switch newValue {
                 case .images:
                     isSidebarVisible = true
-                    activeTool = nil
+                    model.presentation.editorActiveTool = nil
                 case nil:
                     isSidebarVisible = false
-                    activeTool = nil
+                    model.presentation.editorActiveTool = nil
                 default:
                     isSidebarVisible = false
-                    activeTool = newValue
+                    model.presentation.editorActiveTool = newValue
                 }
             }
+        )
+    }
+
+    private var canvasMenuBinding: Binding<CanvasToolbarMenu?> {
+        Binding(
+            get: { model.presentation.editorCanvasMenu },
+            set: { model.presentation.editorCanvasMenu = $0 }
         )
     }
 
@@ -436,19 +440,11 @@ struct EditorView: View {
             // E22.1: de sidebar (nu via de app-bar) en een open paneel sluiten
             // elkaar uit — opent de sidebar, dan klapt het paneel dicht.
             .onChange(of: isSidebarVisible) { _, visible in
-                if visible { activeTool = nil }
+                if visible { model.presentation.editorActiveTool = nil }
             }
             .onAppear {
-                stylizeQuality.onBoostCutout = {
+                model.stylizeQuality.onBoostCutout = {
                     await performBoostResolution()
-                }
-            }
-            .sheet(isPresented: Binding(
-                get: { stylizeQuality.preGate != nil },
-                set: { if !$0 { stylizeQuality.resolvePreGate(.proceed) } }
-            )) {
-                if let gate = stylizeQuality.preGate {
-                    PreStylizeQualitySheet(gate: gate) { stylizeQuality.resolvePreGate($0) }
                 }
             }
     }
@@ -828,12 +824,12 @@ struct EditorView: View {
             // (paneel dicht, knop pas bij klik 2) — zelfde bug als destijds bij
             // `canvasMenu` (zie de catcher in de chrome-overlay).
             .overlay {
-                if activeTool != nil || isSidebarVisible {
+                if model.presentation.editorActiveTool != nil || isSidebarVisible {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
                             toolSelection.wrappedValue = nil
-                            canvasMenu = nil
+                            model.presentation.editorCanvasMenu = nil
                         }
                 }
             }
@@ -884,11 +880,11 @@ struct EditorView: View {
                         // de toolbar (laatste ZStack-kind) zodat klikken op het menu de
                         // menu-knoppen bereiken; klikken elders op de kaart sluiten 'm.
                         // Vervangt de blanket-overlay die het menu afdekte.
-                        if canvasMenu != nil {
+                        if model.presentation.editorCanvasMenu != nil {
                             Color.clear
                                 .contentShape(Rectangle())
                                 .frame(width: side, height: side)
-                                .onTapGesture { canvasMenu = nil }
+                                .onTapGesture { model.presentation.editorCanvasMenu = nil }
                         }
 
                         // OUTER grijze ring op de zichtbare kaartrand — vaste 2pt,
@@ -911,11 +907,11 @@ struct EditorView: View {
                                 onFlip: flipHorizontally,
                                 frameShape: portraitModel?.frameShape ?? .circle,
                                 onSetFrameShape: setFrameShape,
-                                activeMenu: $canvasMenu,
+                                activeMenu: canvasMenuBinding,
                                 gridEnabled: $canvasGridEnabled,
                                 isAutoFraming: isAutoFraming,
                                 layout: .headerRow,
-                                background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement).onHover { pointerOverChrome = $0 } }
+                                background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, presentation: model.presentation, entitlement: entitlement).onHover { pointerOverChrome = $0 } }
                             )
                             .disabled(isolating != nil || isAutoFraming)
                         }
@@ -929,7 +925,7 @@ struct EditorView: View {
                 // is → een stale hover-true kan canvas-scroll nooit blokkeren.
                 CanvasInteractionCatcher(
                     camera: $camera,
-                    chromeHovered: pointerOverChrome && (canvasMenu != nil || activeTool != nil)
+                    chromeHovered: pointerOverChrome && (model.presentation.editorCanvasMenu != nil || model.presentation.editorActiveTool != nil)
                 )
             }
             // Geen top/bottom-marge: het canvas loopt door tot de vensterrand;
@@ -954,7 +950,7 @@ struct EditorView: View {
             // tot de cutout staat. Het frame blijft geselecteerd (ring + naam-chip).
             .onChange(of: isolating != nil) { _, active in
                 if active {
-                    activeTool = nil
+                    model.presentation.editorActiveTool = nil
                     canvasSubjectSelected = false
                     // Een eventuele view-zoom van het vorige portret mag niet
                     // doorwerken in de reveal (anders compoundeert 'ie de inzoom).
@@ -1003,7 +999,7 @@ struct EditorView: View {
                         baseImage: rawCutout,
                         entitlement: entitlement,
                         portrait: portraitModel,
-                        coordinator: stylizeQuality,
+                        coordinator: model.stylizeQuality,
                         onApply: undoableApplyPreservingAlpha("Face edit"),
                         isPro: entitlement.isProActive
                     )
@@ -1011,7 +1007,7 @@ struct EditorView: View {
                 }
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
-                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, entitlement: entitlement)
+                BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground, presentation: model.presentation, entitlement: entitlement)
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:
@@ -1021,7 +1017,7 @@ struct EditorView: View {
                     baseImage: rawCutout,
                     entitlement: entitlement,
                     portrait: portraitModel,
-                    coordinator: stylizeQuality,
+                    coordinator: model.stylizeQuality,
                     onApply: undoableApply("Change clothes")
                 )
                     .id(portraitModel?.persistentModelID)
@@ -1032,7 +1028,7 @@ struct EditorView: View {
                     baseImage: rawCutout,
                     entitlement: entitlement,
                     portrait: portraitModel,
-                    coordinator: stylizeQuality,
+                    coordinator: model.stylizeQuality,
                     onApply: undoableApply("Apply effect")
                 )
                     .id(portraitModel?.persistentModelID)
@@ -1043,7 +1039,7 @@ struct EditorView: View {
                     baseImage: rawCutout,
                     entitlement: entitlement,
                     portrait: portraitModel,
-                    coordinator: stylizeQuality,
+                    coordinator: model.stylizeQuality,
                     onApply: undoableApply("Change hair")
                 )
                     .id(portraitModel?.persistentModelID)
@@ -1062,7 +1058,7 @@ struct EditorView: View {
     #if DEBUG
     private func debugEditorOnAppear() {
         if let tool = Self.debugInitialTool {
-            activeTool = tool
+            model.presentation.editorActiveTool = tool
             Self.debugInitialTool = nil
         }
         // E18.12: smoke-haak — toon de aan-staat van de lokale toggles.

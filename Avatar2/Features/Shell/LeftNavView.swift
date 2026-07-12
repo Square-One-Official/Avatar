@@ -33,16 +33,8 @@ struct LeftNavView: View {
     /// Hoogte van de klikbare profielrij (zonder de omringende padding).
     private static let userRowHeight: CGFloat = 40
 
-    @State private var showUserMenu = false
-    @State private var renamingFolder: Folder2?
-    @State private var isCreatingFolder = false
     @State private var draftName = ""
-    /// De map waarboven nu een portret zweeft (drop-highlight). Eén tegelijk.
     @State private var dropTargetedFolderID: PersistentIdentifier?
-    @State private var menuFolder: Folder2?
-    @State private var menuAnchor: CGRect = .zero
-    /// E46.1: map-delete vraagt eerst bevestiging (zelfde patroon als portret-delete).
-    @State private var deletingFolder: Folder2?
 
     private static let contextMenuSpace = "leftNavContextMenu"
 
@@ -103,11 +95,11 @@ struct LeftNavView: View {
             RoundedRectangle(cornerRadius: ShellMetrics.panelCornerRadius, style: .continuous)
         )
         .overlay {
-            if showUserMenu {
+            if model.presentation.leftNavUserMenuOpen {
                 ZStack(alignment: .bottomLeading) {
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { showUserMenu = false }
+                        .onTapGesture { model.presentation.leftNavUserMenuOpen = false }
                     userMenu
                         .fixedSize()
                         .padding(.horizontal, DSSpacing.gap2)
@@ -115,58 +107,12 @@ struct LeftNavView: View {
                         .transition(.dsScaleFade(anchor: .bottom, reduceMotion: reduceMotion))
                 }
             }
-            if menuFolder != nil {
-                DSContextMenuOverlay(anchor: menuAnchor, onDismiss: { menuFolder = nil }) {
-                    if let folder = menuFolder {
-                        folderMenu(folder)
-                    }
-                }
-            }
         }
         .coordinateSpace(name: Self.contextMenuSpace)
-        .dsMotion(DSMotion.fast, value: showUserMenu)
+        .dsMotion(DSMotion.fast, value: model.presentation.leftNavUserMenuOpen)
         .task { await entitlement.refresh() }
-        .alert("Rename folder", isPresented: Binding(
-            get: { renamingFolder != nil },
-            set: { if !$0 { renamingFolder = nil } }
-        )) {
-            TextField("Folder name", text: $draftName)
-            Button("Save") {
-                if let f = renamingFolder, !draftName.trimmingCharacters(in: .whitespaces).isEmpty {
-                    f.name = draftName
-                }
-                renamingFolder = nil
-            }
-            Button("Cancel", role: .cancel) { renamingFolder = nil }
-        }
-        .alert("Create folder", isPresented: $isCreatingFolder) {
-            TextField("Folder name", text: $draftName)
-            Button("Create") { confirmCreateFolder() }
-            Button("Cancel", role: .cancel) { isCreatingFolder = false }
-        }
-        // E46.1: delete met bevestiging (zelfde toon als portret-delete). De
-        // delete-rule is `.nullify`, dus de portretten in de map blijven bestaan —
-        // dat zegt de message expliciet.
-        .confirmationDialog(
-            "Delete this folder?",
-            isPresented: Binding(
-                get: { deletingFolder != nil },
-                set: { if !$0 { deletingFolder = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let folder = deletingFolder {
-                    if model.selectedFolderID == folder.persistentModelID {
-                        model.selectedFolderID = nil
-                    }
-                    modelContext.delete(folder)
-                }
-                deletingFolder = nil
-            }
-            Button("Cancel", role: .cancel) { deletingFolder = nil }
-        } message: {
-            Text("Portraits in this folder are kept. This can't be undone.")
+        .onChange(of: model.presentation.alert) { _, alert in
+            if case .createFolder(let draft) = alert { draftName = draft }
         }
     }
 
@@ -222,62 +168,29 @@ struct LeftNavView: View {
             }
         }
         .contextMenuTrigger(in: .named(Self.contextMenuSpace)) { frame in
-            menuFolder = folder
-            menuAnchor = frame
+            model.presentation.openFolderContextMenu(
+                folderID: folder.persistentModelID,
+                anchor: frame
+            )
         }
     }
 
-    /// E50.1: rechtermuis-menu op een map-rij — map-brede set-acties (dezelfde
-    /// `PortraitSetActions` als de handmatige multi-selectie, maar op ALLE
-    /// portretten in de map) + de bestaande Rename/Delete.
-    private func folderMenu(_ folder: Folder2) -> some View {
-        let items = FolderSetScope.items(in: portraits, folderID: folder.persistentModelID)
-        return DSContextMenuPanel(minWidth: 210) {
-            DSMenuRow("Select all in folder", icon: "checkmark.circle", disabled: items.isEmpty) {
-                menuFolder = nil
-                // Eerst naar de map navigeren (wist de selectie), dán alles
-                // selecteren — de gebruiker ZIET meteen wat er geselecteerd is.
-                model.showPortraits(folderID: folder.persistentModelID)
-                model.selectAllPortraits(items.map(\.persistentModelID))
-            }
-            DSMenuRow("Align set", icon: "align.horizontal.left", disabled: items.isEmpty) {
-                menuFolder = nil
-                PortraitSetActions.align(items, undoManager: undoManager) { model.setBusyMessage = $0 }
-            }
-            // Match lighting heeft ≥2 portretten nodig (referentie + minstens één
-            // doel); referentie = het jongst bewerkte portret (bovenaan de lens).
-            DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
-                menuFolder = nil
-                guard let reference = FolderSetScope.matchLightingReference(items) else { return }
-                PortraitSetActions.matchLighting(
-                    items, reference: reference, undoManager: undoManager
-                ) { model.setBusyMessage = $0 }
-            }
-            DSMenuRow("Export set", icon: "square.and.arrow.up.on.square", disabled: items.isEmpty) {
-                menuFolder = nil
-                PortraitSetActions.export(items, isPro: model.isPro) { model.setBusyMessage = $0 }
-            }
-            Divider().padding(.vertical, 2)
-            DSMenuRow("Default background…", icon: "photo.on.rectangle") {
-                menuFolder = nil
-                model.showFolderBackgroundPicker(folderID: folder.persistentModelID)
-            }
-            Divider().padding(.vertical, 2)
-            DSMenuRow("Rename", icon: "pencil") {
-                menuFolder = nil
-                draftName = folder.name
-                renamingFolder = folder
-            }
-            Divider().padding(.vertical, 2)
-            DSMenuRow("Delete", icon: "trash", destructive: true) {
-                menuFolder = nil
-                deletingFolder = folder
-            }
-        }
+    private func beginCreateFolder() {
+        draftName = ""
+        model.presentation.alert = .createFolder(draft: "")
+    }
+
+    private func confirmCreateFolder() {
+        let name = draftName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        let n = folders.count + 1
+        let folder = Folder2(name: name, order: n)
+        modelContext.insert(folder)
+        model.isPortraitsExpanded = true
+        model.showPortraits(folderID: folder.persistentModelID)
     }
 
     /// Verplaats de gesleepte portretten naar `folder` (haalt het echte Portrait2
-    /// op via de SwiftData-identiteit uit de drag-payload). `true` als er minstens
     /// één daadwerkelijk verplaatst is.
     private func move(_ items: [PortraitDragItem], into folder: Folder2) -> Bool {
         var moved = false
@@ -291,22 +204,6 @@ struct LeftNavView: View {
 
     private var isPortraitsAllSelected: Bool {
         model.section == .portraits && model.selectedFolderID == nil && !model.isShowingSettings
-    }
-
-    private func beginCreateFolder() {
-        draftName = ""
-        isCreatingFolder = true
-    }
-
-    private func confirmCreateFolder() {
-        let name = draftName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let n = folders.count + 1
-        let folder = Folder2(name: name, order: n)
-        modelContext.insert(folder)
-        model.isPortraitsExpanded = true
-        model.showPortraits(folderID: folder.persistentModelID)
-        isCreatingFolder = false
     }
 
     // MARK: - Upgrade-banner + quota
@@ -348,7 +245,7 @@ struct LeftNavView: View {
     // MARK: - Gebruikersrij + menu
 
     private var userRow: some View {
-        Button { showUserMenu.toggle() } label: {
+        Button { model.presentation.leftNavUserMenuOpen.toggle() } label: {
             HStack(spacing: DSSpacing.gap2) {
                 Circle()
                     .fill(DSColor.Background.neutralStronger)
@@ -379,17 +276,17 @@ struct LeftNavView: View {
     private var userMenu: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
             menuRow("Settings", icon: "gearshape") {
-                showUserMenu = false
+                model.presentation.leftNavUserMenuOpen = false
                 model.isShowingSettings = true
             }
             menuRow("Manage backgrounds", icon: "photo.on.rectangle") {
-                showUserMenu = false
+                model.presentation.leftNavUserMenuOpen = false
                 model.isShowingManageBackgrounds = true
             }
             if entitlement.isSignedIn {
                 Divider().padding(.vertical, 2)
                 menuRow("Sign out", icon: "rectangle.portrait.and.arrow.right", destructive: true) {
-                    showUserMenu = false
+                    model.presentation.leftNavUserMenuOpen = false
                     entitlement.signOutAccount()
                 }
             }

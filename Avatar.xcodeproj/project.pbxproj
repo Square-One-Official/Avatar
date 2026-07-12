@@ -143,6 +143,7 @@
 		682DC6487B4538A4753ACAC4 /* ExportSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE5329A76249E55A6CEA3562 /* ExportSheetTests.swift */; };
 		689F10CA89234488595FB627 /* BannerCanvasChromeMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807F74AA9ECC254783BE28B7 /* BannerCanvasChromeMetricsTests.swift */; };
 		68A855F7FE00A495A4F48EFB /* ProcessingStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */; };
+		68B5D92B962668400DBB1517 /* UIPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E149C6DB97088D150128BD66 /* UIPresentationStore.swift */; };
 		692D91420BD13F3A0409A12A /* LibraryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DA344343F0EF03C724D5743 /* LibraryArchive.swift */; };
 		694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2B6957003039CB34DD8610 /* PortraitExporter.swift */; };
 		6B544FC0626AD4CC467ECC79 /* ImageAdjustments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8024D84C778A83045FEA287D /* ImageAdjustments.swift */; };
@@ -242,10 +243,12 @@
 		B7A6D2D851544AFD6F3D90C2 /* BannerCanvasDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B2F1C093D7657D24C28653 /* BannerCanvasDrop.swift */; };
 		B7BE94756631FED1390881A5 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		B7EDC4EF58F5F0EDBAE8E873 /* ImportDropZone.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B1C3A5D25B8EA4299A5A39 /* ImportDropZone.swift */; };
+		B8206C2F61CE578216A90494 /* PersistentPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */; };
 		B83C7D4364C30F0B497432B6 /* OnboardingStepEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F687FF9D2FCFD8F72505C3 /* OnboardingStepEngine.swift */; };
 		B8412D3703E3218B58415CDC /* BannerDocRenderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3098E9C7AFF99608BB65B49F /* BannerDocRenderTests.swift */; };
 		B8FF564CD5FA186B77A96C95 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */; };
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
+		BCF0B97BA2069984413BCB67 /* FloatingOverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */; };
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
 		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
@@ -370,6 +373,7 @@
 		19E2DEEC1EC0C83C7E12F490 /* LocalUpscale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUpscale.swift; sourceTree = "<group>"; };
 		1AF7FBFC38D120438709012D /* ImagePlaygroundEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePlaygroundEntry.swift; sourceTree = "<group>"; };
 		1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitContextMenu.swift; sourceTree = "<group>"; };
+		1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingOverlayHost.swift; sourceTree = "<group>"; };
 		1D40E681885CB6D731F70EDA /* SettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsModel.swift; sourceTree = "<group>"; };
 		1E8C2D2C00CF4175DA0F1BF9 /* BannerTextFloatingToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTextFloatingToolbar.swift; sourceTree = "<group>"; };
 		2010776A8205C9E5E7F1E828 /* WorkingToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkingToastView.swift; sourceTree = "<group>"; };
@@ -532,6 +536,7 @@
 		BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPreset.swift; sourceTree = "<group>"; };
 		BC28570953429FABB63D1572 /* PrivacyElevationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyElevationSheet.swift; sourceTree = "<group>"; };
 		BF5D10603D8C4CBCEBF63691 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
+		BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistentPresentationTests.swift; sourceTree = "<group>"; };
 		BFEB57BF9CE4292E9C2463D3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C1191A20AC32839CBA5B4807 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		C1658094DC9377C3D97B55BF /* ClothesPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClothesPanel.swift; sourceTree = "<group>"; };
@@ -566,6 +571,7 @@
 		DE931792D085D73E20E9D67F /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		DEA75506BA85C34AFDE8E8E2 /* ShaderEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShaderEffect.swift; sourceTree = "<group>"; };
 		DED2448B10A7B5504F841578 /* ProBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProBadge.swift; sourceTree = "<group>"; };
+		E149C6DB97088D150128BD66 /* UIPresentationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIPresentationStore.swift; sourceTree = "<group>"; };
 		E1C39BC6F02663B4EF77BAA1 /* Folder2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder2.swift; sourceTree = "<group>"; };
 		E21A227552D65C64EBB609A5 /* Mesh 02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 02.png"; sourceTree = "<group>"; };
 		E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatingCanvas.swift; sourceTree = "<group>"; };
@@ -926,6 +932,7 @@
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
 				6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
+				BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */,
 				6F4C6433C0A7DD0C9E89C753 /* Portrait2Tests.swift */,
 				A7F4BBC106F461A04908F03F /* PrivacyGateTests.swift */,
 				CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */,
@@ -1025,6 +1032,7 @@
 			isa = PBXGroup;
 			children = (
 				155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */,
+				1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */,
 				FFCC71547FA68BD97E340BCB /* HairNudgeBanner.swift */,
 				A6345E6DEE84999748B5B8A0 /* HomeView.swift */,
 				E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */,
@@ -1037,6 +1045,7 @@
 				9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */,
 				390524875FAE18DD4A1A916F /* ShellView.swift */,
 				3309483DB7C17688EECFF2A9 /* SmokeSeed.swift */,
+				E149C6DB97088D150128BD66 /* UIPresentationStore.swift */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -1430,6 +1439,7 @@
 				C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */,
 				CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */,
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
+				BCF0B97BA2069984413BCB67 /* FloatingOverlayHost.swift in Sources */,
 				EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */,
 				71736FD56D1E830A1A73A300 /* FolderDefaultBackgroundControl.swift in Sources */,
 				6117785B527A89D2B896A234 /* FolderImportSupport.swift in Sources */,
@@ -1505,6 +1515,7 @@
 				0F58801880D68B9634335DF9 /* ThumbnailRenderer.swift in Sources */,
 				65088B7D5AF83EF42399D109 /* ThumbnailStore.swift in Sources */,
 				31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */,
+				68B5D92B962668400DBB1517 /* UIPresentationStore.swift in Sources */,
 				1516320AF8E8CED7840BCEAD /* URL+ExternalScheme.swift in Sources */,
 				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
 				98AB53571B09A54CAC6D4E9F /* WindowAppearance.swift in Sources */,
@@ -1538,6 +1549,7 @@
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
 				9CF91F689F47904D7A69234F /* LocalUpscaleTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
+				B8206C2F61CE578216A90494 /* PersistentPresentationTests.swift in Sources */,
 				B75EB071FBBE2203B62354C2 /* Portrait2Tests.swift in Sources */,
 				71F32905E25A2A0995ADAC68 /* PrivacyGateTests.swift in Sources */,
 				D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */,

@@ -15,7 +15,13 @@ struct SocialPreviewView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var avatarImage: NSImage?
     @State private var bannerFill: BannerCompositor.Fill?
-    @State private var activePicker: PreviewPicker?
+
+    private var activePicker: Binding<PreviewPicker?> {
+        Binding(
+            get: { model.presentation.previewPicker },
+            set: { model.presentation.previewPicker = $0 }
+        )
+    }
 
     private static let pickerSpace = "socialPreviewPicker"
 
@@ -45,9 +51,9 @@ struct SocialPreviewView: View {
                         platform: platform,
                         width: cardWidth,
                         coordinateSpace: .named(Self.pickerSpace),
-                        onAvatarTap: { activePicker = .portrait(anchor: $0) },
+                        onAvatarTap: { activePicker.wrappedValue = .portrait(anchor: $0) },
                         onBannerTap: platform.hasCover
-                            ? { activePicker = .banner(anchor: $0, platform: platform) }
+                            ? { activePicker.wrappedValue = .banner(anchor: $0, platform: platform) }
                             : nil
                     ) {
                         bannerLayer
@@ -65,17 +71,17 @@ struct SocialPreviewView: View {
 
     @ViewBuilder
     private var pickerOverlay: some View {
-        if let activePicker, let portrait {
+        if let activePicker = activePicker.wrappedValue, let portrait {
             switch activePicker {
             case .portrait(let anchor):
-                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker = nil }) {
+                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker.wrappedValue = nil }) {
                     PortraitPickerPanel(current: portrait) { selected in
                         model.selectPortraitInPreview(selected)
-                        self.activePicker = nil
+                        self.activePicker.wrappedValue = nil
                     }
                 }
             case .banner(let anchor, let platform):
-                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker = nil }) {
+                PreviewPickerPanel(anchor: anchor, onDismiss: { self.activePicker.wrappedValue = nil }) {
                     BannerPickerPanel(
                         portrait: portrait,
                         platform: platform,

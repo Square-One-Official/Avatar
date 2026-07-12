@@ -329,6 +329,16 @@ final class ShellModel {
     /// Name/Role-knop op het canvas (sidebar gebruikt z'n eigen renameTarget).
     var isShowingRename = false
 
+    /// E53.7: board bulk-rename — snapshot-IDs op ShellModel zodat de sheet
+    /// op ShellView blijft hangen (niet op BoardView).
+    var renamePortraitIDs: [PersistentIdentifier] = []
+
+    /// E53.7: gedeelde presentatiestate voor overlays/menu's.
+    var presentation = UIPresentationStore()
+
+    /// E53.7: pre-stylize gate — leeft op ShellModel i.p.v. EditorView @State.
+    let stylizeQuality = StylizeQualityCoordinator()
+
     /// Geselecteerd portret in de set (E05.4); naam/rol schrijven door.
     private(set) var selectedPortrait: Portrait2?
     /// ModelContext komt uit de environment (ShellView .task) — SwiftData

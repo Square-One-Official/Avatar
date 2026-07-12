@@ -10,6 +10,7 @@ struct BannerCanvasTextChrome: View {
     @Bindable var doc: BannerDoc
     @Binding var selection: Set<BannerElementRef>
     let layerID: UUID
+    var presentation: UIPresentationStore
     let canvasSize: CGSize
     let layout: BannerCanvasChromeMetrics.Layout
     let undoManager: UndoManager?
@@ -89,6 +90,7 @@ struct BannerCanvasTextChrome: View {
                     BannerTextFloatingToolbar(
                         doc: doc,
                         layerID: layerID,
+                        presentation: presentation,
                         undoManager: undoManager,
                         anchorTextTop: toolbarAnchor(for: rect),
                         onDelete: removeLayer,

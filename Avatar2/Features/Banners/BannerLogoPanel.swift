@@ -10,10 +10,10 @@ import SwiftUI
 struct BannerLogoPanel: View {
     @Bindable var doc: BannerDoc
     @Binding var selection: Set<BannerElementRef>
+    var presentation: UIPresentationStore
     var subtitle: String?
 
     @State private var brand = BrandColorKit.shared
-    @State private var showBrandColorPicker = false
     @State private var pickerColor: Color = .white
 
     private let swatch: CGFloat = 28
@@ -86,7 +86,7 @@ struct BannerLogoPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
             Text("Brand colors").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
             HStack(spacing: DSSpacing.gap2) {
-                Button { showBrandColorPicker = true } label: {
+                Button { presentation.colorPicker = .bannerLogoBrand } label: {
                     Circle()
                         .fill(DSColor.Background.neutral)
                         .frame(width: swatch, height: swatch)
@@ -99,7 +99,13 @@ struct BannerLogoPanel: View {
                 .buttonStyle(.plain)
                 .dsHoverScale()
                 .help("Add brand colour")
-                .popover(isPresented: $showBrandColorPicker, arrowEdge: .bottom) {
+                .dsDropdownMenu(
+                    isPresented: Binding(
+                        get: { presentation.colorPicker == .bannerLogoBrand },
+                        set: { presentation.colorPicker = $0 ? .bannerLogoBrand : nil }
+                    ),
+                    anchorHeight: swatch
+                ) {
                     DSColorPicker(color: $pickerColor, supportsAlpha: false)
                         .appliedAppearancePreference()
                 }
@@ -119,7 +125,7 @@ struct BannerLogoPanel: View {
                 }
             }
             .onChange(of: pickerColor) { _, c in
-                guard showBrandColorPicker, let hex = c.hexRGB else { return }
+                guard presentation.colorPicker == .bannerLogoBrand, let hex = c.hexRGB else { return }
                 brand.add(hex)
             }
         }

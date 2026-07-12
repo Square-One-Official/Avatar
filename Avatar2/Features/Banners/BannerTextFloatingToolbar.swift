@@ -25,6 +25,7 @@ enum BannerTextPresets {
 struct BannerTextFloatingToolbar: View {
     @Bindable var doc: BannerDoc
     let layerID: UUID
+    var presentation: UIPresentationStore
     let undoManager: UndoManager?
     /// Bovenrand van het tekstkader in scherm-coördinaten (midden X, top Y).
     let anchorTextTop: CGPoint
@@ -33,11 +34,16 @@ struct BannerTextFloatingToolbar: View {
     var menuDismissNonce: Int = 0
     var onMenusOpenChange: ((Bool) -> Void)?
 
-    @State private var showColorMenu = false
-    @State private var showFormatMenu = false
-    @State private var showSizeMenu = false
     @State private var layersBeforeEdit: BannerLayers?
     @State private var pillHeight: CGFloat = 36
+
+    private var colorMenuKind: BannerFloatingMenu { .textColor(layerID: layerID) }
+    private var formatMenuKind: BannerFloatingMenu { .textFormat(layerID: layerID) }
+    private var sizeMenuKind: BannerFloatingMenu { .textSize(layerID: layerID) }
+
+    private var showColorMenu: Bool { presentation.bannerFloatingMenu == colorMenuKind }
+    private var showFormatMenu: Bool { presentation.bannerFloatingMenu == formatMenuKind }
+    private var showSizeMenu: Bool { presentation.bannerFloatingMenu == sizeMenuKind }
 
     private let gapAboveText: CGFloat = 10
 
@@ -78,14 +84,13 @@ struct BannerTextFloatingToolbar: View {
             .position(pillCenter)
             .animation(DSMotion.fast, value: showFormatMenu)
             .animation(DSMotion.fast, value: showColorMenu)
+            .animation(DSMotion.fast, value: presentation.bannerFloatingMenu)
             .onDisappear {
                 BannerFontPanelController.shared.dismiss()
                 BannerColorPanelController.shared.dismiss()
             }
             .onChange(of: menuDismissNonce) { _, _ in closeSubmenus() }
-            .onChange(of: showColorMenu) { _, _ in reportMenusOpen() }
-            .onChange(of: showFormatMenu) { _, _ in reportMenusOpen() }
-            .onChange(of: showSizeMenu) { _, _ in reportMenusOpen() }
+            .onChange(of: presentation.bannerFloatingMenu) { _, _ in reportMenusOpen() }
     }
 
     private var anySubmenuOpen: Bool {
@@ -93,9 +98,27 @@ struct BannerTextFloatingToolbar: View {
     }
 
     private func closeSubmenus() {
-        showColorMenu = false
-        showFormatMenu = false
-        showSizeMenu = false
+        switch presentation.bannerFloatingMenu {
+        case .textColor(layerID), .textFormat(layerID), .textSize(layerID):
+            presentation.bannerFloatingMenu = nil
+        default:
+            break
+        }
+    }
+
+    private func toggleMenu(_ kind: BannerFloatingMenu) {
+        presentation.bannerFloatingMenu = presentation.bannerFloatingMenu == kind ? nil : kind
+    }
+
+    private func closeMenu(_ kind: BannerFloatingMenu) {
+        if presentation.bannerFloatingMenu == kind { presentation.bannerFloatingMenu = nil }
+    }
+
+    private func menuBinding(_ kind: BannerFloatingMenu) -> Binding<Bool> {
+        Binding(
+            get: { presentation.bannerFloatingMenu == kind },
+            set: { presentation.bannerFloatingMenu = $0 ? kind : nil }
+        )
     }
 
     private func reportMenusOpen() {
@@ -124,9 +147,7 @@ struct BannerTextFloatingToolbar: View {
         let hex = doc.layers.texts.first(where: { $0.id == layerID })?.colorHex ?? "#FFFFFF"
         let color = Color(hexRGB: hex) ?? .white
         return Button {
-            showFormatMenu = false
-            showSizeMenu = false
-            showColorMenu.toggle()
+            toggleMenu(colorMenuKind)
         } label: {
             Circle()
                 .fill(color)
@@ -139,9 +160,7 @@ struct BannerTextFloatingToolbar: View {
 
     private var formatButton: some View {
         Button {
-            showColorMenu = false
-            showSizeMenu = false
-            showFormatMenu.toggle()
+            toggleMenu(formatMenuKind)
         } label: {
             Text("Aa")
                 .font(.system(size: 15, weight: .semibold))
@@ -154,7 +173,7 @@ struct BannerTextFloatingToolbar: View {
     }
 
     private func openFontPanel() {
-        showFormatMenu = false
+        closeMenu(formatMenuKind)
         guard let index = layerIndex else { return }
         let layer = doc.layers.texts[index]
         BannerFontPanelController.shared.show(layer: layer) { font in
@@ -165,9 +184,7 @@ struct BannerTextFloatingToolbar: View {
     private var sizeButton: some View {
         let size = Int(doc.layers.texts.first(where: { $0.id == layerID })?.fontSize ?? 50)
         return Button {
-            showColorMenu = false
-            showFormatMenu = false
-            showSizeMenu.toggle()
+            toggleMenu(sizeMenuKind)
         } label: {
             HStack(spacing: 4) {
                 Text("\(size)")
@@ -179,7 +196,7 @@ struct BannerTextFloatingToolbar: View {
             .foregroundStyle(DSColor.Foreground.primary)
         }
         .buttonStyle(.plain)
-        .dsDropdownMenu(isPresented: $showSizeMenu, anchorHeight: 28, placement: .below) {
+        .dsDropdownMenu(isPresented: menuBinding(sizeMenuKind), anchorHeight: 28, placement: .below) {
             sizeMenu
         }
     }
@@ -194,7 +211,7 @@ struct BannerTextFloatingToolbar: View {
                 }
             }
             HoverFill(active: false, activeFill: .clear, baseFill: DSColor.Background.neutral, cornerRadius: DSRadius.md) {
-                showColorMenu = false
+                closeMenu(colorMenuKind)
                 BannerColorPanelController.shared.show(hex: currentHex) { color in
                     guard let hex = Color(nsColor: color).hexRGB else { return }
                     mutateLayer { $0.colorHex = hex }
@@ -210,7 +227,7 @@ struct BannerTextFloatingToolbar: View {
         .padding(DSSpacing.gap3)
         .frame(width: 220)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
-        .dsDropdownDismissOverlay(isPresented: $showColorMenu)
+        .dsDropdownDismissOverlay(isPresented: menuBinding(colorMenuKind))
     }
 
     private var formatMenu: some View {
@@ -228,7 +245,7 @@ struct BannerTextFloatingToolbar: View {
             Divider().padding(.vertical, 2)
 
             HoverRow {
-                showFormatMenu = false
+                closeMenu(formatMenuKind)
                 onDelete()
             } label: {
                 Text("Delete Text")
@@ -242,7 +259,7 @@ struct BannerTextFloatingToolbar: View {
         .padding(DSSpacing.gap2)
         .frame(width: 248)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
-        .dsDropdownDismissOverlay(isPresented: $showFormatMenu)
+        .dsDropdownDismissOverlay(isPresented: menuBinding(formatMenuKind))
     }
 
     /// Gesegmenteerde B | I | U met hairline-scheidingen (één grijze pil, actieve
@@ -287,7 +304,7 @@ struct BannerTextFloatingToolbar: View {
 
     private var fontsChip: some View {
         HoverFill(active: false, activeFill: .clear, baseFill: DSColor.Background.neutral, cornerRadius: DSRadius.md) {
-            showFormatMenu = false
+            closeMenu(formatMenuKind)
             openFontPanel()
         } label: {
             VStack(spacing: 0) {
@@ -311,7 +328,7 @@ struct BannerTextFloatingToolbar: View {
                 ForEach(BannerTextPresets.fontSizes, id: \.self) { size in
                     HoverRow {
                         mutateLayer { $0.fontSize = size }
-                        showSizeMenu = false
+                        closeMenu(sizeMenuKind)
                     } label: {
                         HStack {
                             Text("\(Int(size))")
@@ -334,7 +351,7 @@ struct BannerTextFloatingToolbar: View {
         }
         .frame(width: 132, height: 220)
         .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
-        .dsDropdownDismissOverlay(isPresented: $showSizeMenu)
+        .dsDropdownDismissOverlay(isPresented: menuBinding(sizeMenuKind))
     }
 
     // MARK: - Helpers
@@ -363,7 +380,7 @@ struct BannerTextFloatingToolbar: View {
         let selected = currentHex.caseInsensitiveCompare(hex) == .orderedSame
         return Button {
             mutateLayer { $0.colorHex = hex }
-            showColorMenu = false
+            closeMenu(colorMenuKind)
         } label: {
             Circle()
                 .fill(Color(hexRGB: hex) ?? .white)

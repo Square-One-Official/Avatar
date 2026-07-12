@@ -15,6 +15,7 @@ import SwiftUI
 struct SettingsRootView: View {
     /// E15.3: Account-pagina leest plan/credits/e-mail via het entitlement.
     let entitlement: EntitlementModel
+    let model: ShellModel
     @Binding var page: SettingsPage
 
     #if DEBUG
@@ -67,7 +68,7 @@ struct SettingsRootView: View {
                 case .aiModels:
                     SettingsAIModelsPage(entitlement: entitlement)
                 case .account:
-                    SettingsAccountPage(entitlement: entitlement)
+                    SettingsAccountPage(entitlement: entitlement, model: model)
                 case .about:
                     SettingsAboutPage()
                 }

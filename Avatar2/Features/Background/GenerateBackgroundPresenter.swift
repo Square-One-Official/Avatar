@@ -1,5 +1,6 @@
 // E42 — Sheet-presentatie op een stabiele host (overleeft toolbar/tab-wissels).
 
+import AvatarUI
 import SwiftUI
 
 @MainActor
@@ -48,14 +49,13 @@ private struct GenerateBackgroundSheetHost: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $presenter.isPresented, onDismiss: { presenter.dismiss() }) {
+            .dsPersistentSheet(isPresented: $presenter.isPresented, onDismiss: { presenter.dismiss() }) {
                 GenerateBackgroundSheet(
                     context: presenter.context,
                     entitlement: entitlement,
                     applyAfterSave: presenter.applyAfterSave,
                     onSaved: { presenter.complete(with: $0) }
                 )
-                .interactiveDismissDisabled(true)
             }
     }
 }

@@ -8,10 +8,10 @@ import SwiftUI
 
 struct SettingsAccountPage: View {
     @Bindable var entitlement: EntitlementModel
+    @Bindable var model: ShellModel
     /// E18.1: e-mail+OTP-login vanuit Account als je uitgelogd bent.
-    @State private var showSignIn = false
-    /// E15.7: bevestigingsdialoog vóór de definitieve account-verwijdering.
-    @State private var showDeleteConfirm = false
+    /// E53.7: sheet leeft op Avatar2App (entitlement.presentSignIn).
+    /// E53.7: delete-account confirm op FloatingOverlayHost via ShellModel.
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,7 +35,7 @@ struct SettingsAccountPage: View {
                             } else {
                                 // E18.8: sign-in zit nu in de Email-rij i.p.v.
                                 // een los Session-blok.
-                                DSPrimaryButton("Sign in", size: .small) { showSignIn = true }
+                                DSPrimaryButton("Sign in", size: .small) { entitlement.presentSignIn() }
                             }
                         }
                         SettingsRow(
@@ -94,7 +94,7 @@ struct SettingsAccountPage: View {
                                 subtitle: "Permanently removes your account, subscription and credits"
                             ) {
                                 DSNeutralButton("Delete account…") {
-                                    showDeleteConfirm = true
+                                    model.presentation.confirm = .deleteAccount
                                 }
                                 .disabled(entitlement.isDeletingAccount)
                             }
@@ -108,23 +108,6 @@ struct SettingsAccountPage: View {
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { await entitlement.refresh() }
-        .sheet(isPresented: $showSignIn) {
-            SignInSheet(entitlement: entitlement)
-        }
-        // E15.7: zelfde confirm-patroon als portret-delete
-        // (PortraitContextMenu) — destructieve actie nooit met één klik.
-        .confirmationDialog(
-            "Delete your account?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Delete account", role: .destructive) {
-                Task { await entitlement.deleteAccount() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This permanently deletes your account, cancels any subscription and removes your remaining credits. This can't be undone. Portraits stored on this Mac stay on this Mac.")
-        }
     }
 
     private var creditsSubtitle: String {

@@ -31,6 +31,8 @@ struct BackgroundPanel: View {
     /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
     /// `portrait` blijft de bron voor display/selectie-state (Original/custom).
     var onApply: ((PortraitBackground) -> Void)? = nil
+    /// E53.7: presentatiestate voor caret-loze color picker (geen systeem-popover).
+    var presentation: UIPresentationStore
     /// Benodigd voor de CMS/Unsplash-fetches en de generatie; optioneel zodat
     /// bestaande aanroeplocaties zonder entitlement blijven werken.
     var entitlement: EntitlementModel? = nil
@@ -47,7 +49,6 @@ struct BackgroundPanel: View {
     // E24.24: persistente custom-achtergrond-uploads (herbruikbare tegels).
     @State private var customImages = BackgroundImageKit.shared
     // E25.2: DSColorPicker vanuit de "+"-tegel in Color & Gradient.
-    @State private var showColorPicker = false
     @State private var pickerColor: Color = .white
     // Hover-state voor het verwijder-kruisje op brand-kleuren (audit #1).
     @State private var hoveredBrandHex: String?
@@ -275,21 +276,27 @@ struct BackgroundPanel: View {
                 .foregroundStyle(DSColor.Foreground.subtle)
         } action: {
             if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
-            showColorPicker = true
+            presentation.editorBackgroundColorPickerOpen = true
         }
         .help("Pick a colour")
-        .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+        .dsDropdownMenu(
+            isPresented: Binding(
+                get: { presentation.editorBackgroundColorPickerOpen },
+                set: { presentation.editorBackgroundColorPickerOpen = $0 }
+            ),
+            anchorHeight: rowTileWidth * (10.0 / 16.0)
+        ) {
             DSColorPicker(color: $pickerColor, supportsAlpha: false)
                 .appliedAppearancePreference()
         }
         .onChange(of: pickerColor) { _, c in
-            guard showColorPicker, let hex = c.hexRGB else { return }
+            guard presentation.editorBackgroundColorPickerOpen, let hex = c.hexRGB else { return }
             selectColor(hex)
         }
         // Audit #1 (random shades): bewaar bij sluiten alléén de kleur die
         // daadwerkelijk als achtergrond is toegepast — voorheen groeide de
         // brand-rij met élke picker-sessie een willekeurige tussenstand.
-        .onChange(of: showColorPicker) { _, open in
+        .onChange(of: presentation.editorBackgroundColorPickerOpen) { _, open in
             guard !open, let hex = pickerColor.hexRGB,
                   activeColorHex == hex else { return }
             brand.add(hex)
