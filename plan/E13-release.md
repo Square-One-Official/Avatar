@@ -122,7 +122,8 @@ groen; fresh launch van de Debug-build logt de launch-check zonder dat About ope
 
 
 ## 13.6 — AuthSessionFileStorage: token-write faalt bij vergrendeld scherm [INFRA]
-- status: ready
+- status: in_progress
+- owner: INFRA (2026-07-12, branch v2/e13-13.6)
 - team: INFRA
 - blockedBy: —
 
