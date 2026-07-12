@@ -60,10 +60,38 @@ Scope:
   deploy van backend + admin is een expliciet besluit van Thierry ná merge.
 
 ## 54.2 — Bakeoff: stijltrouw & identiteitsbehoud met referenties
-- status: in_progress
+- status: done (eerste pas, nano-banana; multi-model-matrix = optionele vervolgstap)
 - owner: AI (2026-07-12)
 - team: AI
 - blockedBy: — (54.1 done; referenties geseed 2026-07-12 — zie hieronder)
+
+**Result (bakeoff 2026-07-12, nano-banana = productie-default; beeldmateriaal in
+`~/Documents/Claude/Projects/Aaavatar/e54-bakeoff/`):** 4 effecten × {zonder, mét
+referenties} × 2 E09-portretten (p1/p3) + 2 clausule-v2-armen, callshape 1-op-1 de
+backend (`stylizeInputFor` + `STYLE_REFERENCE_CLAUSE`). **Verdict: referenties NIET
+default aanzetten** —
+- ✅ Geen identity-bleed: gezichtsloze referenties werken zoals gehoopt (de E54.1-regel
+  klopt); de persoon blijft altijd de persoon.
+- ❌ Maar fotografische object-referenties (clay/wood/3d = productfoto's van figurines)
+  ankeren het model op het VERKEERDE: het kopieert achtergrondkleur, sokkel en
+  compositie van de referentie en laat de persoon (grotendeels) fotografisch —
+  stijltrouw ZAKT t.o.v. prompt-only (wood-p1-refs: foto-buste op houten sokkel;
+  clay-p1-refs: nauwelijks transformatie). Oorzaak: het "medium" van de referentie
+  (studiofoto) wordt als doelstijl gelezen, niet het materiaal.
+- ✅ Scribble (referentie is zélf een tekening) = neutraal tot licht positief →
+  medium-match is de bepalende variabele, niet het onderwerp.
+- ❌ Clausule-tuning v2 ("alleen materiaal/textuur overnemen, compositie/achtergrond
+  negeren, transformeer volledig") maakte het erger: bijna-passthrough van de foto.
+- Bijvangst: nano-banana leverde ook één prompt-only-passthrough (clay-p3-noref, foto
+  vrijwel onbewerkt terug) — bestaand kwaliteitsrisico los van referenties.
+**Gevolg-actie (direct uitgevoerd):** de geseedde koppel-rijen zijn weer LOSGEHAALD
+(`effects_style_references` leeg; media 11–18 + storage-bestanden blijven staan) —
+anders had elke prod-stylize per direct de slechtere refs-arm gekregen (54.1-wiring
+appendt automatisch). Herkoppelen = `seed_refs.py` opnieuw draaien.
+**Aanbeveling:** default-flip afblazen; 54.3 (stijl-distillatie naar TEKST) is de
+kansrijke route voor materiaal-effecten — dat omzeilt het medium-anker; referenties
+evt. alleen voor tekening-achtige effecten heroverwegen, of referenties maken die
+zelf in het doelmedium gerenderd zijn i.p.v. er een foto van te zijn.
 
 **Seeding (2026-07-12, autonoom op verzoek Thierry):** per effect 2 stijlreferenties
 gegenereerd met `google/nano-banana` (gezichtsloos conform de identity-bleed-regel:
