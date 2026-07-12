@@ -20,7 +20,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | Epic | Team | Status |
 |------|------|--------|
 | [E01 Fundament](E01-fundament.md) | INFRA | **done** (1.1–1.15) |
-| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); ⚠ 2.6 (randkwaliteit lage res) stond hier maar heeft géén story in het epic-bestand — nog uitschrijven of schrappen |
+| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); 2.6 (randkwaliteit lage res) backlog — de story stond al in het epic-bestand maar was zijn `##`-kop kwijt (gerepareerd 2026-07-12) |
 | [E03 Design system](E03-design-system.md) | DS | **done** (3.1–3.19) |
 | [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.8) |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | **done** (5.1–5.8) |
