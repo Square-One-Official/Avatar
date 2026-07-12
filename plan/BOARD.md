@@ -46,7 +46,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **done** (38.1–38.4, Figma-stijl Metal-shaders; DoD hergeverifieerd 2026-07-02 na E37.19) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **done** (39.1–39.2; 39.1 afgerond met prod-verificatie + decode-tests, 2026-07-02) |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **done** (40.1–40.2; 40.1 gehard 2026-07-02 — linked-check nu via `BannerDeletion.isLinked`, E46-les) |
-| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4) — ⚠ billing-check 2026-07-12: Topaz kost $0,05–0,10+/run vs ~$0,021 opbrengst (1 credit) → verlieslatend; keuze-opties in DECISIONS-PENDING (aanbevolen: input-cap + 3 credits) |
+| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4, **41.5**: twee tiers Regular 1cr google / High 3cr topaz+6MP-cap, besluit Thierry 2026-07-12 — op branch `v2/e41-41.5`; backend los deploybaar, app-merge wacht op E53.7) |
 | [E42 AI background generation](E42-ai-background-generation.md) | FEAT+INFRA+AI | **done** (42.1–42.3, 42.5–42.7); 42.4 backlog (wide T2I bakeoff) |
 | [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **done** (43.1–43.2 + 43.5, prod uitgevoerd 2026-07-02); 43.3–43.4 backlog |
 | [E44 Cloud-actie betrouwbaarheid](E44-cloud-betrouwbaarheid.md) | FEAT+INFRA | **done** (44.1–44.2, prod-deploy 2026-07-02); 44.3 backlog |

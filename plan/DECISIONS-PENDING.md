@@ -2,7 +2,14 @@
 
 ## Open
 
-### Topaz-upscale verlieslatend per run (E41-follow-up) — KEUZE, wacht op Thierry
+### Topaz-upscale verlieslatend per run (E41-follow-up) — BESLIST 2026-07-12 (Thierry)
+- **Besluit:** twee tiers — **Regular** = google/upscaler voor 1 credit, **High quality** =
+  Topaz voor 3 credits mét 6 MP-input-cap. Gebouwd als **E41.5** (branch `v2/e41-41.5`,
+  DoD groen): backend-`quality`-param + cap + gesplitste credit-log, app-dropdown met 3 rijen.
+  Backend is los deploybaar en backward-compatibel (geen `quality` → regular) — deployen stopt
+  de verlieslatende Topaz-runs direct. Onderstaande analyse blijft voor het register.
+
+#### (register) Oorspronkelijke bevinding & opties
 - **Bevinding (2026-07-12, billing-check op verzoek):** `topazlabs/image-upscale` rekent per
   **output-megapixel**: ≤24 MP output = $0,05 · ≤48 MP = $0,10 · verder oplopend ($0,20 bij
   96 MP). Onze pipeline stuurt de input ongecapt door (geen resize in `upscale.ts`) met `2x` —
