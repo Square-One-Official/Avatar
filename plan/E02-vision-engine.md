@@ -142,7 +142,9 @@ de ORMBG-varianten draaien tegen het lokaal geïnstalleerde model
 (app-container-fallback; XCTSkip zonder installatie, guard dan nog gedekt via
 SRGBNormalizerTests) — plus 7 helper-tests (normalisatie/pass-through/alpha/
 P3/guard). AvatarKit 70 tests groen, AvatarUI 37 groen; Avatar én Avatar2
-bouwen Debug groen. — Cutout-randkwaliteit op lage resolutie
+bouwen Debug groen.
+
+## 2.6 — Cutout-randkwaliteit op lage resolutie [AI]
 - status: backlog
 - team: AI
 - blockedBy: —

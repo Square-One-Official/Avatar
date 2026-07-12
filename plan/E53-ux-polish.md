@@ -26,9 +26,20 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 **DoD:** beide targets bouwen, tests groen, per punt afgevinkt in de Result-regel.
 
 ## 53.2 — Banner Studio bruikbaarheid (UX1 + UX2, P0)
-- status: ready
+- status: in_progress
+- owner: FEAT (2026-07-12, checkpoint op branch v2/e53-2-banner-studio)
 - team: FEAT
-- blockedBy: —
+- blockedBy: E53.7-landing (UX2 raakt BannerStudioView, in bewerking in die sessie)
+
+**Voortgang (checkpoint 2026-07-12; builds + tests groen op 5 na — die 5
+(AuthSessionStorageTests) zijn de vergrendeld-scherm-flake, zie E13.6, los van
+deze story):** UX1 ✅ compleet —
+placeholder-sweep v2 (legacy "Your text" matcht mee, geforceerde herbake van
+bestaande bakes, stempel pas ná voltooide run, Home-hook; +2 tests). UX2 ⏳
+alleen de aanzet (`fitCameraScale`-helper + `userZoomed`-vlag) — fit-op-open/
+resize + zoom-chip in BannerStudioView bouwen zodra E53.7 gemerged is.
+NB: banners blijven achter `bannersEnabled` (besluit Thierry 2026-07-12) —
+prioriteit t.o.v. 53.1/53.4 dienovereenkomstig.
 
 **Wat:** UX1: banner-thumbnails tonen placeholder-lagen ("Type to enter
 text"-soep) op Home/gallery — verifieer eerst tegen de E37.18-sweep+migratie
@@ -39,7 +50,8 @@ fit-to-window bij open + zoom-chip (hergebruik E27.10-recept).
 en de Studio past in het venster; tests groen; Result-regel.
 
 ## 53.3 — DSThumbnailCard: AX + hover als één DS-story (UX28 + UX26, P0)
-- status: ready
+- status: in_progress
+- owner: DS (2026-07-12, hervat op branch v2/e53-3-kaart-ax)
 - team: DS
 - blockedBy: —
 
@@ -50,6 +62,7 @@ zit in de gallery-kaart (PortraitsGalleryView.swift:244-253) — volg UXS-7 in h
 PLAN-document, incl. DSIconButton-verplicht-label.
 **DoD:** kaarten zijn met VoiceOver/AX-inspector bereikbaar en activeerbaar
 (open/selecteer/contextmenu); tests groen; Result-regel.
+**Result (code klaar + DoD-build groen; live AX-check wacht op Thierry):** ✅ `PortraitCardAccessibility`-modifier (grid-tegel + Home-hero): één AX-element per kaart — label = naam+rol ("Untitled portrait"-fallback), traits button/+selected, default-actie = openen, named actions "Select"/"Deselect" (⌘-klik-pad) en "Show Context Menu" (punt-anker op de gemeten kaart-frame); ✅ GalleryLens: grote preview + filmstrip-thumbs als AX-elementen (activeren = focus, named actions Open/Select) + "Previous/Next portrait"-labels op de blader-pijlen; ✅ DSIconButton: `label`-param verplicht → `accessibilityLabel` + `.help` in de component zelf, alle call sites voorzien (ad-hoc `.accessibilityLabel`-modifiers opgeruimd); ✅ meegenomen UXS-27 (E53.6 DS-deel): `neutralSurface`-ladder relatief aan de base + nieuw token `neutral-strongest-2` — chip-hover op gevulde chips weer zichtbaar (UX36). build-v2.sh volledig groen. ⚠ De VoiceOver/AX-inspector-verificatie kon niet autonoom (AX-API vereist Accessibility-permission): draai `swift scripts/axprobe.swift <pid>` vanuit een getruste terminal tegen een `--smoke-store`-instance — verwacht per kaart een button "Ava Bennett, Product Designer" met de drie acties — of check kort met de AX-inspector.
 
 ## 53.4 — DSMotion-sweep: reduce-motion app-breed (UX30)
 - status: ready
