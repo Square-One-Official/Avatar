@@ -120,3 +120,29 @@ Geverifieerd: beide targets bouwen; Avatar2-tests, AvatarKit (89) en AvatarUI (3
 groen; fresh launch van de Debug-build logt de launch-check zonder dat About open was
 (via `/usr/bin/log stream`).
 
+
+## 13.6 — AuthSessionFileStorage: token-write faalt bij vergrendeld scherm [INFRA]
+- status: done
+- owner: INFRA (2026-07-12, branch v2/e13-13.6)
+- team: INFRA
+- blockedBy: —
+
+Gevonden tijdens de E53.2-DoD (2026-07-12, ~02:10): `AuthSessionFileStorage.store`
+schrijft met `[.atomic, .completeFileProtection]`; zodra het scherm vergrendeld is
+(`CGSSessionScreenIsLocked`) faalt élke zulke write met EPERM ("mktemp failed …
+errno 1", regel 37) — live gereproduceerd met een minimale `Data.write`:
+`.atomic` slaagt, `.atomic + .completeFileProtection` faalt bij lock, en dezelfde
+5 `AuthSessionStorageTests` die om 01:36/02:04 groen waren falen om 02:10 (scherm
+op slot) in élke worktree, óók buiten de sandbox.
+**Gevolg in productie:** een Supabase-token-refresh terwijl de Mac vergrendeld is
+(app draait door) kan zijn sessie niet persisteren → verklaart mogelijk de
+sessie-herstel-klachten die 921b1e7 (Pro grace-period) aan de symptoomkant dempt.
+**Voorstel:** file-protection-klasse heroverwegen voor dit pad — bv. schrijf met
+`.atomic` + `posixPermissions 0o600` (zoals nu al ná de write gezet wordt) en laat
+`.completeFileProtection` vallen (macOS-keybag-semantiek ≠ iOS), óf vang de fout
+en herkans na unlock (NSWorkspace.screensDidWakeNotification). Testflank: de 5
+AuthSessionStorageTests draaien alleen betrouwbaar met ontgrendeld scherm —
+documenteer dat in de test of maak de write-optie injecteerbaar.
+**DoD:** beide targets bouwen; AuthSessionStorageTests groen mét en zonder
+vergrendeld scherm (of expliciet gedocumenteerde lock-gate); Result-regel.
+**Result:** ✅ `.completeFileProtection` uit `AuthSessionFileStorage.store` (alleen nog `.atomic` + de bestaande 0600/0700-permissies) — confidentialiteit komt al van de AES-GCM-envelop met Keychain-sleutel, de protection-class voegde niets toe en blokkeerde writes bij dichte keybag; rationale als comment op de write. ✅ Geverifieerd ónder vergrendeld scherm (`CGSSessionScreenIsLocked=true`): AuthSessionStorageTests 6/6 groen waar vóór de fix 5/6 faalden met EPERM — de lock-conditie zelf was het bewijs. ✅ build-v2.sh volledig groen (idem vergrendeld). ⚠ v1 heeft dezelfde bug (`Avatar/Services/FileAuthStorage.swift:56`) — niet aangeraakt (v1 bevroren, geen SHARED-story); apart besluit Thierry of dit een SHARED-fix waard is.
