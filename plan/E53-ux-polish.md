@@ -26,7 +26,8 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 **DoD:** beide targets bouwen, tests groen, per punt afgevinkt in de Result-regel.
 
 ## 53.2 — Banner Studio bruikbaarheid (UX1 + UX2, P0)
-- status: ready
+- status: in_progress
+- owner: claude (FEAT)
 - team: FEAT
 - blockedBy: —
 

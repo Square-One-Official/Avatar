@@ -8,6 +8,13 @@ import SwiftUI
 enum BannerTextPresets {
     static let placeholder = "Type to enter text"
 
+    /// Legacy default-literals die vóór de Freeform-chrome (d1ec4e7) als échte
+    /// `layer.string` persisteerden: het oude Text-paneel (E37.4,
+    /// `BannerTextPanel.addText`) zaaide "Your text". De UX-audit (UX1) zag die
+    /// lagen nog als thumbnail-soep — voor filter/sweep/render tellen ze als
+    /// placeholder (UXS-5).
+    static let legacyPlaceholders: Set<String> = ["Your text"]
+
     static let fontSizes: [Double] = [10, 12, 14, 18, 24, 36, 48, 64, 72, 96, 144]
 
     /// Freeform-achtige swatches (wit → zwart + accenten).
@@ -18,7 +25,7 @@ enum BannerTextPresets {
 
     static func isEmptyOrPlaceholder(_ string: String) -> Bool {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty || trimmed == placeholder
+        return trimmed.isEmpty || trimmed == placeholder || legacyPlaceholders.contains(trimmed)
     }
 }
 

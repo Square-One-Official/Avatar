@@ -93,6 +93,22 @@ enum BannerCanvasChromeMetrics {
         )
     }
 
+    /// Camera-schaal van de fit-stand (Studio-open, venster-resize, ⌘0 en de
+    /// zoom-chip, UXS-6): de banner-kaart (`fitLayout`-drawn) op `padding` van
+    /// de viewport — de marge houdt selectie-handles en chrome vrij. Dit is ook
+    /// het 100%-anker van het chip-percentage (fit = 100%).
+    static func fitCameraScale(
+        canvasSize: CGSize,
+        viewport: CGSize,
+        padding: CGFloat = 0.94
+    ) -> CGFloat {
+        guard viewport.width > 0, viewport.height > 0 else { return 1 }
+        let drawn = fitLayout(canvasSize: canvasSize, viewport: viewport, horizontalPadding: 0).drawn
+        var camera = CanvasCamera()
+        camera.fitToContent(contentSize: drawn, in: viewport, padding: padding)
+        return max(camera.scale, 0.0001)
+    }
+
     static func screenRect(canvasRect: CGRect, layout: Layout) -> CGRect {
         let localTL = CGPoint(
             x: layout.origin.x + canvasRect.minX * layout.scale,

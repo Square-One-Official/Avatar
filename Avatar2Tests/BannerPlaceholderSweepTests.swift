@@ -139,6 +139,43 @@ final class BannerPlaceholderSweepTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: BannerPlaceholderMigration.defaultsKey))
     }
 
+    // UXS-5 (v2-sweep): het legacy "Your text"-literal van het oude Text-paneel
+    // (E37.4) telt óók als placeholder — filter, sweep en migratie.
+    func testMigrationMatchesLegacyYourTextPlaceholder() async throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BannerDoc.self, configurations: config)
+        let context = ModelContext(container)
+        let legacy = makeDoc(texts: [
+            BannerTextLayer(string: "Your text", fontSize: 96, colorHex: "#FFFFFF"),
+        ])
+        context.insert(legacy)
+        try context.save()
+
+        let defaults = try freshDefaults()
+        await BannerPlaceholderMigration.runIfNeeded(context: context, defaults: defaults)
+
+        XCTAssertTrue(legacy.layers.texts.isEmpty, "legacy 'Your text'-laag hoort geleegd te zijn")
+    }
+
+    // UXS-5 (v2-sweep): een doc met schone lagen maar een bestaande bake wordt
+    // eenmalig herbakken (bake kan van vóór de render-guard stammen).
+    func testMigrationRebakesCleanDocsWithExistingPreview() async throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: BannerDoc.self, configurations: config)
+        let context = ModelContext(container)
+        let clean = makeDoc(texts: [BannerTextLayer(string: "Keep me", fontSize: 96, colorHex: "#FFFFFF")])
+        let staleBake = Data([9, 9, 9])
+        clean.previewImageData = staleBake
+        context.insert(clean)
+        try context.save()
+
+        let defaults = try freshDefaults()
+        await BannerPlaceholderMigration.runIfNeeded(context: context, defaults: defaults)
+
+        XCTAssertNotNil(clean.previewImageData)
+        XCTAssertNotEqual(clean.previewImageData, staleBake, "bestaande bake hoort eenmalig herbakken te zijn")
+    }
+
     func testMigrationRunsOnlyOnce() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: BannerDoc.self, configurations: config)

@@ -67,6 +67,10 @@ struct BannerStudioView: View {
     @State private var canvasViewportSize: CGSize = .zero
     /// Viewport-camera (E27): zoom/pan over de banner-kaart, sessie-only.
     @State private var camera = CanvasCamera()
+    /// UXS-6: true zodra de gebruiker zelf zoomt/pant (⌘+/⌘−, ⌘1, scroll/pinch,
+    /// spatie-pan) — venster-resize her-fit dan niet meer, tot Fit (chip/⌘0/open)
+    /// de vlag reset.
+    @State private var userZoomed = false
 
     init(doc: BannerDoc, entitlement: EntitlementModel? = nil) {
         self.doc = doc
