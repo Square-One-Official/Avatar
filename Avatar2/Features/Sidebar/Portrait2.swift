@@ -98,7 +98,7 @@ final class Portrait2 {
     /// E24.33: Effects-cache op het portret. `effectBaseData` = de cutout van
     /// vóór er een effect werd toegepast ("None"/origineel voor de Effects-
     /// feature, eenmalig vastgelegd). `effectActiveRaw` = het actieve effect
-    /// (RemoteEffect.key), nil = None. `effectCacheData` = JSON van
+    /// (RemoteEffect.key), nil = None. `effectCacheData` = binaire plist van
     /// [key: PNG-Data] met de al gegenereerde resultaten → schakelen tussen
     /// None/effecten is INSTANT en kost geen nieuwe credits (alleen het refresh-
     /// icoon hergenereert bewust). Lichtgewicht migratie via de defaults.
@@ -106,15 +106,26 @@ final class Portrait2 {
     var effectActiveRaw: String?
     @Attribute(.externalStorage) var effectCacheData: Data?
 
-    /// E24.33: de effect-cache als [key: PNG-Data] (JSON in `effectCacheData`).
+    /// E24.33: de effect-cache als [key: PNG-Data] in `effectCacheData`.
+    /// E49.3: opslag = binaire plist (Data blijft rauw) i.p.v. JSON, dat élke
+    /// PNG base64'de (+33% opslag). Lezen valt terug op JSON voor portretten
+    /// die vóór deze wissel zijn geschreven; de eerstvolgende set herschrijft
+    /// als plist.
     var effectCache: [String: Data] {
         get {
-            guard let effectCacheData,
-                  let decoded = try? JSONDecoder().decode([String: Data].self, from: effectCacheData)
-            else { return [:] }
-            return decoded
+            guard let effectCacheData else { return [:] }
+            if let decoded = try? PropertyListDecoder()
+                .decode([String: Data].self, from: effectCacheData) {
+                return decoded
+            }
+            let json = try? JSONDecoder().decode([String: Data].self, from: effectCacheData)
+            return json ?? [:]
         }
-        set { effectCacheData = try? JSONEncoder().encode(newValue) }
+        set {
+            let encoder = PropertyListEncoder()
+            encoder.outputFormat = .binary
+            effectCacheData = try? encoder.encode(newValue)
+        }
     }
 
     /// De gestylede VOLLE afbeelding (incl. gestylede achtergrond) van het ACTIEVE
@@ -136,12 +147,16 @@ final class Portrait2 {
             return cachedEffectBg
         }
         // Alleen de ACTIEVE entry uitpakken i.p.v. via `effectCache` de héle
-        // [key: PNG]-dict te decoderen (dat base64-decodeert élke gecachte PNG).
-        // JSONEncoder schrijft `Data` als base64-string, dus JSONSerialization
-        // geeft [key: base64].
+        // [key: PNG]-dict te decoderen. E49.3: opslag is binaire plist
+        // (PropertyListSerialization geeft [key: Data] zonder base64-stap);
+        // JSON-pad blijft als leesfallback voor pre-E49.3-portretten, waar
+        // JSONEncoder `Data` als base64-string schreef.
         var decoded: Data?
-        if let object = try? JSONSerialization.jsonObject(with: effectCacheData) as? [String: String],
-           let base64 = object[key] {
+        if let plist = try? PropertyListSerialization
+            .propertyList(from: effectCacheData, options: [], format: nil) as? [String: Data] {
+            decoded = plist[key]
+        } else if let object = try? JSONSerialization.jsonObject(with: effectCacheData) as? [String: String],
+                  let base64 = object[key] {
             decoded = Data(base64Encoded: base64)
         }
         cachedEffectBg = decoded

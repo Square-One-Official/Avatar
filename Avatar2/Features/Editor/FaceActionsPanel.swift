@@ -12,7 +12,6 @@
 import AppKit
 import AvatarKit
 import AvatarUI
-import PhosphorSwift
 import SwiftUI
 
 /// Stuurt de generatieve face-edits (Whiten teeth/Apply make-up/Reduce
@@ -146,11 +145,12 @@ struct FaceActionsPanel: View {
     }
 
     // Bekende icon-mapping per preset-sleutel (voor nu alleen de 3 bestaande).
-    private func icon(for key: String) -> Ph {
+    // E49.4: via DSIcon (SF Symbols); de bedoelde Phosphor-namen wonen dáár.
+    private func icon(for key: String) -> DSIcon.Symbol {
         switch key {
-        case "whiten-teeth": return .tooth
-        case "apply-makeup": return .palette
-        case "reduce-wrinkles": return .smiley
+        case "whiten-teeth": return .whitenTeeth
+        case "apply-makeup": return .applyMakeup
+        case "reduce-wrinkles": return .reduceWrinkles
         default: return .sparkle
         }
     }
@@ -204,15 +204,13 @@ struct FaceActionsPanel: View {
                             // thumbnail blijft het bekende preset-icoon staan.
                             if let url = preset.thumbnailUrl {
                                 RemoteThumbnail(url: url) {
-                                    icon(for: preset.key).regular
-                                        .scaledToFit()
+                                    DSIcon(icon(for: preset.key), size: 32)
                                         .frame(width: 36, height: 36)
                                 }
                                 .frame(width: cardWidth, height: cardHeight)
                                 .clipped()
                             } else {
-                                icon(for: preset.key).regular
-                                    .scaledToFit()
+                                DSIcon(icon(for: preset.key), size: 32)
                                     .frame(width: 36, height: 36)
                             }
                         }

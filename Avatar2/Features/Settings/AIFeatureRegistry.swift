@@ -19,7 +19,7 @@ enum AIFeature: String, CaseIterable, Sendable, Equatable {
         switch self {
         case .boostOnline: return "Boost resolution"
         case .colorise: return "Colorise"
-        case .restoreBody: return "Restore body"
+        case .restoreBody: return "Fill in body"
         case .effectGenerate, .effectRegenerate: return "Apply style"
         case .hairEdit: return "Hair edit"
         case .clothesEdit: return "Clothing edit"

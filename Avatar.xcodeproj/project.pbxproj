@@ -107,7 +107,6 @@
 		4EEF7EBE6FC696C28CCC83EB /* PortraitSetActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499AFD3440A49F0D511B668B /* PortraitSetActions.swift */; };
 		4FD3743A8B3F587FC230891E /* BannerPlaceholderSweepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */; };
 		50B817781B5090A200CE1A51 /* BannerTextFloatingToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8C2D2C00CF4175DA0F1BF9 /* BannerTextFloatingToolbar.swift */; };
-		51481357AD84A6C1F270498B /* PhosphorSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2EA013076753B0525BADB705 /* PhosphorSwift */; };
 		524B6A85C7C4B12BA53B9ED0 /* PillSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */; };
 		552DB890E25DC4C7C13EB602 /* ImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A09E65B08B3DB5530D416B59 /* ImageProcessor.swift */; };
 		55DE2F5F0D7B45FA5C672E13 /* BannerCanvasChromeMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A8D0A82AF96EE53F5E3EE /* BannerCanvasChromeMetrics.swift */; };
@@ -178,6 +177,7 @@
 		867313BD6DC51163C952CA94 /* AutoAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECE2EA74BCD5AA894A3864C /* AutoAligner.swift */; };
 		86A30C768747A50D4DA2F0AF /* BannerCanvasImageChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9633D488AE5B4BD05D81FC26 /* BannerCanvasImageChrome.swift */; };
 		86C887ED5EFC7C85A0658205 /* StatusChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F137F8D4D25DCECC222EE48 /* StatusChip.swift */; };
+		87C53410B0B2087017B84516 /* UndoHistoryCap.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */; };
 		88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		88F219E35BB48BDC77DA3BAF /* AutoFramer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483B0B526A772D660C1ECB8 /* AutoFramer.swift */; };
 		890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1658094DC9377C3D97B55BF /* ClothesPanel.swift */; };
@@ -250,6 +250,7 @@
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
 		BCF0B97BA2069984413BCB67 /* FloatingOverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */; };
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
+		C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE640D635F259A76EC318FDB /* AppLinks.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
 		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
 		C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9329E36279558288146B065 /* ExportSheet.swift */; };
@@ -269,10 +270,10 @@
 		CE49AA0F4C494B5D4D81E589 /* AutoFramerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DD51E68A2A1951BA1990DD /* AutoFramerTests.swift */; };
 		CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */ = {isa = PBXBuildFile; productRef = 7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */; };
 		CF614D480B6F6CC84CA59412 /* AIPrivacyTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E95FDC855FE9663A7F6421E /* AIPrivacyTier.swift */; };
+		CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */; };
 		CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE27586F91E9706E71610E7 /* FaceActionsPanel.swift */; };
 		D0FDF943F975516A5670C6B0 /* ShaderEffectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA4E038045F62810713D0E11 /* ShaderEffectTests.swift */; };
 		D10DD1DAD674FDF2DFD2FD11 /* OutOfCreditsToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F87925CBE72ABD8237FF3 /* OutOfCreditsToast.swift */; };
-		D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85946241C86C51F94E31DFF8 /* PortraitHeader.swift */; };
 		D27FD8B3821AA756198BDB78 /* PlatformChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67DA5A7897F95C4BCE9C4754 /* PlatformChrome.swift */; };
 		D3902C8E716FB212480A16B3 /* OnboardingStepPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */; };
 		D43723746F3532F825382CAB /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 349CA2BF8E0D0316D4C6EC9F /* Localization.swift */; };
@@ -411,6 +412,7 @@
 		41C70EB846E92A3FCDD00E5C /* LibraryBreadcrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBreadcrumb.swift; sourceTree = "<group>"; };
 		42425F916AF8200C81E49949 /* EntitlementModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModel.swift; sourceTree = "<group>"; };
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
+		44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadPortraitCommand.swift; sourceTree = "<group>"; };
 		46B2F1C093D7657D24C28653 /* BannerCanvasDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasDrop.swift; sourceTree = "<group>"; };
 		48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairPanel.swift; sourceTree = "<group>"; };
 		48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformOverlay.swift; sourceTree = "<group>"; };
@@ -481,7 +483,6 @@
 		82575791940C04DCA96509C9 /* StylizeQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylizeQualityTests.swift; sourceTree = "<group>"; };
 		8483B0B526A772D660C1ECB8 /* AutoFramer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoFramer.swift; sourceTree = "<group>"; };
 		84B7A4BBDFBCEECCDAC5E767 /* PillSegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillSegmentedControl.swift; sourceTree = "<group>"; };
-		85946241C86C51F94E31DFF8 /* PortraitHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitHeader.swift; sourceTree = "<group>"; };
 		86F687FF9D2FCFD8F72505C3 /* OnboardingStepEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepEngine.swift; sourceTree = "<group>"; };
 		877D5A42F98746FCC7A61452 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		89B6546E0BE313C07BC46399 /* BannerBreadcrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerBreadcrumb.swift; sourceTree = "<group>"; };
@@ -523,6 +524,7 @@
 		ADBC4C2744B059195DB3E27A /* BannerTextPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTextPanel.swift; sourceTree = "<group>"; };
 		AE002256F664727C1749A0E6 /* SettingsCheckmarkRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCheckmarkRow.swift; sourceTree = "<group>"; };
 		AE3A8D0A82AF96EE53F5E3EE /* BannerCanvasChromeMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasChromeMetrics.swift; sourceTree = "<group>"; };
+		AE640D635F259A76EC318FDB /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		B138BC85B9312BCC2043B26A /* BannerTypeToEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerTypeToEditTests.swift; sourceTree = "<group>"; };
 		B313E53EBD6AC732524D4690 /* ImportFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
 		B6174C4006B70AA84DC47783 /* ProcessingStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingStatusView.swift; sourceTree = "<group>"; };
@@ -544,6 +546,7 @@
 		C4417A7EE7A4B91214521C0C /* OnboardingStepPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingStepPrivacy.swift; sourceTree = "<group>"; };
 		C447017F67D767535688965F /* Avatar2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Avatar2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C504E7ED42D59197C3971A3A /* LeftNavView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftNavView.swift; sourceTree = "<group>"; };
+		C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoHistoryCap.swift; sourceTree = "<group>"; };
 		C61EA8ABE1B5D7EDE1478FCF /* AvatarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarApp.swift; sourceTree = "<group>"; };
 		C67B1818524625F66274E218 /* GoogleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInButton.swift; sourceTree = "<group>"; };
 		C8E28085965A8F0A7E153144 /* BannerShaderRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerShaderRenderer.swift; sourceTree = "<group>"; };
@@ -634,7 +637,6 @@
 				248D6FE426BDB0DF1D040BF1 /* AvatarKit in Frameworks */,
 				CE98AE59A4385ABC95F178C4 /* AvatarUI in Frameworks */,
 				18B4690E8B43BA765620B155 /* Sparkle in Frameworks */,
-				51481357AD84A6C1F270498B /* PhosphorSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -677,9 +679,11 @@
 		25450612C0A547C1E86969AE /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				AE640D635F259A76EC318FDB /* AppLinks.swift */,
 				104DC6671647D23FFB03532A /* RemoteThumbnail.swift */,
 				DD5144A00B0FE56D48BFED3B /* ThumbnailRenderer.swift */,
 				3E381F6622B4D1F0E8B88A50 /* ThumbnailStore.swift */,
+				C5BD3D3D78D6BA68BEA5C33D /* UndoHistoryCap.swift */,
 				D7F0C232F29D34C390EAED00 /* URL+ExternalScheme.swift */,
 			);
 			path = Shared;
@@ -1037,7 +1041,6 @@
 				A6345E6DEE84999748B5B8A0 /* HomeView.swift */,
 				E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */,
 				C504E7ED42D59197C3971A3A /* LeftNavView.swift */,
-				85946241C86C51F94E31DFF8 /* PortraitHeader.swift */,
 				54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */,
 				E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */,
 				9E2F90C51F873C306E8E73DF /* ShellModel.swift */,
@@ -1046,6 +1049,7 @@
 				390524875FAE18DD4A1A916F /* ShellView.swift */,
 				3309483DB7C17688EECFF2A9 /* SmokeSeed.swift */,
 				E149C6DB97088D150128BD66 /* UIPresentationStore.swift */,
+				44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -1178,7 +1182,6 @@
 				3A383A9104F04C87490DC691 /* AvatarKit */,
 				7E0CF97AD8A2696E0DDEDB76 /* AvatarUI */,
 				183C72136A3DB4697DABE7C7 /* Sparkle */,
-				2EA013076753B0525BADB705 /* PhosphorSwift */,
 			);
 			productName = Avatar2;
 			productReference = 7514CACB1C00FEA0BA5B6C5B /* Avatar2.app */;
@@ -1235,7 +1238,6 @@
 			mainGroup = AA5FB63F3F50F7DA1D7BBCD3;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */,
 				C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 				FAD8C4AE8E294733D9421134 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
@@ -1373,6 +1375,7 @@
 				CF614D480B6F6CC84CA59412 /* AIPrivacyTier.swift in Sources */,
 				37DBE53613C79814FFD858A2 /* AdjustUndo.swift in Sources */,
 				A9D2A5FF7F46FFDDE4D8FE4C /* AppFeatureFlags.swift in Sources */,
+				C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */,
 				90B4834B1029881FE5011BEE /* AppleBackgroundPlaygroundModifier.swift in Sources */,
 				E37BDB111105A44AA7F0BDA5 /* AppleIntelligenceAvailability.swift in Sources */,
 				183E736C6ADAF26009FAB576 /* AppleIntelligenceAvailabilityRefresh.swift in Sources */,
@@ -1479,7 +1482,6 @@
 				F31E762F95DD3C336A3DE4B0 /* PortraitContextMenu.swift in Sources */,
 				9842DF7250CB0EA5FBCE4A53 /* PortraitDragItem.swift in Sources */,
 				694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */,
-				D26CC2E4FC847EE576CA6FE4 /* PortraitHeader.swift in Sources */,
 				A467B165881557A4E0CD4FA1 /* PortraitPickerPanel.swift in Sources */,
 				4EEF7EBE6FC696C28CCC83EB /* PortraitSetActions.swift in Sources */,
 				D4817F27762F9D7C51324091 /* PortraitsGalleryView.swift in Sources */,
@@ -1517,7 +1519,9 @@
 				31F9C39D336CA9FAD5C479CC /* TransformUndo.swift in Sources */,
 				68B5D92B962668400DBB1517 /* UIPresentationStore.swift in Sources */,
 				1516320AF8E8CED7840BCEAD /* URL+ExternalScheme.swift in Sources */,
+				87C53410B0B2087017B84516 /* UndoHistoryCap.swift in Sources */,
 				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
+				CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */,
 				98AB53571B09A54CAC6D4E9F /* WindowAppearance.swift in Sources */,
 				95CD3DA3494929EBD52C9510 /* WorkingToastView.swift in Sources */,
 			);
@@ -1998,14 +2002,6 @@
 				minimumVersion = 2.0.0;
 			};
 		};
-		70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/phosphor-icons/swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.1.0;
-			};
-		};
 		C8563EE8B7639A0683C1B596 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle";
@@ -2044,11 +2040,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4E940B3E8C9FDB39B1283788 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
-		};
-		2EA013076753B0525BADB705 /* PhosphorSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 70308B960BB83CC4DFC58BA8 /* XCRemoteSwiftPackageReference "swift" */;
-			productName = PhosphorSwift;
 		};
 		3A383A9104F04C87490DC691 /* AvatarKit */ = {
 			isa = XCSwiftPackageProductDependency;

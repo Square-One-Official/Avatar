@@ -990,20 +990,17 @@ struct BoardView: View {
     /// E29.2/E31.7: pas dezelfde achtergrond toe op alle geselecteerde portretten.
     private func applyBackgroundToAll(_ background: PortraitBackground) {
         let targets = selectedPortraits
-        let cache = thumbs
         undoManager?.beginUndoGrouping()
         undoManager?.setActionName("Background")
         for p in targets {
             let before = p.background
             guard before != background else { continue }
             p.setBackground(background)
-            cache.invalidate(p)
             ReversibleChange.register(
                 undoManager, target: p,
                 from: before, to: background, actionName: "Background"
             ) { portrait, bg in
                 portrait.setBackground(bg)
-                cache.invalidate(portrait)
             }
         }
         undoManager?.endUndoGrouping()
@@ -1013,14 +1010,11 @@ struct BoardView: View {
         let before = node.background
         guard before != background else { return }
         node.setBackground(background)
-        thumbs.invalidate(node)
-        let cache = thumbs
         ReversibleChange.register(
             undoManager, target: node,
             from: before, to: background, actionName: "Background"
         ) { portrait, bg in
             portrait.setBackground(bg)
-            cache.invalidate(portrait)
         }
     }
 
@@ -1105,20 +1099,17 @@ struct BoardView: View {
     /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
     private func applyAdjustToAll(_ adjust: PortraitAdjust) {
         let targets = selectedPortraits
-        let cache = thumbs
         undoManager?.beginUndoGrouping()
         undoManager?.setActionName("Adjust")
         for p in targets {
             let before = p.adjust
             p.adjust = adjust
             p.touch()
-            cache.invalidate(p)
             AdjustUndo.register(
                 undoManager, target: p,
-                apply: { [p, cache] adj in
+                apply: { [p] adj in
                     p.adjust = adj
                     p.touch()
-                    cache.invalidate(p)
                 },
                 undoTo: before, redoTo: adjust, actionName: "Adjust"
             )
@@ -1169,7 +1160,6 @@ struct BoardView: View {
                 item.node.cutoutDerivesFromOriginal = false
                 item.node.touch()
                 CutoutDataUndo.register(undoManager, portrait: item.node, undoTo: item.before, redoTo: after, actionName: "Match Lighting")
-                thumbs.invalidate(item.node)
             }
             undoManager?.endUndoGrouping()
         }
@@ -1265,7 +1255,6 @@ struct BoardView: View {
     private func applyToNode(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
         await model.applyEffectResult(image)
-        thumbs.invalidate(node)
         editTool = nil
     }
 
@@ -1273,7 +1262,6 @@ struct BoardView: View {
     private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
         await model.applyEffectResult(image, preserveSourceAlpha: true)
-        thumbs.invalidate(node)
         editTool = nil
     }
 
@@ -1285,13 +1273,11 @@ struct BoardView: View {
             return
         }
         await applyToNode(image, node)
-        let cache = thumbs
         ImageEnhanceUndo.register(
             undoManager, target: node,
-            apply: { [model, cache] img in
+            apply: { [model] img in
                 model.select(node)
                 await model.applyEffectResult(img)
-                cache.invalidate(node)
             },
             undoTo: before, redoTo: image, actionName: actionName
         )
@@ -1303,13 +1289,11 @@ struct BoardView: View {
             return
         }
         await applyToNodePreservingAlpha(image, node)
-        let cache = thumbs
         ImageEnhanceUndo.register(
             undoManager, target: node,
-            apply: { [model, cache] img in
+            apply: { [model] img in
                 model.select(node)
                 await model.applyEffectResult(img, preserveSourceAlpha: true)
-                cache.invalidate(node)
             },
             undoTo: before, redoTo: image, actionName: actionName
         )

@@ -81,12 +81,12 @@ struct SettingsAboutPage: View {
                         linkRow(
                             title: "Website",
                             subtitle: "aaavatar.nl",
-                            url: "https://aaavatar.nl"
+                            url: AppLinks.website
                         )
                         linkRow(
                             title: "Privacy policy",
                             subtitle: "How Aaavatar handles your photos",
-                            url: "https://aaavatar.nl/privacy"
+                            url: AppLinks.privacyPolicy
                         )
                     }
                 }
@@ -98,12 +98,10 @@ struct SettingsAboutPage: View {
         .padding(.trailing, DSSpacing.gap6)
     }
 
-    private func linkRow(title: String, subtitle: String, url: String) -> some View {
+    private func linkRow(title: String, subtitle: String, url: URL) -> some View {
         SettingsRow(title: title, subtitle: subtitle) {
             DSIconButton(Image(systemName: "arrow.up.right")) {
-                if let target = URL(string: url) {
-                    NSWorkspace.shared.open(target)
-                }
+                NSWorkspace.shared.open(url)
             }
             .accessibilityLabel("Open \(title)")
         }

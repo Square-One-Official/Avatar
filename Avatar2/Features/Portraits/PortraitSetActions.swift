@@ -91,11 +91,23 @@ enum PortraitSetActions {
         onBusy("Exporting \(targets.count) portraits…")
         Task {
             defer { onBusy(nil) }
+            // Dedupliceer binnen de batch: twee portretten met dezelfde naam
+            // worden "Naam.png", "Naam-2.png", "Naam-3.png" i.p.v. elkaar stil
+            // te overschrijven.
+            var usedNames: Set<String> = []
             for (i, p) in targets.enumerated() {
-                guard let data = PortraitExporter.makePNG(for: p, watermark: !isPro, shape: p.frameShape) else { continue }
-                let base = p.name.trimmingCharacters(in: .whitespaces)
-                let name = (base.isEmpty ? "portrait-\(i + 1)" : base.replacingOccurrences(of: "/", with: "-")) + ".png"
-                try? data.write(to: dir.appendingPathComponent(name))
+                // Off-main render (makePNGAsync) — de compositing blokkeert de UI niet.
+                guard let data = await PortraitExporter.makePNGAsync(for: p, watermark: !isPro, shape: p.frameShape) else { continue }
+                let trimmed = p.name.trimmingCharacters(in: .whitespaces)
+                let base = trimmed.isEmpty ? "portrait-\(i + 1)" : trimmed.replacingOccurrences(of: "/", with: "-")
+                var name = base
+                var counter = 2
+                while usedNames.contains(name.lowercased()) {
+                    name = "\(base)-\(counter)"
+                    counter += 1
+                }
+                usedNames.insert(name.lowercased())
+                try? data.write(to: dir.appendingPathComponent(name + ".png"))
             }
         }
     }

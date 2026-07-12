@@ -59,7 +59,7 @@ struct PrivacyFeatureMatrix: View {
     private var advancedFeatures: [String] {
         [
             "Boost resolution (online)",
-            "Colorise, Restore body",
+            "Colorise, Fill in body",
             "Effects, Hair, Clothing, Face edits",
             "Generate backgrounds (Gemini / OpenAI)",
         ]

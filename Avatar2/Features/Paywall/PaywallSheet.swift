@@ -316,8 +316,8 @@ struct PaywallSheet: View {
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.muted)
             HStack(spacing: DSSpacing.gap3) {
-                Link("Terms of Service", destination: URL(string: "https://aaavatar.nl/terms-of-service")!)
-                Link("Privacy Policy", destination: URL(string: "https://aaavatar.nl/privacy-policy")!)
+                Link("Terms of Service", destination: AppLinks.termsOfService)
+                Link("Privacy Policy", destination: AppLinks.privacyPolicy)
             }
             .dsTextStyle(.labelSmall)
             .foregroundStyle(DSColor.Foreground.muted)

@@ -13,10 +13,6 @@ import SwiftData
 final class Folder2 {
     var name: String
     var createdAt: Date
-    /// Sorteervolgorde in de galerij (handmatig herschikbaar later).
-    var order: Int = 0
-    /// Optionele tag-kleur (Riverside-stijl), hex #RRGGBB. nil = neutraal.
-    var colorHex: String?
 
     /// Standaardachtergrond voor nieuwe imports in deze map (kleur xor
     /// afbeelding). Beide nil = geen default — imports blijven transparant.
@@ -29,11 +25,9 @@ final class Folder2 {
     @Relationship(deleteRule: .nullify, inverse: \Portrait2.folder)
     var portraits: [Portrait2] = []
 
-    init(name: String, createdAt: Date = .now, order: Int = 0, colorHex: String? = nil) {
+    init(name: String, createdAt: Date = .now) {
         self.name = name
         self.createdAt = createdAt
-        self.order = order
-        self.colorHex = colorHex
     }
 
     /// De geconfigureerde standaardachtergrond, of nil wanneer geen default is

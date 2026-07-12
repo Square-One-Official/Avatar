@@ -595,7 +595,10 @@ private func presentGenerateBackground(
     guard let entitlement else { return }
     switch PrivacyPreferences2.shared.effectiveTier {
     case .onDevice:
+        // E49.2: de allowAIFeature-call toont de elevation-modal — dan NIET
+        // ook nog de generate-sheet openen (dubbele modal-bug).
         _ = entitlement.allowAIFeature(.backgroundGenerate)
+        return
     case .appleCloud:
         guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
     case .thirdParty:

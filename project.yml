@@ -14,13 +14,6 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation
     from: "0.9.20"
-  # E20.1/E24: Phosphor-iconen. Hangt ALLEEN aan het Avatar2-app-target (gebouwd
-  # via xcodebuild → actool kan de asset-catalog → Bundle.module werkt). NIET aan
-  # AvatarUI, want `swift test --package-path AvatarUI` (CLI, geen actool) breekt
-  # daarop. Zo blijven de menu-iconen Phosphor en de package-tests groen.
-  PhosphorSwift:
-    url: https://github.com/phosphor-icons/swift
-    from: "2.1.0"
   AvatarKit:
     path: AvatarKit
   AvatarUI:
@@ -202,7 +195,6 @@ targets:
       - package: AvatarKit
       - package: AvatarUI
       - package: Sparkle
-      - package: PhosphorSwift
     resources:
       - path: Avatar2/Assets.xcassets
     info:

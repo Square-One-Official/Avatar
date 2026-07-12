@@ -338,6 +338,7 @@ struct HomeView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .keyboardShortcut("u", modifiers: .command)
+        // ⌘U zelf leeft app-breed in het File-menu (UploadPortraitCommands,
+        // E49.2); de knop houdt alleen het badge als visuele hint.
     }
 }

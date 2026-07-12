@@ -81,6 +81,8 @@ struct ShellView: View {
         .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
         // ⌘, opent de in-venster Settings (zie SettingsCommands in het app-menu).
         .focusedSceneValue(\.openSettings, OpenSettingsAction { model.isShowingSettings = true })
+        // ⌘U opent het import-panel (zie UploadPortraitCommands in het File-menu).
+        .focusedSceneValue(\.uploadPortrait, UploadPortraitAction { model.presentOpenPanel() })
         // Vaste venster-chrome: traffic-light-strook + toggle schuiven niet mee
         // met de sidebar-animatie; de strip hoort visueel bij de nav wanneer open.
         .overlay(alignment: .topLeading) {

@@ -156,34 +156,14 @@ public actor OrmbgModelStore {
         defer { try? fm.removeItem(at: scratch) }
 
         // 1. Download de zip — gestreamd naar schijf, niet via Data in
-        //    het geheugen. Met voortgangscallback gaat het via bytes(from:)
-        //    zodat de fractie per chunk gemeld kan worden; zonder callback
-        //    blijft het de kant-en-klare download(from:).
+        //    het geheugen. Met voortgangscallback gaat het via een download-
+        //    delegate (`didWriteData` meldt de fractie per chunk; E49.3 —
+        //    de oude AsyncBytes-lus itereerde per byte over ~45MB); zonder
+        //    callback blijft het de kant-en-klare download(from:).
         let zipURL = scratch.appendingPathComponent("model.zip")
         if let onProgress {
-            let (bytes, response) = try await URLSession.shared.bytes(from: manifest.zipURL)
-            let expected = response.expectedContentLength
-            fm.createFile(atPath: zipURL.path, contents: nil)
-            let handle = try FileHandle(forWritingTo: zipURL)
-            defer { try? handle.close() }
-            var buffer = Data()
-            buffer.reserveCapacity(1 << 18)
-            var received: Int64 = 0
-            for try await byte in bytes {
-                buffer.append(byte)
-                if buffer.count >= 1 << 18 {
-                    try handle.write(contentsOf: buffer)
-                    received += Int64(buffer.count)
-                    buffer.removeAll(keepingCapacity: true)
-                    if expected > 0 {
-                        onProgress(min(1, Double(received) / Double(expected)))
-                    }
-                }
-            }
-            if !buffer.isEmpty {
-                try handle.write(contentsOf: buffer)
-            }
-            onProgress(1)
+            try await ProgressDownloader(destination: zipURL, onProgress: onProgress)
+                .download(from: manifest.zipURL)
         } else {
             let (tempFile, _) = try await URLSession.shared.download(from: manifest.zipURL)
             try fm.moveItem(at: tempFile, to: zipURL)
@@ -231,5 +211,64 @@ public actor OrmbgModelStore {
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// E49.3: delegate-gebaseerde download met chunk-voortgang. URLSession
+/// streamt zelf naar een tempfile en `didWriteData` meldt de fractie per
+/// ontvangen chunk — geen per-byte `AsyncBytes`-iteratie meer. Net als bij
+/// de voortgangsloze `download(from:)`-tak is de SHA-256-gate erná de wacht
+/// tegen half-gedownloade of foutieve payloads (incl. non-2xx-bodies).
+private final class ProgressDownloader: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let destination: URL
+    private let onProgress: @Sendable (Double) -> Void
+    /// Alleen aangeraakt op de seriële delegate-queue van de sessie.
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var moveError: Error?
+
+    init(destination: URL, onProgress: @escaping @Sendable (Double) -> Void) {
+        self.destination = destination
+        self.onProgress = onProgress
+    }
+
+    func download(from url: URL) async throws {
+        let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            continuation = cont
+            session.downloadTask(with: url).resume()
+        }
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64
+    ) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        onProgress(min(1, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
+    }
+
+    func urlSession(
+        _ session: URLSession, downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
+        // `location` is alleen geldig bínnen deze callback → meteen verplaatsen;
+        // een fout hier komt terug via didCompleteWithError.
+        do { try FileManager.default.moveItem(at: location, to: destination) }
+        catch { moveError = error }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let continuation else { return }
+        self.continuation = nil
+        if let error {
+            continuation.resume(throwing: error)
+        } else if let moveError {
+            continuation.resume(throwing: moveError)
+        } else {
+            onProgress(1)
+            continuation.resume()
+        }
     }
 }

@@ -239,7 +239,7 @@ struct FloatingOverlayHost: View {
         guard case .createFolder = alert else { return }
         let name = alertDraft.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        modelContext.insert(Folder2(name: name, order: folders.count + 1))
+        modelContext.insert(Folder2(name: name))
     }
 
     private func confirmRenameBanner(_ alert: PresentationAlert) {
@@ -256,7 +256,7 @@ struct FloatingOverlayHost: View {
         guard case .createFolderForPortraits(let targetIDs, _) = alert else { return }
         let name = alertDraft.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
-        let folder = Folder2(name: name, order: folders.count + 1)
+        let folder = Folder2(name: name)
         modelContext.insert(folder)
         for id in targetIDs {
             if let p = portraits.first(where: { $0.persistentModelID == id }) {
