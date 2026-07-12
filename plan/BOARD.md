@@ -31,7 +31,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
-| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+**13.5** done — 13.1–13.3 backlog (gedeblokkeerd) |
+| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+**13.5** done — 13.1–13.3 backlog (gedeblokkeerd); **13.6 ready** (token-write faalt bij vergrendeld scherm — mogelijke wortel van de sessie-herstel-klachten) |
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.7, incl. Stripe-webhook-shapefix); 14.8 backlog (credits-transparantie) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
@@ -57,5 +57,5 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
-| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1–53.4 + 53.6 ready** (36 bevindingen, 29 UXS-stories); 53.5 backlog |
+| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | 53.1 + 53.4 + 53.6 ready; **53.3 code-klaar op branch** (live AX-check bij Thierry); **53.2 checkpoint** (UX1 klaar, UX2 wacht op E53.7); 53.5 backlog — merges wachten op vrije werkboom (E53.7) |
 | [E54 CMS-stijlreferenties voor Effects](E54-effect-stijlreferenties.md) | INFRA+AI | **54.1 done + live op prod** (2026-07-04); 54.2 wacht op CMS-referenties (Thierry); 54.3–54.4 backlog |
