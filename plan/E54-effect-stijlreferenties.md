@@ -60,9 +60,20 @@ Scope:
   deploy van backend + admin is een expliciet besluit van Thierry ná merge.
 
 ## 54.2 — Bakeoff: stijltrouw & identiteitsbehoud met referenties
-- status: backlog
+- status: in_progress
+- owner: AI (2026-07-12)
 - team: AI
-- blockedBy: 54.1 · Thierry seedt per effect referenties in het CMS
+- blockedBy: — (54.1 done; referenties geseed 2026-07-12 — zie hieronder)
+
+**Seeding (2026-07-12, autonoom op verzoek Thierry):** per effect 2 stijlreferenties
+gegenereerd met `google/nano-banana` (gezichtsloos conform de identity-bleed-regel:
+clay=vos+zonnebloem, wood=vogel+beer, 3d=kat+robot, scribble=fiets+koffie), visueel
+gereviewd, en in het CMS gezet — storage-upload naar `announcement-media/media/e54-*.png`
++ `payload.media`-rijen (id 11–18) + `payload.effects_style_references`-rijen via de
+Supabase Management-API (de Payload-REST-key is Vercel-sensitive en dus niet leesbaar;
+de DB-route is 1-op-1 wat Payload's drizzle-adapter verwacht, DDL uit sql/017).
+Publieke URL geverifieerd (200, image/png). NB: verwissel/vervang kan gewoon via de
+admin-UI; de rijen zijn additief.
 
 E09.1/E41-patroon: per stylize-model (nano-banana, flux-2-pro, gpt-image-1.5) met/zonder
 referenties op een vast testportret, beoordeeld op (a) stijltrouw aan de voorbeelden en
