@@ -20,7 +20,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | Epic | Team | Status |
 |------|------|--------|
 | [E01 Fundament](E01-fundament.md) | INFRA | **done** (1.1–1.15) |
-| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); ⚠ 2.6 (randkwaliteit lage res) stond hier maar heeft géén story in het epic-bestand — nog uitschrijven of schrappen |
+| [E02 Vision-engine minimaal](E02-vision-engine.md) | AI | **done** (2.1–2.5); 2.6 (randkwaliteit lage res) backlog — de story stond al in het epic-bestand maar was zijn `##`-kop kwijt (gerepareerd 2026-07-12) |
 | [E03 Design system](E03-design-system.md) | DS | **done** (3.1–3.19) |
 | [E04 Onboarding 2.0](E04-onboarding.md) | FEAT | **done** (4.1–4.8) |
 | [E05 Main app shell](E05-main-shell.md) | FEAT | **done** (5.1–5.8) |
@@ -31,7 +31,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
-| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+**13.5** done — 13.1–13.3 backlog (gedeblokkeerd) |
+| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+13.5+**13.6 done** (13.6: completeFileProtection-fix, gemerged 2026-07-12 — mogelijke wortel van de sessie-herstel-klachten; v1-tegenhanger = los besluit) — 13.1–13.3 backlog (gedeblokkeerd) |
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.7, incl. Stripe-webhook-shapefix); 14.8 backlog (credits-transparantie) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
@@ -57,5 +57,5 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
-| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1–53.4 + 53.6 ready** (36 bevindingen, 29 UXS-stories); 53.5 backlog |
+| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | 53.1 + 53.4 + 53.6 ready; **53.3 code-klaar op branch** (live AX-check bij Thierry); **53.2 checkpoint** (UX1 klaar, UX2 wacht op E53.7); 53.5 backlog — merges wachten op vrije werkboom (E53.7) |
 | [E54 CMS-stijlreferenties voor Effects](E54-effect-stijlreferenties.md) | INFRA+AI | **54.1 done + live op prod** (2026-07-04); 54.2 wacht op CMS-referenties (Thierry); 54.3–54.4 backlog |
