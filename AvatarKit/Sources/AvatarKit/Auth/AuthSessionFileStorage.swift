@@ -34,7 +34,14 @@ public struct AuthSessionFileStorage: AuthLocalStorage {
     public func store(key: String, value: Data) throws {
         let url = fileURL(for: key)
         let payload = try AuthSessionEncryption.encrypt(value)
-        try payload.write(to: url, options: [.atomic, .completeFileProtection])
+        // E13.6: GEEN `.completeFileProtection` — met vergrendeld scherm
+        // (keybag dicht) faalt élke protected-class file-creatie met EPERM,
+        // waardoor een token-refresh terwijl de Mac op slot staat zijn sessie
+        // niet kon persisteren (mogelijke wortel van de sessie-herstel-
+        // klachten rond 921b1e7). Confidentialiteit komt al van de AES-GCM-
+        // envelop (`AuthSessionEncryption`, sleutel in de Keychain) + 0600/0700-
+        // permissies — de protection-class voegde hier niets aan toe.
+        try payload.write(to: url, options: [.atomic])
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600],
             ofItemAtPath: url.path

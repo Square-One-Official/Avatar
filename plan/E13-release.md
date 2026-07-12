@@ -122,7 +122,7 @@ groen; fresh launch van de Debug-build logt de launch-check zonder dat About ope
 
 
 ## 13.6 — AuthSessionFileStorage: token-write faalt bij vergrendeld scherm [INFRA]
-- status: in_progress
+- status: done
 - owner: INFRA (2026-07-12, branch v2/e13-13.6)
 - team: INFRA
 - blockedBy: —
@@ -145,3 +145,4 @@ AuthSessionStorageTests draaien alleen betrouwbaar met ontgrendeld scherm —
 documenteer dat in de test of maak de write-optie injecteerbaar.
 **DoD:** beide targets bouwen; AuthSessionStorageTests groen mét en zonder
 vergrendeld scherm (of expliciet gedocumenteerde lock-gate); Result-regel.
+**Result:** ✅ `.completeFileProtection` uit `AuthSessionFileStorage.store` (alleen nog `.atomic` + de bestaande 0600/0700-permissies) — confidentialiteit komt al van de AES-GCM-envelop met Keychain-sleutel, de protection-class voegde niets toe en blokkeerde writes bij dichte keybag; rationale als comment op de write. ✅ Geverifieerd ónder vergrendeld scherm (`CGSSessionScreenIsLocked=true`): AuthSessionStorageTests 6/6 groen waar vóór de fix 5/6 faalden met EPERM — de lock-conditie zelf was het bewijs. ✅ build-v2.sh volledig groen (idem vergrendeld). ⚠ v1 heeft dezelfde bug (`Avatar/Services/FileAuthStorage.swift:56`) — niet aangeraakt (v1 bevroren, geen SHARED-story); apart besluit Thierry of dit een SHARED-fix waard is.
