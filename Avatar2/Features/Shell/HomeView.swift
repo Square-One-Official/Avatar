@@ -117,7 +117,15 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // CMS-banner-presets alleen laden als de Banners-suite aan staat.
-        .task { if AppFeatureFlags.bannersEnabled { await presetsModel.load() } }
+        .task {
+            if AppFeatureFlags.bannersEnabled {
+                // UXS-5: Home toont dezelfde gebakken previews als de gallery —
+                // draai de eenmalige placeholder-sweep+herbake dus ook hier,
+                // vóór de banner-sectie stale bakes kan tonen.
+                await BannerPlaceholderMigration.runIfNeeded(context: modelContext)
+                await presetsModel.load()
+            }
+        }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
     }
 
