@@ -2,6 +2,26 @@
 
 ## Open
 
+### Topaz-upscale verlieslatend per run (E41-follow-up) — KEUZE, wacht op Thierry
+- **Bevinding (2026-07-12, billing-check op verzoek):** `topazlabs/image-upscale` rekent per
+  **output-megapixel**: ≤24 MP output = $0,05 · ≤48 MP = $0,10 · verder oplopend ($0,20 bij
+  96 MP). Onze pipeline stuurt de input ongecapt door (geen resize in `upscale.ts`) met `2x` —
+  een gewone 12 MP-foto wordt 48 MP output = **$0,10/run**. Opbrengst: upscale = **1 credit ≈
+  €0,019 netto (~$0,021)** (het E14.3-tarief stamt uit het real-esrgan-tijdperk à ~$0,002).
+  Elke Topaz-run kost daarmee **2,4×–9× de opbrengst** — niet houdbaar zodra er volume komt.
+  (De Replicate-API toont geen recente predictions meer; werkelijke uitgaven sinds de
+  2026-07-03-deploy: replicate.com → Account → Billing.)
+- **Opties:**
+  1. **(aanbevolen)** Topaz houden + server-side input-cap ~6 MP (output blijft ≤24 MP → vast
+     $0,05) **én** upscale-tarief naar **3 credits** (~$0,063 opbrengst → ~25% marge). Kwaliteit
+     blijft de bakeoff-winnaar; de cap kost portretten in de praktijk niets (cutout-inputs
+     zitten daar ruim onder).
+  2. Default naar `google/upscaler` x2 q100 (vast $0,02/beeld): break-even op 1 credit, gezonde
+     marge op 2 credits; Topaz blijft dev-/Pro-arm. Kwaliteit = tweede uit de bakeoff.
+  3. Niets doen = elke upscale bewust subsidiëren (alleen oké zolang volume ~nul is).
+- **Uitvoering na keuze:** klein INFRA-werk (models.ts-tarief + evt. input-cap in `upscale.ts`);
+  check ook of de credit-chip in de app het tarief uit een constante haalt of hardcoded 1 toont.
+
 ### Frame-vorm: cirkel als DEFAULT-merkvorm (E24.16) — BEVESTIGEN, wacht op Thierry
 - **Context:** 24.16 maakt de frame-vorm per-portret kiesbaar (Frame ▾ → Shape: Circle/Square) en
   zet de **default op circle** (zoals het story-plan vroeg). Via de SwiftData-migratie-default

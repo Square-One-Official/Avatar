@@ -46,7 +46,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **done** (38.1–38.4, Figma-stijl Metal-shaders; DoD hergeverifieerd 2026-07-02 na E37.19) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **done** (39.1–39.2; 39.1 afgerond met prod-verificatie + decode-tests, 2026-07-02) |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **done** (40.1–40.2; 40.1 gehard 2026-07-02 — linked-check nu via `BannerDeletion.isLinked`, E46-les) |
-| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4; 41.3 opgegaan in 41.4) — bakeoff gedraaid, default → topaz, prod-deploy 2026-07-03; follow-up Thierry: Topaz-billing checken |
+| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4) — ⚠ billing-check 2026-07-12: Topaz kost $0,05–0,10+/run vs ~$0,021 opbrengst (1 credit) → verlieslatend; keuze-opties in DECISIONS-PENDING (aanbevolen: input-cap + 3 credits) |
 | [E42 AI background generation](E42-ai-background-generation.md) | FEAT+INFRA+AI | **done** (42.1–42.3, 42.5–42.7); 42.4 backlog (wide T2I bakeoff) |
 | [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **done** (43.1–43.2 + 43.5, prod uitgevoerd 2026-07-02); 43.3–43.4 backlog |
 | [E44 Cloud-actie betrouwbaarheid](E44-cloud-betrouwbaarheid.md) | FEAT+INFRA | **done** (44.1–44.2, prod-deploy 2026-07-02); 44.3 backlog |
@@ -57,5 +57,5 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
-| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | 53.1 + 53.4 + 53.6 ready; **53.3 code-klaar op branch** (live AX-check bij Thierry); **53.2 checkpoint** (UX1 klaar, UX2 wacht op E53.7); 53.5 backlog — merges wachten op vrije werkboom (E53.7) |
+| [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | 53.1 + 53.4 + 53.6 ready; **53.3 done** (live AX-geverifieerd 2026-07-12, op branch); **53.2 checkpoint** (UX1 klaar, UX2 wacht op E53.7); 53.5 backlog — merges wachten op vrije werkboom (E53.7) |
 | [E54 CMS-stijlreferenties voor Effects](E54-effect-stijlreferenties.md) | INFRA+AI | **54.1 done + live op prod** (2026-07-04); 54.2 wacht op CMS-referenties (Thierry); 54.3–54.4 backlog |
