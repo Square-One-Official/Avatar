@@ -980,7 +980,9 @@ struct BoardView: View {
             if isOpen {
                 BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, entitlement: entitlement)
                     .padding(DSSpacing.gap4)
-                    .frame(width: 320)
+                    // 440: zelfde breedte als de editor-popover (Notion-stijl
+                    // tab-paneel, 4-koloms grid).
+                    .frame(width: 440)
                     .fixedSize(horizontal: false, vertical: true)
                     // E32.1: zelfde paneel-radius (xl4) als de rest.
                     .dsPanelSurface(cornerRadius: DSRadius.xl4)

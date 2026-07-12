@@ -8,7 +8,7 @@ import {
   UnknownModelOverrideError,
 } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets } from "../../lib/payload.js";
+import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { flattenOnGrey } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
@@ -37,6 +37,53 @@ const SHARPNESS_CLAUSE =
 /** Client-flag `preserve_framing`: stylize op volle origineel → geen reframe. */
 const FRAMING_CLAUSE =
   "Keep the exact same crop, zoom, and position of the person in the frame — do not reframe, recenter, or change the composition.";
+
+/**
+ * E54: rolverdeling wanneer een effect CMS-stijlreferenties meestuurt. Zonder
+ * deze clausule moet het model zelf raden welke input de persoon is en welke
+ * de stijl — met identity-bleed uit de referenties als bekend gevolg.
+ */
+const STYLE_REFERENCE_CLAUSE =
+  "The first image is the person to transform. Every other image is a style example only: match its artistic style, colour palette, texture, brushwork and lighting exactly, but do not copy any person, face, pose or composition from the style examples.";
+
+/** Max referenties richting het model; meer verwatert identity-behoud. */
+const STYLE_REF_MAX = 3;
+
+/**
+ * In-process cache van referentie-data-URLs. Referenties wijzigen alleen bij
+ * een CMS-edit, dus een warme Vercel-instance hoeft ze niet per generatie
+ * opnieuw te downloaden. TTL ruim boven de 60s effects-cache is prima: de
+ * URL is content-addressed per upload (nieuwe upload = nieuwe URL).
+ */
+const styleRefCache = new Map<string, { expiresAt: number; dataUrl: string }>();
+const STYLE_REF_CACHE_TTL_MS = 10 * 60_000;
+
+async function fetchStyleReferences(urls: string[]): Promise<string[]> {
+  const now = Date.now();
+  const results = await Promise.all(
+    urls.slice(0, STYLE_REF_MAX).map(async (url) => {
+      // Verkleind ophalen via de Supabase image-transformatie (E52.1-patroon):
+      // CMS-uploads kunnen multi-MB zijn; ~1024px is zat als stijlvoorbeeld.
+      const scaled = thumbnailVariant(url, 1024, 85) ?? url;
+      const hit = styleRefCache.get(scaled);
+      if (hit && hit.expiresAt > now) return hit.dataUrl;
+      try {
+        const res = await fetch(scaled);
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        const mime = res.headers.get("content-type") ?? "image/jpeg";
+        const dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        styleRefCache.set(scaled, { expiresAt: now + STYLE_REF_CACHE_TTL_MS, dataUrl });
+        return dataUrl;
+      } catch {
+        // Soft-fail per referentie: minder referenties is beter dan een
+        // mislukte generatie.
+        return null;
+      }
+    }),
+  );
+  return results.filter((r): r is string => r !== null);
+}
 
 const STYLE_PROMPTS: Record<string, string> = {
   clay:
@@ -188,7 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
   // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
-  let styleReferenceDataUrl: string | null = null;
+  let styleReferenceDataUrls: string[] = [];
   const styleKey = (req.body?.style ?? "") as string;
   const hairPreset = (req.body?.hair_preset ?? "") as string;
   const hairPrompt = (req.body?.hair_prompt ?? "") as string;
@@ -209,18 +256,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
     prompt = mapped;
-    // Fetch the style reference image if the CMS effect has one, so it can be
-    // passed to the model as a visual style guide alongside the prompt.
-    if (effect?.styleReferenceUrl) {
-      try {
-        const refRes = await fetch(effect.styleReferenceUrl);
-        if (refRes.ok) {
-          const buf = Buffer.from(await refRes.arrayBuffer());
-          const mime = refRes.headers.get("content-type") ?? "image/jpeg";
-          styleReferenceDataUrl = `data:${mime};base64,${buf.toString("base64")}`;
-        }
-      } catch {
-        // Soft-fail: no reference is better than aborting the stylize call.
+    // E54: CMS-stijlreferenties meesturen als visuele stijlgids naast de
+    // prompt. De rolclausule alléén toevoegen als er echt referenties
+    // meegaan — anders verwijst de prompt naar afbeeldingen die er niet zijn.
+    if (effect && effect.styleReferenceUrls.length > 0) {
+      styleReferenceDataUrls = await fetchStyleReferences(effect.styleReferenceUrls);
+      if (styleReferenceDataUrls.length > 0) {
+        prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
       }
     }
   } else if (hairPreset) {
@@ -328,7 +370,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resultUrl = await stylizeEdit({
       imageDataUrl: flatDataUrl,
       prompt,
-      styleReferenceDataUrl,
+      styleReferenceDataUrls,
       width: meta.width ?? 0,
       height: meta.height ?? 0,
       model: modelRef,

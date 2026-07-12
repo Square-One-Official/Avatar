@@ -50,14 +50,20 @@ struct ShellView: View {
 
             if studioFullBleed {
                 HStack(alignment: .top, spacing: 0) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     Spacer(minLength: 0)
                 }
             } else {
                 HStack(spacing: ShellMetrics.sidebarContentSpacing) {
-                    leftNavSlot
-                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
                     mainArea
                         .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
@@ -80,7 +86,6 @@ struct ShellView: View {
         .overlay(alignment: .topLeading) {
             ShellSidebarChrome(
                 isSidebarVisible: model.isLeftNavVisible,
-                studioFullBleed: studioFullBleed,
                 onToggleSidebar: { model.toggleLeftNav() }
             )
             .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
@@ -96,11 +101,10 @@ struct ShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
         }
-        // E19.1: Share/export-popup (DS).
-        .sheet(isPresented: $model.isShowingExport) {
-            if let portrait = model.selectedPortrait {
-                ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
-            }
+        // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
+        // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
+        .sheet(item: $model.exportSession) { session in
+            ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
         .sheet(isPresented: $model.isShowingRename) {
@@ -314,16 +318,13 @@ struct ShellView: View {
         }
     }
 
-    /// Sidebar-slot: altijd gemonteerd, onthult via leading-clip (zelfde spring als chrome).
+    /// Sidebar-slot: insert/remove met slide — géén leading-width-clip (dat liet
+    /// de top-leading hoekradius als los vlekje achter).
     private var leftNavSlot: some View {
         LeftNavView(model: model, entitlement: entitlement)
             .padding(.leading, LeftNavView.edgeInset)
             .frame(width: LeftNavView.layoutWidth, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .top)
-            .frame(width: model.isLeftNavVisible ? LeftNavView.layoutWidth : 0, alignment: .leading)
-            .clipped()
-            .allowsHitTesting(model.isLeftNavVisible)
-            .accessibilityHidden(!model.isLeftNavVisible)
     }
 
     private var mainArea: some View {
@@ -433,12 +434,9 @@ struct ShellView: View {
                 }
             )
         }
-        // UXS-29(v2): de band negeert de toolbar-safe-area en pint op de oude
-        // contentTop-lijn — identiek aan vóór de toolbar (de editor-canvas-
-        // chips rekenen op deze vrije hoogte).
-        .padding(.top, ShellMetrics.contentTopSafeArea + ShellMetrics.topBarTopInset)
+        .padding(.top, ShellMetrics.shellTopBarControlTopInset)
         .frame(maxWidth: .infinity, alignment: .top)
-        .frame(height: ShellMetrics.contentTopSafeArea + ShellMetrics.topBarBandHeight, alignment: .top)
+        .frame(height: ShellMetrics.editorTopChromeBandHeight, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
     }
 
@@ -446,12 +444,13 @@ struct ShellView: View {
     /// bewust onafhankelijk van `studioFullBleed` (UXS-28/UX35): de oude
     /// `gap3`-tak rekende alsof de band in de content-kolom leefde, waardoor de
     /// breadcrumb bij Edit↔Preview ~248pt versprong (tot óver de sidebar).
-    /// Sidebar open → ná de sidebar-kaart; dicht → ná traffic-lights + toggle.
+    /// Sidebar open → ná de sidebar-kaart; dicht → ná sidebar-toggle (zelfde rij
+    /// als traffic-lights).
     private var shellEditorBreadcrumbLeading: CGFloat {
         if model.isLeftNavVisible {
             return LeftNavView.layoutWidth + DSSpacing.gap3
         }
-        return ShellMetrics.editorBreadcrumbLeadingCollapsed - ShellMetrics.windowEdgeInset
+        return ShellMetrics.editorBreadcrumbLeadingCollapsed
     }
 
     private var isolatingStatusLabel: String? {

@@ -872,6 +872,30 @@ public final class BackendClient {
         return resp.backgrounds
     }
 
+    // MARK: POST /v1/unsplash (UX-audit background-paneel, 2026-07-03)
+    /// Zoek (of blader, bij lege query) Unsplash-achtergronden via de
+    /// backend-proxy — de access key blijft server-side. Anoniem-vriendelijk,
+    /// zelfde soft-fail-gedachte als /v1/backgrounds. POST i.p.v. GET met
+    /// query-string: `send` bouwt URL's via `appendingPathComponent`, dat een
+    /// "?" zou percent-encoden.
+    public func unsplashPhotos(query: String?) async throws -> UnsplashFeed {
+        struct Body: Encodable { let q: String? }
+        let body = try JSONEncoder().encode(Body(q: query))
+        return try await requestAllowingAnonymous("/v1/unsplash", method: "POST", body: body)
+    }
+
+    /// Unsplash-guideline: registreer een download op het moment dat een foto
+    /// daadwerkelijk als achtergrond wordt toegepast. Best-effort — een
+    /// gemiste registratie mag apply nooit blokkeren.
+    public func unsplashTrackDownload(_ downloadLocation: String) async {
+        struct Body: Encodable { let track: String }
+        struct OkResponse: Decodable { let ok: Bool }
+        guard let body = try? JSONEncoder().encode(Body(track: downloadLocation)) else { return }
+        _ = try? await requestAllowingAnonymous(
+            "/v1/unsplash", method: "POST", body: body
+        ) as OkResponse
+    }
+
     // MARK: GET /v1/messages (E17.3)
     /// Getargete in-app-berichten (verenigd Message-model, E17.2). De server
     /// filtert op cohort/signup-datum/app-versie/platform/expiry/seen; de

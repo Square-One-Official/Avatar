@@ -19,6 +19,7 @@ final class AppleIntelligenceAvailabilityTests: XCTestCase {
             XCTAssertFalse(status.footnote.isEmpty)
         }
         XCTAssertTrue(AppleIntelligenceSupportStatus.supported.footnote.isEmpty)
+        XCTAssertTrue(AppleIntelligenceSupportStatus.appleIntelligenceUnavailable.offersSystemSettingsShortcut)
     }
 
     @MainActor

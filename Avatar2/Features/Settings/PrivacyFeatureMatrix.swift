@@ -18,6 +18,9 @@ struct PrivacyFeatureMatrix: View {
             Text("What works on each tier")
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
+                .padding(.vertical, DSSpacing.gap1)
+                .padding(.horizontal, DSSpacing.gap1)
+                .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
     }
 

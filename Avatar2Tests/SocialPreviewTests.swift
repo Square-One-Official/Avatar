@@ -1,6 +1,5 @@
-// E47.3 — social-preview platform-switch-logica (E34). De segmented control
-// stuurt via `PreviewTab.platforms` welke platform-mockups renderen; de
-// platform-geometrie (cover-maat/-ratio, profielcirkel) is de gedeelde bron
+// E47.3 — social-preview platform-geometrie (E34). De preview toont alle
+// platforms tegelijk; cover-maat/-ratio en profielcirkel zijn de gedeelde bron
 // van mockup én cover-export. Banner-vulling: `BannerResolver` vertaalt de
 // banner-keuze (match/kleur/afbeelding) naar een compositor-fill.
 
@@ -11,29 +10,6 @@ import XCTest
 
 @MainActor
 final class SocialPreviewTests: XCTestCase {
-
-    // MARK: - PreviewTab → platforms (de switch-logica achter de segmented control)
-
-    func testEnkelePlatformTabsTonenAlleenZichzelf() {
-        XCTAssertEqual(PreviewTab.linkedIn.platforms, [.linkedIn])
-        XCTAssertEqual(PreviewTab.x.platforms, [.x])
-        XCTAssertEqual(PreviewTab.instagram.platforms, [.instagram])
-    }
-
-    func testAllTabToontAllePlatformsInCanoniekeVolgorde() {
-        XCTAssertEqual(PreviewTab.all.platforms, SocialPlatform.allCases)
-        XCTAssertEqual(PreviewTab.all.platforms, [.linkedIn, .x, .instagram])
-    }
-
-    func testElkPlatformKomtInPreciesEenEnkeleTabVoor() {
-        // Elke platform-mockup moet via precies één niet-All-tab bereikbaar zijn —
-        // een nieuw platform zonder eigen tab zou stilletjes alleen onder All vallen.
-        let singleTabs = PreviewTab.allCases.filter { $0 != .all }
-        for platform in SocialPlatform.allCases {
-            let hits = singleTabs.filter { $0.platforms == [platform] }
-            XCTAssertEqual(hits.count, 1, "\(platform) hoort in precies één eigen tab")
-        }
-    }
 
     // MARK: - Platform-geometrie (mockup en cover-export delen deze bron)
 

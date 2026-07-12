@@ -10,7 +10,9 @@ import { authed } from "../lib/access";
  * Three things make an effect: a stable `key` (sent to the image model and
  * used as the on-device cache key), a `thumbnail` (the card preview), and a
  * `prompt` (the full instruction the model runs). The prompt never leaves the
- * server — `/v1/effects` omits it; only `/v1/stylize` reads it.
+ * server — `/v1/effects` omits it; only `/v1/stylize` reads it. Optional
+ * `styleReferences` (E54) are example images sent to the model alongside the
+ * prompt; like the prompt they stay server-side.
  *
  * Seed the four launch effects on first deploy (copy the prompts from
  * `backend/api/v1/stylize.ts` → STYLE_PROMPTS):
@@ -74,6 +76,26 @@ export const Effects: CollectionConfig = {
           '"Transform this portrait into a claymation-style clay sculpture: smooth modelling-clay skin, hand-sculpted texture, soft studio lighting. Keep the person\'s facial features, expression, hairstyle and clothing clearly recognizable so the person remains identifiable."\n\n' +
           "Tips: start with “Transform this portrait into…”, describe the material / texture / lighting, then ALWAYS end with the identity sentence above so the result still looks like the same person.",
       },
+    },
+    {
+      name: "styleReferences",
+      type: "array",
+      required: false,
+      maxRows: 4,
+      admin: {
+        description:
+          "Example images of the target style (E54). They are sent to the image model together with the prompt, so the result matches these examples much more closely than a text prompt alone.\n\n" +
+          "What makes a good reference: a finished output in exactly the style you want (material, brushwork, palette, lighting). Prefer images WITHOUT a prominent recognizable face — the model can borrow facial features from reference people (identity bleed). If a face is unavoidable, keep it small or turned away.\n\n" +
+          "1–3 images is the sweet spot; the backend sends at most 3. Like the prompt, references never leave the server.",
+      },
+      fields: [
+        {
+          name: "image",
+          type: "upload",
+          relationTo: "media",
+          required: true,
+        },
+      ],
     },
     {
       name: "order",

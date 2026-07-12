@@ -13,7 +13,6 @@ struct SocialPreviewView: View {
     var isPro: Bool = false
 
     @Environment(\.undoManager) private var undoManager
-    @State private var tab: PreviewTab = .linkedIn
     @State private var avatarImage: NSImage?
     @State private var bannerFill: BannerCompositor.Fill?
     @State private var activePicker: PreviewPicker?
@@ -21,17 +20,14 @@ struct SocialPreviewView: View {
     private static let pickerSpace = "socialPreviewPicker"
 
     private var portrait: Portrait2? { model.selectedPortrait }
-    private var cardWidth: CGFloat { tab == .all ? 380 : 540 }
+    private let cardWidth: CGFloat = 600
 
     var body: some View {
         ZStack(alignment: .top) {
             DSColor.Background.app
                 .ignoresSafeArea(edges: [.horizontal, .bottom])
 
-            VStack(spacing: 0) {
-                header
-                previewArea
-            }
+            previewArea
 
             pickerOverlay
         }
@@ -39,26 +35,12 @@ struct SocialPreviewView: View {
         .task(id: portrait?.updatedAt) { await refresh() }
     }
 
-    // MARK: Header — platform segmented switcher
-
-    private var header: some View {
-        DSSegmentedControl(
-            selection: $tab,
-            segments: PreviewTab.allCases.map { .init(tag: $0, label: $0.label) },
-            equalWidth: true
-        )
-        .frame(width: 420)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, DSSpacing.gap5)
-        .padding(.vertical, DSSpacing.gap3)
-    }
-
     // MARK: Preview — skeleton chrome per platform
 
     private var previewArea: some View {
         ScrollView {
             VStack(spacing: DSSpacing.gap8) {
-                ForEach(tab.platforms) { platform in
+                ForEach(SocialPlatform.allCases) { platform in
                     PlatformChrome(
                         platform: platform,
                         width: cardWidth,

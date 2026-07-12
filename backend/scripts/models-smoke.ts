@@ -57,9 +57,9 @@ assert.ok(
       );
     }
   }
-  // De Boost-default: real-esrgan (gepind) tot de E41.4-bakeoff op preview de
-  // beoogde winnaar (topaz) bevestigt — daarna hier de assert mee omzetten.
-  assert.match(defaultModelRef("upscale"), /^nightmareai\/real-esrgan:[a-f0-9]{64}$/);
+  // De Boost-default: topaz — bakeoff-winnaar E41.4 (2026-07-03). Officiële
+  // owner, dus bewust unversioned (geen pin-guard van toepassing).
+  assert.equal(defaultModelRef("upscale"), "topazlabs/image-upscale");
   // E41.4-bakeoff-armen whitelisted voor dev-overrides; prefixes intact voor
   // upscaleInputFor (lib/replicate.ts matcht op het slug-prefix).
   assert.equal(resolveModelOverride("upscale", "topaz", true), "topazlabs/image-upscale");

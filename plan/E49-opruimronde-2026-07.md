@@ -10,7 +10,7 @@ een aparte story per regel te hoeven claimen.
 ---
 
 ## 49.1 — Dode code opruimen [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -33,9 +33,10 @@ een aparte story per regel te hoeven claimen.
 - `ThumbnailStore.invalidate()` — gedocumenteerde no-op.
 **Voorstel:** verwijderen resp. corrigeren per punt.
 **DoD:** beide targets bouwen, tests groen, Result-regel met de lijst afgevinkt.
+**Result:** ✅ `PortraitHeader.swift` verwijderd + gederegistreerd (xcodegen, scheme-/Package.resolved-churn teruggedraaid); ✅ `EditorTool.dsSymbol` weg; ✅ `EditorTool.pendingStory` weg + stub-copy zonder story-nummers ("… tools are unavailable right now.", `EditorToolTests` mee); ✅ onbereikbare `canvasPanel(.background)`-tak weg (Background blijft via de `CanvasActionToolbar`-dropdown); ✅ stale ⌘=-comment bij `zoomCamera` herschreven naar de huidige View-menu/CanvasZoomEqualsShortcut-route (E27.10 had de verborgen knoppen al geschrapt); ✅ `Folder2.order`/`colorHex` weg (schrijf-sites LeftNavView/PortraitContextMenu/SmokeSeed mee-opgeschoond; lichte migratie, velden werden nergens gelezen); ✅ `ImagePlaygroundEntryButton` (+ private Available-struct, ongebruikte imports) weg — `ImagePlaygroundEntry.pngData` blijft (3 call-sites); ✅ `ThumbnailStore.invalidate()` no-op weg incl. alle 10 call-sites/cache-captures in BoardView; ☑︎ `OnboardingModel.finishSignedIn()` — reeds gedaan door E04.8 (0 hits). build-v2.sh volledig groen (Avatar + Avatar2 build, Avatar2-testsuite, AvatarKit- en AvatarUI-packagetests).
 
 ## 49.2 — Kleine UX-consistentie [FEAT]
-- status: ready
+- status: done
 - team: FEAT
 - blockedBy: —
 
@@ -58,9 +59,11 @@ een aparte story per regel te hoeven claimen.
   succesbevestiging (`OnboardingOTPView.swift:36-44`, `OnboardingEmailView.swift:40-44`)
   — naar `DSColor.Signal.error` + `DSValidationState.error`, in lijn met SignInSheet.
 **DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ export-/share-naam volgt `portrait.name` (sanitized, lege naam → oude "Aaavatar-portrait"-fallback) in ExportSheet; ✅ bulk-export op `makePNGAsync` (render off-main) + batch-dedupe `-2`/`-3` (case-insensitive) i.p.v. stil overschrijven; ✅ privacy-/terms-URL's naar één `AppLinks`-constante (`/privacy-policy` is live, `/privacy` was 404 — Settings/About gefixt; PaywallSheet + OnboardingEmailView mee); ✅ ⌘U app-breed als File-menu-command (`UploadPortraitCommands` + focused-scene-value uit ShellView, zelfde patroon als SettingsCommands/CanvasZoomCommands; view-scoped shortcut van de Home-knop af, ⌘U-badge blijft); ✅ `GenerateBackgroundSwatch.openSheet` `.onDevice`-tak kreeg de missende `return` (geen elevation-modal + sheet tegelijk meer, gelijk aan `ManageBackgroundsSheet.openGenerate`); ✅ onboarding-fouten in `DSColor.Signal.error` + veld-validation `.error` (OnboardingEmailView/OnboardingOTPView, in lijn met SignInSheet; resend-bevestiging blijft subtle); ✅ follow-ups: "Restore body"→"Fill in body" (AIFeatureRegistry.uiLabel + PrivacyFeatureMatrix) en dev-label "Fill body"→"Fill in body" (DevModelOverrides). build-v2.sh volledig groen.
 
 ## 49.3 — Perf-restjes [AI]
-- status: ready
+- status: done
+- owner: AI (2026-07-12)
 - team: AI
 - blockedBy: —
 
@@ -78,9 +81,11 @@ een aparte story per regel te hoeven claimen.
   herschreven per nieuwe entry) — overweeg losse `externalStorage`-velden per entry
   via een kind-entiteit, of minimaal binaire plist i.p.v. JSON.
 **DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ OrmbgModelStore-downloadprogress via `URLSessionDownloadDelegate` (`didWriteData`-fractie per chunk, geen per-byte-`AsyncBytes`-lus meer; SHA-256-gate erná onveranderd); ✅ `ShellModel.applyAlphaMask` op gedeelde `AlphaMaskRendering.context` i.p.v. verse `CIContext` per aanroep; ✅ undo-cap: `.undoHistoryCap()` (default 20) op de WindowGroup-root in Avatar2App — `levelsOfUndo` was NSUndoManager-default onbegrensd met volle PNG-payloads in de closures; ✅ `Portrait2.effectCache` → binaire plist (Data rauw i.p.v. base64-JSON, −33% opslag; leesfallback voor oude JSON-blobs, `effectBackgroundData` pakt de actieve entry via PropertyListSerialization) + 2 nieuwe tests (roundtrip + JSON-fallback) in Portrait2Tests. build-v2.sh volledig groen.
 
 ## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
-- status: ready
+- status: done
+- owner: DS (2026-07-12)
 - team: DS
 - blockedBy: —
 
@@ -98,3 +103,4 @@ SF Symbols te blijven en verwijder de PhosphorSwift-dependency + de 2 losse
 call-sites.
 **DoD:** `swift test --package-path AvatarUI` blijft groen; DECISIONS-PENDING.md
 bijgewerkt naar "Beslist"; Result-regel.
+**Result:** ✅ besluit: bewust bij SF Symbols; PhosphorSwift uit project.yml (package-def + Avatar2-dependency) en beide imports weg. ✅ LET OP — dit wijzigt wél zichtbare glyphs: CanvasActionToolbar rendert 9 Phosphor-iconen (Frame-pil `frameCorners`, Background-pil `image`, grid-chip `gridNine`, dropdown-rijen `cornersOut`/`crop`/`perspective`/`flipHorizontal`, shape-rijen `circle`/`square`) en FaceActionsPanel 3 preset-fallbacks (`tooth`/`palette`/`smiley`) — alle 12 nu via de DSIcon-seam op SF-equivalenten (nieuwe Symbol-cases: frame/grid/shapeCircle/shapeSquare + whitenTeeth/applyMakeup/reduceWrinkles); Phosphor-naam per case in commentaar. ✅ Nieuw `DSIcon.image(_:)` (kaal SF-Image, erft omgevings-tint) zodat active-lime op capsule-pillen blijft werken — de DSIcon-víew zet een vaste primary-tint; pill-maatvoering via gedeelde `_DSFontSizedIcon` (zelfde gewicht als de onderste toolbar). ✅ DECISIONS-PENDING.md → "BESLIST 2026-07-12 (E49.4)" incl. terugdraai-route (font-optie). build-v2.sh volledig groen; `swift test --package-path AvatarUI` groen.

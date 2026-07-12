@@ -858,6 +858,10 @@ struct EditorView: View {
                     }
                 }
             }
+            // E27.1: ingezoomde scène binnen de canvas-slot houden (niet over de
+            // panelen/toolbar lekken). Alleen de foto/scene — frame-chrome (ring +
+            // chips) zit erbóven zodat hoeken niet worden afgeknipt.
+            .clipped()
             // E33: frame-chrome (selectie-RING + naam-CHIP + frame-TOOLBAR) als
             // SCREEN-SPACE overlay — exact het CanvasTransformOverlay-recept: posities
             // via de camera-mapping (scherm = midden + scale·(p−midden) + offset) maar
@@ -920,11 +924,6 @@ struct EditorView: View {
                     }
                 }
             }
-            // E27.1: ingezoomde scène binnen de canvas-slot houden (niet over de
-            // panelen/toolbar lekken). De catcher vangt scroll/⌘-scroll/spatie-
-            // drag (clicks vallen door); de zoom-shortcuts (⌘+/⌘−/⌘0/⇧1) komen
-            // nu uit het View-menu in de menubalk.
-            .clipped()
             .background {
                 // chromeHovered telt alléén als er ook echt een menu/paneel open
                 // is → een stale hover-true kan canvas-scroll nooit blokkeren.
