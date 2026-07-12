@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
 import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
 import { currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { bleedFlatten, reapplyAlpha } from "../../lib/image.js";
+import { bleedFlatten, capPixels, reapplyAlpha } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, upscale } from "../../lib/replicate.js";
 
@@ -13,25 +13,44 @@ export const config = {
 };
 
 /**
- * POST /v1/upscale — "Boost resolution" (E10.3).
+ * POST /v1/upscale — "Boost resolution" (E10.3, tiers E41.5).
  *
  * Body:    { image?: <base64 PNG with alpha>,        // legacy inline
- *            storage_key?: "<userId>/<uuid>.png" }   // upload-bypass (groot beeld)
+ *            storage_key?: "<userId>/<uuid>.png",    // upload-bypass (groot beeld)
+ *            quality?: "regular" | "high" }          // E41.5, default "regular"
  * Returns: 200 { cutout: <base64 PNG>, credits_remaining: int }
  *          402 insufficient_credits · 401 · 429 · 504
+ *
+ * Tiers (besluit Thierry 2026-07-12, zie plan/E41 41.5): "regular" =
+ * google/upscaler x2 q100 voor 1 credit (vast $0,02/beeld); "high" =
+ * Topaz High Fidelity V2 voor 3 credits, mét een 6 MP-input-cap zodat de
+ * output ≤24 MP blijft en Topaz in de laagste unit ($0,05) valt. Zonder cap
+ * schaalt Topaz' unit-billing met de output-megapixels en is elke run
+ * verlieslatend. Dev-`model_override` blijft voorgaan op de tier-modelkeuze.
  *
  * Pipeline (zoals colorize, met credit-gate):
  *   1. bleedFlatten (E41.4): edge-bleed + flatten — upscalers negeren alpha,
  *      en een naive grijs-flatten bakt een grijze halo in zachte haarranden.
+ *      Vooraf (E41.5): 6 MP-cap wanneer het resolved model Topaz is.
  *   2. Credit-gate (402 als leeg; alleen niet-dev betaalt).
- *   3. 2× fidelity-upscale op de RGB (model uit MODEL_REGISTRY.upscale).
+ *   3. 2× fidelity-upscale op de RGB (tier-model).
  *   4. Hang het oorspronkelijke alfa er weer aan, herschaald naar de nieuwe
  *      maat (reapplyAlpha, lanczos3, zacht) — resultaat blijft een
  *      transparante cutout.
- *   5. Log 1 credit, geef de grotere cutout terug.
+ *   5. Log de tier-credits, geef de grotere cutout terug.
  *
  * Fouten vóór de billable Replicate-call rekenen nooit af.
  */
+
+/** E41.5: model + tarief per tier. Registry-refs, geen losse strings. */
+const UPSCALE_TIERS = {
+  regular: { modelKey: "google-upscaler", credits: 1 },
+  high: { modelKey: "topaz", credits: 3 },
+} as const;
+type UpscaleQuality = keyof typeof UPSCALE_TIERS;
+
+/** Input-cap voor het Topaz-pad: 6 MP × (2×)² = 24 MP output = laagste unit. */
+const TOPAZ_MAX_INPUT_PIXELS = 6_000_000;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
@@ -52,7 +71,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const isDevUser = isDevUnlimitedUser(user.email);
 
+  // E41.5: tier-keuze. Onbekende waarde → 400 (geen stille fallback: de
+  // client betaalt per tier, dus een typefout mag nooit een ander tarief
+  // krijgen dan bedoeld).
+  const rawQuality = req.body?.quality ?? "regular";
+  if (rawQuality !== "regular" && rawQuality !== "high") {
+    res.status(400).json({ error: "unknown_quality" });
+    return;
+  }
+  const tier = UPSCALE_TIERS[rawQuality as UpscaleQuality];
+
   // E01.10: optionele model-override — dev-only, whitelist in MODEL_REGISTRY.
+  // Zonder override bepaalt de tier het model.
   let modelRef: string | null;
   try {
     modelRef = resolveModelOverride("upscale", req.body?.model_override, isDevUser);
@@ -63,19 +93,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     throw e;
   }
+  if (!modelRef) {
+    modelRef = MODEL_REGISTRY.upscale.models[tier.modelKey].ref;
+  }
 
   try {
     await ensureUser(user.id);
 
-    // Step 1: edge-bleed + flatten (upscalers negeren alpha; E41.4). Pure
+    // Step 1 (E41.5): kosten-cap vóór alles — Topaz rekent per output-MP.
+    // Op het resolved model gekeyd zodat ook een dev-override naar Topaz
+    // gecapt wordt en een override naar bv. real-esrgan niet.
+    const cappedInput = modelRef.startsWith("topazlabs/")
+      ? await capPixels(inputBytes, TOPAZ_MAX_INPUT_PIXELS)
+      : inputBytes;
+
+    // Edge-bleed + flatten (upscalers negeren alpha; E41.4). Pure
     // server-side beeldbewerking — veilig vóór de credit-gate.
-    const flattened = await bleedFlatten(inputBytes);
+    const flattened = await bleedFlatten(cappedInput);
     const flattenedDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
 
     // Step 2: credit-gate (alleen niet-dev).
     if (!isDevUser) {
       const credits = await currentCredits(user.id);
-      if (credits < MODEL_REGISTRY.upscale.credits) {
+      if (credits < tier.credits) {
         res.status(402).json({ error: "insufficient_credits", credits_remaining: 0 });
         return;
       }
@@ -95,8 +135,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!isDevUser) {
       await logCredit({
         userId: user.id,
-        delta: -MODEL_REGISTRY.upscale.credits,
-        reason: "upscale",
+        delta: -tier.credits,
+        reason: rawQuality === "high" ? "upscale_high" : "upscale",
         ref: upscaledUrl,
       });
     }

@@ -23,6 +23,26 @@ export const MAX_DECODED_IMAGE_BYTES = 12 * 1024 * 1024;
 export const MAX_INPUT_IMAGE_PIXELS = 50_000_000;
 
 /**
+ * E41.5: schaal een PNG terug tot maximaal `maxPixels` beeldpunten (aspect
+ * behouden, lanczos3). Kosten-cap voor het Topaz-pad: Topaz rekent per
+ * OUTPUT-megapixel ($0,05 t/m 24 MP, daarboven duurder) — 6 MP input × 2×
+ * blijft precies binnen de laagste unit. Onder de cap komt het origineel
+ * byte-identiek terug (geen her-encode).
+ */
+export async function capPixels(png: Buffer, maxPixels: number): Promise<Buffer> {
+  const meta = await sharp(png).metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (w <= 0 || h <= 0 || w * h <= maxPixels) return png;
+  const scale = Math.sqrt(maxPixels / (w * h));
+  const newW = Math.max(1, Math.floor(w * scale));
+  return sharp(png)
+    .resize({ width: newW, kernel: "lanczos3" })
+    .png()
+    .toBuffer();
+}
+
+/**
  * Flatten a transparent-background cutout PNG onto a neutral grey
  * background so identity-preserving instruction editors (Nano Banana,
  * Flux Kontext, etc.) get a normal RGB photo to work with.

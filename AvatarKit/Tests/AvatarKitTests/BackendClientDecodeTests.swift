@@ -188,6 +188,25 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertEqual(credits, 39)
     }
 
+    // E41.5: de high-tier gaat over hetzelfde endpoint (alleen `quality` in de
+    // body verschilt) en mapt op het 3-credits-tarief.
+    func testUpscaleHighQualityTier() async throws {
+        stubUploadLeg()
+        BackendStubURLProtocol.setStub(.json(200, """
+            { "cutout": "\(base64("upscaled-hi-png"))", "credits_remaining": 36 }
+            """), forPath: "/v1/upscale")
+
+        let (data, credits) = try await client.upscale(
+            imagePNG: Data("input-png".utf8), quality: .high
+        )
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), "upscaled-hi-png")
+        XCTAssertEqual(credits, 36)
+        XCTAssertEqual(BackendClient.UpscaleQuality.high.creditAction, .upscaleHigh)
+        XCTAssertEqual(BackendClient.UpscaleQuality.regular.creditAction, .upscale)
+        XCTAssertEqual(BackendClient.UpscaleQuality.high.rawValue, "high")
+        XCTAssertEqual(BackendClient.UpscaleQuality.regular.rawValue, "regular")
+    }
+
     // MARK: - POST /v1/colorize
 
     func testColorizeDecodesBackendShape() async throws {

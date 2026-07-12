@@ -7,6 +7,8 @@ final class CreditMeterTests: XCTestCase {
         XCTAssertEqual(CreditMeter.credits(for: .magicCutout), 1)
         XCTAssertEqual(CreditMeter.credits(for: .colorize), 1)
         XCTAssertEqual(CreditMeter.credits(for: .upscale), 1)
+        // E41.5 (besluit Thierry 2026-07-12): High-tier = Topaz, 3 credits.
+        XCTAssertEqual(CreditMeter.credits(for: .upscaleHigh), 3)
         XCTAssertEqual(CreditMeter.credits(for: .fillBody), 2)
         XCTAssertEqual(CreditMeter.credits(for: .generativeStandard), 4)
         XCTAssertEqual(CreditMeter.credits(for: .generativePremium), 7)

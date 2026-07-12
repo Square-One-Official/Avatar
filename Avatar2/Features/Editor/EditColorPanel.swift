@@ -10,10 +10,23 @@ import AvatarKit
 import AvatarUI
 import SwiftUI
 
-/// E41.2: hoe een "Boost resolution" draait — lokaal (gratis, on-device) of
-/// online (beste kwaliteit, 1 credit). De gebruiker kiest per keer via het
-/// dropdown-menu op de Boost-chip.
-enum BoostMode: Equatable, Sendable { case local, online }
+/// E41.2/E41.5 (herzien, Thierry 2026-07-12): hoe een "Boost resolution"
+/// draait — lokaal (gratis, on-device) of online (Topaz High Fidelity V2,
+/// 3 credits). Eén betaalde optie: de gratis on-device boost dekt het lichte
+/// geval al, dus een goedkopere online-middenweg (google) voegde alleen
+/// keuzestress toe; die tier bestaat backend-side nog wel (o.a. voor oude
+/// builds zonder `quality`-veld).
+enum BoostMode: Equatable, Sendable {
+    case local, online
+
+    /// Chip-/menulabel voor de kosten.
+    var costLabel: String {
+        switch self {
+        case .local: return "Free"
+        case .online: return CreditMeter.chipLabel(for: .upscaleHigh)
+        }
+    }
+}
 
 /// Welke chip-dropdown momenteel open is. Eén tegelijk; nil = dicht.
 private enum ChipMenu: Hashable { case boost, removeBackground }
@@ -311,7 +324,7 @@ struct EditColorPanel: View {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: 12, weight: .medium))
                 Text("Boost").dsTextStyle(.labelSmall)
-                Text(boostMode == .local ? "Free" : "1 credit")
+                Text(boostMode.costLabel)
                     .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
                 DSPrivacyBadge(tier: boostMode == .local ? .onDevice : .thirdParty)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
@@ -337,9 +350,12 @@ struct EditColorPanel: View {
                 noteHybridFallbackIfNeeded()
                 onBoost(.local)
             }
+            // E41.5 (herzien): één betaalde optie — Topaz, 3 credits.
             onlineHybridMenuRow(
                 title: "Online",
-                shortcut: advancedAllowed ? "Best · 1 credit" : "Sharper · Advanced privacy"
+                shortcut: advancedAllowed
+                    ? "Best · \(BoostMode.online.costLabel)"
+                    : "Sharper · Advanced privacy"
             ) {
                 openMenu = nil
                 boostMode = .online

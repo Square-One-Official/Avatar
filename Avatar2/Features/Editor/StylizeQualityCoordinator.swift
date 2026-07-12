@@ -29,7 +29,7 @@ struct PreStylizeGate: Identifiable {
 final class StylizeQualityCoordinator {
     var preGate: PreStylizeGate?
 
-    /// Wired by EditorView — runs Real-ESRGAN on the current cutout (1 credit).
+    /// Wired by EditorView — cloud-boost van het huidige cutout (Topaz, 3 credits; E41.5).
     var onBoostCutout: (() async -> Void)?
 
     private var preGateContinuation: CheckedContinuation<PreStylizeDecision, Never>?
@@ -117,13 +117,13 @@ struct PreStylizeQualitySheet: View {
     private var message: String {
         switch gate.kind {
         case .lowResolution:
-            return "This photo is low resolution. Boosting may improve sharpness before editing (1 credit). Results are not guaranteed."
+            return "This photo is low resolution. Boosting may improve sharpness before editing (\(CreditMeter.chipLabel(for: .upscaleHigh))). Results are not guaranteed."
         case .effectsLowResOriginal:
-            return "Your original photo is low resolution. You can boost it first (1 credit), continue with the original (background will be styled), or stylize the cutout instead — the background and scene will not be restyled."
+            return "Your original photo is low resolution. You can boost it first (\(CreditMeter.chipLabel(for: .upscaleHigh))), continue with the original (background will be styled), or stylize the cutout instead — the background and scene will not be restyled."
         }
     }
 
     private var boostLabel: String {
-        "Boost resolution (\(CreditMeter.chipLabel(for: .upscale)))"
+        "Boost resolution (\(CreditMeter.chipLabel(for: .upscaleHigh)))"
     }
 }
