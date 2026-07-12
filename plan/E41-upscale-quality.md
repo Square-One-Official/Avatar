@@ -227,3 +227,24 @@ replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid).
 **Prod-deploy:** uitgevoerd 2026-07-03 met expliciet akkoord Thierry
 (avatars-ja3k8daeg, Ready; api.aaavatar.nl/v1/upscale live geverifieerd
 401-zonder-auth) — Boost online draait nu Topaz met de anti-halo-pipeline.
+
+## 41.5 — Twee upscale-tiers: Regular (1 credit) & High quality (3 credits) [INFRA+FEAT]
+- status: in_progress
+- owner: INFRA+FEAT (2026-07-12, branch v2/e41-41.5)
+- team: INFRA+FEAT
+- blockedBy: —
+
+Besluit Thierry (2026-07-12, n.a.v. de billing-check in DECISIONS-PENDING): twee
+opties i.p.v. één verlieslatende default — **Regular** = `google/upscaler` x2 q100
+voor 1 credit ($0,02 kosten ≈ $0,021 opbrengst, break-even) en **High quality** =
+`topazlabs/image-upscale` (High Fidelity V2) voor **3 credits** mét een server-side
+input-cap van ~6 MP zodat de output ≤24 MP blijft en Topaz vast $0,05/run kost
+(~$0,063 opbrengst → ~25% marge).
+**Scope:** backend `/v1/upscale` krijgt `quality: "regular"|"high"` (default
+regular; dev-`model_override` blijft voorgaan), per-tier credits + de 6 MP-cap
+(alleen Topaz-pad, sharp-downscale vóór flatten); app: Boost-dropdown wordt
+3 rijen (On device · Online Regular 1 cr · Online High 3 cr), `CreditMeter`
+krijgt `upscaleHigh` (3), `BackendClient.upscale` geeft quality door;
+StylizeQualityCoordinator-row = Regular.
+**DoD:** backend `npx tsc --noEmit` + unit-tests (cap-functie) groen;
+build-v2.sh volledig groen; Result-regel. Prod-deploy = expliciete go Thierry.
