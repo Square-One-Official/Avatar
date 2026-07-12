@@ -1240,20 +1240,18 @@ struct EditorView: View {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
         // E41.2: de gebruiker koos de modus via het Boost-dropdown. Lokaal =
-        // gratis, on-device, geen gate. Online = cloud + tier-credits (E41.5):
-        // Regular (google, 1 cr) of High (Topaz, 3 cr).
+        // gratis, on-device, geen gate. Online (E41.5, herzien) = Topaz High
+        // Fidelity V2, 3 credits — de enige betaalde tier in de UI.
         switch mode {
         case .local:
             runLocalBoost(png: png, portraitModel: portraitModel, entitlement: entitlement)
-        case .onlineRegular:
-            Task { await performBoostResolution(quality: .regular) }
-        case .onlineHigh:
-            Task { await performBoostResolution(quality: .high) }
+        case .online:
+            Task { await performBoostResolution() }
         }
     }
 
     @MainActor
-    private func performBoostResolution(quality: BackendClient.UpscaleQuality = .regular) async {
+    private func performBoostResolution(quality: BackendClient.UpscaleQuality = .high) async {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
         // .online — privacy gate + sign-in/credits.

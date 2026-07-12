@@ -10,19 +10,20 @@ import AvatarKit
 import AvatarUI
 import SwiftUI
 
-/// E41.2/E41.5: hoe een "Boost resolution" draait — lokaal (gratis, on-device)
-/// of online in twee tiers (besluit Thierry 2026-07-12): Regular = 1 credit
-/// (google/upscaler), High = 3 credits (Topaz). De gebruiker kiest per keer
-/// via het dropdown-menu op de Boost-chip.
+/// E41.2/E41.5 (herzien, Thierry 2026-07-12): hoe een "Boost resolution"
+/// draait — lokaal (gratis, on-device) of online (Topaz High Fidelity V2,
+/// 3 credits). Eén betaalde optie: de gratis on-device boost dekt het lichte
+/// geval al, dus een goedkopere online-middenweg (google) voegde alleen
+/// keuzestress toe; die tier bestaat backend-side nog wel (o.a. voor oude
+/// builds zonder `quality`-veld).
 enum BoostMode: Equatable, Sendable {
-    case local, onlineRegular, onlineHigh
+    case local, online
 
     /// Chip-/menulabel voor de kosten.
     var costLabel: String {
         switch self {
         case .local: return "Free"
-        case .onlineRegular: return CreditMeter.chipLabel(for: .upscale)
-        case .onlineHigh: return CreditMeter.chipLabel(for: .upscaleHigh)
+        case .online: return CreditMeter.chipLabel(for: .upscaleHigh)
         }
     }
 }
@@ -107,7 +108,7 @@ struct EditColorPanel: View {
     // afkapt — anders zou de gebruiker een lege dropdown zien.
     @State private var openMenu: ChipMenu?
     @State private var boostMode: BoostMode =
-        PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .onlineRegular
+        PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .online
     /// Alléén de lopende download-voortgang van het High-quality-model (ORMBG).
     /// Of het model áctief is lezen we reactief uit `PrivacyPreferences2.engine`
     /// (zie `highQualityActive`) — niet uit een eigen snapshot — zodat een download
@@ -349,26 +350,16 @@ struct EditColorPanel: View {
                 noteHybridFallbackIfNeeded()
                 onBoost(.local)
             }
-            // E41.5: twee online-tiers (besluit Thierry 2026-07-12).
+            // E41.5 (herzien): één betaalde optie — Topaz, 3 credits.
             onlineHybridMenuRow(
                 title: "Online",
                 shortcut: advancedAllowed
-                    ? "Good · \(BoostMode.onlineRegular.costLabel)"
+                    ? "Best · \(BoostMode.online.costLabel)"
                     : "Sharper · Advanced privacy"
             ) {
                 openMenu = nil
-                boostMode = .onlineRegular
-                onBoost(.onlineRegular)
-            }
-            onlineHybridMenuRow(
-                title: "Online · High quality",
-                shortcut: advancedAllowed
-                    ? "Best · \(BoostMode.onlineHigh.costLabel)"
-                    : "Sharpest · Advanced privacy"
-            ) {
-                openMenu = nil
-                boostMode = .onlineHigh
-                onBoost(.onlineHigh)
+                boostMode = .online
+                onBoost(.online)
             }
         }
     }
