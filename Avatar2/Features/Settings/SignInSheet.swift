@@ -19,8 +19,7 @@ struct SignInSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { close() }
-                    .accessibilityLabel("Close")
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { close() }
             }
             Group {
                 switch entitlement.signInFlow.phase {

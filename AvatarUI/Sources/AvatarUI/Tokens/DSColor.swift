@@ -30,6 +30,10 @@ public enum DSColor {
         public static let neutralStronger = Color(lightHex: 0x000000, lightAlpha: 0x1A, darkHex: 0xFFFFFF, darkAlpha: 0x1A)
         /// `background/neutral-strongest` — wit@15% (dark) · zwart@15% (light)
         public static let neutralStrongest = Color(lightHex: 0x000000, lightAlpha: 0x26, darkHex: 0xFFFFFF, darkAlpha: 0x26)
+        /// `background/neutral-strongest-2` — wit@20% (dark) · zwart@20% (light).
+        /// UXS-27: pressed-trede voor chips die op `neutral-stronger` rústen —
+        /// zonder deze extra stap zouden hover en pressed daar samenvallen.
+        public static let neutralStrongest2 = Color(lightHex: 0x000000, lightAlpha: 0x33, darkHex: 0xFFFFFF, darkAlpha: 0x33)
         /// `background/action` — #d5f466 (lime-accent, brand; beide themes)
         public static let action = Color(hex: 0xD5F466)
         /// `background/shadow` — #190b0859 (donkere drop-shadow; beide themes)

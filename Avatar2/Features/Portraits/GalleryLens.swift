@@ -67,14 +67,27 @@ struct GalleryLens: View {
         .contentShape(Rectangle())
         .onTapGesture { model.openPortrait(p) }
         .help("Click to open · ← / → to browse")
+        // UXS-7 (UX28): de grote preview als AX-element — activeren = openen,
+        // net als de plain klik. Vóór de arrow-overlays gezet zodat de
+        // Previous/Next-knoppen hun eigen AX-element houden.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(axLabel(p))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens the portrait in the editor")
+        .accessibilityAction { model.openPortrait(p) }
         // Blader-pijlen links/rechts (cyclisch). De knoppen vangen hun eigen klik,
         // dus ze openen het portret niet.
-        .overlay(alignment: .leading) { navArrow("chevron.left") { cycle(-1) } }
-        .overlay(alignment: .trailing) { navArrow("chevron.right") { cycle(1) } }
+        .overlay(alignment: .leading) { navArrow("chevron.left", label: "Previous portrait") { cycle(-1) } }
+        .overlay(alignment: .trailing) { navArrow("chevron.right", label: "Next portrait") { cycle(1) } }
         .portraitContextMenuTrigger(portrait: p, model: model, scope: .portraitsGallery)
     }
 
-    private func navArrow(_ symbol: String, action: @escaping () -> Void) -> some View {
+    private func axLabel(_ p: Portrait2) -> String {
+        let name = p.name.isEmpty ? "Untitled portrait" : p.name
+        return p.role.isEmpty ? name : "\(name), \(p.role)"
+    }
+
+    private func navArrow(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .semibold))
@@ -86,6 +99,8 @@ struct GalleryLens: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
         .padding(DSSpacing.gap5)
         .opacity(items.count > 1 ? 1 : 0)
         .allowsHitTesting(items.count > 1)
@@ -147,5 +162,16 @@ struct GalleryLens: View {
             }
             .dsMotion(DSMotion.micro, value: isFocus)
             .portraitContextMenuTrigger(portrait: p, model: model, scope: .portraitsGallery)
+            // UXS-7 (UX28): filmstrip-thumb als AX-element — activeren = focussen
+            // (zelfde pad als de plain klik), "Select" = het ⌘-klik-pad, "Open"
+            // opent direct in de editor.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(axLabel(p))
+            .accessibilityAddTraits(isSel ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { focusID = p.persistentModelID }
+            .accessibilityAction(named: "Open") { model.openPortrait(p) }
+            .accessibilityAction(named: isSel ? "Deselect" : "Select") {
+                model.handlePortraitClick(p, ordered: items.map(\.persistentModelID), mods: .command)
+            }
     }
 }

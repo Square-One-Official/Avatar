@@ -46,6 +46,7 @@ public struct DSToast: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     DSIconButton(
                         Image(systemName: "xmark"),
+                        label: "Dismiss",
                         style: .ghostNeutral,
                         size: .small,
                         action: onClose

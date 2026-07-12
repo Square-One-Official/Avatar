@@ -100,10 +100,9 @@ struct SettingsAboutPage: View {
 
     private func linkRow(title: String, subtitle: String, url: URL) -> some View {
         SettingsRow(title: title, subtitle: subtitle) {
-            DSIconButton(Image(systemName: "arrow.up.right")) {
+            DSIconButton(Image(systemName: "arrow.up.right"), label: "Open \(title)") {
                 NSWorkspace.shared.open(url)
             }
-            .accessibilityLabel("Open \(title)")
         }
     }
 }

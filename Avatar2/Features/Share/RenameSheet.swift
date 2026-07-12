@@ -46,8 +46,7 @@ struct RenameSheet: View {
                 Text(isBulk ? "Rename \(targets.count) portraits" : "Rename")
                     .dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
-                    .accessibilityLabel("Close")
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
             }
             DSTextField(label: "Name", placeholder: "Name", text: $draftName)
                 .onSubmit { save() }

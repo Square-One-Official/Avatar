@@ -67,7 +67,7 @@ struct PaywallSheet: View {
         VStack(spacing: DSSpacing.gap4) {
             HStack {
                 Spacer(minLength: 0)
-                DSIconButton(Image(systemName: "xmark"), size: .small) {
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) {
                     model.isPaywallPresented = false
                 }
             }
@@ -102,7 +102,7 @@ struct PaywallSheet: View {
                     .foregroundStyle(DSColor.Foreground.subtle)
             }
             Spacer(minLength: 0)
-            DSIconButton(Image(systemName: "xmark"), size: .small) {
+            DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) {
                 model.isPaywallPresented = false
             }
         }
@@ -131,7 +131,7 @@ struct PaywallSheet: View {
                     .foregroundStyle(DSColor.Foreground.primary)
                 HStack {
                     Spacer()
-                    DSIconButton(Image(systemName: "xmark"), size: .small) {
+                    DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) {
                         model.isPaywallPresented = false
                     }
                 }

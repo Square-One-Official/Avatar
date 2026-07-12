@@ -316,6 +316,16 @@ struct HomeView: View {
             }
             // Ook de uitgelichte Recent-kaart is naar een map sleepbaar.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))
+            // UXS-7 (UX28): de hero-kaart als één AX-element met open/selecteer/menu.
+            .portraitCardAccessibility(
+                portrait: portrait, model: model, isSelected: isSelected,
+                ordered: { portraits.map(\.persistentModelID) },
+                onContextMenu: { frame in
+                    model.preparePortraitContextMenu(on: portrait)
+                    menuTarget = portrait
+                    menuAnchor = frame
+                }
+            )
     }
 
     private var uploadBar: some View {

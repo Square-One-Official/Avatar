@@ -79,10 +79,9 @@ struct GenerateBackgroundSheet: View {
                     .dsTextStyle(.h4)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) {
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) {
                     dismiss()
                 }
-                .accessibilityLabel("Close")
                 .disabled(form.isGenerating)
             }
             Text("\(context.contextHint)")

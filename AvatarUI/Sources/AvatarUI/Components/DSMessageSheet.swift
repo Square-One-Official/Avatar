@@ -47,8 +47,7 @@ public struct DSMessageSheet: View {
                     .dsTextStyle(.h3)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Spacer(minLength: DSSpacing.gap2)
-                DSIconButton(Image(systemName: "xmark"), size: .small) { onDismiss() }
-                    .accessibilityLabel("Dismiss")
+                DSIconButton(Image(systemName: "xmark"), label: "Dismiss", size: .small) { onDismiss() }
             }
             Text(attributed(messageBody))
                 .dsTextStyle(.bodySmall)
@@ -131,11 +130,9 @@ public struct DSMessageBanner: View {
             }
             Spacer(minLength: DSSpacing.gap2)
             if hasCTA {
-                DSIconButton(Image(systemName: "chevron.right"), size: .small) { onCTA() }
-                    .accessibilityLabel("Open")
+                DSIconButton(Image(systemName: "chevron.right"), label: "Open", size: .small) { onCTA() }
             }
-            DSIconButton(Image(systemName: "xmark"), size: .small) { onDismiss() }
-                .accessibilityLabel("Dismiss")
+            DSIconButton(Image(systemName: "xmark"), label: "Dismiss", size: .small) { onDismiss() }
         }
         .padding(DSSpacing.gap3)
         .frame(maxWidth: 608, alignment: .leading)
