@@ -329,9 +329,13 @@ struct HomeView: View {
                 portrait: portrait, model: model, isSelected: isSelected,
                 ordered: { portraits.map(\.persistentModelID) },
                 onContextMenu: { frame in
+                    // E53.7: menu-request via de presentation-store (scope .home).
                     model.preparePortraitContextMenu(on: portrait)
-                    menuTarget = portrait
-                    menuAnchor = frame
+                    model.presentation.openPortraitContextMenu(
+                        portraitID: portrait.persistentModelID,
+                        anchor: frame,
+                        scope: .home
+                    )
                 }
             )
     }
