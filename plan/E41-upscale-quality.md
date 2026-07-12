@@ -229,7 +229,7 @@ replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid).
 401-zonder-auth) — Boost online draait nu Topaz met de anti-halo-pipeline.
 
 ## 41.5 — Twee upscale-tiers: Regular (1 credit) & High quality (3 credits) [INFRA+FEAT]
-- status: in_progress
+- status: done (op branch v2/e41-41.5; app-merge wacht op E53.7 — backend is los deploybaar)
 - owner: INFRA+FEAT (2026-07-12, branch v2/e41-41.5)
 - team: INFRA+FEAT
 - blockedBy: —
@@ -248,3 +248,4 @@ krijgt `upscaleHigh` (3), `BackendClient.upscale` geeft quality door;
 StylizeQualityCoordinator-row = Regular.
 **DoD:** backend `npx tsc --noEmit` + unit-tests (cap-functie) groen;
 build-v2.sh volledig groen; Result-regel. Prod-deploy = expliciete go Thierry.
+**Result:** ✅ backend: `quality: "regular"|"high"` op `/v1/upscale` (onbekende waarde → 400 `unknown_quality`, géén stille tarief-fallback), `UPSCALE_TIERS` (regular=google-upscaler/1cr · high=topaz/3cr), dev-`model_override` blijft voorgaan; ✅ 6 MP-input-cap (`capPixels`, lanczos3, byte-identieke passthrough onder de cap) gekeyd op het resolved model (`topazlabs/`-prefix) — output blijft ≤24 MP = Topaz' laagste unit ($0,05); functioneel geverifieerd (12 MP→2828×2121, aspect intact); credit-log splitst `upscale`/`upscale_high`; ✅ app: `BoostMode` → local/onlineRegular/onlineHigh met 3-rijen-dropdown ("On device · Free" / "Online · Good · 1 credit" / "Online · High quality · Best · 3 credits", privacy-gating per rij zoals voorheen), chip-kostenlabel volgt de gekozen modus, `CreditMeter.upscaleHigh` (3cr) + tests, `BackendClient.upscale(quality:)` (StylizeQualityCoordinator-pad = default regular, matcht z'n 1-credit-label); ✅ backend `tsc --noEmit` groen, build-v2.sh volledig groen (incl. nieuwe CreditMeter-/BackendClient-tests). **Backward-compat bewust:** een oude build zonder `quality`-veld krijgt regular (google, 1cr) — backend éérst deployen stopt de Topaz-verliezen direct, ook vóór de app-merge.

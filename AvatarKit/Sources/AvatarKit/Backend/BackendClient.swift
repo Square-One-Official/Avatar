@@ -567,28 +567,45 @@ public final class BackendClient {
         throw lastError ?? BackendError.decode
     }
 
-    // MARK: POST /v1/upscale (Boost resolution, E10.3)
-    /// Verhoogt de resolutie van het cutout via Real-ESRGAN (2×). De backend
-    /// flattent op grijs, upscalet de RGB en hangt het alfa herschaald weer
-    /// aan, dus het resultaat blijft een transparante cutout. 1 credit; 402 →
-    /// `BackendError.noCredits` (paywall).
+    // MARK: POST /v1/upscale (Boost resolution, E10.3 · tiers E41.5)
+
+    /// E41.5: de twee betaalde upscale-tiers. Raw values = het `quality`-veld
+    /// van `/v1/upscale`; het tarief hoort erbij via `creditAction`.
+    public enum UpscaleQuality: String, Sendable {
+        /// google/upscaler x2 — 1 credit.
+        case regular
+        /// Topaz High Fidelity V2 (server capt input op 6 MP) — 3 credits.
+        case high
+
+        public var creditAction: CreditMeter.Action {
+            self == .high ? .upscaleHigh : .upscale
+        }
+    }
+
+    /// Verhoogt de resolutie van het cutout (2×). De backend flattent met
+    /// edge-bleed, upscalet de RGB via het tier-model en hangt het alfa
+    /// herschaald weer aan, dus het resultaat blijft een transparante cutout.
+    /// Tarief per tier (zie `UpscaleQuality`); 402 → `BackendError.noCredits`
+    /// (paywall).
     private struct UpscaleResponse: Decodable {
         let cutout: String
         let creditsRemaining: Int
     }
-    public func upscale(imagePNG: Data) async throws -> (Data, Int) {
+    public func upscale(imagePNG: Data, quality: UpscaleQuality = .regular) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
+            let quality: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
                 case storageKey = "storage_key"
+                case quality
                 case modelOverride = "model_override"
             }
         }
-        // Geen dev-override-UI voor upscale → altijd het registry-default-model.
+        // Geen dev-override-UI voor upscale → de tier bepaalt het model.
         let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey, modelOverride: nil)
+            Body(storageKey: storageKey, quality: quality.rawValue, modelOverride: nil)
         )
         let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {

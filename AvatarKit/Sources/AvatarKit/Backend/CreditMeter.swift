@@ -25,9 +25,12 @@ public enum CreditMeter {
     public enum Action: String, Sendable, CaseIterable {
         case magicCutout
         case colorize
-        /// Upscale / resolutie verhogen (besluit Thierry 2026-06-13: 1 credit,
-        /// lichte cloud-call; modelkeuze nog open — losse AI-spike).
+        /// Upscale Regular (E41.5, besluit Thierry 2026-07-12): google/upscaler,
+        /// 1 credit — vaste modelprijs $0,02/beeld ≈ de credit-opbrengst.
         case upscale
+        /// Upscale High quality (E41.5): Topaz High Fidelity V2, 3 credits —
+        /// dekt Topaz' $0,05-unit (server capt de input op 6 MP).
+        case upscaleHigh
         case fillBody
         /// Generatieve stijl/kleding/haar — standaardmodel (nano-banana c.s.).
         case generativeStandard
@@ -40,6 +43,7 @@ public enum CreditMeter {
         switch action {
         case .magicCutout, .colorize, .upscale: return 1
         case .fillBody: return 2
+        case .upscaleHigh: return 3
         case .generativeStandard: return 4
         case .generativePremium: return 7
         }

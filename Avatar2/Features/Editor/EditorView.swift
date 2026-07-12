@@ -1234,22 +1234,26 @@ struct EditorView: View {
         ) { p, bg in p.setBackground(bg) }
     }
 
-    /// E10.3: cloud-upscale van het huidige portret (Real-ESRGAN, 1 credit).
+    /// E10.3/E41.5: cloud-upscale van het huidige portret in de gekozen tier.
     /// Vervangt canvas + cutout via `onApplyResult`, undo'baar; 402 → paywall.
     private func runBoostResolution(_ mode: BoostMode) {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
         // E41.2: de gebruiker koos de modus via het Boost-dropdown. Lokaal =
-        // gratis, on-device, geen gate. Online = beste kwaliteit, cloud + credit.
-        if mode == .local {
+        // gratis, on-device, geen gate. Online = cloud + tier-credits (E41.5):
+        // Regular (google, 1 cr) of High (Topaz, 3 cr).
+        switch mode {
+        case .local:
             runLocalBoost(png: png, portraitModel: portraitModel, entitlement: entitlement)
-            return
+        case .onlineRegular:
+            Task { await performBoostResolution(quality: .regular) }
+        case .onlineHigh:
+            Task { await performBoostResolution(quality: .high) }
         }
-        Task { await performBoostResolution() }
     }
 
     @MainActor
-    private func performBoostResolution() async {
+    private func performBoostResolution(quality: BackendClient.UpscaleQuality = .regular) async {
         guard !isBoosting, let entitlement, let portraitModel,
               let png = rawCutout.pngData() else { return }
         // .online — privacy gate + sign-in/credits.
@@ -1271,7 +1275,7 @@ struct EditorView: View {
             entitlement.dismissWorkingToast()
         }
         do {
-            let (data, _) = try await entitlement.backend.upscale(imagePNG: png)
+            let (data, _) = try await entitlement.backend.upscale(imagePNG: png, quality: quality)
             guard let after = NSImage(data: data) else {
                 // E44.2: 200 met onbruikbare bytes — de server kan al een
                 // credit hebben afgeschreven. Zichtbare fout + saldo-refresh

@@ -159,6 +159,8 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
         label: "Real-ESRGAN",
       },
     },
+    // E41.5: upscale rekent per tier af — zie UPSCALE_TIERS in api/v1/upscale.ts
+    // (regular=1, high=3). Dit veld is voor upscale alleen nog de registry-vorm.
     credits: 1,
     requiresCloud: true,
   },

@@ -10,10 +10,22 @@ import AvatarKit
 import AvatarUI
 import SwiftUI
 
-/// E41.2: hoe een "Boost resolution" draait — lokaal (gratis, on-device) of
-/// online (beste kwaliteit, 1 credit). De gebruiker kiest per keer via het
-/// dropdown-menu op de Boost-chip.
-enum BoostMode: Equatable, Sendable { case local, online }
+/// E41.2/E41.5: hoe een "Boost resolution" draait — lokaal (gratis, on-device)
+/// of online in twee tiers (besluit Thierry 2026-07-12): Regular = 1 credit
+/// (google/upscaler), High = 3 credits (Topaz). De gebruiker kiest per keer
+/// via het dropdown-menu op de Boost-chip.
+enum BoostMode: Equatable, Sendable {
+    case local, onlineRegular, onlineHigh
+
+    /// Chip-/menulabel voor de kosten.
+    var costLabel: String {
+        switch self {
+        case .local: return "Free"
+        case .onlineRegular: return CreditMeter.chipLabel(for: .upscale)
+        case .onlineHigh: return CreditMeter.chipLabel(for: .upscaleHigh)
+        }
+    }
+}
 
 /// Welke chip-dropdown momenteel open is. Eén tegelijk; nil = dicht.
 private enum ChipMenu: Hashable { case boost, removeBackground }
@@ -95,7 +107,7 @@ struct EditColorPanel: View {
     // afkapt — anders zou de gebruiker een lege dropdown zien.
     @State private var openMenu: ChipMenu?
     @State private var boostMode: BoostMode =
-        PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .online
+        PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .onlineRegular
     /// Alléén de lopende download-voortgang van het High-quality-model (ORMBG).
     /// Of het model áctief is lezen we reactief uit `PrivacyPreferences2.engine`
     /// (zie `highQualityActive`) — niet uit een eigen snapshot — zodat een download
@@ -311,7 +323,7 @@ struct EditColorPanel: View {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: 12, weight: .medium))
                 Text("Boost").dsTextStyle(.labelSmall)
-                Text(boostMode == .local ? "Free" : "1 credit")
+                Text(boostMode.costLabel)
                     .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
                 DSPrivacyBadge(tier: boostMode == .local ? .onDevice : .thirdParty)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
@@ -337,13 +349,26 @@ struct EditColorPanel: View {
                 noteHybridFallbackIfNeeded()
                 onBoost(.local)
             }
+            // E41.5: twee online-tiers (besluit Thierry 2026-07-12).
             onlineHybridMenuRow(
                 title: "Online",
-                shortcut: advancedAllowed ? "Best · 1 credit" : "Sharper · Advanced privacy"
+                shortcut: advancedAllowed
+                    ? "Good · \(BoostMode.onlineRegular.costLabel)"
+                    : "Sharper · Advanced privacy"
             ) {
                 openMenu = nil
-                boostMode = .online
-                onBoost(.online)
+                boostMode = .onlineRegular
+                onBoost(.onlineRegular)
+            }
+            onlineHybridMenuRow(
+                title: "Online · High quality",
+                shortcut: advancedAllowed
+                    ? "Best · \(BoostMode.onlineHigh.costLabel)"
+                    : "Sharpest · Advanced privacy"
+            ) {
+                openMenu = nil
+                boostMode = .onlineHigh
+                onBoost(.onlineHigh)
             }
         }
     }
