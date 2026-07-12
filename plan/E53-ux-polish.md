@@ -50,8 +50,8 @@ fit-to-window bij open + zoom-chip (hergebruik E27.10-recept).
 en de Studio past in het venster; tests groen; Result-regel.
 
 ## 53.3 — DSThumbnailCard: AX + hover als één DS-story (UX28 + UX26, P0)
-- status: in_progress
-- owner: DS (2026-07-12, hervat op branch v2/e53-3-kaart-ax)
+- status: done (merge naar v2-main wacht op vrije werkboom/E53.7)
+- owner: DS (2026-07-12, branch v2/e53-3-kaart-ax)
 - team: DS
 - blockedBy: —
 
@@ -62,7 +62,7 @@ zit in de gallery-kaart (PortraitsGalleryView.swift:244-253) — volg UXS-7 in h
 PLAN-document, incl. DSIconButton-verplicht-label.
 **DoD:** kaarten zijn met VoiceOver/AX-inspector bereikbaar en activeerbaar
 (open/selecteer/contextmenu); tests groen; Result-regel.
-**Result (code klaar + DoD-build groen; live AX-check wacht op Thierry):** ✅ `PortraitCardAccessibility`-modifier (grid-tegel + Home-hero): één AX-element per kaart — label = naam+rol ("Untitled portrait"-fallback), traits button/+selected, default-actie = openen, named actions "Select"/"Deselect" (⌘-klik-pad) en "Show Context Menu" (punt-anker op de gemeten kaart-frame); ✅ GalleryLens: grote preview + filmstrip-thumbs als AX-elementen (activeren = focus, named actions Open/Select) + "Previous/Next portrait"-labels op de blader-pijlen; ✅ DSIconButton: `label`-param verplicht → `accessibilityLabel` + `.help` in de component zelf, alle call sites voorzien (ad-hoc `.accessibilityLabel`-modifiers opgeruimd); ✅ meegenomen UXS-27 (E53.6 DS-deel): `neutralSurface`-ladder relatief aan de base + nieuw token `neutral-strongest-2` — chip-hover op gevulde chips weer zichtbaar (UX36). build-v2.sh volledig groen. ⚠ De VoiceOver/AX-inspector-verificatie kon niet autonoom (AX-API vereist Accessibility-permission): draai `swift scripts/axprobe.swift <pid>` vanuit een getruste terminal tegen een `--smoke-store`-instance — verwacht per kaart een button "Ava Bennett, Product Designer" met de drie acties — of check kort met de AX-inspector.
+**Result (code klaar + DoD-build groen; live AX-check wacht op Thierry):** ✅ `PortraitCardAccessibility`-modifier (grid-tegel + Home-hero): één AX-element per kaart — label = naam+rol ("Untitled portrait"-fallback), traits button/+selected, default-actie = openen, named actions "Select"/"Deselect" (⌘-klik-pad) en "Show Context Menu" (punt-anker op de gemeten kaart-frame); ✅ GalleryLens: grote preview + filmstrip-thumbs als AX-elementen (activeren = focus, named actions Open/Select) + "Previous/Next portrait"-labels op de blader-pijlen; ✅ DSIconButton: `label`-param verplicht → `accessibilityLabel` + `.help` in de component zelf, alle call sites voorzien (ad-hoc `.accessibilityLabel`-modifiers opgeruimd); ✅ meegenomen UXS-27 (E53.6 DS-deel): `neutralSurface`-ladder relatief aan de base + nieuw token `neutral-strongest-2` — chip-hover op gevulde chips weer zichtbaar (UX36). build-v2.sh volledig groen. ✅ Live AX-geverifieerd (2026-07-12, Accessibility-permission door Thierry verleend; `scripts/axprobe.swift` tegen een `--smoke-store`-instance): per kaart een `AXButton` met label "«naam», «rol»" (bv. "Ava Bennett, Product Designer") en de acties `AXPress` (openen) + named actions "Select" en "Show Context Menu" — kaarten zijn bereikbaar én activeerbaar via de AX-boom.
 
 ## 53.4 — DSMotion-sweep: reduce-motion app-breed (UX30)
 - status: ready
