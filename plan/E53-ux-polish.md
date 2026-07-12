@@ -27,9 +27,19 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 
 ## 53.2 — Banner Studio bruikbaarheid (UX1 + UX2, P0)
 - status: in_progress
-- owner: claude (FEAT)
+- owner: FEAT (2026-07-12, checkpoint op branch v2/e53-2-banner-studio)
 - team: FEAT
-- blockedBy: —
+- blockedBy: E53.7-landing (UX2 raakt BannerStudioView, in bewerking in die sessie)
+
+**Voortgang (checkpoint 2026-07-12; builds + tests groen op 5 na — die 5
+(AuthSessionStorageTests) zijn de vergrendeld-scherm-flake, zie E13.6, los van
+deze story):** UX1 ✅ compleet —
+placeholder-sweep v2 (legacy "Your text" matcht mee, geforceerde herbake van
+bestaande bakes, stempel pas ná voltooide run, Home-hook; +2 tests). UX2 ⏳
+alleen de aanzet (`fitCameraScale`-helper + `userZoomed`-vlag) — fit-op-open/
+resize + zoom-chip in BannerStudioView bouwen zodra E53.7 gemerged is.
+NB: banners blijven achter `bannersEnabled` (besluit Thierry 2026-07-12) —
+prioriteit t.o.v. 53.1/53.4 dienovereenkomstig.
 
 **Wat:** UX1: banner-thumbnails tonen placeholder-lagen ("Type to enter
 text"-soep) op Home/gallery — verifieer eerst tegen de E37.18-sweep+migratie
