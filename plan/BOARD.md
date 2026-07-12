@@ -31,7 +31,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
-| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+**13.5** done — 13.1–13.3 backlog (gedeblokkeerd); **13.6 ready** (token-write faalt bij vergrendeld scherm — mogelijke wortel van de sessie-herstel-klachten) |
+| [E13 Release-voorbereiding](E13-release.md) | INFRA | 13.0+13.4+13.5+**13.6 done** (13.6: completeFileProtection-fix, gemerged 2026-07-12 — mogelijke wortel van de sessie-herstel-klachten; v1-tegenhanger = los besluit) — 13.1–13.3 backlog (gedeblokkeerd) |
 | [E14 Monetization 2.0](E14-monetization.md) | FEAT+INFRA | **done** (14.1–14.7, incl. Stripe-webhook-shapefix); 14.8 backlog (credits-transparantie) |
 | [E15 Settings volledig](E15-settings.md) | FEAT | **done** (15.1–15.7) |
 | [E16 Apple Intelligence](E16-apple-intelligence.md) | AI | blocked — wacht op macOS 27-beta op dev-Mac |
