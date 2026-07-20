@@ -28,14 +28,14 @@
     "next": "^15.5.18",
     "otpauth": "^9.5.1",
     "payload": "^3.0.0",
-    "pg": "^8.20.0",
+    "pg": "^8.22.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^4.0.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
-    "@swc-node/register": "^1.11.1",
+    "@swc-node/register": "^1.12.1",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
