@@ -75,7 +75,7 @@ struct SettingsCheckmarkRow<Leading: View>: View {
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .onHover { isHovering = $0 && !isDisabled }
-        .animation(DSMotion.micro, value: isHovering)
+        .dsMotion(DSMotion.micro, value: isHovering)
     }
 }
 
@@ -119,7 +119,7 @@ struct SettingsSelectableRowHoverSurface: ViewModifier {
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .onHover { isHovering = $0 && !isDisabled }
-            .animation(DSMotion.micro, value: isHovering)
+            .dsMotion(DSMotion.micro, value: isHovering)
     }
 }
 

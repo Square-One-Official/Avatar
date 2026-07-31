@@ -60,7 +60,7 @@ public struct DSGhostButton: View {
                     .background(backgroundColor, in: Capsule())
                     .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
                     .onHover { isHovering = $0 }
-                    .animation(DSMotion.micro, value: isHovering)
+                    .dsMotion(DSMotion.micro, value: isHovering)
             }
 
             private var backgroundColor: Color {

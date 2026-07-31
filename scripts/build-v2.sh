@@ -7,6 +7,9 @@ cd "$(dirname "$0")/.."
 
 DERIVED="${DERIVED_DATA:-build/dd}"
 
+echo "==> reduce-motion-guard (E53.4)"
+bash scripts/check-motion.sh
+
 echo "==> xcodegen"
 xcodegen generate
 

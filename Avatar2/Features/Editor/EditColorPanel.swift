@@ -491,7 +491,7 @@ struct EditColorPanel: View {
         // Dicht: laat alle tikken door naar de sliders eronder. Open: vang ze
         // (vanglaag sluit, menu-rijen reageren).
         .allowsHitTesting(openMenu != nil)
-        .animation(DSMotion.fast, value: openMenu)
+        .dsMotion(DSMotion.fast, value: openMenu)
     }
 
     private func floatingMenu<Menu: View>(_ menu: Menu, at chip: CGRect, in size: CGSize) -> some View {

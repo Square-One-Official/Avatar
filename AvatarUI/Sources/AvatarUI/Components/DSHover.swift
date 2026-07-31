@@ -28,7 +28,7 @@ private struct DSHoverHighlight: ViewModifier {
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .onHover { hovering = $0 }
-            .animation(DSMotion.micro, value: hovering)
+            .dsMotion(DSMotion.micro, value: hovering)
     }
 }
 
@@ -40,6 +40,6 @@ private struct DSHoverScale: ViewModifier {
         content
             .scaleEffect(hovering ? scale : 1)
             .onHover { hovering = $0 }
-            .animation(DSMotion.micro, value: hovering)
+            .dsMotion(DSMotion.micro, value: hovering)
     }
 }

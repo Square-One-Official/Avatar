@@ -88,7 +88,7 @@ public struct DSToolButton: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(DSMotion.micro, value: showTooltip)
+        .dsMotion(DSMotion.micro, value: showTooltip)
     }
 
     private func styledIcon(_ color: Color) -> some View {
@@ -138,8 +138,8 @@ private struct ToolSurface: View {
             .transaction(value: isActive) { txn in
                 txn.animation = DSMotion.fast
             }
-            .animation(DSMotion.micro, value: isHovering)
-            .animation(DSMotion.micro, value: configuration.isPressed)
+            .dsMotion(DSMotion.micro, value: isHovering)
+            .dsMotion(DSMotion.micro, value: configuration.isPressed)
     }
 
     private var backgroundColor: Color {

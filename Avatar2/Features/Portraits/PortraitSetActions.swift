@@ -5,6 +5,7 @@
 
 import AppKit
 import AvatarKit
+import AvatarUI
 import SwiftData
 import SwiftUI
 
@@ -28,7 +29,7 @@ enum PortraitSetActions {
             // 2. Schrijf + registreer in één undo-groep.
             undoManager?.beginUndoGrouping()
             undoManager?.setActionName("Align")
-            withAnimation(.spring(duration: 0.45)) {
+            DSMotion.animate(DSMotion.springTransform) {
                 for (portrait, before, transform) in items {
                     portrait.offsetX = transform.offset.width
                     portrait.offsetY = transform.offset.height
@@ -63,7 +64,7 @@ enum PortraitSetActions {
             }
             undoManager?.beginUndoGrouping()
             undoManager?.setActionName("Match Lighting")
-            withAnimation(.spring(duration: 0.4)) {
+            DSMotion.animate(DSMotion.springTransform) {
                 for (portrait, before, after) in items {
                     portrait.cutoutData = after
                     portrait.cutoutDerivesFromOriginal = false

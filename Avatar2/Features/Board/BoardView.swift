@@ -786,11 +786,11 @@ struct BoardView: View {
     }
 
     private func zoom(_ factor: CGFloat) {
-        withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
+        DSMotion.animate(DSMotion.springSmall) { camera.zoomCentered(by: factor) }
     }
 
     private func fit() {
-        withAnimation(.spring(duration: 0.3)) { camera.fitToContent(contentSize: boardSize, in: viewport) }
+        DSMotion.animate(DSMotion.springSmall) { camera.fitToContent(contentSize: boardSize, in: viewport) }
     }
 
     // MARK: - E29.2 batch-toolbar
@@ -1025,7 +1025,7 @@ struct BoardView: View {
         let before = targets.map { CGPoint(x: $0.boardX, y: $0.boardY) }
         let minX = targets.map(\.boardX).min()!, maxX = targets.map(\.boardX).max()!
         let minY = targets.map(\.boardY).min()!, maxY = targets.map(\.boardY).max()!
-        withAnimation(.spring(duration: 0.25, bounce: 0.08)) {
+        DSMotion.animate(DSMotion.springSmall) {
             switch axis {
             case .left:    targets.forEach { $0.boardX = minX }
             case .centerH: targets.forEach { $0.boardX = (minX + maxX) / 2 }
@@ -1052,7 +1052,7 @@ struct BoardView: View {
         let gridH = Double(rows) * Double(cellHeight) + Double(rows - 1) * Double(gap)
         let ox = cx - gridW / 2 + Double(cardSide) / 2
         let oy = cy - gridH / 2 + Double(cellHeight) / 2
-        withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+        DSMotion.animate(DSMotion.springSmall) {
             for (i, p) in targets.enumerated() {
                 p.boardX = ox + Double(i % cols) * (Double(cardSide) + Double(gap))
                 p.boardY = oy + Double(i / cols) * (Double(cellHeight) + Double(gap))
@@ -1068,7 +1068,7 @@ struct BoardView: View {
         let targets = selectedPortraits
         guard targets.count >= 3 else { return }
         let before = targets.map { CGPoint(x: $0.boardX, y: $0.boardY) }
-        withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+        DSMotion.animate(DSMotion.springSmall) {
             switch axis {
             case .horizontal:
                 let sorted = targets.sorted { $0.boardX < $1.boardX }
@@ -1188,7 +1188,7 @@ struct BoardView: View {
 
     /// E31.7: zet de frame-vorm van één board-node (zelfde als EditorView).
     private func setNodeFrameShape(_ shape: ExportShape, _ node: Portrait2) {
-        withAnimation(.spring(duration: 0.3)) { node.frameShape = shape }
+        DSMotion.animate(DSMotion.springSmall) { node.frameShape = shape }
         node.touch()
     }
 

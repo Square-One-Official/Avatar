@@ -9,6 +9,7 @@
 // off-main. De actie schrijft het resultaat op Portrait2 — het
 // E06.4-canvas observeert het model en animeert de overgang.
 
+import AvatarUI
 import CoreGraphics
 import Foundation
 import SwiftUI
@@ -243,7 +244,7 @@ enum AutoFramer {
             cutoutSize: size,
             bodyBottomY: metrics.bodyBottomY
         )
-        withAnimation(.spring(duration: 0.45)) {
+        DSMotion.animate(DSMotion.springTransform) {
             portrait.offsetX = transform.offset.width
             portrait.offsetY = transform.offset.height
             portrait.scale = transform.scale

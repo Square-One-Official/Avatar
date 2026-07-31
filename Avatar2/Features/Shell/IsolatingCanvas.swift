@@ -55,7 +55,8 @@ struct IsolatingFrameLayer: View {
             .clipShape(clipShape)
             .onChange(of: cutout != nil, initial: true) { _, hasCutout in
                 guard hasCutout else { return }
-                withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
+                // Pure opacity-reveal → mag óók onder reduce-motion lopen (E53.4).
+                DSMotion.animateCrossFade(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
                     backgroundFaded = true
                 }
             }

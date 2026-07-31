@@ -87,8 +87,8 @@ public struct DSIconButton: View {
                 .opacity(currentOpacity)
                 .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
                 .onHover { isHovering = $0 }
-                .animation(DSMotion.micro, value: isHovering)
-                .animation(DSMotion.micro, value: configuration.isPressed)
+                .dsMotion(DSMotion.micro, value: isHovering)
+                .dsMotion(DSMotion.micro, value: configuration.isPressed)
         }
 
         private var isHighlighted: Bool {

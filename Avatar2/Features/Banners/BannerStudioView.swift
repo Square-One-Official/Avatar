@@ -121,13 +121,13 @@ struct BannerStudioView: View {
         .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
             zoomIn: { zoomCamera(by: 1.25) },
             zoomOut: { zoomCamera(by: 0.8) },
-            zoomToFit: { withAnimation(.spring(duration: 0.3)) { applyBannerOpenFit() } },
-            actualSize: { withAnimation(.spring(duration: 0.3)) { applyBannerActualSize() } }
+            zoomToFit: { DSMotion.animate(DSMotion.springSmall) { applyBannerOpenFit() } },
+            actualSize: { DSMotion.animate(DSMotion.springSmall) { applyBannerActualSize() } }
         ))
     }
 
     private func zoomCamera(by factor: CGFloat) {
-        withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
+        DSMotion.animate(DSMotion.springSmall) { camera.zoomCentered(by: factor) }
     }
 
     private func applyBannerOpenFit(viewport: CGSize? = nil) {

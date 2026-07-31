@@ -75,7 +75,7 @@ private struct ThemeMenuPill: View {
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))
             .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
             .onHover { isHovering = $0 }
-            .animation(DSMotion.micro, value: isHovering)
+            .dsMotion(DSMotion.micro, value: isHovering)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
