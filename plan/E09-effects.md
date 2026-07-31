@@ -80,3 +80,55 @@ Beide targets bouwen groen, alle suites groen.
 **Voor de volgende E13.0-port:** stylize.ts staat productie-klaar op v2-main maar nog niet op
 `api.aaavatar.nl` — tot de port draait de Effects-generatie tegen een Vercel-preview-deploy.
 
+
+## 9.3 — Eigen effecten (user-created custom effects)
+- status: done (code) — **prod-uitrol wacht op Thierry: sql/015 + backend-deploy**
+- owner: FEAT+INFRA
+- team: FEAT+INFRA+AI
+- blockedBy: —
+
+**Wat:** een Pro-gebruiker maakt zijn eigen Effect uit een referentiebeeld + een
+korte beschrijving. Effects → "Create"-kaart → beeld droppen + beschrijven →
+*Save* (alleen bewaren) of *Apply & Save* (bewaren + meteen genereren). Het
+referentiebeeld stuurt écht de stijl — het gaat als tweede beeld naar het model,
+niet alleen als thumbnail — en de effecten syncen per account. Aanmaken kost
+niets; pas het tóépassen kost een credit (zelfde tarief als een built-in effect).
+
+**DoD:** beide targets bouwen + tests groen + Result-regel. ✅
+
+**Result (gebouwd 2026-06-25, gemerged naar v2-main 2026-07-31):**
+**Backend** — `sql/015_custom_effects.sql` (owner-scoped tabel, RLS aan, publieke
+`custom-effects`-bucket voor referentie + thumbnail), [customEffects.ts](../backend/lib/customEffects.ts)
+(list/get/create/delete + referentie-download), [/v1/custom-effects](../backend/api/v1/custom-effects.ts)
++ [/v1/custom-effects/[id]](../backend/api/v1/custom-effects/[id].ts) (Pro-gegate
+list/create/delete), en een `custom_effect_id`-tak in [stylize.ts](../backend/api/v1/stylize.ts):
+Pro-check + eigenaar-scope, prompt uit de opgeslagen beschrijving in een vast
+`CUSTOM_STYLE_TEMPLATE` (rolclausule: bewerk beeld 1, leen alleen de *look* van
+beeld 2) + de identity-clausule. `tsc --noEmit` schoon.
+**AvatarKit** — `RemoteCustomEffect` (cacheKey `custom:<id>`), `customEffects()`,
+`createCustomEffect()`, `deleteCustomEffect()` en `stylize(imagePNG:customEffectID:)`.
+**App** — `EffectCard` verenigt built-in en custom op de bestaande string-cachekey,
+dus selectie/cache/persistentie (`effectCache`/`effectActiveRaw`) blijven ongewijzigd;
+Pro-gegate "Create"-kaart, custom-kaarten met contextmenu-delete, instant lokale
+thumbnail na aanmaken; [CreateEffectSheet.swift](../Avatar2/Features/Editor/CreateEffectSheet.swift).
+
+**Merge-besluiten (2026-07-31, de branch stond 224 commits achter):**
+- Eén referentie-kanaal: de E34-`referenceDataUrl` is opgegaan in E54's
+  `styleReferenceDataUrls`-array (portret eerst, referenties daarna) — CMS-
+  stijlreferenties en het custom-referentiebeeld nemen nu dezelfde weg naar het
+  model i.p.v. twee parallelle paden door `stylizeInputFor`.
+- `stylize(imagePNG:customEffectID:)` geeft `StylizeCallResult` terug (was een
+  tuple), gelijk aan de andere stylize-armen.
+- Het EffectCard-paneel is opnieuw aangebracht bóvenop het huidige paneel, dus
+  mét StylizeQualityCoordinator-gate, AIFeature-gating, async `onApply`,
+  cutout-dimensies/`softSource`/`preserveFraming` en de E52.1-`ThumbnailCache`.
+- E53.7-conform: de Create-modal leeft in `UIPresentationStore` en hangt via
+  `dsPersistentSheet` op ShellView; het resultaat gaat via de store terug naar
+  het paneel (geen paneel-`@State`).
+
+**Nog te doen vóór live (gated — Thierry):** (1) `sql/015_custom_effects.sql` op de
+prod-Supabase draaien (tabel + bucket bestaan daar nog niet); (2) backend
+prod-deploy zodat `/v1/custom-effects` en de `custom_effect_id`-tak bestaan —
+zonder (1) en (2) geeft de Create-knop een serverfout. De app-kant is
+backward-compatibel: zonder de endpoints blijft de lijst leeg (soft-fail) en
+werken de built-in effecten gewoon.

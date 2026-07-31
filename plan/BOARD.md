@@ -27,7 +27,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | **done** (6.1–6.6) |
 | [E07 Background](E07-background.md) | FEAT | **done** (7.1–7.2) |
 | [E08 Barebones-flows](E08-barebones.md) | FEAT | **done** (8.1 → E15, 8.2–8.3) |
-| [E09 Effects](E09-effects.md) | FEAT+AI | **done** (9.1–9.2) |
+| [E09 Effects](E09-effects.md) | FEAT+AI | **done** (9.1–9.2); **9.3 done** (eigen effecten, gemerged 2026-07-31 — prod-uitrol wacht op Thierry: sql/015 + backend-deploy) |
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
