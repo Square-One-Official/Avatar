@@ -10,7 +10,8 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 ---
 
 ## 53.1 — Polish-sprint S-items (top-10 #1–#7)
-- status: ready
+- status: in_progress
+- owner: FEAT (2026-07-31, branch v2/e53-1-polish)
 - team: FEAT
 - blockedBy: —
 
@@ -84,7 +85,8 @@ UX31–UX33) — oppakken in een volgende polish-ronde; UX6 (update-flow
 relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
 
 ## 53.6 — Shell-chrome & hover-fixes (UX34–UX36, meldingen Thierry 2026-07-02)
-- status: ready
+- status: in_progress
+- owner: FEAT+DS (2026-07-31, branch v2/e53-1-polish)
 - team: FEAT+DS
 - blockedBy: —
 
