@@ -221,7 +221,7 @@ struct EditorView: View {
     /// volgen reactief). `touch()` zet "laatst bewerkt" bij.
     private func setFrameShape(_ shape: ExportShape) {
         guard let portraitModel else { return }
-        withAnimation(.spring(duration: 0.3)) {
+        DSMotion.animate(DSMotion.springSmall) {
             portraitModel.frameShape = shape
         }
         portraitModel.touch()
@@ -405,7 +405,7 @@ struct EditorView: View {
             .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
                 zoomIn: { zoomCamera(by: 1.25) },
                 zoomOut: { zoomCamera(by: 0.8) },
-                zoomToFit: { withAnimation(.spring(duration: 0.3)) { applyEditorOpenFit() } }
+                zoomToFit: { DSMotion.animate(DSMotion.springSmall) { applyEditorOpenFit() } }
             ))
             // E27.10 (audit C2): ⌘= = ⌘⇧= — het menu-item voert ⌘+; deze
             // verborgen brug registreert de shift-loze variant.
@@ -621,7 +621,7 @@ struct EditorView: View {
     // Zoom-acties voor de View-menu-commands (⌘+/⌘−/⌘0/⌘1, CanvasZoomCommands)
     // en de ⌘=-shortcut (CanvasZoomEqualsShortcut); alles animeert soepel.
     private func zoomCamera(by factor: CGFloat) {
-        withAnimation(.spring(duration: 0.25)) { camera.zoomCentered(by: factor) }
+        DSMotion.animate(DSMotion.springSmall) { camera.zoomCentered(by: factor) }
     }
 
     private func applyEditorOpenFit(viewport: CGSize? = nil) {
@@ -652,7 +652,7 @@ struct EditorView: View {
     /// recept als de board-Fit-chip (.ultraThinMaterial + divider-rand).
     private var zoomChip: some View {
         Button {
-            withAnimation(.spring(duration: 0.3)) { applyEditorOpenFit() }
+            DSMotion.animate(DSMotion.springSmall) { applyEditorOpenFit() }
         } label: {
             Text("\(Int((camera.scale / editorFitScale * 100).rounded()))%")
                 .dsTextStyle(.labelSmall)

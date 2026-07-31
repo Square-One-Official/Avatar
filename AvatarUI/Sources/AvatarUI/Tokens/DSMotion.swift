@@ -35,6 +35,18 @@ public enum DSMotion {
     public static func animate(_ animation: Animation, _ body: () -> Void) {
         withAnimation(reduceMotionEnabled ? nil : animation, body)
     }
+
+    /// Voor animaties die alléén opacity veranderen (cross-fades, reveals).
+    /// Die blijven óók onder "Verminder beweging" lopen: een fade verplaatst
+    /// niets, dus veroorzaakt geen bewegingsklachten — hem tóch killen maakt
+    /// reveals harder dan nodig. Bewust een eigen functie i.p.v. een kale
+    /// `withAnimation`, zodat de uitzondering expliciet én greppable is
+    /// (zie `scripts/check-motion.sh`).
+    ///
+    /// Gebruik dit NIET voor iets dat beweegt of schaalt — dan hoort `animate`.
+    public static func animateCrossFade(_ animation: Animation, _ body: () -> Void) {
+        withAnimation(animation, body)
+    }
 }
 
 public extension View {

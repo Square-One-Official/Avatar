@@ -73,7 +73,7 @@ public struct DSTextField: View {
             }
         }
         .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
-        .animation(DSMotion.fast, value: validation)
+        .dsMotion(DSMotion.fast, value: validation)
     }
 
     private var borderColor: Color {

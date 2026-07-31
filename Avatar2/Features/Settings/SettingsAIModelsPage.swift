@@ -352,7 +352,7 @@ private struct OptionChipButton: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 && !selected }
-        .animation(DSMotion.micro, value: isHovering)
+        .dsMotion(DSMotion.micro, value: isHovering)
     }
 }
 

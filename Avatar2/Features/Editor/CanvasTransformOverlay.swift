@@ -85,7 +85,7 @@ struct CanvasTransformOverlay: View {
         .frame(width: side, height: side)
         // Tijdens pannen even weg (zoals E24.29 deed met isDragging).
         .opacity(isPanning ? 0 : 1)
-        .animation(DSMotion.micro, value: isPanning)
+        .dsMotion(DSMotion.micro, value: isPanning)
         .coordinateSpace(name: Self.space)
     }
 

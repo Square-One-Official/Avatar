@@ -36,7 +36,7 @@ struct CanvasFrameChip: View {
             )
             .contentShape(Capsule(style: .continuous))
             .onHover { hovering = $0 }
-            .animation(DSMotion.micro, value: hovering)
+            .dsMotion(DSMotion.micro, value: hovering)
             .onDoubleClick { onRename() }
             .help("Double-click to rename")
     }

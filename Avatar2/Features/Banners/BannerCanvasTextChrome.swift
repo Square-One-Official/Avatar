@@ -103,7 +103,7 @@ struct BannerCanvasTextChrome: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(.easeOut(duration: 0.12), value: showToolbar)
+            .dsMotion(DSMotion.fast, value: showToolbar)
             .onAppear {
                 draftString = layer.string
                 if !isEditing { boxFocused = true }

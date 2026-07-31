@@ -126,7 +126,8 @@ PLAN-document, incl. DSIconButton-verplicht-label.
 **Result (code klaar + DoD-build groen; live AX-check wacht op Thierry):** ✅ `PortraitCardAccessibility`-modifier (grid-tegel + Home-hero): één AX-element per kaart — label = naam+rol ("Untitled portrait"-fallback), traits button/+selected, default-actie = openen, named actions "Select"/"Deselect" (⌘-klik-pad) en "Show Context Menu" (punt-anker op de gemeten kaart-frame); ✅ GalleryLens: grote preview + filmstrip-thumbs als AX-elementen (activeren = focus, named actions Open/Select) + "Previous/Next portrait"-labels op de blader-pijlen; ✅ DSIconButton: `label`-param verplicht → `accessibilityLabel` + `.help` in de component zelf, alle call sites voorzien (ad-hoc `.accessibilityLabel`-modifiers opgeruimd); ✅ meegenomen UXS-27 (E53.6 DS-deel): `neutralSurface`-ladder relatief aan de base + nieuw token `neutral-strongest-2` — chip-hover op gevulde chips weer zichtbaar (UX36). build-v2.sh volledig groen. ✅ Live AX-geverifieerd (2026-07-12, Accessibility-permission door Thierry verleend; `scripts/axprobe.swift` tegen een `--smoke-store`-instance): per kaart een `AXButton` met label "«naam», «rol»" (bv. "Ava Bennett, Product Designer") en de acties `AXPress` (openen) + named actions "Select" en "Show Context Menu" — kaarten zijn bereikbaar én activeerbaar via de AX-boom.
 
 ## 53.4 — DSMotion-sweep: reduce-motion app-breed (UX30)
-- status: ready
+- status: done
+- owner: DS (2026-08-01, branch v2/e53-4-motion)
 - team: DS
 - blockedBy: —
 
@@ -134,6 +135,48 @@ PLAN-document, incl. DSIconButton-verplicht-label.
 een DSMotion-helper i.p.v. per-view checks.
 **DoD:** met reduce-motion aan zijn alle transities cross-fade/instant; tests
 groen; Result-regel.
+
+**Result (2026-08-01):** de sweep bleek breder dan de audit-telling van "~20 raw
+`withAnimation`-sites" — er waren drie soorten omzeiling, en alleen de eerste
+stond in het plan:
+1. **18 kale `withAnimation`** (canvas-zoom/fit in editor, board en banner-studio;
+   align/match-lighting; AutoFramer; gallery-scroll) → `DSMotion.animate` met een
+   token. De ruwe springs met `bounce: 0.08`/`0.1` zijn meteen bounce-loos
+   geworden (`springSmall`/`springTransform`), conform de DS-regel dat overshoot
+   niet bij dit product past.
+2. **7 kale `.animation(.spring/.easeOut …)`** → `.dsMotion(…)`. De drie losse
+   toast-springs in `Avatar2App` zijn er één geworden op `entitlement.activeToast`
+   (de E53.1-reducer), i.p.v. drie animaties op de onderliggende vlaggen.
+3. **38 × `.animation(DSMotion.<token>, value:)`** — dit is de verraderlijke: die
+   sites gebruikten wél een DS-token, maar `.animation` is niet reduce-motion-
+   bewust, dus ze bewogen gewoon door. Alleen `.dsMotion` doet de check. Deze
+   groep stond niet in de audit en was de helft van het probleem.
+
+Daarnaast de **per-view checks weg** (het "centraliseer"-deel van de story): de
+`.animation(reduceMotion ? nil : …)`-ternaries in ShellView (4×) en LeftNavView
+zijn `.dsMotion` geworden; de bijbehorende ongebruikte
+`@Environment(\.accessibilityReduceMotion)` is opgeruimd. De check zit nu op één
+plek, in `DSMotionModifier`.
+
+**Nieuwe uitzondering, bewust:** `DSMotion.animateCrossFade` voor animaties die
+alléén opacity veranderen (de cutout-reveal in `IsolatingCanvas`). Een fade
+verplaatst niets en veroorzaakt dus geen bewegingsklachten — die killen maakt de
+reveal harder dan nodig. Het is een eigen, greppable functie i.p.v. een
+ongemarkeerde kale `withAnimation`, zodat de uitzondering zichtbaar blijft.
+
+**Guard:** [scripts/check-motion.sh](../scripts/check-motion.sh) faalt op elke kale
+`withAnimation(`/`.animation(` in `Avatar2/` + `AvatarUI/Sources` (DSMotion.swift
+zelf uitgezonderd), en draait nu als eerste stap van
+[build-v2.sh](../scripts/build-v2.sh) — de DoD-runner is hier het CI-equivalent.
+Guard geverifieerd mét een opzettelijke overtreding: die faalt de build.
++7 tests op de DSMotion-contracten (body draait óók met reduce-motion aan, de
+enter/exit-asymmetrie, de duur-ladder, transitions leveren een andere variant).
+
+**Openstaand:** de handmatige verificatie uit de DoD — System Settings →
+Accessibility → Reduce motion aan en een smoke door editor/board/studio — is niet
+gedraaid; die vergt de systeeminstelling omzetten op Thierry's Mac. De guard +
+tests borgen dat er geen route meer ís die de vlag negeert, maar het oogtest-deel
+staat nog open.
 
 ## 53.5 — P1/P2-restlijst (backlog)
 - status: backlog

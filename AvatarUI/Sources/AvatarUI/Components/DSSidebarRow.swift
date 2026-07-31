@@ -79,7 +79,7 @@ public struct DSSidebarRow<Avatar: View>: View {
         }
         .buttonStyle(DSStateOpacityButtonStyle())
         .onHover { isHovering = $0 }
-        .animation(DSMotion.micro, value: isHovering)
+        .dsMotion(DSMotion.micro, value: isHovering)
         .accessibilityLabel(Text(role.map { "\(name), \($0)" } ?? name))
     }
 }

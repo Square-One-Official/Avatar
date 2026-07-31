@@ -127,7 +127,7 @@ struct GalleryLens: View {
             // De filmstrip volgt de focus (klik of ←/→) en centreert 'm.
             .onChange(of: focusID) { _, id in
                 guard let id else { return }
-                withAnimation(.spring(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
+                DSMotion.animate(DSMotion.springSmall) { proxy.scrollTo(id, anchor: .center) }
             }
         }
     }

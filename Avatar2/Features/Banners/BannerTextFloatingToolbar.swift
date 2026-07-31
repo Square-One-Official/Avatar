@@ -89,9 +89,9 @@ struct BannerTextFloatingToolbar: View {
             }
             .onPreferenceChange(ToolbarPillHeightKey.self) { pillHeight = $0 }
             .position(pillCenter)
-            .animation(DSMotion.fast, value: showFormatMenu)
-            .animation(DSMotion.fast, value: showColorMenu)
-            .animation(DSMotion.fast, value: presentation.bannerFloatingMenu)
+            .dsMotion(DSMotion.fast, value: showFormatMenu)
+            .dsMotion(DSMotion.fast, value: showColorMenu)
+            .dsMotion(DSMotion.fast, value: presentation.bannerFloatingMenu)
             .onDisappear {
                 BannerFontPanelController.shared.dismiss()
                 BannerColorPanelController.shared.dismiss()

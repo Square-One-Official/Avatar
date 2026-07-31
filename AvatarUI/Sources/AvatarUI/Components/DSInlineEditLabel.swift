@@ -142,7 +142,7 @@ public struct DSInlineEditLabel: View {
             removeClickMonitor()
             setCursor(pushed: false)
         }
-        .animation(DSMotion.micro, value: isHovering)
+        .dsMotion(DSMotion.micro, value: isHovering)
         .accessibilityLabel(Text(placeholder))
         .accessibilityValue(Text(text))
     }

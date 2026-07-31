@@ -63,7 +63,7 @@ private struct DSDropdownMenuModifier<Menu: View>: ViewModifier {
                 }
             }
             .zIndex(isPresented ? 10 : 0)
-            .animation(DSMotion.fast, value: isPresented)
+            .dsMotion(DSMotion.fast, value: isPresented)
     }
 }
 

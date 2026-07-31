@@ -29,7 +29,7 @@ struct ShellTopBar: View {
     var body: some View {
         toolCluster
             .frame(maxWidth: .infinity, alignment: .leading)
-            .animation(.easeOut(duration: 0.18), value: isSettingsActive)
+            .dsMotion(DSMotion.fast, value: isSettingsActive)
     }
 
     // Rechts: editor-chrome tijdens bewerken; ✕ in Settings-modus.
@@ -143,8 +143,8 @@ private struct SharePillButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
-        .animation(DSMotion.micro, value: hovering)
-        .animation(DSMotion.micro, value: pressed)
+        .dsMotion(DSMotion.micro, value: hovering)
+        .dsMotion(DSMotion.micro, value: pressed)
         .accessibilityLabel("Share")
     }
 
@@ -181,8 +181,8 @@ private struct DSCompactTopBarButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
-        .animation(DSMotion.micro, value: hovering)
-        .animation(DSMotion.micro, value: pressed)
+        .dsMotion(DSMotion.micro, value: hovering)
+        .dsMotion(DSMotion.micro, value: pressed)
         .accessibilityLabel(label)
     }
 }

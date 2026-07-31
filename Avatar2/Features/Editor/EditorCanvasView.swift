@@ -414,7 +414,7 @@ struct AlignmentGuideOverlay2: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 1 * inv)
             .opacity(isVisible ? 1 : 0)
-            .animation(DSMotion.fast, value: isVisible)
+            .dsMotion(DSMotion.fast, value: isVisible)
         }
         .allowsHitTesting(false)
     }

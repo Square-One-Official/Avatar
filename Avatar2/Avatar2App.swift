@@ -140,7 +140,7 @@ struct Avatar2App: App {
             }
             // E17.5: in-app bericht-sheet (overlay → geen layoutshift).
             .overlay { messageOverlay }
-            .animation(.easeOut(duration: 0.18), value: messaging.current)
+            .dsMotion(DSMotion.fast, value: messaging.current)
             // E01.14: géén handmatige setFrameAutosaveName meer — SwiftUI's
             // WindowGroup persisteert het venster-frame zelf (defaultSize bij
             // eerste start, daarna de gebruikersmaat). Twee autosave-bronnen
@@ -184,9 +184,9 @@ struct Avatar2App: App {
                 .padding(DSSpacing.gap5)
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-            .animation(.spring(duration: 0.3), value: entitlement.errorToast)
-            .animation(.spring(duration: 0.3), value: entitlement.workingContext != nil)
-            .animation(.spring(duration: 0.3), value: entitlement.isShowingOutOfCreditsToast)
+            // E53.4: één reduce-motion-bewuste animatie op de gekozen toast i.p.v.
+            // drie losse springs op de onderliggende vlaggen.
+            .dsMotion(DSMotion.springSmall, value: entitlement.activeToast)
             // Privacy Tier Picker: elevation modal → Settings.
             .overlay {
                 if let request = entitlement.privacyElevation {
@@ -203,7 +203,7 @@ struct Avatar2App: App {
                     .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.18), value: entitlement.privacyElevation)
+            .dsMotion(DSMotion.fast, value: entitlement.privacyElevation)
             // E18.2 + E53.7: sign-in op app-root; geen auto-dismiss bij focusverlies.
             .dsPersistentSheet(isPresented: Binding(
                 get: { entitlement.cloudGate == .signIn },

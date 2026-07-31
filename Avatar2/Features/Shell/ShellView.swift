@@ -415,10 +415,12 @@ struct ShellView: View {
                 .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.section)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingSocialPreview)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingBannerPreview)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.editingBanner != nil)
+        // E53.4: de reduce-motion-check zit in `dsMotion` zelf, niet in een
+        // ternary per view — één plek die je kunt vertrouwen.
+        .dsMotion(DSMotion.emphasis, value: model.section)
+        .dsMotion(DSMotion.emphasis, value: model.isShowingSocialPreview)
+        .dsMotion(DSMotion.emphasis, value: model.isShowingBannerPreview)
+        .dsMotion(DSMotion.emphasis, value: model.editingBanner != nil)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 

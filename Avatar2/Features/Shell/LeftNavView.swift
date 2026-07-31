@@ -337,7 +337,6 @@ private struct LeftNavExpandableHeader: View {
     let onCreateFolder: () -> Void
 
     @State private var rowHovering = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Vaste breedte links zodat label niet verschuift bij icon ↔ chevron.
     /// Zelfde 18 pt als `LeftNavRow`-iconen → label kolom lijn-ligt met Home/Banners.
@@ -423,7 +422,7 @@ private struct LeftNavExpandableHeader: View {
             .allowsHitTesting(rowHovering)
         }
         .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
-        .animation(reduceMotion ? nil : DSMotion.micro, value: rowHovering)
+        .dsMotion(DSMotion.micro, value: rowHovering)
     }
 
     private var rowBackground: Color {

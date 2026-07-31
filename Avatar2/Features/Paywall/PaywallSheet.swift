@@ -147,7 +147,7 @@ struct PaywallSheet: View {
             checkoutErrorView
             footer
         }
-        .animation(DSMotion.base, value: model.selectedInterval)
+        .dsMotion(DSMotion.base, value: model.selectedInterval)
     }
 
     // Monthly / Yearly segmented pill (lokaal; geen AvatarUI-wijziging).

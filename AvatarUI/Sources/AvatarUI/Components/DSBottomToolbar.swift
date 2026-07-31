@@ -192,7 +192,7 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
             // re-enablen bij `.result` zacht terugkomt i.p.v. te poppen.
             .disabled(!toolsEnabled)
             .opacity(toolsEnabled ? DSOpacity.strong : DSOpacity.disabled)
-            .animation(DSMotion.base, value: toolsEnabled)
+            .dsMotion(DSMotion.base, value: toolsEnabled)
 
             // Accessoires (undo/redo/compare) blijven buiten de Card-capsule.
             accessory
@@ -347,9 +347,9 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
                 }
                 .scaleEffect(configuration.isPressed ? pressScale : 1.0)
                 .onHover { isHovering = $0 }
-                .animation(DSMotion.fast, value: isActive)
-                .animation(DSMotion.micro, value: isHovering)
-                .animation(DSMotion.micro, value: configuration.isPressed)
+                .dsMotion(DSMotion.fast, value: isActive)
+                .dsMotion(DSMotion.micro, value: isHovering)
+                .dsMotion(DSMotion.micro, value: configuration.isPressed)
         }
 
         private var backgroundColor: Color {
@@ -459,8 +459,8 @@ struct DSToolbarOverflowButtonStyle: ButtonStyle {
                 .scaleEffect(configuration.isPressed ? size.pressScale : 1.0)
                 .contentShape(Circle())
                 .onHover { isHovering = $0 }
-                .animation(DSMotion.micro, value: isHovering)
-                .animation(DSMotion.micro, value: configuration.isPressed)
+                .dsMotion(DSMotion.micro, value: isHovering)
+                .dsMotion(DSMotion.micro, value: configuration.isPressed)
         }
     }
 }
