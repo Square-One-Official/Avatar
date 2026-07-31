@@ -748,6 +748,29 @@ struct EditorView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                // UXS-17 (UX18): de oude hint was kale zwevende
+                                // tekst en las als debug-overlay; die is met de
+                                // toolbar-unificatie verdwenen, maar daarmee gaf
+                                // niets meer aan dát je naar het origineel kijkt.
+                                // Een DS-capsule die alleen tijdens de hold staat
+                                // — geen permanente chrome, dus ook geen
+                                // "verberg na N keer"-teller nodig.
+                                .overlay(alignment: .top) {
+                                    Text("Original")
+                                        .dsTextStyle(.labelSmall)
+                                        .foregroundStyle(DSColor.Foreground.primary)
+                                        .padding(.horizontal, DSSpacing.gap3)
+                                        .frame(height: 26)
+                                        .background(.ultraThinMaterial, in: Capsule())
+                                        .overlay(
+                                            Capsule().strokeBorder(
+                                                DSColor.Foreground.divider,
+                                                lineWidth: DSBorderWidth.thin
+                                            )
+                                        )
+                                        .padding(DSSpacing.gap4)
+                                        .accessibilityLabel("Showing the original photo")
+                                }
                         } else {
                             // E06.4: pan/snap-canvas + subject-schaal via handles.
                             // E27.1: de VIEW-zoom zit niet meer hier maar als camera
