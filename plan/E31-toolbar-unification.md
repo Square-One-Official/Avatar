@@ -258,6 +258,49 @@ app wordt bevestigd; debug-haken `--board-select <n>` / `--board-batch-bg <hex|n
 **Restpunt:** board-"Enhance" = kleur/Adjust-paneel; de editor-Enhance AI-één-tik-acties zijn op de
 board nog niet bedraad (aparte follow-up).
 
+## 31.8 — Fill-in-body naming/metering consolideren [FEAT]
+- status: done
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C4).
+**Wat:** Fill-in-body bestaat als "Restore body"-chip in het Enhance-paneel
+(`EditColorPanel.swift:166` → `onRestoreBody` → `EditorView.runFillBody`, FLUX Fill
+Pro, 2 credits) — maar drie namen lopen door elkaar: chip "Restore body", de
+overflow-actie "Restore to original" (= re-isolate, een andere functie, registreert
+per ongeluk óók undo-naam "Restore body", `EditorView.swift:500`), en de
+werk-toast "Filling in body". Undo-menu liegt dus over welke actie wordt
+teruggedraaid. De chip toont alleen een Pro-badge, niet de 2-credit-prijs
+(`CreditMeter.chipLabel(for: .fillBody)` bestaat en is getest, wordt hier niet
+gebruikt).
+**Voorstel:** één canonieke naam ("Fill in body") voor chip, toast én undo-entry;
+de overflow-restore-actie krijgt zijn eigen correcte undo-naam; credit-chip via
+`CreditMeter.chipLabel`.
+**DoD:** beide targets bouwen; undo-menu toont de juiste naam per actie; chip toont
+de credit-prijs; tests groen; Result-regel.
+
+**Result:** één canonieke naam per actie:
+- **Chip** heet nu "Fill in body" (`EditColorPanel`, closure hernoemd
+  `onRestoreBody` → `onFillBody`) en toont naast de Pro-badge de echte prijs via
+  `CreditMeter.chipLabel(for: .fillBody)` ("2 credits") — `quickAction` toont
+  Pro-badge en credit-prijs voortaan onafhankelijk i.p.v. either/or.
+- **Undo-entry** van `runFillBody` heet "Fill in body" (was "Fill body"); de
+  werk-toast "Filling in body" sluit daar al op aan (ongewijzigd).
+- **Overflow-actie** `restoreToOriginal` registreert z'n eigen correcte undo-naam
+  "Restore to original" (was per ongeluk "Restore body" → undo-menu loog);
+  foutmelding + doc-comments (`onApplyIsolated`/`onIsolateSubject`) meegetrokken.
+
+**Bewust buiten deze story** (buiten de afgesproken scope Board/Editor; melden i.p.v.
+stil meefixen): `AIFeature.restoreBody.uiLabel` ("Restore body") in
+`Avatar2/Features/Settings/AIFeatureRegistry.swift` + de regel "Colorise, Restore
+body" in `PrivacyFeatureMatrix.swift` — de privacy-elevation-modal/Settings-matrix
+noemen de actie dus nog bij de oude naam; kleine follow-up (2 strings), hoort bij
+C8-credits-transparantie. `DevModelOverrides` ("Fill body", dev-only label) idem.
+
+**DoD/Verificatie:** Avatar (v1) + Avatar2 bouwen; `xcodebuild test -scheme Avatar2`
+100/100 groen; `swift test` AvatarKit 89 + AvatarUI 37 groen. `CreditMeter.chipLabel`
+(.fillBody → "2 credits") was al gedekt door de bestaande AvatarKit-tests.
+
 ---
 
 ## Definition of Done (epic)

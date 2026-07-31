@@ -13,10 +13,11 @@ import AvatarUI
 import SwiftUI
 
 struct SettingsAboutPage: View {
-    /// E01.11: Sparkle-updater. Eigen instance voor de Settings-sessie; de
-    /// auto-check-voorkeur leeft in Sparkle's eigen store (niet langer in
-    /// settings2.autoUpdateCheck).
-    @State private var updater = UpdateManager()
+    /// E13.5 (audit-C1): consumeert dé app-brede Sparkle-updater die
+    /// Avatar2App bezit en via Environment doorgeeft — Sparkle verwacht één
+    /// SPUUpdater per proces, dus hier nooit meer een eigen instance maken.
+    /// De auto-check-voorkeur leeft in Sparkle's eigen store.
+    @Environment(UpdateManager.self) private var updater
 
     private var versionLabel: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–"
@@ -80,33 +81,28 @@ struct SettingsAboutPage: View {
                         linkRow(
                             title: "Website",
                             subtitle: "aaavatar.nl",
-                            url: "https://aaavatar.nl"
+                            url: AppLinks.website
                         )
                         linkRow(
                             title: "Privacy policy",
                             subtitle: "How Aaavatar handles your photos",
-                            url: "https://aaavatar.nl/privacy"
+                            url: AppLinks.privacyPolicy
                         )
                     }
                 }
             }
             .padding(.top, DSSpacing.gap8)
-
-            Spacer()
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
     }
 
-    private func linkRow(title: String, subtitle: String, url: String) -> some View {
+    private func linkRow(title: String, subtitle: String, url: URL) -> some View {
         SettingsRow(title: title, subtitle: subtitle) {
-            DSIconButton(Image(systemName: "arrow.up.right")) {
-                if let target = URL(string: url) {
-                    NSWorkspace.shared.open(target)
-                }
+            DSIconButton(Image(systemName: "arrow.up.right"), label: "Open \(title)") {
+                NSWorkspace.shared.open(url)
             }
-            .accessibilityLabel("Open \(title)")
         }
     }
 }

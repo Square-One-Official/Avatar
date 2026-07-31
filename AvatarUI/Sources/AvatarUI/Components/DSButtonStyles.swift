@@ -19,7 +19,7 @@ struct DSStateOpacityButtonStyle: ButtonStyle {
             configuration.label
                 .opacity(currentOpacity)
                 .onHover { isHovering = $0 }
-                .animation(.easeOut(duration: 0.1), value: isHovering)
+                .animation(DSMotion.micro, value: isHovering)
         }
 
         private var currentOpacity: Double {

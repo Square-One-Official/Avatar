@@ -199,3 +199,33 @@ model"-kaart in SettingsAIModelsPage met Nano Banana (default, checkmark) / Open
 Smoke (`--show-settings aiModels`): kaart rendert met nano geselecteerd. Beide targets groen,
 alle suites groen. Live request-param-wissel verifieerbaar tegen de Vercel-preview (port-only;
 landt op productie bij de volgende E13.0-port samen met E09.2's stylize.ts).
+
+## 15.7 — Delete-account-rij
+- status: done
+- team: FEAT
+- blockedBy: —
+- Result: Delete-account is end-to-end bereikbaar (branch v2/e14-15-audit-fixes).
+  `BackendClient.deleteAccount()` toegevoegd (POST `/v1/account/delete` +
+  `X-Confirm-Delete: yes` via nieuwe `extraHeaders`-parameter op de request-pijplijn);
+  `EntitlementModel.deleteAccount()` (busy-vlag, bij succes `signOutAccount()`, bij
+  falen fout-toast — sessie blijft intact, endpoint is idempotent); destructieve
+  "Delete account"-rij in de Session-sectie van SettingsAccountPage achter een
+  confirmationDialog (zelfde patroon als portret-delete). Lokale bibliotheek blijft
+  bewust staan (dialog-copy zegt dat expliciet). E2E getest tegen prod met een
+  throwaway-account (aangemaakt via GoTrue admin, password-grant-token, delete →
+  `{deleted:true, auth_user_deleted:true}`, user daarna 404). Tests: 3 nieuwe
+  BackendClientDecodeTests (header/method-contract, 500-pad, notSignedIn) + 1
+  EntitlementModelTest (faalpad houdt state intact); alles groen, beide app-targets
+  bouwen. Geen backend-wijziging nodig — het endpoint stond al live.
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C7).
+**Wat:** `SettingsAccountPage.swift` biedt alleen Email / Plan+Manage subscription /
+Credits / Sign out. De backend heeft al `/v1/account/delete` (cancelt Stripe-subs,
+wist de Supabase-user, incl. `x-confirm-delete`-header), maar er is géén
+client-methode of UI die dit endpoint bereikt. GDPR art. 17-frictie, en bij een
+latere Mac App Store-route een harde afwijzing op guideline 5.1.1(v).
+**Voorstel:** `BackendClient.deleteAccount()` toevoegen; een destructieve rij in de
+Session-sectie met bevestigingsdialoog; na succes `signOutAccount()` + eventueel de
+optie de lokale bibliotheek te bewaren of te wissen aanbieden.
+**DoD:** beide targets bouwen; delete-account is bereikbaar en werkt end-to-end tegen
+een test-account; tests groen; Result-regel.

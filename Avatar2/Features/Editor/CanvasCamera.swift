@@ -40,6 +40,20 @@ struct CanvasCamera: Equatable {
         offset = .zero
     }
 
+    /// Editor-open (en ⌘0): toon de HÉLE kaart (frame) gecentreerd in het venster.
+    /// De kaart is "cover"-gemaakt (zijde = de LANGSTE venster-as), dus op 1× loopt
+    /// hij buiten beeld; deze fit zoomt 'm terug tot `coverage` van de KORTSTE
+    /// venster-as. Daardoor staat het frame altijd volledig in beeld met marge —
+    /// de zwevende naam-chip-rij (boven) en toolbar (onder) vallen er niet overheen.
+    /// Puur camera-zoom: geen layout-padding/insets die de scène verschuiven.
+    mutating func fitEditorCard(cardSide: CGFloat, in viewport: CGSize, coverage: CGFloat = 0.7) {
+        // Vierkante kaart contain-fitten = `coverage`·min(venster-as) / kaartzijde,
+        // gecentreerd (offset 0). Hergebruikt `fitToContent` zodat de clamp/guard/
+        // centreer-logica op één plek leeft.
+        fitToContent(contentSize: CGSize(width: cardSide, height: cardSide),
+                     in: viewport, padding: coverage)
+    }
+
     /// Zoom rond een vast PUNT (cursorlocatie in viewport-punten) zodat het punt
     /// onder de cursor stil blijft staan. Gebruikt door ⌘-scroll/magnify in de
     /// NSEvent-catcher. Afleiding: met scherm = midden + scale·(p−midden) + offset
@@ -67,14 +81,5 @@ struct CanvasCamera: Equatable {
         offset.width *= r
         offset.height *= r
         scale = newScale
-    }
-
-    /// ⌘0 (100%): zet de zoom terug op 1× én centreert de scène (pan = 0). In
-    /// dit camera-model is 1× tegelijk de fit-schaal — een pixel-echte 100%
-    /// vraagt de bron-pixelmaat en hoort bij 27.2/27.3. Recenteren is een
-    /// expliciete wens (anders blijft een verschoven canvas off-center staan).
-    mutating func resetToActualSize() {
-        scale = 1
-        offset = .zero
     }
 }

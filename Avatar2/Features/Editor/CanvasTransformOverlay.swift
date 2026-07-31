@@ -18,6 +18,8 @@ import SwiftUI
 struct CanvasTransformOverlay: View {
     /// Zijde van de (niet-gezoomde) canvas-vierkant-slot, in punten.
     let side: CGFloat
+    /// Midden van de kaart in viewport-coördinaten (default: vierkant gecentreerd).
+    var cardCenter: CGPoint?
     let image: NSImage
     let portrait: Portrait2
     /// De huidige camera (E27.1) — mapt canvas-punten naar het scherm.
@@ -44,7 +46,7 @@ struct CanvasTransformOverlay: View {
             y: (t.offsetY + image.size.height * t.scale / 2) * factor
         )
         // Camera-mapping: scherm = midden + scale·(p − midden) + offset.
-        let vp = CGPoint(x: side / 2, y: side / 2)
+        let vp = cardCenter ?? CGPoint(x: side / 2, y: side / 2)
         let center = CGPoint(
             x: vp.x + camera.scale * (centerCanvas.x - vp.x) + camera.offset.width,
             y: vp.y + camera.scale * (centerCanvas.y - vp.y) + camera.offset.height
@@ -59,10 +61,11 @@ struct CanvasTransformOverlay: View {
         ]
 
         ZStack {
-            // E24.29: subtiel selectiekader op de onderwerp-box (vaste 1pt lijn —
-            // screen-space, dus geen camera-verdikking).
+            // E24.29: selectiekader op de onderwerp-box (vaste 1pt lijn —
+            // screen-space). primaryForeground i.p.v. lime-fill: leesbaar op lichte
+            // én donkere canvas (E23 theme-bewust).
             Rectangle()
-                .strokeBorder(DSColor.Action.primary.opacity(0.45), lineWidth: 1)
+                .strokeBorder(DSColor.Action.primaryForeground.opacity(0.85), lineWidth: 1)
                 .frame(width: max(0, halfW * 2), height: max(0, halfH * 2))
                 .position(center)
                 .allowsHitTesting(false)
@@ -82,15 +85,15 @@ struct CanvasTransformOverlay: View {
         .frame(width: side, height: side)
         // Tijdens pannen even weg (zoals E24.29 deed met isDragging).
         .opacity(isPanning ? 0 : 1)
-        .animation(.easeOut(duration: 0.12), value: isPanning)
+        .animation(DSMotion.micro, value: isPanning)
         .coordinateSpace(name: Self.space)
     }
 
     private func handleDot(at pos: CGPoint, center: CGPoint) -> some View {
-        // E24.29: 10pt-dot — hier vaste schermgrootte (screen-space overlay).
+        // E24.29: 10pt-dot — vaste schermgrootte (screen-space overlay).
         Circle()
-            .fill(.white)
-            .overlay(Circle().strokeBorder(DSColor.Action.primary, lineWidth: 1.5))
+            .fill(DSColor.Background.card)
+            .overlay(Circle().strokeBorder(DSColor.Action.primaryForeground, lineWidth: 1.5))
             .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
             .frame(width: 10, height: 10)
             .position(pos)

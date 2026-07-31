@@ -11,6 +11,15 @@ struct Avatar2App: App {
     @State private var entitlement: EntitlementModel
     /// E17.5: getargete in-app-berichten (verenigd Message-model).
     @State private var messaging: MessagingService
+    /// E13.5 (audit-C1): dé app-brede Sparkle-updater — één SPUUpdater per
+    /// proces. Via Environment naar Settings→About; launch doet een
+    /// achtergrondcheck (zie `.task` hieronder).
+    @State private var updates: UpdateManager
+
+    /// Eigen SwiftData-store voor de set (E05.4). Normaal de persistente store;
+    /// onder `--smoke-store` (DEBUG) een GEÏSOLEERDE, gezaaide in-memory store zodat
+    /// smoke-screenshots Thierry's echte portretten niet vervuilen.
+    private let modelContainer: ModelContainer
 
     init() {
         // Eén venster, geen tabs: zonder dit injecteert AppKit een eigen
@@ -25,6 +34,33 @@ struct Avatar2App: App {
         _onboarding = State(initialValue: OnboardingModel(auth: auth))
         _entitlement = State(initialValue: entitlement)
         _messaging = State(initialValue: MessagingService(backend: entitlement.backend))
+        // E13.5: Sparkle start hier (één per proces); in de unit-test-host
+        // valt UpdateManager zelf terug op een no-op-engine.
+        _updates = State(initialValue: UpdateManager())
+        modelContainer = Self.makeModelContainer()
+    }
+
+    /// Bouwt de set-store: persistent in productie, gezaaid in-memory bij
+    /// `--smoke-store` (DEBUG-smoke).
+    private static func makeModelContainer() -> ModelContainer {
+        let models: [any PersistentModel.Type] = [Portrait2.self, Folder2.self, Banner2.self, BannerDoc.self]
+        let schema = Schema(models)
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--smoke-store") {
+            if let container = try? ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            ) {
+                SmokeSeed.populate(container.mainContext)
+                return container
+            }
+        }
+        #endif
+        do {
+            return try ModelContainer(for: schema)
+        } catch {
+            fatalError("Kon de Avatar2-store niet maken: \(error)")
+        }
     }
 
     var body: some Scene {
@@ -39,6 +75,9 @@ struct Avatar2App: App {
             // Punt 18a: minimum waarbij de layout nooit kapot kan (de
             // first-use-ring schaalt mee, 18b); default-opening hieronder.
             .frame(minWidth: 800, minHeight: 600)
+            // E49.3: beeld-edits houden volledige PNG-Data in undo-closures;
+            // zonder cap groeit de venster-history onbegrensd.
+            .undoHistoryCap()
             #if DEBUG
             .task {
                 // Smoke-run-haak (--onboarding-step <stap>): forceer de flow
@@ -77,13 +116,27 @@ struct Avatar2App: App {
             #endif
             // E17.5: getargete berichten ophalen bij app-start (faalt stil).
             .task { await messaging.refresh() }
+            // E13.5 (audit-C1): achtergrond-update-check bij launch — About
+            // hoeft nooit open. Eenmalig per proces (guard in de manager) en
+            // respecteert de "Automatic updates"-toggle.
+            .task { updates.checkForUpdatesInBackgroundAtLaunch() }
+            // E13.5: dezelfde instance voor Settings→About (geen tweede
+            // SPUUpdater per proces).
+            .environment(updates)
             // Account-fix: de Supabase-sessie (bearer-token) wordt ASYNC hersteld
             // via authStateChanges ná launch. De vroege refresh (ShellTopBar) haalt
             // dan nog het ANONIEME account op (geen Pro, 0 credits) → alle pro-
             // features vielen in de paywall. Her-fetch het account zodra het token
             // er is (isSignedIn flipt) zodat Pro/credits kloppen.
-            .onChange(of: entitlement.isSignedIn) { _, signedIn in
-                if signedIn { Task { await entitlement.refresh() } }
+            .onChange(of: auth.isSignedIn) { _, signedIn in
+                if signedIn {
+                    Task { await entitlement.refresh() }
+                } else {
+                    // E04.8: sign-out → als de onboarding weer actief wordt
+                    // (hasCompleted == false), begint die op splash i.p.v.
+                    // een verweesde tussenstap.
+                    onboarding.resetToSplash()
+                }
             }
             // E17.5: in-app bericht-sheet (overlay → geen layoutshift).
             .overlay { messageOverlay }
@@ -92,9 +145,9 @@ struct Avatar2App: App {
             // WindowGroup persisteert het venster-frame zelf (defaultSize bij
             // eerste start, daarna de gebruikersmaat). Twee autosave-bronnen
             // op één NSWindow lieten het hiddenTitleBar-venster inklappen.
-            .sheet(isPresented: Binding(
+            .dsPersistentSheet(isPresented: Binding(
                 get: { entitlement.isPaywallPresented },
-                set: { entitlement.isPaywallPresented = $0 }
+                set: { if $0 { entitlement.isPaywallPresented = true } }
             )) {
                 PaywallSheet(model: entitlement)
             }
@@ -110,11 +163,13 @@ struct Avatar2App: App {
                         }
                     } else if let message = entitlement.errorToast {
                         // E18.3: cloud-fout als toast i.p.v. inline tekst.
+                        // E44.1: duur uit het model (≥ 8s) — 4s was zo kort
+                        // dat een echte fout onopgemerkt bleef.
                         DSToast(title: "Something went wrong", description: message) {
                             entitlement.dismissErrorToast()
                         }
                         .task {
-                            try? await Task.sleep(for: .seconds(4))
+                            try? await Task.sleep(for: EntitlementModel.errorToastDuration)
                             entitlement.dismissErrorToast()
                         }
                     }
@@ -125,23 +180,27 @@ struct Avatar2App: App {
             .animation(.spring(duration: 0.3), value: entitlement.errorToast)
             .animation(.spring(duration: 0.3), value: entitlement.workingContext != nil)
             .animation(.spring(duration: 0.3), value: entitlement.isShowingOutOfCreditsToast)
-            // E18.2: contextuele cloud-feature-gate — online aanzetten.
-            .alert(
-                "Turn on online models?",
-                isPresented: Binding(
-                    get: { entitlement.cloudGate == .enableOnline },
-                    set: { if !$0 { entitlement.dismissCloudGate() } }
-                )
-            ) {
-                Button("Turn on") { entitlement.enableOnlineModels() }
-                Button("Not now", role: .cancel) { entitlement.dismissCloudGate() }
-            } message: {
-                Text("Effects, Hair and Clothing use secure online models. Turn them on to continue — your photos are processed securely and never stored.")
+            // Privacy Tier Picker: elevation modal → Settings.
+            .overlay {
+                if let request = entitlement.privacyElevation {
+                    ZStack {
+                        Color.black.opacity(0.45)
+                            .ignoresSafeArea()
+                            .onTapGesture { entitlement.dismissPrivacyElevation() }
+                        PrivacyElevationSheet(
+                            request: request,
+                            onOpenSettings: { entitlement.openPrivacySettings() },
+                            onDismiss: { entitlement.dismissPrivacyElevation() }
+                        )
+                    }
+                    .transition(.opacity)
+                }
             }
-            // E18.2: gate — inloggen om Pro te checken.
-            .sheet(isPresented: Binding(
+            .animation(.easeOut(duration: 0.18), value: entitlement.privacyElevation)
+            // E18.2 + E53.7: sign-in op app-root; geen auto-dismiss bij focusverlies.
+            .dsPersistentSheet(isPresented: Binding(
                 get: { entitlement.cloudGate == .signIn },
-                set: { if !$0 { entitlement.dismissCloudGate() } }
+                set: { _ in }
             )) {
                 SignInSheet(entitlement: entitlement)
             }
@@ -155,13 +214,25 @@ struct Avatar2App: App {
         // eigen `CommandMenu("View")` — dat laatste maakte een TWEEDE menu met
         // dezelfde titel naast het AppKit-View-menu (Enter Full Screen/tabs).
         .commands {
+            // ⌘, → in-venster Settings (vervangt het standaard uitgegrijsde item).
+            CommandGroup(replacing: .appSettings) {
+                SettingsCommands()
+            }
             CommandGroup(after: .sidebar) {
                 Divider()
                 CanvasZoomCommands()
             }
+            // E49.2: ⌘U app-breed in het File-menu (werkt ook op board/editor);
+            // zelfde focused-scene-value-patroon als SettingsCommands hierboven.
+            CommandGroup(after: .newItem) {
+                UploadPortraitCommands()
+            }
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
-        .modelContainer(for: Portrait2.self)
+        // PoC (left-nav): Folder2 voor de Portraits-galerij, E35.1: Banner2 voor de
+        // Banners-bibliotheek. De container wordt in `init` gebouwd (persistent, of
+        // gezaaid in-memory bij `--smoke-store`).
+        .modelContainer(modelContainer)
         // Bevinding 1 (E04.5): Figma kent geen aparte titelbalk — één zwart
         // vlak, traffic lights inline, geen venstertitel. hiddenTitleBar
         // geeft full-size content; de topbar reserveert zelf ruimte naast

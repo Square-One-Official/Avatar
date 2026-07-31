@@ -1,9 +1,7 @@
 // FigJam-stijl naam-chip linksboven het frame (E33). Vervangt de gecentreerde
-// PortraitHeader in de enkel-editor: toont de portretnaam als pill die
-//   - bij een single-click het frame selecteert (top-toolbar + ring terug), en
-//   - bij een dubbelklik de rename-modal opent (FigJam-conventie).
-// De active-stijl (neutraal-grijze rand) volgt de frame-selectie; de naam is áltijd
-// zichtbaar (ook gedeselecteerd), net als de "Section 1"-labels in FigJam.
+// PortraitHeader in de enkel-editor: toont de portretnaam als pill; dubbelklik
+// opent de rename-modal (FigJam-conventie). Het frame is altijd actief — de chip
+// deelt één rij met Frame/Background/grid naast de kaart.
 // Naam/fallback-logica 1-op-1 uit de oude PortraitHeader.
 
 import AvatarUI
@@ -11,9 +9,9 @@ import SwiftUI
 
 struct CanvasFrameChip: View {
     var name: String?
-    var isActive: Bool
-    var onSelect: () -> Void
     var onRename: () -> Void
+
+    @State private var hovering = false
 
     private var displayName: String {
         let n = name ?? ""
@@ -28,24 +26,18 @@ struct CanvasFrameChip: View {
             .lineLimit(1)
             .frame(height: 28)
             .padding(.horizontal, DSSpacing.gap3)
-            .background(DSColor.Background.card, in: Capsule(style: .continuous))
+            .background(
+                DSColor.neutralSurface(pressed: false, hovering: hovering, base: DSColor.Background.neutralStronger),
+                in: Capsule(style: .continuous)
+            )
             .overlay(
-                // Active = neutraal-grijze rand (macOS-stijl, cohesie met de OUTER
-                // frame-ring — géén lime); rust = subtiele neutral-rand.
                 Capsule(style: .continuous)
-                    .strokeBorder(
-                        isActive ? EditorView.frameSelectionGrey : DSColor.Background.neutralStronger,
-                        lineWidth: isActive ? 1.5 : 1
-                    )
+                    .strokeBorder(EditorView.frameSelectionGrey, lineWidth: 1.5)
             )
             .contentShape(Capsule(style: .continuous))
-            // Dubbelklik vóór single zodat hij voorrang krijgt (FigJam: klik =
-            // selecteren, dubbelklik = hernoemen).
-            .onTapGesture(count: 2) { onRename() }
-            .onTapGesture { onSelect() }
-            // Alleen een opacity-/kleur-crossfade van de rand (geen beweging) —
-            // reduced-motion-bewust via dsMotion.
-            .dsMotion(DSMotion.fast, value: isActive)
-            .help("Click to select · double-click to rename")
+            .onHover { hovering = $0 }
+            .animation(DSMotion.micro, value: hovering)
+            .onDoubleClick { onRename() }
+            .help("Double-click to rename")
     }
 }

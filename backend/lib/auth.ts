@@ -9,7 +9,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 // key published at /auth/v1/.well-known/jwks.json. Legacy HS256 JWT shared
 // secret is intentionally not supported — project must have legacy JWT-based
 // API keys disabled in Settings → API Keys.
-const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+// Single normalized auth base (trailing slash stripped) so the JWKS fetch URL
+// and the asserted issuer can never disagree on trailing-slash handling — a
+// trailing slash in SUPABASE_URL would otherwise give the JWKS path a double
+// slash (`…co//auth/v1/.well-known/…`) while the issuer stayed canonical.
+const SUPABASE_AUTH_BASE = `${SUPABASE_URL.replace(/\/+$/, "")}/auth/v1`;
+
+const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_AUTH_BASE}/.well-known/jwks.json`));
+
+// Pinning the JWKS URL to this project already prevents cross-project token
+// reuse, so asserting `iss` is defense-in-depth — it rejects a token whose
+// issuer doesn't match even if it somehow verified against the key set.
+// (Audience is intentionally not asserted: the project's `aud` value isn't
+// verified here, and a wrong guess would reject every valid token.)
 
 export type AuthedUser = {
   id: string;
@@ -77,7 +89,7 @@ export async function optionalUser(
 
 async function verifyToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, JWKS);
+    const { payload } = await jwtVerify(token, JWKS, { issuer: SUPABASE_AUTH_BASE });
     return payload;
   } catch {
     return null;

@@ -10,9 +10,9 @@
  *     CreditMeter expose per action (E03.7 cloud-glyph).
  *
  * Refs are either a pinned `slug:versionhash` (community models whose
- * unversioned slug 404s on `replicate.run` — BiRefNet, DeOldify) or an
- * unversioned official slug (flux-fill-pro). Upgrading a model = changing
- * one line here.
+ * unversioned slug 404s on `replicate.run` — BiRefNet, DeOldify,
+ * Real-ESRGAN, Crystal Upscaler) or an unversioned official slug
+ * (flux-fill-pro). Upgrading a model = changing one line here.
  *
  * NOTE for E09.1 (bakeoff) / E15.5 (dev model-picker): alternative models
  * register here as extra `models` entries. An alternative must accept the
@@ -20,7 +20,7 @@
  * adapter in lib/replicate.ts first and only then register it.
  */
 
-export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale";
+export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale" | "generate_background";
 
 export interface ModelEntry {
   /** Replicate ref: unversioned `owner/slug` or pinned `owner/slug:version`. */
@@ -127,19 +127,56 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 4,
     requiresCloud: true,
   },
-  // E10.3: Boost resolution. Real-ESRGAN — robuuste, goedkope 2–4× upscaler
-  // (~$0,002–0,005/call, ruim binnen 1 credit). Community-model → gepind op
-  // versie (unversioned slug 404t, zelfde patroon als birefnet). Bij een
-  // 404 op de preview de hash herpinnen via replicate.com/nightmareai/real-esrgan.
+  // E10.3 + E41.1 + E41.4: Boost resolution. Default = topaz (Gigapixel High
+  // Fidelity V2): won de E41.4-bakeoff (2026-07-03, 4 armen × 5 E09-
+  // portretten, live Replicate-runs door de echte pipeline) op detailbehoud
+  // + natuurlijke huidtextuur zonder identiteitsdrift; 8–15s per run.
+  // real-esrgan bleef ook zonder face_enhance de "plastic" verliezer.
+  // Crystal-422-naschrift (2026-07-03): de in E41.3 gepinde hash wás de
+  // huidige latest (zonder login verifieerbaar — `latest_version` staat in
+  // de HTML van de modelpagina). 422 "Invalid version or not permitted"
+  // betekent dat dit model geen versioned runs toestaat → unversioned ref,
+  // met een expliciete uitzondering op de pin-guard in models-smoke.ts;
+  // unversioned live bevestigd in de bakeoff.
+  // NB: upscaleInputFor (lib/replicate.ts) matcht op het slug-prefix.
   upscale: {
-    defaultModel: "real-esrgan",
+    defaultModel: "topaz",
     models: {
+      topaz: {
+        ref: "topazlabs/image-upscale",
+        label: "Topaz Gigapixel (High Fidelity V2)",
+      },
+      "google-upscaler": {
+        ref: "google/upscaler",
+        label: "Google Upscaler (Imagen)",
+      },
+      "crystal-upscaler": {
+        ref: "philz1337x/crystal-upscaler",
+        label: "Crystal Upscaler (portrait)",
+      },
       "real-esrgan": {
         ref: "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
         label: "Real-ESRGAN",
       },
     },
+    // E41.5: upscale rekent per tier af — zie UPSCALE_TIERS in api/v1/upscale.ts
+    // (regular=1, high=3). Dit veld is voor upscale alleen nog de registry-vorm.
     credits: 1,
+    requiresCloud: true,
+  },
+  generate_background: {
+    defaultModel: "nano-banana",
+    models: {
+      "nano-banana": {
+        ref: "google/nano-banana",
+        label: "Nano Banana (Gemini 2.5 Flash Image)",
+      },
+      "gpt-image-1.5": {
+        ref: "openai/gpt-image-1.5",
+        label: "GPT Image 1.5",
+      },
+    },
+    credits: 2,
     requiresCloud: true,
   },
 };
@@ -159,6 +196,7 @@ export function defaultModelRef(feature: CloudFeature): string {
  */
 export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
   stylize: ["nano-banana", "gpt-image-1.5"],
+  generate_background: ["nano-banana", "gpt-image-1.5"],
 };
 
 /**

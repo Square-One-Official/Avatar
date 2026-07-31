@@ -16,17 +16,15 @@
 // aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
 // een klik op de canvas (EditorView) de dropdown sluit, net als de panelen.
 //
-// E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
-// het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
-// bottom-toolbar en de app-bar blijven SF Symbols (besluit Thierry).
+// E49.4-iconen: alle iconen zijn SF Symbols via DSIcon (de PhosphorSwift-
+// dependency is verwijderd; de bedoelde Phosphor-namen staan als commentaar
+// in DSIcon als latere omschakel-seam — zie plan/DECISIONS-PENDING.md).
 //
 // E32: deze toolbar deelt nu exact dezelfde DS-componenten als de onderste
 // toolbar (`DSCapsuleToolButton` + `.dsToolbarCapsule`), alleen op `.compact`-
-// maat. De Phosphor-menu-iconen renderen via de generieke icon-init (Phosphor
-// blijft Phosphor); de chevron is een gedeelde SF `chevron.down`. De dropdowns
+// maat; de chevron is een gedeelde SF `chevron.down`. De dropdowns
 // delen de paneel-radius (xl4) met de onderste DSEditPanel.
 
-import PhosphorSwift
 import AvatarUI
 import SwiftUI
 
@@ -34,6 +32,13 @@ import SwiftUI
 enum CanvasToolbarMenu: Hashable {
     // E31.2: `adjust` → onderste capsule ("Enhance"). E31.3: `ai` → Enhance-paneel.
     case frame, background
+}
+
+/// `.capsule` = compact capsule boven/in het frame (board batch-bar). `.headerRow` =
+/// losse 28pt-pillen naast de naam-chip (single-editor).
+enum CanvasToolbarLayout {
+    case capsule
+    case headerRow
 }
 
 struct CanvasActionToolbar<Background: View>: View {
@@ -49,20 +54,33 @@ struct CanvasActionToolbar<Background: View>: View {
     @Binding var activeMenu: CanvasToolbarMenu?
     /// E24.26: grid/thirds-overlay aan/uit (toggle in de toolbar).
     @Binding var gridEnabled: Bool
+    /// Vision-detectie loopt voor auto-frame (subtiele spinner op Frame-knop).
+    var isAutoFraming: Bool = false
     /// E31.7: de board hergebruikt deze toolbar maar zonder de editor-only
     /// transform-acties (Auto-frame/Crop/Fix-angle) en zonder de grid-toggle —
     /// die hebben geen effect op een statische board-node. Default true →
     /// single-editor ongewijzigd.
     var showFramingActions: Bool = true
     var showGrid: Bool = true
+    /// `.headerRow` = naast de naam-chip (28pt, geen outer capsule).
+    var layout: CanvasToolbarLayout = .capsule
     @ViewBuilder var background: () -> Background
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var buttonSize: DSToolbarSize { layout == .headerRow ? .chip : .compact }
+    private var buttonSurface: CapsuleToolSurface { layout == .headerRow ? .secondary : .ghost }
+    private var rowSpacing: CGFloat {
+        layout == .headerRow ? DSSpacing.gap2 : DSToolbarSize.compact.itemSpacing
+    }
 
     var body: some View {
-        HStack(spacing: DSSpacing.gap1) {
-            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
+        HStack(spacing: rowSpacing) {
+            toolbarItem(.frame, "Frame", icon: .frame, chevron: true, width: 240, padding: DSSpacing.gap2) {
                 frameMenu
             }
-            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
+            // 440: het Notion-stijl tab-paneel (4 tabs + Original/None-pills,
+            // 4-koloms grid) heeft meer breedte nodig dan de oude swatch-rijen.
+            toolbarItem(.background, "Background", icon: .background, chevron: false, width: 440, padding: DSSpacing.gap4) {
                 background()
             }
             // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen
@@ -72,21 +90,17 @@ struct CanvasActionToolbar<Background: View>: View {
                 // nu dezelfde lime-ring + lime-tint als een actieve onderste pil.
                 DSCapsuleToolButton(
                     isActive: gridEnabled,
-                    size: .compact,
+                    size: buttonSize,
+                    surface: buttonSurface,
                     action: { gridEnabled.toggle() }
                 ) {
-                    Ph.gridNine.regular
-                        .scaledToFit()
-                        .frame(width: DSToolbarSize.compact.iconPointSize,
-                               height: DSToolbarSize.compact.iconPointSize)
+                    pillIcon(.grid)
                 }
                 .help("Toggle alignment grid")
             }
         }
-        // E32: zelfde solide Card-capsule als de onderste toolbar (geen glas/rand),
-        // alleen compacter (`.compact`).
-        .dsToolbarCapsule(size: .compact)
-        .animation(.easeOut(duration: 0.14), value: activeMenu)
+        .modifier(CanvasToolbarChrome(layout: layout, buttonSize: buttonSize))
+        .dsMotion(DSMotion.fast, value: activeMenu)
         #if DEBUG
         .onAppear {
             let args = ProcessInfo.processInfo.arguments
@@ -101,24 +115,29 @@ struct CanvasActionToolbar<Background: View>: View {
     /// `dsPanelSurface`-oppervlak met de bottom-panelen.
     @ViewBuilder
     private func toolbarItem<Content: View>(
-        _ menu: CanvasToolbarMenu, _ title: String, icon: Ph,
+        _ menu: CanvasToolbarMenu, _ title: String, icon: DSIcon.Symbol,
         chevron: Bool, width: CGFloat, padding: CGFloat,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        // E32: gedeelde compact-pil i.p.v. de inline `menuButton`. De Phosphor-
-        // menu-iconen blijven Phosphor (generieke icon-init); de chevron is een
+        // E32: gedeelde compact-pil i.p.v. de inline `menuButton`. E49.4: de
+        // menu-iconen komen via `DSIcon.image` (SF Symbols); de chevron is een
         // gedeelde SF `chevron.down`. Active (menu open) krijgt nu de lime-ring.
         DSCapsuleToolButton(
             label: title,
             showChevron: chevron,
-            isActive: activeMenu == menu,
-            size: .compact,
+            isActive: activeMenu == menu || (menu == .frame && isAutoFraming),
+            size: buttonSize,
+            surface: buttonSurface,
             action: { activeMenu = (activeMenu == menu) ? nil : menu }
         ) {
-            icon.regular
-                .scaledToFit()
-                .frame(width: DSToolbarSize.compact.iconPointSize,
-                       height: DSToolbarSize.compact.iconPointSize)
+            if menu == .frame && isAutoFraming {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: buttonSize.iconPointSize,
+                           height: buttonSize.iconPointSize)
+            } else {
+                pillIcon(icon)
+            }
         }
         .overlay(alignment: .top) {
             if activeMenu == menu {
@@ -128,14 +147,23 @@ struct CanvasActionToolbar<Background: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
                     // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
                     .dsPanelSurface(cornerRadius: DSRadius.xl4)
-                    // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
-                    .offset(y: DSToolbarSize.compact.height
-                              + DSToolbarSize.compact.containerPadding
-                              + DSSpacing.gap2)
+                    .offset(y: buttonSize.height + dropdownGap)
                     .zIndex(10)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
             }
         }
+    }
+
+    private var dropdownGap: CGFloat {
+        layout == .headerRow ? DSSpacing.gap2 : buttonSize.containerPadding + DSSpacing.gap2
+    }
+
+    /// E49.4: zelfde font-maatvoering als de onderste toolbar (`.medium`, zie
+    /// `_DSFontSizedIcon`) zodat de pillen één gewicht delen; erft de
+    /// omgevings-tint (active-lime) i.p.v. DSIcon's vaste primary.
+    private func pillIcon(_ icon: DSIcon.Symbol) -> some View {
+        DSIcon.image(icon)
+            .font(.system(size: buttonSize.iconPointSize, weight: .medium))
     }
 
     // MARK: Dropdown-inhoud
@@ -145,11 +173,11 @@ struct CanvasActionToolbar<Background: View>: View {
             // E31.7: de transform-acties bestaan alleen in de single-editor
             // (live transform-state); op de board tonen we enkel Flip + Shape.
             if showFramingActions {
-                menuRow("Auto-frame & center", icon: .cornersOut, action: onAutoFrame)
+                menuRow("Auto-frame & center", icon: .autoFrame, action: onAutoFrame)
                 menuRow("Crop", icon: .crop, action: onCrop)
-                menuRow("Fix camera angle", icon: .perspective, action: onFixAngle)
+                menuRow("Fix camera angle", icon: .fixAngle, action: onFixAngle)
             }
-            menuRow("Flip horizontal", icon: .flipHorizontal, action: onFlip)
+            menuRow("Flip horizontal", icon: .flip, action: onFlip)
 
             // E24.16: frame-vorm-keuze. Cirkel = merkvorm (default), vierkant
             // als alternatief; de actieve vorm krijgt een checkmark.
@@ -159,24 +187,24 @@ struct CanvasActionToolbar<Background: View>: View {
                 .foregroundStyle(DSColor.Foreground.muted)
                 .padding(.horizontal, DSSpacing.gap3)
                 .padding(.bottom, DSSpacing.gap1)
-            shapeRow("Circle", icon: .circle, shape: .circle)
-            shapeRow("Square", icon: .square, shape: .square)
+            shapeRow("Circle", icon: .shapeCircle, shape: .circle)
+            shapeRow("Square", icon: .shapeSquare, shape: .square)
         }
     }
 
-    private func shapeRow(_ title: String, icon: Ph, shape: ExportShape) -> some View {
+    private func shapeRow(_ title: String, icon: DSIcon.Symbol, shape: ExportShape) -> some View {
         Button {
             activeMenu = nil
             onSetFrameShape(shape)
         } label: {
             HStack(spacing: DSSpacing.gap2) {
-                icon.regular.scaledToFit().frame(width: 16, height: 16)
+                rowIcon(icon)
                 Text(title).dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary)
                 Spacer(minLength: DSSpacing.gap2)
                 if frameShape == shape {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                 }
             }
             .foregroundStyle(DSColor.Foreground.primary)
@@ -189,14 +217,22 @@ struct CanvasActionToolbar<Background: View>: View {
         .buttonStyle(.plain)
     }
 
+    /// E49.4: dropdown-rij-icoon — vaste 16pt-doos zoals voorheen; erft de
+    /// rij-foreground (primary) via het omgevings-tintpad van `DSIcon.image`.
+    private func rowIcon(_ icon: DSIcon.Symbol) -> some View {
+        DSIcon.image(icon)
+            .font(.system(size: 13, weight: .regular))
+            .frame(width: 16, height: 16)
+    }
+
     /// Een dropdown-rij; `action == nil` = nog-niet-gebouwde stub (gedimd).
-    private func menuRow(_ title: String, icon: Ph, pro: Bool = false, action: (() -> Void)?) -> some View {
+    private func menuRow(_ title: String, icon: DSIcon.Symbol, pro: Bool = false, action: (() -> Void)?) -> some View {
         Button {
             activeMenu = nil
             action?()
         } label: {
             HStack(spacing: DSSpacing.gap2) {
-                icon.regular.scaledToFit().frame(width: 16, height: 16)
+                rowIcon(icon)
                 Text(title).dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary)
                 Spacer(minLength: DSSpacing.gap2)
                 if pro { DSProChip() }
@@ -213,4 +249,18 @@ struct CanvasActionToolbar<Background: View>: View {
         .disabled(action == nil)
     }
 
+}
+
+private struct CanvasToolbarChrome: ViewModifier {
+    let layout: CanvasToolbarLayout
+    let buttonSize: DSToolbarSize
+
+    func body(content: Content) -> some View {
+        switch layout {
+        case .capsule:
+            content.dsToolbarCapsule(size: .compact)
+        case .headerRow:
+            content
+        }
+    }
 }

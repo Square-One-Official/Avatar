@@ -15,19 +15,13 @@ import SwiftUI
 struct SettingsRootView: View {
     /// E15.3: Account-pagina leest plan/credits/e-mail via het entitlement.
     let entitlement: EntitlementModel
+    let model: ShellModel
+    @Binding var page: SettingsPage
 
     #if DEBUG
     /// Smoke-run-haak (--show-settings <pagina>); zie ShellView.
     @MainActor static var debugInitialPage: SettingsPage?
     #endif
-
-    @State private var page: SettingsPage = {
-        #if DEBUG
-        return SettingsRootView.debugInitialPage ?? .preferences
-        #else
-        return .preferences
-        #endif
-    }()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -66,16 +60,23 @@ struct SettingsRootView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch page {
-        case .preferences:
-            SettingsPreferencesPage()
-        case .aiModels:
-            SettingsAIModelsPage(entitlement: entitlement)
-        case .account:
-            SettingsAccountPage(entitlement: entitlement)
-        case .about:
-            SettingsAboutPage()
+        ScrollView {
+            Group {
+                switch page {
+                case .preferences:
+                    SettingsPreferencesPage()
+                case .aiModels:
+                    SettingsAIModelsPage(entitlement: entitlement)
+                case .account:
+                    SettingsAccountPage(entitlement: entitlement, model: model)
+                case .about:
+                    SettingsAboutPage()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.bottom, DSSpacing.gap8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

@@ -45,6 +45,33 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
         override var isFlipped: Bool { true }
     }
 
+    // MARK: - Scroll-delta-schaling (E27.9, audit C2)
+    // Een trackpad meldt PUNTEN (`hasPreciseScrollingDeltas == true`); een
+    // muiswiel meldt LINE-deltas (~±1 per tik). Apple's docs: vermenigvuldig
+    // line-deltas met de regelhoogte. Zonder die schaal was een wiel-tik
+    // ~0,75pt pan en ~1% zoom — "het board scrollt niet" met een muis.
+    // Statisch + puur zodat Avatar2Tests de schaling kan dekken.
+
+    /// Regelhoogte-benadering voor muiswiel-line-deltas (plan 27.9: ×20–40).
+    static let mouseWheelLineHeight: CGFloat = 24
+    /// Zoomgevoeligheid van ⌘-scroll (per punt scroll-delta).
+    static let zoomPerScrollUnit: CGFloat = 0.01
+
+    /// Scroll-delta → pan-delta in viewport-punten.
+    static func scrollPanDelta(_ delta: CGFloat, precise: Bool) -> CGFloat {
+        precise ? delta : delta * mouseWheelLineHeight
+    }
+
+    /// Scroll-delta → zoomfactor voor ⌘-scroll. Trackpad: ongewijzigd gedrag
+    /// (kleine punt-deltas op event-rate). Muiswiel: line-delta × regelhoogte,
+    /// geclampt zodat één (door macOS versnelde) wiel-tik de zoom niet in één
+    /// klap laat springen.
+    static func scrollZoomFactor(deltaY: CGFloat, precise: Bool) -> CGFloat {
+        if precise { return 1 - deltaY * zoomPerScrollUnit }
+        let factor = 1 - deltaY * mouseWheelLineHeight * zoomPerScrollUnit
+        return min(max(factor, 0.75), 1.33)
+    }
+
     final class Coordinator {
         var camera: Binding<CanvasCamera>
         var chromeHovered = false
@@ -52,8 +79,6 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
         private var monitor: Any?
         private var spaceDown = false
 
-        // Zoomgevoeligheid van ⌘-scroll (per scroll-eenheid).
-        private let zoomPerScrollUnit: CGFloat = 0.01
         private let spaceKeyCode: UInt16 = 49
 
         init(camera: Binding<CanvasCamera>) { self.camera = camera }
@@ -99,15 +124,22 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
                 return nil
             case .scrollWheel:
                 guard let point = pointInCanvas(for: event) else { return event }
+                // E27.9 (audit C2): muiswiel-line-deltas naar punten schalen;
+                // trackpad-deltas (hasPreciseScrollingDeltas) zijn al punten.
+                let precise = event.hasPreciseScrollingDeltas
                 var cam = camera.wrappedValue
                 if event.modifierFlags.contains(.command) {
                     // ⌘-scroll = zoom rond de cursor.
-                    let factor = 1 - event.scrollingDeltaY * zoomPerScrollUnit
+                    let factor = CanvasInteractionCatcher.scrollZoomFactor(
+                        deltaY: event.scrollingDeltaY, precise: precise
+                    )
                     cam.zoom(by: factor, around: point, in: viewBoundsSize())
                 } else {
                     // Gewone scroll / two-finger = pan.
-                    cam.offset.width += event.scrollingDeltaX
-                    cam.offset.height += event.scrollingDeltaY
+                    cam.offset.width += CanvasInteractionCatcher
+                        .scrollPanDelta(event.scrollingDeltaX, precise: precise)
+                    cam.offset.height += CanvasInteractionCatcher
+                        .scrollPanDelta(event.scrollingDeltaY, precise: precise)
                 }
                 camera.wrappedValue = cam
                 return nil

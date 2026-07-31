@@ -78,8 +78,9 @@ struct CreateEffectSheet: View {
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             Spacer()
-            DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
-                .accessibilityLabel("Close")
+            // E53.3: `label` is verplicht op DSIconButton — de component zet zelf
+            // accessibilityLabel + .help, dus geen losse modifier meer.
+            DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
         }
     }
 

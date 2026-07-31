@@ -4,13 +4,11 @@
 // parameter; de KLEUR zet de aanroeper met `.foregroundStyle` (template-images),
 // default primary.
 //
-// BACKING: bedoeld zijn Phosphor-iconen (Figma), maar de Phosphor-SPM-package
-// (`phosphor-icons/swift`, 2.1.0) levert een asset-catalog die de CLI-DoD
-// (`swift test --package-path AvatarUI`, geen actool) niet kan compileren →
-// `Bundle.module`-fout. Daarom draait DSIcon interim op SF Symbols met een
-// 1-op-1 plek voor de Phosphor-namen. Zie plan/DECISIONS-PENDING.md.
-// Figma-TODO: terug naar Phosphor zodra de CLI-build-route is opgelost
-// (AvatarUI-tests via xcodebuild, of een font-gebaseerde Phosphor-bron).
+// BACKING: SF Symbols — BESLIST 2026-07-12 (E49.4, zie plan/DECISIONS-PENDING.md).
+// Figma tekende Phosphor, maar de Phosphor-SPM-package (asset-catalog) breekt de
+// CLI-DoD (`swift test`, geen actool); de dependency is verwijderd. De bedoelde
+// Phosphor-naam staat per case in commentaar: mocht Thierry later alsnog naar
+// Phosphor willen (font-gebaseerde bron), dan is deze file de enige omschakelplek.
 
 import SwiftUI
 
@@ -22,8 +20,14 @@ public struct DSIcon: View {
         case share, settings, undo, redo, add, close
         // Canvas-controls
         case crop, autoFrame, fixAngle, flip, restoreBody
+        // Canvas-toolbar (frame-pil + dropdowns)
+        case frame, grid, shapeCircle, shapeSquare
+        // Face-edits (FaceActionsPanel-presetkaarten)
+        case whitenTeeth, applyMakeup, reduceWrinkles
         // Overig
         case check, sparkle, colorize, boost
+        // Privacy tiers (Privacy Tier Picker)
+        case privacyOnDevice, privacyAppleCloud, privacyAdvanced
     }
 
     public enum Weight {
@@ -76,10 +80,28 @@ public struct DSIcon: View {
         case .fixAngle:    return "camera"              // Ph.perspective
         case .flip:        return "arrow.left.and.right.righttriangle.left.righttriangle.right" // Ph.flipHorizontal
         case .restoreBody: return "arrow.up.left.and.arrow.down.right" // Ph.arrowsOutCardinal
+        case .frame:       return "rectangle.dashed"    // Ph.frameCorners
+        case .grid:        return "square.grid.3x3"     // Ph.gridNine
+        case .shapeCircle: return "circle"              // Ph.circle
+        case .shapeSquare: return "square"              // Ph.square
+        case .whitenTeeth: return "mouth"               // Ph.tooth
+        case .applyMakeup: return "paintpalette"        // Ph.palette
+        case .reduceWrinkles: return "face.smiling"     // Ph.smiley
         case .check:       return "checkmark"           // Ph.check
         case .sparkle:     return "sparkles"            // Ph.sparkle
         case .colorize:    return "paintpalette"        // Ph.palette
         case .boost:       return "arrow.up.left.and.arrow.down.right" // upscale
+        case .privacyOnDevice:  return "lock.shield"           // Ph.shieldCheck
+        case .privacyAppleCloud: return "sparkles"             // Ph.sparkle
+        case .privacyAdvanced: return "cloud.fill"            // Ph.cloud
         }
+    }
+
+    /// E49.4: het kale SF-Image per betekenis — voor contexten die zélf tinten
+    /// en maatvoeren (bv. `DSCapsuleToolButton`s active-lime of dropdown-rijen).
+    /// Anders dan de `DSIcon`-view zet dit GEEN vaste foregroundStyle, zodat de
+    /// omgevings-tint (active/hover-states) blijft werken.
+    public static func image(_ symbol: Symbol) -> Image {
+        Image(systemName: systemName(for: symbol))
     }
 }

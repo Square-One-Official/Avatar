@@ -27,6 +27,7 @@ struct OnboardingEmailView: View {
                     DSTextField(
                         placeholder: "Work email address",
                         icon: Image(systemName: "envelope"),
+                        validation: model.auth.lastError == nil ? .normal : .error,
                         text: $model.emailInput
                     )
                     .onSubmit {
@@ -38,9 +39,12 @@ struct OnboardingEmailView: View {
                     .disabled(!model.canSubmitEmail)
 
                     if let error = model.auth.lastError {
+                        // E49.2: fouten in signaalstijl (rood veld + rode copy),
+                        // in lijn met SignInSheet — niet dezelfde subtle-grijs
+                        // als een bevestiging.
                         Text(error)
                             .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.subtle)
+                            .foregroundStyle(DSColor.Signal.error)
                     }
                     Text("Upgraded to Pro before? Sign in with that same email to keep it.")
                         .dsTextStyle(.bodySmall)
@@ -80,12 +84,12 @@ struct OnboardingEmailView: View {
         plain.foregroundColor = DSColor.Foreground.muted
         var terms = AttributedString("Terms of Service")
         terms.foregroundColor = DSColor.Action.primary
-        terms.link = URL(string: "https://aaavatar.nl/terms-of-service")
+        terms.link = AppLinks.termsOfService
         var middle = AttributedString(" and ")
         middle.foregroundColor = DSColor.Foreground.muted
         var privacy = AttributedString("Privacy Policy")
         privacy.foregroundColor = DSColor.Action.primary
-        privacy.link = URL(string: "https://aaavatar.nl/privacy-policy")
+        privacy.link = AppLinks.privacyPolicy
         var dot = AttributedString(".")
         dot.foregroundColor = DSColor.Foreground.muted
         return Text(plain + terms + middle + privacy + dot)

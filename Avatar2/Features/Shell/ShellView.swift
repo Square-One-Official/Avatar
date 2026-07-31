@@ -21,39 +21,77 @@ struct ShellView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// E19.5: set-brede voortgang (Align/Match lighting) als toast.
-    @State private var setBusyMessage: String?
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
     @State private var debugShowColorPicker = false
     @State private var debugPickerColor: Color = Color(hue: 0.55, saturation: 0.7, brightness: 0.9)
 
+    /// Portrait- + banner-editor: canvas full-bleed; sidebar/chrome als overlay.
+    private var studioFullBleed: Bool {
+        guard !model.isShowingSettings else { return false }
+        if model.section == .editor && !model.isShowingSocialPreview { return true }
+        if model.editingBanner != nil && !model.isShowingBannerPreview { return true }
+        return false
+    }
+
     var body: some View {
-        // Sidebar (E05.4) schuift rechts in; het canvas centreert mee in de
-        // resterende ruimte (één spring, geen layoutshift).
-        HStack(spacing: 0) {
-            mainArea
-            if model.isSidebarVisible {
-                SidebarView(
-                    selectedID: model.selectedPortrait?.persistentModelID,
-                    onSelect: { model.select($0) },
-                    onAdd: { model.presentOpenPanel() },
-                    onExport: { model.select($0); model.exportCurrentPortrait() },
-                    onSetBusy: { setBusyMessage = $0 },
-                    isPro: entitlement.isProActive
-                )
-                // Losstaande kaart met marge rondom (bevinding 8; frame-
-                // inzet 4) — zelfde inset waarmee de kaartradius
-                // concentrisch rekent (bevinding 17).
-                .padding(SidebarView.edgeInset)
-                // Kale move (géén eigen animatie): de transitie ERFT de container-
-                // animatie hieronder, zodat de sidebar-slide en de canvas-
-                // hercentrering onder ÉÉN spring in lockstep bewegen (geen
-                // desync). Reduce-motion → kale fade i.p.v. snap.
-                .transition(reduceMotion ? .opacity : .move(edge: .trailing))
+        ZStack {
+            if studioFullBleed {
+                Group {
+                    if let doc = model.editingBanner {
+                        BannerStudioView(doc: doc, model: model, entitlement: entitlement)
+                    } else {
+                        canvas
+                            .opacity(model.isDropTargeted ? 0 : 1)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+            }
+
+            if studioFullBleed {
+                HStack(alignment: .top, spacing: 0) {
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
+                    Spacer(minLength: 0)
+                }
+            } else {
+                HStack(spacing: ShellMetrics.sidebarContentSpacing) {
+                    if model.isLeftNavVisible {
+                        leftNavSlot
+                            .padding(.vertical, ShellMetrics.windowEdgeInset)
+                            .transition(.move(edge: .leading))
+                    }
+                    mainArea
+                        .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
+                        .padding(.trailing, ShellMetrics.windowEdgeInset)
+                }
             }
         }
-        .dsMotion(DSMotion.springTransform, value: model.isSidebarVisible)
-        .background(DSColor.Background.app)
+        // UXS-29(v2): de unified toolbar (stabilise) geeft het venster een hoge
+        // top-safe-area. De shell negeert die op root-niveau zodat de zwevende
+        // sidebar-kaart op z'n gap3-inset vanaf de vénstertop blijft (met de
+        // traffic-lights native gecentreerd ín de kaart); de content-kolom
+        // krijgt de titelbalk-hoogte expliciet terug via safeAreaPadding.
+        .ignoresSafeArea(.container, edges: .top)
+        .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+        .background(studioFullBleed ? Color.clear : DSColor.Background.app)
+        .background(WindowTrafficLightStabilizer().frame(width: 0, height: 0))
+        // ⌘, opent de in-venster Settings (zie SettingsCommands in het app-menu).
+        .focusedSceneValue(\.openSettings, OpenSettingsAction { model.isShowingSettings = true })
+        // ⌘U opent het import-panel (zie UploadPortraitCommands in het File-menu).
+        .focusedSceneValue(\.uploadPortrait, UploadPortraitAction { model.presentOpenPanel() })
+        // Vaste venster-chrome: traffic-light-strook + toggle schuiven niet mee
+        // met de sidebar-animatie; de strip hoort visueel bij de nav wanneer open.
+        .overlay(alignment: .topLeading) {
+            ShellSidebarChrome(
+                isSidebarVisible: model.isLeftNavVisible,
+                onToggleSidebar: { model.toggleLeftNav() }
+            )
+            .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+        }
         // E23: geen forced .dark meer — de hoofdshell volgt de
         // AppearancePreference (default Dark) zodat Light/System werken.
         // E18.4: set-brede edits (Match lighting) wijzigen alleen cutoutData;
@@ -65,42 +103,92 @@ struct ShellView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
         }
-        // E19.1: Share/export-popup (DS).
-        .sheet(isPresented: $model.isShowingExport) {
-            if let portrait = model.selectedPortrait {
-                ExportSheet(portrait: portrait, isPro: entitlement.isProActive)
-            }
+        // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
+        // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
+        .dsPersistentSheet(item: $model.exportSession) { session in
+            ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
-        .sheet(isPresented: $model.isShowingRename) {
+        .dsPersistentSheet(isPresented: $model.isShowingRename) {
             if let portrait = model.selectedPortrait {
                 RenameSheet(portrait: portrait)
             }
         }
+        // E53.7: board bulk-rename op stabiele host.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { !model.renamePortraitIDs.isEmpty },
+            set: { if !$0 { model.renamePortraitIDs = [] } }
+        )) {
+            RenameSheet(portraitIDs: model.renamePortraitIDs)
+        }
+        // PoC (left-nav): "Manage backgrounds" vanuit het gebruikersmenu.
+        .dsPersistentSheet(isPresented: $model.isShowingManageBackgrounds) {
+            ManageBackgroundsSheet(entitlement: entitlement)
+        }
+        // E53.7: pre-stylize gate — leeft op ShellModel, niet op EditorView.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { model.stylizeQuality.preGate != nil },
+            set: { _ in }
+        )) {
+            if let gate = model.stylizeQuality.preGate {
+                PreStylizeQualitySheet(gate: gate) { model.stylizeQuality.resolvePreGate($0) }
+            }
+        }
+        // E34: "Create effect"-modal (eigen effecten) — stabiele host, resultaat
+        // gaat via de store terug naar het Effects-paneel.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { model.presentation.createEffectSheetOpen },
+            set: { model.presentation.createEffectSheetOpen = $0 }
+        )) {
+            CreateEffectSheet(entitlement: entitlement) { result in
+                model.presentation.createdCustomEffect = result
+            }
+        }
+        .generateBackgroundSheet(entitlement: entitlement)
+        // E53.7: contextmenu's + store-gedreven alerts/confirms.
+        .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
                 .padding(DSSpacing.gap8)
                 .background(DSColor.Background.app)
+                .appliedAppearancePreference()
         }
-        // E19.5: voortgangs-toast voor Align set / Match lighting.
+        // E19.5: voortgangs-toast voor de set-acties (Align/Match/Export).
         .overlay(alignment: .bottomTrailing) {
-            if let message = setBusyMessage {
+            if let message = model.setBusyMessage {
                 DSToast(title: message) {}
                     .padding(DSSpacing.gap5)
                     .transition(.dsSlide(.trailing, reduceMotion: reduceMotion))
             }
         }
-        .dsMotion(DSMotion.enter, value: setBusyMessage)
+        .dsMotion(DSMotion.enter, value: model.setBusyMessage)
+        .onChange(of: entitlement.openSettingsPage) { _, page in
+            if let page {
+                model.openSettings(page: page)
+                entitlement.openSettingsPage = nil
+            }
+        }
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
             // portret direct op canvas; first-use alleen bij écht leeg.
             model.restoreSelectionAtLaunch()
             #if DEBUG
+            // UXS-28 smoke-haak: open het herstelde portret direct in de editor
+            // (de kaarten zijn nog niet AX-bedienbaar — zie UX28/UXS-7 — dus
+            // smokes kunnen de editor anders niet bereiken).
+            if ProcessInfo.processInfo.arguments.contains("--open-editor"),
+               let portrait = model.selectedPortrait {
+                model.openPortrait(portrait)
+            }
             // E19.1 smoke-haak: open de export-popup ná de selectie-restore.
             if ProcessInfo.processInfo.arguments.contains("--show-export") {
                 model.exportCurrentPortrait()
+            }
+            // E34.5 smoke-haak: open de social-preview-overlay ná de restore.
+            if ProcessInfo.processInfo.arguments.contains("--show-social-preview") {
+                model.showSocialPreview()
             }
             // Smoke-run-haak: `--show-settings [pagina]` wordt in
             // ShellModel.init gelezen (vóór first render, geen venster-race);
@@ -110,6 +198,46 @@ struct ShellView: View {
             // uit de proces-argumenten gelezen (geen race).
             // E05.6: `--force-hair-nudge` toont de nudge voor de smoke.
             if args.contains("--force-hair-nudge") { model.debugForceHairNudge() }
+            // Drop-import-smoke: `--import-after <pad> [sec]` — simuleert een
+            // Finder-drop in de library (zelfde model-pad als handleDrop).
+            if let i = args.firstIndex(of: "--import-after"), args.indices.contains(i + 1) {
+                let path = args[i + 1]
+                let delay = (args.indices.contains(i + 2) ? TimeInterval(args[i + 2]) : nil) ?? 3
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(delay))
+                    await model.importImage(from: URL(fileURLWithPath: path))
+                }
+            }
+            // Drop-import-smoke: `--record-states <logpad>` — logt ~15s lang elke
+            // 50ms sectie + canvas-state + selectie, om de importflow-volgorde
+            // te verifiëren zonder screen-recording-permissie.
+            if let i = args.firstIndex(of: "--record-states"), args.indices.contains(i + 1) {
+                let logURL = URL(fileURLWithPath: args[i + 1])
+                Task { @MainActor in
+                    let t0 = Date()
+                    var lines: [String] = []
+                    var last = ""
+                    for _ in 0..<300 {
+                        let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                        let canvasDesc: String
+                        switch model.canvas {
+                        case .empty: canvasDesc = "empty"
+                        case .processing: canvasDesc = "processing"
+                        case .revealing: canvasDesc = "revealing"
+                        case .result: canvasDesc = "result"
+                        case .failed(let msg): canvasDesc = "failed(\(msg))"
+                        }
+                        let line = "section=\(model.section) canvas=\(canvasDesc) " +
+                            "selected=\(model.selectedPortrait?.name ?? "nil")"
+                        if line != last {
+                            lines.append(String(format: "%06dms %@", ms, line))
+                            last = line
+                            try? lines.joined(separator: "\n").write(to: logURL, atomically: true, encoding: .utf8)
+                        }
+                        try? await Task.sleep(for: .milliseconds(50))
+                    }
+                }
+            }
             // E05.7: `--seed-set` dupliceert het portret en opent de sidebar.
             if args.contains("--seed-set") { model.debugSeedSecondPortraitAndOpenSidebar() }
             // E24.14: `--seed-adjust` zet een zichtbare Adjust-laag (canvas +
@@ -132,13 +260,36 @@ struct ShellView: View {
                 model.debugScaleSubject(factor: f)
             }
             // E27.4: open de board-view (alle portretten op één canvas).
-            if args.contains("--board") { model.isBoardMode = true }
+            if args.contains("--board") { model.showPortraits(); model.setPortraitsViewMode(.canvas) }
+            // PoC (left-nav): open de Portraits-galerij direct voor de smoke.
+            if args.contains("--portraits") { model.section = .portraits }
+            // Smoke: forceer een specifieke lens op de Portraits-surface
+            // (`--lens grid|list|gallery|canvas`) — deterministisch i.p.v. klikken.
+            if let i = args.firstIndex(of: "--lens"), args.indices.contains(i + 1) {
+                model.showPortraits()
+                switch args[i + 1] {
+                case "list": model.setPortraitsViewMode(.list)
+                case "gallery": model.setPortraitsViewMode(.gallery)
+                case "canvas": model.setPortraitsViewMode(.canvas)
+                default: model.setPortraitsViewMode(.grid)
+                }
+            }
+            // PoC (left-nav): forceer de left-nav dicht (collapsed-screenshot).
+            if args.contains("--hide-leftnav") { model.isLeftNavVisible = false }
+            // PoC (left-nav): open "Manage backgrounds" direct voor de smoke.
+            if args.contains("--manage-backgrounds") { model.isShowingManageBackgrounds = true }
             // E24.23: zet een achtergrond-afbeelding vanaf een pad (reproductie).
             if let i = args.firstIndex(of: "--seed-bg"), args.indices.contains(i + 1) {
                 model.debugSetBackgroundImage(path: args[i + 1])
             }
             // E24.21: open de rename-modal voor de smoke.
             if args.contains("--show-rename") { model.isShowingRename = true }
+            // Smoke: toon de grid, drill na een marge in het jongste portret.
+            if args.contains("--drill-in-demo") {
+                model.section = .portraits
+                try? await Task.sleep(for: .seconds(3))
+                model.debugDrillIntoFirstPortrait()
+            }
             // E25.1: open de standalone DSColorPicker voor de smoke.
             if args.contains("--show-colorpicker") { debugShowColorPicker = true }
             // E24.24: simuleer een persistente upload (kit + achtergrond).
@@ -160,91 +311,26 @@ struct ShellView: View {
             }
             #endif
         }
-    }
-
-    private var mainArea: some View {
-        VStack(spacing: 0) {
-            if model.isShowingSettings {
-                // Punt 14: Settings vervangt de canvas-weergave binnen het
-                // hoofdvenster; topbar (quota + gear) blijft als overlay
-                // staan. Esc sluit (verborgen cancel-knop, werkt
-                // venster-breed); de gear toggelt.
-                SettingsRootView(entitlement: entitlement)
-                    .background(
-                        Button("") { model.isShowingSettings = false }
-                            .keyboardShortcut(.cancelAction)
-                            .opacity(0)
-                            .accessibilityHidden(true)
-                    )
-            } else {
-                // E31.x (besluit Thierry): de Name/Role-kop zweeft als overlay in
-                // de topstrook (zie de overlays hieronder).
-                // Besluit Thierry (2026-06-24): GEEN top-inset meer — het canvas
-                // loopt door tot de bovenrand van het venster (symmetrisch met de
-                // onderkant), met de top-chrome (topbar + naam-chip + Frame/Background)
-                // erover zwevend i.p.v. in een aparte Background.app-band.
-                canvas
-                    // Tijdens een drag fade't de hele canvas-inhoud (foto +
-                    // Name/Role-chip + editor-toolbar) uit naar de app-
-                    // achtergrond, zodat alleen de dropzone-overlay overblijft —
-                    // een schone lei, net als first-use (bevinding: drag toont
-                    // dropzone óver de avatar i.p.v. leeg scherm).
-                    .opacity(model.isDropTargeted ? 0 : 1)
-            }
+        .refreshAppleIntelligenceAvailability {
+            PrivacyPreferences2.shared.reapplyFingerprintPolicy()
         }
-        // Punt 19: top-uitlijning — de VStack centreerde verticaal,
-        // waardoor de kaart bij lage vensters onder de quota-rij kroop;
-        // header hoort vast bovenaan (Figma y=32), de foto is het enige
-        // flexibele element.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // Heel het venster is droptarget (Fitts, review-besluit); de
-        // Figma-dropzone (App / Dropzone, 4017:1622) is puur visueel.
         .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
             handleDrop(providers)
         }
         .overlay {
-            // Geen dropzone bovenop Settings (punt 14): de drop zelf wordt
-            // in handleDrop genegeerd zolang Settings open staat.
-            if model.isDropTargeted && !model.isShowingSettings {
+            if model.isDropTargeted && !model.isShowingSettings && !model.isShowingSocialPreview && !model.isShowingBannerPreview {
                 DropzoneOverlay()
                     .allowsHitTesting(false)
             }
         }
-        // Topbar (E04.5): quota + Upgrade links, gear rechts — 1-op-1
-        // de "top"-strook uit de App-frames. De gear toggelt de in-window
-        // Settings (punt 14) en toont de active-state zolang die open is.
-        .overlay(alignment: .top) {
-            ShellTopBar(
-                model: entitlement,
-                isSettingsActive: model.isShowingSettings,
-                onToggleSettings: { model.isShowingSettings.toggle() },
-                // Capabilities NIET meer gaten met `!isShowingSettings`: de
-                // editor-cluster blijft gemount zodat ShellTopBar 'm als geheel
-                // kan kruisvervagen naar de Close-knop (geen verspringen).
-                canExport: model.canExport,
-                onExport: { model.exportCurrentPortrait() },
-                // E27.4: board-modus-toggle (alle portretten op één canvas).
-                canToggleBoard: model.canExport,
-                isBoardActive: model.isBoardMode,
-                onToggleBoard: { model.toggleBoard() },
-                // E22.1: sidebar-toggle uit de bottom-toolbar → app-bar.
-                canToggleSidebar: model.canExport,
-                isSidebarActive: model.isSidebarVisible,
-                onToggleSidebar: { model.toggleSidebar() }
-            )
-        }
-        // Status-pill op vensterniveau (bevinding 3): de frames zetten
-        // hem rechtsonder in het venster (Isolating 4017:1862 x816–988,
-        // Image added 4017:1849), niet aan de foto geplakt.
         .overlay(alignment: .bottomTrailing) {
-            if let label = isolatingStatusLabel {
+            if let label = isolatingStatusLabel, !model.isShowingSocialPreview {
                 IsolatingStatusPill(label: label)
                     .padding(DSSpacing.gap4)
             }
         }
-        // E05.6: eenmalige hifi-haar-nudge — subtiel onderin, geen modal.
         .overlay(alignment: .bottom) {
-            if model.showHairNudge && !model.isShowingSettings {
+            if model.showHairNudge && !model.isShowingSettings && !model.isShowingSocialPreview {
                 HairNudgeBanner(
                     onDownload: { model.acceptHairNudge() },
                     onDismiss: { model.dismissHairNudge() }
@@ -255,6 +341,146 @@ struct ShellView: View {
         }
         .dsMotion(DSMotion.enter, value: model.showHairNudge)
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
+        .overlay(alignment: .top) {
+            if showsEditorTopChrome {
+                editorTopChromeBand
+            }
+        }
+    }
+
+    /// Sidebar-slot: insert/remove met slide — géén leading-width-clip (dat liet
+    /// de top-leading hoekradius als los vlekje achter).
+    private var leftNavSlot: some View {
+        LeftNavView(model: model, entitlement: entitlement)
+            .padding(.leading, LeftNavView.edgeInset)
+            .frame(width: LeftNavView.layoutWidth, alignment: .leading)
+            .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private var mainArea: some View {
+        VStack(spacing: 0) {
+            if model.isShowingSettings {
+                // Settings vervangt de hoofdweergave; Esc sluit (verborgen
+                // cancel-knop, venster-breed) of de ✕ in de topbar.
+                SettingsRootView(entitlement: entitlement, model: model, page: $model.settingsPage)
+                    .background(
+                        Button("") { model.isShowingSettings = false }
+                            .keyboardShortcut(.cancelAction)
+                            .opacity(0)
+                            .accessibilityHidden(true)
+                    )
+            } else if let doc = model.editingBanner {
+                Group {
+                    if model.isShowingBannerPreview {
+                        BannerPreviewView(doc: doc, isPro: entitlement.isProActive)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .transition(.opacity)
+            } else if model.section == .home {
+                // PoC (left-nav): Home — het overzicht (laatste + eerdere /
+                // first-use). De top-right-chrome blijft hier weg.
+                HomeView(model: model, entitlement: entitlement)
+                    // Tijdens een drag fade't de hele Home-inhoud uit zodat alleen
+                    // de dropzone-overlay (op mainArea-niveau) zichtbaar blijft —
+                    // zelfde gedrag als de editor-canvas.
+                    .opacity(model.isDropTargeted ? 0 : 1)
+                    .transition(.opacity)
+            } else if model.section == .portraits {
+                // PoC (left-nav): de Portraits-grid van de geselecteerde map.
+                PortraitsGalleryView(model: model, entitlement: entitlement)
+                    .transition(.opacity)
+            } else if model.section == .banners {
+                // E35.3: Banners-bibliotheek.
+                BannersGalleryView(model: model, entitlement: entitlement)
+                    .transition(.opacity)
+            } else {
+                Group {
+                    if model.isShowingSocialPreview {
+                        SocialPreviewView(
+                            model: model,
+                            isPro: entitlement.isProActive
+                        )
+                    } else if studioFullBleed {
+                        Color.clear
+                    } else {
+                        canvas
+                            .opacity(model.isDropTargeted ? 0 : 1)
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.section)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingSocialPreview)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.isShowingBannerPreview)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: model.editingBanner != nil)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var showsEditorTopChrome: Bool {
+        model.section == .editor || model.isShowingSettings || model.editingBanner != nil
+    }
+
+    private var editorTopChromeBand: some View {
+        HStack(alignment: .top, spacing: DSSpacing.gap2) {
+            if model.editingBanner != nil && !model.isShowingSettings {
+                BannerBreadcrumb(model: model)
+                    .padding(.leading, shellEditorBreadcrumbLeading)
+                    .transition(.opacity)
+                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+            } else if model.section == .editor && !model.isShowingSettings {
+                LibraryBreadcrumb(model: model)
+                    .padding(.leading, shellEditorBreadcrumbLeading)
+                    .transition(.opacity)
+                    .dsMotion(DSMotion.springTransform, value: model.isLeftNavVisible)
+            }
+            Spacer(minLength: DSSpacing.gap2)
+            ShellTopBar(
+                isSettingsActive: model.isShowingSettings,
+                onToggleSettings: { model.isShowingSettings.toggle() },
+                isEditing: model.section == .editor || model.editingBanner != nil,
+                canExport: model.editingBanner != nil ? model.canExportBanner : model.canExport,
+                onExport: {
+                    if model.editingBanner != nil {
+                        model.exportCurrentBanner(isPro: entitlement.isProActive)
+                    } else {
+                        model.exportCurrentPortrait()
+                    }
+                },
+                canPreview: model.editingBanner != nil ? model.canPreviewBanner : model.canPreview,
+                isPreviewActive: model.editingBanner != nil
+                    ? model.isShowingBannerPreview
+                    : model.isShowingSocialPreview,
+                onPreviewActiveChange: { active in
+                    if model.editingBanner != nil {
+                        model.isShowingBannerPreview = active
+                    } else if active {
+                        model.showSocialPreview()
+                    } else {
+                        model.isShowingSocialPreview = false
+                    }
+                }
+            )
+        }
+        .padding(.top, ShellMetrics.shellTopBarControlTopInset)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(height: ShellMetrics.editorTopChromeBandHeight, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
+    }
+
+    /// Leading in vénster-space (de top-chrome-band overlayt de root-ZStack) —
+    /// bewust onafhankelijk van `studioFullBleed` (UXS-28/UX35): de oude
+    /// `gap3`-tak rekende alsof de band in de content-kolom leefde, waardoor de
+    /// breadcrumb bij Edit↔Preview ~248pt versprong (tot óver de sidebar).
+    /// Sidebar open → ná de sidebar-kaart; dicht → ná sidebar-toggle (zelfde rij
+    /// als traffic-lights).
+    private var shellEditorBreadcrumbLeading: CGFloat {
+        if model.isLeftNavVisible {
+            return LeftNavView.layoutWidth + DSSpacing.gap3
+        }
+        return ShellMetrics.editorBreadcrumbLeadingCollapsed
     }
 
     private var isolatingStatusLabel: String? {
@@ -267,20 +493,9 @@ struct ShellView: View {
 
     @ViewBuilder
     private var canvas: some View {
-        // E27.4: de board-view (alle portretten) vervangt de enkel-portret-canvas
-        // in board-modus. Klik een portret → selecteren + terug naar de editor.
-        if model.isBoardMode {
-            BoardView(
-                model: model,
-                entitlement: entitlement,
-                onOpen: { portrait in
-                    model.select(portrait)
-                    model.isBoardMode = false
-                }
-            )
-        } else {
-            editorCanvas
-        }
+        // De board/canvas is nu een Portraits-LENS (LibraryViewMode.canvas), geen
+        // studio-modus meer → de studio toont altijd de enkel-portret-editor.
+        editorCanvas
     }
 
     @ViewBuilder
@@ -296,10 +511,12 @@ struct ShellView: View {
         if let content = editorContent {
             EditorView(
                 portrait: content.cutout,
+                model: model,
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
-                onApplyResult: { model.applyEffectResult($0) },
-                onApplyAlphaPreserving: { model.applyEffectResult($0, preserveSourceAlpha: true) },
+                onApplyResult: { await model.applyEffectResult($0) },
+                onApplyAlphaPreserving: { await model.applyEffectResult($0, preserveSourceAlpha: true) },
+                onApplyIsolated: { await model.applyIsolatedResult($0) },
                 onIsolateSubject: { try await model.isolateSubject($0) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
@@ -347,22 +564,19 @@ struct ShellView: View {
     /// E-fix: het beeld + de isolating-fase die de persistente EditorView voedt.
     /// Niet-nil zodra er een portret te tonen is:
     ///   • `.result` → de cutout, geen isolating-fase (normale editor);
-    ///   • `.processing`/`.revealing` mét een al-geselecteerd portret (een
-    ///     VERVANGENDE import) → de vorige cutout als drager + de isolating-fase
-    ///     die ín het frame speelt.
-    /// Bij de éérste import is er nog geen selectie (`previousCutout == nil`) →
-    /// nil, zodat de full-screen IsolatingCanvas het overneemt ("alleen bij
-    /// vervangen", besluit Thierry).
+    ///   • `.processing`/`.revealing` → de isolating-fase speelt ín het frame.
+    ///     De drager is de vorige cutout (VERVANGENDE import in de editor) of —
+    ///     bij een library-import, die de selectie wist (runCutout) — het
+    ///     origineel zelf. De drager rendert niet zolang de isolating-laag
+    ///     speelt; hij houdt alleen de EditorView-identiteit stabiel.
     private var editorContent: (cutout: NSImage, isolating: EditorView.IsolatingPhase?)? {
         switch model.canvas {
         case .result(let cutout):
             return (cutout, nil)
         case .processing(let original):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .processing(original))
+            return (previousCutout ?? original, .processing(original))
         case .revealing(let original, let cutout):
-            guard let previous = previousCutout else { return nil }
-            return (previous, .revealing(original: original, cutout: cutout))
+            return (previousCutout ?? original, .revealing(original: original, cutout: cutout))
         case .empty, .failed:
             return nil
         }
@@ -398,7 +612,7 @@ struct ShellView: View {
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         // Punt 14: tijdens Settings geen imports — de canvas-weergave is
         // niet zichtbaar, een stille import zou verwarren.
-        guard !model.isShowingSettings else { return false }
+        guard !model.isShowingSettings, !model.isShowingSocialPreview else { return false }
         if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
                 let url: URL?
@@ -424,5 +638,37 @@ struct ShellView: View {
             return true
         }
         return false
+    }
+}
+
+// MARK: - Settings menu command (⌘,)
+
+/// Door `ShellView` gepubliceerde actie om de in-venster Settings te openen;
+/// nil tijdens onboarding (shell niet in beeld) → het menu-item grijst uit.
+struct OpenSettingsAction {
+    var open: () -> Void
+}
+
+private struct OpenSettingsKey: FocusedValueKey {
+    typealias Value = OpenSettingsAction
+}
+
+extension FocusedValues {
+    var openSettings: OpenSettingsAction? {
+        get { self[OpenSettingsKey.self] }
+        set { self[OpenSettingsKey.self] = newValue }
+    }
+}
+
+/// Vervangt het (standaard uitgegrijsde) "Settings…"-item in het app-menu door
+/// ⌘, → opent de in-venster Settings. Mirror van `CanvasZoomCommands`:
+/// een `View` met `@FocusedValue` zodat het item enable/disablet met de shell.
+struct SettingsCommands: View {
+    @FocusedValue(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Settings…") { openSettings?.open() }
+            .keyboardShortcut(",", modifiers: .command)
+            .disabled(openSettings == nil)
     }
 }

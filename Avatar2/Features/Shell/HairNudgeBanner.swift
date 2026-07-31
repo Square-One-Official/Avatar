@@ -14,7 +14,7 @@ struct HairNudgeBanner: View {
         HStack(spacing: DSSpacing.gap3) {
             Image(systemName: "wand.and.stars")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(DSColor.Action.primary)
+                .foregroundStyle(DSColor.Action.primaryForeground)
 
             VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
                 Text("Rough hair edges?")

@@ -161,7 +161,7 @@ item = (
     f"      <sparkle:shortVersionString>{os.environ['APPCAST_VERSION']}</sparkle:shortVersionString>\n"
     "      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>\n"
     "      <enclosure\n"
-    f"        url=\"https://github.com/thierrzz/Avatar/releases/download/v{os.environ['APPCAST_VERSION']}/{os.environ['APPCAST_DMG_NAME']}\"\n"
+    f"        url=\"https://github.com/Square-One-Official/Avatar/releases/download/v{os.environ['APPCAST_VERSION']}/{os.environ['APPCAST_DMG_NAME']}\"\n"
     f"        length=\"{os.environ['APPCAST_LENGTH']}\"\n"
     "        type=\"application/x-apple-diskimage\"\n"
     f"        sparkle:edSignature=\"{os.environ['APPCAST_ED_SIGNATURE']}\" />\n"
@@ -191,7 +191,7 @@ cp "$PROJECT_DIR/appcast.xml" "$PROJECT_DIR/backend/api/_appcast.xml"
 #     bumping the public version), upload the new DMG over the old asset
 #     instead of failing.
 echo "→ Creating GitHub Release..."
-# Stable-named copy so https://github.com/thierrzz/Avatar/releases/latest/download/Aaavatar.dmg
+# Stable-named copy so https://github.com/Square-One-Official/Avatar/releases/latest/download/Aaavatar.dmg
 # always resolves to the newest release. The website (Framer) links to that URL,
 # so it never has to be updated per release.
 STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"

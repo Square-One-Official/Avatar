@@ -83,12 +83,6 @@ public final class BackendClient {
         return production
     }
 
-    /// Of er een sessie is (Bearer-token aanwezig). Gebruikt door
-    /// CloudCutoutEngine.isAvailable (E02.4) zodat de router het cloud-pad
-    /// niet kiest voor uitgelogde gebruikers; zegt niets over credits of
-    /// entitlement. (Eén-regel-toevoeging buiten Engines/ — INFRA-review.)
-    public var hasSession: Bool { auth.accessToken != nil }
-
     // MARK: GET /v1/account
     /// Current tier, credits, and subscription state. Drives `ProEntitlement`.
     /// Anonymous-friendly: when no Bearer token is available the server
@@ -305,6 +299,118 @@ public final class BackendClient {
     }
 
     // MARK: POST /v1/stylize
+
+    /// Pixel dimensions returned by `/v1/stylize` (instrumentation + post-boost UI).
+    public struct StylizeDimensions: Decodable, Sendable, Equatable {
+        public let inputWidth: Int
+        public let inputHeight: Int
+        public let outputWidth: Int
+        public let outputHeight: Int
+
+        enum CodingKeys: String, CodingKey {
+            case inputWidth = "input_width"
+            case inputHeight = "input_height"
+            case outputWidth = "output_width"
+            case outputHeight = "output_height"
+        }
+
+        public var outputLongEdge: Int { max(outputWidth, outputHeight) }
+    }
+
+    /// Result of any `/v1/stylize` call (Effects, hair, clothes, face).
+    public struct StylizeCallResult: Sendable {
+        public let data: Data
+        public let creditsRemaining: Int
+        public let dimensions: StylizeDimensions?
+    }
+
+    private struct StylizeResponse: Decodable {
+        let image: String
+        let creditsRemaining: Int
+        let inputWidth: Int?
+        let inputHeight: Int?
+        let outputWidth: Int?
+        let outputHeight: Int?
+
+        var dimensions: StylizeDimensions? {
+            guard let inputWidth, let inputHeight, let outputWidth, let outputHeight else { return nil }
+            return StylizeDimensions(
+                inputWidth: inputWidth, inputHeight: inputHeight,
+                outputWidth: outputWidth, outputHeight: outputHeight
+            )
+        }
+    }
+
+    private struct StylizeBody: Encodable {
+        let storageKey: String
+        let generationModel: String
+        let modelOverride: String?
+        let cutoutW: Int?
+        let cutoutH: Int?
+        let style: String?
+        let hairPreset: String?
+        let hairPrompt: String?
+        let clothesPreset: String?
+        let clothesPrompt: String?
+        let facePreset: String?
+        let softSource: Bool?
+        let preserveFraming: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case storageKey = "storage_key"
+            case generationModel = "generation_model"
+            case modelOverride = "model_override"
+            case cutoutW = "cutout_w"
+            case cutoutH = "cutout_h"
+            case style
+            case hairPreset = "hair_preset"
+            case hairPrompt = "hair_prompt"
+            case clothesPreset = "clothes_preset"
+            case clothesPrompt = "clothes_prompt"
+            case facePreset = "face_preset"
+            case softSource = "soft_source"
+            case preserveFraming = "preserve_framing"
+        }
+    }
+
+    private func runStylize(
+        imagePNG: Data,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        style: String? = nil,
+        hairPreset: String? = nil,
+        hairPrompt: String? = nil,
+        clothesPreset: String? = nil,
+        clothesPrompt: String? = nil,
+        facePreset: String? = nil,
+        softSource: Bool = false,
+        preserveFraming: Bool = false
+    ) async throws -> StylizeCallResult {
+        let storageKey = try await uploadInputPNG(imagePNG)
+        let body = try JSONEncoder().encode(
+            StylizeBody(
+                storageKey: storageKey,
+                generationModel: GenerationModelStore.shared.current.rawValue,
+                modelOverride: DevModelOverrides.shared.override(for: .stylize),
+                cutoutW: cutoutWidth,
+                cutoutH: cutoutHeight,
+                style: style,
+                hairPreset: hairPreset,
+                hairPrompt: hairPrompt,
+                clothesPreset: clothesPreset,
+                clothesPrompt: clothesPrompt,
+                facePreset: facePreset,
+                softSource: softSource ? true : nil,
+                preserveFraming: preserveFraming ? true : nil
+            )
+        )
+        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
+        guard let data = Data(base64Encoded: resp.image) else {
+            throw BackendError.decode
+        }
+        return StylizeCallResult(data: data, creditsRemaining: resp.creditsRemaining, dimensions: resp.dimensions)
+    }
+
     /// Effects (E09.2; CMS-gestuurd sinds E33) — stuurt het huidige portret + een
     /// stijl-key naar het productie-`/v1/stylize`. De `styleKey` komt uit de
     /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
@@ -315,34 +421,89 @@ public final class BackendClient {
     ///
     /// Op 402 (geen credits) gooit dit `BackendError.noCredits` → de caller
     /// toont de paywall; andere fouten propageren voor de faaltoast.
-    private struct StylizeResponse: Decodable {
-        let image: String
-        let creditsRemaining: Int          // decoded from `credits_remaining`
+    public func stylize(
+        imagePNG: Data,
+        styleKey: String,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false,
+        preserveFraming: Bool = false
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            style: styleKey, softSource: softSource, preserveFraming: preserveFraming
+        )
     }
-    public func stylize(imagePNG: Data, styleKey: String) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
+
+    // MARK: POST /v1/generate-background (E42)
+    /// Text-to-background voor portret/banner-achtergronden. Stuurt stijl/view-
+    /// keys + beschrijving; de server bouwt de prompt. Geen upload nodig.
+    public struct GenerateBackgroundCallResult: Sendable {
+        public let imageData: Data
+        public let creditsRemaining: Int
+    }
+
+    /// Response-vorm van `POST /v1/generate-background` (200). Internal (niet
+    /// function-local) zodat de contract-test in AvatarKitTests hem tegen een
+    /// fixture van de letterlijke endpoint-JSON kan decoden — E43.2, na de
+    /// "Unexpected server response"-outage waarin client en backend stilletjes
+    /// een verschillend contract spraken. Moet 1-op-1 blijven sporen met
+    /// `backend/api/v1/generate-background.ts` (res.status(200).json).
+    struct GenerateBackgroundResponse: Decodable {
+        let imageUrl: String
+        let creditsRemaining: Int
+    }
+
+    public func generateBackground(
+        userPrompt: String,
+        styleKey: String,
+        customStyleText: String?,
+        viewKey: String,
+        targetWidth: Int,
+        targetHeight: Int,
+        generationModel: String?
+    ) async throws -> GenerateBackgroundCallResult {
         struct Body: Encodable {
-            let storageKey: String
-            let style: String
-            let generationModel: String
+            let userPrompt: String
+            let styleKey: String
+            let customStyleText: String?
+            let viewKey: String
+            let targetWidth: Int
+            let targetHeight: Int
+            let generationModel: String?
             let modelOverride: String?
+
             enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case style
+                case userPrompt = "user_prompt"
+                case styleKey = "style_key"
+                case customStyleText = "custom_style_text"
+                case viewKey = "view_key"
+                case targetWidth = "target_width"
+                case targetHeight = "target_height"
                 case generationModel = "generation_model"
                 case modelOverride = "model_override"
             }
         }
+
+        let modelKey = generationModel ?? GenerationModelStore.shared.current.rawValue
         let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey, style: styleKey,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+            Body(
+                userPrompt: userPrompt,
+                styleKey: styleKey,
+                customStyleText: customStyleText,
+                viewKey: viewKey,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                generationModel: modelKey,
+                modelOverride: DevModelOverrides.shared.override(for: .generateBackground)
+            )
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
+        let resp: GenerateBackgroundResponse = try await request("/v1/generate-background", method: "POST", body: body)
+        guard let url = URL(string: resp.imageUrl) else {
             throw BackendError.decode
         }
-        return (data, resp.creditsRemaining)
+        let data = try await Self.downloadResultImage(from: url)
+        return GenerateBackgroundCallResult(imageData: data, creditsRemaining: resp.creditsRemaining)
     }
 
     // MARK: POST /v1/stylize (custom effect, E34)
@@ -351,8 +512,9 @@ public final class BackendClient {
     /// op, giet de opgeslagen beschrijving in het custom-sjabloon en hangt de
     /// referentie-afbeelding als tweede beeld aan de model-call (stijlreferentie).
     /// Pro-only (403 `pro_required` → `BackendError.proRequired`); 402 → paywall.
-    /// Zelfde response als `stylize(imagePNG:styleKey:)`.
-    public func stylize(imagePNG: Data, customEffectID: String) async throws -> (Data, Int) {
+    /// Zelfde response-vorm als `stylize(imagePNG:styleKey:)`; `dimensions` blijft
+    /// nil (de custom-tak stuurt geen cutout-maten mee).
+    public func stylize(imagePNG: Data, customEffectID: String) async throws -> StylizeCallResult {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -375,31 +537,109 @@ public final class BackendClient {
         guard let data = Data(base64Encoded: resp.image) else {
             throw BackendError.decode
         }
-        return (data, resp.creditsRemaining)
+        return StylizeCallResult(data: data, creditsRemaining: resp.creditsRemaining, dimensions: nil)
     }
 
-    // MARK: POST /v1/upscale (Boost resolution, E10.3)
-    /// Verhoogt de resolutie van het cutout via Real-ESRGAN (2×). De backend
-    /// flattent op grijs, upscalet de RGB en hangt het alfa herschaald weer
-    /// aan, dus het resultaat blijft een transparante cutout. 1 credit; 402 →
-    /// `BackendError.noCredits` (paywall).
+    /// Downloads a generated RESULT image from the short-lived signed Supabase
+    /// Storage URL returned by `/v1/generate-background`. The result is handed
+    /// over as a URL rather than inline base64 because a full-frame background
+    /// can exceed Vercel's ~4.5 MB response body cap (which would truncate the
+    /// body and leave the user charged with no image).
+    ///
+    /// Uses a plain session, not `TLSPinning.pinnedShared`: the host is
+    /// `*.supabase.co`, which is deliberately not pinned (Supabase rotates
+    /// certs across tenants — see `TLSPinning`), and the signed token already
+    /// authorizes the fetch. Retries a few times so a transient CDN hiccup on
+    /// this second hop doesn't waste the (already-charged) generation.
+    private static let resultDownloadSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 120
+        config.tlsMinimumSupportedProtocolVersion = .TLSv12
+        return URLSession(configuration: config)
+    }()
+
+    /// Test-seam (E47.1): laat tests de result-download door hun stub-sessie
+    /// leiden. `resultDownloadSession` is bewust privé/statisch (aparte
+    /// niet-gepinde sessie voor *.supabase.co), dus zonder deze haak is
+    /// `generateBackground` niet integraal testbaar. Internal — alleen
+    /// bereikbaar via `@testable import`; blijft `nil` in productie.
+    static var resultDownloadSessionOverride: URLSession?
+
+    private static func downloadResultImage(from url: URL) async throws -> Data {
+        let session = resultDownloadSessionOverride ?? resultDownloadSession
+        var lastError: Error?
+        for attempt in 0..<3 {
+            // Honour cooperative cancellation: if the user cancelled the
+            // generation, bail immediately instead of burning retries. Both
+            // checkCancellation and a cancelled URLSession task surface as
+            // CancellationError so the caller's `catch is CancellationError`
+            // path returns silently (no error banner, no wasted refresh).
+            try Task.checkCancellation()
+            if attempt > 0 {
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 400_000_000)
+            }
+            do {
+                let (data, response) = try await session.data(from: url)
+                guard
+                    let http = response as? HTTPURLResponse,
+                    (200...299).contains(http.statusCode),
+                    !data.isEmpty
+                else {
+                    lastError = BackendError.decode
+                    continue
+                }
+                return data
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError ?? BackendError.decode
+    }
+
+    // MARK: POST /v1/upscale (Boost resolution, E10.3 · tiers E41.5)
+
+    /// E41.5: de twee betaalde upscale-tiers. Raw values = het `quality`-veld
+    /// van `/v1/upscale`; het tarief hoort erbij via `creditAction`.
+    public enum UpscaleQuality: String, Sendable {
+        /// google/upscaler x2 — 1 credit.
+        case regular
+        /// Topaz High Fidelity V2 (server capt input op 6 MP) — 3 credits.
+        case high
+
+        public var creditAction: CreditMeter.Action {
+            self == .high ? .upscaleHigh : .upscale
+        }
+    }
+
+    /// Verhoogt de resolutie van het cutout (2×). De backend flattent met
+    /// edge-bleed, upscalet de RGB via het tier-model en hangt het alfa
+    /// herschaald weer aan, dus het resultaat blijft een transparante cutout.
+    /// Tarief per tier (zie `UpscaleQuality`); 402 → `BackendError.noCredits`
+    /// (paywall).
     private struct UpscaleResponse: Decodable {
         let cutout: String
         let creditsRemaining: Int
     }
-    public func upscale(imagePNG: Data) async throws -> (Data, Int) {
+    public func upscale(imagePNG: Data, quality: UpscaleQuality = .regular) async throws -> (Data, Int) {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
+            let quality: String
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
                 case storageKey = "storage_key"
+                case quality
                 case modelOverride = "model_override"
             }
         }
-        // Geen dev-override-UI voor upscale → altijd het registry-default-model.
+        // Geen dev-override-UI voor upscale → de tier bepaalt het model.
         let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey, modelOverride: nil)
+            Body(storageKey: storageKey, quality: quality.rawValue, modelOverride: nil)
         )
         let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)
         guard let data = Data(base64Encoded: resp.cutout) else {
@@ -415,34 +655,19 @@ public final class BackendClient {
     /// tekst gaat als `hair_prompt` (server giet het in een vast sjabloon —
     /// geen rauwe instructie). Resultaat = opaque PNG + bijgewerkt saldo;
     /// 402 → `BackendError.noCredits` (paywall).
-    public func editHair(imagePNG: Data, preset: HairStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let hairPreset: String?
-            let hairPrompt: String?
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case hairPreset = "hair_preset"
-                case hairPrompt = "hair_prompt"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 hairPreset: preset?.rawValue,
-                 hairPrompt: freeText,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editHair(
+        imagePNG: Data,
+        presetKey: String? = nil,
+        freeText: String? = nil,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            hairPreset: presetKey, hairPrompt: freeText, softSource: softSource,
+            preserveFraming: true
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/stylize (clothes-intent, E10.4)
@@ -451,34 +676,19 @@ public final class BackendClient {
     /// `freeText`; de server mapt het naar een clothes-only edit-prompt met
     /// het harde acceptatiecriterium (gezicht/haar/pose/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editClothes(imagePNG: Data, preset: ClothesStyle? = nil, freeText: String? = nil) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let clothesPreset: String?
-            let clothesPrompt: String?
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case clothesPreset = "clothes_preset"
-                case clothesPrompt = "clothes_prompt"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 clothesPreset: preset?.rawValue,
-                 clothesPrompt: freeText,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editClothes(
+        imagePNG: Data,
+        presetKey: String? = nil,
+        freeText: String? = nil,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            clothesPreset: presetKey, clothesPrompt: freeText, softSource: softSource,
+            preserveFraming: true
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/stylize (face-intent, E32.1)
@@ -487,31 +697,17 @@ public final class BackendClient {
     /// server mapt `face_preset` naar een gezicht-only edit-prompt met het
     /// harde acceptatiecriterium (identiteit/pose/haar/kleding/achtergrond
     /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
-    public func editFace(imagePNG: Data, preset: FaceEdit) async throws -> (Data, Int) {
-        let storageKey = try await uploadInputPNG(imagePNG)
-        struct Body: Encodable {
-            let storageKey: String
-            let facePreset: String
-            let generationModel: String
-            let modelOverride: String?
-            enum CodingKeys: String, CodingKey {
-                case storageKey = "storage_key"
-                case facePreset = "face_preset"
-                case generationModel = "generation_model"
-                case modelOverride = "model_override"
-            }
-        }
-        let body = try JSONEncoder().encode(
-            Body(storageKey: storageKey,
-                 facePreset: preset.rawValue,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
-                 modelOverride: DevModelOverrides.shared.override(for: .stylize))
+    public func editFace(
+        imagePNG: Data,
+        presetKey: String,
+        cutoutWidth: Int? = nil,
+        cutoutHeight: Int? = nil,
+        softSource: Bool = false
+    ) async throws -> StylizeCallResult {
+        try await runStylize(
+            imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
+            facePreset: presetKey, softSource: softSource
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
-        return (data, resp.creditsRemaining)
     }
 
     // MARK: POST /v1/checkout/subscribe-anonymous
@@ -561,6 +757,28 @@ public final class BackendClient {
             "/v1/account/resend-magic-link", method: "POST"
         )
         return resp.email
+    }
+
+    // MARK: POST /v1/account/delete (E15.7)
+    /// GDPR art. 17 — verwijdert het account definitief. Server-side
+    /// (backend/api/v1/account/delete.ts): cancelt actieve Stripe-
+    /// subscriptions, veegt de cutout-uploads-prefix en wist de Supabase-
+    /// auth-user via de GoTrue admin API (FK-cascade ruimt de rest op).
+    /// Vereist een sessie (JWT = consent-signaal) plus de
+    /// `X-Confirm-Delete: yes`-header als tweede consent. POST i.p.v.
+    /// DELETE — het endpoint accepteert beide en URLSession is
+    /// inconsistent met DELETE+body.
+    private struct DeleteAccountResponse: Decodable {
+        let deleted: Bool
+    }
+    public func deleteAccount() async throws {
+        let resp: DeleteAccountResponse = try await request(
+            "/v1/account/delete", method: "POST",
+            extraHeaders: ["X-Confirm-Delete": "yes"]
+        )
+        // Het endpoint stuurt `deleted:false` alleen met een 5xx (dan is de
+        // server-throw hierboven al gebeurd), maar guard defensief.
+        guard resp.deleted else { throw BackendError.server(500, "delete_failed") }
     }
 
     // MARK: POST /v1/checkout/topup
@@ -699,19 +917,53 @@ public final class BackendClient {
         let _: Empty = try await request("/v1/custom-effects/\(id)", method: "DELETE")
     }
 
-    // MARK: GET /v1/app-config (CMS-gestuurd, E33+)
-    /// App-brede visuele configuratie (splash-achtergrond + lege-canvas-avatars).
-    /// Anoniem-vriendelijk — gebruikt vóórdat de gebruiker is ingelogd.
-    private struct AppConfigResponse: Decodable {
-        let splashBackgroundUrl: URL?
-        let emptyStateAvatarUrls: [URL]
+    // MARK: GET /v1/banner-presets (CMS-gestuurd, E39)
+    /// Banner-Studio-startpunten. Anoniem-vriendelijk; de empty-state/home
+    /// valt terug op lokale presets als dit faalt.
+    private struct BannerPresetsResponse: Decodable {
+        // Envelope-key `banner_presets` → `bannerPresets` via .convertFromSnakeCase.
+        let bannerPresets: [RemoteBannerPreset]
     }
+    public func bannerPresets() async throws -> [RemoteBannerPreset] {
+        let resp: BannerPresetsResponse = try await requestAllowingAnonymous("/v1/banner-presets", method: "GET")
+        return resp.bannerPresets
+    }
+
+    // MARK: GET /v1/app-config (CMS-gestuurd, E33+)
+    /// App-brede visuele configuratie. Anoniem-vriendelijk.
     public func appConfig() async throws -> RemoteAppConfig {
-        let resp: AppConfigResponse = try await requestAllowingAnonymous("/v1/app-config", method: "GET")
+        let resp: RemoteAppConfigResponse = try await requestAllowingAnonymous("/v1/app-config", method: "GET")
         return RemoteAppConfig(
             splashBackgroundUrl: resp.splashBackgroundUrl,
-            emptyStateAvatarUrls: resp.emptyStateAvatarUrls
+            emptyStateAvatarUrls: resp.emptyStateAvatarUrls,
+            gradientPresets: resp.gradientPresets,
+            paywallProFeatures: resp.paywallProFeatures
         )
+    }
+
+    // MARK: GET /v1/hair-presets, /v1/clothes-presets, /v1/face-presets (CMS, E33+)
+    /// Kapsel-presets voor het Hair-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func hairPresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/hair-presets", method: "GET")
+        return resp.presets
+    }
+
+    /// Kleding-presets voor het Clothes-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func clothesPresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/clothes-presets", method: "GET")
+        return resp.presets
+    }
+
+    /// Face beauty-presets voor het Face-paneel. Anoniem-vriendelijk; soft-fail → [].
+    public func facePresets() async throws -> [RemotePreset] {
+        let resp: RemotePresetsResponse = try await requestAllowingAnonymous("/v1/face-presets", method: "GET")
+        return resp.presets
+    }
+
+    // MARK: GET /v1/feature-flags (CMS-gestuurd, E33+)
+    /// Remote feature flags. Anoniem-vriendelijk; soft-fail → allEnabled.
+    public func featureFlags() async throws -> RemoteFeatureFlags {
+        try await requestAllowingAnonymous("/v1/feature-flags", method: "GET")
     }
 
     // MARK: GET /v1/backgrounds (CMS-gestuurd, E33+)
@@ -723,6 +975,30 @@ public final class BackendClient {
     public func backgrounds() async throws -> [RemoteBackground] {
         let resp: BackgroundsResponse = try await requestAllowingAnonymous("/v1/backgrounds", method: "GET")
         return resp.backgrounds
+    }
+
+    // MARK: POST /v1/unsplash (UX-audit background-paneel, 2026-07-03)
+    /// Zoek (of blader, bij lege query) Unsplash-achtergronden via de
+    /// backend-proxy — de access key blijft server-side. Anoniem-vriendelijk,
+    /// zelfde soft-fail-gedachte als /v1/backgrounds. POST i.p.v. GET met
+    /// query-string: `send` bouwt URL's via `appendingPathComponent`, dat een
+    /// "?" zou percent-encoden.
+    public func unsplashPhotos(query: String?) async throws -> UnsplashFeed {
+        struct Body: Encodable { let q: String? }
+        let body = try JSONEncoder().encode(Body(q: query))
+        return try await requestAllowingAnonymous("/v1/unsplash", method: "POST", body: body)
+    }
+
+    /// Unsplash-guideline: registreer een download op het moment dat een foto
+    /// daadwerkelijk als achtergrond wordt toegepast. Best-effort — een
+    /// gemiste registratie mag apply nooit blokkeren.
+    public func unsplashTrackDownload(_ downloadLocation: String) async {
+        struct Body: Encodable { let track: String }
+        struct OkResponse: Decodable { let ok: Bool }
+        guard let body = try? JSONEncoder().encode(Body(track: downloadLocation)) else { return }
+        _ = try? await requestAllowingAnonymous(
+            "/v1/unsplash", method: "POST", body: body
+        ) as OkResponse
     }
 
     // MARK: GET /v1/messages (E17.3)
@@ -748,11 +1024,13 @@ public final class BackendClient {
     private func request<R: Decodable>(
         _ path: String,
         method: String,
-        body: Data? = nil
+        body: Data? = nil,
+        extraHeaders: [String: String] = [:]
     ) async throws -> R {
         guard let token = auth.accessToken else { throw BackendError.notSignedIn }
         return try await send(
-            path: path, method: method, body: body, token: token
+            path: path, method: method, body: body, token: token,
+            extraHeaders: extraHeaders
         )
     }
 
@@ -774,12 +1052,19 @@ public final class BackendClient {
         path: String,
         method: String,
         body: Data?,
-        token: String?
+        token: String?,
+        extraHeaders: [String: String] = [:]
     ) async throws -> R {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = method
         if let token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        // Endpoint-specifieke headers (E15.7: `X-Confirm-Delete` voor
+        // account-delete). Bewust vóór de vaste headers hieronder, zodat een
+        // extra header nooit een standaardheader kan overschrijven.
+        for (field, value) in extraHeaders {
+            req.setValue(value, forHTTPHeaderField: field)
         }
         // Stable per-Mac identifier for the free-tier anti-cheat layer.
         // Sent on every request so the backend can cross-reference the

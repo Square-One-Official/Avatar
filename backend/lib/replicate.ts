@@ -6,12 +6,17 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 /**
  * Hard timeout for any single `replicate.run()` call (audit MEDIUM #17).
  * The SDK has no built-in client-side timeout; a hung Replicate prediction
- * would otherwise let the Vercel function run to its 60s `maxDuration`,
+ * would otherwise let the Vercel function run to its `maxDuration`,
  * costing the user a full timeout instead of a clean 504.
  *
- * 50s leaves ~10s of headroom under Vercel's default function ceiling so
- * the handler can still finalise (free-trial counter, response write)
- * after we surface the timeout.
+ * 50s is the DEFAULT budget, sized for the endpoints on a 60s `maxDuration`
+ * (vercel.json: cutout) — ~10s headroom so the handler can still finalise
+ * (free-trial counter, response write) after we surface the timeout.
+ * Features whose model legitimately runs longer get a per-feature budget
+ * instead: `STYLIZE_TIMEOUT_MS`, `BACKGROUND_TIMEOUT_MS` and
+ * `COLORIZE_TIMEOUT_MS` (80s, under their 90s `maxDuration`). E44.1: don't
+ * reuse this default for a slow model — DeOldify cold starts sat right at
+ * the 50s edge and died as silent 504s.
  */
 const REPLICATE_TIMEOUT_MS = 50_000;
 
@@ -197,7 +202,16 @@ export async function outpaintPortrait(input: {
  * The ref (incl. pinned version) lives in MODEL_REGISTRY (lib/models.ts);
  * `model` accepts a whitelisted override ref from `resolveModelOverride`
  * (E01.10) with the same input contract.
+ *
+ * Ruimere timeout dan de 50s-default (E44.1, audit B2): DeOldify op
+ * `render_factor: 35` + een cold start zit geregeld tegen/over de 50s,
+ * waardoor legitieme runs als 504 stierven — geen resultaat, geen credit,
+ * maar ook geen zichtbare fout. vercel.json geeft colorize 90s
+ * `maxDuration`; 80s laat 10s marge voor het afronden van de response
+ * (zelfde verhouding als STYLIZE_TIMEOUT_MS).
  */
+const COLORIZE_TIMEOUT_MS = 80_000;
+
 export async function colorize(input: {
   imageDataUrl: string;
   model?: string | null;
@@ -211,6 +225,7 @@ export async function colorize(input: {
         render_factor: 35,
       },
     }),
+    COLORIZE_TIMEOUT_MS,
   )) as unknown;
 
   return extractUrl(output, "colorize");
@@ -226,18 +241,48 @@ export async function upscale(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
+  const ref = input.model ?? defaultModelRef("upscale");
   const output = (await runWithRetry(
     "upscale",
-    () => replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
-      input: {
-        image: input.imageDataUrl,
-        scale: 2,
-        face_enhance: false,
-      },
+    () => replicate.run(ref as `${string}/${string}`, {
+      input: upscaleInputFor(ref, input.imageDataUrl),
     }),
   )) as unknown;
 
   return extractUrl(output, "upscale");
+}
+
+/**
+ * Per-model input-vertaling voor de upscaler (E41.1 + E41.4; spiegelt
+ * stylizeInputFor). Identiteit gaat vóór scherpte: geen generatieve
+ * gezichts-"verbetering" — GFPGAN-achtige reconstructie maakt huid glad en
+ * gumt sproeten/sieraden weg (kwaliteitsklacht 2026-07-03). Onbekende refs
+ * vallen op de Real-ESRGAN-vorm terug.
+ */
+function upscaleInputFor(ref: string, imageDataUrl: string): Record<string, unknown> {
+  if (ref.startsWith("topazlabs/image-upscale")) {
+    // High Fidelity V2 = de detail-behoudende Gigapixel-variant;
+    // face_enhancement bewust uit. PNG voorkomt JPEG-randartefacten vlak
+    // vóór de alpha-reapply.
+    return {
+      image: imageDataUrl,
+      enhance_model: "High Fidelity V2",
+      upscale_factor: "2x",
+      face_enhancement: false,
+      output_format: "png",
+    };
+  }
+  if (ref.startsWith("google/upscaler")) {
+    // Output is JPEG; default compression_quality 80 bakt compressieruis in
+    // de haarranden → maximaal.
+    return { image: imageDataUrl, upscale_factor: "x2", compression_quality: 100 };
+  }
+  if (ref.startsWith("philz1337x/crystal-upscaler")) {
+    return { image: imageDataUrl, scale_factor: 2 };
+  }
+  // Real-ESRGAN (huidige default) & onbekend: face_enhance UIT — de E41.1-
+  // stand (aan) bleek de gladde-huid/weg-oorbellen-oorzaak.
+  return { image: imageDataUrl, scale: 2, face_enhance: false };
 }
 
 /**
@@ -265,13 +310,11 @@ export async function stylizeEdit(input: {
   width: number;
   height: number;
   model?: string | null;
-  /**
-   * E34: optionele STIJL-REFERENTIE (user-created custom effect). Gaat als
-   * tweede beeld mee in de model-image-array; het portret (`imageDataUrl`)
-   * blijft het eerste/te-bewerken beeld. De prompt verheldert de rol (zie
-   * stylize.ts CUSTOM_STYLE_TEMPLATE). nil = gewone één-beeld-stylize.
-   */
-  referenceDataUrl?: string | null;
+  /** Optioneel: data-URLs van voorbeeld-outputs die het model als visuele
+   *  stijlreferenties meekrijgt naast de prompt. Gebruikt door Effects (E54)
+   *  én door user-created custom effects (E34 — precies één referentie); de
+   *  prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
+  styleReferenceDataUrls?: string[] | null;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
@@ -291,16 +334,15 @@ function stylizeInputFor(
     prompt: string;
     width: number;
     height: number;
-    referenceDataUrl?: string | null;
+    styleReferenceDataUrls?: string[] | null;
   },
 ): Record<string, unknown> {
-  // E34: het portret eerst (te bewerken), de optionele stijlreferentie tweede.
-  // Alle vier armen nemen een image-array, dus een tweede beeld is een append;
-  // de prompt (CUSTOM_STYLE_TEMPLATE) vertelt het model welke rol elk speelt.
-  const images = input.referenceDataUrl
-    ? [input.imageDataUrl, input.referenceDataUrl]
-    : [input.imageDataUrl];
+  // Het portret eerst (dat is het te bewerken beeld), stijlreferenties daarna.
+  // Alle vier armen nemen een image-array, dus extra beelden zijn een append;
+  // de prompt vertelt het model welke rol elk beeld speelt (E54-rolclausule,
+  // resp. CUSTOM_STYLE_TEMPLATE voor user-created effects).
   if (ref.startsWith("google/nano-banana")) {
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -314,6 +356,7 @@ function stylizeInputFor(
     // `aspect_ratio: "match_input_image"` zodat het kader niet herkadert.
     // Schema controleren vóór de eerste bakeoff-run (replicate.com/bytedance/
     // seedream-4); bij een veld-mismatch faalt de dev-only call zichtbaar.
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -322,6 +365,7 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("black-forest-labs/flux-2")) {
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       input_images: images,
@@ -334,6 +378,7 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("openai/gpt-image")) {
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       input_images: images,
@@ -350,6 +395,36 @@ function stylizeInputFor(
     };
   }
   throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
+}
+
+const BACKGROUND_TIMEOUT_MS = 80_000;
+
+/**
+ * Text-to-background via neutral canvas + instruction-edit models
+ * (E42). Caller supplies the composed prompt and a grey canvas data URL
+ * at the target aspect ratio.
+ */
+export async function generateBackgroundImage(input: {
+  prompt: string;
+  imageDataUrl: string;
+  width: number;
+  height: number;
+  model?: string | null;
+}): Promise<string> {
+  const ref = input.model ?? defaultModelRef("generate_background");
+  const payload = stylizeInputFor(ref, {
+    imageDataUrl: input.imageDataUrl,
+    prompt: input.prompt,
+    width: input.width,
+    height: input.height,
+  });
+  const output = (await runWithRetry(
+    "generateBackgroundImage",
+    () => replicate.run(ref as `${string}/${string}`, { input: payload }),
+    BACKGROUND_TIMEOUT_MS,
+  )) as unknown;
+
+  return extractUrl(output, "generateBackgroundImage");
 }
 
 function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" {

@@ -80,26 +80,86 @@ enum BackgroundKit {
 /// Persistente brand colors (hex), door de gebruiker toegevoegd via de
 /// eyedropper. UserDefaults-backed; @Observable zodat de paneel-rij
 /// live bijwerkt.
+/// Audit-opschoning (2026-07-03): de oude picker bewaarde bij élke
+/// sluit-actie een tussenstand, waardoor de kit volliep met tientallen bijna
+/// identieke tinten ("veel random rood"). De kit saneert daarom bij laden
+/// éénmalig de opgeslagen lijst (perceptueel bijna-gelijke kleuren vouwen
+/// samen, recentste wint, max `maxStored`) en houdt hem bij `add` schoon.
 @MainActor
 @Observable
 final class BrandColorKit {
     static let shared = BrandColorKit()
 
     private static let key = "backgroundBrandColorsHex"
+    /// Ruim genoeg voor een echte brand-kit, krap genoeg om nooit meer een
+    /// eindeloze rij te worden.
+    static let maxStored = 12
+    /// Euclidische RGB-afstand (0–441) waaronder twee tinten als "dezelfde
+    /// kleur" tellen. 30 vouwt picker-drag-tussenstanden samen maar laat
+    /// bewust gekozen buurkleuren (bv. twee merkroden) naast elkaar bestaan.
+    private static let minDistance: Double = 30
 
     private(set) var hexColors: [String]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.hexColors = defaults.stringArray(forKey: Self.key) ?? []
+        let stored = defaults.stringArray(forKey: Self.key) ?? []
+        let cleaned = Self.sanitized(stored)
+        self.hexColors = cleaned
+        if cleaned != stored { defaults.set(cleaned, forKey: Self.key) }
     }
 
     @ObservationIgnored private let defaults: UserDefaults
 
     func add(_ hex: String) {
-        guard !hexColors.contains(hex) else { return }
+        guard let rgb = Self.rgbComponents(hex) else { return }
+        // Bijna-gelijke bestaande tint(en) eruit — de nieuwste wint z'n plek
+        // achteraan; daarna cappen op de recentste `maxStored`.
+        hexColors.removeAll { existing in
+            guard let other = Self.rgbComponents(existing) else { return true }
+            return Self.distance(rgb, other) < Self.minDistance
+        }
         hexColors.append(hex)
+        if hexColors.count > Self.maxStored {
+            hexColors.removeFirst(hexColors.count - Self.maxStored)
+        }
         defaults.set(hexColors, forKey: Self.key)
+    }
+
+    /// Verwijder een brand-kleur (het hover-kruisje in het background-paneel).
+    func remove(_ hex: String) {
+        hexColors.removeAll { $0 == hex }
+        defaults.set(hexColors, forKey: Self.key)
+    }
+
+    /// Eénmalige sanering van een opgeslagen lijst: onparseerbare waardes
+    /// weg, perceptuele near-duplicates samengevouwen (recentste wint,
+    /// volgorde blijft), gecapt op de recentste `maxStored`.
+    static func sanitized(_ hexes: [String]) -> [String] {
+        var keptRecentFirst: [(hex: String, rgb: (Double, Double, Double))] = []
+        for hex in hexes.reversed() {
+            guard let rgb = rgbComponents(hex) else { continue }
+            let isNearDuplicate = keptRecentFirst.contains {
+                distance(rgb, $0.rgb) < minDistance
+            }
+            if !isNearDuplicate { keptRecentFirst.append((hex, rgb)) }
+            if keptRecentFirst.count == maxStored { break }
+        }
+        return keptRecentFirst.reversed().map(\.hex)
+    }
+
+    private static func rgbComponents(_ hex: String) -> (Double, Double, Double)? {
+        var s = hex
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+        return (Double((v >> 16) & 0xFF), Double((v >> 8) & 0xFF), Double(v & 0xFF))
+    }
+
+    private static func distance(
+        _ a: (Double, Double, Double), _ b: (Double, Double, Double)
+    ) -> Double {
+        let dr = a.0 - b.0, dg = a.1 - b.1, db = a.2 - b.2
+        return (dr * dr + dg * dg + db * db).squareRoot()
     }
 }
 
@@ -158,6 +218,14 @@ final class BackgroundImageKit {
         imageIDs.append(id)
         defaults.set(imageIDs, forKey: Self.key)
         return png
+    }
+
+    /// PoC (Manage backgrounds): verwijder een upload (bestand + id + cache).
+    func remove(_ id: String) {
+        if let u = url(id) { try? FileManager.default.removeItem(at: u) }
+        imageCache[id] = nil
+        imageIDs.removeAll { $0 == id }
+        defaults.set(imageIDs, forKey: Self.key)
     }
 }
 

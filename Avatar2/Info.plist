@@ -66,5 +66,18 @@
 	<string>iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Aaavatar portrait reference</string>
+			<key>UTTypeIdentifier</key>
+			<string>nl.squareone.aaavatar2.portrait-ref</string>
+		</dict>
+	</array>
 </dict>
 </plist>

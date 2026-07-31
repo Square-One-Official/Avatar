@@ -5,29 +5,48 @@
 
 import AvatarKit
 import AvatarUI
+import SwiftData
 import SwiftUI
 
 struct RenameSheet: View {
-    /// Eén of meer portretten. Bij ≥2 zet Save dezelfde naam + rol op állemaal
-    /// (board-multiselectie); bij één het bekende enkel-rename-gedrag.
-    let portraits: [Portrait2]
+    private let inlinePortraits: [Portrait2]
+    private let portraitIDs: [PersistentIdentifier]
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var draftName = ""
     @State private var draftRole = ""
 
-    init(portrait: Portrait2) { self.portraits = [portrait] }
-    init(portraits: [Portrait2]) { self.portraits = portraits }
+    init(portrait: Portrait2) {
+        inlinePortraits = [portrait]
+        portraitIDs = []
+    }
 
-    private var isBulk: Bool { portraits.count >= 2 }
+    init(portraits: [Portrait2]) {
+        inlinePortraits = portraits
+        portraitIDs = []
+    }
+
+    /// E53.7: ID-snapshot vanuit BoardView — stabiel op ShellView-host.
+    init(portraitIDs: [PersistentIdentifier]) {
+        inlinePortraits = []
+        self.portraitIDs = portraitIDs
+    }
+
+    private var targets: [Portrait2] {
+        if !inlinePortraits.isEmpty { return inlinePortraits }
+        return portraitIDs.compactMap { modelContext.model(for: $0) as? Portrait2 }
+    }
+
+    private var isBulk: Bool { targets.count >= 2 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap5) {
             HStack {
-                Text(isBulk ? "Rename \(portraits.count) portraits" : "Rename")
+                Text(isBulk ? "Rename \(targets.count) portraits" : "Rename")
                     .dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), size: .small) { dismiss() }
-                    .accessibilityLabel("Close")
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
             }
             DSTextField(label: "Name", placeholder: "Name", text: $draftName)
                 .onSubmit { save() }
@@ -41,25 +60,22 @@ struct RenameSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 360)
         .background(DSColor.Background.app)
-        // Prefill met de gedeelde waarde; bij afwijkende waarden (gemengde
-        // selectie) leeg, zodat Save bewust een nieuwe naam/rol op alles zet.
+        .appliedAppearancePreference()
         .onAppear {
             draftName = commonValue(\.name)
             draftRole = commonValue(\.role)
         }
     }
 
-    /// De gemeenschappelijke waarde van een veld over alle portretten, of "" als
-    /// ze verschillen (of er geen zijn).
     private func commonValue(_ key: KeyPath<Portrait2, String>) -> String {
-        guard let first = portraits.first?[keyPath: key] else { return "" }
-        return portraits.allSatisfy { $0[keyPath: key] == first } ? first : ""
+        guard let first = targets.first?[keyPath: key] else { return "" }
+        return targets.allSatisfy { $0[keyPath: key] == first } ? first : ""
     }
 
     private func save() {
         let name = draftName.trimmingCharacters(in: .whitespaces)
         let role = draftRole.trimmingCharacters(in: .whitespaces)
-        for portrait in portraits {
+        for portrait in targets {
             portrait.name = name
             portrait.role = role
             portrait.touch()

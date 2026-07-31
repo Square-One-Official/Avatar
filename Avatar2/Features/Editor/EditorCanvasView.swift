@@ -3,8 +3,7 @@
 // regels ~252–350): 1024-units canvasruimte, shift = dominante as,
 // snap-hysterese enter 12 / exit 24 met .alignment-tick, .generic-tick per
 // 24 units (continue dragtextuur), zoom 0,5×–3× om het canvasmidden.
-// Dubbelklik = reset naar fill-fit; E06.5 vervangt dat door echt
-// auto-frame. Y-snap = canvasmidden zoals v1 — de ooglijn-snap verhuist
+// Y-snap = canvasmidden zoals v1 — de ooglijn-snap verhuist
 // naar E06.5 zodra eyeCenter (ProcessedSubject) op het portret bekend is;
 // de guide toont de standaard-ooglijn al wél.
 //
@@ -28,11 +27,6 @@ struct EditorCanvasView: View {
     @Binding var isSelected: Bool
     /// E27.3: pan-drag bezig → EditorView dimt de (screen-space) handles weg.
     @Binding var isPanning: Bool
-    /// E33: frame-selectie (FigJam) — apart van onderwerp-selectie. Een klik op
-    /// de lege canvas-ruimte óf op het onderwerp houdt/zet het frame geselecteerd
-    /// (top-toolbar + ring + chip-highlight in EditorView); alléén een klik
-    /// búíten het frame (EditorView's deselect-laag) zet het weer uit.
-    @Binding var frameSelected: Bool
     /// E24.16/24.8: de frame-vorm clipt het BEELD (niet de handles), zodat de
     /// selectie-handles bij een cirkel-frame zichtbaar/bruikbaar blijven.
     var frameShape: ExportShape = .square
@@ -95,12 +89,10 @@ struct EditorCanvasView: View {
             let clip: AnyShape = frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
             ZStack {
                 // E24.17: klik BUITEN het onderwerp (de hoeken bij een cirkel,
-                // of de marge) = onderwerp deselecteren → handles weg. E33: deze
-                // klik valt nog ín het frame, dus het frame blijft/wordt
-                // geselecteerd (toolbar + ring blijven).
+                // of de marge) = onderwerp deselecteren → handles weg.
                 Color.clear
                     .contentShape(Rectangle())
-                    .onTapGesture { isSelected = false; frameSelected = true }
+                    .onTapGesture { isSelected = false }
 
                 // Onderwerp op SUBJECT-schaal (Portrait2.scale via de handles).
                 // E27.1: de VIEW-zoom zit niet meer hier maar als camera op de
@@ -160,14 +152,10 @@ struct EditorCanvasView: View {
                 // canvas-clip, zodat ze op élk zoomniveau even groot blijven en
                 // (bij een groot-geschaald onderwerp) zichtbaar/grijpbaar worden
                 // door uit te zoomen. Deze view houdt alleen het onderwerp + de
-                // deselect-tap + de pan-/dubbelklik-gestures (E24.32 intact).
+                // deselect-tap + de pan-gesture (E24.32 intact).
             }
             // E27.1: pinch/scroll-VIEW-zoom is verhuisd naar de camera (op de
-            // hele scène, EditorView). De pan-drag zit op het onderwerp (E24.32);
-            // dubbelklik = auto-frame/fit van het ONDERWERP (los van de camera).
-            .onTapGesture(count: 2) {
-                resetToFit()
-            }
+            // hele scène, EditorView). De pan-drag zit op het onderwerp (E24.32).
             .clipped()
             #if DEBUG
             // E24.17/24.19 smoke-haken: forceer de geselecteerde staat resp. de
@@ -213,26 +201,6 @@ struct EditorCanvasView: View {
             offsetX: c.offsetX, offsetY: c.offsetY, scale: c.scale, cutoutSize: image.size
         )
         return CanvasTransform(offsetX: r.offsetX, offsetY: r.offsetY, scale: r.scale)
-    }
-
-    private func fitTransform() -> CanvasTransform {
-        // E24.18: padded FIT (marge in circle én square). Canonieke berekening:
-        // AutoFramer.fitTransform (gedeeld; voorheen hier 1-op-1 gedupliceerd).
-        let t = AutoFramer.fitTransform(cutoutSize: image.size)
-        return CanvasTransform(offsetX: t.offset.width, offsetY: t.offset.height, scale: t.scale)
-    }
-
-    private func resetToFit() {
-        // Dubbelklik = auto-frame (E06.5): echte AutoAligner-port wanneer
-        // er een model + CGImage is; anders fill-fit.
-        guard let portrait,
-              let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            withAnimation(.spring(duration: 0.35)) {
-                writeTransform(fitTransform(), touch: true)
-            }
-            return
-        }
-        Task { await AutoFramer.apply(to: portrait, image: cg, undoManager: undoManager) }
     }
 
     // MARK: - Drag = pan + snap (v1-port)
@@ -349,17 +317,14 @@ struct EditorCanvasView: View {
     private func selectFromTap(at location: CGPoint, imageRect: CGRect) {
         guard imageRect.width > 0, imageRect.height > 0, imageRect.contains(location) else {
             isSelected = false      // binnen de vorm maar buiten het beeld → leeg
-            frameSelected = true
             return
         }
         let u = (location.x - imageRect.minX) / imageRect.width
         let v = (location.y - imageRect.minY) / imageRect.height
         if image.isOpaqueAtNormalizedPoint(u: u, v: v) {
             isSelected = true       // persoon-pixel → onderwerp + handles
-            frameSelected = true
         } else {
             isSelected = false      // transparante achtergrond ín het frame
-            frameSelected = true
         }
     }
 
@@ -449,7 +414,7 @@ struct AlignmentGuideOverlay2: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 1 * inv)
             .opacity(isVisible ? 1 : 0)
-            .animation(.easeOut(duration: 0.15), value: isVisible)
+            .animation(DSMotion.fast, value: isVisible)
         }
         .allowsHitTesting(false)
     }

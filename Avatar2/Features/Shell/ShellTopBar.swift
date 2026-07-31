@@ -1,162 +1,198 @@
-// Shell-topbar (E04.5 + visuele pass punt 15, Figma: App-frames node "top"
-// 4017:1921 + gear "Frame 27"). De quota-regel begint exact op x76 — vlak
-// naast de window-controls (x16–68) — en zit verticaal gecentreerd op
-// dezelfde regel (strook h52, middellijn y26): tekst y18/h16, chip y14/h24.
-// De gear (48-cirkel) hangt op y12 met trailing 16. Zichtbaarheid
-// quota/Upgrade volgt het E05.1-besluit (pas ná de eerste cutout).
-// Punt 14: de gear toggelt de in-window Settings en toont de active-state.
+// Shell-topbar (PoC left-nav herziening). Sterk uitgekleed: de credits-teller,
+// de gear (Settings), de board- en de rechter-sidebar-toggle zijn weg — die
+// leven nu in de left-nav. De sidebar-inklap-toggle zit in ShellSidebarChrome
+// (ShellView) náást de traffic-lights, altijd op dezelfde vensterpositie.
+// Wat hier overblijft:
+//   • rechts de editor-chrome (view-toggle + Share), ALLEEN tijdens bewerken;
+//   • een ✕ om de in-window Settings te sluiten.
+//
+// Compacte Granola-stijl rij: gelabelde segmented control (Edit · Preview)
+// + gelabelde Share-pil (icoon links).
 
-import AvatarKit
 import AvatarUI
 import SwiftUI
 
 struct ShellTopBar: View {
-    let model: EntitlementModel
     let isSettingsActive: Bool
     let onToggleSettings: () -> Void
-    /// E08.2: export/share. Verborgen tot er een portret op het canvas staat.
+    /// Editor-chrome toont ALLEEN tijdens het bewerken van een portret.
+    var isEditing: Bool = false
     var canExport: Bool = false
     var onExport: () -> Void = {}
-    /// E27.4: board-modus-toggle (alle portretten op één canvas).
-    var canToggleBoard: Bool = false
-    var isBoardActive: Bool = false
-    var onToggleBoard: () -> Void = {}
-    /// E22.1: bibliotheek/sidebar-toggle, verhuisd uit de bottom-toolbar.
-    var canToggleSidebar: Bool = false
-    var isSidebarActive: Bool = false
-    var onToggleSidebar: () -> Void = {}
+    /// E34.5: social-preview als tweede segment naast Edit.
+    var canPreview: Bool = false
+    var isPreviewActive: Bool = false
+    var onPreviewActiveChange: (Bool) -> Void = { _ in }
 
-    /// Visuele-verificatie-haak: toon de quota-badge met een vaste preview-
-    /// tekst zonder ingelogd account (--badge-preview). No-op in normale runs.
-    private static let isBadgePreview =
-        ProcessInfo.processInfo.arguments.contains("--badge-preview")
+    private static let controlHeight: CGFloat = 28
 
     var body: some View {
-        // Feedback Thierry (Granola-referentie): de quota-teller hoort op
-        // DEZELFDE regel als de traffic-lights (venstertop), niet eronder.
-        // De 48 pt tool-knoppen passen niet op die regel zonder de window-
-        // controls te raken, dus teller en tools liggen in twee lagen: de
-        // teller gecentreerd op de window-controls-regel (28 pt), de tools in
-        // hun eigen h52-strook eronder.
-        ZStack(alignment: .topLeading) {
-            toolCluster
-            quotaCluster
-        }
-        .animation(.easeOut(duration: 0.18), value: isSettingsActive)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .task { await model.refresh() }
-    }
-
-    // E24.13: quota-badge alléén ná de eerste cutout en NIET in Settings.
-    // Kruisvervaag op opacity (i.p.v. wegnemen) zodat de linkerkant niet
-    // wegklapt tijdens de Settings-toggle.
-    @ViewBuilder
-    private var quotaCluster: some View {
-        if model.hasCompletedFirstCutout || Self.isBadgePreview {
-            HStack(spacing: DSSpacing.gap2) {
-                Text(quotaLabel)
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                DSChip("Upgrade", type: .brand) {
-                    model.requestUpgrade()
-                }
-            }
-            // Voorbij de window-controls (links) én verticaal gecentreerd op de
-            // traffic-light-regel (28 pt vanaf de venstertop) i.p.v. tegen de
-            // 48 pt tool-knoppen — dát duwde 'm een regel te laag. ignoresSafeArea
-            // borgt dat we ook bij een eventuele top-safe-area op die regel blijven.
-            .padding(.leading, ShellMetrics.topBarLeadingAfterWindowControls)
-            .frame(height: ShellMetrics.windowControlsRowHeight)
+        toolCluster
             .frame(maxWidth: .infinity, alignment: .leading)
-            .ignoresSafeArea(.container, edges: .top)
-            .opacity(isSettingsActive ? 0 : 1)
-            .allowsHitTesting(!isSettingsActive)
-        }
+            .animation(.easeOut(duration: 0.18), value: isSettingsActive)
     }
 
-    // Punt 14-vervolg: de editor-cluster en de Close-knop liggen in een
-    // trailing-uitgelijnde ZStack en kruisvervagen op `isSettingsActive`.
-    // Zo verspringt er niets bij het openen van Settings — een tandwiel opent,
-    // een ✕ sluit (geen dubbelzinnige "actieve gear"). Eigen h52-strook
-    // (gap-3 vanaf de top) zodat de 48 pt-knoppen vrij van de window-controls
-    // blijven.
+    // Rechts: editor-chrome tijdens bewerken; ✕ in Settings-modus.
     private var toolCluster: some View {
         HStack(spacing: 0) {
             Spacer(minLength: DSSpacing.gap2)
             ZStack(alignment: .trailing) {
-                HStack(spacing: DSSpacing.gap2) {
-                    if canExport {
-                        DSToolButton(Image(systemName: "square.and.arrow.up"), label: "Share", tooltipEdge: .bottom) {
-                            onExport()
-                        }
+                HStack(spacing: DSSpacing.gap1_5) {
+                    if isEditing && canPreview {
+                        EditorViewModeToggle(
+                            isPreview: isPreviewActive,
+                            height: Self.controlHeight,
+                            onChange: onPreviewActiveChange
+                        )
                     }
-                    DSToolButton(
-                        Image(systemName: "gearshape.fill"),
-                        label: "Settings",
-                        tooltipEdge: .bottom
-                    ) {
-                        onToggleSettings()
-                    }
-                    if canToggleBoard {
-                        // E27.4: board-modus (alle portretten op één canvas).
-                        DSToolButton(
-                            Image(systemName: "square.grid.2x2"),
-                            label: "Board",
-                            isActive: isBoardActive,
-                            tooltipEdge: .bottom
-                        ) {
-                            onToggleBoard()
-                        }
-                    }
-                    if canToggleSidebar {
-                        // E24.5: bibliotheek/sidebar-toggle UITERST RECHTS.
-                        DSToolButton(
-                            Image(systemName: "sidebar.right"),
-                            label: "Library",
-                            isActive: isSidebarActive,
-                            tooltipEdge: .bottom
-                        ) {
-                            onToggleSidebar()
-                        }
+                    if isEditing && canExport {
+                        SharePillButton(height: Self.controlHeight, action: onExport)
                     }
                 }
                 .opacity(isSettingsActive ? 0 : 1)
                 .allowsHitTesting(!isSettingsActive)
 
-                // Enige knop in Settings-modus: ✕ uiterst rechts (de hoek waar
-                // de Library-knop stond). `xmark` = het canonieke sluit-glyph.
-                DSToolButton(Image(systemName: "xmark"), label: "Close", tooltipEdge: .bottom) {
-                    onToggleSettings()
-                }
+                DSCompactTopBarButton(
+                    icon: "xmark",
+                    label: "Close",
+                    height: Self.controlHeight,
+                    action: onToggleSettings
+                )
                 .opacity(isSettingsActive ? 1 : 0)
                 .allowsHitTesting(isSettingsActive)
             }
             .padding(.trailing, ShellMetrics.topBarInset)
         }
-        .padding(.top, DSSpacing.gap3)
-        .frame(height: 52, alignment: .top)
+        .frame(height: ShellMetrics.topBarRowHeight, alignment: .top)
+    }
+}
+
+// MARK: - Editor view mode (Edit · Preview)
+
+/// Gelabelde segmented control — icoon + tekst per segment (pencil · eye).
+private struct EditorViewModeToggle: View {
+    @Namespace private var selectionNamespace
+    let isPreview: Bool
+    let height: CGFloat
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment(icon: "pencil", label: "Edit", selected: !isPreview) {
+                DSMotion.animate(DSMotion.springSmall) { onChange(false) }
+            }
+            segment(icon: "eye", label: "Preview", selected: isPreview) {
+                DSMotion.animate(DSMotion.springSmall) { onChange(true) }
+            }
+        }
+        .padding(DSSpacing.gap0_5)
+        .background(DSColor.Background.neutral, in: Capsule())
+        .dsMotion(DSMotion.springSmall, value: isPreview)
     }
 
-    // Besluit Thierry (Granola-referentie): aftellende teller "X left of Y" —
-    // resterend van het totaal, telt af naar 0. Semantiek volgt v1's
-    // "X of 3 left".
-    private var quotaLabel: String {
-        if Self.isBadgePreview { return "147 left of 200" }
-        if model.isProActive {
-            // Resterende credits over de maand-grant. Top-ups stapelen bóven
-            // de grant (verlopen nooit) → dan is er geen vaste noemer en valt
-            // de teller terug op de kale balans i.p.v. een misleidende "523 left of 200".
-            let quota = model.monthlyQuota
-            if quota > 0, model.creditsRemaining <= quota {
-                return "\(model.creditsRemaining) left of \(quota)"
+    private func segment(icon: String, label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap1) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                Text(label)
+                    .dsTextStyle(.labelSmall)
             }
-            return "\(model.creditsRemaining) credits"
+            .foregroundStyle(selected ? DSColor.Foreground.primary : DSColor.Foreground.muted)
+            .padding(.horizontal, DSSpacing.gap2_5)
+            .frame(height: height)
+            .background {
+                if selected {
+                    Capsule()
+                        .fill(DSColor.Background.neutralStronger)
+                        .matchedGeometryEffect(id: "selection", in: selectionNamespace)
+                }
+            }
+            .contentShape(Capsule())
         }
-        if let free = model.freeImportsRemaining {
-            // Resterend van de free-cap. Clamp tegen serverskew zodat het totaal klopt.
-            let remaining = max(0, min(FreeTier.maxPortraits, free))
-            return "\(remaining) left of \(FreeTier.maxPortraits)"
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+    }
+}
+
+// MARK: - Share pill (icon + label, high-contrast)
+
+/// Gelabelde Share-knop — Granola-stijl: icoon links, tekst rechts, inverted
+/// surface (wit op dark / donker op light) als primaire actie in de topbar.
+private struct SharePillButton: View {
+    let height: CGFloat
+    let action: () -> Void
+    @State private var hovering = false
+    @State private var pressed = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: DSSpacing.gap1_5) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 14, weight: .medium))
+                Text("Share")
+                    .dsTextStyle(.labelSmall)
+            }
+            .foregroundStyle(DSColor.Background.app)
+            .padding(.horizontal, DSSpacing.gap3)
+            .frame(height: height)
+            .background(shareSurface, in: Capsule())
+            .scaleEffect(pressed ? 0.97 : 1)
         }
-        return ""
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
+        .animation(DSMotion.micro, value: hovering)
+        .animation(DSMotion.micro, value: pressed)
+        .accessibilityLabel("Share")
+    }
+
+    private var shareSurface: Color {
+        if pressed { return DSColor.Foreground.subtle }
+        if hovering { return DSColor.Foreground.subtle.opacity(0.92) }
+        return DSColor.Foreground.primary
+    }
+}
+
+// MARK: - Compact icon button (Settings close)
+
+private struct DSCompactTopBarButton: View {
+    let icon: String
+    let label: String
+    let height: CGFloat
+    let action: () -> Void
+    @State private var hovering = false
+    @State private var pressed = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(DSColor.Foreground.primary)
+                .frame(width: height, height: height)
+                .background(
+                    DSColor.neutralSurface(pressed: pressed, hovering: hovering,
+                                           base: DSColor.Background.neutral),
+                    in: Capsule()
+                )
+                .scaleEffect(pressed ? 0.97 : 1)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
+        .animation(DSMotion.micro, value: hovering)
+        .animation(DSMotion.micro, value: pressed)
+        .accessibilityLabel(label)
+    }
+}
+
+private extension View {
+    func pressEvents(onPress: @escaping () -> Void, onRelease: @escaping () -> Void) -> some View {
+        simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in onPress() }
+                .onEnded { _ in onRelease() }
+        )
     }
 }

@@ -2,6 +2,33 @@
 
 ## Open
 
+### Topaz-upscale verlieslatend per run (E41-follow-up) — BESLIST 2026-07-12 (Thierry)
+- **Besluit:** twee tiers — **Regular** = google/upscaler voor 1 credit, **High quality** =
+  Topaz voor 3 credits mét 6 MP-input-cap. Gebouwd als **E41.5** (branch `v2/e41-41.5`,
+  DoD groen): backend-`quality`-param + cap + gesplitste credit-log, app-dropdown met 3 rijen.
+  Backend is los deploybaar en backward-compatibel (geen `quality` → regular) — deployen stopt
+  de verlieslatende Topaz-runs direct. Onderstaande analyse blijft voor het register.
+
+#### (register) Oorspronkelijke bevinding & opties
+- **Bevinding (2026-07-12, billing-check op verzoek):** `topazlabs/image-upscale` rekent per
+  **output-megapixel**: ≤24 MP output = $0,05 · ≤48 MP = $0,10 · verder oplopend ($0,20 bij
+  96 MP). Onze pipeline stuurt de input ongecapt door (geen resize in `upscale.ts`) met `2x` —
+  een gewone 12 MP-foto wordt 48 MP output = **$0,10/run**. Opbrengst: upscale = **1 credit ≈
+  €0,019 netto (~$0,021)** (het E14.3-tarief stamt uit het real-esrgan-tijdperk à ~$0,002).
+  Elke Topaz-run kost daarmee **2,4×–9× de opbrengst** — niet houdbaar zodra er volume komt.
+  (De Replicate-API toont geen recente predictions meer; werkelijke uitgaven sinds de
+  2026-07-03-deploy: replicate.com → Account → Billing.)
+- **Opties:**
+  1. **(aanbevolen)** Topaz houden + server-side input-cap ~6 MP (output blijft ≤24 MP → vast
+     $0,05) **én** upscale-tarief naar **3 credits** (~$0,063 opbrengst → ~25% marge). Kwaliteit
+     blijft de bakeoff-winnaar; de cap kost portretten in de praktijk niets (cutout-inputs
+     zitten daar ruim onder).
+  2. Default naar `google/upscaler` x2 q100 (vast $0,02/beeld): break-even op 1 credit, gezonde
+     marge op 2 credits; Topaz blijft dev-/Pro-arm. Kwaliteit = tweede uit de bakeoff.
+  3. Niets doen = elke upscale bewust subsidiëren (alleen oké zolang volume ~nul is).
+- **Uitvoering na keuze:** klein INFRA-werk (models.ts-tarief + evt. input-cap in `upscale.ts`);
+  check ook of de credit-chip in de app het tarief uit een constante haalt of hardcoded 1 toont.
+
 ### Frame-vorm: cirkel als DEFAULT-merkvorm (E24.16) — BEVESTIGEN, wacht op Thierry
 - **Context:** 24.16 maakt de frame-vorm per-portret kiesbaar (Frame ▾ → Shape: Circle/Square) en
   zet de **default op circle** (zoals het story-plan vroeg). Via de SwiftData-migratie-default
@@ -19,6 +46,11 @@
   Transactionele/welkom-mails blijven ongefilterd. Te bevestigen door Thierry vóór live.
 
 ## Beslist
+
+### Banners-feature-flag: blijft uit tot gebruikersvraag (E37) — BESLIST 2026-07-12
+- **Besluit (Thierry):** `AppFeatureFlags.bannersEnabled` blijft default **uit**, ook nu alle
+  technische blockers (37.17–37.19) zijn opgelost. Flip pas wanneer er aantoonbare gebruikersvraag
+  naar banners is. De matched-background banner-export in Social Preview blijft wél live.
 
 ### Upscale-model voor "Boost resolution" (E10.3) — BESLIST 2026-06-14
 - **Besluit:** **Real-ESRGAN** (`nightmareai/real-esrgan`, gepind op versie) als default-upscaler,
@@ -50,20 +82,24 @@
 - **Historie:** symptoom was "Token expired" bij verify; E18.21 probeerde `.email`+`.signup`-fallback
   (later teruggedraaid naar enkel `.email`, wat correct is). App-kant (verify + foutweergave) klaar.
 
-### Phosphor-iconen: SPM-package incompatibel met CLI-DoD (2026-06-14)
-- **Probleem:** `phosphor-icons/swift` (2.1.0) bevat een **asset-catalog**. CLI `swift build`/
-  `swift test` heeft geen `actool`, dus de resource-bundle-accessor wordt niet gegenereerd →
-  `type 'Bundle?' has no member 'module'` in PhosphorSwift.swift. De DoD-stap
-  `swift test --package-path AvatarUI` faalt daardoor. Onder xcodebuild (app-target) zou het
-  wél bouwen.
-- **Interim (gedaan):** `DSIcon`-laag draait op SF Symbols met de bedoelde Phosphor-naam per case
-  in commentaar; één plek om later om te zetten.
-- **Opties voor Thierry (kies één):**
-  1. AvatarUI-unittests vía xcodebuild draaien (scheme/host opzetten) i.p.v. `swift test`, dan kan
-     de Phosphor-package mee. Build-v2.sh aanpassen.
-  2. Een font-gebaseerde Phosphor-bron gebruiken (geen asset-catalog → CLI-vriendelijk).
+### Phosphor-iconen: SPM-package incompatibel met CLI-DoD (2026-06-14) — BESLIST 2026-07-12 (E49.4)
+- **Besluit (E49.4, DS):** **bewust bij SF Symbols blijven**; de PhosphorSwift-dependency is
+  verwijderd (project.yml + beide imports). Let op: dit wijzigt wél 12 zichtbare glyphs — de
+  CanvasActionToolbar-pillen/dropdowns (frameCorners/image/gridNine/cornersOut/crop/perspective/
+  flipHorizontal/circle/square) en de 3 FaceActionsPanel-preset-fallbacks (tooth/palette/smiley)
+  renderden nog écht Phosphor en staan nu op SF-equivalenten via de DSIcon-seam.
+  `DSIcon` blijft de enige icon-seam en houdt de bedoelde Phosphor-naam per case in commentaar —
+  later alsnog omschakelen (via optie 2/3 hieronder) is één file. Terugdraaien kan Thierry
+  altijd besluiten; dan is optie 2 (font-gebaseerde bron, CLI-vriendelijk) de aangewezen route.
+- **Oorspronkelijk probleem:** `phosphor-icons/swift` (2.1.0) bevat een **asset-catalog**. CLI
+  `swift build`/`swift test` heeft geen `actool`, dus de resource-bundle-accessor wordt niet
+  gegenereerd → `type 'Bundle?' has no member 'module'`. De DoD-stap
+  `swift test --package-path AvatarUI` faalt daardoor; alleen xcodebuild kon de package aan.
+- **Destijds geïnventariseerde opties (voor het register):**
+  1. AvatarUI-unittests vía xcodebuild i.p.v. `swift test` (raakt build-v2.sh en de vaste
+     test-runner-afspraak).
+  2. Een font-gebaseerde Phosphor-bron (geen asset-catalog → CLI-vriendelijk).
   3. Phosphor-SVG's als eigen resources vendoren zonder asset-catalog.
-- Tot dan blijft DSIcon op SF Symbols (visueel benaderend, niet 1-op-1 Figma).
 
 ### E24.8 — canvas-zoom vs afbeelding-schaling via selectie-handles (2026-06-14)
 - **Status:** DEFAULT GEBOUWD (24.8 done). De keuzes hieronder blijven open ter bevestiging/iteratie

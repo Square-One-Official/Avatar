@@ -30,6 +30,10 @@ public enum DSColor {
         public static let neutralStronger = Color(lightHex: 0x000000, lightAlpha: 0x1A, darkHex: 0xFFFFFF, darkAlpha: 0x1A)
         /// `background/neutral-strongest` — wit@15% (dark) · zwart@15% (light)
         public static let neutralStrongest = Color(lightHex: 0x000000, lightAlpha: 0x26, darkHex: 0xFFFFFF, darkAlpha: 0x26)
+        /// `background/neutral-strongest-2` — wit@20% (dark) · zwart@20% (light).
+        /// UXS-27: pressed-trede voor chips die op `neutral-stronger` rústen —
+        /// zonder deze extra stap zouden hover en pressed daar samenvallen.
+        public static let neutralStrongest2 = Color(lightHex: 0x000000, lightAlpha: 0x33, darkHex: 0xFFFFFF, darkAlpha: 0x33)
         /// `background/action` — #d5f466 (lime-accent, brand; beide themes)
         public static let action = Color(hex: 0xD5F466)
         /// `background/shadow` — #190b0859 (donkere drop-shadow; beide themes)
@@ -58,6 +62,9 @@ public enum DSColor {
         public static let primaryStaticBlack = Color(hex: 0x111111)
         /// `foreground/default/thumb` — wit (dark) · donker (light)
         public static let thumb = Color(lightHex: 0x1C1917, darkHex: 0xFFFFFF)
+        /// Destructive actie-ink (menu-rijen, delete-knoppen) — niet de pastel
+        /// `Signal.error` achtergrond-token; leesbaar op card/panel surfaces.
+        public static let destructive = Color(lightHex: 0xDC2626, darkHex: 0xFF6B6B)
     }
 
     /// Signaalkleuren (Figma Badge Type=Error/Success/Warning/Info). Pastel,
@@ -77,10 +84,20 @@ public enum DSColor {
 
     /// `foreground/action/primary/*` — brand-lime, beide themes gelijk.
     public enum Action {
-        /// `foreground/action/primary/default` — #d5f466 (lime-accent)
+        /// `foreground/action/primary/default` — #d5f466 (lime-accent). Dit is de
+        /// brand-FILL (badge-bg, paneel-fill, toggle-aan, selectie op canvas):
+        /// lime hoort als vlak, niet als inkt. Beide themes gelijk.
         public static let primary = Color(hex: 0xD5F466)
-        /// `foreground/action/primary/on-action` — #073c31
+        /// `foreground/action/primary/on-action` — #073c31 (diepe brand-groen,
+        /// de inkt-op-lime van de badge).
         public static let onAction = Color(hex: 0x073C31)
+        /// Brand-accent als INKT/RAND op een neutrale surface (active toolbar-pil,
+        /// active ring, selectie-foreground). Lime is op zwart perfecte inkt, maar
+        /// wast op een lichte surface weg (contrast ~1.2:1) → theme-bewust: dark =
+        /// lime #d5f466 (ongewijzigd, dark = fallback), light = #073c31 — exact de
+        /// diepe groen waarmee de badge zijn lime al paart, zodat active-states
+        /// 1-op-1 met de badge meelezen i.p.v. te vervagen.
+        public static let primaryForeground = Color(lightHex: 0x073C31, darkHex: 0xD5F466)
     }
 
     /// `Projects/*` — kleurlabels (Project color picker), beide themes gelijk.

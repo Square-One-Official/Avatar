@@ -15,8 +15,17 @@ import SwiftData
 import SwiftUI
 
 struct BoardView: View {
+    /// Folder-scope (Portraits-canvas-lens): nil = alle beelden, anders alleen de
+    /// portretten van die map. Default nil → ongewijzigd gedrag.
+    var folderID: PersistentIdentifier? = nil
     /// Dezelfde bron als de sidebar (E05.4): alle portretten, jongste eerst.
-    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
+    @Query(sort: \Portrait2.updatedAt, order: .reverse) private var allPortraits: [Portrait2]
+    /// Folder-gescope set die HEEL BoardView aanstuurt (layout/selectie/
+    /// visibleNodes/boardSize). Eén plek scopen → alle call-sites volgen vanzelf.
+    private var portraits: [Portrait2] {
+        guard let folderID else { return allPortraits }
+        return allPortraits.filter { $0.folder?.persistentModelID == folderID }
+    }
     /// E30.1: dezelfde edit-pipeline als de editor — bij één-selectie zetten we
     /// `model.selectedPortrait` op de node en hergebruiken we model.applyEffectResult
     /// (cloud-re-isolatie!) / commitAdjust i.p.v. die logica te dupliceren.
@@ -33,14 +42,31 @@ struct BoardView: View {
     // editen op de board). Dezelfde `EditorTool` als de single-editor zodat de
     // board exact dezelfde capsule-items/labels/iconen toont.
     @State private var editTool: EditorTool?
-    // E31.7: stuurt de Frame/Background-dropdowns van de gedeelde
-    // `CanvasActionToolbar` in de board single-select top-bar.
-    @State private var canvasMenu: CanvasToolbarMenu?
 
     /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
+    private var boardToolbarItems: [DSToolbarItem<EditorTool>] {
+        let flags = entitlement.featureFlags
+        return EditorView.toolbarItems.filter { item in
+            switch item.id {
+            case .effects:    return flags.effectsEnabled
+            case .face:       return flags.faceEnabled
+            case .hair:       return flags.hairEnabled
+            case .clothing:   return flags.clothesEnabled
+            default:          return true
+            }
+        }
+    }
+
     private var selectedNode: Portrait2? {
         guard selection.count == 1, let id = selection.first else { return nil }
         return portraits.first { $0.persistentModelID == id }
+    }
+
+    private var boardCanvasMenuBinding: Binding<CanvasToolbarMenu?> {
+        Binding(
+            get: { model.presentation.boardCanvasMenu },
+            set: { model.presentation.boardCanvasMenu = $0 }
+        )
     }
 
     /// E27.6 (Tier 3): off-main thumbnail-store — decodeert elke cutout één keer
@@ -65,6 +91,9 @@ struct BoardView: View {
 
     // E29.1: multi-select op de board.
     @State private var selection: Set<PersistentIdentifier> = []
+    /// E29.4: range-anker voor shift-klik — de laatst kaal/cmd-geselecteerde
+    /// node; shift-klik selecteert alles tussen dit anker en de aangeklikte node.
+    @State private var selectionAnchor: PersistentIdentifier?
     /// Marquee-rechthoek (board-space) tijdens een sleep op de lege board.
     @State private var marquee: CGRect?
     /// Basis-selectie vastgelegd bij de start van een marquee-sleep, zodat
@@ -76,20 +105,23 @@ struct BoardView: View {
     // ons eigen DS-menu (zie de overlay onder in `body`), gepositioneerd onder de
     // aangeklikte node. Bij een multi-selectie (≥2) werken Rename/Export/Delete op
     // de hele selectie — vandaar lijsten i.p.v. één target.
-    @State private var menuTarget: Portrait2?
-    @State private var renameTargets: [Portrait2] = []
-    @State private var deleteTargets: [Portrait2] = []
     /// Bulk-export-status (board heeft geen shell-toast) → getoond in de HUD.
     @State private var exportStatus: String?
 
-    // E29.2: batch-toolbar (open dropdown) + de geselecteerde portretten.
-    @State private var batchMenu: BatchMenu?
     // E29.3: loopt tijdens de "Match lighting"-normalisatie over de selectie.
     @State private var isMatchingLight = false
-    private enum BatchMenu: Hashable { case background, adjust, align, organize }
 
     private var selectedPortraits: [Portrait2] {
         portraits.filter { selection.contains($0.persistentModelID) }
+    }
+
+    private var boardMenuTarget: Portrait2? {
+        guard let id = model.presentation.boardPortraitMenuID else { return nil }
+        return portraits.first { $0.persistentModelID == id }
+    }
+
+    private func dismissBoardMenu() {
+        model.presentation.boardPortraitMenuID = nil
     }
 
     // Node-/cel-maten (board-space).
@@ -113,9 +145,10 @@ struct BoardView: View {
     }
 
     var body: some View {
-        // Top-level GeometryReader = de echte canvas-slot-maat (de vaste board-
-        // maat lekt zo niet de viewport-meting in).
-        GeometryReader { geo in
+        // GEEN top-level GeometryReader: die is gulzig en perst de left-nav smaller
+        // in board-view (de scroll-lenzen niet). De inhoud vult 'polite' via
+        // .frame(maxWidth/maxHeight: .infinity); de viewport-maat meten we in een
+        // .background(GeometryReader), wat de omliggende layout niet beïnvloedt.
             ZStack {
                 DSColor.Background.app
 
@@ -142,7 +175,8 @@ struct BoardView: View {
                         .background {
                             CanvasInteractionCatcher(
                                 camera: $camera,
-                                chromeHovered: batchMenu != nil || canvasMenu != nil
+                                chromeHovered: model.presentation.boardBatchMenu != nil
+                                    || model.presentation.boardCanvasMenu != nil
                             )
                             boardShortcutButtons
                         }
@@ -150,7 +184,7 @@ struct BoardView: View {
 
                 hud
             }
-            .frame(width: geo.size.width, height: geo.size.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coordinateSpace(name: "boardRoot")
             // E29.2: batch-toolbar bovenaan zodra er ≥1 geselecteerd is. Als
             // top-overlay (deterministisch) + padding om onder de app-topbar te
@@ -184,41 +218,19 @@ struct BoardView: View {
             // Rechtermuis-menu — gepositioneerd onder de aangeklikte node; een
             // transparante scrim eronder sluit bij een klik buiten het menu.
             .overlay {
-                if let target = menuTarget {
+                if let target = boardMenuTarget {
                     contextMenuOverlay(target)
                 }
             }
-            // Rename-modal (gedeelde RenameSheet) — bij ≥2 targets zet Save dezelfde
-            // naam + rol op álle geselecteerde portretten.
-            .sheet(isPresented: Binding(
-                get: { !renameTargets.isEmpty },
-                set: { if !$0 { renameTargets = [] } }
-            )) {
-                if !renameTargets.isEmpty { RenameSheet(portraits: renameTargets) }
-            }
-            // Delete met bevestiging (zelfde modelContext-pad als de sidebar);
-            // bij ≥2 targets verwijdert het de hele selectie.
-            .confirmationDialog(
-                deleteTargets.count >= 2 ? "Delete \(deleteTargets.count) portraits?" : "Delete this portrait?",
-                isPresented: Binding(
-                    get: { !deleteTargets.isEmpty },
-                    set: { if !$0 { deleteTargets = [] } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    for target in deleteTargets {
-                        selection.remove(target.persistentModelID)
-                        modelContext.delete(target)
-                    }
-                    deleteTargets = []
+            // Viewport-maat meten zónder gulzige top-level GeometryReader: een
+            // .background(GeometryReader) matcht de inhoudsmaat en raakt de layout niet.
+            .background(
+                GeometryReader { geo in
+                    Color.clear
+                        .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
+                        .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
                 }
-                Button("Cancel", role: .cancel) { deleteTargets = [] }
-            } message: {
-                Text("This can't be undone.")
-            }
-            .onAppear { viewport = geo.size; assignInitialLayout(); fitIfNeeded(); debugSeedSelection() }
-            .onChange(of: geo.size) { _, s in viewport = s; fitIfNeeded() }
+            )
             // @Query laadt ná de eerste render → layout + fit zodra de set binnen
             // is; `didInitialFit` latcht pas bij een niet-lege set.
             .onChange(of: portraits.count) { _, _ in assignInitialLayout(); fitIfNeeded() }
@@ -227,8 +239,8 @@ struct BoardView: View {
             .onChange(of: selection) { _, sel in
                 // Sluit altijd alle dropdowns bij selectie-wissel — anders
                 // heropen de batch-bar met een nog-open dropdown.
-                batchMenu = nil
-                canvasMenu = nil
+                model.presentation.boardBatchMenu = nil
+                model.presentation.boardCanvasMenu = nil
                 if sel.count == 1, let id = sel.first,
                    let node = portraits.first(where: { $0.persistentModelID == id }) {
                     model.select(node)
@@ -236,7 +248,17 @@ struct BoardView: View {
                     editTool = nil
                 }
             }
-        }
+            // E27.10 (audit C2): één gedeeld zoom-mechanisme voor editor én
+            // board — de board publiceert dezelfde focused-scene-value, dus de
+            // View-menu-items (⌘+/⌘−/⌘0) werken hier nu ook; de eigen verborgen
+            // +/=/−/0-knoppen zijn uit `boardShortcutButtons` vervallen.
+            .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
+                zoomIn: { zoom(1.25) },
+                zoomOut: { zoom(0.8) },
+                zoomToFit: { fit() }
+            ))
+            // ⌘= (shift-loze ⌘+) — zelfde verborgen brug als de editor.
+            .background { CanvasZoomEqualsShortcut(zoomIn: { zoom(1.25) }) }
     }
 
     // MARK: - Board-canvas (absolute node-posities)
@@ -253,56 +275,13 @@ struct BoardView: View {
             // zichtbare viewport vallen, renderen. Scheelt views + werk bij pan/
             // zoom op een grote set.
             ForEach(visibleNodes(), id: \.portrait.persistentModelID) { item in
-                let p = item.portrait
-                // E27.6 (Tier 1): de node-visuals zitten in een losse, `Equatable`
-                // view → een pan/zoom-only change laat 'm `==` blijven en SwiftUI
-                // slaat z'n body over. Gestures + hover hangen BUITEN `.equatable()`
-                // (verse closures zouden de skip anders breken); de camera-
-                // afhankelijke drag-math blijft in `BoardView`.
-                // De achtergrondLAAG ÍS de originele foto (Original-modus, of
-                // Portrait-blur zonder eigen achtergrond) → spiegelt
-                // EditorView.backgroundIsAlignedOriginal: custom upload/kleur wint.
-                let bgIsAlignedOriginal = p.backgroundImageData == nil
-                    && p.backgroundColorHex == nil
-                    && (p.useOriginalBackground || p.portraitBlur)
-                BoardNodeView(
-                    thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
-                    // Origineel als achtergrondLAAG (uitgelijnd achter de cutout-thumb),
-                    // gedecodeerd + downscaled via dezelfde store (nooit de volle
-                    // originalData per frame). nil tenzij Original-modus actief is.
-                    backgroundOriginalImage: bgIsAlignedOriginal
-                        ? thumbs.original(for: p, maxDimension: cardSide * 2)
-                        : nil,
-                    isSelected: selection.contains(p.persistentModelID),
-                    frameShape: p.frameShape,
-                    name: p.name,
-                    role: p.role,
-                    backgroundColorHex: p.backgroundColorHex,
-                    backgroundImageData: p.backgroundImageData,
-                    portraitBlur: p.portraitBlur,
-                    contentVersion: p.updatedAt,
-                    cardSide: cardSide,
-                    labelGap: labelGap,
-                    labelHeight: labelHeight,
-                    cellHeight: cellHeight
-                )
-                .equatable()
-                .contentShape(Rectangle())
-                .dsHoverHighlight(cornerRadius: DSRadius.xl4)
-                // E29.1: dubbelklik = openen in de editor; enkelklik = selecteren
-                // (cmd/shift = toevoegen/afhalen). Sleep = node verplaatsen (E27.4).
-                .onTapGesture(count: 2) { onOpen(p) }
-                .onTapGesture { tapNode(p) }
-                // Rechtermuis → hetzelfde DS-menu als de sidebar. Selecteert de
-                // node eerst als 'ie nog niet in de selectie zit (Finder-gedrag),
-                // zodat "Export N portraits…" alleen verschijnt bij een echte
-                // multi-selectie; binnen een bestaande ≥2-selectie blijft die staan.
-                .onRightClick {
-                    if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
-                    menuTarget = p
-                }
-                .gesture(dragGesture(for: p))
-                .position(x: item.center.x, y: item.center.y)
+                // E-fix (schone build): de node + al z'n modifiers staan in een aparte
+                // methode i.p.v. inline. Eén grote ForEach-closure (14-arg BoardNodeView
+                // + `.equatable()` + 6 modifiers + gestures) tipte de Swift type-checker
+                // over z'n complexiteitslimiet bij een schone build (incrementeel
+                // hergebruikte de oude .o, dus onzichtbaar) → de misleidende
+                // "ForEach … Binding<C>"-cascade. Extractie houdt de inferentie klein.
+                boardNode(item)
             }
 
             // E29.1: marquee-rechthoek (board-space; lijn ÷camera = constant dun).
@@ -369,6 +348,62 @@ struct BoardView: View {
     /// node-drag + `BoardMoveUndo` verschuiven direct, zonder een aparte cache te
     /// syncen. (Bij echte duizenden: een grid-bucket-index i.p.v. de O(n)-scan — pas
     /// als profiling het vraagt.)
+    /// De node + al z'n modifiers (zie de extractie-reden bij de ForEach). Los
+    /// gehouden zodat de type-checker elke node-expressie klein genoeg houdt.
+    /// E27.6: de visuals zitten in de `Equatable` BoardNodeView (pan/zoom-only =
+    /// `==` blijft → body geskipt); gestures/hover hangen erbuiten.
+    private func boardNode(_ item: (portrait: Portrait2, center: CGPoint)) -> some View {
+        let p = item.portrait
+        // De achtergrondLAAG ÍS de originele foto (Original-modus, of Portrait-blur
+        // zonder eigen achtergrond) → spiegelt EditorView.backgroundIsAlignedOriginal.
+        let bgIsAlignedOriginal = p.backgroundImageData == nil
+            && p.backgroundColorHex == nil
+            && (p.useOriginalBackground || p.portraitBlur)
+        return BoardNodeView(
+            thumbnail: thumbs.thumbnail(for: p, maxDimension: cardSide * 2),
+            backgroundOriginalImage: bgIsAlignedOriginal
+                ? thumbs.originalBackdrop(for: p, maxDimension: cardSide * 2)
+                : nil,
+            isSelected: selection.contains(p.persistentModelID),
+            frameShape: p.frameShape,
+            name: p.name,
+            role: p.role,
+            backgroundColorHex: p.backgroundColorHex,
+            backgroundImageData: p.backgroundImageData,
+            portraitBlur: p.portraitBlur,
+            contentVersion: p.updatedAt,
+            cardSide: cardSide,
+            labelGap: labelGap,
+            labelHeight: labelHeight,
+            cellHeight: cellHeight
+        )
+        .equatable()
+        .contentShape(Rectangle())
+        .dsHoverHighlight(cornerRadius: DSRadius.xl4)
+        // Dubbelklik = openen in de editor; enkelklik = selecteren. Sleep = node
+        // verplaatsen (E27.4).
+        // E29.4 (audit C5): expliciete modifier-gestures i.p.v. de globale
+        // `NSEvent.modifierFlags` onder een tap (fragiel — cmd/shift-klik verving
+        // live de selectie i.p.v. te toggelen). Cmd = toggle, shift = range
+        // uitbreiden (macOS/Finder-conventie), kale klik = vervang. Volgorde is
+        // prioriteit: eerder-attached gestures winnen, dus de modifier-varianten
+        // vóór de kale tap.
+        .onTapGesture(count: 2) { onOpen(p) }
+        .gesture(TapGesture().modifiers(.command).onEnded { toggleNodeSelection(p) })
+        .gesture(TapGesture().modifiers(.shift).onEnded { extendSelectionRange(to: p) })
+        .gesture(TapGesture().onEnded { selectOnly(p) })
+        // Rechtermuis → DS-menu; selecteert de node eerst als 'ie nog niet in de
+        // selectie zit (Finder), zodat "Export N…" alleen bij een echte multi-
+        // selectie verschijnt; binnen een bestaande ≥2-selectie blijft die staan.
+        .onRightClick {
+            if !selection.contains(p.persistentModelID) { selection = [p.persistentModelID] }
+            model.presentation.boardPortraitMenuID = p.persistentModelID
+            model.presentation.boardPortraitMenuAnchor = menuAnchor(for: p)
+        }
+        .gesture(dragGesture(for: p))
+        .position(x: item.center.x, y: item.center.y)
+    }
+
     private func visibleNodes() -> [(portrait: Portrait2, center: CGPoint)] {
         guard viewport.width > 0, viewport.height > 0, camera.scale > 0 else {
             return portraits.enumerated().map { (portrait: $1, center: center(of: $1, index: $0)) }
@@ -397,15 +432,75 @@ struct BoardView: View {
         return CGRect(x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y)
     }
 
-    /// E29.1: enkelklik op een node — cmd/shift togglet 'm in/uit de selectie;
-    /// anders selecteer alléén deze node.
-    private func tapNode(_ portrait: Portrait2) {
+    // MARK: - E29.4 selectie-semantiek (audit C5)
+
+    /// Kale klik — vervang de selectie door alléén deze node; de node wordt het
+    /// range-anker voor een latere shift-klik.
+    private func selectOnly(_ portrait: Portrait2) {
         let id = portrait.persistentModelID
-        if NSEvent.modifierFlags.contains(.command) || NSEvent.modifierFlags.contains(.shift) {
-            if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        selection = [id]
+        selectionAnchor = id
+    }
+
+    /// Cmd-klik — toggle de node in/uit de selectie (macOS-conventie). Een
+    /// toegevoegde node wordt het nieuwe range-anker; valt het anker zelf uit de
+    /// selectie, dan schuift het anker naar een resterende node.
+    private func toggleNodeSelection(_ portrait: Portrait2) {
+        let result = Self.toggledSelection(
+            current: selection, anchor: selectionAnchor,
+            toggling: portrait.persistentModelID
+        )
+        selection = result.selection
+        selectionAnchor = result.anchor
+    }
+
+    /// Pure toggle-semantiek (E47.3-seam; unit-getest in `BoardSelectionTests`,
+    /// zelfde patroon als `rangeExtendedSelection`): cmd-klik voegt een node toe
+    /// (die wordt het nieuwe anker) of haalt 'm eruit; verdwijnt het anker zelf
+    /// uit de selectie, dan schuift het anker naar een resterende node (of nil
+    /// bij een lege selectie). Gedrag identiek aan de oude inline-variant.
+    static func toggledSelection<ID: Hashable>(
+        current: Set<ID>, anchor: ID?, toggling id: ID
+    ) -> (selection: Set<ID>, anchor: ID?) {
+        var selection = current
+        var anchor = anchor
+        if selection.contains(id) {
+            selection.remove(id)
+            if anchor == id { anchor = selection.first }
         } else {
-            selection = [id]
+            selection.insert(id)
+            anchor = id
         }
+        return (selection, anchor)
+    }
+
+    /// Shift-klik — breid de selectie uit met de RANGE anker→node in
+    /// board-volgorde (Finder-conventie: shift = range, cmd = toggle; shift is
+    /// dus géén toggle-alias van cmd meer). Zonder (geldig) anker: additief.
+    private func extendSelectionRange(to portrait: Portrait2) {
+        let id = portrait.persistentModelID
+        selection = Self.rangeExtendedSelection(
+            current: selection,
+            anchor: selectionAnchor,
+            target: id,
+            order: portraits.map(\.persistentModelID)
+        )
+        if selectionAnchor == nil { selectionAnchor = id }
+    }
+
+    /// Pure range-uitbreiding (unit-getest in `BoardSelectionTests`): union van
+    /// de bestaande selectie met alle nodes tussen anker en doel (inclusief,
+    /// beide richtingen) in de gegeven volgorde. Geen/onbekend anker → alleen
+    /// het doel erbij (additief).
+    static func rangeExtendedSelection<ID: Hashable>(
+        current: Set<ID>, anchor: ID?, target: ID, order: [ID]
+    ) -> Set<ID> {
+        guard let anchor,
+              let anchorIndex = order.firstIndex(of: anchor),
+              let targetIndex = order.firstIndex(of: target) else {
+            return current.union([target])
+        }
+        return current.union(order[min(anchorIndex, targetIndex)...max(anchorIndex, targetIndex)])
     }
 
     // MARK: - Rechtermuis-context-menu (pariteit met de sidebar, E24.22)
@@ -417,7 +512,7 @@ struct BoardView: View {
         ZStack(alignment: .topLeading) {
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { menuTarget = nil }
+                .onTapGesture { dismissBoardMenu() }
             nodeContextMenu(for: target)
                 .fixedSize()
                 .offset(x: anchor.x, y: anchor.y)
@@ -432,60 +527,37 @@ struct BoardView: View {
     private func nodeContextMenu(for portrait: Portrait2) -> some View {
         let bulk = selection.count >= 2
         let n = selection.count
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+        DSContextMenuPanel {
             if bulk {
-                menuRow("Rename \(n) portraits", icon: "pencil") {
-                    menuTarget = nil; renameTargets = selectedPortraits
+                DSMenuRow("Rename \(n) portraits", icon: "pencil") {
+                    dismissBoardMenu()
+                    model.renamePortraitIDs = selectedPortraits.map(\.persistentModelID)
                 }
-                menuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
-                    menuTarget = nil; bulkExport()
+                DSMenuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
+                    dismissBoardMenu(); bulkExport()
                 }
                 Divider().padding(.vertical, 2)
-                menuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
-                    menuTarget = nil; deleteTargets = selectedPortraits
+                DSMenuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
+                    dismissBoardMenu()
+                    model.presentation.confirm = .deletePortraits(
+                        ids: selectedPortraits.map(\.persistentModelID)
+                    )
                 }
             } else {
-                menuRow("Rename", icon: "pencil") { menuTarget = nil; renameTargets = [portrait] }
-                menuRow("Export…", icon: "square.and.arrow.up") {
-                    menuTarget = nil; model.select(portrait); model.exportCurrentPortrait()
+                DSMenuRow("Rename", icon: "pencil") {
+                    dismissBoardMenu()
+                    model.renamePortraitIDs = [portrait.persistentModelID]
+                }
+                DSMenuRow("Export…", icon: "square.and.arrow.up") {
+                    dismissBoardMenu(); model.select(portrait); model.exportCurrentPortrait()
                 }
                 Divider().padding(.vertical, 2)
-                menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
-            }
-        }
-        .padding(DSSpacing.gap1)
-        // Past zich aan de inhoud aan (de bulk-labels zijn langer), met een vloer
-        // van 190 zodat het enkel-menu niet te smal wordt. `.fixedSize()` in
-        // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
-        // precies, zonder vaste overbreedte.
-        .frame(minWidth: 190, alignment: .leading)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
-    }
-
-    private func menuRow(_ title: String, icon: String, destructive: Bool = false,
-                         shortcut: String? = nil, disabled: Bool = false,
-                         action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: icon).font(.system(size: 12, weight: .medium)).frame(width: 16)
-                Text(title).dsTextStyle(.labelBase)
-                Spacer(minLength: DSSpacing.gap4)
-                if let shortcut {
-                    Text(shortcut)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
+                DSMenuRow("Delete", icon: "trash", destructive: true) {
+                    dismissBoardMenu()
+                    model.presentation.confirm = .deletePortraits(ids: [portrait.persistentModelID])
                 }
             }
-            .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
     }
 
     /// Top-leading van het menu (viewport-space), net onder de node-kaart en
@@ -635,7 +707,10 @@ struct BoardView: View {
             if args.contains("--board-match-light") { matchLightingSelection() }
         }
         // Smoke: forceer het rechtermuis-menu op de eerste node (los van --board-select).
-        if args.contains("--show-board-menu") { menuTarget = menuTarget ?? portraits.first }
+        if args.contains("--show-board-menu") {
+            model.presentation.boardPortraitMenuID = model.presentation.boardPortraitMenuID
+                ?? portraits.first?.persistentModelID
+        }
         #endif
     }
 
@@ -695,11 +770,10 @@ struct BoardView: View {
 
     @ViewBuilder
     private var boardShortcutButtons: some View {
+        // E27.10: de zoom-sneltoetsen (⌘+/⌘=/⌘−/⌘0) zijn hier weg — die lopen
+        // nu via het View-menu + `CanvasZoomEqualsShortcut` (zelfde mechanisme
+        // als de editor, zie `body`). Hier alleen nog selectie/organize.
         Group {
-            Button("") { zoom(1.25) }.keyboardShortcut("+", modifiers: .command)
-            Button("") { zoom(1.25) }.keyboardShortcut("=", modifiers: .command)
-            Button("") { zoom(0.8) }.keyboardShortcut("-", modifiers: .command)
-            Button("") { fit() }.keyboardShortcut("0", modifiers: .command)
             Button("") { selection = Set(portraits.map(\.persistentModelID)) }.keyboardShortcut("a", modifiers: .command)
             // Organize-snelkoppelingen (^⌥): de methodes guarden zelf op selectiegrootte.
             Button("") { tidyUpSelection() }.keyboardShortcut("t", modifiers: [.control, .option])
@@ -738,8 +812,8 @@ struct BoardView: View {
             // E31.7: Background = dezelfde volledige BackgroundPanel als de
             // single-editor (besluit Thierry: geen aparte inline-swatches),
             // toegepast op ALLE geselecteerde.
-            backgroundMenuButton(isOpen: batchMenu == .background,
-                                  toggle: { batchMenu = (batchMenu == .background) ? nil : .background },
+            backgroundMenuButton(isOpen: model.presentation.boardBatchMenu == .background,
+                                  toggle: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .background) ? nil : .background },
                                   display: selectedPortraits.first)
 
             Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
@@ -774,17 +848,21 @@ struct BoardView: View {
             DSCapsuleToolButton(
                 Image(systemName: "slider.horizontal.3"),
                 label: "Adjust",
-                isActive: batchMenu == .adjust,
+                isActive: model.presentation.boardBatchMenu == .adjust,
                 size: .compact,
-                action: { batchMenu = (batchMenu == .adjust) ? nil : .adjust }
+                action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .adjust) ? nil : .adjust }
             )
             .overlay(alignment: .top) {
-                if batchMenu == .adjust, let first = selectedPortraits.first,
+                if model.presentation.boardBatchMenu == .adjust, let first = selectedPortraits.first,
                    let img = NSImage(data: first.cutoutData) {
                     EditColorPanel(
                         source: img,
                         initial: first.adjust,
-                        onCommit: { _, after in applyAdjustToAll(after) }
+                        onCommit: { _, after in applyAdjustToAll(after) },
+                        // E29.5 (audit C6): de AI-één-tik-chips zijn hier niet
+                        // bedraad (default-lege closures = dode chips) → uit.
+                        // Batch-Adjust = alleen de sliders.
+                        showAutoEnhance: false
                     )
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
@@ -813,12 +891,12 @@ struct BoardView: View {
         DSCapsuleToolButton(
             Image(systemName: "align.horizontal.left.fill"),
             showChevron: true,
-            isActive: batchMenu == .align,
+            isActive: model.presentation.boardBatchMenu == .align,
             size: .compact,
-            action: { batchMenu = (batchMenu == .align) ? nil : .align }
+            action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .align) ? nil : .align }
         )
         .overlay(alignment: .top) {
-            if batchMenu == .align {
+            if model.presentation.boardBatchMenu == .align {
                 HStack(spacing: DSToolbarSize.compact.itemSpacing) {
                     alignIcon("align.horizontal.left", .left)
                     alignIcon("align.horizontal.center", .centerH)
@@ -848,28 +926,25 @@ struct BoardView: View {
             Image(systemName: "square.grid.2x2"),
             label: "Organize",
             showChevron: true,
-            isActive: batchMenu == .organize,
+            isActive: model.presentation.boardBatchMenu == .organize,
             size: .compact,
-            action: { batchMenu = (batchMenu == .organize) ? nil : .organize }
+            action: { model.presentation.boardBatchMenu = (model.presentation.boardBatchMenu == .organize) ? nil : .organize }
         )
         .overlay(alignment: .top) {
-            if batchMenu == .organize {
-                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    menuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
-                        batchMenu = nil; tidyUpSelection()
+            if model.presentation.boardBatchMenu == .organize {
+                DSContextMenuPanel(minWidth: 240) {
+                    DSMenuRow("Tidy up", icon: "square.grid.2x2", shortcut: "⌃⌥T") {
+                        model.presentation.boardBatchMenu = nil; tidyUpSelection()
                     }
-                    menuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
-                            shortcut: "⌃⌥V", disabled: selection.count < 3) {
-                        batchMenu = nil; distributeSelection(.vertical)
+                    DSMenuRow("Distribute vertical spacing", icon: "rectangle.split.1x2",
+                              shortcut: "⌃⌥V", disabled: selection.count < 3) {
+                        model.presentation.boardBatchMenu = nil; distributeSelection(.vertical)
                     }
-                    menuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
-                            shortcut: "⌃⌥H", disabled: selection.count < 3) {
-                        batchMenu = nil; distributeSelection(.horizontal)
+                    DSMenuRow("Distribute horizontal spacing", icon: "rectangle.split.2x1",
+                              shortcut: "⌃⌥H", disabled: selection.count < 3) {
+                        model.presentation.boardBatchMenu = nil; distributeSelection(.horizontal)
                     }
                 }
-                .padding(DSSpacing.gap1)
-                .frame(minWidth: 240, alignment: .leading)
-                .dsPanelSurface(cornerRadius: DSRadius.lg)
                 .fixedSize()
                 .offset(y: DSToolbarSize.compact.height
                           + DSToolbarSize.compact.containerPadding
@@ -896,9 +971,11 @@ struct BoardView: View {
         )
         .overlay(alignment: .top) {
             if isOpen {
-                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, entitlement: entitlement)
+                BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) }, presentation: model.presentation, entitlement: entitlement)
                     .padding(DSSpacing.gap4)
-                    .frame(width: 320)
+                    // 440: zelfde breedte als de editor-popover (Notion-stijl
+                    // tab-paneel, 4-koloms grid).
+                    .frame(width: 440)
                     .fixedSize(horizontal: false, vertical: true)
                     // E32.1: zelfde paneel-radius (xl4) als de rest.
                     .dsPanelSurface(cornerRadius: DSRadius.xl4)
@@ -913,20 +990,17 @@ struct BoardView: View {
     /// E29.2/E31.7: pas dezelfde achtergrond toe op alle geselecteerde portretten.
     private func applyBackgroundToAll(_ background: PortraitBackground) {
         let targets = selectedPortraits
-        let cache = thumbs
         undoManager?.beginUndoGrouping()
         undoManager?.setActionName("Background")
         for p in targets {
             let before = p.background
             guard before != background else { continue }
             p.setBackground(background)
-            cache.invalidate(p)
             ReversibleChange.register(
                 undoManager, target: p,
                 from: before, to: background, actionName: "Background"
             ) { portrait, bg in
                 portrait.setBackground(bg)
-                cache.invalidate(portrait)
             }
         }
         undoManager?.endUndoGrouping()
@@ -936,14 +1010,11 @@ struct BoardView: View {
         let before = node.background
         guard before != background else { return }
         node.setBackground(background)
-        thumbs.invalidate(node)
-        let cache = thumbs
         ReversibleChange.register(
             undoManager, target: node,
             from: before, to: background, actionName: "Background"
         ) { portrait, bg in
             portrait.setBackground(bg)
-            cache.invalidate(portrait)
         }
     }
 
@@ -1028,20 +1099,17 @@ struct BoardView: View {
     /// E29.2: pas dezelfde Adjust-laag toe op alle geselecteerde portretten.
     private func applyAdjustToAll(_ adjust: PortraitAdjust) {
         let targets = selectedPortraits
-        let cache = thumbs
         undoManager?.beginUndoGrouping()
         undoManager?.setActionName("Adjust")
         for p in targets {
             let before = p.adjust
             p.adjust = adjust
             p.touch()
-            cache.invalidate(p)
             AdjustUndo.register(
                 undoManager, target: p,
-                apply: { [p, cache] adj in
+                apply: { [p] adj in
                     p.adjust = adj
                     p.touch()
-                    cache.invalidate(p)
                 },
                 undoTo: before, redoTo: adjust, actionName: "Adjust"
             )
@@ -1062,24 +1130,36 @@ struct BoardView: View {
                 .cgImage(forProposedRect: nil, context: nil, hints: nil),
               let refStats = SetLightingNormalizer.referenceStats(of: refCG) else { return }
         isMatchingLight = true
+        // Snapshot op de main-actor: (node, bron-bytes). De zware per-node match
+        // (decode + colorMatrix + PNG-encode) draait OFF-MAIN; alleen de SwiftData-
+        // mutaties + undo blijven op main. `Stats` is Sendable en de normalizer
+        // gebruikt een thread-safe CIContext. `selectedPortraits`-volgorde +
+        // reference blijven exact als voorheen (ordening behouden).
+        let work: [(node: Portrait2, before: Data)] = targets
+            .filter { $0.persistentModelID != reference.persistentModelID }
+            .map { ($0, $0.cutoutData) }
+        let inputs = work.map(\.before)
+        let stats = refStats
         Task { @MainActor in
             defer { isMatchingLight = false }
-            var items: [(Portrait2, Data, Data)] = []
-            for p in targets where p.persistentModelID != reference.persistentModelID {
-                guard let cg = NSImage(data: p.cutoutData)?
-                        .cgImage(forProposedRect: nil, context: nil, hints: nil),
-                      let outCG = SetLightingNormalizer.match(cg, to: refStats),
-                      let png = NSBitmapImageRep(cgImage: outCG).representation(using: .png, properties: [:])
-                else { continue }
-                items.append((p, p.cutoutData, png))
-            }
+            let outputs: [Data?] = await Task.detached(priority: .userInitiated) {
+                inputs.map { data -> Data? in
+                    guard let cg = NSImage(data: data)?
+                            .cgImage(forProposedRect: nil, context: nil, hints: nil),
+                          let outCG = SetLightingNormalizer.match(cg, to: stats),
+                          let png = NSBitmapImageRep(cgImage: outCG).representation(using: .png, properties: [:])
+                    else { return nil }
+                    return png
+                }
+            }.value
             undoManager?.beginUndoGrouping()
             undoManager?.setActionName("Match Lighting")
-            for (p, before, after) in items {
-                p.cutoutData = after
-                p.touch()
-                CutoutDataUndo.register(undoManager, portrait: p, undoTo: before, redoTo: after, actionName: "Match Lighting")
-                thumbs.invalidate(p)
+            for (i, item) in work.enumerated() {
+                guard let after = outputs[i] else { continue }
+                item.node.cutoutData = after
+                item.node.cutoutDerivesFromOriginal = false
+                item.node.touch()
+                CutoutDataUndo.register(undoManager, portrait: item.node, undoTo: item.before, redoTo: after, actionName: "Match Lighting")
             }
             undoManager?.endUndoGrouping()
         }
@@ -1097,11 +1177,11 @@ struct BoardView: View {
             onFlip: { flipNode(node) },
             frameShape: node.frameShape,
             onSetFrameShape: { setNodeFrameShape($0, node) },
-            activeMenu: $canvasMenu,
+            activeMenu: boardCanvasMenuBinding,
             gridEnabled: .constant(false),
             showFramingActions: false,
             showGrid: false,
-            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }, entitlement: entitlement) }
+            background: { BackgroundPanel(portrait: node, onApply: { undoableSetBackground($0, on: node) }, presentation: model.presentation, entitlement: entitlement) }
         )
     }
 
@@ -1128,25 +1208,33 @@ struct BoardView: View {
                             initial: node.adjust,
                             onCommit: { _, after in applyAdjustToAll(after) },
                             onRetouch: { retouchNode(node) },
-                            showRetouch: true
+                            showRetouch: true,
+                            // E29.5 (audit C6): Studio Light/Portrait/Colorise/
+                            // Boost/Fill in body zijn op de board niet bedraad
+                            // (default-lege closures) → verberg ze; alleen de
+                            // wél-werkende retouch-chip + sliders blijven. Echt
+                            // bedraden kan pas met de gedeelde apply/undo/gate-
+                            // service (editor+board) — zie de story-Result.
+                            showAutoEnhance: false
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
-                                     onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Apply effect") })
+                                     presentation: model.presentation,
+                                     onApply: { await undoableApplyToNode($0, node, actionName: "Apply effect") })
                             .id(node.persistentModelID)
                     case .clothing:
                         ClothesPanel(baseImage: base, entitlement: entitlement,
-                                     onApply: { undoableApplyToNode($0, node, actionName: "Change clothing") })
+                                     onApply: { await undoableApplyToNode($0, node, actionName: "Change clothing") })
                             .id(node.persistentModelID)
                     case .hair:
                         HairPanel(baseImage: base, entitlement: entitlement,
-                                  onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
+                                  onApply: { await undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
                     case .face:
                         FaceActionsPanel(
                             baseImage: base,
                             entitlement: entitlement,
-                            onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
+                            onApply: { await undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
                             isPro: entitlement.isProActive
                         )
                         .id(node.persistentModelID)
@@ -1159,89 +1247,101 @@ struct BoardView: View {
                 .dsPanelSurface(cornerRadius: DSRadius.xl)
             }
 
-            DSBottomToolbar(items: EditorView.toolbarItems, selection: $editTool)
+            DSBottomToolbar(items: boardToolbarItems, selection: $editTool)
         }
     }
 
     /// E30.1: een cloud/flip-resultaat op de node toepassen via dezelfde pipeline
     /// als de editor (re-isolatie bij volle achtergrond) → cutoutData + thumbnail.
-    private func applyToNode(_ image: NSImage, _ node: Portrait2) {
+    private func applyToNode(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
-        model.applyEffectResult(image)
-        thumbs.invalidate(node)
+        await model.applyEffectResult(image)
         editTool = nil
     }
 
-    /// Effects/face-edits: bewaart de cutout-alpha als masker i.p.v. Vision
-    /// opnieuw te draaien op een artistiek gestyled beeld.
-    private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) {
+    /// Face-edits: bewaart de cutout-alpha als masker i.p.v. Vision opnieuw.
+    private func applyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2) async {
         model.select(node)
-        model.applyEffectResult(image, preserveSourceAlpha: true)
-        thumbs.invalidate(node)
+        await model.applyEffectResult(image, preserveSourceAlpha: true)
         editTool = nil
     }
 
     /// Zelfde als applyToNode maar registreert ook een undo/redo-entry zodat
     /// Cmd+Z de bewerking terugdraait en Cmd+Shift+Z 'm hertoepast.
-    private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) {
+    private func undoableApplyToNode(_ image: NSImage, _ node: Portrait2, actionName: String) async {
         guard let before = NSImage(data: node.cutoutData) else {
-            applyToNode(image, node)
+            await applyToNode(image, node)
             return
         }
-        applyToNode(image, node)
-        let cache = thumbs
+        await applyToNode(image, node)
         ImageEnhanceUndo.register(
             undoManager, target: node,
-            apply: { [model, cache] img in
+            apply: { [model] img in
                 model.select(node)
-                model.applyEffectResult(img)
-                cache.invalidate(node)
+                await model.applyEffectResult(img)
             },
             undoTo: before, redoTo: image, actionName: actionName
         )
     }
 
-    private func undoableApplyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2, actionName: String) {
+    private func undoableApplyToNodePreservingAlpha(_ image: NSImage, _ node: Portrait2, actionName: String) async {
         guard let before = NSImage(data: node.cutoutData) else {
-            applyToNodePreservingAlpha(image, node)
+            await applyToNodePreservingAlpha(image, node)
             return
         }
-        applyToNodePreservingAlpha(image, node)
-        let cache = thumbs
+        await applyToNodePreservingAlpha(image, node)
         ImageEnhanceUndo.register(
             undoManager, target: node,
-            apply: { [model, cache] img in
+            apply: { [model] img in
                 model.select(node)
-                model.applyEffectResult(img, preserveSourceAlpha: true)
-                cache.invalidate(node)
+                await model.applyEffectResult(img, preserveSourceAlpha: true)
             },
             undoTo: before, redoTo: image, actionName: actionName
         )
     }
 
     /// Spiegelt de cutout van de node horizontaal (zelfde transform als editor).
+    /// Decode + flip-render draaien off-main; alleen de apply (SwiftData) op main.
     private func flipNode(_ node: Portrait2) {
-        let base = NSImage(data: node.cutoutData) ?? NSImage()
-        guard let cg = base.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let space = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(
-                data: nil, width: cg.width, height: cg.height,
-                bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              ) else { return }
-        ctx.translateBy(x: CGFloat(cg.width), y: 0)
-        ctx.scaleBy(x: -1, y: 1)
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
-        guard let out = ctx.makeImage() else { return }
-        undoableApplyToNode(NSImage(cgImage: out, size: base.size), node, actionName: "Flip")
+        let data = node.cutoutData
+        Task {
+            let box = await Task.detached(priority: .userInitiated) { () -> SendableCGImage? in
+                guard let cg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                      let space = CGColorSpace(name: CGColorSpace.sRGB),
+                      let ctx = CGContext(
+                        data: nil, width: cg.width, height: cg.height,
+                        bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      ) else { return nil }
+                ctx.translateBy(x: CGFloat(cg.width), y: 0)
+                ctx.scaleBy(x: -1, y: 1)
+                ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+                return ctx.makeImage().map(SendableCGImage.init)
+            }.value
+            guard let out = box?.cgImage else { return }
+            await undoableApplyToNode(
+                NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)),
+                node, actionName: "Flip"
+            )
+        }
     }
 
     /// One-click retouch op de node (lokaal, zelfde enhancer als de editor).
+    /// Decode + enhance draaien off-main; alleen de apply (SwiftData) op main.
     private func retouchNode(_ node: Portrait2) {
-        guard let cg = NSImage(data: node.cutoutData)?
-                .cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let out = PortraitEnhancer.magicRetouch(cg) else { return }
-        undoableApplyToNode(NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)), node, actionName: "One click retouch")
+        let data = node.cutoutData
+        Task {
+            let box = await Task.detached(priority: .userInitiated) { () -> SendableCGImage? in
+                guard let cg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                      let out = PortraitEnhancer.magicRetouch(cg) else { return nil }
+                return SendableCGImage(cgImage: out)
+            }.value
+            guard let out = box?.cgImage else { return }
+            await undoableApplyToNode(
+                NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height)),
+                node, actionName: "One click retouch"
+            )
+        }
     }
 
     private var hud: some View {

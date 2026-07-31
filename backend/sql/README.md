@@ -20,6 +20,11 @@ do not branch or skip numbers.
 | 010 | `010_newsletter_cohorts_view.sql` | Materialised view + refresh function so admin doesn't need service role (audit HIGH #12) | 001, 008 |
 | 011 | `011_free_import_counter_merge.sql` | Account/device counter merge on sign-in (audit MEDIUM #19) | 001, 004, 007 |
 | 013 | `013_newsletter_cohorts_revoke_public.sql` | Revoke anon/authenticated grants on cohort view + refresh fn (linter ERROR) | 010 |
+| 014 | `014_newsletter_double_optin.sql` | Double-opt-in ledger for Nieuwsbrief 2.0 (E17.6) — gated, additive | 010 |
+| 014 | `014_generated_results_bucket.sql` | Storage bucket `generated-results` for /v1/generate-background signed-URL delivery (E42) — ⚠️ duplicate number with the double-opt-in migration (both idempotent; apply both) | — |
+| 015 | `015_custom_effects.sql` | User-created custom Effects (E34): table + storage | 001, 006 |
+| 016 | `016_refund_e43_generate_background_outage.sql` | **One-off ops script, not schema**: credit-refund for the E43/A2 generate-background outage. Dry-run first; refund block is commented out — run only after sign-off | 001 |
+| 017 | `017_payload_effects_style_references.sql` | `payload.effects_style_references` array table for CMS style references on Effects (E54.1) — apply BEFORE the admin deploy that ships the field | 008 |
 
 ## Data classification
 

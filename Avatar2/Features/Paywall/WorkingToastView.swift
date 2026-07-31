@@ -44,6 +44,7 @@ struct WorkingToastView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     DSIconButton(
                         Image(systemName: "xmark"),
+                        label: "Dismiss",
                         style: .ghostNeutral,
                         size: .small,
                         action: onClose
@@ -51,17 +52,15 @@ struct WorkingToastView: View {
                 }
 
                 // Cycling description: .id(index) laat SwiftUI de Text als
-                // een nieuw view zien → de asymmetrische transitie vurt.
-                // Oud bericht schuift omhoog weg, nieuw schuift van onder in.
+                // een nieuw view zien → de transitie vuurt. Kale crossfade i.p.v.
+                // offset(y:±5): die liet de tekst elke cyclus verticaal schuifelen
+                // (de "stagger" die buggy oogde). Eén opacity-fade leest rustig.
                 Text(currentMessage)
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.subtle)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .id(index)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .offset(y: 5)),
-                        removal:   .opacity.combined(with: .offset(y: -5))
-                    ))
+                    .transition(.opacity)
             }
             .padding(DSSpacing.gap4)
         }
@@ -82,7 +81,7 @@ struct WorkingToastView: View {
             let nanos = UInt64(currentDwell * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanos)
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) { index += 1 }
+            DSMotion.animate(DSMotion.base) { index += 1 }
         }
     }
 }

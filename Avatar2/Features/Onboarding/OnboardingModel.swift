@@ -41,18 +41,17 @@ final class OnboardingModel {
         self.auth = auth
         self.defaults = defaults
         self.hasCompleted = defaults.bool(forKey: Self.completedKey)
-        #if DEBUG
-        // Visuele-verificatie-haak: sla de flow over zodat de shell (incl.
-        // topbar-badge) direct te screenshotten is.
-        if ProcessInfo.processInfo.arguments.contains("--badge-preview") {
-            hasCompleted = true
-        }
-        #endif
     }
 
-    /// Onboarding tonen zolang niet afgerond én niet ingelogd — een uit de
-    /// Keychain herstelde sessie slaat de flow over.
-    var isActive: Bool { !hasCompleted && !auth.isSignedIn }
+    /// Onboarding tonen zolang niet afgerond. Een uit de Keychain herstelde
+    /// sessie (flow nog op splash) slaat de flow over, maar een sign-in
+    /// mídden in de flow (`verifyCode` → `.privacy`) mag de flow niet
+    /// unmounten: anders verliest het ingelogde pad de privacy- (E04.3) en
+    /// downloadstap (E04.6) — audit B4/E04.8.
+    var isActive: Bool {
+        guard !hasCompleted else { return false }
+        return step != .splash || !auth.isSignedIn
+    }
 
     var trimmedEmail: String {
         emailInput.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -98,6 +97,8 @@ final class OnboardingModel {
         do {
             try await auth.verifyCode(email: trimmedEmail, code: otpCode)
             // E04.3: na verify naar de privacy-stap, niet meteen afronden.
+            // `isActive` blijft true (stap != .splash) ook al flipt
+            // `auth.isSignedIn` in hetzelfde frame — E04.8.
             step = .privacy
         } catch {
             // Boodschap staat in auth.lastError; code blijft staan zodat
@@ -143,9 +144,14 @@ final class OnboardingModel {
         markCompleted()
     }
 
-    /// E04.2 roept dit aan na een geslaagde code-verificatie.
-    func finishSignedIn() {
-        markCompleted()
+    /// E04.8: sign-out vanuit de Shell. Wordt de onboarding daarna weer
+    /// actief (`hasCompleted == false`), dan begint die op splash — niet op
+    /// een verweesde tussenstap zoals `.privacy`.
+    func resetToSplash() {
+        emailInput = ""
+        otpCode = ""
+        didResendCode = false
+        step = .splash
     }
 
     private func markCompleted() {

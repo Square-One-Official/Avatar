@@ -52,11 +52,44 @@ final class ThumbnailStore {
         return nil
     }
 
-    /// Bron-compat met de oude `BoardThumbnailCache`: met (id, updatedAt)-keying is
-    /// invalidatie automatisch (een edit bumpt `updatedAt` → nieuwe key → verse
-    /// decode), dus dit is een no-op. Behouden zodat de bestaande call-sites
-    /// (undo-closures e.d.) ongemoeid blijven.
-    func invalidate(_ portrait: Portrait2) {}
+    /// Gecachete, verkleinde ORIGINELE importfoto — voor de Original-achtergrond /
+    /// Portrait-blur op de board. GÉÉN Adjust-laag: die geldt alleen voor het
+    /// onderwerp (net als in de editor/export blijft de achtergrond rauw). `nil`
+    /// zolang 'ie decodeert of als er geen origineel is. Gekeyd op (id, maat) —
+    /// `originalData` is na import onveranderlijk, dus geen `updatedAt` nodig.
+    func original(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+        guard let data = portrait.originalData else { return nil }
+        let key = "orig-\(portrait.persistentModelID)-\(Int(maxDimension.rounded()))"
+        if let image = images[key] { return image }
+        guard !inFlight.contains(key) else { return nil }
+        inFlight.insert(key)
+        let maxPixelSize = Int(maxDimension.rounded())
+        Task { [weak self] in
+            let boxed = await Self.decode(data: data, maxPixelSize: maxPixelSize, adjust: .neutral)
+            self?.finish(key: key, boxed: boxed)
+        }
+        return nil
+    }
+
+    /// Gecachete, verkleinde "originele foto"-achtergrondlaag voor de board: bij een
+    /// actief effect de GESTYLEDE volle foto (zodat de backdrop bij het effect past),
+    /// anders de rauwe originele foto. Gekeyd op het actieve effect (`effectActiveRaw`)
+    /// zodat 'ie mee-ververst als het effect wisselt — i.t.t. `original(for:)`, dat de
+    /// onveranderlijke originalData cachet. `nil` zolang 'ie decodeert / als er niets is.
+    func originalBackdrop(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
+        guard let data = portrait.effectBackgroundData ?? portrait.originalData else { return nil }
+        let effectKey = portrait.effectActiveRaw ?? "none"
+        let key = "origbd-\(portrait.persistentModelID)-\(effectKey)-\(Int(maxDimension.rounded()))"
+        if let image = images[key] { return image }
+        guard !inFlight.contains(key) else { return nil }
+        inFlight.insert(key)
+        let maxPixelSize = Int(maxDimension.rounded())
+        Task { [weak self] in
+            let boxed = await Self.decode(data: data, maxPixelSize: maxPixelSize, adjust: .neutral)
+            self?.finish(key: key, boxed: boxed)
+        }
+        return nil
+    }
 
     private static func key(_ portrait: Portrait2, _ maxDimension: CGFloat) -> String {
         // De volledige identifier i.p.v. z'n 64-bit `hashValue` — even stabiel

@@ -8,7 +8,7 @@ import {
   UnknownModelOverrideError,
 } from "../../lib/models.js";
 import { activeSubscription, currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
-import { fetchActiveEffects } from "../../lib/payload.js";
+import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
 import { flattenOnGrey } from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
@@ -51,6 +51,61 @@ const CUSTOM_STYLE_TEMPLATE = (description: string) => {
     IDENTITY_CLAUSE
   );
 };
+
+/** Client-flag `soft_source`: bron is laag-res/soft → vraag scherpte in het resultaat. */
+const SHARPNESS_CLAUSE =
+  "If the source image is soft, blurry or low-resolution, render the styled result with crisp sharp detail — do not reproduce blur or softness from the input.";
+
+/** Client-flag `preserve_framing`: stylize op volle origineel → geen reframe. */
+const FRAMING_CLAUSE =
+  "Keep the exact same crop, zoom, and position of the person in the frame — do not reframe, recenter, or change the composition.";
+
+/**
+ * E54: rolverdeling wanneer een effect CMS-stijlreferenties meestuurt. Zonder
+ * deze clausule moet het model zelf raden welke input de persoon is en welke
+ * de stijl — met identity-bleed uit de referenties als bekend gevolg.
+ */
+const STYLE_REFERENCE_CLAUSE =
+  "The first image is the person to transform. Every other image is a style example only: match its artistic style, colour palette, texture, brushwork and lighting exactly, but do not copy any person, face, pose or composition from the style examples.";
+
+/** Max referenties richting het model; meer verwatert identity-behoud. */
+const STYLE_REF_MAX = 3;
+
+/**
+ * In-process cache van referentie-data-URLs. Referenties wijzigen alleen bij
+ * een CMS-edit, dus een warme Vercel-instance hoeft ze niet per generatie
+ * opnieuw te downloaden. TTL ruim boven de 60s effects-cache is prima: de
+ * URL is content-addressed per upload (nieuwe upload = nieuwe URL).
+ */
+const styleRefCache = new Map<string, { expiresAt: number; dataUrl: string }>();
+const STYLE_REF_CACHE_TTL_MS = 10 * 60_000;
+
+async function fetchStyleReferences(urls: string[]): Promise<string[]> {
+  const now = Date.now();
+  const results = await Promise.all(
+    urls.slice(0, STYLE_REF_MAX).map(async (url) => {
+      // Verkleind ophalen via de Supabase image-transformatie (E52.1-patroon):
+      // CMS-uploads kunnen multi-MB zijn; ~1024px is zat als stijlvoorbeeld.
+      const scaled = thumbnailVariant(url, 1024, 85) ?? url;
+      const hit = styleRefCache.get(scaled);
+      if (hit && hit.expiresAt > now) return hit.dataUrl;
+      try {
+        const res = await fetch(scaled);
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        const mime = res.headers.get("content-type") ?? "image/jpeg";
+        const dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        styleRefCache.set(scaled, { expiresAt: now + STYLE_REF_CACHE_TTL_MS, dataUrl });
+        return dataUrl;
+      } catch {
+        // Soft-fail per referentie: minder referenties is beter dan een
+        // mislukte generatie.
+        return null;
+      }
+    }),
+  );
+  return results.filter((r): r is string => r !== null);
+}
 
 const STYLE_PROMPTS: Record<string, string> = {
   clay:
@@ -202,9 +257,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
   // (alléén dev, bakeoff/handmatig testen).
   let prompt: string;
-  // E34: optionele stijlreferentie (custom effect). Blijft nil voor alle
-  // bestaande intents; alleen de custom-effect-tak vult 'm.
-  let referenceDataUrl: string | null = null;
+  // Stijlreferenties richting het model: CMS-referenties per effect (E54) óf
+  // de ene referentie-afbeelding van een user-created custom effect (E34).
+  // Blijft leeg voor alle andere intents.
+  let styleReferenceDataUrls: string[] = [];
   const customEffectId = (req.body?.custom_effect_id ?? "") as string;
   const styleKey = (req.body?.style ?? "") as string;
   const hairPreset = (req.body?.hair_preset ?? "") as string;
@@ -230,7 +286,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     prompt = CUSTOM_STYLE_TEMPLATE(effect.prompt);
     try {
       const refBytes = await downloadReferenceBytes(effect.reference_path);
-      referenceDataUrl = `data:image/png;base64,${refBytes.toString("base64")}`;
+      // Zelfde kanaal als de CMS-referenties (E54): het portret blijft het
+      // eerste beeld, de referentie gaat als tweede mee. De rolclausule zit
+      // hier al in CUSTOM_STYLE_TEMPLATE zelf.
+      styleReferenceDataUrls = [`data:image/png;base64,${refBytes.toString("base64")}`];
     } catch (e) {
       console.error(
         "/v1/stylize custom reference fetch failed:",
@@ -245,14 +304,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // blijven werken tijdens het seed-venster (en als de CMS even onbereikbaar
     // is). STYLE_PROMPTS verdwijnt zodra de effecten in de CMS bevestigd zijn.
     const effects = await fetchActiveEffects();
-    const mapped = effects.find((e) => e.key === styleKey)?.prompt ?? STYLE_PROMPTS[styleKey];
+    const effect = effects.find((e) => e.key === styleKey);
+    const mapped = effect?.prompt ?? STYLE_PROMPTS[styleKey];
     if (!mapped) {
       res.status(400).json({ error: "unknown_style" });
       return;
     }
     prompt = mapped;
+    // E54: CMS-stijlreferenties meesturen als visuele stijlgids naast de
+    // prompt. De rolclausule alléén toevoegen als er echt referenties
+    // meegaan — anders verwijst de prompt naar afbeeldingen die er niet zijn.
+    if (effect && effect.styleReferenceUrls.length > 0) {
+      styleReferenceDataUrls = await fetchStyleReferences(effect.styleReferenceUrls);
+      if (styleReferenceDataUrls.length > 0) {
+        prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
+      }
+    }
   } else if (hairPreset) {
-    const mapped = HAIR_PRESETS[hairPreset];
+    // CMS-first: try Payload, fall back to hardcoded HAIR_PRESETS.
+    const cmsPresets = await fetchActiveHairPresets();
+    const mapped = cmsPresets.find((p) => p.key === hairPreset)?.prompt ?? HAIR_PRESETS[hairPreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_hair_preset" });
       return;
@@ -267,7 +338,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = HAIR_FREE_TEMPLATE(hairPrompt.trim());
   } else if (clothesPreset) {
-    const mapped = CLOTHES_PRESETS[clothesPreset];
+    // CMS-first: try Payload, fall back to hardcoded CLOTHES_PRESETS.
+    const cmsPresets = await fetchActiveClothesPresets();
+    const mapped = cmsPresets.find((p) => p.key === clothesPreset)?.prompt ?? CLOTHES_PRESETS[clothesPreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_clothes_preset" });
       return;
@@ -281,7 +354,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = CLOTHES_FREE_TEMPLATE(clothesPrompt.trim());
   } else if (facePreset) {
-    const mapped = FACE_PRESETS[facePreset];
+    // CMS-first: try Payload, fall back to hardcoded FACE_PRESETS.
+    const cmsPresets = await fetchActiveFacePresets();
+    const mapped = cmsPresets.find((p) => p.key === facePreset)?.prompt ?? FACE_PRESETS[facePreset];
     if (!mapped) {
       res.status(400).json({ error: "unknown_face_preset" });
       return;
@@ -297,6 +372,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Niet-dev zonder geldige intent, of dev zonder enige prompt.
     res.status(400).json({ error: "unknown_style" });
     return;
+  }
+
+  if (req.body?.soft_source === true) {
+    prompt = `${prompt} ${SHARPNESS_CLAUSE}`;
+  }
+  if (req.body?.preserve_framing === true) {
+    prompt = `${prompt} ${FRAMING_CLAUSE}`;
   }
 
   // Input image: inline base64 (legacy) of een Storage-upload (storage_key,
@@ -343,17 +425,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resultUrl = await stylizeEdit({
       imageDataUrl: flatDataUrl,
       prompt,
+      styleReferenceDataUrls,
       width: meta.width ?? 0,
       height: meta.height ?? 0,
       model: modelRef,
-      // E34: nil voor alle bestaande intents; gezet voor een custom effect.
-      referenceDataUrl,
     });
     const download = await fetch(resultUrl);
     if (!download.ok) {
       throw new Error(`stylize result fetch failed: ${download.status}`);
     }
     const resultBytes = Buffer.from(await download.arrayBuffer());
+    const resultMeta = await sharp(resultBytes).metadata();
+    const inputW = meta.width ?? 0;
+    const inputH = meta.height ?? 0;
+    const outputW = resultMeta.width ?? 0;
+    const outputH = resultMeta.height ?? 0;
+    const cutoutW = Number(req.body?.cutout_w) || 0;
+    const cutoutH = Number(req.body?.cutout_h) || 0;
+    console.info(
+      `[stylize_dims] input=${inputW}x${inputH} output=${outputW}x${outputH}` +
+        (cutoutW > 0 ? ` cutout=${cutoutW}x${cutoutH}` : ""),
+    );
 
     if (!isDevUser) {
       await logCredit({
@@ -369,6 +461,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       image: resultBytes.toString("base64"),
       credits_remaining: creditsRemaining,
       model: modelRef ?? MODEL_REGISTRY.stylize.defaultModel,
+      input_width: inputW,
+      input_height: inputH,
+      output_width: outputW,
+      output_height: outputH,
     });
   } catch (err) {
     // Log the message only — the Replicate SDK embeds the auth header in the

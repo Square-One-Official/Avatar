@@ -28,15 +28,22 @@ struct OnboardingOTPView: View {
                 .multilineTextAlignment(.center)
 
                 VStack(spacing: DSSpacing.gap2) {
-                    DSOTPField(code: $model.otpCode, length: OnboardingModel.otpLength)
+                    DSOTPField(
+                        code: $model.otpCode,
+                        length: OnboardingModel.otpLength,
+                        validation: model.auth.lastError == nil ? .normal : .error
+                    )
                         .onChange(of: model.otpCode) { _, newValue in
                             guard newValue.count == OnboardingModel.otpLength else { return }
                             Task { await model.verifyCode() }
                         }
                     if let error = model.auth.lastError {
+                        // E49.2: fout in signaalstijl (rood veld + rode copy, in
+                        // lijn met SignInSheet); de succesbevestiging hieronder
+                        // blijft subtle.
                         Text(error)
                             .dsTextStyle(.bodySmall)
-                            .foregroundStyle(DSColor.Foreground.subtle)
+                            .foregroundStyle(DSColor.Signal.error)
                     } else if model.didResendCode {
                         Text("New code sent.")
                             .dsTextStyle(.bodySmall)

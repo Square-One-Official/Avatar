@@ -43,3 +43,6 @@ docs/legal/dpa/
 
 # Incremental TS build state (per-project, machine-local)
 *.tsbuildinfo
+
+# Cursor: regels versioneren, debug-logs niet
+.cursor/*.log

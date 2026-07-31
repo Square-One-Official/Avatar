@@ -149,3 +149,73 @@ INFRA-story toevoegen i.p.v. zelf in AvatarKit bouwen.
    subscribeAnonymous(). Rest van de checkout-flow ongewijzigd.
 
 **Result:** `BackendClient.subscribe(interval:)` toegevoegd (authed `request`, hit `/v1/checkout/subscribe` — endpoint bestond al in productie) naast `subscribeAnonymous`; EntitlementModel.startSubscribe routeert ingelogde gebruikers (`auth.isSignedIn`) naar de authed flow (gekoppeld aan Supabase user-id, hergebruikt de Stripe-customer → geen dubbele customer), anonieme gebruikers naar de e-mail-flow. Geen UI-wijziging (zelfde paywall) → geen visuele smoke nodig. Kleine AvatarKit-toevoeging (INFRA-review genoteerd); geen backend-deploy nodig. Beide targets bouwen groen, suite groen.
+
+## 14.7 — Stripe-webhook verifiëren + refill-datum-guard
+- status: done
+- team: INFRA + FEAT
+- blockedBy: —
+- Result: Root cause gevonden en gefixt (branch v2/e14-15-audit-fixes). **Stripe-bevindingen:**
+  het live webhook-endpoint (`we_1TRZdZ…` → avatars-api-five.vercel.app/api/stripe-webhook)
+  staat op API-versie **2026-04-22.dahlia** terwijl de handler-code de acacia-shapes verwacht.
+  Sinds basil (2025-03-31) zit `current_period_start/end` niet meer top-level op de
+  Subscription (alleen op de items) → `new Date(undefined*1000).toISOString()` gooide een
+  RangeError → 500 → **failed delivery**. Zo is het `customer.subscription.deleted`-event van
+  4 jun (evt_1TeVNmAcH6vt33NABIJ88QlU, pending_webhooks=1 — enige gefaalde delivery) nooit
+  geland: de Supabase-rij `sub_1TTGaPAcH6vt33NAFPl7bFgM` zegt nog `active` /
+  period_end=2026-06-04 / cancel_at_period_end=false, terwijl Stripe zegt canceled
+  (opgezegd 4 mei, geëindigd 4 jun). Vandaar "Refills on 4 Jun 2026". Er is geen betalende
+  Pro die maandcredits mist (de enige sub is echt geëindigd), maar de ex-subscriber wordt
+  nog als actieve Pro geserveerd. Tweede stille faalweg bevestigd: invoice-lines dragen in
+  dahlia `pricing.price_details.price` i.p.v. `price` → tier-null → stille grant-skip.
+  **Fixes:** `stripe-webhook.ts` leest nu beide payload-shapes (`subscriptionPeriod()`,
+  `invoiceLinePriceId()`), gooit nooit meer op een ontbrekende periode (status-update
+  overleeft), en tier-null logt een zoekbare `[ALERT]`-console.error op alle drie de paden.
+  Client: `EntitlementModel.upcomingMonthlyResetAt` guard (verleden-datum → "Refills
+  monthly with your plan") in SettingsAccountPage + PaywallSheet, en "200" vervangen door
+  `model.monthlyQuota`. Tests: 2 nieuwe EntitlementModelTests (verleden/toekomst-datum);
+  alles groen (AvatarKit 78, AvatarUI 37, Avatar2 suite, `tsc --noEmit`).
+  **Follow-up:** webhook-fix mee in de eerstvolgende prod-deploy (E43-akkoord loopt);
+  daarna het 4-jun-deleted-event resenden vanuit het Stripe-dashboard (30-dagen-retentie
+  verloopt ±4 jul!) óf de subscriptions-rij handmatig op `canceled` zetten.
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B8).
+**Wat:** Settings→Account en de top-up-paywall toonden "Refills on 4 Jun 2026" — een
+datum in het **verleden**. Bron: `backend/api/v1/account.ts` spiegelt
+`subscriptions.current_period_end` 1-op-1; alleen de Stripe-webhook ververst die
+kolom. Twee stille faalwegen gevonden in `stripe-webhook.ts`: (a) `resolvePriceLive`
+→ `tier == null` → `upsertSubscription` returnt zonder update én `invoice.paid`
+doet `if (!tier) break` → **geen periode-update én geen maandelijkse creditgrant**;
+(b) mogelijk falende webhook-deliveries sinds begin juni (te checken in het
+Stripe-dashboard). Client toont de datum bovendien ongeguard
+(`SettingsAccountPage.swift:102`, `PaywallSheet.swift:114`) en hardcodet "200"
+i.p.v. `EntitlementModel.monthlyQuota`.
+**Voorstel:** (1) Stripe-delivery-log + de betreffende `subscriptions`-rij checken;
+alert toevoegen op tier-null in de webhook; (2) client: datum in het verleden →
+terugvallen op "Refills monthly with your plan"; "200" vervangen door
+`model.monthlyQuota`.
+**DoD:** geen datum in het verleden meer zichtbaar; webhook-tier-null triggert een
+zichtbare log/alert; tests groen; Result-regel met de bevindingen uit het
+Stripe-dashboard.
+
+## 14.8 — Credits-transparantie: cost-aware gating + uniforme chips (backlog)
+- status: backlog
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C8).
+**Wat:** `PrivacyGate.evaluate` is binair (`isProActive || isDevUnlimited ||
+creditsRemaining > 0`) — een Pro met 0 credits of een free user met 1 credit op een
+4-credits hair-edit worden beide "allowed" en lopen pas tegen de server-402 aan (na
+upload + wachttijd). `CreditMeter.canAfford(_:creditsRemaining:)` bestaat en is
+getest maar wordt in `Avatar2/` nergens aangeroepen. Daarnaast zijn de chips
+inconsistent: Boost toont hardcoded `"1 credit"` (niet via `CreditMeter.chipLabel`);
+Colorise en Restore body tonen alléén een Pro-badge, geen kosten; de
+generate-background-prijs is client-hardcoded en intern inconsistent (context
+rekent 3 credits voor ultra-wide, de registry zegt 2).
+**Voorstel:** `PrivacyGate` cost-aware maken via `feature.creditCost` +
+`CreditMeter.canAfford` → direct `needsCredits` i.p.v. een gegarandeerde
+server-roundtrip; alle credit-chips via `CreditMeter.chipLabel` genereren; de
+background-generate-prijs uit één bron (server-config of `CreditMeter`) trekken.
+**DoD:** alle cloud-acties tonen hun kosten via hetzelfde chip-contract vóór
+uitvoering; een gebruiker met te weinig credits krijgt de melding vóór de
+upload start; tests groen; Result-regel.

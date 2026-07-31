@@ -30,6 +30,7 @@ public struct DSGhostButton: View {
     public var body: some View {
         Button(action: action) {
             DSButtonLabel(title: title, icon: icon, size: size)
+                .fixedSize(horizontal: !fullWidth, vertical: false)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
                 .padding(.horizontal, size.horizontalPadding)
                 .padding(.vertical, size.verticalPadding)
@@ -59,7 +60,7 @@ public struct DSGhostButton: View {
                     .background(backgroundColor, in: Capsule())
                     .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
                     .onHover { isHovering = $0 }
-                    .animation(.easeOut(duration: 0.1), value: isHovering)
+                    .animation(DSMotion.micro, value: isHovering)
             }
 
             private var backgroundColor: Color {

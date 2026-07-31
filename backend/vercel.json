@@ -21,10 +21,17 @@
       "maxDuration": 90,
       "memory": 1024
     },
+    "api/v1/generate-background.ts": {
+      "maxDuration": 90,
+      "memory": 1024
+    },
     "api/stripe-webhook.ts": {
       "maxDuration": 30
     },
     "api/cron/grant-yearly-credits.ts": {
+      "maxDuration": 60
+    },
+    "api/cron/sweep-generated-results.ts": {
       "maxDuration": 60
     },
     "api/appcast.ts": {
@@ -35,6 +42,10 @@
     {
       "path": "/api/cron/grant-yearly-credits",
       "schedule": "0 3 1 * *"
+    },
+    {
+      "path": "/api/cron/sweep-generated-results",
+      "schedule": "0 * * * *"
     }
   ],
   "rewrites": [

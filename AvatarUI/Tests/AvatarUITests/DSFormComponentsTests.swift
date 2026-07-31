@@ -153,3 +153,15 @@ extension DSFormComponentsTests {
         XCTAssertEqual(leeg.height, 24)
     }
 }
+
+// E33 — macOS-native dubbelklik-overlay
+extension DSFormComponentsTests {
+
+    @MainActor
+    func testOnDoubleClickModifierRendert() {
+        let view = Text("Name")
+            .padding()
+            .onDoubleClick {}
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
+}

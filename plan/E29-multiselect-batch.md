@@ -81,3 +81,78 @@ zichtbare voor/na-verschil is klein (referentie ≈ doel → gain ≈ 1). Op een
 (verschillende belichting) trekt de normalisatie de set naar één consistente studio-look — dat is de
 geteste E12.2-engine; de meerwaarde hier is de board-multi-select-instap. **Figma-TODO:** knop-styling
 + een referentie-keuze (welke node is de "studio"-referentie) tegen Figma/Thierry leggen.
+
+## 29.4 — Board: cmd/shift-klik via expliciete gestures [FEAT]
+- status: done
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C5).
+**Wat:** `BoardView.swift:435-442` bevat wél toggle-logica
+(`NSEvent.modifierFlags.contains(.command/.shift)` → insert/remove, anders
+`selection = [id]`), maar leest de **globale** `NSEvent.modifierFlags` onder een
+double-tap-gesture (`count: 2`, regel 392) i.p.v. de modifiers van het triggerende
+event zelf — live aantoonbaar fragiel: cmd/shift-klik vervangt de selectie i.p.v.
+toggelt.
+**Voorstel:** expliciete gestures i.p.v. globale event-state:
+`TapGesture().modifiers(.command)` naast een kale tap, en apart `.modifiers(.shift)`
+voor additief/range-gedrag (macOS-conventie: shift = range, niet toggle-alias van
+cmd). Verifieer op een verse build (dual-instance/DerivedData-valkuil is hier eerder
+gezien).
+**DoD:** beide targets bouwen; cmd-klik toggelt, shift-klik breidt een range uit,
+kale klik vervangt; tests groen; Result-regel.
+
+**Result:** `tapNode` (globale `NSEvent.modifierFlags`-lezing) is vervangen door drie
+expliciete gestures op de node: `TapGesture().modifiers(.command)` → `toggleNodeSelection`
+(insert/remove, macOS-conventie), `TapGesture().modifiers(.shift)` → `extendSelectionRange`
+(RANGE anker→node in board-volgorde, Finder-conventie — shift is geen toggle-alias van cmd
+meer), kale `TapGesture` → `selectOnly` (vervang; zet het range-anker). Nieuw
+`@State selectionAnchor` volgt de laatst kaal/cmd-geselecteerde node; valt het anker uit de
+selectie dan schuift het door. De range-logica zit in de pure statische helper
+`BoardView.rangeExtendedSelection(current:anchor:target:order:)` — unit-getest in het nieuwe
+`Avatar2Tests/BoardSelectionTests.swift` (6 tests: voorwaarts/achterwaarts, union met
+bestaande selectie, geen/onbekend anker → additief, anker==doel). Gesture-volgorde =
+prioriteit (modifier-varianten vóór de kale tap); dubbelklik-open ongewijzigd.
+
+**DoD/Verificatie:** Avatar (v1) + Avatar2 bouwen; `xcodebuild test -scheme Avatar2`
+100/100 groen (incl. de 6 nieuwe), `swift test` AvatarKit 89 + AvatarUI 37 groen.
+Bijvangst: flaky `EntitlementModelTests.testMonthlyResetInFutureIsUpcoming` gedeflaked
+(ISO8601 trunceert subseconden → `rounded(.down)` i.p.v. `rounded()`; was 1-op-3 rood).
+
+## 29.5 — Board-panelen: dode chips + gedeelde kwaliteitsgate [FEAT]
+- status: done
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevindingen C6, en de
+Editor/Board-review F5/F10).
+**Wat:** `EditColorPanel.swift:82` heeft `showAutoEnhance` default `true`; de
+board-call-sites (single-select Enhance `BoardView.swift:1136-1142`, batch-Adjust
+`BoardView.swift:774-799`) geven geen closures mee → de chips Studio Light/
+Portrait/Colorise/Boost/Restore body renderen met de default-lege closures
+(`EditColorPanel.swift:44-56`) en doen dus niets bij een klik. Daarnaast krijgen de
+board-panelen geen `StylizeQualityCoordinator` mee (param default `nil`) — de
+pre-stylize-kwaliteitsgates draaien dus alléén in de editor; dezelfde Effects-klik
+gedraagt zich op de board anders dan in de editor (pipeline-drift, board dupliceert
+de editor's apply/undo-pad in `applyToNode`/`undoableApplyToNode`).
+**Voorstel:** `showAutoEnhance: false` op beide board-call-sites zetten óf de acties
+echt bedraden; op termijn één gedeelde apply/undo/gate-service die editor én board
+injecteren i.p.v. twee parallelle implementaties.
+**DoD:** beide targets bouwen; geen chip op de board doet meer niets bij een klik;
+tests groen; Result-regel.
+
+**Result:** beide board-call-sites zetten nu expliciet `showAutoEnhance: false`. In
+`EditColorPanel` gate die vlag voortaan ALLEEN de vijf onbedrade AI-één-tik-chips
+(Studio Light/Portrait/Colorise/Boost/Restore body); de chip-rij zelf rendert op het
+nieuwe `showsQuickActions` (`showAutoEnhance || showRetouch || showRemoveBackground ||
+showAppleEdit`) — zo blijft op de board-single-select de wél-bedrade "One click
+retouch"-chip (`retouchNode`) staan terwijl de dode chips verdwijnen; de batch-Adjust
+toont alleen nog de sliders + Reset. Editor-call-site ongewijzigd (alles expliciet
+bedraad). **Bewust niet in deze story:** de `StylizeQualityCoordinator`-injectie op de
+board-panelen (Effects/Hair/Clothes/Face) — de gates hangen aan editor-hooks
+(`onBoostCutout`/pre-gate-sheet) die de board niet heeft; dat hoort bij de "één
+gedeelde apply/undo/gate-service voor editor én board" uit het voorstel (aparte
+follow-up-story, samen met het `applyToNode`/`undoableApplyToNode`-duplicaat).
+
+**DoD/Verificatie:** Avatar (v1) + Avatar2 bouwen; `xcodebuild test -scheme Avatar2`
+100/100 groen; `swift test` AvatarKit 89 + AvatarUI 37 groen.

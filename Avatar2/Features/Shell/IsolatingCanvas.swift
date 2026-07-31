@@ -33,6 +33,11 @@ struct IsolatingFrameLayer: View {
     let original: NSImage
     let cutout: NSImage?
     var clipShape: AnyShape = AnyShape(Rectangle())
+    /// Full-screen (eerste import) VULT de kaart (`.fill`, Figma-gedrag). In het
+    /// editor-frame PAST de foto IN het frame (`.fit`): een staande foto zou met
+    /// `.fill` tot een gezichts-crop inzoomen ("zoomt in bij droppen") — `.fit`
+    /// toont de hele foto, dezelfde kadrering als de uiteindelijke (padded-fit) cutout.
+    var fills = true
 
     @State private var backgroundFaded = false
 
@@ -59,7 +64,7 @@ struct IsolatingFrameLayer: View {
     private func portraitLayer(_ image: NSImage) -> some View {
         Image(nsImage: image)
             .resizable()
-            .scaledToFill()
+            .aspectRatio(contentMode: fills ? .fill : .fit)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
     }

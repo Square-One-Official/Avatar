@@ -54,7 +54,7 @@ public struct DSToolButton: View {
             ZStack {
                 styledIcon(DSColor.Foreground.primary)
                     .opacity(isActive ? 0 : 1)
-                styledIcon(DSColor.Action.primary)
+                styledIcon(DSColor.Action.primaryForeground)
                     .opacity(isActive ? 1 : 0)
             }
             .frame(width: 48, height: 48)
@@ -88,7 +88,7 @@ public struct DSToolButton: View {
                     .allowsHitTesting(false)
             }
         }
-        .animation(.easeOut(duration: 0.12), value: showTooltip)
+        .animation(DSMotion.micro, value: showTooltip)
     }
 
     private func styledIcon(_ color: Color) -> some View {
@@ -121,7 +121,7 @@ private struct ToolSurface: View {
             .overlay {
                 Circle()
                     .strokeBorder(
-                        DSColor.Action.primary,
+                        DSColor.Action.primaryForeground,
                         lineWidth: DSBorderWidth.medium
                     )
                     .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
@@ -136,10 +136,10 @@ private struct ToolSurface: View {
             // (overshoot/wobble) i.p.v. de bedoelde easeOut. Een `.transaction`
             // override op dezelfde trigger is lokaal en wint wél van de ouder.
             .transaction(value: isActive) { txn in
-                txn.animation = .easeOut(duration: 0.15)
+                txn.animation = DSMotion.fast
             }
-            .animation(.easeOut(duration: 0.1), value: isHovering)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .animation(DSMotion.micro, value: isHovering)
+            .animation(DSMotion.micro, value: configuration.isPressed)
     }
 
     private var backgroundColor: Color {

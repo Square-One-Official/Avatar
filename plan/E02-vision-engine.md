@@ -107,3 +107,60 @@ Op bestaande /v1/cutout via AvatarKit BackendClient.
 
 **Result:** `CloudCutoutEngine` (struct, `CutoutEngine`-conform, kind `.replicate`) in `AvatarKit/Engines/` — dunne adapter rond `BackendClient.cutout` (bestaande /v1/cutout incl. Storage-upload-flow en creditaftrek; BackendError's propageren ongewijzigd), PNG↔CGImage via ImageIO, `isAvailable` = sessie-aanwezig via nieuwe één-regel `BackendClient.hasSession` (buiten Engines/ — **INFRA-review gevraagd**); 5 tests zonder netwerk (URLProtocol-stub voor het volledige wire-pad, notSignedIn vóór I/O, alpha-roundtrip), totaal 25 packagetests groen; beide targets bouwen Debug groen via build-v2.sh.
 
+## 2.5 — Kleurruimte-normalisatie bij import (grayscale/CMYK-fix)
+- status: done
+- team: AI
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B1).
+**Wat:** `VisionCutoutEngine.swift:107-112` en `OrmbgEngine.swift:83-88` renderen naar
+`.RGBA8` met de **bron**-kleurruimte (`image.colorSpace ?? sRGB`). Voor een
+grayscale-PNG (DeviceGray, samplesPerPixel 2) of een CMYK-JPEG is dat incompatibel
+met `.RGBA8` → `createCGImage` geeft `nil` → `Failure.renderFailed`. Beide engines
+bevatten dezelfde regel, dus de `PipelineRouter`-cascade redt niets. Empirisch
+gereproduceerd: DeviceGray-CGImage door `EngineRendering.linearContext` →
+`createCGImage(RGBA8, grayCS)` = nil; met sRGB = ok. `visionInput`
+(regel 149-153) faalt om dezelfde reden en valt stil terug op de originele
+resolutie (adaptieve upscale al kapot vóór de eindrender).
+**Voorstel:** normaliseer élke import naar sRGB-RGBA op één plek —
+`ShellModel.importImage`, vóór de engines worden aangeroepen (dekt ook toekomstige
+consumers zoals AutoFramer/ClothesMaskGenerator) — of minimaal in beide engines:
+`let outputColorSpace = (image.colorSpace?.model == .rgb ? image.colorSpace : nil)
+?? CGColorSpace(name: .sRGB)!`.
+**DoD:** beide targets bouwen; nieuwe grayscale/CMYK-fixture-tests in
+`VisionCutoutEngineTests` én `OrmbgEngineTests` slagen; tests groen; Result-regel.
+
+**Result:** twee niveaus zoals voorgesteld — (1) `SRGBNormalizer` (public, in
+`AvatarKit/Engines/`): élke import naar sRGB-RGBA8 op het éne choke-point
+`ShellModel.runCutout` (beide importImage-overloads); pass-through als al
+genormaliseerd, wide-gamut (P3) gaat bewust mee naar sRGB; (2) engine-guard
+`EngineRendering.outputColorSpace(for:)` (niet-RGB-bron → sRGB, RGB incl. P3
+blijft) op alle drie de `.RGBA8`-rendersites: VisionCutoutEngine eindrender +
+`visionInput`, OrmbgEngine eindrender. Tests: DeviceGray/DeviceCMYK
+hoofd+schouders-fixtures (gedeeld, `ColorSpaceFixtures`) door béide engines —
+de ORMBG-varianten draaien tegen het lokaal geïnstalleerde model
+(app-container-fallback; XCTSkip zonder installatie, guard dan nog gedekt via
+SRGBNormalizerTests) — plus 7 helper-tests (normalisatie/pass-through/alpha/
+P3/guard). AvatarKit 70 tests groen, AvatarUI 37 groen; Avatar én Avatar2
+bouwen Debug groen.
+
+## 2.6 — Cutout-randkwaliteit op lage resolutie [AI]
+- status: backlog
+- team: AI
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B7). Dit is
+de E02.2-bakeoff die de header van dit epic al aankondigde.
+**Wat:** `VisionCutoutEngine.swift:85-89` bevat bewust geen kleur-decontaminatie —
+de composite is origineel × zachte alpha, dus in de soft band blijft een
+haar/achtergrond-kleurmengsel zichtbaar (magenta/roze fringe op de
+183px-lastige-haar-testfoto). De guided-filter-radius is bovendien vast r=8 in
+**bronpixels** — op een 183px-foto is dat ~4,4% van de beeldbreedte, op een
+4000px-foto 0,2%: een véél bredere fringe-band juist op lage resolutie, waar het
+masker toch al zwak is.
+**Voorstel:** (a) radius schalen met resolutie, bv. `max(2, longEdge/256)`; (b) een
+lichte decontaminatie-stap voor de soft band — `DominantColor.edge` is al
+beschikbaar in dezelfde module; (c) overweeg een import-waarschuwing onder ~400px.
+**DoD:** beide targets bouwen; visuele vergelijking vóór/na op de bestaande
+lastige-haar-fixtures in de Result-regel; tests groen.
+

@@ -10,17 +10,61 @@ import AppKit
 import AvatarKit
 import SwiftUI
 
-/// E19.1: export-vorm (v1-pariteit). Circle maskeert de vierkante output.
-enum ExportShape: String, CaseIterable, Identifiable {
-    case square, circle
+/// E19.1: export-vorm (v1-pariteit). Circle/rounded maskeren de vierkante output.
+/// `.rounded` (Slack/Discord-stijl) is export-only — de canvas-frame biedt alleen
+/// square/circle, en alle canvas-checks zijn binair `== .circle` (rounded valt daar
+/// dus terug op square). Alleen de export-picker itereert over `allCases`.
+enum ExportShape: String, CaseIterable, Identifiable, Sendable {
+    case square, circle, rounded
     var id: String { rawValue }
-    var label: String { self == .square ? "Square" : "Circle" }
+    var label: String {
+        switch self {
+        case .square: return "Square"
+        case .circle: return "Circle"
+        case .rounded: return "Rounded"
+        }
+    }
 }
 
 enum PortraitExporter {
     static let exportSide = 1024
     /// E19.1: aangeboden maten in de export-popup.
     static let sizeOptions = [512, 1024, 2048]
+
+    /// Sendable momentopname van de portret-velden die de export leest.
+    /// `Portrait2` is een SwiftData `@Model` (niet Sendable): snapshot op de
+    /// main-actor, render daarna veilig off-main (`makePNGAsync`).
+    struct RenderInput: Sendable {
+        let cutoutData: Data
+        let adjust: PortraitAdjust
+        let offsetX: Double
+        let offsetY: Double
+        let scale: Double
+        let portraitBlur: Bool
+        let effectBackgroundData: Data?
+        let originalData: Data?
+        let backgroundImageData: Data?
+        let backgroundColorHex: String?
+        let useOriginalBackground: Bool
+    }
+
+    /// Leest het portret synchroon → roep aan waar `portrait` veilig is (main).
+    @MainActor
+    static func renderInput(from portrait: Portrait2) -> RenderInput {
+        RenderInput(
+            cutoutData: portrait.cutoutData,
+            adjust: portrait.adjust,
+            offsetX: portrait.offsetX,
+            offsetY: portrait.offsetY,
+            scale: portrait.scale,
+            portraitBlur: portrait.portraitBlur,
+            effectBackgroundData: portrait.effectBackgroundData,
+            originalData: portrait.originalData,
+            backgroundImageData: portrait.backgroundImageData,
+            backgroundColorHex: portrait.backgroundColorHex,
+            useOriginalBackground: portrait.useOriginalBackground
+        )
+    }
 
     /// Bouwt de export-PNG voor een portret. nil als er geen cutout is.
     @MainActor
@@ -30,13 +74,40 @@ enum PortraitExporter {
         side: Int = exportSide,
         shape: ExportShape = .square
     ) -> Data? {
-        guard var cutout = NSImage(data: portrait.cutoutData)?
+        makePNG(renderInput(from: portrait), watermark: watermark, side: side, shape: shape)
+    }
+
+    /// Off-main variant: snapshot op de main-actor, render op een achtergrond-
+    /// thread. Voor live previews (Export-sheet, Social Preview) zodat de
+    /// compositing de UI niet blokkeert. Beeld identiek aan `makePNG(for:)`.
+    @MainActor
+    static func makePNGAsync(
+        for portrait: Portrait2,
+        watermark: Bool,
+        side: Int = exportSide,
+        shape: ExportShape = .square
+    ) async -> Data? {
+        let input = renderInput(from: portrait)
+        return await Task.detached(priority: .userInitiated) {
+            makePNG(input, watermark: watermark, side: side, shape: shape)
+        }.value
+    }
+
+    /// Pure, off-main render van een Sendable `RenderInput` — identiek beeld als
+    /// de portret-variant, maar zonder `Portrait2`-toegang (dus thread-safe).
+    static func makePNG(
+        _ input: RenderInput,
+        watermark: Bool,
+        side: Int = exportSide,
+        shape: ExportShape = .square
+    ) -> Data? {
+        guard var cutout = NSImage(data: input.cutoutData)?
             .cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
 
         // E24.14: pas de niet-destructieve Adjust-laag toe vóór compositing,
         // zodat de export exact het canvas volgt (WYSIWYG). cutoutData zelf
         // blijft rauw; de params leven op het portret.
-        let adjust = portrait.adjust
+        let adjust = input.adjust
         if !adjust.isNeutral,
            let adjusted = PortraitEnhancer.colorAdjust(
             cutout, brightness: adjust.brightness, contrast: adjust.contrast,
@@ -46,26 +117,29 @@ enum PortraitExporter {
         }
 
         let placement = BackgroundCompositor.Placement(
-            offsetX: portrait.offsetX,
-            offsetY: portrait.offsetY,
-            scale: portrait.scale,
+            offsetX: input.offsetX,
+            offsetY: input.offsetY,
+            scale: input.scale,
             canvasUnit: 1024
         )
 
-        let blur = portrait.portraitBlur
-        let originalCG = portrait.originalData.flatMap {
+        let blur = input.portraitBlur
+        // "Originele foto"-achtergrondlaag: bij een actief effect de gestylede volle
+        // foto (backdrop past bij het effect), anders de rauwe originele foto. Beide
+        // delen het cutout-frame/-ratio → de aligned-render registreert gelijk.
+        let originalCG = (input.effectBackgroundData ?? input.originalData).flatMap {
             NSImage(data: $0)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         }
         // AchtergrondLAAG-beeld (spiegelt EditorView.backgroundLayerImage): custom
-        // upload, óf de originele foto bij Original-modus en bij Portrait zonder
-        // expliciete achtergrond. nil = vlakke kleur of geen achtergrond.
+        // upload, óf de (evt. gestylede) originele foto bij Original-modus en bij
+        // Portrait zonder expliciete achtergrond. nil = vlakke kleur of geen achtergrond.
         let backgroundImage: CGImage? = {
-            if let data = portrait.backgroundImageData,
+            if let data = input.backgroundImageData,
                let bg = NSImage(data: data)?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 return bg
             }
-            if portrait.backgroundColorHex != nil { return nil }
-            if portrait.useOriginalBackground { return originalCG }
+            if input.backgroundColorHex != nil { return nil }
+            if input.useOriginalBackground { return originalCG }
             if blur { return originalCG }
             return nil
         }()
@@ -73,9 +147,9 @@ enum PortraitExporter {
         // De achtergrondLAAG ÍS de originele foto (Original-modus / Portrait zonder
         // eigen achtergrond) → uitgelijnd op de cutout-rect tekenen (registreert,
         // niet dubbel). Custom upload → aspect-fill. Spiegelt EditorView.
-        let bgIsAlignedOriginal = portrait.backgroundImageData == nil
-            && portrait.backgroundColorHex == nil
-            && (portrait.useOriginalBackground || blur)
+        let bgIsAlignedOriginal = input.backgroundImageData == nil
+            && input.backgroundColorHex == nil
+            && (input.useOriginalBackground || blur)
 
         var composited: CGImage
         if var bg = backgroundImage {
@@ -87,7 +161,7 @@ enum PortraitExporter {
             composited = (try? BackgroundCompositor.composite(
                 cutout: cutout, over: background, placement: placement, outputSize: side
             )) ?? cutout
-        } else if let hex = portrait.backgroundColorHex, let rgb = rgbComponents(hex) {
+        } else if let hex = input.backgroundColorHex, let rgb = rgbComponents(hex) {
             composited = (try? BackgroundCompositor.composite(
                 cutout: cutout, over: .color(red: rgb.r, green: rgb.g, blue: rgb.b),
                 placement: placement, outputSize: side
@@ -97,10 +171,59 @@ enum PortraitExporter {
             composited = transparentSquare(cutout: cutout, placement: placement, side: side) ?? cutout
         }
 
-        if shape == .circle { composited = circleMasked(composited) ?? composited }
+        switch shape {
+        case .circle: composited = circleMasked(composited) ?? composited
+        case .rounded: composited = roundedMasked(composited) ?? composited
+        case .square: break
+        }
 
         let final = watermark ? applyWatermark(to: composited, shape: shape) : composited
         return png(from: final)
+    }
+
+    /// E34.7: bouwt de WIJDE cover-banner-PNG voor een platform (LinkedIn/X).
+    /// nil voor platforms zonder cover (Instagram) of bij een renderfout. De
+    /// vulling komt uit `BannerResolver` (match-portret / kleur / afbeelding);
+    /// het onderwerp wordt NIET ingebakken (LinkedIn/X leggen de profielfoto er
+    /// zelf overheen). Free-tier krijgt een hoek-watermerk.
+    @MainActor
+    static func makeBannerPNG(
+        for portrait: Portrait2,
+        platform: SocialPlatform,
+        watermark: Bool,
+        banner: BannerBackground? = nil
+    ) -> Data? {
+        guard let coverSize = platform.coverSize else { return nil }
+        // `banner` overschrijft de keuze van het portret (gebruikt om bij een
+        // uitgeschakelde Banners-suite altijd de portret-achtergrond te matchen).
+        let fill = banner.map { BannerResolver.fill(for: portrait, banner: $0) }
+            ?? BannerResolver.fill(for: portrait)
+        guard var cover = try? BannerCompositor.composite(fill: fill, size: coverSize) else { return nil }
+        if watermark { cover = bannerWatermark(cover) ?? cover }
+        return png(from: cover)
+    }
+
+    /// Hoek-watermerk voor de wijde banner (rechtsonder, maat naar de HOOGTE
+    /// geschaald — de breedte is veel groter). Spiegelt `applyWatermark`.
+    private static func bannerWatermark(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let fontSize = CGFloat(h) * 0.07
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.85),
+        ]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: "Made with Aaavatar", attributes: attrs))
+        let bounds = CTLineGetImageBounds(line, ctx)
+        let margin = CGFloat(h) * 0.06
+        ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)
+        ctx.setShadow(offset: .zero, blur: fontSize * 0.3, color: NSColor.black.withAlphaComponent(0.5).cgColor)
+        CTLineDraw(line, ctx)
+        return ctx.makeImage()
     }
 
     /// E19.1: maskeer de output tot een cirkel (transparant eromheen).
@@ -117,17 +240,22 @@ enum PortraitExporter {
         return ctx.makeImage()
     }
 
-    /// Presenteert het macOS share sheet vanaf een view-anker.
-    @MainActor
-    static func share(_ data: Data, from view: NSView?) {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Aaavatar-portrait.png")
-        try? data.write(to: url)
-        let picker = NSSharingServicePicker(items: [url])
-        let anchor = view ?? NSApp.keyWindow?.contentView
-        if let anchor {
-            picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
-        }
+    /// Maskeer de output tot een afgeronde vierkant (Slack/Discord-stijl,
+    /// transparant in de hoeken). Hoekradius ≈ 22% van de zijde.
+    private static func roundedMasked(_ image: CGImage) -> CGImage? {
+        let w = image.width, h = image.height
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.clear(CGRect(x: 0, y: 0, width: w, height: h))
+        let radius = CGFloat(min(w, h)) * 0.22
+        let path = CGPath(roundedRect: CGRect(x: 0, y: 0, width: w, height: h),
+                          cornerWidth: radius, cornerHeight: radius, transform: nil)
+        ctx.addPath(path)
+        ctx.clip()
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 
     // MARK: - Helpers
@@ -182,11 +310,11 @@ enum PortraitExporter {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
         let bounds = CTLineGetImageBounds(line, ctx)
         let margin = CGFloat(w) * 0.03
-        // E24.16: bij een cirkel valt de hoek-positie buiten de zichtbare vorm
-        // → centreer horizontaal en til de tekst in de cirkel (≈10% van onder,
-        // ruim binnen de koorde-breedte op die hoogte). Vierkant = hoek
-        // rechtsonder zoals voorheen.
-        if shape == .circle {
+        // E24.16: bij een cirkel/afgeronde vorm valt de hoek-positie buiten (of in
+        // de wegmaskeerde hoek van) de zichtbare vorm → centreer horizontaal en til
+        // de tekst omhoog (≈10% van onder, ruim binnen de breedte op die hoogte).
+        // Vierkant = hoek rechtsonder zoals voorheen.
+        if shape != .square {
             ctx.textPosition = CGPoint(x: (CGFloat(w) - bounds.width) / 2, y: CGFloat(h) * 0.10)
         } else {
             ctx.textPosition = CGPoint(x: CGFloat(w) - bounds.width - margin, y: margin)

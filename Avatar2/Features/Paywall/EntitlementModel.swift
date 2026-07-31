@@ -6,13 +6,39 @@
 
 import AppKit
 import AvatarKit
+import AvatarUI
 import Foundation
 import Observation
+
+/// E53.7: multi-step sign-in state (e-mail → OTP) buiten de sheet-view.
+@MainActor
+struct SignInFlowState: Equatable {
+    enum Phase: Equatable { case email, otp }
+    var phase: Phase = .email
+    var email = ""
+    var code = ""
+    var emailValidation: DSValidationState = .normal
+    var otpValidation: DSValidationState = .normal
+
+    static let otpLength = 6
+
+    mutating func reset() {
+        phase = .email
+        email = ""
+        code = ""
+        emailValidation = .normal
+        otpValidation = .normal
+    }
+}
 
 @MainActor
 @Observable
 final class EntitlementModel {
     private(set) var account: AccountPayload?
+
+    /// Remote feature flags (E33+). Default = allEnabled zodat de app nooit
+    /// kapot gaat als de CMS onbereikbaar is bij startup.
+    private(set) var featureFlags: RemoteFeatureFlags = .allEnabled
 
     var isPaywallPresented = false
     /// Op=op-toast (HTTP 402 / credits op): toast eerst, paywall op tik.
@@ -30,8 +56,17 @@ final class EntitlementModel {
     private(set) var workingContext: WorkingContext?
 
     /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
-    enum CloudGate: Equatable { case enableOnline, signIn }
+    enum CloudGate: Equatable { case signIn }
     var cloudGate: CloudGate?
+
+    /// E53.7: sign-in flow-state op het model — overleeft sheet-recreatie bij
+    /// tab-/vensterwissel (OTP + e-mail blijven staan).
+    var signInFlow = SignInFlowState()
+
+    /// Privacy Tier Picker: elevation modal wanneer feature hogere tier vereist.
+    var privacyElevation: PrivacyElevationRequest?
+    /// Deep-link naar Settings (ShellView opent deze pagina).
+    var openSettingsPage: SettingsPage?
 
     /// Jaar als default-anker ("2 months free") — zelfde besluit als v1:
     /// het betere-waardepad is het pad zonder kliks.
@@ -59,9 +94,16 @@ final class EntitlementModel {
     /// BackendClient houdt `auth` unowned vast; dit model borgt de levensduur.
     private let auth: AuthService
 
-    init(auth: AuthService) {
+    /// `backendSession` is de E47.1-testseam: tests injecteren een
+    /// URLProtocol-stub-sessie zodat elke backend-call stubbaar is. De
+    /// default is exact wat `BackendClient` zelf zou kiezen — geen
+    /// gedragsverandering voor bestaande call sites.
+    init(auth: AuthService, backendSession: URLSession = TLSPinning.pinnedShared) {
         self.auth = auth
-        self.backend = BackendClient(auth: auth)
+        self.backend = BackendClient(auth: auth, session: backendSession)
+        auth.onSignedIn = { [weak self] in
+            Task { await self?.refresh() }
+        }
         #if DEBUG
         // Smoke-run-haak (E15.5): zet de dev-vlag vóór de first render i.p.v.
         // in een .task — twee post-render state-writes in hetzelfde frame
@@ -74,7 +116,15 @@ final class EntitlementModel {
     }
 
     var isProActive: Bool {
-        account?.tier == .pro && account?.subscriptionStatus == .active
+        // Spiegelt v1 `ProEntitlement.isPro` (tier != nil) én de server-
+        // short-circuit in /v1/import-claim (`if (sub)` — past_due telt mee).
+        // Alleen `.active` eisen maakte grace-period (`.lapsed`) onterecht Starter.
+        account?.tier == .pro
+    }
+
+    /// Top-up-ladder in de paywall: alleen bij actief betaald abonnement.
+    var showsTopupRoute: Bool {
+        isProActive && account?.subscriptionStatus == .active
     }
 
     /// E15.5: dev-allowlisted account → toont de Advanced model-picker.
@@ -96,7 +146,7 @@ final class EntitlementModel {
         #if DEBUG
         if debugForceTopup { return true }
         #endif
-        return isProActive
+        return showsTopupRoute
     }
 
     #if DEBUG
@@ -116,6 +166,35 @@ final class EntitlementModel {
     var freeImportsRemaining: Int? { account?.freeImportsRemaining }
     var monthlyResetAt: Date? { account?.monthlyResetAt }
 
+    /// 14.7 (audit B8): de refill-datum, maar alléén als hij in de toekomst
+    /// ligt. `subscriptions.current_period_end` kan server-side stale raken
+    /// (gemiste Stripe-webhook-delivery) — een datum in het verleden is dan
+    /// een leugen ("Refills on 4 Jun 2026"). De UI valt in dat geval terug
+    /// op periodloze copy ("Refills monthly with your plan").
+    var upcomingMonthlyResetAt: Date? {
+        guard let reset = monthlyResetAt, reset > .now else { return nil }
+        return reset
+    }
+
+    /// Aftellende quota-tekst ("X left of Y" / "N credits") — één bron voor de
+    /// topbar én de left-nav (PoC). Pro: resterende credits over de maand-grant;
+    /// top-ups stapelen erbovenop (geen vaste noemer) → kale balans. Free: rest
+    /// van de lifetime-cap.
+    var quotaSummary: String {
+        if isProActive {
+            let quota = monthlyQuota
+            if quota > 0, creditsRemaining <= quota {
+                return "\(creditsRemaining) left of \(quota)"
+            }
+            return "\(creditsRemaining) credits"
+        }
+        if let free = freeImportsRemaining {
+            let remaining = max(0, min(FreeTier.maxPortraits, free))
+            return "\(remaining) left of \(FreeTier.maxPortraits)"
+        }
+        return ""
+    }
+
     // MARK: - Account-pagina (E15.3)
 
     var accountEmail: String? { auth.email }
@@ -125,6 +204,32 @@ final class EntitlementModel {
     func signOutAccount() {
         auth.signOut()
         account = nil
+    }
+
+    // MARK: - Delete account (E15.7, audit C7 — GDPR art. 17)
+
+    /// Loopt zolang de server-side wipe bezig is (disable de rij-knop).
+    private(set) var isDeletingAccount = false
+
+    /// Verwijdert het account definitief via `/v1/account/delete` (cancelt
+    /// Stripe-subs, wist de Supabase-user) en logt bij succes lokaal uit.
+    /// De lokale bibliotheek (portretten/banners op deze Mac) blijft bewust
+    /// staan — die is van de gebruiker, niet van het account.
+    /// Faalt de wipe, dan blijft de sessie intact en meldt de fout-toast dat
+    /// een retry veilig is (het endpoint is idempotent).
+    @discardableResult
+    func deleteAccount() async -> Bool {
+        guard !isDeletingAccount else { return false }
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        do {
+            try await backend.deleteAccount()
+            signOutAccount()
+            return true
+        } catch {
+            presentError("Couldn't delete your account. Please try again — nothing was left half-deleted.")
+            return false
+        }
     }
 
     // MARK: - Sign-in (E18.1) — e-mail + OTP vanuit Account/gate
@@ -165,8 +270,13 @@ final class EntitlementModel {
     /// Anoniem-vriendelijk: zonder token valt /v1/account terug op de
     /// device-grant-lookup. Offline of fout → state blijft staan.
     func refresh() async {
-        if let payload = try? await backend.me() {
+        async let accountFetch = backend.me()
+        async let flagsFetch = backend.featureFlags()
+        if let payload = try? await accountFetch {
             account = payload
+        }
+        if let flags = try? await flagsFetch {
+            featureFlags = flags
         }
     }
 
@@ -183,12 +293,31 @@ final class EntitlementModel {
 
     // MARK: - E18.3 fout-toast
 
+    /// E44.1 (audit B2/B3): auto-dismiss-duur van de fout-toast. 4s was
+    /// makkelijk te missen — een gemiste colorise-fout oogde live als "er
+    /// gebeurt niets". Een échte fout moet minimaal 8s leesbaar blijven
+    /// (plan-DoD). Constante hier (niet inline in `Avatar2App`) zodat de
+    /// ondergrens testbaar is.
+    static let errorToastDuration: Duration = .seconds(8)
+
     func presentError(_ message: String) {
         errorToast = message
     }
 
     func dismissErrorToast() {
         errorToast = nil
+    }
+
+    /// E44.2 (audit B2): zichtbaar faalpad voor een geslaagde server-call
+    /// (HTTP 200) waarvan de bytes niet tot een afbeelding decoderen. De
+    /// server kan op dat pad al een credit hebben afgeschreven, dus naast de
+    /// fout-toast hoort er een `refresh()` zodat het saldo in de QuotaBadge
+    /// klopt — het stille `guard … else { return }`-pad produceerde alle
+    /// Colorise-symptomen tegelijk (geen resultaat, geen zichtbare fout,
+    /// saldo lijkt onveranderd terwijl er wél afgeschreven kan zijn).
+    func presentCloudResultFailure(_ message: String) async {
+        presentError(message)
+        await refresh()
     }
 
     func presentWorking(title: String, messages: [String]) {
@@ -199,35 +328,48 @@ final class EntitlementModel {
         workingContext = nil
     }
 
-    // MARK: - E18.2 contextuele cloud-feature-gate
+    // MARK: - Privacy Tier Picker gate
 
-    /// Mag een cloud-/Pro-feature draaien? Zo niet, toont de juiste pop-up in
-    /// volgorde: (1) online-modellen uit → vraag aanzetten; (2) niet ingelogd
-    /// → sign-in; (3) ingelogd zonder Pro/credits → upgrade. Dev-unlimited en
-    /// credit-houders mogen door.
-    func allowCloudFeature() -> Bool {
-        if PrivacyPreferences2.shared.mode == .localOnly {
-            cloudGate = .enableOnline
+    /// Mag een AI-feature draaien? Zo niet: elevation modal, sign-in of paywall.
+    @discardableResult
+    func allowAIFeature(_ feature: AIFeature) -> Bool {
+        switch PrivacyGate.evaluate(feature, entitlement: self) {
+        case .allowed:
+            return true
+        case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
             return false
-        }
-        if !isSignedIn {
+        case .needsSignIn:
             cloudGate = .signIn
             return false
+        case .needsCredits:
+            requestUpgrade()
+            return false
         }
-        if isProActive || isDevUnlimited || creditsRemaining > 0 {
-            return true
-        }
-        requestUpgrade()
-        return false
     }
 
-    func enableOnlineModels() {
-        PrivacyPreferences2.shared.mode = .cloudAllowed
-        cloudGate = nil
+    func dismissPrivacyElevation() {
+        privacyElevation = nil
+    }
+
+    func openPrivacySettings() {
+        privacyElevation = nil
+        openSettingsPage = .aiModels
     }
 
     func dismissCloudGate() {
         cloudGate = nil
+    }
+
+    /// E53.7: open de gedeelde sign-in sheet (Account + cloud-gate).
+    func presentSignIn() {
+        cloudGate = .signIn
+    }
+
+    /// Expliciet sluiten — wis ook flow-state.
+    func closeSignIn() {
+        cloudGate = nil
+        signInFlow.reset()
     }
 
     /// E14.2: free-tier importgate (3 lifetime-afbeeldingen, source-agnostic).
@@ -236,6 +378,14 @@ final class EntitlementModel {
     /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
     /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
     func claimImport() async -> Bool {
+        #if DEBUG
+        // Smoke-runs (`--smoke-store` e.d.) draaien op een geïsoleerde store maar
+        // delen het echte account; deze bypass houdt de gate uit de flow-smokes
+        // zonder server-claims te verbruiken.
+        if ProcessInfo.processInfo.arguments.contains("--bypass-import-gate") {
+            return true
+        }
+        #endif
         do {
             let resp = try await backend.claimImport()
             if !resp.allowed {

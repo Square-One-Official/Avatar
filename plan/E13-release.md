@@ -83,3 +83,66 @@ DB-migraties 013 + 014 door Thierry in Supabase gedraaid (2026-06-14). **fill_bo
 bewust** en geldt nu ook voor live v1. Rest: Payload `messages`-tabellen via avatar-admin-deploy
 (push:true) — apart, wacht-op-Thierry.
 
+## 13.5 — Sparkle app-breed initialiseren + achtergrondcheck bij launch
+- status: done
+- team: INFRA
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding C1).
+**Wat:** `UpdateManager` (en dus `SPUUpdater.start()`) wordt uitsluitend
+geconstrueerd als `@State` van `SettingsAboutPage.swift:19` — bij app-launch bestaat
+er géén updater, dus de "Automatic updates"-toggle belooft iets dat alleen gebeurt
+terwijl het About-scherm zichtbaar is. `checkForUpdatesInBackground()` heeft nul
+call sites (dood). Elk About-bezoek maakt bovendien een **nieuwe** `SPUUpdater` aan
+op dezelfde bundle — Sparkle verwacht er één per proces; een tweede `start()` kan
+falen (belandt stil in `state = .error`). Voor een DMG-only app is dit het enige
+update-kanaal → release-kritisch.
+**Voorstel:** één app-brede `UpdateManager` (bv. `@State` in `Avatar2App`, doorgeven
+via Environment); bij launch `checkForUpdatesInBackground()` aanroepen. About
+consumeert dezelfde instance i.p.v. een eigen.
+**DoD:** beide targets bouwen; een fresh launch triggert een achtergrond-update-check
+zonder dat About geopend hoeft te worden; tests groen; Result-regel.
+
+**Result:** Gedaan 2026-07-02 (branch v2/e13-5-sparkle). `Avatar2App` bezit nu dé
+app-brede `UpdateManager` (`@State`, gebouwd in `init`) en geeft hem via
+`.environment(updates)` door; `SettingsAboutPage` consumeert die via
+`@Environment(UpdateManager.self)` — geen per-view `SPUUpdater` meer (één per proces,
+zoals Sparkle eist). Bij launch roept een `.task` `checkForUpdatesInBackgroundAtLaunch()`
+aan: eenmalig per proces (guard tegen venster-heropen), respecteert de "Automatic
+updates"-toggle, en zet observeerbaar bewijs (`lastBackgroundCheckRequest`) + een
+`.notice`-logbreadcrumb ("Launch background update check requested (E13.5)",
+subsystem `nl.squareone.aaavatar2`). De echte `SPUUpdater` zit achter een nieuw
+`UpdaterEngine`-seam (SparkleUpdaterEngine in prod, no-op in de unit-test-host zodat
+`xcodebuild test` nooit een echte updater/netwerkcheck start, fake in tests). Nieuw:
+`Avatar2Tests/UpdateManagerTests.swift` (6 tests: één engine-start, launch-check
+precies één keer, toggle-uit → geen check, doorgeef-gedrag, canCheckForUpdates-mirror).
+Geverifieerd: beide targets bouwen; Avatar2-tests, AvatarKit (89) en AvatarUI (37)
+groen; fresh launch van de Debug-build logt de launch-check zonder dat About open was
+(via `/usr/bin/log stream`).
+
+
+## 13.6 — AuthSessionFileStorage: token-write faalt bij vergrendeld scherm [INFRA]
+- status: done
+- owner: INFRA (2026-07-12, branch v2/e13-13.6)
+- team: INFRA
+- blockedBy: —
+
+Gevonden tijdens de E53.2-DoD (2026-07-12, ~02:10): `AuthSessionFileStorage.store`
+schrijft met `[.atomic, .completeFileProtection]`; zodra het scherm vergrendeld is
+(`CGSSessionScreenIsLocked`) faalt élke zulke write met EPERM ("mktemp failed …
+errno 1", regel 37) — live gereproduceerd met een minimale `Data.write`:
+`.atomic` slaagt, `.atomic + .completeFileProtection` faalt bij lock, en dezelfde
+5 `AuthSessionStorageTests` die om 01:36/02:04 groen waren falen om 02:10 (scherm
+op slot) in élke worktree, óók buiten de sandbox.
+**Gevolg in productie:** een Supabase-token-refresh terwijl de Mac vergrendeld is
+(app draait door) kan zijn sessie niet persisteren → verklaart mogelijk de
+sessie-herstel-klachten die 921b1e7 (Pro grace-period) aan de symptoomkant dempt.
+**Voorstel:** file-protection-klasse heroverwegen voor dit pad — bv. schrijf met
+`.atomic` + `posixPermissions 0o600` (zoals nu al ná de write gezet wordt) en laat
+`.completeFileProtection` vallen (macOS-keybag-semantiek ≠ iOS), óf vang de fout
+en herkans na unlock (NSWorkspace.screensDidWakeNotification). Testflank: de 5
+AuthSessionStorageTests draaien alleen betrouwbaar met ontgrendeld scherm —
+documenteer dat in de test of maak de write-optie injecteerbaar.
+**DoD:** beide targets bouwen; AuthSessionStorageTests groen mét en zonder
+vergrendeld scherm (of expliciet gedocumenteerde lock-gate); Result-regel.
+**Result:** ✅ `.completeFileProtection` uit `AuthSessionFileStorage.store` (alleen nog `.atomic` + de bestaande 0600/0700-permissies) — confidentialiteit komt al van de AES-GCM-envelop met Keychain-sleutel, de protection-class voegde niets toe en blokkeerde writes bij dichte keybag; rationale als comment op de write. ✅ Geverifieerd ónder vergrendeld scherm (`CGSSessionScreenIsLocked=true`): AuthSessionStorageTests 6/6 groen waar vóór de fix 5/6 faalden met EPERM — de lock-conditie zelf was het bewijs. ✅ build-v2.sh volledig groen (idem vergrendeld). ⚠ v1 heeft dezelfde bug (`Avatar/Services/FileAuthStorage.swift:56`) — niet aangeraakt (v1 bevroren, geen SHARED-story); apart besluit Thierry of dit een SHARED-fix waard is.

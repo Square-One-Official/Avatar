@@ -118,15 +118,22 @@ extension DSEditPanelTests {
         let top = pixel(cg, x: 400, y: 40)
         XCTAssertGreaterThan(top.r, 180, "foto hoort bovenin te staan: \(top)")
 
-        // Toolbar-zone (onderste 64pt, gemeten náást de glass-cirkel —
-        // de materiaallagen geven in ImageRenderer artefactkleuren):
-        // nooit foto- of paneelpixels.
-        for y in [600 - 12, 600 - 32, 600 - 56] {
-            for x in [100, 700] {
-                let p = pixel(cg, x: x, y: y)
-                XCTAssertFalse(p.r > 180 && p.g < 80, "foto lekt in toolbar-zone op (\(x),\(y)): \(p)")
-                XCTAssertFalse(p.b > 180 && p.r < 80, "paneel lekt in toolbar-zone op (\(x),\(y)): \(p)")
-            }
+        // Besluit Thierry (2026-06-24): het canvas loopt door tot de onderrand en
+        // de toolbar ZWEEFT eroverheen — geen eigen rij, dus geen lege band onder
+        // de toolbar. Twee invarianten:
+        //  (1) Onder de gezwevende capsule (midden) dekt de toolbar de foto af →
+        //      géén puur rood. De capsule is Background.card (licht/donker per
+        //      thema), nooit (r>180, g<80).
+        for y in [600 - 24, 600 - 40] {
+            let p = pixel(cg, x: 400, y: y)
+            XCTAssertFalse(p.r > 180 && p.g < 80, "toolbar dekt de foto niet af op (400,\(y)): \(p)")
+        }
+        //  (2) Het canvas loopt door tot de rand: aan de zijkanten (buiten de
+        //      smalle capsule) en in de gap onder de capsule blijft de foto (rood)
+        //      zichtbaar — bewijs dat er géén band de canvas afkapt.
+        for (x, y) in [(60, 600 - 24), (740, 600 - 24), (400, 600 - 4)] {
+            let p = pixel(cg, x: x, y: y)
+            XCTAssertTrue(p.r > 180 && p.g < 80, "canvas hoort door te lopen tot de rand op (\(x),\(y)): \(p)")
         }
 
         // Paneel-zone: E18.22 — het paneel OVERLAPT nu de onderkant van de

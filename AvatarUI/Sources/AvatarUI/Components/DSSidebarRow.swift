@@ -56,7 +56,7 @@ public struct DSSidebarRow<Avatar: View>: View {
                 if isMultiSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundStyle(DSColor.Action.primary)
+                        .foregroundStyle(DSColor.Action.primaryForeground)
                 }
             }
             .padding(DSSpacing.gap2)
@@ -72,14 +72,14 @@ public struct DSSidebarRow<Avatar: View>: View {
                     }
                     // E19.4: lime rand bij multi-select.
                     if isMultiSelected {
-                        shape.strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                        shape.strokeBorder(DSColor.Action.primaryForeground, lineWidth: DSBorderWidth.medium)
                     }
                 }
             }
         }
         .buttonStyle(DSStateOpacityButtonStyle())
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: isHovering)
+        .animation(DSMotion.micro, value: isHovering)
         .accessibilityLabel(Text(role.map { "\(name), \($0)" } ?? name))
     }
 }

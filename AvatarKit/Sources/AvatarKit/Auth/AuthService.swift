@@ -27,6 +27,12 @@ public final class AuthService {
 
     public var isSignedIn: Bool { accessToken != nil }
 
+    /// Wordt aangeroepen zodra een sessie async hersteld wordt (nil → token).
+    /// EntitlementModel hangt hieraan om /v1/account opnieuw te fetchen —
+    /// `.onChange(of: isSignedIn)` op een computed property via een nested
+    /// @Observable triggert niet betrouwbaar bij launch.
+    public var onSignedIn: (@MainActor () -> Void)?
+
     /// The shared Supabase client. Exposed zodat andere services (bv. een
     /// toekomstige realtime-feature) dezelfde sessiestore hergebruiken.
     @ObservationIgnored
@@ -88,8 +94,12 @@ public final class AuthService {
         do {
             let response = try await supabase.auth.verifyOTP(email: email, token: code, type: .email)
             if let session = response.session {
+                let hadToken = accessToken != nil
                 accessToken = session.accessToken
                 self.email = session.user.email
+                if !hadToken && accessToken != nil {
+                    onSignedIn?()
+                }
             }
         } catch {
             lastError = friendlyMessage(error)
@@ -102,7 +112,22 @@ public final class AuthService {
         lastError = nil
     }
 
+    #if DEBUG
+    /// Test-seam (E04.8): laat unit-tests een sessie simuleren zonder
+    /// Supabase-netwerk — spiegelt alleen de eager-flip van `verifyCode`/
+    /// `signOut`. Alleen in DEBUG-builds aanwezig.
+    public func debugSetSession(accessToken: String?, email: String? = nil) {
+        self.accessToken = accessToken
+        self.email = email
+    }
+    #endif
+
     public func signOut() {
+        // Eager-clear, spiegelt de eager-flip in `verifyCode`: de UI reflecteert
+        // direct "uitgelogd" i.p.v. te wachten op de async `authStateChanges`-
+        // stream (zelfde race-les). De stream bevestigt het daarna idempotent.
+        accessToken = nil
+        email = nil
         Task {
             try? await supabase.auth.signOut()
         }
@@ -117,8 +142,13 @@ public final class AuthService {
             guard let self else { return }
             for await (_, session) in self.supabase.auth.authStateChanges {
                 await MainActor.run {
+                    let hadToken = self.accessToken != nil
                     self.accessToken = session?.accessToken
                     self.email = session?.user.email
+                    let hasToken = self.accessToken != nil
+                    if !hadToken && hasToken {
+                        self.onSignedIn?()
+                    }
                 }
             }
         }

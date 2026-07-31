@@ -2,8 +2,8 @@
 // canvas-toolbar-dropdowns (caret-loos, custom float) ALS de bottom-panelen
 // (DSEditPanel), zodat top en bottom identiek ogen: subtiel glas (in-window-
 // blur + donkere card-tint), een dunne rand (divider) en de DS-radius +
-// schaduw. Vervangt de inline-stijl die DSEditPanel had en die de systeem-
-// `.popover` (mét pijltje) niet kon delen.
+// schaduw. Gebruik `dsDropdownMenu` / overlay — niet `.popover(arrowEdge:)`
+// — anders krijg je systeempijl + dubbele buitenrand.
 
 import SwiftUI
 

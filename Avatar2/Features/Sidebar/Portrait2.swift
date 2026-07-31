@@ -23,6 +23,28 @@ final class Portrait2 {
     /// dit i.p.v. de cutout. Optioneel + externalStorage; bestaande rijen
     /// (migratie default nil) verbergen de compare-knop.
     @Attribute(.externalStorage) var originalData: Data?
+    /// Of `cutoutData` nog een schone isolatie van de originele foto is (zo ja:
+    /// true) of dat een generatieve edit de pixels heeft vervangen (false). Stuurt
+    /// "Remove background": bij true her-isoleren we de ORIGINELE foto (volle
+    /// kleurcontext = scherpste haar-matte, gelijk aan de import), bij false het
+    /// huidige beeld zelf (anders zou je de edit weggooien). Default true (verse
+    /// import); elke generatieve cutout-overschrijving zet 'm op false.
+    var cutoutDerivesFromOriginal: Bool = true
+    /// Het laatste VOLLE generatieve resultaat (onderwerp + door de AI toegevoegde
+    /// achtergrond), vóór isolatie — bewaard zodat "Remove background" het later met
+    /// ORMBG schoon kan her-isoleren (nieuw haar behouden, per-ongeluk-achtergrond
+    /// weg). Niet voor Face-edits (die hergebruiken de alpha). nil = geen generatieve
+    /// edit te her-isoleren; wordt gewist zodra de cutout weer een schone
+    /// origineel-isolatie is. ~1 vol beeld per generatief-bewerkt portret.
+    @Attribute(.externalStorage) var editSourceData: Data?
+    /// Stabiele signature (`Portrait2.cutoutSignature`) van de `cutoutData` waarvan
+    /// `editSourceData` de bron is. Stempel om staleness te detecteren: wijkt de
+    /// signature van de huidige `cutoutData` hiervan af (bv. na een undo/redo of een
+    /// Match Lighting die de cutout terugzette/verving), dan hoort `editSourceData`
+    /// niet meer bij dit beeld → "Remove background" negeert het (geen edit-resurrectie).
+    /// Een content-signature i.p.v. alleen `count` zodat twee verschillende cutouts met
+    /// toevallig gelijke grootte niet vals matchen.
+    var editSourceCutoutSig: Int = 0
 
     /// Canvas-transform (E06.4) in 1024-units canvasruimte (v1-conventie):
     /// het cutout-beeld tekent op (offsetX, offsetY) × scale binnen het
@@ -68,10 +90,15 @@ final class Portrait2 {
     var boardOrder: Int = 0
     var boardPlaced: Bool = false
 
+    /// PoC (left-nav): de map waarin dit portret is ingedeeld (Portraits-
+    /// galerij). Optionele to-one; de inverse + delete-rule wonen op
+    /// `Folder2.portraits`. nil = "Unfiled". Lichtgewicht migratie via nil.
+    var folder: Folder2?
+
     /// E24.33: Effects-cache op het portret. `effectBaseData` = de cutout van
     /// vóór er een effect werd toegepast ("None"/origineel voor de Effects-
     /// feature, eenmalig vastgelegd). `effectActiveRaw` = het actieve effect
-    /// (RemoteEffect.key), nil = None. `effectCacheData` = JSON van
+    /// (RemoteEffect.key), nil = None. `effectCacheData` = binaire plist van
     /// [key: PNG-Data] met de al gegenereerde resultaten → schakelen tussen
     /// None/effecten is INSTANT en kost geen nieuwe credits (alleen het refresh-
     /// icoon hergenereert bewust). Lichtgewicht migratie via de defaults.
@@ -79,15 +106,63 @@ final class Portrait2 {
     var effectActiveRaw: String?
     @Attribute(.externalStorage) var effectCacheData: Data?
 
-    /// E24.33: de effect-cache als [key: PNG-Data] (JSON in `effectCacheData`).
+    /// E24.33: de effect-cache als [key: PNG-Data] in `effectCacheData`.
+    /// E49.3: opslag = binaire plist (Data blijft rauw) i.p.v. JSON, dat élke
+    /// PNG base64'de (+33% opslag). Lezen valt terug op JSON voor portretten
+    /// die vóór deze wissel zijn geschreven; de eerstvolgende set herschrijft
+    /// als plist.
     var effectCache: [String: Data] {
         get {
-            guard let effectCacheData,
-                  let decoded = try? JSONDecoder().decode([String: Data].self, from: effectCacheData)
-            else { return [:] }
-            return decoded
+            guard let effectCacheData else { return [:] }
+            if let decoded = try? PropertyListDecoder()
+                .decode([String: Data].self, from: effectCacheData) {
+                return decoded
+            }
+            let json = try? JSONDecoder().decode([String: Data].self, from: effectCacheData)
+            return json ?? [:]
         }
-        set { effectCacheData = try? JSONEncoder().encode(newValue) }
+        set {
+            let encoder = PropertyListEncoder()
+            encoder.outputFormat = .binary
+            effectCacheData = try? encoder.encode(newValue)
+        }
+    }
+
+    /// De gestylede VOLLE afbeelding (incl. gestylede achtergrond) van het ACTIEVE
+    /// effect — gebruikt als Original-achtergrondlaag zodat de backdrop bij het
+    /// effect past. Sinds effects de volle originele foto styleren (i.p.v. de
+    /// cutout) ÍS de `effectCache`-waarde dat volle beeld. nil = geen actief effect
+    /// → val terug op de rauwe originele foto.
+    /// In-memory cache (niet gepersisteerd/geobserveerd) zodat herhaalde reads
+    /// niet telkens de hele effect-cache-JSON parsen — zelfde patroon als
+    /// `BannerDoc.layers`. Sleutel = actief effect + bron-bytes; bij wijziging mist
+    /// de cache en herberekent.
+    @Transient @ObservationIgnored private var cachedEffectBg: Data? = nil
+    @Transient @ObservationIgnored private var cachedEffectBgActive: String? = nil
+    @Transient @ObservationIgnored private var cachedEffectBgSource: Data? = nil
+
+    var effectBackgroundData: Data? {
+        guard let key = effectActiveRaw, let effectCacheData else { return nil }
+        if cachedEffectBgActive == key, cachedEffectBgSource == effectCacheData {
+            return cachedEffectBg
+        }
+        // Alleen de ACTIEVE entry uitpakken i.p.v. via `effectCache` de héle
+        // [key: PNG]-dict te decoderen. E49.3: opslag is binaire plist
+        // (PropertyListSerialization geeft [key: Data] zonder base64-stap);
+        // JSON-pad blijft als leesfallback voor pre-E49.3-portretten, waar
+        // JSONEncoder `Data` als base64-string schreef.
+        var decoded: Data?
+        if let plist = try? PropertyListSerialization
+            .propertyList(from: effectCacheData, options: [], format: nil) as? [String: Data] {
+            decoded = plist[key]
+        } else if let object = try? JSONSerialization.jsonObject(with: effectCacheData) as? [String: String],
+                  let base64 = object[key] {
+            decoded = Data(base64Encoded: base64)
+        }
+        cachedEffectBg = decoded
+        cachedEffectBgActive = key
+        cachedEffectBgSource = effectCacheData
+        return decoded
     }
 
     /// E24.31: "Original"-achtergrond. Sinds 2026-06-23 (Thierry) = gebruik de
@@ -105,6 +180,26 @@ final class Portrait2 {
     /// portret, undo'baar. Zonder gekozen achtergrond valt het render-time terug
     /// op de originele foto. Lichtgewicht migratie via de default (false).
     var portraitBlur: Bool = false
+
+    /// E34: Banner-achtergrond voor de social-preview-covers (LinkedIn/X). APART
+    /// van de portret-`background`: de banner is wijd (4:1 / 3:1) en kan de
+    /// portret-achtergrond MATCHEN óf ervan afwijken (eigen kleur/afbeelding). De
+    /// "precies één modus"-invariant woont in `bannerBackground`/`setBannerBackground`
+    /// (spiegelt `background`). Default = `.matchPortrait` (zero-config: de banner
+    /// volgt de avatar-achtergrond). Lichtgewicht migratie via de defaults
+    /// (`bannerMatchesBackground` = true, kleur/afbeelding nil).
+    var bannerColorHex: String?
+    @Attribute(.externalStorage) var bannerImageData: Data?
+    var bannerMatchesBackground: Bool = true
+
+    /// E40.2: stabiele verwijzing (encoded `PersistentIdentifier`) naar de
+    /// `BannerDoc` waarvan de huidige `.image`-achtergrond is overgenomen — nil
+    /// als de achtergrond niet (meer) van een banner komt. Maakt een "Update
+    /// background"-actie mogelijk wanneer die banner later in de Studio wijzigt
+    /// (de opgeslagen bytes lopen dan achter op `BannerDoc.previewImageData`).
+    /// Wordt door elke `setBackground` gewist en alléén door de banner-bron weer
+    /// gezet. Lichtgewicht migratie via de default (nil).
+    var backgroundBannerID: String?
 
     init(
         name: String = "",
@@ -161,8 +256,12 @@ final class Portrait2 {
         return .transparent
     }
 
-    /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`.
+    /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`. Wist
+    /// ook de E40.2-bannerkoppeling; de banner-bron zet 'm daarna expliciet
+    /// terug zodat alleen een uit-een-banner overgenomen achtergrond gekoppeld
+    /// blijft.
     func setBackground(_ background: PortraitBackground) {
+        backgroundBannerID = nil
         switch background {
         case .transparent:
             useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = nil
@@ -174,6 +273,50 @@ final class Portrait2 {
             useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = data
         }
         touch()
+    }
+
+    /// E34: de banner-keuze als ÉÉN waarde-object (spiegelt `background`).
+    /// Precies één van: match-portret (default), kleur (hex) of afbeelding
+    /// (upload/gradient/CMS/AI — wijde PNG-bytes).
+    var bannerBackground: BannerBackground {
+        if bannerMatchesBackground { return .matchPortrait }
+        if let bannerColorHex { return .color(bannerColorHex) }
+        if let bannerImageData { return .image(bannerImageData) }
+        return .matchPortrait
+    }
+
+    /// Zet de banner-modus (wist de andere velden) + `touch()`.
+    func setBannerBackground(_ banner: BannerBackground) {
+        switch banner {
+        case .matchPortrait:
+            bannerMatchesBackground = true; bannerColorHex = nil; bannerImageData = nil
+        case .color(let hex):
+            bannerMatchesBackground = false; bannerColorHex = hex; bannerImageData = nil
+        case .image(let data):
+            bannerMatchesBackground = false; bannerColorHex = nil; bannerImageData = data
+        }
+        touch()
+    }
+
+    /// Stabiele, launch-onafhankelijke content-signature van cutout-bytes voor de
+    /// `editSourceCutoutSig`-staleness-stempel. Swift's `Hasher` is per-launch
+    /// gerandomiseerd → onbruikbaar om te persisteren; deze FNV-1a over grootte +
+    /// ~256 verspreide bytes is deterministisch en botst vrijwel nooit tussen twee
+    /// verschillende cutouts. Goedkoop (constante samples), alleen op knop-tik/edit.
+    static func cutoutSignature(_ data: Data) -> Int {
+        var h: UInt64 = 1469598103934665603
+        let prime: UInt64 = 1099511628211
+        h = (h ^ UInt64(truncatingIfNeeded: data.count)) &* prime
+        data.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
+            guard buf.count > 0 else { return }
+            let step = max(1, buf.count / 256)
+            var i = 0
+            while i < buf.count {
+                h = (h ^ UInt64(buf[i])) &* prime
+                i += step
+            }
+        }
+        return Int(bitPattern: UInt(truncatingIfNeeded: h))
     }
 }
 
@@ -187,9 +330,20 @@ enum PortraitBackground: Equatable {
     case image(Data)
 }
 
+/// E34: de banner-achtergrond-modus (social-preview-covers). Precies één van:
+/// match-portret (leid af uit `Portrait2.background`), kleur (hex) of afbeelding
+/// (upload/gradient/CMS/AI — wijde PNG-bytes). Een aparte enum i.p.v.
+/// `PortraitBackground`: de banner heeft een match-modus die het portret niet
+/// kent, is wijd-aspect, en mag bewust van de portret-achtergrond afwijken.
+enum BannerBackground: Equatable {
+    case matchPortrait
+    case color(String)
+    case image(Data)
+}
+
 /// E24.14: niet-destructieve Adjust-laag (brightness/contrast/saturation/
 /// temperature) als waarde-object. Neutraal = identiteit.
-struct PortraitAdjust: Equatable {
+struct PortraitAdjust: Equatable, Sendable {
     var brightness: Double = 0
     var contrast: Double = 1
     var saturation: Double = 1

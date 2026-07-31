@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * The core CMS document. One Announcement drives:
@@ -20,10 +21,15 @@ export const Announcements: CollectionConfig = {
     defaultColumns: ["title", "slug", "publishedAt", "audience", "frequency"],
   },
   access: {
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only. The backend's validated API key
+    // (`Authorization: users API-Key <key>`) satisfies `req.user`, so this
+    // covers the macOS-app read path. Do NOT also allow on mere header
+    // presence: an unvalidated `Authorization: ...` header would have exposed
+    // audienceEmails (end-user PII) to any anonymous caller.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {

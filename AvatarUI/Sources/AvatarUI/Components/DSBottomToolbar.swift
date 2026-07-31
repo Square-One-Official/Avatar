@@ -18,19 +18,55 @@ import SwiftUI
 public enum DSToolbarSize: Sendable {
     case regular
     case compact
+    /// Naast de FigJam-naam-chip (28pt) — losse pillen, geen outer capsule.
+    case chip
 
     /// Pil-hoogte (knop).
-    public var height: CGFloat { self == .regular ? 40 : 32 }
+    public var height: CGFloat {
+        switch self {
+        case .regular: 40
+        case .compact: 32
+        case .chip: 28
+        }
+    }
     /// Icoongrootte: SF Symbol `.font`-punt én Phosphor frame-zijde.
-    public var iconPointSize: CGFloat { self == .regular ? 18 : 15 }
+    public var iconPointSize: CGFloat {
+        switch self {
+        case .regular: 18
+        case .compact: 15
+        case .chip: 15
+        }
+    }
     /// Labelstijl in de pil.
-    public var textStyle: DSTextStyle { self == .regular ? .labelBase : .labelSmall }
+    public var textStyle: DSTextStyle {
+        switch self {
+        case .regular: .labelBase
+        case .compact, .chip: .labelSmall
+        }
+    }
     /// Horizontale padding binnen de pil.
-    public var horizontalPadding: CGFloat { self == .regular ? DSSpacing.gap3 : DSSpacing.gap2 }
+    public var horizontalPadding: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap3
+        case .compact: DSSpacing.gap2
+        case .chip: DSSpacing.gap3
+        }
+    }
     /// Ruimte tussen icoon/label/chevron én tussen pillen onderling.
-    public var itemSpacing: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    public var itemSpacing: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap2
+        case .compact, .chip: DSSpacing.gap1
+        }
+    }
     /// Inset van de capsule rondom de pillen.
-    public var containerPadding: CGFloat { self == .regular ? DSSpacing.gap2 : DSSpacing.gap1 }
+    public var containerPadding: CGFloat {
+        switch self {
+        case .regular: DSSpacing.gap2
+        case .compact: DSSpacing.gap1
+        case .chip: 0
+        }
+    }
     /// Schaal op pressed (identiek voor beide maten).
     public var pressScale: CGFloat { 0.97 }
 }
@@ -135,7 +171,7 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
             // re-enablen bij `.result` zacht terugkomt i.p.v. te poppen.
             .disabled(!toolsEnabled)
             .opacity(toolsEnabled ? DSOpacity.strong : DSOpacity.disabled)
-            .animation(.easeOut(duration: 0.2), value: toolsEnabled)
+            .animation(DSMotion.base, value: toolsEnabled)
 
             // Accessoires (undo/redo/compare) blijven buiten de Card-capsule.
             accessory
@@ -162,6 +198,14 @@ extension DSBottomToolbar where Accessory == EmptyView {
     }
 }
 
+/// Rust-oppervlak van een capsule-toolbar-knop. `.ghost` = transparant tot hover
+/// (onderste/bovenste toolbar). `.secondary` = `background/neutral-stronger` in
+/// rust — voor losse header-row pillen naast de FigJam-naam-chip.
+public enum CapsuleToolSurface {
+    case ghost
+    case secondary
+}
+
 /// E31.1 + E32: gelabelde capsule-pil (icoon + optioneel label + optionele
 /// chevron) uit `floatingToolbar` (4114:978). Gedeeld door de onderste toolbar
 /// (`.regular`) én de bovenste canvas-toolbar (`.compact`) — generiek over de
@@ -177,6 +221,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
     private let showChevron: Bool
     private let isActive: Bool
     private let size: DSToolbarSize
+    private let surface: CapsuleToolSurface
     private let action: () -> Void
 
     /// Generieke init: de caller levert een kant-en-klare icoon-view (Phosphor-pad).
@@ -185,6 +230,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
         showChevron: Bool = false,
         isActive: Bool = false,
         size: DSToolbarSize = .regular,
+        surface: CapsuleToolSurface = .ghost,
         action: @escaping () -> Void,
         @ViewBuilder icon: () -> Icon
     ) {
@@ -192,6 +238,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
         self.showChevron = showChevron
         self.isActive = isActive
         self.size = size
+        self.surface = surface
         self.action = action
         self.icon = icon()
     }
@@ -201,7 +248,12 @@ public struct DSCapsuleToolButton<Icon: View>: View {
             HStack(spacing: size.itemSpacing) {
                 icon
                 if let label {
-                    Text(label).dsTextStyle(size.textStyle)
+                    Text(label)
+                        .dsTextStyle(size.textStyle)
+                        // Een toolbar-pil-label mag nooit wrappen; zonder dit perst
+                        // een krappe parent-HStack langere labels naar twee regels.
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 if showChevron {
                     Image(systemName: "chevron.down")
@@ -211,7 +263,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
             .padding(.horizontal, size.horizontalPadding)
             .frame(height: size.height)
         }
-        .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, pressScale: size.pressScale))
+        .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, surface: surface, pressScale: size.pressScale))
         .accessibilityLabel(Text(label ?? ""))
     }
 }
@@ -225,11 +277,12 @@ public extension DSCapsuleToolButton where Icon == _DSFontSizedIcon {
         showChevron: Bool = false,
         isActive: Bool = false,
         size: DSToolbarSize = .regular,
+        surface: CapsuleToolSurface = .ghost,
         action: @escaping () -> Void
     ) {
         self.init(
             label: label, showChevron: showChevron, isActive: isActive,
-            size: size, action: action
+            size: size, surface: surface, action: action
         ) {
             _DSFontSizedIcon(image: image, pointSize: size.iconPointSize)
         }
@@ -240,42 +293,47 @@ public extension DSCapsuleToolButton where Icon == _DSFontSizedIcon {
 /// in `DSToolButton`: ghost in rust, fill op hover/active.
 public struct CapsuleSurfaceStyle: ButtonStyle {
     let isActive: Bool
+    var surface: CapsuleToolSurface = .ghost
     let pressScale: CGFloat
 
-    public init(isActive: Bool, pressScale: CGFloat = 0.97) {
+    public init(isActive: Bool, surface: CapsuleToolSurface = .ghost, pressScale: CGFloat = 0.97) {
         self.isActive = isActive
+        self.surface = surface
         self.pressScale = pressScale
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        CapsuleSurface(isActive: isActive, pressScale: pressScale, configuration: configuration)
+        CapsuleSurface(isActive: isActive, surface: surface, pressScale: pressScale, configuration: configuration)
     }
 
     private struct CapsuleSurface: View {
         let isActive: Bool
+        let surface: CapsuleToolSurface
         let pressScale: CGFloat
         let configuration: ButtonStyle.Configuration
         @State private var isHovering = false
 
         var body: some View {
             configuration.label
-                .foregroundStyle(isActive ? DSColor.Action.primary : DSColor.Foreground.primary)
+                .foregroundStyle(isActive ? DSColor.Action.primaryForeground : DSColor.Foreground.primary)
                 .background(backgroundColor, in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                        .strokeBorder(DSColor.Action.primaryForeground, lineWidth: DSBorderWidth.medium)
                         .opacity(isActive ? DSOpacity.strong : DSOpacity.hidden)
                 }
                 .scaleEffect(configuration.isPressed ? pressScale : 1.0)
                 .onHover { isHovering = $0 }
-                .animation(.easeOut(duration: 0.15), value: isActive)
-                .animation(.easeOut(duration: 0.1), value: isHovering)
-                .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+                .animation(DSMotion.fast, value: isActive)
+                .animation(DSMotion.micro, value: isHovering)
+                .animation(DSMotion.micro, value: configuration.isPressed)
         }
 
         private var backgroundColor: Color {
             DSColor.neutralSurface(
-                pressed: isActive || configuration.isPressed, hovering: isHovering
+                pressed: isActive || configuration.isPressed,
+                hovering: isHovering,
+                base: surface == .secondary ? DSColor.Background.neutralStronger : .clear
             )
         }
     }
@@ -284,13 +342,18 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
 /// E31.1: overflow `⋯`-icoonknop (Icon-Only Button 4114:983, 40×40) die de
 /// secundaire tools in een menu toont. Vertikale dots conform de Figma-render.
 /// Besluit Thierry (2026-06-22): fill transparant in rust, verschijnt op hover
-/// (neutral-stronger). De menu-open-state is op een `Menu`-label niet eenvoudig
-/// beschikbaar; hover-reveal volstaat en is consistent met de pillen.
+/// (neutral-stronger) / pressed (neutral-strongest), identiek aan de pillen.
+///
+/// E-fix (2026-06-24): `.onHover` op een `Menu` vuurt niet op macOS — de
+/// menu-tracking slokt de hover-events op, dus de reveal verscheen nooit ("geen
+/// hover-state"). We renderen het menu nu áls knop (`.menuStyle(.button)`) en
+/// laten de surface via een echte `ButtonStyle` lopen — net als `DSIconButton`
+/// en `DSCapsuleToolButton`. Hover én pressed komen daarmee uit de knop zelf
+/// (betrouwbaar) i.p.v. uit de menu-wrapper.
 struct DSToolbarOverflowButton<ID: Hashable>: View {
     let items: [DSToolbarItem<ID>]
     var actions: [DSToolbarAction] = []
     @Binding var selection: ID?
-    @State private var isHovering = false
 
     // De `⋯` hangt in de onderste (`.regular`) capsule → deel exact die maat
     // (icoon-punt + knophoogte) zodat 'm naast de pillen consistent oogt.
@@ -310,25 +373,50 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                 }
             }
         } label: {
-            // E-fix (2026-06-23): consistent met de pillen i.p.v. een eigen maat.
-            // Icoon = `iconPointSize`/medium (gelijk aan de pil-iconen; was een
-            // dikkere 20px-resizable die uit de rij sprong). Knop = vierkant op
-            // pil-hoogte → icon-only cirkel, afgeleid van de maat-token i.p.v.
-            // een magische gap2.5-padding. Hover-fill = neutral-stronger in een
-            // Circle, identiek aan de pil-hover.
+            // Icoon = `iconPointSize`/medium (gelijk aan de pil-iconen); knop =
+            // vierkant op pil-hoogte → icon-only cirkel. De surface (fill/hover/
+            // pressed/scale) komt uit DSToolbarOverflowButtonStyle.
             Image(systemName: "ellipsis")
                 .font(.system(size: size.iconPointSize, weight: .medium))
                 .rotationEffect(.degrees(90))
-                .foregroundStyle(DSColor.Foreground.primary)
                 .frame(width: size.height, height: size.height)
-                .background(DSColor.neutralSurface(pressed: false, hovering: isHovering), in: Circle())
-                .contentShape(Circle())
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(DSToolbarOverflowButtonStyle(size: size))
         .menuIndicator(.hidden)
         .fixedSize()
-        .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.1), value: isHovering)
         .accessibilityLabel(Text("More tools"))
+    }
+}
+
+/// Ghost icon-button-surface voor de `⋯`-overflow: transparant in rust,
+/// neutral-stronger op hover, neutral-strongest pressed — in een Circle, exact
+/// de ghost-look van `DSIconButton`/de capsule-pillen. Gedreven door een
+/// `ButtonStyle` zodat hij óók als `Menu`-knop (`.menuStyle(.button)`) werkt.
+struct DSToolbarOverflowButtonStyle: ButtonStyle {
+    let size: DSToolbarSize
+
+    func makeBody(configuration: Configuration) -> some View {
+        Surface(size: size, configuration: configuration)
+    }
+
+    private struct Surface: View {
+        let size: DSToolbarSize
+        let configuration: ButtonStyle.Configuration
+        @State private var isHovering = false
+
+        var body: some View {
+            configuration.label
+                .foregroundStyle(DSColor.Foreground.primary)
+                .background(
+                    DSColor.neutralSurface(pressed: configuration.isPressed, hovering: isHovering),
+                    in: Circle()
+                )
+                .scaleEffect(configuration.isPressed ? size.pressScale : 1.0)
+                .contentShape(Circle())
+                .onHover { isHovering = $0 }
+                .animation(DSMotion.micro, value: isHovering)
+                .animation(DSMotion.micro, value: configuration.isPressed)
+        }
     }
 }

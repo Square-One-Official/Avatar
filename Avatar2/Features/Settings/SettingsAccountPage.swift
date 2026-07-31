@@ -8,8 +8,10 @@ import SwiftUI
 
 struct SettingsAccountPage: View {
     @Bindable var entitlement: EntitlementModel
+    @Bindable var model: ShellModel
     /// E18.1: e-mail+OTP-login vanuit Account als je uitgelogd bent.
-    @State private var showSignIn = false
+    /// E53.7: sheet leeft op Avatar2App (entitlement.presentSignIn).
+    /// E53.7: delete-account confirm op FloatingOverlayHost via ShellModel.
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,7 +35,7 @@ struct SettingsAccountPage: View {
                             } else {
                                 // E18.8: sign-in zit nu in de Email-rij i.p.v.
                                 // een los Session-blok.
-                                DSPrimaryButton("Sign in", size: .small) { showSignIn = true }
+                                DSPrimaryButton("Sign in", size: .small) { entitlement.presentSignIn() }
                             }
                         }
                         SettingsRow(
@@ -75,32 +77,44 @@ struct SettingsAccountPage: View {
                 // sign-in zit nu in de Email-rij hierboven.
                 if entitlement.isSignedIn {
                     SettingsSectionCard(title: "Session") {
-                        SettingsRow(
-                            title: "Sign out",
-                            subtitle: "You can sign back in any time with a code"
-                        ) {
-                            DSNeutralButton("Sign out") {
-                                entitlement.signOutAccount()
+                        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                            SettingsRow(
+                                title: "Sign out",
+                                subtitle: "You can sign back in any time with a code"
+                            ) {
+                                DSNeutralButton("Sign out") {
+                                    entitlement.signOutAccount()
+                                }
+                            }
+                            // E15.7 (audit C7): GDPR art. 17 — definitieve
+                            // verwijdering, achter een bevestigingsdialoog
+                            // (zelfde patroon als portret-delete).
+                            SettingsRow(
+                                title: "Delete account",
+                                subtitle: "Permanently removes your account, subscription and credits"
+                            ) {
+                                DSNeutralButton("Delete account…") {
+                                    model.presentation.confirm = .deleteAccount
+                                }
+                                .disabled(entitlement.isDeletingAccount)
                             }
                         }
                     }
                 }
             }
             .padding(.top, DSSpacing.gap8)
-
-            Spacer()
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { await entitlement.refresh() }
-        .sheet(isPresented: $showSignIn) {
-            SignInSheet(entitlement: entitlement)
-        }
     }
 
     private var creditsSubtitle: String {
-        if let reset = entitlement.monthlyResetAt {
+        // 14.7 (audit B8): alleen een toekomstige refill-datum tonen — een
+        // stale `current_period_end` uit het verleden valt terug op de
+        // periodloze copy.
+        if let reset = entitlement.upcomingMonthlyResetAt {
             return "Refills on \(reset.formatted(date: .abbreviated, time: .omitted))"
         }
         return entitlement.isProActive

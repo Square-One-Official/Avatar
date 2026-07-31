@@ -37,8 +37,6 @@ struct SettingsPreferencesPage: View {
                 }
             }
             .padding(.top, DSSpacing.gap8)
-
-            Spacer()
         }
         .padding(.top, 76)
         .padding(.leading, DSSpacing.gap6)
@@ -47,13 +45,24 @@ struct SettingsPreferencesPage: View {
 
     // Figma-dropdown: pill (bg neutral, r-xl, 40 hoog) met label + chevron.
     private var themeMenu: some View {
+        ThemeMenuPill(selection: $appearanceRaw, label: appearance.label)
+    }
+}
+
+private struct ThemeMenuPill: View {
+    @Binding var selection: String
+    let label: String
+
+    @State private var isHovering = false
+
+    var body: some View {
         Menu {
             ForEach(AppearancePreference.allCases) { option in
-                Button(option.label) { appearanceRaw = option.rawValue }
+                Button(option.label) { selection = option.rawValue }
             }
         } label: {
             HStack(spacing: DSSpacing.gap2) {
-                Text(appearance.label)
+                Text(label)
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Image(systemName: "chevron.down")
@@ -62,13 +71,12 @@ struct SettingsPreferencesPage: View {
             }
             .padding(.horizontal, DSSpacing.gap4)
             .frame(height: 40)
-            .background(DSColor.Background.neutral)
+            .background(isHovering ? DSColor.Background.neutralStronger : DSColor.Background.neutral)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl))
             .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
+            .onHover { isHovering = $0 }
+            .animation(DSMotion.micro, value: isHovering)
         }
-        // .button + .plain rendert het eigen label (pill + tekst + chevron
-        // rechts, zoals het frame); borderlessButton verving het door zijn
-        // eigen chevron-links-layout.
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)

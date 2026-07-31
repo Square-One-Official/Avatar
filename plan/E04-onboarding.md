@@ -171,3 +171,41 @@ uit het oude frame).
    fullscreen-formaat; telkens met en zonder paneel — kaart vierkant, niets afgekapt.
 
 **Result:** Canvas-kaart vult nu de foto-slot van DSEditPanelContainer met `.aspectRatio(1, .fit)` + `maxWidth/maxHeight .infinity` (456-cap weg) — altijd vierkant, groeit/krimpt met venster en geopend paneel, fit (nooit clippen); de 3.16-garantie (foto layoutPriority −1) houdt paneel/toolbar buiten schot. DEBUG-haak `--open-panel <tool>`. Smoke-run (scherm ontgrendeld): kaart 1:1 met geopend Edit-paneel, responsief; geen clipping. Beide targets bouwen groen, tests groen.
+
+## 4.8 — Ingelogd pad verliest de privacy-/downloadstap
+- status: done
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B4).
+**Wat:** `verifyCode()` zet bewust `step = .privacy` ("niet meteen afronden", E04.3),
+maar `AuthService.verifyCode` flipt `accessToken`/`isSignedIn` in hetzelfde frame →
+`OnboardingModel.isActive` (`!hasCompleted && !auth.isSignedIn`) wordt meteen
+`false` → `Avatar2App.swift:62` wisselt direct naar `ShellView`. Gevolg: (a)
+ingelogde gebruikers zien de privacy-stap (E04.3) en de downloadstap (E04.6) nooit —
+de online-modellen-keuze blijft stil op default; (b) `markCompleted()` wordt nooit
+aangeroepen, dus `onboarding2.completed` blijft `false`; (c) een latere sign-out via
+Settings dropt de gebruiker terug op de verweesde stap `.privacy` i.p.v. splash;
+(d) `finishSignedIn()` heeft nul call sites (alleen de definitie, grep-geverifieerd).
+Het anonieme pad (skip → privacy → download → `markCompleted`) is wél correct.
+**Voorstel:** `verifyCode()`-succes laten landen op `.privacy` zonder dat `isActive`
+op `isSignedIn` kortsluit zolang `step != .splash` (of: `hasCompleted` ook zetten in
+`verifyCode`-succes, ná de privacy/download-stap expliciet te hebben getoond).
+`finishSignedIn()` verwijderen of daadwerkelijk gebruiken (zie ook E49.1).
+**DoD:** beide targets bouwen; een verse ingelogde sessie doorloopt privacy → download
+vóórdat de Shell mount; sign-out keert terug naar splash, niet naar een tussenstap;
+tests groen; Result-regel.
+
+**Result:** `OnboardingModel.isActive` kortsluit niet meer op `isSignedIn` zodra de
+flow van splash af is (`!hasCompleted && (step != .splash || !isSignedIn)`) — een
+verse sign-in (verifyCode → `.privacy`) doorloopt nu privacy (E04.3) én download
+(E04.6) vóór de Shell mount, en `finishFromDownload()` zet `onboarding2.completed`
+ook in het ingelogde pad; Keychain-herstelde sessies (nog op splash) slaan de flow
+onveranderd over. `finishSignedIn()` (0 call sites) verwijderd (zie E49.1); nieuw
+`resetToSplash()` bij sign-out via `Avatar2App`'s bestaande `onChange(of:
+isSignedIn)` zodat een her-geactiveerde onboarding op splash begint met schone
+invoer i.p.v. de verweesde `.privacy`-stap. DEBUG-test-seam
+`AuthService.debugSetSession` (AvatarKit) + 3 nieuwe OnboardingModel-unit-tests
+(ingelogd-pad actief t/m download, restored-session-skip, resetToSplash); drive-by:
+flaky `testMonthlyResetInFutureIsUpcoming` deterministisch (ISO8601-truncatie i.p.v.
+`.rounded()`). Beide targets bouwen groen, packagetests groen, Avatar2-suite groen.

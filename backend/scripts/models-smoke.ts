@@ -33,4 +33,41 @@ assert.ok(
     return r.requiresCloud && r.credits >= 1 && !!r.models[r.defaultModel];
   }),
 );
+// E41.3 (audit D8): community-modellen MOETEN op een 64-hex versie-hash gepind
+// zijn — een unversioned community-slug kan op replicate.run 404'en. Officiële
+// slugs (google/, openai/, black-forest-labs/, bytedance/, topazlabs/) mogen
+// unversioned.
+{
+  const OFFICIAL_OWNERS = ["google", "openai", "black-forest-labs", "bytedance", "topazlabs"];
+  // E41.4: crystal-upscaler staat 422 "Invalid version or not permitted" op
+  // élke versioned run (de E41.3-hash wás de latest) — dit model kan alleen
+  // unversioned. Bewuste, per-ref uitzondering; geen derde toevoegen zonder
+  // hetzelfde 422-bewijs.
+  const UNVERSIONED_EXCEPTIONS = new Set(["philz1337x/crystal-upscaler"]);
+  const PINNED = /^[a-z0-9_-]+\/[a-z0-9_.-]+:[a-f0-9]{64}$/;
+  for (const f of Object.keys(MODEL_REGISTRY) as Array<keyof typeof MODEL_REGISTRY>) {
+    for (const [key, entry] of Object.entries(MODEL_REGISTRY[f].models)) {
+      const owner = entry.ref.split("/")[0];
+      if (OFFICIAL_OWNERS.includes(owner)) continue;
+      if (UNVERSIONED_EXCEPTIONS.has(entry.ref)) continue;
+      assert.match(
+        entry.ref,
+        PINNED,
+        `community-model ${f}/${key} (${entry.ref}) mist een gepinde versie-hash`,
+      );
+    }
+  }
+  // De Boost-default: topaz — bakeoff-winnaar E41.4 (2026-07-03). Officiële
+  // owner, dus bewust unversioned (geen pin-guard van toepassing).
+  assert.equal(defaultModelRef("upscale"), "topazlabs/image-upscale");
+  // E41.4-bakeoff-armen whitelisted voor dev-overrides; prefixes intact voor
+  // upscaleInputFor (lib/replicate.ts matcht op het slug-prefix).
+  assert.equal(resolveModelOverride("upscale", "topaz", true), "topazlabs/image-upscale");
+  assert.equal(resolveModelOverride("upscale", "google-upscaler", true), "google/upscaler");
+  assert.equal(
+    resolveModelOverride("upscale", "crystal-upscaler", true),
+    "philz1337x/crystal-upscaler",
+  );
+  assert.equal(resolveModelOverride("upscale", "topaz", false), null);
+}
 console.log("models.ts smoke OK");

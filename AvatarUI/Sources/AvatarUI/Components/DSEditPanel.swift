@@ -21,6 +21,7 @@ private struct DSPanelContentHeightKey: PreferenceKey {
 
 public struct DSEditPanel<Content: View>: View {
     private let title: String
+    private let subtitle: String?
     private let credits: String?
     private let content: Content
     private let maxWidth: CGFloat
@@ -33,12 +34,14 @@ public struct DSEditPanel<Content: View>: View {
     /// i.p.v. het paneel op te rekken.
     public init(
         title: String,
+        subtitle: String? = nil,
         credits: String? = nil,
         maxWidth: CGFloat = 600,
         maxContentHeight: CGFloat = 280,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.subtitle = subtitle
         self.credits = credits
         self.maxWidth = maxWidth
         self.maxContentHeight = maxContentHeight
@@ -47,15 +50,23 @@ public struct DSEditPanel<Content: View>: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            HStack {
-                Text(title)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                if let credits {
-                    Spacer()
-                    Text(credits)
-                        .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                HStack {
+                    Text(title)
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    if let credits {
+                        Spacer()
+                        Text(credits)
+                            .dsTextStyle(.labelSmall)
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+                }
+                if let subtitle {
+                    Text(subtitle)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             // E18.15/18.18: één scrollbare kolom die de inhoud hugt — de
@@ -114,6 +125,7 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
     // E-fix: losse acties in de capsule-overflow (`⋯`) zonder eigen paneel.
     private let overflowActions: [DSToolbarAction]
     @Binding private var activeTool: Tool?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // E-fix: schakelt de feature-pillen uit (gedimd) terwijl er niets is om op te
     // werken — bv. tijdens een vervangende import waarin de cutout nog rekent.
     private let toolsEnabled: Bool
@@ -143,40 +155,56 @@ public struct DSEditPanelContainer<Tool: Hashable, Photo: View, Panel: View, Acc
         self.toolbarAccessory = toolbarAccessory()
     }
 
+    /// Ruimte tussen paneel-onderkant en venster-onderkant: zwevende toolbar +
+    /// gap (identiek aan de oude VStack-spacing, maar zonder layout-shift).
+    private var panelBottomClearance: CGFloat {
+        DSToolbarSize.regular.height
+            + DSToolbarSize.regular.containerPadding * 2
+            + DSSpacing.gap2
+    }
+
     public var body: some View {
-        VStack(spacing: DSSpacing.gap2) {
-            // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt
-            // de onderkant i.p.v. de foto te verkleinen.
-            // E24.25-fix: de foto is een ZUSTER van het paneel (geen overlay-
-            // kind van het transitionende paneel) MET een STABIELE identity
-            // (.id) zodat hij niet mee-animeert/faded als `activeTool` wisselt.
-            // Alléén het paneel transitionet (schuift in van onderen); de foto
-            // blijft volledig stabiel — geen korte fade meer bij menu-open.
-            ZStack(alignment: .bottom) {
-                photo
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .id("editorPhoto")
+        // Besluit Thierry (2026-06-24): het canvas loopt door tot de onderrand van
+        // het venster en de toolbar ZWEEFT eroverheen (Figma floatingToolbar) —
+        // i.p.v. een eigen VStack-rij die onder de toolbar een lege Background.app-
+        // band achterliet ("toolbar heeft al een achtergrondkleur"). De foto vult
+        // dus de volle hoogte; paneel + toolbar liggen als bottom-overlay erover.
+        // E18.22: de foto houdt een CONSTANTE maat — het paneel overlapt de
+        // onderkant i.p.v. de foto te verkleinen. STABIELE identity (.id) zodat de
+        // foto niet mee-animeert/faded als `activeTool` wisselt.
+        //
+        // E-fix (motion): toolbar blijft vast onderaan (ZStack); alléén het paneel
+        // slide't. De oude VStack klapte de hoogte dicht terwijl `.move(.bottom)`
+        // naar een verschuivende onderrand rende → hang/stutter bij dismiss.
+        photo
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .id("editorPhoto")
+            .overlay(alignment: .bottom) {
+                ZStack(alignment: .bottom) {
+                    if let tool = activeTool {
+                        panel(tool)
+                            // STABIELE identity over tool-wissels heen. Tool→tool
+                            // is een in-place update; alléén nil ↔ tool triggert slide.
+                            .padding(.bottom, panelBottomClearance)
+                            .id("editPanel")
+                            .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
+                    }
 
-                if let tool = activeTool {
-                    panel(tool)
-                        .padding(.bottom, DSSpacing.gap2)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    DSBottomToolbar(
+                        items: tools, selection: $activeTool,
+                        overflow: overflowTools, overflowActions: overflowActions,
+                        toolsEnabled: toolsEnabled
+                    ) {
+                        toolbarAccessory
+                    }
+                    .fixedSize()
                 }
+                .padding(.bottom, DSSpacing.gap2)
             }
-            // Clip zodat het paneel netjes vanaf de onderrand in schuift.
-            .clipped()
-
-            DSBottomToolbar(
-                items: tools, selection: $activeTool,
-                overflow: overflowTools, overflowActions: overflowActions,
-                toolsEnabled: toolsEnabled
-            ) {
-                toolbarAccessory
-            }
-                .fixedSize()
-        }
-        // E24.25: animeer alléén de paneel-insert/-remove, niet de foto.
-        .animation(.spring(duration: 0.35), value: activeTool)
+            // E24.25: transactie voor paneel-insert/-remove — exit bij dicht,
+            // enter bij open (matcht dsSlide-asymmetrie). Geen hoogte-settle: de
+            // toolbar staat vast, dus geen layout-animatie die de slide verstoort.
+            .dsMotion(activeTool == nil ? DSMotion.exit : DSMotion.enter, value: activeTool)
     }
 }
 
