@@ -93,6 +93,47 @@ final class PersistentPresentationTests: XCTestCase {
         XCTAssertEqual(store.portraitContextMenu, snapshot)
     }
 
+    /// E53.7-afronding: de laatste drie dropdowns die nog op view-`@State` draaiden
+    /// (achtergrond-type, Boost/Remove background-chips, map-standaardachtergrond)
+    /// leven nu in de store, dus overleven ze een view-recreatie.
+    func testMigratedDropdownStateLivesInStore() {
+        let store = UIPresentationStore()
+
+        store.editorBackgroundTypeMenuOpen = true
+        store.editorChipMenu = .boost
+        store.folderBackgroundPickerOpen = true
+
+        // "View opnieuw gebouwd" — de store is de bron, dus de waarden staan er nog.
+        XCTAssertTrue(store.editorBackgroundTypeMenuOpen)
+        XCTAssertEqual(store.editorChipMenu, .boost)
+        XCTAssertTrue(store.folderBackgroundPickerOpen)
+
+        // Eén tegelijk: een ander chip-menu vervangt het vorige, sluit niet alles.
+        store.editorChipMenu = .removeBackground
+        XCTAssertEqual(store.editorChipMenu, .removeBackground)
+        XCTAssertTrue(store.editorBackgroundTypeMenuOpen)
+    }
+
+    /// `dismissAllEphemeral` moet élk vluchtig menu opruimen — een vergeten slot
+    /// laat een dropdown zweven boven een scherm dat er niet meer is.
+    func testDismissAllEphemeralClearsEveryMenuIncludingMigratedOnes() {
+        let store = UIPresentationStore()
+        store.editorBackgroundTypeMenuOpen = true
+        store.editorChipMenu = .boost
+        store.folderBackgroundPickerOpen = true
+        store.leftNavUserMenuOpen = true
+        // Taak-state (geen vluchtig menu) blijft juist wél staan.
+        store.createEffectSheetOpen = true
+
+        store.dismissAllEphemeral()
+
+        XCTAssertFalse(store.editorBackgroundTypeMenuOpen)
+        XCTAssertNil(store.editorChipMenu)
+        XCTAssertFalse(store.folderBackgroundPickerOpen)
+        XCTAssertFalse(store.leftNavUserMenuOpen)
+        XCTAssertTrue(store.createEffectSheetOpen, "een open taak-modal is geen vluchtig menu")
+    }
+
     func testDismissPortraitContextMenuClearsOnlyMenu() throws {
         let store = UIPresentationStore()
         store.editorActiveTool = .background

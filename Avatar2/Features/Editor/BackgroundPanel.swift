@@ -67,7 +67,15 @@ struct BackgroundPanel: View {
     // vernietigd, maar een lopende generatie moet doorlopen én zichtbaar
     // blijven wanneer de gebruiker terugkomt (UX-audit ronde 4).
     @State private var generateSession = BackgroundGenerateSession.shared
-    @State private var showTypeMenu = false
+    /// E53.7: de type-dropdown leeft in de gedeelde store, niet in view-@State —
+    /// zo overleeft 'ie een tab-/vensterwissel (en ruimt `dismissAllEphemeral`
+    /// 'm samen met de andere menu's op).
+    private var showTypeMenu: Binding<Bool> {
+        Binding(
+            get: { presentation.editorBackgroundTypeMenuOpen },
+            set: { presentation.editorBackgroundTypeMenuOpen = $0 }
+        )
+    }
     // E40.1: gemaakte banners als achtergrond-bron (BannerDoc-previews).
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
     private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
@@ -506,7 +514,7 @@ struct BackgroundPanel: View {
             }
         }
         .frame(height: contentHeight)
-        .dsDropdownDismissOverlay(isPresented: $showTypeMenu)
+        .dsDropdownDismissOverlay(isPresented: showTypeMenu)
     }
 
     private var composer: some View {
@@ -544,7 +552,7 @@ struct BackgroundPanel: View {
     }
 
     private var typeChip: some View {
-        Button { showTypeMenu.toggle() } label: {
+        Button { showTypeMenu.wrappedValue.toggle() } label: {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: generateSession.type.iconName)
                     .font(.system(size: 11, weight: .medium))
@@ -562,7 +570,7 @@ struct BackgroundPanel: View {
         .help("Choose what to generate")
         // Caret-loos DS-dropdown (geen systeem-popover), boven de chip zoals
         // Notion — onder de chip zit alleen nog de paneel-voet.
-        .dsDropdownMenu(isPresented: $showTypeMenu, anchorHeight: 28, placement: .above) {
+        .dsDropdownMenu(isPresented: showTypeMenu, anchorHeight: 28, placement: .above) {
             DSContextMenuPanel(minWidth: 150) {
                 ForEach(BackgroundGenerateType.allCases) { type in
                     DSMenuRow(
@@ -571,7 +579,7 @@ struct BackgroundPanel: View {
                         shortcut: type == generateSession.type ? "✓" : nil
                     ) {
                         generateSession.type = type
-                        showTypeMenu = false
+                        presentation.editorBackgroundTypeMenuOpen = false
                     }
                 }
             }

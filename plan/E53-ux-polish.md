@@ -29,7 +29,7 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 - status: in_progress
 - owner: FEAT (2026-07-12, checkpoint op branch v2/e53-2-banner-studio)
 - team: FEAT
-- blockedBy: E53.7-landing (UX2 raakt BannerStudioView, in bewerking in die sessie)
+- blockedBy: — (E53.7 is af; UX2 kan gebouwd worden)
 
 **Voortgang (checkpoint 2026-07-12; builds + tests groen op 5 na — die 5
 (AuthSessionStorageTests) zijn de vergrendeld-scherm-flake, zie E13.6, los van
@@ -37,7 +37,7 @@ deze story):** UX1 ✅ compleet —
 placeholder-sweep v2 (legacy "Your text" matcht mee, geforceerde herbake van
 bestaande bakes, stempel pas ná voltooide run, Home-hook; +2 tests). UX2 ⏳
 alleen de aanzet (`fitCameraScale`-helper + `userZoomed`-vlag) — fit-op-open/
-resize + zoom-chip in BannerStudioView bouwen zodra E53.7 gemerged is.
+resize + zoom-chip in BannerStudioView kan nu gebouwd worden (E53.7 is af).
 NB: banners blijven achter `bannersEnabled` (besluit Thierry 2026-07-12) —
 prioriteit t.o.v. 53.1/53.4 dienovereenkomstig.
 
@@ -50,7 +50,7 @@ fit-to-window bij open + zoom-chip (hergebruik E27.10-recept).
 en de Studio past in het venster; tests groen; Result-regel.
 
 ## 53.3 — DSThumbnailCard: AX + hover als één DS-story (UX28 + UX26, P0)
-- status: done (merge naar v2-main wacht op vrije werkboom/E53.7)
+- status: done (gemerged naar v2-main)
 - owner: DS (2026-07-12, branch v2/e53-3-kaart-ax)
 - team: DS
 - blockedBy: —
@@ -98,3 +98,71 @@ relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
 - UX34/UXS-29: traffic lights + sidebar-toggle zweven boven de sidebar-kaart —
   sidebar-materiaal doortrekken tot de venstertop + toggle in de sidebar-header.
 **DoD:** beide targets bouwen, tests groen, visuele smoke dark+light; Result-regel.
+
+## 53.7 — Persistente presentatie: modals/menu's overleven een tab- of vensterwissel
+- status: done
+- owner: FEAT+DS
+- team: FEAT+DS
+- blockedBy: —
+
+**Wat:** presentatiestate zat verspreid in view-`@State` op diepe child-views. Bij
+elke view-recreatie (tab-/lens-wissel, `studioFullBleed`-flip, vensterwissel) werd
+die state weggegooid: open modals sloten zichzelf, dropdowns klapten dicht en een
+half ingevulde flow (sign-in, pre-stylize-gate) was weg. Oplossing: presentatie-
+state naar modellen (`UIPresentationStore`, `ShellModel`, `EntitlementModel`),
+sheets alleen op stabiele hosts (`Avatar2App`/`ShellView`) via `dsPersistentSheet`,
+en zwevende overlays via `FloatingOverlayHost` i.p.v. systeem-popovers. De regel
+staat als cursor-rule [ds-persistent-presentation.mdc](../.cursor/rules/ds-persistent-presentation.mdc).
+
+**DoD:** beide targets bouwen, tests groen, geen presentatie-`@State` meer in
+child-views, geen ruwe `.sheet` buiten de stabiele hosts; Result-regel.
+
+**Result:** Het gros landde als WIP-snapshot `49433d4` (2026-07-12, bewust gecommit
+zodat vier wachtende story-branches konden mergen): `UIPresentationStore` +
+`FloatingOverlayHost` + `DSPersistentSheet`, sheets verplaatst naar `ShellView`
+(export, rename incl. board-bulk, manage-backgrounds, pre-stylize-gate),
+sign-in-flow naar `EntitlementModel`, en de cursor-rule. **Afgerond 2026-07-31**
+met de laatste drie dropdowns die nog op view-`@State` draaiden:
+- ✅ `BackgroundPanel.showTypeMenu` → `presentation.editorBackgroundTypeMenuOpen`.
+  Het store-slot bestond al (en werd al opgeruimd in `dismissAllEphemeral`) maar
+  niets schreef ernaar — de panel-`@State` was de echte bron. Nu een `Binding` op
+  de store.
+- ✅ `EditColorPanel.openMenu` (Boost- / Remove background-chipdropdown) → nieuw
+  `presentation.editorChipMenu`; `ChipMenu` van `private` naar internal + `Sendable`.
+  Doorgegeven op alle drie de call sites (EditorView + beide BoardView-panelen),
+  zodat het board niet stil kapotgaat als die chips daar later wél bedraad worden.
+- ✅ `PortraitsGalleryView.folderBackgroundPickerOpen` → nieuw
+  `presentation.folderBackgroundPickerOpen`; deze view wordt bij élke lens-wissel
+  opnieuw gebouwd, dus dit menu viel juist het vaakst om.
+Beide nieuwe slots opgeruimd in `dismissAllEphemeral()`. Verificatie: `.sheet(`
+komt in `Avatar2/` nergens meer voor buiten `ShellView`/`Avatar2App` (op de
+E25.1-debug-haak na) en er staat geen `.popover(` meer in de app. Tests: twee
+nieuwe cases in
+[PersistentPresentationTests](../Avatar2Tests/PersistentPresentationTests.swift) —
+de gemigreerde state overleeft een view-recreatie en `dismissAllEphemeral` ruimt
+élk vluchtig menu op terwijl een open taak-modal blijft staan. `scripts/build-v2.sh`
+volledig groen.
+
+**Bewust NIET meegenomen:** `EditColorPanel.showHybridCoachmark` blijft view-`@State`
+— dat is een inline banner ín het paneel (geen modal/overlay) die zichzelf opnieuw
+aanbiedt via `noteHybridFallbackIfNeeded()`; hem naar de store tillen levert geen
+gedragswinst op. De Apple-Intelligence-sheet in `ImagePlaygroundEditChip` presenteert
+nog vanuit een child-view: dat is een systeem-sheet van het ImagePlayground-framework
+met een eigen levenscyclus, en verplaatsen vergt de bron-afbeelding + completion door
+de store plumben — belegd als eigen story E53.8.
+
+## 53.8 — Apple Intelligence-sheet op een stabiele host
+- status: backlog
+- team: FEAT
+- blockedBy: —
+
+**Wat:** `ImagePlaygroundEditChip` (in `EditColorPanel`) presenteert de
+`imagePlaygroundGenerationSheet` vanuit een diepe child-view — tegen regel 2 van
+[ds-persistent-presentation.mdc](../.cursor/rules/ds-persistent-presentation.mdc)
+in. Een tab-wissel terwijl Image Playground open staat gooit de sheet weg, inclusief
+de generatie eronder. Verplaats de presentatie naar `ShellView` met de bronafbeelding
++ completion via `UIPresentationStore` (zelfde patroon als de Create-effect-modal in
+E09.3). Neem `ImagePlaygroundGenerateSwatch` meteen mee — die staat forward-built maar
+heeft nog geen call site.
+**DoD:** de sheet overleeft een tab-wissel; beide targets bouwen; tests groen;
+Result-regel.

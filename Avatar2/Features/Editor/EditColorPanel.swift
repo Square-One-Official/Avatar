@@ -29,7 +29,8 @@ enum BoostMode: Equatable, Sendable {
 }
 
 /// Welke chip-dropdown momenteel open is. Eén tegelijk; nil = dicht.
-private enum ChipMenu: Hashable { case boost, removeBackground }
+/// E53.7: internal (niet private) omdat de state in `UIPresentationStore` leeft.
+enum ChipMenu: Hashable, Sendable { case boost, removeBackground }
 
 /// Levert de scherm-bounds van elke menu-chip omhoog naar het paneel, zodat het
 /// dropdown-paneel BUITEN de gemaskeerde scroll-rij (en dus ongecliped) onder de
@@ -73,6 +74,8 @@ struct EditColorPanel: View {
     var onRemoveBackground: () -> Void = {}
     /// Tier 2: Image Playground bewerken met huidige cutout als seed.
     var entitlement: EntitlementModel? = nil
+    /// E53.7: host voor de chip-dropdown-state (zie `openMenu`).
+    var presentation: UIPresentationStore? = nil
     var onAppleEdit: (Data) -> Void = { _ in }
     var showAppleEdit: Bool = false
     var isPro: Bool = false
@@ -106,7 +109,12 @@ struct EditColorPanel: View {
     // laatste keuze. Welk menu open is wordt buiten de scroll-rij gerenderd (zie
     // `chipMenuOverlay`), zodat de masker/clip van de horizontale rij het niet
     // afkapt — anders zou de gebruiker een lege dropdown zien.
-    @State private var openMenu: ChipMenu?
+    /// E53.7: welk chip-menu open is leeft in de gedeelde store i.p.v. view-@State,
+    /// zodat een tab-/vensterwissel het menu niet wegslaat.
+    private var openMenu: ChipMenu? {
+        get { presentation?.editorChipMenu }
+        nonmutating set { presentation?.editorChipMenu = newValue }
+    }
     @State private var boostMode: BoostMode =
         PrivacyPreferences2.shared.effectiveTier == .onDevice ? .local : .online
     /// Alléén de lopende download-voortgang van het High-quality-model (ORMBG).

@@ -600,6 +600,7 @@ struct EditorView: View {
             onFillBody: runFillBody,
             onRemoveBackground: runRemoveBackground,
             entitlement: entitlement,
+            presentation: model.presentation,
             onAppleEdit: runAppleIntelligenceEdit,
             showAppleEdit: AppleIntelligenceAvailability.supportsApplePrivateCloud,
             isPro: entitlement?.isProActive ?? false,

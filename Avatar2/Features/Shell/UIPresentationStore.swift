@@ -82,6 +82,8 @@ final class UIPresentationStore {
     var editorActiveTool: EditorTool?
     var editorBackgroundTypeMenuOpen = false
     var editorBackgroundColorPickerOpen = false
+    /// Boost-/Remove background-chip-dropdown in het Edit-paneel (E41.2).
+    var editorChipMenu: ChipMenu?
 
     // MARK: Board session
     var boardCanvasMenu: CanvasToolbarMenu?
@@ -102,6 +104,11 @@ final class UIPresentationStore {
 
     // MARK: Banner gallery
     var bannerGalleryMenu: ContextMenuRequest?
+
+    // MARK: Portraits gallery
+    /// Map-standaardachtergrond-dropdown in de gallery-kop (E53.7: was
+    /// PortraitsGalleryView-@State en verdween bij elke view-recreatie).
+    var folderBackgroundPickerOpen = false
 
     // MARK: Social preview
     var previewPicker: PreviewPicker?
@@ -155,6 +162,7 @@ final class UIPresentationStore {
     func dismissAllEphemeral() {
         editorCanvasMenu = nil
         editorBackgroundTypeMenuOpen = false
+        editorChipMenu = nil
         boardCanvasMenu = nil
         boardBatchMenu = nil
         bannerFloatingMenu = nil
@@ -162,6 +170,7 @@ final class UIPresentationStore {
         leftNavFolderMenu = nil
         portraitContextMenu = nil
         bannerGalleryMenu = nil
+        folderBackgroundPickerOpen = false
         colorPicker = nil
     }
 }

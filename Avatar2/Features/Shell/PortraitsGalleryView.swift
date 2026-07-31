@@ -20,7 +20,14 @@ struct PortraitsGalleryView: View {
 
     /// Gemeten hoogte van de zwevende header → top-inset voor elke lens.
     @State private var headerHeight: CGFloat = 0
-    @State private var folderBackgroundPickerOpen = false
+    /// E53.7: leeft in de gedeelde store, niet in view-@State — de gallery-view
+    /// wordt bij lens-/tabwissel opnieuw gebouwd en sloeg het menu anders weg.
+    private var folderBackgroundPickerOpen: Binding<Bool> {
+        Binding(
+            get: { model.presentation.folderBackgroundPickerOpen },
+            set: { model.presentation.folderBackgroundPickerOpen = $0 }
+        )
+    }
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
@@ -65,11 +72,11 @@ struct PortraitsGalleryView: View {
                            alignment: .top)
                     .clipped()
                     .padding(.top, headerHeight)
-                if folderBackgroundPickerOpen {
+                if folderBackgroundPickerOpen.wrappedValue {
                     Color.clear
                         .contentShape(Rectangle())
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .onTapGesture { folderBackgroundPickerOpen = false }
+                        .onTapGesture { folderBackgroundPickerOpen.wrappedValue = false }
                 }
                 header
                     .background(
@@ -97,7 +104,7 @@ struct PortraitsGalleryView: View {
         .dsMotion(DSMotion.fast, value: model.isDropTargeted)
         .onChange(of: model.folderBackgroundPickerID) { _, id in
             guard id == model.selectedFolderID else { return }
-            folderBackgroundPickerOpen = true
+            folderBackgroundPickerOpen.wrappedValue = true
             model.folderBackgroundPickerID = nil
         }
     }
@@ -160,7 +167,7 @@ struct PortraitsGalleryView: View {
                         folder: folder,
                         entitlement: entitlement,
                         presentation: model.presentation,
-                        isPickerOpen: $folderBackgroundPickerOpen
+                        isPickerOpen: folderBackgroundPickerOpen
                     )
                 }
             }

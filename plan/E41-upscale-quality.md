@@ -229,7 +229,7 @@ replicate.com/account/billing (~$0.08/beeld verwacht; 6 runs gedraaid).
 401-zonder-auth) — Boost online draait nu Topaz met de anti-halo-pipeline.
 
 ## 41.5 — Twee upscale-tiers: Regular (1 credit) & High quality (3 credits) [INFRA+FEAT]
-- status: done (op branch v2/e41-41.5; app-merge wacht op E53.7 — backend is los deploybaar)
+- status: done (app-kant gemerged naar v2-main 2026-07-12; backend live op prod)
 - owner: INFRA+FEAT (2026-07-12, branch v2/e41-41.5)
 - team: INFRA+FEAT
 - blockedBy: —

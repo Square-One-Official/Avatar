@@ -859,6 +859,7 @@ struct BoardView: View {
                         source: img,
                         initial: first.adjust,
                         onCommit: { _, after in applyAdjustToAll(after) },
+                        presentation: model.presentation,
                         // E29.5 (audit C6): de AI-één-tik-chips zijn hier niet
                         // bedraad (default-lege closures = dode chips) → uit.
                         // Batch-Adjust = alleen de sliders.
@@ -1208,6 +1209,7 @@ struct BoardView: View {
                             initial: node.adjust,
                             onCommit: { _, after in applyAdjustToAll(after) },
                             onRetouch: { retouchNode(node) },
+                            presentation: model.presentation,
                             showRetouch: true,
                             // E29.5 (audit C6): Studio Light/Portrait/Colorise/
                             // Boost/Fill in body zijn op de board niet bedraad
