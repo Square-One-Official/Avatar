@@ -229,20 +229,6 @@ final class BackgroundImageKit {
     }
 }
 
-extension Color {
-    /// #RRGGBB uit deze kleur (best-effort via NSColor in sRGB).
-    var hexRGB: String? {
-        guard let srgb = NSColor(self).usingColorSpace(.sRGB) else { return nil }
-        let r = Int((srgb.redComponent * 255).rounded())
-        let g = Int((srgb.greenComponent * 255).rounded())
-        let b = Int((srgb.blueComponent * 255).rounded())
-        return String(format: "#%02X%02X%02X", r, g, b)
-    }
-
-    init?(hexRGB: String) {
-        var s = hexRGB
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
-        self = BackgroundKit.rgb(v)
-    }
-}
+// UXS-22: `Color.hexRGB` / `Color(hexRGB:)` leven nu in AvatarUI (DSColor),
+// samen met de 8-cijfer-variant die BannerDocRenderer nodig had. Deze kopie
+// accepteerde alleen 6 cijfers — dat gaf per call site een ander antwoord.

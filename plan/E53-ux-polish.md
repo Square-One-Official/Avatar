@@ -217,14 +217,105 @@ gedraaid; die vergt de systeeminstelling omzetten op Thierry's Mac. De guard +
 tests borgen dat er geen route meer ís die de vlag negeert, maar het oogtest-deel
 staat nog open.
 
-## 53.5 — P1/P2-restlijst (backlog)
-- status: backlog
+## 53.5 — P1/P2-restlijst
+- status: done
+- owner: FEAT+DS (2026-08-01, branch v2/e53-5-rest)
 - team: FEAT+DS
-- blockedBy: 53.1
+- blockedBy: —
 
 De overige P1/P2-bevindingen uit `AUDIT-UX-2026-07-02.md` (UX8, UX12–UX27,
-UX31–UX33) — oppakken in een volgende polish-ronde; UX6 (update-flow
-relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
+UX31–UX33) — UX6 (update-flow relaunchAndInstall zonder call sites) hoort bij
+E13-releasewerk.
+
+**Result (2026-08-01):** alle 15 openstaande UXS-stories af, in drie batches.
+UX31 (toast-duur/hover) was al gedaan in 53.1, UX30/UX33 in 53.4.
+
+**Batch A — DS-hygiëne**
+- **UXS-22:** er stonden drie hex-parsers (DSColor numeriek, BackgroundKit
+  alleen 6 cijfers, BannerDocRenderer 6+8) — drie antwoorden op dezelfde rare
+  invoer. Nu één `DSHexColor` + `Color(hexRGB:)`/`.hexRGB` in AvatarUI. De
+  renderer houdt alleen z'n zwart-fallback: een render mag niet stoppen op één
+  kapotte kleurwaarde.
+- **UXS-21:** 11 ad-hoc `.shadow`-recepten met zeven radius/offset-combinaties →
+  `DSShadow.card`/`.overlay`/`.handle` + `.dsShadow(_:scale:)`. De scale-param
+  dekt canvas-elementen die met de camera meeschalen. `PlatformChrome` houdt
+  bewust z'n eigen proportionele recept (schaalt met de mockup-diameter).
+- **UXS-26:** `.padding(.top, 76)` op vijf Settings-pagina's →
+  `ShellMetrics.settingsPageTopInset`.
+- **UXS-18:** 12× `Color.accentColor` in Banners → `DSColor.Action.primary`,
+  plus de systeemgroene scale-handle (de enige groene UI in een lime-DS).
+- **UXS-23:** destructieve rijen spraken drie talen (systeemrood, muted, DS-token)
+  → overal `Foreground.destructive`. De "Remove"-rij in de image-toolbar was
+  zelfs onopvallender dan "Replace image" ernaast.
+- **UXS-24:** "Tap the canvas" → "Click the" (dit is een Mac), twee NL-dev-strings
+  naar Engels, Colour→Color in UI-copy. De `watercolour`-CASE blijft — die
+  rawValue kan in opgeslagen keuzes/CMS-keys zitten; alleen het label is US.
+- **UXS-14:** de Colorise-chip toonde alleen een Pro-slot, geen prijs; nu via
+  CreditMeter zoals z'n buren. ("Restore body" stond al nergens meer in UI.)
+
+**Batch B — componenten**
+- **UXS-25:** `DSSegmentedControl` bestond al, maar paywall en
+  ManageBackgroundsSheet hadden elk een eigen kopie — zonder hover, toetsenbord
+  of selected-trait. Component kreeg hover (alleen op níet-gekozen segmenten) en
+  ←/→ zonder wrap-around (op een tweeknops-toggle laat wrappen de selectie
+  stuiteren); beide call sites gemigreerd.
+- **UXS-15:** de board had geen ⌫/Esc terwijl de Studio ze wél had. ⌫ loopt door
+  de bestaande E46-bevestiging. Batch↔single-toolbar en paneel-wissel snapten;
+  nu dsScaleFade via `dsMotion` (dus reduce-motion-bewust).
+
+**Batch C — panels, hints, menu's, Home**
+- **UXS-13:** de Temperature-slider klipte tegen de panelrand. De oorzaak zat in
+  `DSSlider`: de thumb liep van x=0 tot x=width, dus op beide uiteinden stak z'n
+  halve breedte buiten het frame — het viel op Temperature het meest op omdat die
+  als enige een signed range heeft. Baan loopt nu van `thumbRadius` tot
+  `width − thumbRadius`, en `setValue` spiegelt dat zodat klikken op de uiterste
+  rand nog steeds min/max geeft. Kaartlabels kregen `lineLimit(1)` + breedte-cap
+  ("Reduce wrinkles" liep over de kaartrand). Face-panel gebruikte al
+  DSThumbnailCard op Effects-celmaat en de chip-rij was al scrollend.
+- **UXS-17:** de kale "Hold to compare"-tekst was met de toolbar-unificatie al
+  verdwenen — maar daarmee gaf niets meer aan dát je het origineel ziet. Nu een
+  DS-capsule "Original" die alleen tijdens de hold staat (geen permanente chrome,
+  dus geen "verberg na N keer"-teller nodig). De naam-pill (UX19) bleek al op
+  `Foreground.primary` + `neutralSurface` te staan.
+- **UXS-12:** "Check for Updates…" zat alleen in Settings → About; nu ook in het
+  app-menu, via dezelfde UpdateManager. ⌘, en ⌘U waren al app-breed.
+- **UXS-9:** Home deelde op "de nieuwste is speciaal" — altijd precies één
+  portret in Recent (als paginabrede hero), al het andere Earlier, óók als dat
+  ene van maanden geleden was. Nu tijdgebaseerd: Recent = bewerkt in de laatste 7
+  dagen (max 6), rest Earlier, beide in hetzelfde raster. Paginatitel is "Home";
+  Recent/Earlier zijn sectiekoppen. Home en de gallery delen nu hun grid-maten
+  (waren 4 vs 3 kolommen, dus dezelfde kaart oogde per scherm anders).
+  First-use ↔ overzicht wisselt met dsScaleFade. **De hero-kaart is dus weg** —
+  dat is een zichtbare wijziging aan het hoofdscherm; de HeroMorph uit E36 was al
+  opgeruimd (`d488bbd`), dus er lag geen lopend werk onder.
+- **UXS-20 (scope-correctie):** de audit telde ~74 `.font(.system(size:))`-sites
+  als typografie, maar **77 van de 83 zitten op een `Image`/`DSIcon`** — dat is
+  icoongrootte, een ándere as dan tekststijl. Ze op tekst-tokens mappen zou de
+  twee juist verder door elkaar halen. Daarom: de **5 echte tekst-sites** (alle in
+  BannerTextFloatingToolbar) zijn nu DS-tekststijlen, en er is een aparte
+  `DSIconSize`-schaal met LeftNavView als referentie-migratie. De resterende
+  icoon-sites staan als **E53.9** — mechanisch, maar het is een eigen sweep.
+
+**Tests (+7):** `HomeSectionsTests` borgt de nieuwe tijdsplitsing (gisteren =
+Recent, oud = Earlier, grensgeval, cap, elk portret precies één keer, gedeelde
+grid-maten).
+
+**Openstaand:** de visuele her-run van de audit-screenshotserie (panels op
+1100×760, Home breed/smal, studio-selectie) is niet gedraaid — dat vergt de app
+live met seed-data. De logica-kant is met tests geborgd; het oogdeel blijft.
+
+## 53.9 — Icoongrootte-tokens app-breed (rest van UXS-20)
+- status: backlog
+- team: DS
+- blockedBy: —
+
+**Wat:** `DSIconSize` (xs/sm/base/lg/xl) bestaat en LeftNavView is erop
+gemigreerd als referentie. Resteren ~72 `.font(.system(size:))`-sites op
+`Image`/`DSIcon` in Features — mechanisch mappen op de dichtstbijzijnde token,
+mét oogtest per scherm (een icoon dat een halve punt verspringt valt op in een
+toolbar-rij). Banner-canvas-tekst (user content) blijft uitgezonderd.
+**DoD:** `grep -rn "\.font(\.system(size: [0-9]" Avatar2/Features` = alleen
+user-content-render-code; beide targets bouwen; tests groen.
 
 ## 53.6 — Shell-chrome & hover-fixes (UX34–UX36, meldingen Thierry 2026-07-02)
 - status: done

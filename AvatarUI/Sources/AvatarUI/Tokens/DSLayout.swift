@@ -108,4 +108,46 @@ public struct DSShadow: Sendable {
         radius: 80,
         spread: -40
     )
+
+    // UXS-21: de app had 11 ad-hoc `.shadow(color: .black.opacity(…))`-recepten
+    // met zeven verschillende radius/offset-combinaties. Drie semantische
+    // niveaus dekken ze allemaal; zwart-met-alpha blijft de kleur (een schaduw
+    // hoort donker te zijn in béíde themes, dus géén thema-token).
+    /// Rustende oppervlakken die net van de achtergrond loskomen: kaarten,
+    /// zwevende pillen, thumbnails.
+    public static let card = DSShadow(
+        color: .black.opacity(0.12),
+        offset: CGSize(width: 0, height: 4),
+        radius: 12,
+        spread: 0
+    )
+
+    /// Chrome dat bóven content zweeft: floating toolbars, popovers, sheets.
+    public static let overlay = DSShadow(
+        color: .black.opacity(0.25),
+        offset: CGSize(width: 0, height: 6),
+        radius: 16,
+        spread: 0
+    )
+
+    /// Handles/markers óp een canvas — nét genoeg om van het beeld te lichten.
+    public static let handle = DSShadow(
+        color: .black.opacity(0.25),
+        offset: CGSize(width: 0, height: 1),
+        radius: 1,
+        spread: 0
+    )
+}
+
+public extension View {
+    /// Past een DS-schaduwtoken toe. `scale` schaalt radius én offset mee voor
+    /// canvas-elementen die met de camera meeschalen (inverse zoom).
+    func dsShadow(_ shadow: DSShadow, scale: CGFloat = 1) -> some View {
+        self.shadow(
+            color: shadow.color,
+            radius: shadow.radius * scale,
+            x: shadow.offset.width * scale,
+            y: shadow.offset.height * scale
+        )
+    }
 }

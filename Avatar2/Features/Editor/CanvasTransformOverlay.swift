@@ -94,7 +94,7 @@ struct CanvasTransformOverlay: View {
         Circle()
             .fill(DSColor.Background.card)
             .overlay(Circle().strokeBorder(DSColor.Action.primaryForeground, lineWidth: 1.5))
-            .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+            .dsShadow(.handle)
             .frame(width: 10, height: 10)
             .position(pos)
             .gesture(

@@ -95,7 +95,7 @@ struct GalleryLens: View {
                 .frame(width: 40, height: 40)
                 .background(DSColor.Background.card, in: Circle())
                 .overlay(Circle().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
-                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+                .dsShadow(.card, scale: 0.5)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

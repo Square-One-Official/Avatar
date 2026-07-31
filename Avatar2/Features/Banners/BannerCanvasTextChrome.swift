@@ -147,7 +147,7 @@ struct BannerCanvasTextChrome: View {
 
     private func selectionBox(_ rect: CGRect) -> some View {
         Rectangle()
-            .strokeBorder(Color.accentColor, lineWidth: 1.5)
+            .strokeBorder(DSColor.Action.primary, lineWidth: 1.5)
             .frame(width: rect.width + 8, height: rect.height + 8)
             .contentShape(Rectangle())
             .focusable(!isEditing)
@@ -180,7 +180,7 @@ struct BannerCanvasTextChrome: View {
     /// is -1 (links) of +1 (rechts); de box blijft op het anker gecentreerd.
     private func sideHandle(rect: CGRect, side: CGFloat) -> some View {
         Circle()
-            .fill(Color.accentColor)
+            .fill(DSColor.Action.primary)
             .frame(width: 11, height: 11)
             .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
             .contentShape(Circle())
@@ -207,7 +207,8 @@ struct BannerCanvasTextChrome: View {
 
     private func scaleHandle(rect: CGRect) -> some View {
         Circle()
-            .fill(Color.green)
+            // UXS-18: was systeemgroen — de enige groene UI in een lime-DS.
+            .fill(DSColor.Action.primary)
             .frame(width: 12, height: 12)
             .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
             .contentShape(Circle())

@@ -144,7 +144,7 @@ struct BannerTextFloatingToolbar: View {
         .background(
             Capsule(style: .continuous)
                 .fill(DSColor.Background.card)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .dsShadow(.card)
         )
     }
 
@@ -169,8 +169,9 @@ struct BannerTextFloatingToolbar: View {
         Button {
             toggleMenu(formatMenuKind)
         } label: {
+            // UXS-20: DS-tekststijl i.p.v. een los puntgetal uit de schaduwschaal.
             Text("Aa")
-                .font(.system(size: 15, weight: .semibold))
+                .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(minWidth: 28)
         }
@@ -195,7 +196,7 @@ struct BannerTextFloatingToolbar: View {
         } label: {
             HStack(spacing: 4) {
                 Text("\(size)")
-                    .font(.system(size: 15, weight: .medium))
+                    .dsTextStyle(.labelBase)
                     .monospacedDigit()
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .bold))
@@ -224,7 +225,7 @@ struct BannerTextFloatingToolbar: View {
                     mutateLayer { $0.colorHex = hex }
                 }
             } label: {
-                Text("More Text Colours")
+                Text("More Text Colors")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.muted)
                     .frame(maxWidth: .infinity)
@@ -257,7 +258,9 @@ struct BannerTextFloatingToolbar: View {
             } label: {
                 Text("Delete Text")
                     .dsTextStyle(.labelBase)
-                    .foregroundStyle(Color.red)
+                    // UXS-23: één destructive-taal — DSMenuRow gebruikt hetzelfde
+                    // token, dus systeemrood hoort hier niet meer.
+                    .foregroundStyle(DSColor.Foreground.destructive)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, DSSpacing.gap2)
                     .padding(.vertical, DSSpacing.gap1)
@@ -296,7 +299,9 @@ struct BannerTextFloatingToolbar: View {
         active: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        var text = Text(title).font(.system(size: 14, weight: weight))
+        // De B/I/U-knoppen dragen hun eigen gewicht (bold/regular), dus hier
+        // blijft `.system` met het DS-puntformaat i.p.v. een vaste stijl.
+        var text = Text(title).font(.system(size: DSTypography.FontSize.sm, weight: weight))
         if italic { text = text.italic() }
         if underline { text = text.underline() }
         return HoverFill(active: active, activeFill: DSColor.Background.card, cornerRadius: DSRadius.sm) {
@@ -316,9 +321,9 @@ struct BannerTextFloatingToolbar: View {
         } label: {
             VStack(spacing: 0) {
                 Text("Fonts")
-                    .font(.system(size: 13, weight: .medium))
+                    .dsTextStyle(.labelSmall)
                 Text("…")
-                    .font(.system(size: 13, weight: .bold))
+                    .dsTextStyle(.labelSmall)
             }
             .foregroundStyle(DSColor.Foreground.primary)
             .frame(width: 64, height: 40)

@@ -150,33 +150,19 @@ struct PaywallSheet: View {
         .dsMotion(DSMotion.base, value: model.selectedInterval)
     }
 
-    // Monthly / Yearly segmented pill (lokaal; geen AvatarUI-wijziging).
+    // UXS-25: was hand-gerold (zonder hover, zonder toetsenbord, zonder
+    // selected-trait voor VoiceOver); nu de DS-component.
     private var intervalToggle: some View {
-        HStack(spacing: 0) {
-            segment("Monthly", interval: .month)
-            segment("Yearly (2 months free)", interval: .year)
-        }
-        .padding(DSSpacing.gap0_5)
-        .background(DSColor.Background.neutral, in: Capsule())
-    }
-
-    private func segment(_ title: String, interval: SubscriptionInterval) -> some View {
-        let isSelected = model.selectedInterval == interval
-        return Button {
-            model.selectedInterval = interval
-        } label: {
-            Text(title)
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.muted)
-                .padding(.horizontal, DSSpacing.gap4)
-                .padding(.vertical, DSSpacing.gap2)
-                .background {
-                    if isSelected {
-                        Capsule().fill(DSColor.Background.neutralStronger)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
+        DSSegmentedControl(
+            selection: Binding(
+                get: { model.selectedInterval },
+                set: { model.selectedInterval = $0 }
+            ),
+            segments: [
+                .init(tag: .month, label: "Monthly"),
+                .init(tag: .year, label: "Yearly (2 months free)"),
+            ]
+        )
     }
 
     private var starterCard: some View {

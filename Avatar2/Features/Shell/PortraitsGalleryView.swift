@@ -30,7 +30,12 @@ struct PortraitsGalleryView: View {
     }
 
     // "max 3 naast elkaar" — een vast 3-koloms rooster.
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap4), count: 3)
+    // UXS-9: gedeelde grid-maten met Home — dezelfde kaart kreeg per scherm
+    // een andere celbreedte (3 vs 4 kolommen).
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: ShellMetrics.portraitGridSpacing),
+        count: ShellMetrics.portraitGridColumnCount
+    )
 
     private var selectedFolder: Folder2? {
         guard let id = model.selectedFolderID else { return nil }

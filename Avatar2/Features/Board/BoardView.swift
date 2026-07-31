@@ -35,6 +35,8 @@ struct BoardView: View {
     let onOpen: (Portrait2) -> Void
 
     @Environment(\.undoManager) private var undoManager
+    /// UXS-15: transitions op de board honoreren "Verminder beweging".
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Delete-actie van het rechtermuis-menu (zelfde modelContext-pad als de sidebar).
     @Environment(\.modelContext) private var modelContext
 
@@ -196,6 +198,7 @@ struct BoardView: View {
                 Group {
                     if selection.count >= 2 {
                         boardBatchBar
+                            .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
                     } else if let node = selectedNode {
                         singleEditTopBar(node)
                             // Horizontaal gecentreerd boven de geselecteerde node.
@@ -203,9 +206,14 @@ struct BoardView: View {
                             // ligt op vpMidden, dus offset = scale·(boardX−boardMidden)+cameraOffset.
                             .offset(x: camera.scale * (node.boardX - boardSize.width / 2)
                                 + camera.offset.width)
+                            .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
                     }
                 }
                 .padding(.top, 70)
+                // UXS-15 (UX16): batch↔single wisselde zonder enige transitie —
+                // een state-wissel die je tientallen keren per dag ziet hoort
+                // subtiel te bewegen. Respecteert reduce-motion via dsMotion.
+                .dsMotion(DSMotion.fast, value: selection.count >= 2)
             }
             // E30.1: bij één-selectie de editor-bottom-tools (Effects/Face/
             // Clothing/Hair) op de node — zodat in-place editen op de board kan.
@@ -779,10 +787,26 @@ struct BoardView: View {
             Button("") { tidyUpSelection() }.keyboardShortcut("t", modifiers: [.control, .option])
             Button("") { distributeSelection(.vertical) }.keyboardShortcut("v", modifiers: [.control, .option])
             Button("") { distributeSelection(.horizontal) }.keyboardShortcut("h", modifiers: [.control, .option])
+            // UXS-15 (UX16): ⌫ en Esc ontbraken hier terwijl de Banner Studio ze
+            // wél had — twee canvassen die anders reageren op dezelfde toets.
+            // Verwijderen loopt door de bestaande bevestiging (E46), dus ⌫ opent
+            // de confirm i.p.v. direct te wissen.
+            Button("") { deleteSelectionViaConfirm() }
+                .keyboardShortcut(.delete, modifiers: [])
+            Button("") { selection.removeAll() }
+                .keyboardShortcut(.escape, modifiers: [])
         }
         .opacity(0)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// UXS-15: ⌫ op de board — zelfde route als het contextmenu, dus mét de
+    /// E46-bevestiging. Leeg selectie = niets te doen.
+    private func deleteSelectionViaConfirm() {
+        let ids = selectedPortraits.map(\.persistentModelID)
+        guard !ids.isEmpty else { return }
+        model.presentation.confirm = .deletePortraits(ids: ids)
     }
 
     private func zoom(_ factor: CGFloat) {
@@ -1247,10 +1271,14 @@ struct BoardView: View {
                 .frame(width: 420)
                 .fixedSize(horizontal: false, vertical: true)
                 .dsPanelSurface(cornerRadius: DSRadius.xl)
+                // UXS-15 (UX16): paneel-wissels snapten; nu dezelfde
+                // scale-fade als de editor-panelen.
+                .transition(.dsScaleFade(anchor: .bottom, reduceMotion: reduceMotion))
             }
 
             DSBottomToolbar(items: boardToolbarItems, selection: $editTool)
         }
+        .dsMotion(DSMotion.fast, value: editTool)
     }
 
     /// E30.1: een cloud/flip-resultaat op de node toepassen via dezelfde pipeline

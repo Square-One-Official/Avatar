@@ -12,6 +12,7 @@ import AppKit
 import CoreGraphics
 import CoreText
 import AvatarKit
+import AvatarUI
 
 enum BannerDocRenderer {
 
@@ -299,23 +300,12 @@ enum BannerDocRenderer {
     }
 
     /// Parseert `#RRGGBB`/`#RRGGBBAA` (en zonder `#`) naar 0…1-componenten.
+    /// UXS-22: de parser zelf is gedeeld (`DSHexColor`); alleen de
+    /// zwart-fallback voor onparsebare invoer blijft hier, want een render mag
+    /// niet halverwege stoppen op één kapotte kleurwaarde.
     private static func rgba(hex: String) -> (Double, Double, Double, Double) {
-        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard let value = UInt64(s, radix: 16) else { return (0, 0, 0, 1) }
-        switch s.count {
-        case 8:
-            let r = Double((value >> 24) & 0xFF) / 255
-            let g = Double((value >> 16) & 0xFF) / 255
-            let b = Double((value >> 8) & 0xFF) / 255
-            let a = Double(value & 0xFF) / 255
-            return (r, g, b, a)
-        default: // 6 (of korter, links-genuld door UInt64)
-            let r = Double((value >> 16) & 0xFF) / 255
-            let g = Double((value >> 8) & 0xFF) / 255
-            let b = Double(value & 0xFF) / 255
-            return (r, g, b, 1)
-        }
+        guard let c = DSHexColor(hex) else { return (0, 0, 0, 1) }
+        return (c.red, c.green, c.blue, c.alpha)
     }
 
     private static func cgColor(hex: String) -> CGColor {

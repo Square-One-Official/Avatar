@@ -412,7 +412,7 @@ struct AlignmentGuideOverlay2: View {
                 }
             }
             .compositingGroup()
-            .shadow(color: .black.opacity(0.25), radius: 1 * inv)
+            .dsShadow(.handle, scale: inv)
             .opacity(isVisible ? 1 : 0)
             .dsMotion(DSMotion.fast, value: isVisible)
         }

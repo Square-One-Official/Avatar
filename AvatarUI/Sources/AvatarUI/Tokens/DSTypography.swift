@@ -95,3 +95,24 @@ extension View {
             .frame(minHeight: style.lineHeight)
     }
 }
+
+
+/// Optische groottes voor SF-Symbol-iconen (UXS-20).
+///
+/// De audit telde ~74 `.font(.system(size:))`-sites als "typografie", maar 77
+/// daarvan zitten op een `Image`/`DSIcon` — icoongrootte is een ándere as dan
+/// tekststijl (een icoon van 12pt hoort niet automatisch bij `labelSmall`).
+/// Ze op tekst-tokens mappen zou de twee juist verder door elkaar halen; deze
+/// schaal geeft ze een eigen bron.
+public enum DSIconSize {
+    /// Inline naast labelSmall — chevrons, kleine indicatoren.
+    public static let xs: CGFloat = 10
+    /// Standaard menu-/rij-icoon.
+    public static let sm: CGFloat = 12
+    /// Toolbar-pil en icoonknoppen.
+    public static let base: CGFloat = 14
+    /// Prominente acties (capsule-toolbar).
+    public static let lg: CGFloat = 17
+    /// Lege-staat- en placeholder-glyphs.
+    public static let xl: CGFloat = 28
+}

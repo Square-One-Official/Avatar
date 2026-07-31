@@ -57,7 +57,7 @@ struct BannerImageFloatingToolbar: View {
         .background(
             Capsule(style: .continuous)
                 .fill(DSColor.Background.card)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .dsShadow(.card)
         )
         .onChange(of: menuDismissNonce) { _, _ in presentation.bannerFloatingMenu = nil }
         .onChange(of: presentation.bannerFloatingMenu) { _, menu in
@@ -69,7 +69,7 @@ struct BannerImageFloatingToolbar: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(active ? Color.accentColor : DSColor.Foreground.primary)
+                .foregroundStyle(active ? DSColor.Action.primary : DSColor.Foreground.primary)
                 .frame(width: 32, height: 32)
         }
         .buttonStyle(.plain)
@@ -99,10 +99,13 @@ struct BannerImageFloatingToolbar: View {
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+            // UXS-23: dit is een destructieve actie maar stond in de muted-
+            // kleur — dus onopvallender dan "Replace image" ernaast. Zelfde
+            // token als de andere destructieve rijen.
             Button("Remove") { presentation.bannerFloatingMenu = nil; onRemove() }
                 .buttonStyle(.plain)
                 .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.muted)
+                .foregroundStyle(DSColor.Foreground.destructive)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(DSSpacing.gap3)

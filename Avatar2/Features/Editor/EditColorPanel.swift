@@ -196,7 +196,11 @@ struct EditColorPanel: View {
                             if showAutoEnhance {
                                 quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
                                 quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
-                                quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                                // UXS-14: prijs uit CreditMeter, net als de
+                                // buur-chips — deze toonde alleen een Pro-slot,
+                                // dus de kosten waren pas ná de klik zichtbaar.
+                                quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro,
+                                            credit: CreditMeter.chipLabel(for: .colorize), action: onColorise)
                                 boostMenuChip
                                 // E31.8 (audit C4): canonieke naam + de echte
                                 // 2-credit-prijs via CreditMeter (getest label).

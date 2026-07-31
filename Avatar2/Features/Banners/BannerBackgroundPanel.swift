@@ -25,7 +25,7 @@ struct BannerBackgroundPanel: View {
                 if isImageFillActive {
                     zoomRow
                 }
-                Text("Tap the canvas to add a photo — drag to reframe when selected.")
+                Text("Click the canvas to add a photo — drag to reframe when selected.")
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -70,7 +70,7 @@ struct BannerBackgroundPanel: View {
             }
             .buttonStyle(.plain)
             .dsHoverScale()
-            .help("Pick a colour")
+            .help("Pick a color")
             .dsDropdownMenu(
                 isPresented: Binding(
                     get: { presentation.colorPicker == .bannerBackground },

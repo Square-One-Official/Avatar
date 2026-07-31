@@ -34,9 +34,9 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
 
     var summary: String {
         switch self {
-        case .background: return "Colour or gradient here — tap the canvas to add a photo background."
+        case .background: return "Color or gradient here — click the canvas to add a photo background."
         case .shaders:    return "Procedural effects applied to the whole banner."
-        case .text:       return "Tap the canvas to add text — drag to move, use the toolbar to style."
+        case .text:       return "Click the canvas to add text — drag to move, use the toolbar to style."
         case .logo:       return "Tap the canvas to place a logo — drag to move, corners to scale."
         case .size:       return "Platform sizes — LinkedIn, X, wide."
         }
@@ -410,7 +410,7 @@ struct BannerStudioView: View {
                 RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
                     .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
             )
-            .shadow(color: .black.opacity(0.25), radius: 40, y: 24)
+            .dsShadow(.overlay, scale: 2.5)
             .position(
                 x: layout.origin.x + layout.drawn.width / 2,
                 y: layout.origin.y + layout.drawn.height / 2

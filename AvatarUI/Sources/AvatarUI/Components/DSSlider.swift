@@ -68,8 +68,17 @@ public struct DSSlider: View {
             .allowsHitTesting(false)
     }
 
+    /// UXS-13 (UX13): de thumb liep van x=0 tot x=width, dus op beide uiteinden
+    /// stak z'n halve breedte búiten het slider-frame — zichtbaar als een
+    /// afgekapte thumb tegen de panelrand (het duidelijkst op Temperature, die
+    /// als enige een signed range heeft en dus vaak op een extreem staat).
+    /// De baan loopt nu van `thumbRadius` tot `width - thumbRadius`.
+    private static let thumbDiameter: CGFloat = 18   // 14 kern + 2×2 rand
+    private static var thumbRadius: CGFloat { thumbDiameter / 2 }
+
     private func thumbX(for width: CGFloat) -> CGFloat {
-        CGFloat(fraction) * width
+        let travel = max(0, width - Self.thumbDiameter)
+        return Self.thumbRadius + CGFloat(fraction) * travel
     }
 
     private var fraction: Double {
@@ -80,7 +89,10 @@ public struct DSSlider: View {
 
     private func setValue(at x: CGFloat, width: CGFloat) {
         let span = range.upperBound - range.lowerBound
-        let f = (Double(x) / Double(max(1, width))).clamped01
+        // Spiegelt `thumbX`: klikken op de uiterste rand hoort min/max te geven,
+        // niet een waarde die net binnen de baan valt.
+        let travel = max(1, width - Self.thumbDiameter)
+        let f = (Double(x - Self.thumbRadius) / Double(travel)).clamped01
         value = range.lowerBound + f * span
     }
 }

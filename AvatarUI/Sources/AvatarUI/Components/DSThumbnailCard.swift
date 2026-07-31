@@ -62,9 +62,15 @@ public struct DSThumbnailCard<Icon: View>: View {
                     .frame(height: tileHeight * 0.45)
             }
             .overlay(alignment: .bottomLeading) {
+                // UXS-13: één regel, netjes afgekapt. Zonder deze begrenzing
+                // liep een langer label ("Reduce wrinkles") over de kaartrand
+                // of wrapte 'ie over de scrim heen.
                 Text(label)
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: tileSize - DSSpacing.gap2 * 2, alignment: .leading)
                     .padding(.horizontal, DSSpacing.gap2)
                     .padding(.bottom, DSSpacing.gap2)
             }

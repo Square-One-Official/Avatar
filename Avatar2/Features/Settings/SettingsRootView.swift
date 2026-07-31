@@ -55,7 +55,7 @@ struct SettingsRootView: View {
             Spacer()
         }
         .padding(.leading, DSSpacing.gap6 + DSSpacing.gap1)
-        .padding(.top, 76)
+        .padding(.top, ShellMetrics.settingsPageTopInset)
     }
 
     @ViewBuilder

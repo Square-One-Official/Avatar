@@ -53,7 +53,7 @@ struct SettingsAIModelsPage: View {
             }
             .padding(.top, DSSpacing.gap8)
         }
-        .padding(.top, 76)
+        .padding(.top, ShellMetrics.settingsPageTopInset)
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
         .task { model.refreshInstalledState() }
@@ -183,7 +183,7 @@ struct SettingsAIModelsPage: View {
                         .foregroundStyle(DSColor.Foreground.subtle)
                     DSTextField(placeholder: "https://…preview.vercel.app", text: $devApiBase)
                     DSTextField(placeholder: "Vercel protection bypass secret", text: $devVercelBypass)
-                    Text("Leeg = productie. Herstart de app om een wijziging toe te passen.")
+                    Text("Empty = production. Restart the app to apply a change.")
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.muted)
                 }

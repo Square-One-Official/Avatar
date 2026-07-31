@@ -2,6 +2,7 @@
 // vensterrand — sidebar-kaart (E03.15), topbar-cluster en toekomstige
 // randelementen rekenen met hetzelfde token i.p.v. losse getallen.
 
+import Foundation
 import AvatarUI
 import CoreGraphics
 
@@ -75,6 +76,27 @@ enum ShellMetrics {
 
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }
+
+    // MARK: - Portret-grid (UXS-9 / UX8)
+
+    /// Kolommen in het portret-rooster. Home en de Portraits-gallery hadden
+    /// eigen waarden (4 vs 3 kolommen, gap5 vs gap4), waardoor dezelfde kaart
+    /// per scherm een andere maat kreeg.
+    static let portraitGridColumnCount = 4
+    static let portraitGridSpacing: CGFloat = DSSpacing.gap5
+
+    /// Hoeveel portretten "Recent" toont vóór de rest naar Earlier zakt.
+    static let recentSectionLimit = 6
+
+    /// Hoe recent een portret moet zijn voor de Recent-sectie.
+    static let recentSectionWindow: TimeInterval = 7 * 24 * 60 * 60
+
+    // MARK: - Settings-takeover (UXS-26 / UX27)
+
+    /// Top-inset van een Settings-pagina: onder de takeover-header door. Stond
+    /// als kale `76` op vijf pagina's — vijf plekken die stilletjes uit elkaar
+    /// konden lopen zodra de header verandert.
+    static let settingsPageTopInset: CGFloat = 76
 
     // MARK: - Zwevende upload-pill (UXS-10 / UX9)
 

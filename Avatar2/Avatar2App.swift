@@ -234,6 +234,14 @@ struct Avatar2App: App {
             CommandGroup(after: .newItem) {
                 UploadPortraitCommands()
             }
+            // UXS-12 (UX12): "Check for Updates…" hoort in het app-menu — dat is
+            // waar macOS-gebruikers 'm zoeken. Zat alleen in Settings → About,
+            // dus de conventionele plek was leeg. Zelfde UpdateManager, dus geen
+            // tweede update-route.
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updates.checkForUpdates() }
+                    .disabled(!updates.canCheckForUpdates)
+            }
         }
         // Eigen SwiftData-store voor de set (E05.4) — los van de v1-store.
         // PoC (left-nav): Folder2 voor de Portraits-galerij, E35.1: Banner2 voor de

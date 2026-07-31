@@ -46,7 +46,7 @@ struct BannerCanvasDropModifier: ViewModifier {
             .overlay {
                 if isTargeted {
                     RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 2)
+                        .strokeBorder(DSColor.Action.primary.opacity(0.6), lineWidth: 2)
                         .allowsHitTesting(false)
                 }
             }
