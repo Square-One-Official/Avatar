@@ -29,14 +29,6 @@
 - **Uitvoering na keuze:** klein INFRA-werk (models.ts-tarief + evt. input-cap in `upscale.ts`);
   check ook of de credit-chip in de app het tarief uit een constante haalt of hardcoded 1 toont.
 
-### Frame-vorm: cirkel als DEFAULT-merkvorm (E24.16) — BEVESTIGEN, wacht op Thierry
-- **Context:** 24.16 maakt de frame-vorm per-portret kiesbaar (Frame ▾ → Shape: Circle/Square) en
-  zet de **default op circle** (zoals het story-plan vroeg). Via de SwiftData-migratie-default
-  (`frameShapeRaw = "circle"`) krijgen óók bestaande portretten de cirkel — d.w.z. de cirkel wordt
-  de zichtbare merkvorm op canvas + in de export (transparante hoeken).
-- **Te bevestigen:** is cirkel de gewenste default (i.p.v. square)? Zo niet: één regel in
-  `Portrait2.frameShapeRaw` (default → `.square.rawValue`). Niet-blokkerend; alles werkt nu met circle.
-
 ### Double-opt-in filtering bij nieuwsbrief-dispatch (E17.6) — VOORSTEL, wacht op Thierry
 - **Context:** `newsletter_optins` (sql 014) is een additief opt-in-grootboek. De dispatch filtert
   er nu bewust NIET op, zodat bestaande account-houders (die al opt-in gaven bij registratie) niet
@@ -46,6 +38,19 @@
   Transactionele/welkom-mails blijven ongefilterd. Te bevestigen door Thierry vóór live.
 
 ## Beslist
+
+### Frame-vorm: cirkel is de DEFAULT-merkvorm (E24.16) — BESLIST 2026-07-31 (Thierry)
+- **Besluit:** cirkel blijft de default frame-vorm, zoals 24.16 hem gebouwd heeft. Geen
+  code-wijziging nodig — geverifieerd op v2-main: `Portrait2.frameShapeRaw` default =
+  `ExportShape.circle.rawValue` ([Portrait2.swift:79](../Avatar2/Features/Sidebar/Portrait2.swift:79)),
+  de accessor-fallback is `?? .circle` (regel 244), en EditorView geeft
+  `portraitModel?.frameShape ?? .circle` door aan de canvas. Via de SwiftData-migratie-default
+  krijgen bestaande portretten ook de cirkel — bedoeld. Per-portret wisselen blijft kunnen via
+  Frame ▾ → Shape.
+- **Expliciet NIET meegewijzigd:** de export-sheet houdt **Square** als startvorm
+  ([ExportSheet.swift:31](../Avatar2/Features/Share/ExportSheet.swift:31)). Dat is een los
+  E33-besluit van Thierry (2026-06-25): platforms croppen zelf, dus square is de veiligste
+  export-basis. Frame-vorm (canvas/merk) en export-vorm zijn bewust twee assen.
 
 ### Banners-feature-flag: blijft uit tot gebruikersvraag (E37) — BESLIST 2026-07-12
 - **Besluit (Thierry):** `AppFeatureFlags.bannersEnabled` blijft default **uit**, ook nu alle
