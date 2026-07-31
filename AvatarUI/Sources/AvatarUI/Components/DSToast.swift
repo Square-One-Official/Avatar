@@ -10,24 +10,45 @@ import SwiftUI
 public struct DSToast: View {
     private let title: String
     private let description: String?
-    /// Resterend deel van de timer, 1...0; nil verbergt de track.
+    /// Resterend deel van de timer, 1...0; nil verbergt de track. Wordt genegeerd
+    /// zodra `autoDismiss` is gezet — de toast telt dan zelf af.
     private let progress: Double?
     /// Toont een kleine spinner links van de titel (voor lopende acties).
     private let isLoading: Bool
-    private let onClose: () -> Void
+    /// UXS-2: laat de toast zichzelf opruimen na deze duur, met een zichtbare
+    /// timer-track en pauze zolang de muis erboven hangt. nil = de call site
+    /// bepaalt zelf wanneer de toast verdwijnt.
+    private let autoDismiss: Duration?
+    /// nil = geen sluit-affordance. Een sluitknop die niets doet mag niet
+    /// bestaan (UXS-2), dus zonder actie renderen we de knop óók niet.
+    private let onClose: (() -> Void)?
+
+    /// Resterende fractie van `autoDismiss`, 1 → 0.
+    @State private var remaining: Double = 1
+    @State private var isHovering = false
 
     public init(
         title: String,
         description: String? = nil,
         progress: Double? = nil,
         isLoading: Bool = false,
-        onClose: @escaping () -> Void
+        autoDismiss: Duration? = nil,
+        onClose: (() -> Void)? = nil
     ) {
         self.title = title
         self.description = description
         self.progress = progress
         self.isLoading = isLoading
+        self.autoDismiss = autoDismiss
         self.onClose = onClose
+    }
+
+    /// Hertelt de timer zodra de inhoud wijzigt: een vervángende melding krijgt
+    /// de volle duur i.p.v. de resterende tijd van z'n voorganger (UX4).
+    private var contentKey: String { "\(title)|\(description ?? "")" }
+
+    private var trackProgress: Double? {
+        autoDismiss == nil ? progress : remaining
     }
 
     public var body: some View {
@@ -44,13 +65,15 @@ public struct DSToast: View {
                         .dsTextStyle(.labelLarge)
                         .foregroundStyle(DSColor.Foreground.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    DSIconButton(
-                        Image(systemName: "xmark"),
-                        label: "Dismiss",
-                        style: .ghostNeutral,
-                        size: .small,
-                        action: onClose
-                    )
+                    if let onClose {
+                        DSIconButton(
+                            Image(systemName: "xmark"),
+                            label: "Dismiss",
+                            style: .ghostNeutral,
+                            size: .small,
+                            action: onClose
+                        )
+                    }
                 }
                 if let description {
                     Text(description)
@@ -61,18 +84,37 @@ public struct DSToast: View {
             }
             .padding(DSSpacing.gap4)
 
-            if let progress {
+            if let trackProgress {
                 GeometryReader { proxy in
                     HStack(spacing: 0) {
                         Rectangle()
                             .fill(DSColor.Action.primary)
-                            .frame(width: proxy.size.width * progress.clamped01)
+                            .frame(width: proxy.size.width * trackProgress.clamped01)
                         Spacer(minLength: 0)
                     }
                 }
                 .frame(height: 3)
                 .background(DSColor.Background.neutral)
             }
+        }
+        // UXS-2: hover bevriest de timer — je kunt een melding lezen zonder dat
+        // 'ie onder je muis vandaan verdwijnt.
+        .onHover { isHovering = $0 }
+        .task(id: contentKey) {
+            guard let autoDismiss, let onClose else { return }
+            remaining = 1
+            let step = Duration.milliseconds(50)
+            let total = Double(autoDismiss.components.seconds)
+                + Double(autoDismiss.components.attoseconds) / 1e18
+            guard total > 0 else { return }
+            let stepFraction = 0.05 / total
+            while remaining > 0 {
+                try? await Task.sleep(for: step)
+                if Task.isCancelled { return }
+                guard !isHovering else { continue }
+                remaining -= stepFraction
+            }
+            onClose()
         }
         .frame(width: 360)
         .background(DSColor.Background.card)

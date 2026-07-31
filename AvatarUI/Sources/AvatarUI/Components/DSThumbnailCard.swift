@@ -54,13 +54,12 @@ public struct DSThumbnailCard<Icon: View>: View {
                 icon
                     .foregroundStyle(DSColor.Foreground.muted)
             }
-            // Gradient + label altijd onderaan (tekst leesbaar op elke tint).
+            // UXS-3: gedeelde scrim — dekking is klaar vóór de tekstzone, dus
+            // het label blijft leesbaar op élke tint (ook een witte cutout in
+            // light mode).
             .overlay(alignment: .bottom) {
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.65)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: tileHeight * 0.45)
+                DSCardLabelScrim()
+                    .frame(height: tileHeight * 0.45)
             }
             .overlay(alignment: .bottomLeading) {
                 Text(label)

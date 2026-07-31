@@ -18,6 +18,9 @@ struct BannerInlineTextField: NSViewRepresentable {
     var focusOnFirstAppear: Bool = false
     var selectAllOnFirstFocus: Bool
     var onSubmit: () -> Void
+    /// UXS-1: Escape = cancel (macOS-conventie), niet commit. De call site zet de
+    /// tekst terug op de stand van vóór de edit en sluit de editor.
+    var onCancel: () -> Void
     var onDeleteWhenEmpty: () -> Void
 
     func makeNSView(context: Context) -> PlaceholderTextView {
@@ -45,6 +48,7 @@ struct BannerInlineTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ view: PlaceholderTextView, context: Context) {
+        updateCoordinator(context.coordinator)
         if view.string != text { view.string = text }
         applyStyle(to: view)
     }
@@ -86,17 +90,33 @@ struct BannerInlineTextField: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onSubmit: onSubmit, onDeleteWhenEmpty: onDeleteWhenEmpty)
+        Coordinator(text: $text, onSubmit: onSubmit, onCancel: onCancel, onDeleteWhenEmpty: onDeleteWhenEmpty)
+    }
+
+    /// De coordinator wordt één keer gemaakt, maar de closures komen uit een
+    /// struct die SwiftUI bij elke render opnieuw bouwt — dus bij elke update
+    /// verversen, anders houdt een oude closure een verouderde laag-id vast.
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.onSubmit = onSubmit
+        coordinator.onCancel = onCancel
+        coordinator.onDeleteWhenEmpty = onDeleteWhenEmpty
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         @Binding var text: String
-        let onSubmit: () -> Void
-        let onDeleteWhenEmpty: () -> Void
+        var onSubmit: () -> Void
+        var onCancel: () -> Void
+        var onDeleteWhenEmpty: () -> Void
 
-        init(text: Binding<String>, onSubmit: @escaping () -> Void, onDeleteWhenEmpty: @escaping () -> Void) {
+        init(
+            text: Binding<String>,
+            onSubmit: @escaping () -> Void,
+            onCancel: @escaping () -> Void,
+            onDeleteWhenEmpty: @escaping () -> Void
+        ) {
             _text = text
             self.onSubmit = onSubmit
+            self.onCancel = onCancel
             self.onDeleteWhenEmpty = onDeleteWhenEmpty
         }
 
@@ -106,11 +126,17 @@ struct BannerInlineTextField: NSViewRepresentable {
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            // Return / Escape committen (geen handmatige newline; word-wrap regelt
+            // Return committeert (geen handmatige newline; word-wrap regelt
             // meerregelig — consistent met de gebakken render).
-            if commandSelector == #selector(NSResponder.insertNewline(_:))
-                || commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
                 onSubmit()
+                return true
+            }
+            // UXS-1: Escape annuleert. Was hier tot 2026-07-31 samengevoegd met
+            // Return, waardoor Esc de bewerking juist vastlegde — precies het
+            // tegenovergestelde van de macOS-conventie.
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                onCancel()
                 return true
             }
             if commandSelector == #selector(NSResponder.deleteBackward(_:))

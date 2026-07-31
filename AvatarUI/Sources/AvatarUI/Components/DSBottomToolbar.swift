@@ -111,12 +111,22 @@ public struct DSToolbarAction: Identifiable {
     public let id: String
     public let icon: Image
     public let label: String
+    /// Tekent de rij in de destructive-kleur (UXS-4) — voor acties die werk
+    /// weggooien, zoals "Restore to original".
+    public let isDestructive: Bool
     public let action: () -> Void
 
-    public init(id: String, icon: Image, label: String, action: @escaping () -> Void) {
+    public init(
+        id: String,
+        icon: Image,
+        label: String,
+        isDestructive: Bool = false,
+        action: @escaping () -> Void
+    ) {
         self.id = id
         self.icon = icon
         self.label = label
+        self.isDestructive = isDestructive
         self.action = action
     }
 }
@@ -125,6 +135,10 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
     private let items: [DSToolbarItem<ID>]
     private let overflow: [DSToolbarItem<ID>]
     private let overflowActions: [DSToolbarAction]
+    /// UXS-4/E53.7: open-state van de `⋯`-dropdown. Optioneel — call sites die
+    /// een presentatie-store hebben geven 'm door zodat het menu een
+    /// tab-/vensterwissel overleeft.
+    private let overflowOpen: Binding<Bool>?
     @Binding private var selection: ID?
     // E-fix: de feature-pillen zijn uit te schakelen (en te dimmen) terwijl er
     // niets is om op te werken — bv. tijdens een vervangende import waarin de
@@ -137,12 +151,14 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
         selection: Binding<ID?>,
         overflow: [DSToolbarItem<ID>] = [],
         overflowActions: [DSToolbarAction] = [],
+        overflowOpen: Binding<Bool>? = nil,
         toolsEnabled: Bool = true,
         @ViewBuilder accessory: () -> Accessory
     ) {
         self.items = items
         self.overflow = overflow
         self.overflowActions = overflowActions
+        self.overflowOpen = overflowOpen
         self._selection = selection
         self.toolsEnabled = toolsEnabled
         self.accessory = accessory()
@@ -161,7 +177,12 @@ public struct DSBottomToolbar<ID: Hashable, Accessory: View>: View {
                     )
                 }
                 if !overflow.isEmpty || !overflowActions.isEmpty {
-                    DSToolbarOverflowButton(items: overflow, actions: overflowActions, selection: $selection)
+                    DSToolbarOverflowButton(
+                        items: overflow,
+                        actions: overflowActions,
+                        selection: $selection,
+                        isPresented: overflowOpen
+                    )
                 }
             }
             .dsToolbarCapsule(size: .regular)
@@ -187,11 +208,13 @@ extension DSBottomToolbar where Accessory == EmptyView {
         selection: Binding<ID?>,
         overflow: [DSToolbarItem<ID>] = [],
         overflowActions: [DSToolbarAction] = [],
+        overflowOpen: Binding<Bool>? = nil,
         toolsEnabled: Bool = true
     ) {
         self.init(
             items: items, selection: selection,
             overflow: overflow, overflowActions: overflowActions,
+            overflowOpen: overflowOpen,
             toolsEnabled: toolsEnabled,
             accessory: { EmptyView() }
         )
@@ -350,28 +373,30 @@ public struct CapsuleSurfaceStyle: ButtonStyle {
 /// laten de surface via een echte `ButtonStyle` lopen — net als `DSIconButton`
 /// en `DSCapsuleToolButton`. Hover én pressed komen daarmee uit de knop zelf
 /// (betrouwbaar) i.p.v. uit de menu-wrapper.
+/// UXS-4 (UX7): dit was een systeem-`Menu`. Daardoor kregen de rijen macOS'
+/// eigen accent-blauwe highlight — de enige systeemblauwe UI in de editor — en
+/// rende het menupaneel bovenóp de capsule i.p.v. eronder. Nu een DS-dropdown
+/// (`dsDropdownMenu` + `DSContextMenuPanel`/`DSMenuRow`), gelijk aan de
+/// Frame-/Background-/Boost-chips, dus één menu-taal in de hele app.
 struct DSToolbarOverflowButton<ID: Hashable>: View {
     let items: [DSToolbarItem<ID>]
     var actions: [DSToolbarAction] = []
     @Binding var selection: ID?
+    /// Open-state. Optioneel zodat call sites 'm in een presentatie-store kunnen
+    /// hosten (E53.7); zonder binding valt de knop terug op lokale state.
+    var isPresented: Binding<Bool>?
+
+    @State private var localOpen = false
+
+    private var open: Binding<Bool> { isPresented ?? $localOpen }
 
     // De `⋯` hangt in de onderste (`.regular`) capsule → deel exact die maat
     // (icoon-punt + knophoogte) zodat 'm naast de pillen consistent oogt.
     private let size: DSToolbarSize = .regular
 
     var body: some View {
-        Menu {
-            ForEach(items) { item in
-                Button { selection = item.id } label: {
-                    Label { Text(item.label) } icon: { item.icon }
-                }
-            }
-            if !items.isEmpty && !actions.isEmpty { Divider() }
-            ForEach(actions) { action in
-                Button { action.action() } label: {
-                    Label { Text(action.label) } icon: { action.icon }
-                }
-            }
+        Button {
+            open.wrappedValue.toggle()
         } label: {
             // Icoon = `iconPointSize`/medium (gelijk aan de pil-iconen); knop =
             // vierkant op pil-hoogte → icon-only cirkel. De surface (fill/hover/
@@ -381,11 +406,30 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                 .rotationEffect(.degrees(90))
                 .frame(width: size.height, height: size.height)
         }
-        .menuStyle(.button)
         .buttonStyle(DSToolbarOverflowButtonStyle(size: size))
-        .menuIndicator(.hidden)
         .fixedSize()
         .accessibilityLabel(Text("More tools"))
+        // Boven de capsule: eronder zit alleen nog de vensterrand.
+        .dsDropdownMenu(isPresented: open, anchorHeight: size.height, placement: .above) {
+            DSContextMenuPanel(minWidth: 200) {
+                ForEach(items) { item in
+                    DSMenuRow(item.label, icon: item.icon) {
+                        selection = item.id
+                        open.wrappedValue = false
+                    }
+                }
+                if !items.isEmpty && !actions.isEmpty {
+                    Divider().padding(.vertical, DSSpacing.gap1)
+                }
+                ForEach(actions) { action in
+                    DSMenuRow(action.label, icon: action.icon, destructive: action.isDestructive) {
+                        action.action()
+                        open.wrappedValue = false
+                    }
+                }
+            }
+        }
+        .dsDropdownDismissOverlay(isPresented: open)
     }
 }
 

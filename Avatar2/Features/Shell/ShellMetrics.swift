@@ -75,4 +75,20 @@ enum ShellMetrics {
 
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }
+
+    // MARK: - Zwevende upload-pill (UXS-10 / UX9)
+
+    /// Hoogte van de "Upload portrait ⌘U"-pil op Home.
+    static let uploadPillHeight: CGFloat = 44
+
+    /// Afstand van de pil tot de onderrand van het venster.
+    static let uploadPillBottomInset: CGFloat = DSSpacing.gap5
+
+    /// Bodem-inset die de scroll-content vrijhoudt van de zwevende pil, zodat de
+    /// laatste kaartrij er volledig bovenuit te scrollen is. Afgeleid i.p.v. een
+    /// magic number, plus `gap4` lucht zodat het label van de onderste rij niet
+    /// tegen de pil-rand (incl. schaduw) plakt.
+    static var uploadPillScrollInset: CGFloat {
+        uploadPillHeight + uploadPillBottomInset + DSSpacing.gap4
+    }
 }

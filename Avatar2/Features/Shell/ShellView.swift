@@ -157,7 +157,10 @@ struct ShellView: View {
         // E19.5: voortgangs-toast voor de set-acties (Align/Match/Export).
         .overlay(alignment: .bottomTrailing) {
             if let message = model.setBusyMessage {
-                DSToast(title: message) {}
+                // UXS-2: geen sluitknop — deze set-actie loopt tot 'ie klaar is
+                // en heeft geen annuleer-pad. Een knop die niets doet is erger
+                // dan geen knop.
+                DSToast(title: message)
                     .padding(DSSpacing.gap5)
                     .transition(.dsSlide(.trailing, reduceMotion: reduceMotion))
             }
@@ -438,7 +441,10 @@ struct ShellView: View {
             }
             Spacer(minLength: DSSpacing.gap2)
             ShellTopBar(
-                isSettingsActive: model.isShowingSettings,
+                // UXS-11: de settings-✕ verbergen zolang de paywall (of een
+                // andere sheet) ervoor staat — anders staan er twee ✕'en in
+                // beeld en is niet duidelijk welke wát sluit.
+                isSettingsActive: model.isShowingSettings && !entitlement.isPaywallPresented,
                 onToggleSettings: { model.isShowingSettings.toggle() },
                 isEditing: model.section == .editor || model.editingBanner != nil,
                 canExport: model.editingBanner != nil ? model.canExportBanner : model.canExport,

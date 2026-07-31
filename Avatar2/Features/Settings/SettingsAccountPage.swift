@@ -117,8 +117,15 @@ struct SettingsAccountPage: View {
         if let reset = entitlement.upcomingMonthlyResetAt {
             return "Refills on \(reset.formatted(date: .abbreviated, time: .omitted))"
         }
-        return entitlement.isProActive
-            ? "Refills monthly with your plan"
+        if entitlement.isProActive {
+            return "Refills monthly with your plan"
+        }
+        // UXS-11 (UX11): "Credits come with a Pro plan" stond pal naast een
+        // saldo van 34 op een Starter-account — de copy sprak het getal
+        // ernaast tegen. Een Starter kán credits hebben (top-up of restant),
+        // dus zeg dat dan ook.
+        return entitlement.creditsRemaining > 0
+            ? "Top-up credits — you can use these on any plan"
             : "Credits come with a Pro plan"
     }
 }

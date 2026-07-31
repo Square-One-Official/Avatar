@@ -10,8 +10,8 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 ---
 
 ## 53.1 — Polish-sprint S-items (top-10 #1–#7)
-- status: in_progress
-- owner: FEAT (2026-07-31, branch v2/e53-1-polish)
+- status: done
+- owner: FEAT (2026-08-01, branch v2/e53-1-polish)
 - team: FEAT
 - blockedBy: —
 
@@ -25,6 +25,66 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
 - UX10+11: paywall/account copy- & locale-pass + current-plan-badge.
 - UX29: a11y-label-sweep — DSIconButton krijgt verplicht label-param.
 **DoD:** beide targets bouwen, tests groen, per punt afgevinkt in de Result-regel.
+
+**Result (2026-08-01):** alle punten af; `scripts/build-v2.sh` volledig groen.
+- ✅ **UX3 — Escape annuleert** ([BannerInlineTextField.swift](../Avatar2/Features/Banners/BannerInlineTextField.swift)):
+  `insertNewline` en `cancelOperation` zaten in één branch, dus Esc *legde de
+  bewerking juist vast* — het tegenovergestelde van de macOS-conventie. Gesplitst
+  naar een eigen `onCancel`; de chrome legt bij edit-start de tekst vast
+  (`textBeforeEdit`, gezet op beide instap-paden: type-to-edit én dubbelklik) en
+  zet 'm bij Esc terug. Was de laag vers (placeholder/leeg), dan verdwijnt 'ie —
+  net als ⌫ op een lege laag. Geen undo-stap voor een geannuleerde edit.
+  Bijvangst: de coordinator ververst zijn closures nu bij elke update, anders
+  hield 'ie na een laag-wissel een verouderde callback vast.
+- ✅ **UX4 — toast-betrouwbaarheid.** Nieuwe pure reducer
+  `EntitlementModel.resolveToast(error:outOfCredits:working:)` → één slot met
+  prioriteit **fout > op-is-op > bezig** (een fout mág de spinner verdringen: de
+  operatie waar die bij hoorde is mislukt). `DSToast` telt nu zélf af via
+  `.task(id:)` op de inhoud — een vervángende melding krijgt dus de volle duur
+  i.p.v. de rest van zijn voorganger — pauzeert op hover, en rendert **geen
+  sluitknop** als er geen dismiss-actie is (`onClose` is optioneel geworden;
+  de dode `DSToast(title:){}` in ShellView is er één). Duren centraal:
+  `errorToastDuration` (8s) + nieuw `infoToastDuration` (5s), gebruikt door
+  SignInSheet en de op-is-op-toast i.p.v. eigen literals. +4 tests.
+- ✅ **UX5 — kaartlabels leesbaar** ([DSCardLabelScrim.swift](../AvatarUI/Sources/AvatarUI/Components/DSCardLabelScrim.swift)):
+  de oude scrim liep `.clear → black 0.55` naar de ONDERrand, maar het label zit
+  door z'n padding hálverwege die ramp — de dekking onder de tekst was dus veel
+  lager dan 0.55. Nieuwe gedeelde scrim met een **plateau** (0.78) dat begint
+  vóór de tekstzone; wit-op-scrim haalt daarmee 11.7:1 in het slechtst denkbare
+  geval (wit portret, light mode) tegen ~4.0:1 daarvoor. Eén component voor
+  DSThumbnailCard, de gallery-tegels én de Home-hero. Test borgt de 4.5:1-vloer
+  via een pure contrast-functie i.p.v. een oogtest.
+- ✅ **UX7 — "Restore to original" in DS-stijl.** De capsule-overflow (`⋯`) was
+  het laatste systeem-`Menu` in de app; daar kwam de accent-blauwe rij-highlight
+  vandaan én het paneel dat over de toolbar rende. Nu een DS-dropdown
+  (`dsDropdownMenu` + `DSContextMenuPanel`/`DSMenuRow`, geopend naar bóven),
+  gelijk aan de Frame-/Background-/Boost-chips. `DSToolbarAction` kreeg
+  `isDestructive` → de restore-rij staat in de destructive-tint; `DSMenuRow`
+  kreeg een `Image`-variant zodat de toolbar z'n eigen iconen kan hergebruiken.
+  E53.7-conform: de open-state leeft in `UIPresentationStore.editorOverflowMenuOpen`.
+- ✅ **UX9 — scroll-inset onder de upload-pil.** De inset was een los `80`.
+  Vervangen door `ShellMetrics.uploadPillScrollInset` = pil-hoogte +
+  vensterafstand + `gap4` lucht, en de pil zelf leest diezelfde maten. +2 tests
+  (o.a. één die faalt zodra het weer een magic number wordt). **Eerlijk:** het
+  oude getal was toevallig gelijk aan de afgeleide waarde, dus visueel verandert
+  er weinig; de audit-screenshots zijn niet meer beschikbaar, dus als de
+  overlap een andere oorzaak had, vergt dat een live her-check.
+- ✅ **UX10+11 — paywall/account copy & locale.** Starter-kaart krijgt een
+  "Current plan"-badge (de plan-kiezer krijgt alleen een niet-Pro-account te
+  zien — een actieve Pro loopt via `showsTopup` — dus Starter ÍS daar altijd het
+  huidige plan); "Upgrade to pro" → "Upgrade to Pro"; "No bots" → "Human
+  support"; prijzen via `Decimal` + `NumberFormatter` op `Locale.current` i.p.v.
+  hardgecodeerde "€49,90"-strings (valuta blijft EUR, alleen de notatie volgt de
+  locale). De bedragen worden exact opgebouwd (cent als significand): via een
+  Double-literal is `Decimal(4.99)` = 4.99000000000000102… en klopt 10× de
+  maandprijs niet meer tegen de jaarprijs. Dubbele ✕ weg: de settings-✕ verbergt
+  zolang de paywall ervoor staat. Account-credits-copy is conditioneel — een
+  Starter mét saldo krijgt "Top-up credits — you can use these on any plan"
+  i.p.v. het zelf-tegensprekende "Credits come with a Pro plan" naast een saldo
+  van 34. +5 tests (locale-notatie, EUR-behoud over vier locales, 10×-belofte).
+- ✅ **UX29 — a11y-labels** was al gedaan in E53.3 (DSIconButton `label`
+  verplicht, alle call sites voorzien); hier alleen geverifieerd + de nieuwe
+  CreateEffectSheet-knop uit E09.3 meegenomen.
 
 ## 53.2 — Banner Studio bruikbaarheid (UX1 + UX2, P0)
 - status: in_progress
@@ -85,8 +145,8 @@ UX31–UX33) — oppakken in een volgende polish-ronde; UX6 (update-flow
 relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
 
 ## 53.6 — Shell-chrome & hover-fixes (UX34–UX36, meldingen Thierry 2026-07-02)
-- status: in_progress
-- owner: FEAT+DS (2026-07-31, branch v2/e53-1-polish)
+- status: done
+- owner: FEAT+DS (afgerond in eerdere sessies; geverifieerd + gesloten 2026-08-01)
 - team: FEAT+DS
 - blockedBy: —
 
@@ -100,6 +160,29 @@ relaunchAndInstall zonder call sites) hoort bij E13-releasewerk.
 - UX34/UXS-29: traffic lights + sidebar-toggle zweven boven de sidebar-kaart —
   sidebar-materiaal doortrekken tot de venstertop + toggle in de sidebar-header.
 **DoD:** beide targets bouwen, tests groen, visuele smoke dark+light; Result-regel.
+
+**Result (geverifieerd 2026-08-01):** alle drie de punten waren al gebouwd in
+eerdere sessies maar de story stond nog open. Code-verificatie op v2-main:
+- ✅ **UX36/UXS-27** — `DSColor.neutralSurface(pressed:hovering:base:)` is
+  base-bewust: bij een gevúlde base schuift de ladder één trede op (hover →
+  `neutral-strongest`, pressed → het nieuwe token `neutral-strongest-2`). Daarmee
+  is de hover op de Name/Frame/Background/grid-chips niet langer identiek aan hun
+  rustkleur. Geland via E53.3.
+- ✅ **UX35/UXS-28** — `shellEditorBreadcrumbLeading` hangt alleen nog van
+  `isLeftNavVisible` af, niet meer van `studioFullBleed`; de oude `gap3`-tak
+  rekende alsof de band in de content-kolom leefde en liet de breadcrumb bij
+  Edit↔Preview ~248pt verspringen. Commit `4350f62`.
+- ✅ **UX34/UXS-29** — lege unified `NSToolbar` (`ShellSidebarChrome.stabilise`)
+  maakt de titelbalk hoog genoeg dat AppKit de traffic-lights native lager
+  centreert (`windowControlsCenterFromTop` = 26pt), ín de zwevende sidebar-kaart;
+  de toggle ligt op dezelfde middellijn en de content pint op de oude 28pt-lijn
+  (`contentTopSafeArea`) zodat de rest van de layout niet schoof. Commit
+  `e2dff74` (v2 — de v1-aanpak dokte de kaart aan de venstertop en is door
+  Thierry afgekeurd omdat de zwevende gap3-inset moet blijven).
+Deze story voegt dus géén nieuwe code toe; `scripts/build-v2.sh` groen op de
+gecombineerde 53.1+53.6-branch. **Openstaand:** de visuele dark+light-smoke uit de
+DoD is niet opnieuw gedraaid — de drie fixes zijn destijds per commit visueel
+geverifieerd, maar een gecombineerde her-check zou Thierry zelf moeten doen.
 
 ## 53.7 — Persistente presentatie: modals/menu's overleven een tab- of vensterwissel
 - status: done

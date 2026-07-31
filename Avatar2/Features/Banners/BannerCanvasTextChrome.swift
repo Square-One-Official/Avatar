@@ -21,6 +21,9 @@ struct BannerCanvasTextChrome: View {
     @Binding var isManipulating: Bool
 
     @State private var draftString: String = ""
+    /// UXS-1: de tekst zoals die was vóór de huidige edit-sessie — Escape zet
+    /// 'm hiermee terug. nil = niet aan het bewerken.
+    @State private var textBeforeEdit: String?
     @State private var scaleDragStartSize: Double?
     @State private var scaleDragStartBoxWidthCanvas: Double?
     /// Vast middelpunt van het kader bij start van de hoek-schaal (scherm-ruimte).
@@ -109,7 +112,15 @@ struct BannerCanvasTextChrome: View {
                 if !isEditing { draftString = new }
             }
             .onChange(of: isEditing) { _, editing in
-                if !editing { boxFocused = true }
+                if editing {
+                    // Dubbelklik-pad (BannerCanvasOverlay): buiten een edit volgt
+                    // `draftString` de laag, dus dít is de laatst vastgelegde tekst.
+                    // Type-to-edit heeft de snapshot al gezet vóór het overschrijven.
+                    if textBeforeEdit == nil { textBeforeEdit = draftString }
+                } else {
+                    textBeforeEdit = nil
+                    boxFocused = true
+                }
             }
         }
     }
@@ -298,6 +309,7 @@ struct BannerCanvasTextChrome: View {
             focusOnFirstAppear: true,
             selectAllOnFirstFocus: selectAll,
             onSubmit: { commitText() },
+            onCancel: { cancelText() },
             onDeleteWhenEmpty: removeLayer
         )
         .frame(
@@ -323,6 +335,9 @@ struct BannerCanvasTextChrome: View {
         case .ignore:
             return .ignored
         case let .begin(draft):
+            // UXS-1: eerst de bestaande tekst vastleggen — de regel hieronder
+            // overschrijft de draft met de zojuist getypte toets.
+            textBeforeEdit = layer?.string ?? draftString
             draftString = draft
             toolbarVisible = true
             isEditing = true
@@ -387,6 +402,27 @@ struct BannerCanvasTextChrome: View {
         if BannerTextPresets.isEmptyOrPlaceholder(draftString) {
             removeLayer()
         }
+    }
+
+    /// UXS-1: Escape — zet de tekst terug op de stand van vóór de edit en sluit
+    /// de editor. Was de laag vers (placeholder/leeg vóór het typen), dan hoort er
+    /// niets achter te blijven: die laag verdwijnt, net als bij ⌫ op een lege laag.
+    /// Registreert bewust géén undo-stap — een geannuleerde edit is geen wijziging.
+    private func cancelText() {
+        let original = textBeforeEdit
+        textBeforeEdit = nil
+        isEditing = false
+        guard let original else { return }
+        if BannerTextPresets.isEmptyOrPlaceholder(original) {
+            removeLayer()
+            return
+        }
+        draftString = original
+        guard let index = doc.layers.texts.firstIndex(where: { $0.id == layerID }),
+              doc.layers.texts[index].string != original else { return }
+        var layers = doc.layers
+        layers.texts[index].string = original
+        doc.layers = layers
     }
 
     private func removeLayer() {
