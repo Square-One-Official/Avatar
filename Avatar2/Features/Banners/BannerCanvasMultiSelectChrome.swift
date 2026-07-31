@@ -27,14 +27,14 @@ struct BannerCanvasMultiSelectChrome: View {
             ZStack {
                 ForEach(elementRects(), id: \.0) { _, rect in
                     Rectangle()
-                        .strokeBorder(Color.accentColor.opacity(0.55), lineWidth: 1)
+                        .strokeBorder(DSColor.Action.primary.opacity(0.55), lineWidth: 1)
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
                         .allowsHitTesting(false)
                 }
 
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    .strokeBorder(DSColor.Action.primary, lineWidth: 1.5)
                     .frame(width: bounds.width + 12, height: bounds.height + 12)
                     .position(x: bounds.midX, y: bounds.midY)
                     .allowsHitTesting(false)
@@ -70,7 +70,7 @@ struct BannerCanvasMultiSelectChrome: View {
 
     private func cornerHandle(at point: CGPoint) -> some View {
         Circle()
-            .fill(Color.accentColor)
+            .fill(DSColor.Action.primary)
             .frame(width: 12, height: 12)
             .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
             .contentShape(Circle())

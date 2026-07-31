@@ -88,7 +88,7 @@ private struct SplashBackgroundPlaceholder: View {
         }
         .ignoresSafeArea()
         .overlay(alignment: .bottomTrailing) {
-            Text("Asset-placeholder · splash-achtergrond")
+            Text("Asset placeholder · splash background")
                 .dsTextStyle(.labelSmall)
                 .foregroundStyle(DSColor.Foreground.primaryStaticBlack.opacity(DSOpacity.subtle))
                 .padding(DSSpacing.gap2)

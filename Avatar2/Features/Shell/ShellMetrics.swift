@@ -76,6 +76,13 @@ enum ShellMetrics {
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }
 
+    // MARK: - Settings-takeover (UXS-26 / UX27)
+
+    /// Top-inset van een Settings-pagina: onder de takeover-header door. Stond
+    /// als kale `76` op vijf pagina's — vijf plekken die stilletjes uit elkaar
+    /// konden lopen zodra de header verandert.
+    static let settingsPageTopInset: CGFloat = 76
+
     // MARK: - Zwevende upload-pill (UXS-10 / UX9)
 
     /// Hoogte van de "Upload portrait ⌘U"-pil op Home.

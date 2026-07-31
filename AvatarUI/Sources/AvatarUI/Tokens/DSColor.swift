@@ -117,6 +117,58 @@ public enum DSColor {
     }
 }
 
+/// Componenten van een `#RRGGBB`/`#RRGGBBAA`-string, 0…1. Eén parser voor de
+/// hele app (UXS-22): hij stond in drie varianten los in de codebase — DSColor
+/// (numeriek), BackgroundKit (alleen 6 cijfers, SwiftUI-Color) en
+/// BannerDocRenderer (6+8 cijfers, losse Doubles voor CoreGraphics). Drie
+/// parsers = drie verschillende antwoorden op rare invoer.
+public struct DSHexColor: Equatable, Sendable {
+    public let red: Double
+    public let green: Double
+    public let blue: Double
+    public let alpha: Double
+
+    /// nil bij ongeldige invoer — bewust géén stille zwart-fallback, zodat een
+    /// kapotte CMS-waarde zichtbaar wordt op de call site i.p.v. als zwart vlak.
+    public init?(_ hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6 || s.count == 8,
+              s.allSatisfy(\.isHexDigit),
+              let value = UInt64(s, radix: 16)
+        else { return nil }
+
+        if s.count == 8 {
+            red   = Double((value >> 24) & 0xFF) / 255
+            green = Double((value >> 16) & 0xFF) / 255
+            blue  = Double((value >> 8) & 0xFF) / 255
+            alpha = Double(value & 0xFF) / 255
+        } else {
+            red   = Double((value >> 16) & 0xFF) / 255
+            green = Double((value >> 8) & 0xFF) / 255
+            blue  = Double(value & 0xFF) / 255
+            alpha = 1
+        }
+    }
+}
+
+public extension Color {
+    /// `#RRGGBB` of `#RRGGBBAA` (met of zonder `#`). nil bij ongeldige invoer.
+    init?(hexRGB: String) {
+        guard let c = DSHexColor(hexRGB) else { return nil }
+        self.init(.sRGB, red: c.red, green: c.green, blue: c.blue, opacity: c.alpha)
+    }
+
+    /// `#RRGGBB` uit deze kleur (best-effort via NSColor in sRGB).
+    var hexRGB: String? {
+        guard let srgb = NSColor(self).usingColorSpace(.sRGB) else { return nil }
+        let r = Int((srgb.redComponent * 255).rounded())
+        let g = Int((srgb.greenComponent * 255).rounded())
+        let b = Int((srgb.blueComponent * 255).rounded())
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
+}
+
 extension Color {
     /// 0xRRGGBB + losse alpha-byte (0x00–0xFF), zoals de Figma-hexnotatie.
     init(hex: UInt32, alpha: UInt8 = 0xFF) {

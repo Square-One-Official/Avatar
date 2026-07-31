@@ -144,7 +144,7 @@ struct BannerTextFloatingToolbar: View {
         .background(
             Capsule(style: .continuous)
                 .fill(DSColor.Background.card)
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .dsShadow(.card)
         )
     }
 
@@ -224,7 +224,7 @@ struct BannerTextFloatingToolbar: View {
                     mutateLayer { $0.colorHex = hex }
                 }
             } label: {
-                Text("More Text Colours")
+                Text("More Text Colors")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.muted)
                     .frame(maxWidth: .infinity)
@@ -257,7 +257,9 @@ struct BannerTextFloatingToolbar: View {
             } label: {
                 Text("Delete Text")
                     .dsTextStyle(.labelBase)
-                    .foregroundStyle(Color.red)
+                    // UXS-23: één destructive-taal — DSMenuRow gebruikt hetzelfde
+                    // token, dus systeemrood hoort hier niet meer.
+                    .foregroundStyle(DSColor.Foreground.destructive)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, DSSpacing.gap2)
                     .padding(.vertical, DSSpacing.gap1)

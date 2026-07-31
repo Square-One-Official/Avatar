@@ -32,7 +32,7 @@ struct BannerCanvasBackgroundChrome: View {
                         .onTapGesture { toolbarMenuDismissNonce += 1 }
                 }
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .strokeBorder(Color.accentColor.opacity(0.85), lineWidth: 2)
+                    .strokeBorder(DSColor.Action.primary.opacity(0.85), lineWidth: 2)
                     .frame(width: rect.width - 4, height: rect.height - 4)
                     .position(x: rect.midX, y: rect.midY)
                     .allowsHitTesting(false)

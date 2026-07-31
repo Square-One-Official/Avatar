@@ -126,7 +126,7 @@ struct ExportSheet: View {
                 Image(nsImage: previewImage)
                     .resizable()
                     .scaledToFit()
-                    .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
+                    .dsShadow(.card, scale: 1.35)
             } else {
                 ProgressView()
             }

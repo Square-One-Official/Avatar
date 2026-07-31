@@ -64,7 +64,7 @@ enum AIFeature: String, CaseIterable, Sendable, Equatable {
         case .boostOnline:
             return "For the best upscaling quality, your photo is processed securely online. We never use your images for training."
         case .colorise:
-            return "To add colour to your photo, it is processed securely online. We never use your images for training."
+            return "To add color to your photo, it is processed securely online. We never use your images for training."
         case .restoreBody:
             return "To restore missing areas in your photo, it is processed securely online. We never use your images for training."
         case .effectGenerate, .effectRegenerate:

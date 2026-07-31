@@ -37,7 +37,7 @@ struct BannerCanvasImageChrome: View {
                         .onTapGesture { toolbarMenuDismissNonce += 1 }
                 }
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    .strokeBorder(DSColor.Action.primary, lineWidth: 1.5)
                     .frame(width: rect.width, height: rect.height)
                     .position(x: rect.midX, y: rect.midY)
                     .allowsHitTesting(false)
@@ -67,7 +67,7 @@ struct BannerCanvasImageChrome: View {
 
     private func cornerHandle(at point: CGPoint, rect: CGRect) -> some View {
         Circle()
-            .fill(Color.accentColor)
+            .fill(DSColor.Action.primary)
             .frame(width: 10, height: 10)
             .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
             .position(x: point.x, y: point.y)

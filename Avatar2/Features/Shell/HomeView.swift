@@ -355,8 +355,7 @@ struct HomeView: View {
             .frame(height: ShellMetrics.uploadPillHeight)
             .background(DSColor.Background.card, in: Capsule())
             .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
-            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
-            .shadow(color: .black.opacity(0.06), radius: 2, x: 0, y: 1)
+            .dsShadow(.card)
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)

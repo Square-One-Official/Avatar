@@ -52,7 +52,7 @@ struct HairNudgeBanner: View {
             RoundedRectangle(cornerRadius: DSRadius.xl2)
                 .strokeBorder(DSColor.Foreground.divider, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+        .dsShadow(.overlay)
         .frame(maxWidth: 460)
     }
 }

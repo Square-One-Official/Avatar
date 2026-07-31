@@ -38,7 +38,7 @@ struct SettingsPreferencesPage: View {
             }
             .padding(.top, DSSpacing.gap8)
         }
-        .padding(.top, 76)
+        .padding(.top, ShellMetrics.settingsPageTopInset)
         .padding(.leading, DSSpacing.gap6)
         .padding(.trailing, DSSpacing.gap6)
     }

@@ -98,7 +98,7 @@ struct BannerLogoPanel: View {
                 }
                 .buttonStyle(.plain)
                 .dsHoverScale()
-                .help("Add brand colour")
+                .help("Add brand color")
                 .dsDropdownMenu(
                     isPresented: Binding(
                         get: { presentation.colorPicker == .bannerLogoBrand },

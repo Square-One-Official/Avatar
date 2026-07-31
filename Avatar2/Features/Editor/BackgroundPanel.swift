@@ -286,7 +286,7 @@ struct BackgroundPanel: View {
             if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
             presentation.editorBackgroundColorPickerOpen = true
         }
-        .help("Pick a colour")
+        .help("Pick a color")
         .dsDropdownMenu(
             isPresented: Binding(
                 get: { presentation.editorBackgroundColorPickerOpen },

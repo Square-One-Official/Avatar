@@ -108,7 +108,9 @@ enum BackgroundGenerationStyle: String, CaseIterable, Identifiable, Sendable {
         case .illustration: "Illustration"
         case .line: "Line"
         case .bold: "Bold"
-        case .watercolour: "Watercolour"
+        // UXS-24: US-spelling op het LABEL; de case-naam blijft, die kan
+        // in opgeslagen keuzes/CMS-keys zitten.
+        case .watercolour: "Watercolor"
         case .pencil: "Pencil"
         case .animation3D: "3D Animation"
         case .custom: "Custom"

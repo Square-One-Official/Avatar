@@ -174,8 +174,8 @@ struct BannerCanvasOverlay: View {
         if let marquee {
             let rect = BannerCanvasChromeMetrics.screenRect(canvasRect: marquee, layout: layout)
             Rectangle()
-                .fill(Color.accentColor.opacity(0.12))
-                .overlay(Rectangle().strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 1))
+                .fill(DSColor.Action.primary.opacity(0.12))
+                .overlay(Rectangle().strokeBorder(DSColor.Action.primary.opacity(0.8), lineWidth: 1))
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
                 .allowsHitTesting(false)

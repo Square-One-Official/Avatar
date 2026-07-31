@@ -145,7 +145,7 @@ struct BannerTextPanel: View {
                     .fixedSize(horizontal: true, vertical: false)
                 }
 
-                section("Colour") {
+                section("Color") {
                     colorSwatch(layer)
                 }
             }
@@ -246,7 +246,7 @@ struct BannerTextPanel: View {
         }
         .buttonStyle(.plain)
         .dsHoverScale()
-        .help("Text colour")
+        .help("Text color")
         .dsDropdownMenu(
             isPresented: Binding(
                 get: { presentation.colorPicker == .bannerText(layerID: id) },
