@@ -648,24 +648,13 @@ struct EditorView: View {
     }
 
     /// Klein klikbaar zoom-%-readout linksonder (lichte vervanging van de in
-    /// 27.2a verwijderde zoom-HUD) — klik = Zoom to Fit (⌘0). Zelfde capsule-
-    /// recept als de board-Fit-chip (.ultraThinMaterial + divider-rand).
+    /// 27.2a verwijderde zoom-HUD) — klik = Zoom to Fit (⌘0). UXS-6/UXS-16: het
+    /// capsule-recept zat drie keer los in de app (editor, board, en de Studio
+    /// had niets); nu één DS-component.
     private var zoomChip: some View {
-        Button {
+        DSCanvasZoomChip(scale: camera.scale, fitScale: editorFitScale) {
             DSMotion.animate(DSMotion.springSmall) { applyEditorOpenFit() }
-        } label: {
-            Text("\(Int((camera.scale / editorFitScale * 100).rounded()))%")
-                .dsTextStyle(.labelSmall)
-                .monospacedDigit()
-                .foregroundStyle(DSColor.Foreground.primary)
-                .padding(.horizontal, DSSpacing.gap3)
-                .frame(height: 30)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
         }
-        .buttonStyle(.plain)
-        .help("Zoom to Fit (⌘0)")
-        .padding(DSSpacing.gap4)
     }
 
     private var editorBody: some View {

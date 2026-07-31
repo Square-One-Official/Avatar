@@ -87,10 +87,10 @@ implementatiebron). Dit epic mapt sprint 1 (P0) op 53.1–53.4; sprint 2/3 = 53.
   CreateEffectSheet-knop uit E09.3 meegenomen.
 
 ## 53.2 — Banner Studio bruikbaarheid (UX1 + UX2, P0)
-- status: in_progress
-- owner: FEAT (2026-07-12, checkpoint op branch v2/e53-2-banner-studio)
+- status: done
+- owner: FEAT (UX1 2026-07-12; UX2 afgerond 2026-08-01 op branch v2/e53-2-fit)
 - team: FEAT
-- blockedBy: — (E53.7 is af; UX2 kan gebouwd worden)
+- blockedBy: —
 
 **Voortgang (checkpoint 2026-07-12; builds + tests groen op 5 na — die 5
 (AuthSessionStorageTests) zijn de vergrendeld-scherm-flake, zie E13.6, los van
@@ -109,6 +109,45 @@ paden + forceer herbake. UX2: canvas overflowt het venster zonder fit/zoom —
 fit-to-window bij open + zoom-chip (hergebruik E27.10-recept).
 **DoD:** verse checkout, 1100×760-venster: banners-gallery toont schone thumbs
 en de Studio past in het venster; tests groen; Result-regel.
+
+**Result UX2 (2026-08-01):** de aanzet uit de checkpoint (`fitCameraScale` +
+`userZoomed`) was gebouwd maar nergens aangesloten — `fitCameraScale` had geen
+enkele call site en `userZoomed` werd nooit gezet of gelezen. Nu compleet:
+- **Fit bij openen en bij resize.** `fitCamera(viewport:animated:)` is één route
+  voor openen, doc-wissel, ⌘0 en de chip; de resize-handler her-fit alleen als de
+  gebruiker niet zélf gezoomd heeft. Zonder die guard pakte elk venster-resize de
+  handmatige zoom af.
+- **`userZoomed` echt aangesloten.** Gezet door ⌘+/⌘−, ⌘1 (Actual Size is een
+  bewuste zoom-stand) én — dat was de lastige — door scroll-zoom/pinch/spatie-pan.
+  Die lopen via `CanvasInteractionCatcher`, dat rechtstreeks door een
+  `Binding<CanvasCamera>` schrijft. In plaats van de gedeelde catcher aan te
+  passen, geeft de Studio 'm een wrapper-binding: élke schrijf daardoorheen is
+  per definitie een gebruikersgebaar, dus precies daar wordt de vlag gezet —
+  onze eigen fit-aanroepen raken 'm niet. Fit/⌘0 geeft de vlag weer vrij.
+- **Zoom-chip linksonder**, fit = 100%, klik = terug naar fit.
+
+**Meegenomen: UXS-16 (UX17, "drie canvassen, drie zoom-UI's").** Het
+capsule-recept stond drie keer los in de app — editor met een %-chip, board met
+een "Fit"-knop, Studio met niets. Een vierde kopie bouwen zou dat probleem juist
+vergroten, dus het is nu één DS-component:
+[DSCanvasZoomChip](../AvatarUI/Sources/AvatarUI/Components/DSCanvasZoomChip.swift),
+met een %-variant (editor, Studio) en een tekst-variant ("Fit", board — daar is
+geen vaste kaartmaat om een percentage tegen af te zetten). Er staat geen
+`ultraThinMaterial, in: Capsule()` meer in `Avatar2/`. **UXS-16 is hiermee niet
+volledig af** — het "⌘+/⌘−/⌘0 overal identiek"-deel van UX17 valt nog onder 53.5.
+
+**Tests (+11):** de percentage-logica (fit = 100%, degenererende invoer → "100%"
+i.p.v. NaN/0%) en een nieuwe suite
+[BannerFitToWindowTests](../Avatar2Tests/BannerFitToWindowTests.swift) die de
+audit-klacht zelf vastlegt: 1500×500 én 1584×396 passen binnen 1100×760 én
+820×620, de fit houdt marge over voor de selectie-handles, en een 0×0-viewport
+(vóór de eerste layout) geeft een veilige schaal i.p.v. NaN.
+
+**Openstaand:** de live-verificatie uit de DoD (Studio openen op 1100×760 en
+820×620, screenshot vóór/na) is niet gedraaid — de banners-suite zit achter
+`AppFeatureFlags.bannersEnabled` (default uit, besluit Thierry 2026-07-12), dus
+dit pad is alleen met de flag aan te zien. De geometrie is in plaats daarvan met
+tests vastgelegd op exact die twee venstermaten.
 
 ## 53.3 — DSThumbnailCard: AX + hover als één DS-story (UX28 + UX26, P0)
 - status: done (gemerged naar v2-main)

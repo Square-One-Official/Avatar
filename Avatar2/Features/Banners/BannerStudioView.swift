@@ -107,7 +107,7 @@ struct BannerStudioView: View {
         }
         .onChange(of: doc.persistentModelID) { _, _ in
             doc.dropEmptyTextLayers()
-            applyBannerOpenFit()
+            fitCamera(animated: false)
         }
         .onDisappear {
             thumbnailBakeTask?.cancel()
@@ -121,13 +121,39 @@ struct BannerStudioView: View {
         .focusedSceneValue(\.canvasZoom, CanvasZoomActions(
             zoomIn: { zoomCamera(by: 1.25) },
             zoomOut: { zoomCamera(by: 0.8) },
-            zoomToFit: { DSMotion.animate(DSMotion.springSmall) { applyBannerOpenFit() } },
-            actualSize: { DSMotion.animate(DSMotion.springSmall) { applyBannerActualSize() } }
+            zoomToFit: { fitCamera() },
+            actualSize: {
+                // Actual Size is een bewuste handmatige zoom-stand.
+                userZoomed = true
+                DSMotion.animate(DSMotion.springSmall) { applyBannerActualSize() }
+            }
         ))
     }
 
     private func zoomCamera(by factor: CGFloat) {
+        // UXS-6: vanaf nu is de zoom van de gebruiker — een venster-resize mag
+        // 'm niet meer overschrijven met een fit.
+        userZoomed = true
         DSMotion.animate(DSMotion.springSmall) { camera.zoomCentered(by: factor) }
+    }
+
+    /// Fit (chip, ⌘0, openen, doc-wissel): terug naar "alles past" én de
+    /// handmatige-zoom-vlag vrijgeven, zodat resize weer mag mee-fitten.
+    private func fitCamera(viewport: CGSize? = nil, animated: Bool = true) {
+        userZoomed = false
+        if animated {
+            DSMotion.animate(DSMotion.springSmall) { applyBannerOpenFit(viewport: viewport) }
+        } else {
+            applyBannerOpenFit(viewport: viewport)
+        }
+    }
+
+    /// Camera-schaal waarop de banner precies past — het 100%-anker van de chip.
+    private var bannerFitScale: CGFloat {
+        BannerCanvasChromeMetrics.fitCameraScale(
+            canvasSize: doc.canvasSize,
+            viewport: canvasViewportSize
+        )
     }
 
     private func applyBannerOpenFit(viewport: CGSize? = nil) {
@@ -307,7 +333,17 @@ struct BannerStudioView: View {
             }
             .background {
                 CanvasInteractionCatcher(
-                    camera: $camera,
+                    // UXS-6: élke schrijf hierdoorheen komt van een gebruikers-
+                    // gebaar (scroll-zoom, pinch, spatie-pan), dus precies hier
+                    // markeren we "de zoom is nu van de gebruiker". Zo raakt de
+                    // vlag niet gezet door onze eigen fit-aanroepen.
+                    camera: Binding(
+                        get: { camera },
+                        set: { newValue in
+                            if newValue != camera { userZoomed = true }
+                            camera = newValue
+                        }
+                    ),
                     // Alleen zijpaneel-scroll blokkeert canvas-zoom — niet de
                     // floating tekst-toolbar bij selectie (zoom moet blijven werken).
                     chromeHovered: model.presentation.bannerActiveTool != nil
@@ -327,14 +363,26 @@ struct BannerStudioView: View {
             }
             .onAppear {
                 canvasViewportSize = viewport
-                applyBannerOpenFit(viewport: viewport)
+                fitCamera(viewport: viewport, animated: false)
             }
             .onChange(of: proxy.size) { _, size in
                 canvasViewportSize = size
+                // UXS-6: her-fit bij venster-resize, maar NIET als de gebruiker
+                // zelf heeft ingezoomd — dan zou het venster z'n zoom afpakken.
+                guard !userZoomed else { return }
                 applyBannerOpenFit(viewport: size)
             }
+            .overlay(alignment: .bottomLeading) { zoomChip }
         }
         .ignoresSafeArea()
+    }
+
+    /// UXS-6: zoom-readout linksonder, zelfde component als editor en board.
+    /// Fit = 100%; klik zet de camera terug op fit.
+    private var zoomChip: some View {
+        DSCanvasZoomChip(scale: camera.scale, fitScale: bannerFitScale) {
+            fitCamera()
+        }
     }
 
     /// De banner-kaart op fit-layout-posities; krijgt camera-transform in `canvas`.

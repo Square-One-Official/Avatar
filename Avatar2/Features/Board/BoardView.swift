@@ -1357,16 +1357,11 @@ struct BoardView: View {
                     .foregroundStyle(selection.isEmpty && exportStatus == nil
                                      ? DSColor.Foreground.muted : DSColor.Foreground.primary)
                 Spacer()
-                Button("Fit", action: fit)
-                    .buttonStyle(.plain)
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .padding(.horizontal, DSSpacing.gap3)
-                    .frame(height: 30)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
+                // UXS-6/UXS-16: gedeelde chip. De board toont "Fit" i.p.v. een
+                // percentage — hier is er geen vaste kaartmaat om tegen af te
+                // zetten, dus een percentage zou nergens op slaan.
+                DSCanvasZoomChip(title: "Fit", action: fit)
             }
-            .padding(DSSpacing.gap4)
         }
     }
 }
