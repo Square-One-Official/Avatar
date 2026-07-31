@@ -251,6 +251,7 @@
 		B8FF564CD5FA186B77A96C95 /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */; };
 		BCB144F53A50F7E154817D1C /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 24422B485569134EE9164799 /* Sparkle */; };
 		BCF0B97BA2069984413BCB67 /* FloatingOverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */; };
+		BF781691B508017C788C0E57 /* HomeSectionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 485D83080A757EF57194957C /* HomeSectionsTests.swift */; };
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
 		C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE640D635F259A76EC318FDB /* AppLinks.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
@@ -419,6 +420,7 @@
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
 		44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadPortraitCommand.swift; sourceTree = "<group>"; };
 		46B2F1C093D7657D24C28653 /* BannerCanvasDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasDrop.swift; sourceTree = "<group>"; };
+		485D83080A757EF57194957C /* HomeSectionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionsTests.swift; sourceTree = "<group>"; };
 		48C5ADEE3EE6E5C685CCE119 /* HairPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HairPanel.swift; sourceTree = "<group>"; };
 		48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformOverlay.swift; sourceTree = "<group>"; };
 		48EF633AE84A1D2EF9412998 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -942,6 +944,7 @@
 				BA61629BB768B6A77EF92F3A /* Folder2DefaultBackgroundTests.swift */,
 				1561422710A925A04041E596 /* FolderSetScopeTests.swift */,
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
+				485D83080A757EF57194957C /* HomeSectionsTests.swift */,
 				6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 				BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */,
@@ -1562,6 +1565,7 @@
 				2A605AA106F8A384DCA9CBF9 /* Folder2DefaultBackgroundTests.swift in Sources */,
 				0F18DE1D8BACEDB3AA13CEAC /* FolderSetScopeTests.swift in Sources */,
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
+				BF781691B508017C788C0E57 /* HomeSectionsTests.swift in Sources */,
 				9CF91F689F47904D7A69234F /* LocalUpscaleTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 				B8206C2F61CE578216A90494 /* PersistentPresentationTests.swift in Sources */,

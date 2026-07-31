@@ -22,7 +22,6 @@ struct HomeView: View {
     private var savedBanners: [BannerDoc] { bannerDocs.filter { $0.previewImageData != nil } }
     // E39.2: CMS-presets voor de "start from preset"-rij (soft-fail → fallback).
     @State private var presetsModel: BannerPresetsModel
-    @State private var featuredHovering = false
 
     init(model: ShellModel, entitlement: EntitlementModel) {
         self.model = model
@@ -30,16 +29,71 @@ struct HomeView: View {
         _presetsModel = State(initialValue: BannerPresetsModel(backend: entitlement.backend))
     }
 
-    // Vast 4-koloms rooster met duidelijke ruimte ertussen. De tegel zelf
+    // Vast rooster met duidelijke ruimte ertussen. De tegel zelf
     // (Color.clear + aspectRatio(.fit)) wordt nooit breder dan z'n kolom, dus
-    // gewone flexibele kolommen volstaan nu — geen overloop, echte gaps.
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: DSSpacing.gap5), count: 4)
+    // gewone flexibele kolommen volstaan — geen overloop, echte gaps.
+    // UXS-9: maten uit ShellMetrics, gedeeld met de Portraits-gallery.
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: ShellMetrics.portraitGridSpacing),
+        count: ShellMetrics.portraitGridColumnCount
+    )
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// UXS-9 (UX8): secties op TIJD, niet op "de nieuwste is speciaal". Recent =
+    /// bewerkt in de laatste week (max `recentSectionLimit`); de rest is Earlier.
+    /// De oude indeling zette altijd precies één portret in Recent — ook als dat
+    /// van maanden geleden was — en noemde al het andere Earlier.
+    private var recentPortraits: [Portrait2] {
+        let cutoff = Date().addingTimeInterval(-ShellMetrics.recentSectionWindow)
+        return Array(portraits.filter { $0.updatedAt >= cutoff }
+            .prefix(ShellMetrics.recentSectionLimit))
+    }
+
+    private var earlierPortraits: [Portrait2] {
+        let recentIDs = Set(recentPortraits.map(\.persistentModelID))
+        return portraits.filter { !recentIDs.contains($0.persistentModelID) }
+    }
 
     var body: some View {
-        if portraits.isEmpty {
-            firstUse
-        } else {
-            overview
+        Group {
+            if portraits.isEmpty {
+                firstUse
+            } else {
+                overview
+            }
+        }
+        // UXS-9: first-use ↔ overzicht wisselde met een harde snap.
+        .dsMotion(DSMotion.emphasis, value: portraits.isEmpty)
+        .transition(.dsScaleFade(anchor: .center, reduceMotion: reduceMotion))
+    }
+
+    /// Eén grid-sectie (kop + tegels) — Recent en Earlier delen exact dezelfde
+    /// celmaat en hover-behandeling, want het zijn dezelfde kaarten.
+    @ViewBuilder
+    private func portraitSection(_ title: String, _ items: [Portrait2]) -> some View {
+        if !items.isEmpty {
+            Text(title)
+                .dsTextStyle(.labelLarge)
+                .foregroundStyle(DSColor.Foreground.subtle)
+            LazyVGrid(columns: columns, spacing: ShellMetrics.portraitGridSpacing) {
+                ForEach(items) { portrait in
+                    PortraitGridTile(
+                        portrait: portrait, folders: folders, model: model,
+                        isSelected: model.isPortraitSelected(portrait),
+                        ordered: { portraits.map(\.persistentModelID) },
+                        selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+                        onContextMenu: { frame in
+                            model.preparePortraitContextMenu(on: portrait)
+                            model.presentation.openPortraitContextMenu(
+                                portraitID: portrait.persistentModelID,
+                                anchor: frame,
+                                scope: .home
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -68,38 +122,16 @@ struct HomeView: View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap5) {
-                    Text("Recent")
+                    // UXS-9: "Home" is de paginatitel; Recent/Earlier zijn
+                    // sectiekoppen daaronder (waren allebei paginatitel-stijl,
+                    // wat suggereerde dat het losse schermen waren).
+                    Text("Home")
                         .dsTextStyle(.h3)
                         .foregroundStyle(DSColor.Foreground.primary)
                         .padding(.top, DSSpacing.gap6)
 
-                    if let latest = portraits.first {
-                        featured(latest)
-                    }
-
-                    if portraits.count > 1 {
-                        Text("Earlier")
-                            .dsTextStyle(.labelLarge)
-                            .foregroundStyle(DSColor.Foreground.subtle)
-                        LazyVGrid(columns: columns, spacing: DSSpacing.gap5) {
-                            ForEach(Array(portraits.dropFirst())) { portrait in
-                                PortraitGridTile(
-                                    portrait: portrait, folders: folders, model: model,
-                                    isSelected: model.isPortraitSelected(portrait),
-                                    ordered: { portraits.map(\.persistentModelID) },
-                                    selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
-                                    onContextMenu: { frame in
-                                        model.preparePortraitContextMenu(on: portrait)
-                                        model.presentation.openPortraitContextMenu(
-                                            portraitID: portrait.persistentModelID,
-                                            anchor: frame,
-                                            scope: .home
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    portraitSection("Recent", recentPortraits)
+                    portraitSection("Earlier", earlierPortraits)
 
                     // Banners-sectie achter de feature-flag (release zonder banners).
                     if AppFeatureFlags.bannersEnabled {
@@ -261,85 +293,6 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .dsHoverScale(1.02)
     }
-
-    /// Max-breedte van de featured-kaart — compacter dan de volledige
-    /// vensterbreedte, maar iets groter dan voorheen (gebruikersfeedback).
-    private let featuredMaxWidth: CGFloat = 420
-
-    private func featured(_ portrait: Portrait2) -> some View {
-        let isSelected = model.isPortraitSelected(portrait)
-        // Zelfde robuuste vierkant als de grid-tegels: Color.clear bepaalt de
-        // 1:1-maat, de compositie ligt eroverheen (anders dicteert de
-        // achtergrond-afbeelding z'n eigen — tweemaal zo hoge — ratio).
-        return Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay {
-                ZStack(alignment: .bottomLeading) {
-                    PortraitCompositeMeasured(portrait: portrait)
-
-                    // UXS-3: gedeelde scrim i.p.v. een eigen ramp.
-                    DSCardLabelScrim()
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                            .dsTextStyle(.labelLarge).foregroundStyle(.white).lineLimit(1)
-                        if !portrait.role.isEmpty {
-                            Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
-                        }
-                    }
-                    .padding(DSSpacing.gap4)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: DSRadius.xl3, style: .continuous)
-                    .strokeBorder(
-                        (isSelected || featuredHovering) ? DSColor.Action.primary : DSColor.Foreground.divider,
-                        lineWidth: (isSelected || featuredHovering) ? DSBorderWidth.medium : DSBorderWidth.thin
-                    )
-            )
-            // Selectie-vinkje (Finder-stijl) rechtsboven.
-            .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    DSSelectionCheckBadge(size: 22)
-                        .padding(DSSpacing.gap3)
-                }
-            }
-            .contentShape(Rectangle())
-            .frame(maxWidth: featuredMaxWidth, alignment: .leading)
-            .onHover { featuredHovering = $0 }
-            .dsMotion(DSMotion.micro, value: featuredHovering)
-            .dsMotion(DSMotion.micro, value: isSelected)
-            // Plain klik = openen; ⌘/⇧ = multi-select (gedeeld via ShellModel).
-            .onTapGesture {
-                model.handlePortraitClick(portrait, ordered: portraits.map(\.persistentModelID), mods: NSApp.currentEvent?.modifierFlags ?? [])
-            }
-            .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
-                model.preparePortraitContextMenu(on: portrait)
-                model.presentation.openPortraitContextMenu(
-                    portraitID: portrait.persistentModelID,
-                    anchor: frame,
-                    scope: .home
-                )
-            }
-            // Ook de uitgelichte Recent-kaart is naar een map sleepbaar.
-            .draggable(PortraitDragItem(id: portrait.persistentModelID))
-            // UXS-7 (UX28): de hero-kaart als één AX-element met open/selecteer/menu.
-            .portraitCardAccessibility(
-                portrait: portrait, model: model, isSelected: isSelected,
-                ordered: { portraits.map(\.persistentModelID) },
-                onContextMenu: { frame in
-                    // E53.7: menu-request via de presentation-store (scope .home).
-                    model.preparePortraitContextMenu(on: portrait)
-                    model.presentation.openPortraitContextMenu(
-                        portraitID: portrait.persistentModelID,
-                        anchor: frame,
-                        scope: .home
-                    )
-                }
-            )
-    }
-
     private var uploadBar: some View {
         Button { model.presentOpenPanel() } label: {
             HStack(spacing: DSSpacing.gap2) {
