@@ -31,6 +31,10 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
         self.equalWidth = equalWidth
     }
 
+    /// UXS-25: welk segment de muis raakt — een segmented control zonder hover
+    /// voelt dood, want niets verraadt dat de niet-gekozen kant klikbaar is.
+    @State private var hoveredTag: Tag?
+
     public var body: some View {
         HStack(spacing: 0) {
             ForEach(segments) { segment in
@@ -40,11 +44,31 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
         .padding(DSSpacing.gap0_5)
         .background(DSColor.Background.neutral, in: Capsule())
         .dsMotion(DSMotion.springSmall, value: selection)
+        // UXS-25: ←/→ lopen door de segmenten zodra de control focus heeft.
+        .focusable()
+        .onMoveCommand { direction in
+            switch direction {
+            case .left:  moveSelection(by: -1)
+            case .right: moveSelection(by: 1)
+            default:     break
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Verschuift de selectie binnen de grenzen (geen wrap-around: op een
+    /// tweeknops-toggle zou wrappen de selectie laten stuiteren).
+    private func moveSelection(by offset: Int) {
+        guard let index = segments.firstIndex(where: { $0.tag == selection }) else { return }
+        let next = index + offset
+        guard segments.indices.contains(next) else { return }
+        DSMotion.animate(DSMotion.springSmall) { selection = segments[next].tag }
     }
 
     @ViewBuilder
     private func segmentButton(_ segment: Segment) -> some View {
         let isSelected = selection == segment.tag
+        let isHovered = hoveredTag == segment.tag
         let horizontalPadding = equalWidth ? DSSpacing.gap2 : DSSpacing.gap4
         Button {
             DSMotion.animate(DSMotion.springSmall) { selection = segment.tag }
@@ -62,11 +86,17 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
                         Capsule()
                             .fill(DSColor.Background.neutralStronger)
                             .matchedGeometryEffect(id: "selection", in: selectionNamespace)
+                    } else if isHovered {
+                        // Alleen op níet-gekozen segmenten: de selectie heeft al
+                        // een vulling, daar zou hover er alleen troebel op staan.
+                        Capsule().fill(DSColor.Background.neutralStronger.opacity(0.5))
                     }
                 }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .onHover { hoveredTag = $0 ? segment.tag : (hoveredTag == segment.tag ? nil : hoveredTag) }
+        .dsMotion(DSMotion.micro, value: isHovered)
         .accessibilityLabel(segment.label)
         .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
     }

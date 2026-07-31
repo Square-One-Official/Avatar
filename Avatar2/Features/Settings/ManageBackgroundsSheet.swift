@@ -64,23 +64,14 @@ struct ManageBackgroundsSheet: View {
         .padding(.bottom, DSSpacing.gap4)
     }
 
+    // UXS-25: tweede hand-gerolde kopie — nu dezelfde DS-component als de
+    // paywall, inclusief hover, ←/→ en de selected-trait.
     private var segmented: some View {
-        HStack(spacing: DSSpacing.gap1) {
-            ForEach(Tab.allCases) { item in
-                Button { tab = item } label: {
-                    Text(item.rawValue.capitalized)
-                        .dsTextStyle(.labelBase)
-                        .foregroundStyle(tab == item ? DSColor.Foreground.primary : DSColor.Foreground.muted)
-                        .padding(.horizontal, DSSpacing.gap3)
-                        .frame(height: 32)
-                        .background(
-                            tab == item ? DSColor.Background.neutralStronger : .clear,
-                            in: Capsule()
-                        )
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+        HStack(spacing: 0) {
+            DSSegmentedControl(
+                selection: $tab,
+                segments: Tab.allCases.map { .init(tag: $0, label: $0.rawValue.capitalized) }
+            )
             Spacer()
         }
     }
