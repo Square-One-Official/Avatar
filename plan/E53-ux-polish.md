@@ -217,10 +217,11 @@ gedraaid; die vergt de systeeminstelling omzetten op Thierry's Mac. De guard +
 tests borgen dat er geen route meer ís die de vlag negeert, maar het oogtest-deel
 staat nog open.
 
-## 53.5 — P1/P2-restlijst (backlog)
-- status: backlog
+## 53.5 — P1/P2-restlijst
+- status: in_progress
+- owner: FEAT+DS (2026-08-01, branch v2/e53-5-rest)
 - team: FEAT+DS
-- blockedBy: 53.1
+- blockedBy: —
 
 De overige P1/P2-bevindingen uit `AUDIT-UX-2026-07-02.md` (UX8, UX12–UX27,
 UX31–UX33) — oppakken in een volgende polish-ronde; UX6 (update-flow
