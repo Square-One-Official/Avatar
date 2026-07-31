@@ -35,15 +35,16 @@ struct SignInSheet: View {
         .appliedAppearancePreference()
         .overlay(alignment: .bottom) {
             if let error = entitlement.authError {
-                DSToast(title: "Couldn't sign you in", description: error) {
-                    entitlement.dismissAuthError()
-                }
+                // UXS-2: duur uit het model (geen eigen literal) en de toast
+                // regelt zelf aftellen + hover-pauze.
+                DSToast(
+                    title: "Couldn't sign you in",
+                    description: error,
+                    autoDismiss: EntitlementModel.infoToastDuration,
+                    onClose: { entitlement.dismissAuthError() }
+                )
                 .padding(DSSpacing.gap4)
                 .transition(.dsSlide(.bottom, reduceMotion: reduceMotion))
-                .task {
-                    try? await Task.sleep(for: .seconds(5))
-                    entitlement.dismissAuthError()
-                }
             }
         }
         .dsMotion(DSMotion.enter, value: entitlement.authError)

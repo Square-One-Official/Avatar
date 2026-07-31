@@ -154,24 +154,31 @@ struct Avatar2App: App {
             // E18.23: toasts rechtsONDERin, met slide-in/out — niet meer
             // centraal-onder waar ze knoppen overlapten.
             .overlay(alignment: .bottomTrailing) {
+                // UXS-2: één slot, dus prioriteit i.p.v. if/else-volgorde —
+                // `activeToast` kiest fout > op-is-op > bezig. Een fout mag de
+                // spinner verdringen: de operatie waar die bij hoorde is mislukt.
                 Group {
-                    if entitlement.isShowingOutOfCreditsToast {
+                    switch entitlement.activeToast {
+                    case let .error(message):
+                        // E18.3: cloud-fout als toast i.p.v. inline tekst.
+                        // E44.1: duur uit het model (≥ 8s) — 4s was zo kort
+                        // dat een echte fout onopgemerkt bleef. UXS-2: de toast
+                        // telt zelf af (op `id: message`, dus een vervangende
+                        // melding krijgt de volle duur) en pauzeert op hover.
+                        DSToast(
+                            title: "Something went wrong",
+                            description: message,
+                            autoDismiss: EntitlementModel.errorToastDuration,
+                            onClose: { entitlement.dismissErrorToast() }
+                        )
+                    case .outOfCredits:
                         OutOfCreditsToastView(model: entitlement)
-                    } else if let ctx = entitlement.workingContext {
+                    case let .working(ctx):
                         WorkingToastView(context: ctx) {
                             entitlement.dismissWorkingToast()
                         }
-                    } else if let message = entitlement.errorToast {
-                        // E18.3: cloud-fout als toast i.p.v. inline tekst.
-                        // E44.1: duur uit het model (≥ 8s) — 4s was zo kort
-                        // dat een echte fout onopgemerkt bleef.
-                        DSToast(title: "Something went wrong", description: message) {
-                            entitlement.dismissErrorToast()
-                        }
-                        .task {
-                            try? await Task.sleep(for: EntitlementModel.errorToastDuration)
-                            entitlement.dismissErrorToast()
-                        }
+                    case .none:
+                        EmptyView()
                     }
                 }
                 .padding(DSSpacing.gap5)

@@ -7,7 +7,9 @@ import SwiftUI
 
 public struct DSMenuRow: View {
     private let title: String
-    private let icon: String
+    /// SF-symboolnaam óf een kant-en-klaar `Image` (bijv. een Phosphor-icoon uit
+    /// een toolbar-item dat als menu-rij hergebruikt wordt).
+    private let icon: Image
     private let destructive: Bool
     private let showsChevron: Bool
     private let shortcut: String?
@@ -17,6 +19,26 @@ public struct DSMenuRow: View {
     public init(
         _ title: String,
         icon: String,
+        destructive: Bool = false,
+        showsChevron: Bool = false,
+        shortcut: String? = nil,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = Image(systemName: icon)
+        self.destructive = destructive
+        self.showsChevron = showsChevron
+        self.shortcut = shortcut
+        self.disabled = disabled
+        self.action = action
+    }
+
+    /// UXS-4: variant voor call sites die het icoon al als `Image` hebben —
+    /// de capsule-overflow hergebruikt zijn toolbar-iconen als menu-rijen.
+    public init(
+        _ title: String,
+        icon: Image,
         destructive: Bool = false,
         showsChevron: Bool = false,
         shortcut: String? = nil,
@@ -35,7 +57,7 @@ public struct DSMenuRow: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: icon)
+                icon
                     .font(.system(size: 12, weight: .medium))
                     .frame(width: 16)
                 Text(title).dsTextStyle(.labelBase)

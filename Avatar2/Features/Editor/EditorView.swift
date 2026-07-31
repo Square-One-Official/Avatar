@@ -449,6 +449,9 @@ struct EditorView: View {
                 id: "restore-original",
                 icon: Image(systemName: "arrow.counterclockwise"),
                 label: "Restore to original",
+                // UXS-4: gooit het huidige bewerkte beeld weg → destructive-tint
+                // i.p.v. de systeem-accentkleur die het systeem-Menu gaf.
+                isDestructive: true,
                 action: restoreToOriginal
             ),
         ]
@@ -673,6 +676,10 @@ struct EditorView: View {
             activeTool: toolSelection,
             overflowTools: Self.overflowItems,
             overflowActions: overflowActions,
+            overflowOpen: Binding(
+                get: { model.presentation.editorOverflowMenuOpen },
+                set: { model.presentation.editorOverflowMenuOpen = $0 }
+            ),
             // E-fix: de feature-tools werken op de afgewerkte cutout — tijdens de
             // isolating-fase is die er nog niet, dus dim ze tot het resultaat staat.
             toolsEnabled: isolating == nil

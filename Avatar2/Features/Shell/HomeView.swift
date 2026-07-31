@@ -107,13 +107,15 @@ struct HomeView: View {
                     }
                 }
                 .padding(.horizontal, DSSpacing.gap6)
-                // Extra bottom padding so last row isn't hidden behind the floating button.
-                .padding(.bottom, 80)
+                // UXS-10 (UX9): de zwevende upload-pil mag content niet permanent
+                // maskeren. Inset afgeleid uit de pil-maten (ShellMetrics) i.p.v.
+                // een los getal, zodat 'ie meebeweegt als de pil verandert.
+                .padding(.bottom, ShellMetrics.uploadPillScrollInset)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             uploadBar
-                .padding(.bottom, DSSpacing.gap5)
+                .padding(.bottom, ShellMetrics.uploadPillBottomInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // CMS-banner-presets alleen laden als de Banners-suite aan staat.
@@ -275,10 +277,8 @@ struct HomeView: View {
                 ZStack(alignment: .bottomLeading) {
                     PortraitCompositeMeasured(portrait: portrait)
 
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.55)],
-                        startPoint: .center, endPoint: .bottom
-                    )
+                    // UXS-3: gedeelde scrim i.p.v. een eigen ramp.
+                    DSCardLabelScrim()
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
@@ -352,7 +352,7 @@ struct HomeView: View {
                 DSBadge("⌘U", type: .neutral)
             }
             .padding(.horizontal, DSSpacing.gap4)
-            .frame(height: 44)
+            .frame(height: ShellMetrics.uploadPillHeight)
             .background(DSColor.Background.card, in: Capsule())
             .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
             .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)

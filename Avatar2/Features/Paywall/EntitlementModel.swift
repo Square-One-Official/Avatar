@@ -49,7 +49,7 @@ final class EntitlementModel {
     private(set) var errorToast: String?
 
     /// Lopende cloud-actie-toast — statische titel + cycling copy per feature.
-    struct WorkingContext {
+    struct WorkingContext: Equatable {
         let title: String
         let messages: [String]
     }
@@ -299,6 +299,42 @@ final class EntitlementModel {
     /// (plan-DoD). Constante hier (niet inline in `Avatar2App`) zodat de
     /// ondergrens testbaar is.
     static let errorToastDuration: Duration = .seconds(8)
+
+    /// UXS-2: duur voor niet-kritieke meldingen (sign-in-fout, op-is-op). Eén
+    /// bron i.p.v. losse literals per call site.
+    static let infoToastDuration: Duration = .seconds(5)
+
+    // MARK: - UXS-2 toast-prioriteit
+
+    /// Welke toast er op enig moment rechtsonder hoort te staan. Er is één slot,
+    /// dus de keuze is een prioriteitsvraag — niet de volgorde van een if/else-
+    /// keten. Een FOUT wint altijd: die zegt dat de operatie is mislukt, dus de
+    /// bijbehorende spinner is per definitie achterhaald.
+    enum ActiveToast: Equatable {
+        case error(String)
+        case outOfCredits
+        case working(WorkingContext)
+    }
+
+    /// Pure reducer — los van de view zodat de prioriteit testbaar is.
+    static func resolveToast(
+        error: String?,
+        outOfCredits: Bool,
+        working: WorkingContext?
+    ) -> ActiveToast? {
+        if let error { return .error(error) }
+        if outOfCredits { return .outOfCredits }
+        if let working { return .working(working) }
+        return nil
+    }
+
+    var activeToast: ActiveToast? {
+        Self.resolveToast(
+            error: errorToast,
+            outOfCredits: isShowingOutOfCreditsToast,
+            working: workingContext
+        )
+    }
 
     func presentError(_ message: String) {
         errorToast = message

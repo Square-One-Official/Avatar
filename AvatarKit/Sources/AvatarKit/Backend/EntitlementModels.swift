@@ -31,16 +31,58 @@ public enum ProTier: String, Codable, CaseIterable, Identifiable, Sendable {
     /// credit per image.
     public var monthlyCredits: Int { 200 }
 
-    /// Display price in EUR (informational only — Stripe is source of truth).
-    public var monthlyPriceEUR: String { "€4,99" }
+    // Bedragen (informatief — Stripe is de bron van waarheid). De VALUTA is
+    // altijd EUR omdat Stripe in euro's afrekent; alleen de NOTATIE volgt de
+    // systeemlocale (UXS-11): "€4,99" in nl-NL, "€4.99" in en-US. Hardgecodeerde
+    // strings logen tegen elke niet-Nederlandse gebruiker.
+    /// Exact opgebouwd (cent als significand), niet via een Double-literal:
+    /// `Decimal(4.99)` levert 4.99000000000000102… op en dan klopt zelfs
+    /// 10× de maandprijs niet meer precies tegen de jaarprijs.
+    public var monthlyPrice: Decimal { Decimal(sign: .plus, exponent: -2, significand: 499) }
 
-    /// Display price for the yearly plan (€49,90 = 10× monthly = 2 months
-    /// free, 17% discount). Stripe is source of truth.
-    public var annualPriceEUR: String { "€49,90" }
+    /// Jaarplan = 10× de maandprijs (2 maanden gratis, 17% korting).
+    public var annualPrice: Decimal { Decimal(sign: .plus, exponent: -2, significand: 4990) }
 
-    /// Per-month equivalent when billed annually, for "€4,16/mo billed
-    /// annually" copy in the paywall.
-    public var annualPricePerMonthEUR: String { "€4,16" }
+    /// Maand-equivalent bij jaarlijkse betaling, voor "…/mo billed annually".
+    public var annualPricePerMonth: Decimal { Decimal(sign: .plus, exponent: -2, significand: 416) }
+
+    /// Display price in EUR, genoteerd volgens de systeemlocale.
+    public var monthlyPriceDisplay: String { ProTier.formatPrice(monthlyPrice) }
+    public var annualPriceDisplay: String { ProTier.formatPrice(annualPrice) }
+    public var annualPricePerMonthDisplay: String { ProTier.formatPrice(annualPricePerMonth) }
+
+    // De oude vaste-notatie-namen blijven bestaan omdat v1 (`Avatar/`, bevroren)
+    // ze gebruikt en buiten deze story valt; ze wijzen nu naar de locale-bewuste
+    // waarde, dus v1 profiteert mee zonder dat we die code aanraken.
+    public var monthlyPriceEUR: String { monthlyPriceDisplay }
+    public var annualPriceEUR: String { annualPriceDisplay }
+    public var annualPricePerMonthEUR: String { annualPricePerMonthDisplay }
+
+    /// EUR-bedrag in de notatie van `locale`. Los testbaar; `locale` is alleen
+    /// een parameter zodat tests niet van de machine-instelling afhangen.
+    public static func formatPrice(_ amount: Decimal, locale: Locale = .current) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "EUR"
+        formatter.locale = locale
+        // Hele bedragen tonen we niet als "€50" maar als "€50,00" zou storen bij
+        // een prijs die op ,90 eindigt — dus altijd twee decimalen, behalve als
+        // het bedrag exact rond is.
+        let isWhole = amount == amount.rounded(0, .plain)
+        formatter.minimumFractionDigits = isWhole ? 0 : 2
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: amount as NSDecimalNumber)
+            ?? "€\(amount)"
+    }
+}
+
+private extension Decimal {
+    func rounded(_ scale: Int, _ mode: NSDecimalNumber.RoundingMode) -> Decimal {
+        var value = self
+        var result = Decimal()
+        NSDecimalRound(&result, &value, scale, mode)
+        return result
+    }
 }
 
 /// Billing cadence chosen by the user in the paywall. Sent to the

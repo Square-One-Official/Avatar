@@ -277,10 +277,8 @@ struct PortraitGridTile: View {
         ZStack(alignment: .bottomLeading) {
             PortraitCompositeMeasured(portrait: portrait)
 
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.55)],
-                startPoint: .center, endPoint: .bottom
-            )
+            // UXS-3: gedeelde scrim i.p.v. een eigen ramp — zie DSCardLabelScrim.
+            DSCardLabelScrim()
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(portrait.name.isEmpty ? "Untitled" : portrait.name)

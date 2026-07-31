@@ -84,6 +84,9 @@ final class UIPresentationStore {
     var editorBackgroundColorPickerOpen = false
     /// Boost-/Remove background-chip-dropdown in het Edit-paneel (E41.2).
     var editorChipMenu: ChipMenu?
+    /// De `⋯`-overflow van de onderste capsule (UXS-4: DS-dropdown i.p.v. een
+    /// systeem-Menu, dus de open-state leeft hier).
+    var editorOverflowMenuOpen = false
 
     // MARK: Board session
     var boardCanvasMenu: CanvasToolbarMenu?
@@ -163,6 +166,7 @@ final class UIPresentationStore {
         editorCanvasMenu = nil
         editorBackgroundTypeMenuOpen = false
         editorChipMenu = nil
+        editorOverflowMenuOpen = false
         boardCanvasMenu = nil
         boardBatchMenu = nil
         bannerFloatingMenu = nil

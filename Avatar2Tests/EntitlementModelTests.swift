@@ -312,6 +312,69 @@ final class EntitlementModelTests: XCTestCase {
         )
     }
 
+    // MARK: - UXS-2 — toast-prioriteit (UX4)
+
+    /// Er is één toast-slot. Een fout moet een lopende working-toast verdringen:
+    /// de operatie waar die spinner bij hoorde is juist mislukt, dus de spinner
+    /// laten winnen betekent dat de gebruiker de fout nooit ziet.
+    func testErrorOutranksWorkingToast() {
+        let working = EntitlementModel.WorkingContext(title: "Applying style", messages: ["…"])
+
+        XCTAssertEqual(
+            EntitlementModel.resolveToast(error: "boom", outOfCredits: false, working: working),
+            .error("boom")
+        )
+        XCTAssertEqual(
+            EntitlementModel.resolveToast(error: "boom", outOfCredits: true, working: working),
+            .error("boom")
+        )
+    }
+
+    /// Zonder fout blijft de bestaande volgorde staan: op-is-op vóór bezig.
+    func testToastPriorityBelowError() {
+        let working = EntitlementModel.WorkingContext(title: "Applying style", messages: ["…"])
+
+        XCTAssertEqual(
+            EntitlementModel.resolveToast(error: nil, outOfCredits: true, working: working),
+            .outOfCredits
+        )
+        XCTAssertEqual(
+            EntitlementModel.resolveToast(error: nil, outOfCredits: false, working: working),
+            .working(working)
+        )
+        XCTAssertNil(
+            EntitlementModel.resolveToast(error: nil, outOfCredits: false, working: nil)
+        )
+    }
+
+    /// De reducer hangt aan het model, niet alleen aan losse argumenten.
+    func testActiveToastFollowsModelState() {
+        let model = EntitlementModel(auth: AuthService())
+        XCTAssertNil(model.activeToast)
+
+        model.presentWorking(title: "Applying style", messages: ["…"])
+        XCTAssertEqual(
+            model.activeToast,
+            .working(EntitlementModel.WorkingContext(title: "Applying style", messages: ["…"]))
+        )
+
+        model.presentError("boom")
+        XCTAssertEqual(model.activeToast, .error("boom"), "een fout verdringt de spinner")
+
+        model.dismissErrorToast()
+        XCTAssertEqual(
+            model.activeToast,
+            .working(EntitlementModel.WorkingContext(title: "Applying style", messages: ["…"])),
+            "na het wegklikken van de fout hoort de lopende actie weer zichtbaar te zijn"
+        )
+    }
+
+    /// Niet-kritieke meldingen delen één duur-constante i.p.v. losse literals.
+    func testInfoToastDurationIsShorterThanErrorDuration() {
+        XCTAssertLessThan(EntitlementModel.infoToastDuration, EntitlementModel.errorToastDuration)
+        XCTAssertGreaterThanOrEqual(EntitlementModel.infoToastDuration, .seconds(4))
+    }
+
     /// E44.2: een 200-response met onbruikbare bytes (guard-pad in
     /// EditorView's Boost/Colorise/Fill-in-body) moet een zichtbare fout
     /// tonen ÉN het saldo verversen — de server kan op dat pad al een credit

@@ -182,9 +182,18 @@ struct PaywallSheet: View {
     private var starterCard: some View {
         planCard(highlighted: false) {
             VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                Text("Starter")
-                    .dsTextStyle(.labelLarge)
-                    .foregroundStyle(DSColor.Foreground.primary)
+                // UXS-11: op een gratis account was dit de enige kaart zónder
+                // markering — de "Upgrade"-badge stond op Pro, dus niets vertelde
+                // je wélk plan je hebt. Deze plan-kiezer krijgt alleen een
+                // niet-Pro-account te zien (een actieve Pro loopt via
+                // `showsTopup`), dus Starter ÍS hier altijd het huidige plan.
+                HStack(alignment: .top) {
+                    Text("Starter")
+                        .dsTextStyle(.labelLarge)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    Spacer()
+                    DSBadge("Current plan", type: .neutral)
+                }
                 Text("Free")
                     .dsTextStyle(.h3)
                     .foregroundStyle(DSColor.Foreground.primary)
@@ -192,7 +201,8 @@ struct PaywallSheet: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap1_5) {
                 featureRow("3 images total")
                 featureRow("Local processing")
-                featureRow("No bots")
+                // UXS-11: "No bots" beschreef een afwezigheid, niet een waarde.
+                featureRow("Human support")
                 featureRow("Export")
             }
             .padding(.top, DSSpacing.gap3)
@@ -210,7 +220,10 @@ struct PaywallSheet: View {
                 DSBadge("Upgrade", type: .brand)
             }
             HStack(alignment: .firstTextBaseline, spacing: DSSpacing.gap1) {
-                Text(model.selectedInterval == .year ? ProTier.pro.annualPriceEUR : ProTier.pro.monthlyPriceEUR)
+                // UXS-11: notatie volgt de systeemlocale (€4,99 vs €4.99).
+                Text(model.selectedInterval == .year
+                     ? ProTier.pro.annualPriceDisplay
+                     : ProTier.pro.monthlyPriceDisplay)
                     .dsTextStyle(.h3)
                     .foregroundStyle(DSColor.Foreground.primary)
                     .contentTransition(.numericText())
@@ -223,7 +236,8 @@ struct PaywallSheet: View {
             }
             .padding(.top, DSSpacing.gap3)
             Spacer(minLength: DSSpacing.gap6)
-            DSPrimaryButton("Upgrade to pro", fullWidth: true) {
+            // UXS-11: "Upgrade to pro" → "Upgrade to Pro" (productnaam).
+            DSPrimaryButton("Upgrade to Pro", fullWidth: true) {
                 Task { await model.startSubscribe() }
             }
             .disabled(model.isCheckoutBusy)

@@ -9,28 +9,18 @@ import SwiftUI
 struct OutOfCreditsToastView: View {
     let model: EntitlementModel
 
-    private static let duration: TimeInterval = 6
-    // Audit-cleanup: één lineair geanimeerde waarde (1→0) i.p.v. een
-    // TimelineView die de hele toast 30×/sec herbouwt voor de balk.
-    @State private var progress: Double = 1
-
     var body: some View {
+        // UXS-2: aftellen, timer-track en hover-pauze zitten in DSToast zelf; de
+        // duur komt uit het model i.p.v. een eigen literal hier.
         DSToast(
             title: "You're out of credits",
             description: "Top up to keep editing — tap for options.",
-            progress: progress,
+            autoDismiss: EntitlementModel.infoToastDuration,
             onClose: { model.dismissOutOfCreditsToast() }
         )
         .contentShape(Rectangle())
         .onTapGesture {
             model.requestUpgrade()
-        }
-        .onAppear {
-            withAnimation(.linear(duration: Self.duration)) { progress = 0 }
-        }
-        .task {
-            try? await Task.sleep(for: .seconds(Self.duration))
-            model.dismissOutOfCreditsToast()
         }
     }
 }
