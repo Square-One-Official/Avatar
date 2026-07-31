@@ -181,6 +181,7 @@
 		88D8A68E6ADCCD30592CA30D /* SidebarProQuotaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */; };
 		88F219E35BB48BDC77DA3BAF /* AutoFramer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483B0B526A772D660C1ECB8 /* AutoFramer.swift */; };
 		890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1658094DC9377C3D97B55BF /* ClothesPanel.swift */; };
+		890D95DCD08BBDDDEC331F9A /* CreateEffectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2D25010E780489AB4EC11D /* CreateEffectSheet.swift */; };
 		89AA16048F395B4CF00BA39D /* ProBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED2448B10A7B5504F841578 /* ProBadge.swift */; };
 		89C89D347949E200275051E3 /* BackgroundPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */; };
 		8A196264D08873D2B5233B3A /* Banner2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75684711188D45F74A4EE9B4 /* Banner2.swift */; };
@@ -405,6 +406,7 @@
 		36637FF39639D1B8BC7F4A8F /* GenerateBackgroundSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerateBackgroundSheet.swift; sourceTree = "<group>"; };
 		37714B4962091DDA609E9093 /* UpdateManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManagerTests.swift; sourceTree = "<group>"; };
 		390524875FAE18DD4A1A916F /* ShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellView.swift; sourceTree = "<group>"; };
+		3C2D25010E780489AB4EC11D /* CreateEffectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEffectSheet.swift; sourceTree = "<group>"; };
 		3E381F6622B4D1F0E8B88A50 /* ThumbnailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailStore.swift; sourceTree = "<group>"; };
 		3E5F9051E4989F2E687B45B0 /* BannerImageFloatingToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerImageFloatingToolbar.swift; sourceTree = "<group>"; };
 		3F41A01E8DFA4DA68A205834 /* EntitlementModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModelTests.swift; sourceTree = "<group>"; };
@@ -713,6 +715,7 @@
 				48D5377722F2BEA7DCD9A7F5 /* CanvasTransformOverlay.swift */,
 				50588A3B4DA898B3891C3FE3 /* CanvasZoomCommands.swift */,
 				C1658094DC9377C3D97B55BF /* ClothesPanel.swift */,
+				3C2D25010E780489AB4EC11D /* CreateEffectSheet.swift */,
 				E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */,
 				CD268A444023531C2A4E84A3 /* EditorCanvasChromeMetrics.swift */,
 				533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */,
@@ -1432,6 +1435,7 @@
 				60848B6E2D75BC44DC1F1922 /* CanvasTransformOverlay.swift in Sources */,
 				D56BE5D31CB70F1184FFDCC3 /* CanvasZoomCommands.swift in Sources */,
 				890919CA88B63F8285D61963 /* ClothesPanel.swift in Sources */,
+				890D95DCD08BBDDDEC331F9A /* CreateEffectSheet.swift in Sources */,
 				583F43C151B5D8F624F3F885 /* CutoutDataUndo.swift in Sources */,
 				B64A1678796BB93D290579D2 /* EditColorPanel.swift in Sources */,
 				4A60B15520F03FDC9BA7427B /* EditorCanvasChromeMetrics.swift in Sources */,

@@ -109,6 +109,15 @@ final class UIPresentationStore {
     // MARK: Color pickers (caret-loos overlay i.p.v. systeem-popover)
     var colorPicker: PersistentColorPicker?
 
+    // MARK: Effects — eigen effecten maken (E34)
+    /// De "Create effect"-modal. Leeft hier (niet in `EffectsPanel`-@State) zodat
+    /// 'ie een tab-/vensterwissel overleeft; de sheet hangt op ShellView.
+    var createEffectSheetOpen = false
+    /// Het resultaat van die modal. Het Effects-paneel consumeert 'm (en zet 'm
+    /// daarna op nil) — de sheet leeft op de stabiele host, het EffectsModel in
+    /// het paneel, dus de store is de brievenbus tussen die twee.
+    var createdCustomEffect: CreateEffectResult?
+
     // MARK: Alerts & confirms
     var alert: PresentationAlert?
     var confirm: PresentationConfirm?

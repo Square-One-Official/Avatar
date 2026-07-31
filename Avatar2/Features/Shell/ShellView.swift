@@ -134,6 +134,16 @@ struct ShellView: View {
                 PreStylizeQualitySheet(gate: gate) { model.stylizeQuality.resolvePreGate($0) }
             }
         }
+        // E34: "Create effect"-modal (eigen effecten) — stabiele host, resultaat
+        // gaat via de store terug naar het Effects-paneel.
+        .dsPersistentSheet(isPresented: Binding(
+            get: { model.presentation.createEffectSheetOpen },
+            set: { model.presentation.createEffectSheetOpen = $0 }
+        )) {
+            CreateEffectSheet(entitlement: entitlement) { result in
+                model.presentation.createdCustomEffect = result
+            }
+        }
         .generateBackgroundSheet(entitlement: entitlement)
         // E53.7: contextmenu's + store-gedreven alerts/confirms.
         .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }

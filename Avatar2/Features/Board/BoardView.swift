@@ -1219,6 +1219,7 @@ struct BoardView: View {
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
+                                     presentation: model.presentation,
                                      onApply: { await undoableApplyToNode($0, node, actionName: "Apply effect") })
                             .id(node.persistentModelID)
                     case .clothing:

@@ -10,11 +10,48 @@
 // Payload (`backend.effects()`); een nieuw effect verschijnt zonder app-release.
 // Tot de fetch landt (of bij offline) draait het paneel op `RemoteEffect.fallback`
 // (de vier launch-keys, zonder thumbnail).
+//
+// E34: gebruikers maken hun EIGEN effect. Een "Create effect"-(+)kaart (Pro)
+// opent een modal (referentiebeeld + beschrijving); het effect wordt gegenereerd,
+// op het portret getoond én bewaard als eigen effect met het referentiebeeld als
+// thumbnail. Custom effecten syncen per account (`backend.customEffects()`) en
+// delen exact dezelfde cache/persistentie als de built-ins (string-keyed, met de
+// `custom:<id>`-namespace).
 
 import AppKit
 import AvatarKit
 import AvatarUI
 import SwiftUI
+
+/// Eén kaart in het paneel: een built-in CMS-stijl of een eigen custom effect.
+/// Verenigt beide op de string-cachekey (`key`) zodat selectie, cache en
+/// persistentie (effectCache/effectActiveRaw) ongewijzigd blijven.
+struct EffectCard: Identifiable, Equatable {
+    enum Kind: Equatable { case builtin, custom }
+    let key: String          // built-in: effect.key · custom: "custom:<id>"
+    let label: String
+    let kind: Kind
+    let thumbnailUrl: URL?
+    let customID: String?    // alleen voor custom: de rij-id (naar /v1/stylize)
+
+    var id: String { key }
+
+    init(_ effect: RemoteEffect) {
+        key = effect.key
+        label = effect.label
+        kind = .builtin
+        thumbnailUrl = effect.thumbnailUrl
+        customID = nil
+    }
+
+    init(_ effect: RemoteCustomEffect) {
+        key = effect.cacheKey
+        label = effect.label
+        kind = .custom
+        thumbnailUrl = effect.thumbnailUrl
+        customID = effect.id
+    }
+}
 
 /// Stuurt de stijl-generatie aan en reikt het resultaat omhoog naar de
 /// ShellModel (die canvas + opgeslagen cutout vervangt). De Effects-staat
@@ -25,24 +62,33 @@ import SwiftUI
 final class EffectsModel {
     enum Phase: Equatable {
         case idle
-        case working(RemoteEffect)
+        case working(String)   // de cachekey van het effect dat genereert
         case failed(String)
     }
 
     private(set) var phase: Phase = .idle
-    /// Het toegepaste effect (active state), nil = None (basisbeeld).
-    private(set) var selected: RemoteEffect?
+    /// De cachekey van het toegepaste effect (active state), nil = None (basis).
+    private(set) var selectedKey: String?
     /// Ingesteld door EffectsPanel via de SwiftUI-omgeving zodat selectie-wijzigingen
     /// in hetzelfde undo-groepje als de bijbehorende beeld-swap landen.
     var undoManager: UndoManager?
     /// Sessie-cache: gedeeld over alle instanties zodat herhaaldelijk openen van
     /// het paneel niet terugvalt op de hardgecodeerde fallback. Leeg = eerste open.
     private static var sessionCache: [RemoteEffect] = []
+    /// Custom effecten (E34) — ook sessie-gecachet zodat heropenen niet flitst.
+    private static var customSessionCache: [RemoteCustomEffect] = []
 
-    /// De beschikbare stijlen (CMS-gestuurd, E33). Start op de sessie-cache als
+    /// De built-in stijlen (CMS-gestuurd, E33). Start op de sessie-cache als
     /// die al gevuld is (eerder geladen in dezelfde sessie), anders op de fallback.
-    private(set) var remoteEffects: [RemoteEffect] =
+    private(set) var builtinEffects: [RemoteEffect] =
         EffectsModel.sessionCache.isEmpty ? RemoteEffect.fallback : EffectsModel.sessionCache
+    /// De eigen custom effecten (E34). Start op de sessie-cache; leeg = nog niet
+    /// geladen / geen eigen effecten / niet-Pro.
+    private(set) var customEffects: [RemoteCustomEffect] = EffectsModel.customSessionCache
+
+    /// Lokaal geseede thumbnails (E34): meteen na het aanmaken tonen we het
+    /// net-gedropte referentiebeeld zonder een round-trip naar de bucket-URL.
+    private var localThumbnails: [String: NSImage] = [:]
 
     private let entitlement: EntitlementModel
     private let onApply: (NSImage) async -> Void
@@ -74,9 +120,10 @@ final class EffectsModel {
         // Hydrateer uit het portret (E24.33). Cache + basis zijn key-gestuurd
         // (string), LOS van de CMS-lijst: zo blijft de hydratie correct ook als
         // het actieve effect (nog) niet in de geladen lijst zit (offline /
-        // CMS-only effect vóór de fetch landt). Met een actief effect is
-        // `baseImage` (de huidige cutout) het effect-beeld; de echte basis staat
-        // dan in `effectBaseData`. Zonder actief effect ÍS de cutout de basis.
+        // CMS-only effect vóór de fetch landt, of een eigen custom effect). Met
+        // een actief effect is `baseImage` (de huidige cutout) het effect-beeld;
+        // de echte basis staat dan in `effectBaseData`. Zonder actief effect ÍS
+        // de cutout de basis.
         let activeKey = portrait?.effectActiveRaw
         if activeKey != nil, let data = portrait?.effectBaseData, let img = NSImage(data: data) {
             self.base = img
@@ -99,10 +146,9 @@ final class EffectsModel {
         }
         self.cache = hydrated
         self.pngCache = hydratedPNG
-
-        // Resolveer de selectie tegen de (fallback-)lijst; `loadEffects()`
-        // herresolveert zodra de CMS-lijst binnen is.
-        self.selected = activeKey.flatMap { k in remoteEffects.first { $0.key == k } }
+        // De selectie ÍS de key — geen resolutie tegen een lijst nodig, dus ook
+        // correct voor een custom effect dat pas ná de fetch bekend is.
+        self.selectedKey = activeKey
     }
 
     /// Het beeld dat naar de stylize-backend gaat — zie `StylizeQuality.effectsStylizeSource`.
@@ -114,54 +160,77 @@ final class EffectsModel {
 
     var isBusy: Bool { if case .working = phase { return true } else { return false } }
 
-    func isCached(_ effect: RemoteEffect) -> Bool { cache[effect.key] != nil }
+    /// De kaarten in paneel-volgorde: eigen effecten eerst (nieuwste eerst, zoals
+    /// de backend ze teruggeeft), daarna de built-in stijlen.
+    var cards: [EffectCard] {
+        customEffects.map(EffectCard.init) + builtinEffects.map(EffectCard.init)
+    }
 
-    /// Haal de CMS-stijllijst op (E33). Soft-fail: bij een lege/gefaalde fetch
-    /// houden we de fallback zodat het paneel bruikbaar blijft. Na succes
-    /// herresolveren we de actieve selectie tegen de verse lijst zodat de
-    /// selectie-ring naar dezelfde waarde wijst als de kaart (Equatable).
+    func isSelected(_ card: EffectCard) -> Bool { selectedKey == card.key }
+    func isWorking(_ card: EffectCard) -> Bool { phase == .working(card.key) }
+    func isCached(_ card: EffectCard) -> Bool { cache[card.key] != nil }
+
+    /// Mag de huidige gebruiker custom effecten maken? (Pro-only capability, E34.)
+    var canCreateCustom: Bool { entitlement.isProActive || entitlement.isDevUnlimited }
+
+    /// Haal de CMS-stijllijst (E33) én de eigen custom effecten (E34) op.
+    /// Soft-fail: bij een lege/gefaalde fetch houden we de bestaande lijst zodat
+    /// het paneel bruikbaar blijft.
     func loadEffects() async {
         let fetched = (try? await entitlement.backend.effects()) ?? []
-        guard !fetched.isEmpty else { return }
-        EffectsModel.sessionCache = fetched
-        remoteEffects = fetched
-        let activeKey = selected?.key ?? portrait?.effectActiveRaw
-        if let activeKey {
-            selected = fetched.first { $0.key == activeKey } ?? selected
+        if !fetched.isEmpty {
+            EffectsModel.sessionCache = fetched
+            builtinEffects = fetched
+            // E52.1: warm de gedeelde thumbnail-cache (memory + disk, downsampled
+            // decode). De kaarten renderen via `RemoteThumbnail`, dus geen eigen
+            // NSCache/thumbnailVersion-boekhouding meer.
+            ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
         }
-        // E52.1: warm de gedeelde thumbnail-cache (memory + disk, downsampled
-        // decode). De kaarten renderen via `RemoteThumbnail`, dus geen eigen
-        // NSCache/thumbnailVersion-boekhouding meer.
+        await loadCustomEffects()
+    }
+
+    /// Custom effecten (E34) — alleen voor Pro (de capability is Pro). Soft-fail
+    /// (incl. 403 pro_required) houdt de lijst leeg/ongewijzigd.
+    func loadCustomEffects() async {
+        guard canCreateCustom else { return }
+        guard let fetched = try? await entitlement.backend.customEffects() else { return }
+        EffectsModel.customSessionCache = fetched
+        customEffects = fetched
         ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
     }
 
+    /// Lokaal geseed referentiebeeld voor een vers-gemaakt custom effect (E34):
+    /// toont de kaart meteen, zonder round-trip naar de bucket-URL. nil → de
+    /// kaart rendert via `RemoteThumbnail` op `card.thumbnailUrl`.
+    func localThumbnail(for card: EffectCard) -> NSImage? { localThumbnails[card.key] }
+
     /// None-kaart: terug naar het basisbeeld (instant, geen credits).
     func selectNone() {
-        guard !isBusy, selected != nil else { return }
-        let prevSelected = selected
-        selected = nil
+        guard !isBusy, selectedKey != nil else { return }
+        let prev = selectedKey
+        selectedKey = nil
         phase = .idle
         Task {
             await onApply(base)
-            registerSelectionUndo(from: prevSelected, to: nil)
+            registerSelectionUndo(from: prev, to: nil)
             persist()
         }
     }
 
     /// Tik op een effect-kaart: actief → None; gecachet → instant uit cache;
     /// anders → genereren. Tijdens een lopende generatie negeren we tikken.
-    func toggle(_ effect: RemoteEffect) {
+    func toggle(_ card: EffectCard) {
         guard !isBusy else { return }
-        if selected == effect {
+        if selectedKey == card.key {
             selectNone()
             return
         }
-        if let cached = cache[effect.key] {
+        if let cached = cache[card.key] {
             // Cache-hit: instant uit cache, maar her-isolatie kan even duren.
-            let prevSelected = selected
-            selected = effect
+            let prev = selectedKey
+            selectedKey = card.key
             Task {
-                phase = .working(effect)
+                phase = .working(card.key)
                 entitlement.presentWorking(
                     title: "Applying style",
                     messages: ["Cutting out the subject…", "Almost there…"]
@@ -169,21 +238,21 @@ final class EffectsModel {
                 await onApply(cached)
                 phase = .idle
                 entitlement.dismissWorkingToast()
-                registerSelectionUndo(from: prevSelected, to: effect)
+                registerSelectionUndo(from: prev, to: card.key)
                 persist()
             }
             return
         }
-        Task { await generate(effect) }
+        Task { await generate(card) }
     }
 
     /// Refresh-icoon op de actieve kaart: bewust opnieuw genereren (kost credits).
-    func regenerate(_ effect: RemoteEffect) {
+    func regenerate(_ card: EffectCard) {
         guard !isBusy else { return }
-        Task { await generate(effect, feature: .effectRegenerate) }
+        Task { await generate(card, feature: .effectRegenerate) }
     }
 
-    private func generate(_ effect: RemoteEffect, feature: AIFeature = .effectGenerate) async {
+    private func generate(_ card: EffectCard, feature: AIFeature = .effectGenerate) async {
         guard entitlement.allowAIFeature(feature) else { return }
 
         let defaultChoice = StylizeQuality.defaultEffectsSourceChoice(portrait: portrait)
@@ -201,7 +270,7 @@ final class EffectsModel {
             return
         }
         let (cutoutW, cutoutH) = StylizeQuality.cutoutDimensions(for: cutoutBefore)
-        phase = .working(effect)
+        phase = .working(card.key)
         entitlement.presentWorking(
             title: "Applying style",
             messages: [
@@ -217,38 +286,86 @@ final class EffectsModel {
             let softSource = StylizeQuality.requestsSoftSourcePrompt(for: source)
             // Cutout én origineel: geen reframe — achtergrond zit los van het cutout.
             let preserveFraming = true
-            let result = try await entitlement.backend.stylize(
-                imagePNG: png, styleKey: effect.key,
-                cutoutWidth: cutoutW, cutoutHeight: cutoutH,
-                softSource: softSource,
-                preserveFraming: preserveFraming
-            )
-            guard let image = NSImage(data: result.data) else {
+            let resultData: Data
+            switch card.kind {
+            case .builtin:
+                let response = try await entitlement.backend.stylize(
+                    imagePNG: png, styleKey: card.key,
+                    cutoutWidth: cutoutW, cutoutHeight: cutoutH,
+                    softSource: softSource,
+                    preserveFraming: preserveFraming
+                )
+                resultData = response.data
+            case .custom:
+                // E34: de server bouwt de prompt uit de opgeslagen beschrijving en
+                // stuurt het referentiebeeld als stijlreferentie mee naar het model.
+                let response = try await entitlement.backend.stylize(
+                    imagePNG: png, customEffectID: card.customID ?? ""
+                )
+                resultData = response.data
+            }
+            guard let image = NSImage(data: resultData) else {
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("The styled image came back unreadable.")
                 return
             }
             StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
-            cache[effect.key] = image
-            if let png = image.pngData() { pngCache[effect.key] = png }
-            let prevSelected = selected
-            selected = effect
+            cache[card.key] = image
+            if let png = image.pngData() { pngCache[card.key] = png }
+            let prev = selectedKey
+            selectedKey = card.key
             await onApply(image)
             phase = .idle
             entitlement.dismissWorkingToast()
-            registerSelectionUndo(from: prevSelected, to: effect)
+            registerSelectionUndo(from: prev, to: card.key)
             persist()
             await entitlement.refresh()
         } catch BackendError.noCredits {
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
+        } catch BackendError.proRequired {
+            // E34: de custom-effect-tak is Pro-only; een verlopen abonnement
+            // tijdens de sessie landt hier i.p.v. op een generieke foutmelding.
+            phase = .idle
+            entitlement.dismissWorkingToast()
+            entitlement.requestUpgrade()
         } catch {
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't apply that style. Please try again.")
         }
+    }
+
+    // MARK: - Custom effects (E34)
+
+    /// Voegt een net-aangemaakt custom effect toe (vooraan) en seedt zijn
+    /// thumbnail met het zojuist gedropte referentiebeeld zodat de kaart meteen
+    /// verschijnt zonder bucket-round-trip. Optioneel meteen toepassen.
+    func addCustomEffect(_ effect: RemoteCustomEffect, referenceImage: NSImage, apply: Bool) {
+        customEffects.insert(effect, at: 0)
+        EffectsModel.customSessionCache = customEffects
+        localThumbnails[effect.cacheKey] = referenceImage
+        if apply {
+            Task { await generate(EffectCard(effect)) }
+        }
+    }
+
+    /// Verwijdert een eigen custom effect (server + lokaal). Was 'ie actief, dan
+    /// terug naar None.
+    func deleteCustomEffect(_ card: EffectCard) {
+        guard card.kind == .custom, let id = card.customID else { return }
+        if selectedKey == card.key { selectNone() }
+        customEffects.removeAll { $0.id == id }
+        EffectsModel.customSessionCache = customEffects
+        cache[card.key] = nil
+        pngCache[card.key] = nil
+        localThumbnails[card.key] = nil
+        if portrait?.effectCache[card.key] != nil {
+            persist()
+        }
+        Task { try? await entitlement.backend.deleteCustomEffect(id: id) }
     }
 
     /// Registreert selectie-undo naast de beeld-swap zodat Cmd+Z de badge én
@@ -257,15 +374,15 @@ final class EffectsModel {
     /// Target is het portret (SwiftData), niet `self`: EffectsModel leeft alleen
     /// zolang het paneel open is — na sluiten crashte een tweede undo op een
     /// dangling weak ref.
-    private func registerSelectionUndo(from previous: RemoteEffect?, to next: RemoteEffect?) {
+    private func registerSelectionUndo(from previous: String?, to next: String?) {
         guard let portrait else { return }
         ReversibleChange.register(
             undoManager, target: portrait,
             from: previous, to: next,
             actionName: "Apply effect"
-        ) { [weak self] p, sel in
-            p.effectActiveRaw = sel?.key
-            self?.selected = sel
+        ) { [weak self] p, key in
+            p.effectActiveRaw = key
+            self?.selectedKey = key
         }
     }
 
@@ -275,7 +392,7 @@ final class EffectsModel {
         if portrait.effectBaseData == nil {
             portrait.effectBaseData = base.pngData()
         }
-        portrait.effectActiveRaw = selected?.key
+        portrait.effectActiveRaw = selectedKey
         // pngCache is al ge-encodeerd (één keer per effect) — alleen kopiëren,
         // geen her-encode van de hele cache per toggle (perf).
         portrait.effectCache = pngCache
@@ -288,6 +405,9 @@ struct EffectsPanel: View {
     let entitlement: EntitlementModel
     var portrait: Portrait2?
     var coordinator: StylizeQualityCoordinator?
+    /// E53.7: de "Create effect"-modal leeft op de stabiele host (ShellView), dus
+    /// het paneel schrijft zijn open-state hier i.p.v. in eigen @State.
+    var presentation: UIPresentationStore?
     var onApply: (NSImage) async -> Void = { _ in }
 
     @State private var model: EffectsModel
@@ -298,12 +418,14 @@ struct EffectsPanel: View {
         entitlement: EntitlementModel,
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
+        presentation: UIPresentationStore? = nil,
         onApply: @escaping (NSImage) async -> Void = { _ in }
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
         self.portrait = portrait
         self.coordinator = coordinator
+        self.presentation = presentation
         self.onApply = onApply
         _model = State(initialValue: EffectsModel(
             entitlement: entitlement,
@@ -323,8 +445,9 @@ struct EffectsPanel: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DSSpacing.gap2) {
                     noneCard
-                    ForEach(model.remoteEffects) { effect in
-                        styleCard(effect)
+                    createCard
+                    ForEach(model.cards) { card in
+                        styleCard(card)
                     }
                 }
                 .padding(.vertical, DSSpacing.gap2)
@@ -334,9 +457,18 @@ struct EffectsPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .horizontalScrollEdgeFade()
         }
-        // E33: CMS-lijst ophalen bij openen. Soft-fail houdt de fallback.
+        // E33/E34: CMS-lijst + eigen effecten ophalen bij openen. Soft-fail.
         .task { await model.loadEffects() }
         .onAppear { model.undoManager = undoManager }
+        // E34+E53.7: de modal zelf hangt op ShellView; hier consumeren we alleen
+        // haar resultaat (en legen de brievenbus zodat 'ie niet twee keer landt).
+        .onChange(of: presentation?.createdCustomEffect?.effect.id) { _, newValue in
+            guard newValue != nil, let result = presentation?.createdCustomEffect else { return }
+            presentation?.createdCustomEffect = nil
+            model.addCustomEffect(
+                result.effect, referenceImage: result.referenceImage, apply: result.apply
+            )
+        }
     }
 
     /// E24.33: "None"-kaart helemaal links — terug naar het origineel (basis).
@@ -346,7 +478,7 @@ struct EffectsPanel: View {
         } label: {
             DSThumbnailCard(
                 label: "None",
-                isSelected: model.selected == nil,
+                isSelected: model.selectedKey == nil,
                 tileSize: cardWidth,
                 tileHeight: cardHeight
             ) {
@@ -363,35 +495,78 @@ struct EffectsPanel: View {
         .opacity(model.isBusy ? 0.5 : 1)
     }
 
-    private func styleCard(_ effect: RemoteEffect) -> some View {
-        let isSelected = model.selected == effect
-        let isWorking = model.phase == .working(effect)
-        return Button {
-            model.toggle(effect)
+    /// E34: "Create effect"-kaart — opent de modal (Pro). Niet-Pro → upgrade.
+    private var createCard: some View {
+        Button {
+            if model.canCreateCustom {
+                presentation?.createEffectSheetOpen = true
+            } else {
+                entitlement.requestUpgrade()
+            }
         } label: {
             DSThumbnailCard(
-                label: effect.label,
-                isSelected: isSelected,
-                isWorking: isWorking,
+                label: "Create",
+                isPro: !model.canCreateCustom,
                 tileSize: cardWidth,
-                tileHeight: cardHeight,
-                onRefresh: isSelected ? { model.regenerate(effect) } : nil
+                tileHeight: cardHeight
             ) {
-                thumbnail(for: effect)
+                VStack(spacing: DSSpacing.gap1) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 26, weight: .semibold))
+                    Text("New effect")
+                        .dsTextStyle(.labelSmall)
+                }
+                .foregroundStyle(DSColor.Foreground.muted)
             }
         }
         .buttonStyle(.plain)
         .disabled(model.isBusy)
-        .opacity(model.isBusy && !isWorking ? 0.5 : 1)
+        .opacity(model.isBusy ? 0.5 : 1)
+        .help("Create your own effect from a reference image")
     }
 
-    /// CMS-thumbnail (E33) die de tile vult; valt terug op het sparkles-icoon
+    @ViewBuilder
+    private func styleCard(_ card: EffectCard) -> some View {
+        let isSelected = model.isSelected(card)
+        Button {
+            model.toggle(card)
+        } label: {
+            DSThumbnailCard(
+                label: card.label,
+                isSelected: isSelected,
+                isWorking: model.isWorking(card),
+                tileSize: cardWidth,
+                tileHeight: cardHeight,
+                onRefresh: isSelected ? { model.regenerate(card) } : nil
+            ) {
+                thumbnail(for: card)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isBusy)
+        .opacity(model.isBusy && !model.isWorking(card) ? 0.5 : 1)
+        // E34: eigen effecten zijn verwijderbaar via het contextmenu.
+        .modifier(DeletableCustom(card: card, isBusy: model.isBusy) {
+            model.deleteCustomEffect(card)
+        })
+    }
+
+    /// CMS-/referentie-thumbnail die de tile vult; valt terug op het sparkles-icoon
     /// terwijl 'ie laadt of als het effect geen thumbnail heeft. E52.1: via de
     /// gedeelde `ThumbnailCache` (memory + disk + downsampled decode) i.p.v.
-    /// AsyncImage — her-opens zijn instant, ook na een app-herstart.
+    /// AsyncImage — her-opens zijn instant, ook na een app-herstart. Een vers
+    /// aangemaakt custom effect (E34) toont zijn lokaal geseede referentiebeeld
+    /// zolang de bucket-URL nog niet warm is.
     @ViewBuilder
-    private func thumbnail(for effect: RemoteEffect) -> some View {
-        if let url = effect.thumbnailUrl {
+    private func thumbnail(for card: EffectCard) -> some View {
+        if let local = model.localThumbnail(for: card) {
+            Image(nsImage: local)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(width: cardWidth, height: cardHeight)
+                .clipped()
+        } else if let url = card.thumbnailUrl {
             RemoteThumbnail(url: url) {
                 placeholderIcon
             }
@@ -405,5 +580,25 @@ struct EffectsPanel: View {
     private var placeholderIcon: some View {
         Image(systemName: "sparkles")
             .font(.system(size: 28, weight: .regular))
+    }
+}
+
+/// E34: contextmenu-delete, alleen op eigen (custom) effecten.
+private struct DeletableCustom: ViewModifier {
+    let card: EffectCard
+    let isBusy: Bool
+    let onDelete: () -> Void
+
+    func body(content: Content) -> some View {
+        if card.kind == .custom {
+            content.contextMenu {
+                Button(role: .destructive) { onDelete() } label: {
+                    Label("Delete effect", systemImage: "trash")
+                }
+                .disabled(isBusy)
+            }
+        } else {
+            content
+        }
     }
 }

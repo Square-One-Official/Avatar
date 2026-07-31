@@ -999,6 +999,7 @@ struct EditorView: View {
                     entitlement: entitlement,
                     portrait: portraitModel,
                     coordinator: model.stylizeQuality,
+                    presentation: model.presentation,
                     onApply: undoableApply("Apply effect")
                 )
                     .id(portraitModel?.persistentModelID)

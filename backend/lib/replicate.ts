@@ -311,8 +311,9 @@ export async function stylizeEdit(input: {
   height: number;
   model?: string | null;
   /** Optioneel: data-URLs van voorbeeld-outputs die het model als visuele
-   *  stijlreferenties meekrijgt naast de prompt. Alleen voor Effects (E54);
-   *  de prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
+   *  stijlreferenties meekrijgt naast de prompt. Gebruikt door Effects (E54)
+   *  én door user-created custom effects (E34 — precies één referentie); de
+   *  prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
   styleReferenceDataUrls?: string[] | null;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
@@ -336,6 +337,10 @@ function stylizeInputFor(
     styleReferenceDataUrls?: string[] | null;
   },
 ): Record<string, unknown> {
+  // Het portret eerst (dat is het te bewerken beeld), stijlreferenties daarna.
+  // Alle vier armen nemen een image-array, dus extra beelden zijn een append;
+  // de prompt vertelt het model welke rol elk beeld speelt (E54-rolclausule,
+  // resp. CUSTOM_STYLE_TEMPLATE voor user-created effects).
   if (ref.startsWith("google/nano-banana")) {
     const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
