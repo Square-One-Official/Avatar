@@ -21,3 +21,26 @@ import type { PayloadRequest } from "payload";
 // assignable to every access slot — including the `admin` panel-access field,
 // which, unlike read/create/update/delete, cannot return a `Where` query.
 export const authed = ({ req }: { req: PayloadRequest }): boolean => Boolean(req.user);
+
+/**
+ * Stricter sibling of `authed`: an interactive admin session only — an
+ * API-key principal is denied.
+ *
+ * `authed` deliberately accepts the backend's `users API-Key <key>` because
+ * the backend has to READ content collections. That's fine for announcements
+ * and effects, but not for a collection that hands out paid entitlements: it
+ * would mean the API key sitting in the avatars-api environment can grant
+ * itself Pro. Read stays on `authed` (the backend must read the list); every
+ * write goes through this rule, so a leaked API key is read-only against
+ * `pro-access`.
+ *
+ * Payload tags the resolved principal with the strategy that authenticated it
+ * (`payload/dist/auth/strategies/apiKey.js` sets `_strategy = "api-key"`; the
+ * cookie/JWT strategy sets `"local-jwt"`), which is the only place the two are
+ * distinguishable at access-control time.
+ */
+export const adminSession = ({ req }: { req: PayloadRequest }): boolean => {
+  const user = req.user as ({ _strategy?: string } & Record<string, unknown>) | null | undefined;
+  if (!user) return false;
+  return user._strategy !== "api-key";
+};

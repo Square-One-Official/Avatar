@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { isDevUnlimitedUser, requireUser } from "../../../lib/auth.js";
+import { requireUser } from "../../../lib/auth.js";
+import { proOverrideFor } from "../../../lib/proAccess.js";
 import { activeSubscription } from "../../../lib/supabase.js";
 import { deleteCustomEffect } from "../../../lib/customEffects.js";
 
@@ -19,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!user) return;
 
   const isPro =
-    isDevUnlimitedUser(user.email) || (await activeSubscription(user.id)) !== null;
+    (await proOverrideFor(user.email)) !== null || (await activeSubscription(user.id)) !== null;
   if (!isPro) {
     res.status(403).json({ error: "pro_required" });
     return;

@@ -6,9 +6,11 @@ import {
   optionalUser,
   readDeviceFingerprint,
 } from "../../lib/auth.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 import {
   activeSubscription,
   currentCredits,
+  ensureCompedCredits,
   ensureUser,
   freeCutoutsUsed,
   freeImportsUsedForUser,
@@ -62,11 +64,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const user = userResult;
       await ensureUser(user.id);
 
-      // Dev-allowlisted users impersonate Pro state without an actual Stripe
-      // subscription. Mirrors the bypass in /v1/cutout so
-      // the client unlocks every Pro-gated UI path. Quota uses a high sentinel
-      // so the UI doesn't surface a paywall on the first cutout call.
-      if (isDevUnlimitedUser(user.email)) {
+      // E14.9 — the Pro list (CMS `pro-access`, plus the DEV_UNLIMITED_EMAILS
+      // break-glass env var). Two levels, two very different payloads.
+      const override = await proOverrideFor(user.email);
+
+      // "unlimited" (internal/dev): impersonate Pro state without an actual
+      // Stripe subscription. Mirrors the bypass in /v1/cutout so the client
+      // unlocks every Pro-gated UI path. Quota uses a high sentinel so the UI
+      // doesn't surface a paywall on the first cutout call.
+      if (override?.mode === "unlimited") {
         res.status(200).json({
           tier: "pro",
           credits_remaining: 999_999,
@@ -85,12 +91,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
+      // "pro" (comped): a real Pro entitlement with a real credit balance.
+      // Top the month's allowance up BEFORE reading the balance below, so the
+      // number the client renders is the one it can actually spend.
+      if (override?.mode === "pro") {
+        await ensureCompedCredits(user.id, override.monthlyCredits);
+      }
+
       const [sub, credits, freeCutouts, freeImports] = await Promise.all([
         activeSubscription(user.id),
         currentCredits(user.id),
         freeCutoutsUsed(user.id),
         freeImportsUsedForUser(user.id),
       ]);
+
+      // A comp doesn't overwrite a real subscription — if the account also
+      // pays, the Stripe numbers win (they're the ones with a renewal date and
+      // a webhook keeping them fresh).
+      if (override?.mode === "pro" && !sub) {
+        res.status(200).json({
+          tier: "pro",
+          credits_remaining: credits,
+          monthly_quota: override.monthlyCredits,
+          monthly_reset_at: nextMonthlyResetAt(),
+          subscription_status: "active",
+          subscription_renews_at: nextMonthlyResetAt(),
+          free_cutouts_used: freeCutouts,
+          free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
+          free_imports_used: freeImports,
+          free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+          needs_account_link: false,
+        });
+        return;
+      }
 
       const tier = mapTierForClient(sub?.tier);
       const monthlyQuota = sub ? quotaForRawTier(sub.tier) : 0;
@@ -253,14 +286,12 @@ function mapSubscriptionStatus(
 }
 
 /**
- * True when the caller's e-mail is on the DEV_UNLIMITED_EMAILS allowlist.
- * Same comma-separated env var honored by /v1/cutout.
+ * First instant of next month, UTC — when a comped Pro's credits top back up
+ * to their allowance (`ensureCompedCredits`). Mirrors what
+ * `subscription_renews_at` means for a paying subscriber so the client's
+ * "Refills on …" copy needs no special case.
  */
-function isDevUnlimitedUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
+function nextMonthlyResetAt(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
 }

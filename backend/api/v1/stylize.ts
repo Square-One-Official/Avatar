@@ -1,13 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import sharp from "sharp";
-import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
+import { checkRateLimit, requireUser } from "../../lib/auth.js";
 import {
   MODEL_REGISTRY,
   resolveGenerationModel,
   resolveModelOverride,
   UnknownModelOverrideError,
 } from "../../lib/models.js";
-import { activeSubscription, currentCredits, ensureUser, logCredit } from "../../lib/supabase.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
+import { activeSubscription, currentCredits, ensureCompedCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
 import { flattenOnGrey } from "../../lib/image.js";
@@ -250,7 +251,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const isDevUser = isDevUnlimitedUser(user.email);
+  // E14.9 — the Pro list: CMS `pro-access` first, DEV_UNLIMITED_EMAILS as
+  // break-glass. "unlimited" skips credit accounting entirely; a comped Pro
+  // gets this month's allowance and then spends credits like anyone else.
+  const override = await proOverrideFor(user.email);
+  const isDevUser = override?.mode === "unlimited";
+  if (override?.mode === "pro") {
+    await ensureCompedCredits(user.id, override.monthlyCredits);
+  }
 
   // Prompt-bepaling, in volgorde: een Effects-`style` (E09.2), een hair-intent
   // (E11.2, `hair_preset`/`hair_prompt`), een clothes-intent (E10.4), een
@@ -273,7 +281,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // E34: user-created custom effect. Pro-only (de capability is Pro), eigenaar-
     // gescoped. De prompt = de opgeslagen beschrijving in een vast sjabloon; de
     // referentie-afbeelding gaat als tweede beeld mee naar het model.
-    const isPro = isDevUser || (await activeSubscription(user.id)) !== null;
+    const isPro = override !== null || (await activeSubscription(user.id)) !== null;
     if (!isPro) {
       res.status(403).json({ error: "pro_required" });
       return;

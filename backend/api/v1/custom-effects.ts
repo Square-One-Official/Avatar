@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
+import { checkRateLimit, requireUser } from "../../lib/auth.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, ensureUser } from "../../lib/supabase.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import {
@@ -49,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Pro gate -- the create/list capability is Pro-only. Dev-allowlisted users
   // pass too (they skip every gate, E01.10).
   const isPro =
-    isDevUnlimitedUser(user.email) || (await activeSubscription(user.id)) !== null;
+    (await proOverrideFor(user.email)) !== null || (await activeSubscription(user.id)) !== null;
   if (!isPro) {
     res.status(403).json({ error: "pro_required" });
     return;
