@@ -50,10 +50,19 @@ fi
 
 echo "📦 Releasing Avatar v${VERSION} (build ${BUILD})"
 
-# 1. Bump version in project.yml
+# 1. Bump version in project.yml — alléén de EERSTE match (het root-blok, van
+#    v1). E13.1: het Avatar2-target heeft een eigen MARKETING_VERSION/
+#    CURRENT_PROJECT_VERSION verderop; een globale sed zou het v2-kanaal
+#    stil mee-hernummeren.
 echo "→ Bumping version in project.yml..."
-sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"${VERSION}\"/" "$PROJECT_DIR/project.yml"
-sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" "$PROJECT_DIR/project.yml"
+RELEASE_VERSION="$VERSION" RELEASE_BUILD="$BUILD" python3 - <<'PYEOF'
+import os, re, pathlib
+p = pathlib.Path(os.environ.get("PROJECT_YML", "project.yml"))
+s = p.read_text()
+s = re.sub(r'MARKETING_VERSION: .*', f'MARKETING_VERSION: "{os.environ["RELEASE_VERSION"]}"', s, count=1)
+s = re.sub(r'CURRENT_PROJECT_VERSION: .*', f'CURRENT_PROJECT_VERSION: "{os.environ["RELEASE_BUILD"]}"', s, count=1)
+p.write_text(s)
+PYEOF
 
 # 2. Regenerate Xcode project
 echo "→ xcodegen generate..."

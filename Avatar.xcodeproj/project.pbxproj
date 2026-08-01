@@ -170,6 +170,7 @@
 		7E12D547F38001F6E103685A /* BannerDocUndo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E87FD1E67FDD5DA7A08AF30 /* BannerDocUndo.swift */; };
 		82491CEFF1852DDF363A9E13 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A67F34619015B892E51F8BA0 /* ExportService.swift */; };
 		82F6A3CD14E80DEC44B874A5 /* BannerCanvasBackgroundChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90DA3703F9048567A6F98A1 /* BannerCanvasBackgroundChrome.swift */; };
+		834EC65C5A25AA4CBC278A52 /* V1LibraryImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5150AC059C68E9D248689607 /* V1LibraryImporterTests.swift */; };
 		850254B0FC758B3438E67CCD /* WelcomeSignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CDB6FFFA83220DF03B28819 /* WelcomeSignInSheet.swift */; };
 		8513D2AB34581596C0A23037 /* EditorCanvasChromeMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 360B7554EDE4CCA44D8752A0 /* EditorCanvasChromeMetricsTests.swift */; };
 		85461649DB9BB1202DDCE7E4 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2693F8D8DF077DF8A7B7B1 /* OnboardingFlow.swift */; };
@@ -203,6 +204,7 @@
 		95CD3DA3494929EBD52C9510 /* WorkingToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2010776A8205C9E5E7F1E828 /* WorkingToastView.swift */; };
 		95F4BD761335C567240DC500 /* ImagePlaygroundGenerateSwatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3435052A6259B180B23A1EC0 /* ImagePlaygroundGenerateSwatch.swift */; };
 		9600441B3A8EF33D6A357A91 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE931792D085D73E20E9D67F /* DebugLog.swift */; };
+		9608B6ECF46AE4C190F55321 /* V1LibraryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42D7DFA027B86D29A1A904E0 /* V1LibraryImporter.swift */; };
 		9719C92AD3812008649958D3 /* ThumbnailRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67095B33836C86C2D0368E3E /* ThumbnailRendererTests.swift */; };
 		97E60A95558FCB71B2F77F95 /* PrivacyFeatureMatrix.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71B019FF49F48AF90B32CC6E /* PrivacyFeatureMatrix.swift */; };
 		9842DF7250CB0EA5FBCE4A53 /* PortraitDragItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F814DBBEE1B0EDD799B6EF51 /* PortraitDragItem.swift */; };
@@ -420,6 +422,7 @@
 		3FE4A6E054F04E9AF5422E8D /* SettingsAIModelsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAIModelsPage.swift; sourceTree = "<group>"; };
 		41C70EB846E92A3FCDD00E5C /* LibraryBreadcrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryBreadcrumb.swift; sourceTree = "<group>"; };
 		42425F916AF8200C81E49949 /* EntitlementModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementModel.swift; sourceTree = "<group>"; };
+		42D7DFA027B86D29A1A904E0 /* V1LibraryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V1LibraryImporter.swift; sourceTree = "<group>"; };
 		43EC78094FAA5B838EB188CD /* OnboardingEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingEmailView.swift; sourceTree = "<group>"; };
 		44AF47E26C13F98A2B8C634A /* UploadPortraitCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadPortraitCommand.swift; sourceTree = "<group>"; };
 		46B2F1C093D7657D24C28653 /* BannerCanvasDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerCanvasDrop.swift; sourceTree = "<group>"; };
@@ -434,6 +437,7 @@
 		50588A3B4DA898B3891C3FE3 /* CanvasZoomCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasZoomCommands.swift; sourceTree = "<group>"; };
 		509FB1F0B48CA9A30328C709 /* EditorToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorToolTests.swift; sourceTree = "<group>"; };
 		5127F7FAC6DD92487E178E76 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		5150AC059C68E9D248689607 /* V1LibraryImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V1LibraryImporterTests.swift; sourceTree = "<group>"; };
 		524900E2503633B99626081F /* BannerExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerExport.swift; sourceTree = "<group>"; };
 		533857103FAF1F71D774C1E4 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
 		54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitsGalleryView.swift; sourceTree = "<group>"; };
@@ -884,6 +888,7 @@
 				363170BAE87D782CD9CDDB50 /* SettingsRootView.swift */,
 				81677C85F6BBC1623B3AF210 /* SignInSheet.swift */,
 				017ABCA2D077C2C3F1FDFB8E /* UpdateManager.swift */,
+				42D7DFA027B86D29A1A904E0 /* V1LibraryImporter.swift */,
 				4DBD86C6755AD4FDA5BA4D6A /* WindowAppearance.swift */,
 			);
 			path = Settings;
@@ -964,6 +969,7 @@
 				67095B33836C86C2D0368E3E /* ThumbnailRendererTests.swift */,
 				37714B4962091DDA609E9093 /* UpdateManagerTests.swift */,
 				0EBB75BDF842EC2ECD6EF77F /* UploadPillInsetTests.swift */,
+				5150AC059C68E9D248689607 /* V1LibraryImporterTests.swift */,
 			);
 			path = Avatar2Tests;
 			sourceTree = "<group>";
@@ -1542,6 +1548,7 @@
 				87C53410B0B2087017B84516 /* UndoHistoryCap.swift in Sources */,
 				934D2470F8CDB095D736779F /* UpdateManager.swift in Sources */,
 				CF7AD0FDD99C77EB89D1B680 /* UploadPortraitCommand.swift in Sources */,
+				9608B6ECF46AE4C190F55321 /* V1LibraryImporter.swift in Sources */,
 				98AB53571B09A54CAC6D4E9F /* WindowAppearance.swift in Sources */,
 				95CD3DA3494929EBD52C9510 /* WorkingToastView.swift in Sources */,
 			);
@@ -1587,6 +1594,7 @@
 				9719C92AD3812008649958D3 /* ThumbnailRendererTests.swift in Sources */,
 				57C5B2D43C24DE9E088745CF /* UpdateManagerTests.swift in Sources */,
 				B64DAF2D3BA47AB4887D6575 /* UploadPillInsetTests.swift in Sources */,
+				834EC65C5A25AA4CBC278A52 /* V1LibraryImporterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1668,6 +1676,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Avatar2/Avatar2.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 100;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Avatar2/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1675,6 +1684,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;
@@ -1832,6 +1842,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Avatar2/Avatar2.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 100;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Avatar2/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1839,6 +1850,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;

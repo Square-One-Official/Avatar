@@ -61,7 +61,7 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://api.aaavatar.nl/appcast.xml</string>
+	<string>https://api.aaavatar.nl/appcast-v2.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU=</string>
 	<key>SUScheduledCheckInterval</key>

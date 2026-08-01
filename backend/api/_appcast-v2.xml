@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone="yes"?>
+<!-- Sparkle-feed voor Aaavatar 2 (E13.1). Eigen kanaal, los van appcast.xml
+     (v1): v1-installs pollen dat oude feed-URL en zien 2.0-releases dus nooit.
+     release-v2.sh voegt items bovenaan dit channel toe en spiegelt het bestand
+     naar backend/api/_appcast-v2.xml (geserveerd op api.aaavatar.nl/appcast-v2.xml).
+     Een leeg channel is geldig: Sparkle meldt dan "geen update". -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+  </channel>
+</rss>
