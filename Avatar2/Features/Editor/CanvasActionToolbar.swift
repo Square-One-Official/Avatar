@@ -203,7 +203,7 @@ struct CanvasActionToolbar<Background: View>: View {
                 Spacer(minLength: DSSpacing.gap2)
                 if frameShape == shape {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: DSIconSize.xs, weight: .semibold))
                         .foregroundStyle(DSColor.Action.primaryForeground)
                 }
             }
@@ -221,7 +221,7 @@ struct CanvasActionToolbar<Background: View>: View {
     /// rij-foreground (primary) via het omgevings-tintpad van `DSIcon.image`.
     private func rowIcon(_ icon: DSIcon.Symbol) -> some View {
         DSIcon.image(icon)
-            .font(.system(size: 13, weight: .regular))
+            .font(.system(size: DSIconSize.sm, weight: .regular))
             .frame(width: 16, height: 16)
     }
 

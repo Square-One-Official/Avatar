@@ -260,7 +260,7 @@ struct LeftNavView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: DSIconSize.sm, weight: .semibold))
+                    .font(.system(size: DSIconSize.xs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .padding(.horizontal, DSSpacing.gap2)
@@ -298,7 +298,7 @@ struct LeftNavView: View {
     private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: icon).font(.system(size: DSIconSize.base, weight: .medium)).frame(width: 18)
+                Image(systemName: icon).font(.system(size: DSIconSize.sm, weight: .medium)).frame(width: 18)
                 Text(title).dsTextStyle(.labelBase)
                 Spacer(minLength: 0)
             }
@@ -445,7 +445,7 @@ private struct LeftNavFolderRow: View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
                 Image(systemName: "folder")
-                    .font(.system(size: DSIconSize.base, weight: .regular))
+                    .font(.system(size: DSIconSize.sm, weight: .regular))
                     .frame(width: 16)
                 Text(name)
                     .dsTextStyle(.labelBase)

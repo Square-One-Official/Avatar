@@ -66,3 +66,17 @@ final class DSMotionTests: XCTestCase {
         XCTAssertNotEqual(String(describing: scaleNormal), String(describing: scaleReduced))
     }
 }
+
+// E53.9 — de icoonschaal is strikt oplopend; gelijke of omgekeerde trappen
+// maken de semantiek (xxs < … < xxl) betekenisloos.
+final class DSIconSizeTests: XCTestCase {
+    func testScaleIsStrictlyIncreasing() {
+        let ladder: [CGFloat] = [
+            DSIconSize.xxs, DSIconSize.xs, DSIconSize.sm, DSIconSize.base,
+            DSIconSize.lg, DSIconSize.xl, DSIconSize.xxl,
+        ]
+        for (a, b) in zip(ladder, ladder.dropFirst()) {
+            XCTAssertLessThan(a, b, "DSIconSize hoort strikt op te lopen")
+        }
+    }
+}

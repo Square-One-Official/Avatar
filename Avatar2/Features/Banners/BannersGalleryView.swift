@@ -165,7 +165,7 @@ private struct BannerGridTile: View {
                             Image(nsImage: img).resizable().scaledToFill()
                         } else {
                             Image(systemName: "rectangle.on.rectangle.angled")
-                                .font(.system(size: 24, weight: .light))
+                                .font(.system(size: DSIconSize.xl, weight: .light))
                                 .foregroundStyle(DSColor.Foreground.muted)
                         }
                     }
@@ -208,7 +208,7 @@ private struct BannersEmptyState: View {
             VStack(spacing: DSSpacing.gap6) {
                 VStack(spacing: DSSpacing.gap2) {
                     Image(systemName: "rectangle.on.rectangle.angled")
-                        .font(.system(size: 40, weight: .light))
+                        .font(.system(size: DSIconSize.xxl, weight: .light))
                         .foregroundStyle(DSColor.Foreground.muted)
                     Text("Make your first banner")
                         .dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)

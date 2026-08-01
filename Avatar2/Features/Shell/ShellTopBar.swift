@@ -94,7 +94,7 @@ private struct EditorViewModeToggle: View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: DSIconSize.sm, weight: .medium))
                 Text(label)
                     .dsTextStyle(.labelSmall)
             }
@@ -130,7 +130,7 @@ private struct SharePillButton: View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap1_5) {
                 Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: DSIconSize.base, weight: .medium))
                 Text("Share")
                     .dsTextStyle(.labelSmall)
             }
@@ -168,7 +168,7 @@ private struct DSCompactTopBarButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: DSIconSize.base, weight: .medium))
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(width: height, height: height)
                 .background(

@@ -13,7 +13,7 @@ struct BannerBreadcrumb: View {
         HStack(spacing: DSSpacing.gap2) {
             Button { model.goBackFromBanner() } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: DSIconSize.sm, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.primary)
                     .frame(width: 22, height: 22)
                     .contentShape(Rectangle())
@@ -61,7 +61,7 @@ struct BannerBreadcrumb: View {
 
     private var sep: some View {
         Image(systemName: "chevron.right")
-            .font(.system(size: 9, weight: .semibold))
+            .font(.system(size: DSIconSize.xxs, weight: .semibold))
             .foregroundStyle(DSColor.Foreground.muted.opacity(0.7))
     }
 }

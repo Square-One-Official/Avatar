@@ -10,6 +10,9 @@ DERIVED="${DERIVED_DATA:-build/dd}"
 echo "==> reduce-motion-guard (E53.4)"
 bash scripts/check-motion.sh
 
+echo "==> icoongrootte-guard (E53.9)"
+bash scripts/check-icon-sizes.sh
+
 echo "==> xcodegen"
 xcodegen generate
 

@@ -54,7 +54,7 @@ struct SettingsCheckmarkRow<Leading: View>: View {
                 Spacer(minLength: DSSpacing.gap2)
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.system(size: DSIconSize.lg, weight: .regular))
                     .foregroundStyle(
                         isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted
                     )

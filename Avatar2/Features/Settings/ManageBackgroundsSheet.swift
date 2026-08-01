@@ -52,7 +52,7 @@ struct ManageBackgroundsSheet: View {
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: DSIconSize.sm, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
@@ -131,7 +131,7 @@ struct ManageBackgroundsSheet: View {
             sectionHeader("Saved effects") { EmptyView() }
             VStack(spacing: DSSpacing.gap2) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 32, weight: .light))
+                    .font(.system(size: DSIconSize.xxl, weight: .light))
                     .foregroundStyle(DSColor.Foreground.muted)
                 Text("Your saved effects will live here")
                     .dsTextStyle(.labelBase)
@@ -152,7 +152,7 @@ struct ManageBackgroundsSheet: View {
                         .frame(width: 84, height: 84)
                         .overlay(
                             Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .regular))
+                                .font(.system(size: DSIconSize.lg, weight: .regular))
                                 .foregroundStyle(DSColor.Foreground.muted)
                         )
                 }
@@ -189,7 +189,7 @@ struct ManageBackgroundsSheet: View {
             .overlay(alignment: .topTrailing) {
                 Button(action: onDelete) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: DSIconSize.lg))
                         .foregroundStyle(.white, .black.opacity(0.6))
                         .padding(4)
                 }

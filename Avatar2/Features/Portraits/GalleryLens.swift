@@ -90,7 +90,7 @@ struct GalleryLens: View {
     private func navArrow(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: DSIconSize.lg, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(width: 40, height: 40)
                 .background(DSColor.Background.card, in: Circle())

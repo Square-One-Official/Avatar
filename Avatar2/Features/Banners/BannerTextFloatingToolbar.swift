@@ -199,7 +199,7 @@ struct BannerTextFloatingToolbar: View {
                     .dsTextStyle(.labelBase)
                     .monospacedDigit()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: DSIconSize.xxs, weight: .bold))
             }
             .foregroundStyle(DSColor.Foreground.primary)
         }
@@ -349,7 +349,7 @@ struct BannerTextFloatingToolbar: View {
                             Spacer()
                             if Int(current) == Int(size) {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(.system(size: DSIconSize.xs, weight: .semibold))
                                     .foregroundStyle(DSColor.Foreground.muted)
                             }
                         }
@@ -417,7 +417,7 @@ struct BannerTextFloatingToolbar: View {
             mutateLayer { $0.alignRaw = align }
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: DSIconSize.sm, weight: .medium))
                 .foregroundStyle(selected ? DSColor.Action.primaryForeground : DSColor.Foreground.primary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 40)

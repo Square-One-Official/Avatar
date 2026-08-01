@@ -101,7 +101,7 @@ struct CreateEffectSheet: View {
                     } else {
                         VStack(spacing: DSSpacing.gap2) {
                             Image(systemName: "photo.on.rectangle.angled")
-                                .font(.system(size: 26, weight: .regular))
+                                .font(.system(size: DSIconSize.xl, weight: .regular))
                             Text("Drop image\nor click")
                                 .multilineTextAlignment(.center)
                                 .dsTextStyle(.labelSmall)

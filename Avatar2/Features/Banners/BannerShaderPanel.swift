@@ -100,7 +100,7 @@ struct BannerShaderPanel: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
             HStack(spacing: DSSpacing.gap2) {
                 Image(systemName: value.enabled ? "eye" : "eye.slash")
-                    .font(.system(size: 12))
+                    .font(.system(size: DSIconSize.sm))
                     .foregroundStyle(DSColor.Foreground.muted)
                     .onTapGesture { layer.wrappedValue.enabled.toggle() }
                     .help(value.enabled ? "Hide" : "Show")
@@ -124,7 +124,7 @@ struct BannerShaderPanel: View {
                 }
                 .buttonStyle(.plain).help("Remove")
             }
-            .font(.system(size: 13))
+            .font(.system(size: DSIconSize.sm))
 
             if let effect, value.enabled {
                 ForEach(effect.params) { p in

@@ -297,7 +297,7 @@ struct HomeView: View {
         Button { model.presentOpenPanel() } label: {
             HStack(spacing: DSSpacing.gap2) {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.system(size: DSIconSize.lg, weight: .regular))
                     .foregroundStyle(DSColor.Foreground.subtle)
                 Text("Upload portrait")
                     .dsTextStyle(.labelBase)

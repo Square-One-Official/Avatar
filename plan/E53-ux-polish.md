@@ -305,7 +305,8 @@ grid-maten).
 live met seed-data. De logica-kant is met tests geborgd; het oogdeel blijft.
 
 ## 53.9 — Icoongrootte-tokens app-breed (rest van UXS-20)
-- status: backlog
+- status: done
+- owner: DS (2026-08-01, branch v2/e53-9-iconsize)
 - team: DS
 - blockedBy: —
 
@@ -316,6 +317,34 @@ mét oogtest per scherm (een icoon dat een halve punt verspringt valt op in een
 toolbar-rij). Banner-canvas-tekst (user content) blijft uitgezonderd.
 **DoD:** `grep -rn "\.font(\.system(size: [0-9]" Avatar2/Features` = alleen
 user-content-render-code; beide targets bouwen; tests groen.
+
+**Result (2026-08-01):** 70 sites in 32 bestanden geveegd; de grep in Features
+is nu **nul** (banner-canvas-tekst rendert via NSFont en matchte het patroon
+sowieso niet, dus er bleef geen legitieme uitzondering over).
+- **Schaal hertund op de mediaan van de échte clusters** in plaats van blind op
+  de bestaande vijf trappen mappen: de sweep trof coherente groepen (8–9
+  chevron-accessoires · 10–11 indicatoren · 12–13 rij-iconen · 14–15 toolbar ·
+  16–18 prominent · 24–28 placeholder-glyphs · 32–40 heroes). Nieuwe trappen
+  `xxs = 9` en `xxl = 36`, en `xl` van 28 → 26 (mediaan; had nog geen call
+  sites, dus vrij te hertunen). Daarmee landt élke site exact of ±1pt — behalve
+  de 24/28-glyphs (±2pt op tegel-placeholders, onzichtbaar op die maat).
+  Alle 8 chevrons die eerst 9pt waren zijn nu écht gelijk aan elkaar; dat was
+  de kern van de schaduwschaal-klacht.
+- **LeftNavView gelijkgetrokken:** de 53.5-referentie-migratie had 11→sm en
+  13→base gekozen (afronden naar boven); de mediaan-regel zegt 11→xs en 13→sm.
+  Eén regel voor de hele app, anders bouwt de sweep de willekeur die 'ie
+  opruimt gewoon opnieuw in.
+- **Guard:** [scripts/check-icon-sizes.sh](../scripts/check-icon-sizes.sh)
+  faalt op elk nieuw los puntgetal in Features en draait in
+  [build-v2.sh](../scripts/build-v2.sh) naast de E53.4-motion-guard —
+  geverifieerd met een opzettelijke overtreding. +1 test: de schaal is strikt
+  oplopend (xxs < … < xxl).
+
+**Openstaand — de oogtest.** De sweep verschuift ~40 sites met ±1pt (11→10,
+13→12, 15→14, 16→17) en de placeholder-glyphs met 2pt. Per site onzichtbaar,
+maar de DoD-oogtest per scherm (toolbar-rijen, panel-headers, Settings) is niet
+gedraaid — dat vergt de app live. Als een rij ergens tóch verspringt is de fix
+één token-waarde in `DSIconSize`, niet een terugkeer naar literals.
 
 ## 53.6 — Shell-chrome & hover-fixes (UX34–UX36, meldingen Thierry 2026-07-02)
 - status: done

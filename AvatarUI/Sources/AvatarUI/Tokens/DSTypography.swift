@@ -105,14 +105,21 @@ extension View {
 /// Ze op tekst-tokens mappen zou de twee juist verder door elkaar halen; deze
 /// schaal geeft ze een eigen bron.
 public enum DSIconSize {
-    /// Inline naast labelSmall — chevrons, kleine indicatoren.
+    // E53.9: de trappen liggen op de MEDIAAN van de clusters die de sweep in de
+    // app aantrof (8–9, 10–11, 12–13, 14–15, 16–18, 24–28, 32–40), zodat de
+    // meeste sites exact of ±1pt landen — geen zichtbare sprongen, wél één bron.
+    /// Chevron-accessoires ín een chip of breadcrumb.
+    public static let xxs: CGFloat = 9
+    /// Kleine indicatoren naast labelSmall.
     public static let xs: CGFloat = 10
     /// Standaard menu-/rij-icoon.
     public static let sm: CGFloat = 12
     /// Toolbar-pil en icoonknoppen.
     public static let base: CGFloat = 14
-    /// Prominente acties (capsule-toolbar).
+    /// Prominente acties (capsule-toolbar, panel-headers).
     public static let lg: CGFloat = 17
-    /// Lege-staat- en placeholder-glyphs.
-    public static let xl: CGFloat = 28
+    /// Placeholder-glyphs op tegels (sparkles, photo).
+    public static let xl: CGFloat = 26
+    /// Lege-staat-heroes.
+    public static let xxl: CGFloat = 36
 }

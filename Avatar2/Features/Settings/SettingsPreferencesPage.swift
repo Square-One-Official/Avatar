@@ -66,7 +66,7 @@ private struct ThemeMenuPill: View {
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: DSIconSize.sm, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.subtle)
             }
             .padding(.horizontal, DSSpacing.gap4)

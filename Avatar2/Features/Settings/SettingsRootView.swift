@@ -153,7 +153,7 @@ struct SettingsRow<Control: View>: View {
                     .frame(width: 40, height: 40)
                     .overlay {
                         Image(systemName: icon)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: DSIconSize.lg, weight: .medium))
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
             }

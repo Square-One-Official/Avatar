@@ -249,7 +249,7 @@ struct PaywallSheet: View {
     private func featureRow(_ text: String) -> some View {
         HStack(spacing: DSSpacing.gap2) {
             Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: DSIconSize.xs, weight: .semibold))
                 .foregroundStyle(DSColor.Action.primaryForeground)
             Text(text)
                 .dsTextStyle(.bodySmall)
@@ -288,7 +288,7 @@ struct PaywallSheet: View {
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.primary)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16))
+                    .font(.system(size: DSIconSize.lg))
                     .foregroundStyle(isSelected ? DSColor.Action.primaryForeground : DSColor.Foreground.muted)
             }
             .padding(.horizontal, DSSpacing.gap4)
