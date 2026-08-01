@@ -117,6 +117,7 @@
 		58AC878946DA80619C58FD87 /* BrandColorKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C0051780A4DF6A2ED5FB85 /* BrandColorKitTests.swift */; };
 		58BC823E9AD033A9C17F7636 /* SettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D40E681885CB6D731F70EDA /* SettingsModel.swift */; };
 		58C7C65381A278B69B016DDB /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877D5A42F98746FCC7A61452 /* MainWindow.swift */; };
+		592A2EC1075DEF0C1EF10643 /* ImagePlaygroundPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 235B8C8926832EE5049488F7 /* ImagePlaygroundPresenter.swift */; };
 		598E5AA5D1B64C6A66AE5249 /* ProEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */; };
 		5A1933EB43B7E0DB59394102 /* ShellTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */; };
 		5B13B60DCAAF2B947682CE7C /* OnboardingStepEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F687FF9D2FCFD8F72505C3 /* OnboardingStepEngine.swift */; };
@@ -289,6 +290,7 @@
 		D56BE5D31CB70F1184FFDCC3 /* CanvasZoomCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50588A3B4DA898B3891C3FE3 /* CanvasZoomCommands.swift */; };
 		D603FC567F0586D2973B4B7A /* OnboardingDownloadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED61BA47F9EEBF8B65EBD9D /* OnboardingDownloadView.swift */; };
 		D70AFE22A4DC82FC3EC07C0B /* BannerDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A47E8CD140B09EF6650C70B /* BannerDeletion.swift */; };
+		D7136726314646E12675C7B6 /* ImagePlaygroundPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBDF6F5F3B4D4659E450419E /* ImagePlaygroundPresenterTests.swift */; };
 		D79FDF2EDB07AAE954B9C38C /* OnboardingPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA52AF8F365805B303AC7D9 /* OnboardingPrivacyView.swift */; };
 		D7CFDCF65F3FA907C6C87990 /* PrivacyPreferences2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60E31735EC49E308BA808F7F /* PrivacyPreferences2.swift */; };
 		D84A73DA71CEC5D750C30163 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7660BC4B678CC5A24BDEB7 /* SettingsView.swift */; };
@@ -386,6 +388,7 @@
 		2032D64D7EF1EE827C17E15E /* AppleIntelligenceAvailabilityRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceAvailabilityRefresh.swift; sourceTree = "<group>"; };
 		217E085CE2EE3A20C24CAA53 /* ListLens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListLens.swift; sourceTree = "<group>"; };
 		22DF1B75C976F24B6DF1512A /* BannerLogoPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerLogoPanel.swift; sourceTree = "<group>"; };
+		235B8C8926832EE5049488F7 /* ImagePlaygroundPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePlaygroundPresenter.swift; sourceTree = "<group>"; };
 		29693AE9839C2E40136C758E /* SupabaseConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseConfig.swift; sourceTree = "<group>"; };
 		2B9319A21481EA22D57BC2DA /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
 		2BA251657BF3B7DD601561F8 /* BannerPlaceholderSweepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerPlaceholderSweepTests.swift; sourceTree = "<group>"; };
@@ -609,6 +612,7 @@
 		F814DBBEE1B0EDD799B6EF51 /* PortraitDragItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitDragItem.swift; sourceTree = "<group>"; };
 		FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		FB7ECB473A580210DC4D2672 /* Avatar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Avatar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FBDF6F5F3B4D4659E450419E /* ImagePlaygroundPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePlaygroundPresenterTests.swift; sourceTree = "<group>"; };
 		FBE27586F91E9706E71610E7 /* FaceActionsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaceActionsPanel.swift; sourceTree = "<group>"; };
 		FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAboutPage.swift; sourceTree = "<group>"; };
 		FE5329A76249E55A6CEA3562 /* ExportSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetTests.swift; sourceTree = "<group>"; };
@@ -864,6 +868,7 @@
 				60BA406576409CD3BF16452F /* ImagePlaygroundBridge.swift */,
 				1AF7FBFC38D120438709012D /* ImagePlaygroundEntry.swift */,
 				3435052A6259B180B23A1EC0 /* ImagePlaygroundGenerateSwatch.swift */,
+				235B8C8926832EE5049488F7 /* ImagePlaygroundPresenter.swift */,
 				CAF5935E244C409DB420FDEF /* ManageBackgroundsSheet.swift */,
 				BC28570953429FABB63D1572 /* PrivacyElevationSheet.swift */,
 				71B019FF49F48AF90B32CC6E /* PrivacyFeatureMatrix.swift */,
@@ -945,6 +950,7 @@
 				1561422710A925A04041E596 /* FolderSetScopeTests.swift */,
 				05F0B8AF0D58714B5977F09E /* HairEdgeHeuristicTests.swift */,
 				485D83080A757EF57194957C /* HomeSectionsTests.swift */,
+				FBDF6F5F3B4D4659E450419E /* ImagePlaygroundPresenterTests.swift */,
 				6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */,
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 				BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */,
@@ -1473,6 +1479,7 @@
 				8C5115841322D419BE3EBA80 /* ImagePlaygroundBridge.swift in Sources */,
 				E28862C9263E5D7CF1C035E8 /* ImagePlaygroundEntry.swift in Sources */,
 				95F4BD761335C567240DC500 /* ImagePlaygroundGenerateSwatch.swift in Sources */,
+				592A2EC1075DEF0C1EF10643 /* ImagePlaygroundPresenter.swift in Sources */,
 				44D52D380A19EA599D99FF44 /* IsolatingCanvas.swift in Sources */,
 				71D8271AC0392FB757D67696 /* LeftNavView.swift in Sources */,
 				0E0FAC5B382DEFF1C740BF67 /* LibraryBreadcrumb.swift in Sources */,
@@ -1566,6 +1573,7 @@
 				0F18DE1D8BACEDB3AA13CEAC /* FolderSetScopeTests.swift in Sources */,
 				18D1D1C8515170D17835F349 /* HairEdgeHeuristicTests.swift in Sources */,
 				BF781691B508017C788C0E57 /* HomeSectionsTests.swift in Sources */,
+				D7136726314646E12675C7B6 /* ImagePlaygroundPresenterTests.swift in Sources */,
 				9CF91F689F47904D7A69234F /* LocalUpscaleTests.swift in Sources */,
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 				B8206C2F61CE578216A90494 /* PersistentPresentationTests.swift in Sources */,
