@@ -410,7 +410,8 @@ met een eigen levenscyclus, en verplaatsen vergt de bron-afbeelding + completion
 de store plumben — belegd als eigen story E53.8.
 
 ## 53.8 — Apple Intelligence-sheet op een stabiele host
-- status: backlog
+- status: done
+- owner: FEAT (2026-08-01, branch v2/e53-8-playground)
 - team: FEAT
 - blockedBy: —
 
@@ -418,9 +419,36 @@ de store plumben — belegd als eigen story E53.8.
 `imagePlaygroundGenerationSheet` vanuit een diepe child-view — tegen regel 2 van
 [ds-persistent-presentation.mdc](../.cursor/rules/ds-persistent-presentation.mdc)
 in. Een tab-wissel terwijl Image Playground open staat gooit de sheet weg, inclusief
-de generatie eronder. Verplaats de presentatie naar `ShellView` met de bronafbeelding
-+ completion via `UIPresentationStore` (zelfde patroon als de Create-effect-modal in
-E09.3). Neem `ImagePlaygroundGenerateSwatch` meteen mee — die staat forward-built maar
-heeft nog geen call site.
+de generatie eronder. Verplaats de presentatie naar `ShellView`; neem
+`ImagePlaygroundGenerateSwatch` meteen mee.
 **DoD:** de sheet overleeft een tab-wissel; beide targets bouwen; tests groen;
 Result-regel.
+
+**Result (2026-08-01):** nieuwe
+[ImagePlaygroundPresenter](../Avatar2/Features/Settings/ImagePlaygroundPresenter.swift)
+(singleton, @Observable) + `.imagePlaygroundHost()` op ShellView, direct naast de
+E42-host. **Bewust het `GenerateBackgroundPresenter`-patroon** en niet de
+`UIPresentationStore`-route die de story voorstelde: dit is een sheet mét een
+resultaat-callback, en precies die combinatie was in E42 al opgelost — een tweede
+patroon ernaast zetten zou de vergelijkbare gevallen juist uit elkaar trekken.
+- Beide knoppen (`ImagePlaygroundEditChip` + `ImagePlaygroundGenerateSwatch`)
+  presenteren niets meer zelf: ze roepen `present(sourceImage:onCompleted:)` na
+  hun bestaande `allowAIFeature`-gate. De `@available`/`canImport`-splitsing per
+  knop verviel daarmee — de OS-check zit nu één keer, op de host.
+- Presenter-contract: `complete(url:)` decodeert de PNG op één plek (onleesbaar
+  resultaat = stil sluiten, níét de callback met lege data — dat zou een leeg
+  beeld over het portret zetten); `dismiss()` wist de callback zodat een
+  geannuleerde sessie nooit de vorige call site terugbelt; de binding-setter
+  op de host doet alleen dismiss (geen destructieve side effects — regel 4).
+- `GenerateBackgroundSheet`'s eigen Apple-Playground-brug is ongemoeid: die
+  presenteert vanuit een sheet die zélf al op de stabiele host staat (E42) met
+  z'n state in het form-model, dus daar bestaat het probleem niet.
+- Bijvangst: beide knoppen kregen een `accessibilityLabel`, en de twee
+  icoon-maten lopen via `DSIconSize` (E53.9-voorschot).
++5 tests op het presenter-contract, incl. "state overleeft het verdwijnen van de
+call site" — dat ís de tab-wissel, als logica. `scripts/build-v2.sh` volledig
+groen.
+
+**Openstaand:** de live tab-wissel-check met een échte Image-Playground-generatie
+vergt macOS 15.1+ met Apple Intelligence actief op de dev-Mac; niet gedraaid.
+Het mechanisme (state buiten de view) is met tests geborgd.

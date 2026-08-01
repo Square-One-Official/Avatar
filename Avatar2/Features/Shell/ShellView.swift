@@ -145,6 +145,10 @@ struct ShellView: View {
             }
         }
         .generateBackgroundSheet(entitlement: entitlement)
+        // E53.8: Apple-Intelligence-sheet op de stabiele host — presenteerde
+        // eerder vanuit de chip in het Enhance-paneel, dus een tab-wissel gooide
+        // een lopende generatie weg.
+        .imagePlaygroundHost()
         // E53.7: contextmenu's + store-gedreven alerts/confirms.
         .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
         // E25.1 smoke-haak: standalone DSColorPicker.
