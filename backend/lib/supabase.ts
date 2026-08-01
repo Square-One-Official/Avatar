@@ -64,6 +64,75 @@ export async function logCredit(opts: {
   if (error) throw error;
 }
 
+/**
+ * E14.9 — top a comped Pro account (CMS `pro-access`, mode "pro") up to its
+ * monthly credit allowance.
+ *
+ * A comped account has no Stripe subscription, so nothing ever grants it
+ * credits: the webhook's `invoice.paid` path is the only grant path for
+ * paying users and it never fires here. Without this the account would show
+ * tier "pro", pass every Pro gate, and then 402 on the first cloud action.
+ *
+ * Semantics are top-up, not stack: the first call in a calendar month raises
+ * the balance TO `monthlyCredits`, it doesn't add `monthlyCredits` to it.
+ * Stacking would let a dormant comped account accrue a year of unspent
+ * credits and then spend them all at once — real Replicate money.
+ *
+ * Idempotency is the same shape as the Stripe topup grants: a deterministic
+ * `ref` plus the partial unique index from sql/018. Two concurrent first-of-
+ * the-month requests race; one insert wins, the loser gets 23505 and we
+ * swallow it. The in-process memo means the balance lookup happens once per
+ * account per month per warm instance, not on every request.
+ *
+ * Never throws — a failed grant must not take down the endpoint that called
+ * it. The user hits the normal insufficient-credits path instead, which is
+ * wrong but recoverable; a 500 is neither.
+ */
+const compedGrantMemo = new Set<string>();
+
+export async function ensureCompedCredits(
+  userId: string,
+  monthlyCredits: number,
+): Promise<void> {
+  if (monthlyCredits <= 0) return;
+
+  // Calendar month in UTC. Deliberately not the signup anniversary: a comp
+  // list has no billing cycle to align to, and "resets on the 1st" is the
+  // thing that's explainable to the person you comped.
+  const now = new Date();
+  const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const memoKey = `${userId}:${period}`;
+  if (compedGrantMemo.has(memoKey)) return;
+
+  try {
+    // `credit_ledger.user_id` FKs `public.users`. Most endpoints call
+    // `ensureUser` well after they resolve entitlements, so the row may not
+    // exist yet on a comped account's first ever request — without this the
+    // insert below dies on a FK violation and the user sees 0 credits.
+    await ensureUser(userId);
+
+    const balance = await currentCredits(userId);
+    const delta = monthlyCredits - balance;
+    if (delta <= 0) {
+      // Already at or above the allowance — nothing to grant this month.
+      compedGrantMemo.add(memoKey);
+      return;
+    }
+
+    const { error } = await supabase.from("credit_ledger").insert({
+      user_id: userId,
+      delta,
+      reason: "comped_pro",
+      ref: `comped:${userId}:${period}`,
+    });
+    // 23505 = unique violation: another request already granted this month.
+    if (error && error.code !== "23505") throw error;
+    compedGrantMemo.add(memoKey);
+  } catch (err) {
+    console.error("[comped-pro] monthly grant failed", userId, period, err);
+  }
+}
+
 /** Ensures a `public.users` row exists (mirrors auth.users). */
 export async function ensureUser(userId: string): Promise<void> {
   const { error } = await supabase

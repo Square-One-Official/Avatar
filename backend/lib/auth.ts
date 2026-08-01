@@ -256,21 +256,11 @@ export async function checkAnonCheckoutRateLimit(ip: string): Promise<boolean> {
   return tryLimit(anonCheckoutLimiter, ip);
 }
 
-/**
- * True when the caller's e-mail is on the DEV_UNLIMITED_EMAILS allowlist
- * (comma-separated env var). Dev-allowlisted users skip credit/trial gates
- * and may use the `model_override` parameter (E01.10). Canonical home of
- * the gate — /v1/account and /v1/checkout/topup still carry local copies
- * from before E01.10; route new callers here.
- */
-export function isDevUnlimitedUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
-}
+// The dev-unlimited allowlist used to live here as a synchronous env-var
+// lookup. E14.9 moved it to `lib/proAccess.ts`, which resolves the CMS
+// `pro-access` list first and keeps DEV_UNLIMITED_EMAILS as the break-glass
+// fallback — see `proOverrideFor` / `isUnlimitedUser` there. The three
+// copy-pasted local variants (/v1/account, /v1/checkout/topup) went with it.
 
 /**
  * Extract the originating client IP. Vercel terminates TLS at the edge and

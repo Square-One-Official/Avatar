@@ -25,6 +25,7 @@ do not branch or skip numbers.
 | 015 | `015_custom_effects.sql` | User-created custom Effects (E34): table + storage | 001, 006 |
 | 016 | `016_refund_e43_generate_background_outage.sql` | **One-off ops script, not schema**: credit-refund for the E43/A2 generate-background outage. Dry-run first; refund block is commented out — run only after sign-off | 001 |
 | 017 | `017_payload_effects_style_references.sql` | `payload.effects_style_references` array table for CMS style references on Effects (E54.1) — apply BEFORE the admin deploy that ships the field | 008 |
+| 018 | `018_pro_access.sql` | `payload.pro_access` (CMS-managed Pro list, E14.9) + `credit_ledger` idempotency index for the monthly comp grant — apply BEFORE the admin/backend deploy | 001, 002, 008 |
 
 ## Data classification
 
@@ -60,6 +61,7 @@ in [`admin/README.md`](../../admin/README.md#database-role-scoped-payload_app).
 | `users` (admin operators) | **PII** | Single-operator at the moment. MFA-gated. |
 | `announcements`, `badge-components`, `media` | **public** | Drives in-app announcements + NEW badges. No PII. |
 | `newsletter-unsubscribes` | **PII** | Email addresses that opted out. Retained even after account deletion so a re-signup doesn't accidentally re-send. |
+| `pro-access` | **PII** | Email addresses granted Pro without payment (E14.9), plus a free-text note about who they are. Writes are admin-session-only; the backend's API key has read access. |
 
 ### Storage buckets
 

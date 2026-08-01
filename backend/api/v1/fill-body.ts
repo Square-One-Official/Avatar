@@ -1,8 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { checkRateLimit, isDevUnlimitedUser, requireUser } from "../../lib/auth.js";
+import { checkRateLimit, requireUser } from "../../lib/auth.js";
 import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 import {
   currentCredits,
+  ensureCompedCredits,
   ensureUser,
   logCredit,
 } from "../../lib/supabase.js";
@@ -81,7 +83,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const isDevUser = isDevUnlimitedUser(user.email);
+  // E14.9 — the Pro list: CMS `pro-access` first, DEV_UNLIMITED_EMAILS as
+  // break-glass. "unlimited" skips credit accounting entirely; a comped Pro
+  // gets this month's allowance and then spends credits like anyone else.
+  const override = await proOverrideFor(user.email);
+  const isDevUser = override?.mode === "unlimited";
+  if (override?.mode === "pro") {
+    await ensureCompedCredits(user.id, override.monthlyCredits);
+  }
 
   // E01.10: optional model override voor de outpaint-stap — dev-only,
   // whitelist in MODEL_REGISTRY. De alpha-herextractie (stap 4) blijft

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../lib/auth.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, supabase } from "../../lib/supabase.js";
 import { fetchPublishedMessages, meetsMinVersion } from "../../lib/payload.js";
 
@@ -37,7 +38,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = new Date();
 
     const sub = await activeSubscription(user.id);
-    const isPro = sub !== null && (sub.status === "active" || sub.status === "trialing");
+    // Comped/dev accounts (E14.9) count as Pro for cohort targeting — they see
+    // the app as a Pro sees it, so "proUsers" copy is the copy that applies.
+    const isPro =
+      (sub !== null && (sub.status === "active" || sub.status === "trialing")) ||
+      (await proOverrideFor(user.email)) !== null;
 
     // Signup-datum voor cohort-targeting (best-effort; public.users.created_at).
     const userCreatedAt = await fetchUserCreatedAt(user.id);

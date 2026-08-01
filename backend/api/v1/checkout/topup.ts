@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
 import { sendCheckoutError } from "../../../lib/checkout-errors.js";
+import { proOverrideFor } from "../../../lib/proAccess.js";
 import { activeSubscription, ensureUser, supabase } from "../../../lib/supabase.js";
 import { isCreditPack, priceIdForPack, stripe, type CreditPack } from "../../../lib/stripe.js";
 
@@ -41,10 +42,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Top-ups are only sold to active subscribers — credits are useless without
   // Pro since the gated feature (Magic Cutout) requires it.
   // Grace-period subs (past_due) are allowed by activeSubscription().
-  // Dev-allowlisted users bypass the gate so they can exercise the full
-  // Stripe Checkout flow even though they have no real subscription row.
+  // Pro-list accounts (E14.9: CMS `pro-access` + the DEV_UNLIMITED_EMAILS
+  // break-glass) bypass the gate so they can exercise the full Stripe Checkout
+  // flow — and buy top-ups — without a real subscription row.
   await ensureUser(user.id);
-  if (!isDevUnlimitedUser(user.email)) {
+  if ((await proOverrideFor(user.email)) === null) {
     const sub = await activeSubscription(user.id);
     if (!sub) {
       res.status(403).json({ error: "pro_required" });
@@ -103,11 +105,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-function isDevUnlimitedUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
-}

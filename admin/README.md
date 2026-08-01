@@ -33,6 +33,32 @@ and prompts you to create the first admin user via the dashboard.
 6. **Set `publishedAt`** — once non-null and in the past, the macOS app
    will see it on next sign-in.
 
+## Granting Pro without payment (`pro-access`)
+
+The **Pro access** collection is the Pro list: accounts that get Pro
+without a Stripe subscription. Add the address the person signs in with;
+it takes effect within a minute (the backend caches the list for 60s) and
+needs no deploy. An entry for an address that never signs up simply does
+nothing until it does.
+
+- **Access = Pro** (default) — a comped subscription. Every Pro gate
+  opens and the account gets `monthlyCredits` (default 200) per calendar
+  month. Cloud actions cost credits exactly as they do for a paying
+  subscriber, so the Replicate bill stays bounded. The allowance is a
+  top-up, not a stack: unspent credits don't roll over.
+- **Access = Unlimited** — internal/dev only. Every credit check
+  bypassed, plus the Advanced model picker in the app. Keep this for our
+  own accounts.
+
+Revoke by unchecking **active** (keeps the record) or by setting
+**expiresAt**. Every change is written to the audit log.
+
+Two things deliberately don't go through this collection: writes are
+admin-session-only, so the backend's Payload API key can read the list but
+never add to it; and `DEV_UNLIMITED_EMAILS` on the avatars-api Vercel
+project still grants Unlimited, as the break-glass path for when this CMS
+is unreachable.
+
 ## Deploy
 
 Deployed as its own Vercel project (`avatar-admin`) at

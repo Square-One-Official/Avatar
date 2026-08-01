@@ -219,3 +219,62 @@ background-generate-prijs uit één bron (server-config of `CreditMeter`) trekke
 **DoD:** alle cloud-acties tonen hun kosten via hetzelfde chip-contract vóór
 uitvoering; een gebruiker met te weinig credits krijgt de melding vóór de
 upload start; tests groen; Result-regel.
+
+## 14.9 — Pro-lijst beheerbaar vanuit de CMS
+- status: done
+- owner: INFRA (AI-agent)
+- blockedBy: —
+
+Vraag van Thierry (2026-08-01): mensen op de Pro-lijst kunnen zetten via de CMS.
+**Was:** de enige niet-Stripe-route naar Pro was `DEV_UNLIMITED_EMAILS`, een
+komma-gescheiden env-var op het avatars-api-Vercel-project. Wijzigen = redeploy,
+geen spoor van wie er is toegevoegd of waarom, en precies één stand (alle
+creditcontroles overslaan) — prima voor onze eigen accounts, ongeschikt om
+iemand Pro te geven.
+
+**Gebouwd:**
+1. **CMS-collectie `pro-access`** (`admin/src/collections/ProAccess.ts`), groep
+   "Access". Velden: `email` (uniek, lowercased), `access`, `monthlyCredits`,
+   `active`, `expiresAt`, `note`, `grantedAt`. Twee niveaus:
+   - `pro` (default) = comped abonnement: alle Pro-gates open, `monthlyCredits`
+     (default 200) per kalendermaand, cloud-acties kosten gewoon credits.
+   - `unlimited` = het oude env-var-gedrag: geen creditboekhouding + de
+     Advanced-modelkiezer (`is_dev_unlimited`, E15.5). Alleen eigen accounts.
+2. **Schrijfrechten los van leesrechten.** Nieuwe access-regel `adminSession`
+   (`admin/src/lib/access.ts`) weigert API-key-principals. De backend-API-key
+   mag de lijst lézen maar er niets aan toevoegen — anders is een lek van die
+   key gelijk aan gratis Pro uitdelen.
+3. **Backend-resolver** `backend/lib/proAccess.ts`: 60s-cache, concurrent
+   refreshes gecollapsed, en bij een CMS-storing tot 10 min de laatste goede
+   lijst serveren (daarna dicht — entitlements falen closed).
+   `DEV_UNLIMITED_EMAILS` blijft leven als break-glass en levert altijd
+   `unlimited`, onafhankelijk van de CMS.
+4. **Maandtegoed voor comped Pro** (`ensureCompedCredits`, supabase.ts). Een
+   comped account heeft geen Stripe-subscription, dus de webhook grant nooit
+   iets — zonder dit zou het tier "pro" tonen en op de eerste cloud-actie 402'en.
+   Top-up-semantiek (niet stapelen): eerste call van de maand tilt het saldo
+   naar `monthlyCredits`. Idempotent via `ref = comped:<user>:<YYYY-MM>` + de
+   partiële unieke index uit sql/018, plus een in-process memo zodat de
+   saldocheck één keer per warme instance per maand gebeurt.
+5. **Alle callsites om**: de gesynchroniseerde `isDevUnlimitedUser` is weg uit
+   `lib/auth.ts` én de twee copy-paste-varianten (`/v1/account`,
+   `/v1/checkout/topup`) — één bron. Pro-gates in stylize/custom-effects en de
+   cohort-targeting in `/v1/messages` + `/v1/announcements/pending` tellen een
+   comped account nu als Pro. Ook `/v1/import-claim`: zonder dat liep een
+   comped account tegen de drie-afbeeldingen-importcap aan terwijl de app Pro
+   toonde.
+6. **`/v1/account`** geeft een comped Pro een echt payload: tier `pro`,
+   werkelijk saldo, `monthly_quota = monthlyCredits`, `monthly_reset_at` = de
+   1e van de volgende maand UTC. Een echt abonnement wint van een comp.
+   Responseshape ongewijzigd; `is_dev_unlimited` is optioneel in de client
+   (`EntitlementModels.swift:188`), dus geen app-wijziging nodig.
+
+**Uitrolvolgorde (Thierry):** eerst `backend/sql/018_pro_access.sql` in de
+Supabase SQL-editor, dan admin deployen, dan backend. Andersom faalt elke
+pro-access-query in Payload en valt de backend terug op alleen de env-var.
+
+**Result:** CMS-collectie `pro-access` + backend-resolver + maandelijkse
+comp-grant; `isDevUnlimitedUser` uit drie plaatsen geconsolideerd naar
+`proOverrideFor`; `tsc --noEmit` schoon op backend, admin `next build` groen
+(4 pre-existing tsc-errors ongewijzigd), Avatar2-target bouwt (geen Swift
+geraakt). Niet gedaan: prod-uitrol — wacht op de SQL-migratie van Thierry.

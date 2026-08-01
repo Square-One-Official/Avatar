@@ -13,6 +13,7 @@ import { BadgeComponents } from "./collections/BadgeComponents";
 import { Effects } from "./collections/Effects";
 import { BannerPresets } from "./collections/BannerPresets";
 import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
+import { ProAccess } from "./collections/ProAccess";
 import { AuditLog } from "./collections/AuditLog";
 import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 
@@ -27,7 +28,7 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, Messages, BadgeComponents, Effects, BannerPresets, NewsletterUnsubscribes, AuditLog],
+  collections: [Users, Media, Announcements, Messages, BadgeComponents, Effects, BannerPresets, NewsletterUnsubscribes, ProAccess, AuditLog],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
   typescript: {

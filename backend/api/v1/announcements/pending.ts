@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
+import { proOverrideFor } from "../../../lib/proAccess.js";
 import { activeSubscription, supabase } from "../../../lib/supabase.js";
 import { fetchPublishedAnnouncements, meetsMinVersion } from "../../../lib/payload.js";
 
@@ -42,7 +43,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Determine subscription state once for audience filtering.
     const sub = await activeSubscription(user.id);
-    const isPro = sub !== null && (sub.status === "active" || sub.status === "trialing");
+    // Comped/dev accounts (E14.9) count as Pro for audience targeting.
+    const isPro =
+      (sub !== null && (sub.status === "active" || sub.status === "trialing")) ||
+      (await proOverrideFor(user.email)) !== null;
 
     // Pull every "seen" slug for this user in a single round-trip rather
     // than per-announcement.
