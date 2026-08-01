@@ -64,7 +64,7 @@ struct BannerBackgroundPanel: View {
                     .frame(width: swatch, height: swatch)
                     .overlay {
                         Image(systemName: "plus")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: DSIconSize.base, weight: .semibold))
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
             }
@@ -134,7 +134,7 @@ struct BannerBackgroundPanel: View {
                     .frame(width: swatch, height: swatch)
                     .overlay {
                         Image(systemName: "plus")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: DSIconSize.base, weight: .semibold))
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
             }
@@ -178,7 +178,7 @@ struct BannerBackgroundPanel: View {
     private var zoomRow: some View {
         HStack(spacing: DSSpacing.gap2) {
             Image(systemName: "plus.magnifyingglass")
-                .font(.system(size: 11))
+                .font(.system(size: DSIconSize.xs))
                 .foregroundStyle(DSColor.Foreground.muted)
             DSSlider(value: zoomBinding, in: 1...3)
                 .frame(maxWidth: 180)

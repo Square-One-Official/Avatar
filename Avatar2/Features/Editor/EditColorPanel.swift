@@ -280,7 +280,7 @@ struct EditColorPanel: View {
                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: isOn ? "checkmark" : icon).font(.system(size: 12, weight: .medium))
+                Image(systemName: isOn ? "checkmark" : icon).font(.system(size: DSIconSize.sm, weight: .medium))
                 Text(label).dsTextStyle(.labelSmall)
                 // E31.8: Pro-badge en credit-prijs zijn onafhankelijk — een
                 // betaalde Pro-actie toont beide (Pro-gate én wat 'ie kost).
@@ -314,7 +314,7 @@ struct EditColorPanel: View {
                 showHybridCoachmark = false
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: DSIconSize.xs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .buttonStyle(.plain)
@@ -334,12 +334,12 @@ struct EditColorPanel: View {
             toggleMenu(.boost)
         } label: {
             HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: 12, weight: .medium))
+                Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: DSIconSize.sm, weight: .medium))
                 Text("Boost").dsTextStyle(.labelSmall)
                 Text(boostMode.costLabel)
                     .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
                 DSPrivacyBadge(tier: boostMode == .local ? .onDevice : .thirdParty)
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                Image(systemName: "chevron.down").font(.system(size: DSIconSize.xxs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .foregroundStyle(DSColor.Foreground.primary)
@@ -420,7 +420,7 @@ struct EditColorPanel: View {
 
     private func cutoutDownloadingChip(_ fraction: Double) -> some View {
         HStack(spacing: DSSpacing.gap1) {
-            Image(systemName: "arrow.down.circle").font(.system(size: 12, weight: .medium))
+            Image(systemName: "arrow.down.circle").font(.system(size: DSIconSize.sm, weight: .medium))
             Text("Downloading… \(Int(fraction * 100))%")
                 .dsTextStyle(.labelSmall)
                 .monospacedDigit()
@@ -435,10 +435,10 @@ struct EditColorPanel: View {
 
     private func cutoutChipLabel(trailingIcon: String?) -> some View {
         HStack(spacing: DSSpacing.gap1) {
-            Image(systemName: "scissors").font(.system(size: 12, weight: .medium))
+            Image(systemName: "scissors").font(.system(size: DSIconSize.sm, weight: .medium))
             Text("Remove background").dsTextStyle(.labelSmall)
             if let trailingIcon {
-                Image(systemName: trailingIcon).font(.system(size: 9, weight: .semibold))
+                Image(systemName: trailingIcon).font(.system(size: DSIconSize.xxs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
         }

@@ -59,7 +59,7 @@ struct OnboardingDownloadView: View {
                 .frame(width: 44, height: 44)
                 .overlay {
                     Image(systemName: glyph)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: DSIconSize.lg, weight: .semibold))
                         .foregroundStyle(DSColor.Action.onAction)
                 }
             ProgressView(value: fraction)

@@ -193,7 +193,7 @@ struct PortraitsGalleryView: View {
     private var emptyState: some View {
         VStack(spacing: DSSpacing.gap2) {
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 36, weight: .light))
+                .font(.system(size: DSIconSize.xxl, weight: .light))
                 .foregroundStyle(DSColor.Foreground.muted)
             Text(model.selectedFolderID == nil ? "No portraits yet" : "This folder is empty")
                 .dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)

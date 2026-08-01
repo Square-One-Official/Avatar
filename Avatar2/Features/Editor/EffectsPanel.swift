@@ -512,7 +512,7 @@ struct EffectsPanel: View {
             ) {
                 VStack(spacing: DSSpacing.gap1) {
                     Image(systemName: "plus")
-                        .font(.system(size: 26, weight: .semibold))
+                        .font(.system(size: DSIconSize.xl, weight: .semibold))
                     Text("New effect")
                         .dsTextStyle(.labelSmall)
                 }
@@ -579,7 +579,7 @@ struct EffectsPanel: View {
 
     private var placeholderIcon: some View {
         Image(systemName: "sparkles")
-            .font(.system(size: 28, weight: .regular))
+            .font(.system(size: DSIconSize.xl, weight: .regular))
     }
 }
 

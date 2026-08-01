@@ -41,14 +41,14 @@ struct BannerLogoPanel: View {
                         .background(RoundedRectangle(cornerRadius: DSRadius.md).fill(DSColor.Background.inset))
                     VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                         HStack(spacing: DSSpacing.gap1) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 11)).foregroundStyle(DSColor.Foreground.muted)
+                            Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: DSIconSize.xs)).foregroundStyle(DSColor.Foreground.muted)
                             Slider(value: scaleBinding, in: 0.08...0.6).frame(width: 120)
                         }
                         positionGrid
                     }
                     Spacer(minLength: 0)
                     Button { removeLogo() } label: {
-                        Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(DSColor.Foreground.muted)
+                        Image(systemName: "trash").font(.system(size: DSIconSize.sm)).foregroundStyle(DSColor.Foreground.muted)
                     }
                     .buttonStyle(.plain).help("Remove logo")
                 }
@@ -92,7 +92,7 @@ struct BannerLogoPanel: View {
                         .frame(width: swatch, height: swatch)
                         .overlay {
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: DSIconSize.base, weight: .semibold))
                                 .foregroundStyle(DSColor.Foreground.subtle)
                         }
                 }

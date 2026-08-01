@@ -13,7 +13,7 @@ struct HairNudgeBanner: View {
     var body: some View {
         HStack(spacing: DSSpacing.gap3) {
             Image(systemName: "wand.and.stars")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: DSIconSize.base, weight: .semibold))
                 .foregroundStyle(DSColor.Action.primaryForeground)
 
             VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
@@ -36,7 +36,7 @@ struct HairNudgeBanner: View {
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: DSIconSize.sm, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.subtle)
                     .frame(width: 24, height: 24)
             }

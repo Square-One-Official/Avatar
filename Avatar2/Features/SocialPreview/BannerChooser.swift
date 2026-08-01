@@ -48,7 +48,7 @@ struct BannerPickerContent: View {
                     .frame(width: 40, height: 28)
                     .overlay {
                         Image(systemName: "link")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: DSIconSize.sm, weight: .semibold))
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
                 Text("Match avatar").dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary)

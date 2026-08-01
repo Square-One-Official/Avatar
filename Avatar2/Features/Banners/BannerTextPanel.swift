@@ -73,7 +73,7 @@ struct BannerTextPanel: View {
 
                 Button { delete(value.id) } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 13))
+                        .font(.system(size: DSIconSize.sm))
                         .foregroundStyle(DSColor.Foreground.muted)
                         .frame(width: 28, height: 28)
                 }
@@ -94,7 +94,7 @@ struct BannerTextPanel: View {
                             .dsTextStyle(.labelBase)
                             .foregroundStyle(DSColor.Foreground.primary)
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: DSIconSize.xs, weight: .semibold))
                             .foregroundStyle(DSColor.Foreground.muted)
                     }
                     .padding(.horizontal, DSSpacing.gap3)
@@ -131,7 +131,7 @@ struct BannerTextPanel: View {
                                 .dsTextStyle(.labelBase)
                                 .foregroundStyle(DSColor.Foreground.primary)
                             Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: DSIconSize.xs, weight: .semibold))
                                 .foregroundStyle(DSColor.Foreground.muted)
                         }
                         .padding(.horizontal, DSSpacing.gap3)
@@ -213,7 +213,7 @@ struct BannerTextPanel: View {
         return Button { layer.wrappedValue.y = y } label: {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
+                    .font(.system(size: DSIconSize.xs))
                 Text(label)
                     .dsTextStyle(.labelSmall)
             }

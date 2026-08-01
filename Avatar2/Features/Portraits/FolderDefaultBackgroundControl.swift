@@ -27,7 +27,7 @@ struct FolderDefaultBackgroundControl: View {
                 }
                 .overlay(alignment: .bottomTrailing) {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: DSIconSize.xs, weight: .semibold))
                         .foregroundStyle(DSColor.Foreground.primary)
                         .padding(DSSpacing.gap2)
                         .background(.ultraThinMaterial, in: Circle())

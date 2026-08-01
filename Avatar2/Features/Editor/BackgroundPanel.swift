@@ -256,7 +256,7 @@ struct BackgroundPanel: View {
     private var uploadedTiles: some View {
         tile(isSelected: false, width: rowTileWidth) {
             Image(systemName: "plus")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: DSIconSize.base, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.subtle)
         } action: { uploadCustom() }
         .help("Upload an image")
@@ -280,7 +280,7 @@ struct BackgroundPanel: View {
         // bijwerken terwijl de picker open is.
         tile(isSelected: false, width: rowTileWidth) {
             Image(systemName: "plus")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: DSIconSize.base, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.subtle)
         } action: {
             if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
@@ -347,7 +347,7 @@ struct BackgroundPanel: View {
     private func brandRemoveBadge(_ hex: String) -> some View {
         Button { brand.remove(hex) } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: DSIconSize.xxs, weight: .bold))
                 .foregroundStyle(DSColor.Foreground.primary)
                 .padding(4)
                 .background(DSColor.Background.card, in: Circle())
@@ -555,10 +555,10 @@ struct BackgroundPanel: View {
         Button { showTypeMenu.wrappedValue.toggle() } label: {
             HStack(spacing: DSSpacing.gap1) {
                 Image(systemName: generateSession.type.iconName)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: DSIconSize.xs, weight: .medium))
                 Text(generateSession.type.label).dsTextStyle(.labelSmall)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: DSIconSize.xxs, weight: .semibold))
             }
             .foregroundStyle(DSColor.Foreground.subtle)
             .padding(.horizontal, DSSpacing.gap2)
@@ -598,11 +598,11 @@ struct BackgroundPanel: View {
                 if isGenerating {
                     // Klikbaar tijdens de run: stop-teken bovenop de spinner.
                     Image(systemName: "stop.fill")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: DSIconSize.xxs, weight: .bold))
                         .foregroundStyle(DSColor.Action.onAction)
                 } else {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: DSIconSize.sm, weight: .bold))
                         .foregroundStyle(DSColor.Action.onAction)
                 }
             }

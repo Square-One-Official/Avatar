@@ -68,7 +68,7 @@ struct BannerImageFloatingToolbar: View {
     private func toolButton(_ icon: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: DSIconSize.base, weight: .medium))
                 .foregroundStyle(active ? DSColor.Action.primary : DSColor.Foreground.primary)
                 .frame(width: 32, height: 32)
         }
@@ -84,7 +84,7 @@ struct BannerImageFloatingToolbar: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: DSIconSize.xs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             Text(BannerNativePanels.formatByteCount(byteCount))

@@ -170,7 +170,7 @@ struct ClothesPanel: View {
                         Task { await model.apply(freeText: trimmed, base: baseImage, portrait: portrait) }
                     } label: {
                         Image(systemName: "chevron.up")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: DSIconSize.base, weight: .semibold))
                             .foregroundStyle(DSColor.Action.onAction)
                             .frame(width: 40, height: 40)
                             .background(DSColor.Action.primary)

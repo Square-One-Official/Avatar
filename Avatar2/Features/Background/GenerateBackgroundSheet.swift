@@ -152,7 +152,7 @@ struct GenerateBackgroundSheet: View {
                 Text(form.model.label)
                     .dsTextStyle(.labelBase)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: DSIconSize.xxs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .foregroundStyle(DSColor.Foreground.primary)
@@ -236,7 +236,7 @@ struct GenerateBackgroundSheet: View {
                         .foregroundStyle(DSColor.Foreground.primary)
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: DSIconSize.xxs, weight: .semibold))
                         .foregroundStyle(DSColor.Foreground.muted)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
@@ -258,7 +258,7 @@ struct GenerateBackgroundSheet: View {
 
     private func stepIcon(_ name: String) -> some View {
         Image(systemName: name)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: DSIconSize.xs, weight: .semibold))
             .foregroundStyle(DSColor.Foreground.muted)
             .frame(width: 16)
     }
@@ -299,7 +299,7 @@ struct GenerateBackgroundSheet: View {
                     .overlay {
                         if item == .custom {
                             Image(systemName: "pencil")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: DSIconSize.sm, weight: .semibold))
                                 .foregroundStyle(DSColor.Foreground.subtle)
                         }
                     }

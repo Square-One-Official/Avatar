@@ -13,7 +13,7 @@ struct SidebarToggleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "sidebar.left")
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: DSIconSize.base, weight: .regular))
                 .foregroundStyle(DSColor.Foreground.muted)
                 .frame(width: ShellMetrics.sidebarToggleWidth, height: ShellMetrics.sidebarToggleWidth)
                 .contentShape(Rectangle())
