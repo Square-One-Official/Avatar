@@ -20,29 +20,78 @@ Tot een port gedraaid is testen agents in-app tegen een Vercel-preview-deploy va
 **Result:** Port gedraaid 2026-06-12: branch v1/backend-port-2026-06-12 met send-recovery-email (E01.7, stond sinds 19 mei ongecommit) + de zeven E01.10-backendbestanden byte-identiek aan v2-main (diff-geverifieerd), ff-merge naar main (b27cdd5..3bc2a76) en gepusht → Vercel-productie-deploy; tsc-typecheck + models-smoke groen op main; productie-smoke OK (/v1/auth/send-recovery-email: 400 invalid_email waar eerst 404; /v1/colorize zonder auth: 401). Bewust niet mee: backend/sql/012 (device_grants account_link) — hoort bij account-link-werk dat nergens in tracked code bestaat, geen dependency van het endpoint; blijft als los punt in de hoofd-checkout. v2-main-kant ongewijzigd.
 
 ## 13.1 — Apart updatekanaal
-- status: backlog
-- owner: —
-- blockedBy: alle FEAT-epics
+- status: done (code + tooling) — **prod-deploy + eerste release zijn gated (Thierry), zie GO-NO-GO-2.0.md §4**
+- owner: INFRA (2026-08-01, branch v2/e13-release)
+- blockedBy: —
 - DoD: beide targets bouwen, tests groen
 
 Eigen appcast voor 2.0-beta; v1-gebruikers merken niets.
 
-**Result:** _(invullen bij done)_
+**Result (2026-08-01):**
+- **Eigen feed:** Avatar2 → `https://api.aaavatar.nl/appcast-v2.xml`; v1 blijft
+  op `/appcast.xml`. Backend: [appcast-v2.ts](../backend/api/appcast-v2.ts) +
+  rewrite in vercel.json; de serveer-logica (cache/etag/304) is gedeeld met het
+  v1-kanaal via [appcastFeed.ts](../backend/lib/appcastFeed.ts) i.p.v.
+  gekopieerd. Canon in de repo-root: `appcast-v2.xml` (leeg channel = geldig,
+  Sparkle meldt "geen update"). `tsc --noEmit` groen.
+- **Eigen versielijn:** het Avatar2-target erfde v1's 1.2.1/18 uit de
+  root-settings — een v1-release-bump zou het v2-kanaal stil hernummeren. Nu
+  target-overrides 2.0.0 / build **100** (ruim boven élk v1-buildnummer, zodat
+  een dev-binary die ooit op het gedeelde feed stond nooit een "downgrade"
+  ziet). Beide geverifieerd via `xcodebuild -showBuildSettings`.
+- **release.sh (v1) ontscherpt:** de globale `sed`-bump verving élke
+  MARKETING_VERSION-match — die zou de nieuwe v2-overrides meepakken. Nu een
+  first-match-only bump (python).
+- **[release-v2.sh](../scripts/release-v2.sh):** volledige v2-flow (scheme
+  Avatar2, "Aaavatar 2.app", `Aaavatar-2-<v>.dmg`, tag `v<v>`), bumpt alléén
+  het Avatar2-blok (assert op precies 2 matches — faalt hard bij een derde),
+  en publiceert als GitHub-**prerelease**. Dat laatste is verplicht: de
+  website linkt `releases/latest/download/Aaavatar.dmg`, en GitHub's "latest"
+  is de nieuwste niet-prerelease — een gewone 2.0-release zou die link kapen
+  en v1-downloaders een 404 geven. Zelfde EdDSA-sleutelpaar als v1 (besluit
+  E01.11), dus geen nieuw key-beheer.
+- **Gated (Thierry):** de backend-port/deploy (prod geeft op `/appcast-v2.xml`
+  nu 404) en de eerste beta-release (signing/notarisatie). Stappen in
+  GO-NO-GO-2.0.md §4.
 
 ## 13.2 — Migratiepad
-- status: backlog
-- owner: —
-- blockedBy: E05.4
+- status: done (code + tests) — **e2e met een echte v1-bibliotheek is gated (Thierry), zie GO-NO-GO-2.0.md §5**
+- owner: INFRA (2026-08-01, branch v2/e13-release)
+- blockedBy: —
 - DoD: beide targets bouwen, tests groen
 
 v1-library → Portrait2-store (read-only import).
 
-**Result:** _(invullen bij done)_
+**Result (2026-08-01):** de migratie rijdt op v1's bestáánde bibliotheek-export
+(`LibraryArchive`, zip met manifest.json + cutout-PNG's) — niet op v1's live
+store. Dat is geen gemakzucht maar een sandbox-feit: beide apps zijn
+gesandboxt onder verschillende bundle-ids, dus v2 kán v1's container niet stil
+lezen; de gebruiker exporteert in v1 en kiest het bestand in v2
+(user-selected-read-entitlement). Read-only aan de v1-kant per constructie.
+- **[V1LibraryArchive](../AvatarKit/Sources/AvatarKit/Services/V1LibraryArchive.swift)**
+  (AvatarKit): tolerante lezer van het schema-1-manifest (ISO-8601), weigert
+  níeuwere schema's expliciet, telt records-zonder-cutout i.p.v. ze stil te
+  snoeien. 5 tests op fixtures in het échte zip-formaat.
+- **[V1LibraryImporter](../Avatar2/Features/Settings/V1LibraryImporter.swift)**
+  (Avatar2): mapt naar Portrait2 in één "Aaavatar 1"-map, met de échte
+  v1-datums (dus oude portretten landen in Earlier, niet bovenop Recent).
+  Idempotent via nieuw veld `Portrait2.v1ImportID` (lichtgewicht migratie,
+  nil-default): her-import dupliceert niets en overschrijft nóóit een portret
+  dat in v2 al bewerkt is. 6 tests, incl. dat v2-eigen portretten onzichtbaar
+  zijn voor de dedup.
+- **Mapping-besluiten:** cutout+naam+datums mee; originele foto níét (zit niet
+  in v1's back-up — alleen een bookmark; v2's bestaande legacy-pad verbergt dan
+  de Original-achtergrondkeuze); v1-tags → `role` (zichtbaar en hernoembaar —
+  weggooien is onherstelbaar); v1's transform/adjust níét (ander canvasmodel,
+  half-kloppende geometrie oogt kapotter dan een nette her-layout). Geen
+  backend-calls, geen credits: de cutout ís al vrijstaand.
+- **Instap:** Settings → Preferences → "Import from Aaavatar 1" →
+  "Import backup…" (NSOpenPanel, .zip); resultaat/fout in de rij-subtitle.
 
 ## 13.3 — Go/no-go-checklist
-- status: backlog
-- owner: —
-- blockedBy: 13.1, 13.2
+- status: done (checklist staat; de ⬜-items zijn per definitie Thierry's go-besluit)
+- owner: INFRA (2026-08-01, branch v2/e13-release)
+- blockedBy: —
 - DoD: beide targets bouwen, tests groen
 
 Bakeoff-besluiten verwerkt, beide apps groen, onboarding+main flow compleet, Stripe-identiteitstest
@@ -50,9 +99,18 @@ Bakeoff-besluiten verwerkt, beide apps groen, onboarding+main flow compleet, Str
 
 Checklist-items uit E01.7 (INFRA, 2026-06-12):
 - [ ] E2E mismatch-pad testen tegen productie. (Deploy-helft is klaar: /v1/auth/send-recovery-email
-      staat sinds de E13.0-port van 2026-06-12 op productie.)
+      staat sinds de E13.0-port van 2026-06-12 op productie.) → opgenomen in
+      GO-NO-GO-2.0.md §6.
 
-**Result:** _(invullen bij done)_
+**Result (2026-08-01):** **[GO-NO-GO-2.0.md](GO-NO-GO-2.0.md)** — negen
+secties, elk item ✅ (met hoe-geverifieerd) of ⬜ (met eigenaar). Vandaag
+geverifieerd: volledige DoD groen (incl. beide guards), prod-surface-smoke
+(8 CMS-endpoints 200, 6 betaalde POST-routes 401, appcast-v1 200),
+`bannersEnabled` default uit, alle bakeoff-besluiten verwerkt op **E32.0 na**
+(nooit gedraaid — expliciet go-besluit: bakeoff vóór launch of nano-banana-
+baseline accepteren). De zes resterende ⬜-stappen staan onderaan het document
+als minimale go-lijst: backend-deployronde, eerste release + Sparkle-e2e,
+migratie-e2e, Stripe-e2e, visuele passes, asset-besluit.
 
 ## 13.4 — Backend-port ronde 2 (v2-main → main) — KLAARGEZET
 - status: done (productie-deploy 2026-06-14) — DB-migraties blijven wacht-op-Thierry

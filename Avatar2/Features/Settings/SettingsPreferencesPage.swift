@@ -8,13 +8,20 @@
 // Besluit Thierry (2026-06-23, cleanup-audit): rij verwijderd → update-
 // voorkeuren leven uitsluitend in About, één bron van waarheid.
 
+import AvatarKit
 import AvatarUI
+import SwiftData
 import SwiftUI
 
 struct SettingsPreferencesPage: View {
     // E23: default = Dark (zie AppearancePreferenceModifier).
     @AppStorage(SettingsDefaults.appearanceKey)
     private var appearanceRaw: String = AppearancePreference.dark.rawValue
+
+    // E13.2: migratie-import uit een Aaavatar 1-back-up.
+    @Environment(\.modelContext) private var modelContext
+    var entitlement: EntitlementModel? = nil
+    @State private var importResult: String?
 
     private var appearance: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .dark
@@ -35,6 +42,19 @@ struct SettingsPreferencesPage: View {
                         themeMenu
                     }
                 }
+
+                // E13.2: migratiepad vanuit Aaavatar 1. Bewust hier en niet in
+                // onboarding: de back-up-export moet eerst in v1 gebeuren, dus
+                // dit is een bewuste handeling, geen eerste-startpad.
+                SettingsSectionCard(title: "Migration") {
+                    SettingsRow(
+                        title: "Import from Aaavatar 1",
+                        subtitle: importResult
+                            ?? "Bring over your v1 library from a backup file (in Aaavatar 1: Settings → Export library)"
+                    ) {
+                        DSNeutralButton("Import backup…") { runImport() }
+                    }
+                }
             }
             .padding(.top, DSSpacing.gap8)
         }
@@ -46,6 +66,19 @@ struct SettingsPreferencesPage: View {
     // Figma-dropdown: pill (bg neutral, r-xl, 40 hoog) met label + chevron.
     private var themeMenu: some View {
         ThemeMenuPill(selection: $appearanceRaw, label: appearance.label)
+    }
+
+    private func runImport() {
+        V1LibraryImporter.presentImportPanel(modelContext: modelContext) { result in
+            switch result {
+            case .success(let summary):
+                importResult = summary.userMessage
+            case .failure(let error):
+                // Fouten óók via de subtitle: de settings-takeover heeft geen
+                // eigen toast-slot en de app-brede fout-toast is voor cloud-acties.
+                importResult = error.localizedDescription
+            }
+        }
     }
 }
 

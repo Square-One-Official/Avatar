@@ -216,6 +216,11 @@ final class Portrait2 {
         self.originalData = originalData
     }
 
+    /// E13.2: v1-UUID wanneer dit portret uit een Aaavatar 1-back-up komt —
+    /// de dedup-sleutel die her-import idempotent maakt. nil voor alles wat in
+    /// v2 zelf is gemaakt. Lichtgewicht migratie via de nil-default.
+    var v1ImportID: String?
+
     /// Markeer als zojuist bewerkt.
     func touch() {
         updatedAt = .now

@@ -36,6 +36,9 @@
     },
     "api/appcast.ts": {
       "includeFiles": "api/_appcast.xml"
+    },
+    "api/appcast-v2.ts": {
+      "includeFiles": "api/_appcast-v2.xml"
     }
   },
   "crons": [
@@ -49,8 +52,21 @@
     }
   ],
   "rewrites": [
-    { "source": "/v1/(.*)", "destination": "/api/v1/$1" },
-    { "source": "/auth-callback", "destination": "/api/auth-callback" },
-    { "source": "/appcast.xml", "destination": "/api/appcast" }
+    {
+      "source": "/v1/(.*)",
+      "destination": "/api/v1/$1"
+    },
+    {
+      "source": "/auth-callback",
+      "destination": "/api/auth-callback"
+    },
+    {
+      "source": "/appcast.xml",
+      "destination": "/api/appcast"
+    },
+    {
+      "source": "/appcast-v2.xml",
+      "destination": "/api/appcast-v2"
+    }
   ]
 }
