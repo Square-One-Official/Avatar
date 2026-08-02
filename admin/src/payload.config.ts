@@ -80,6 +80,19 @@ export default buildConfig({
       collections: {
         media: {
           prefix: "media",
+          // E55.5 — port van 837498f (stond alleen op main): geef een directe
+          // Supabase Storage public-URL uit i.p.v. Payload's proxy-pad
+          // (/api/media/file/…). De proxy zit achter de MFA-middleware (401
+          // voor anonieme app-loads) en mist de CDN-verkleining
+          // (thumbnailVariant matcht alleen de directe vorm). Transformeert
+          // S3_ENDPOINT (…/storage/v1/s3) →
+          // …/storage/v1/object/public/{bucket}/{prefix}/{filename}.
+          generateFileURL: ({ filename, prefix: p }) => {
+            const base = (process.env.S3_ENDPOINT ?? "").replace(/\/s3\/?$/, "");
+            const bucket = process.env.S3_BUCKET ?? "announcement-media";
+            const path = p ? `${p}/${filename}` : filename;
+            return `${base}/object/public/${bucket}/${path}`;
+          },
         },
       },
       bucket: process.env.S3_BUCKET ?? "announcement-media",
