@@ -191,9 +191,20 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
   Echte run + verificatie horen bij 55.8.
 
 ## 55.6 — Instant thumbnails
-- status: in_progress
+- status: done
 - owner: INFRA+FEAT (2026-08-02)
 - team: INFRA + FEAT
+- Result: koude paneel-open hangt niet meer aan de lijst-round-trip (branch
+  `v2/e55-55.6`, merge 039c504). `EffectsListCache` (Caches/CMSLists)
+  persisteert beide lijsten; hydratie sessie → disk → fallback + SWR-refresh;
+  fetches parallel (custom blokkeert built-ins nooit); launch-prewarm
+  `EffectsModel.prewarm` in Avatar2App (= E52.2-effects, status daar
+  bijgewerkt); modellen Codable; fallback → de 6 nieuwe keys; backend geeft
+  custom-thumbs de 320px-variant; ThumbnailCache LRU-cap 100 MB (mtime-touch
+  op disk-hit). Meting: disk-hydratie ~ms (test-assert <100 ms) waar eerst een
+  ~200–500 ms netwerk-round-trip elke thumbnail blokkeerde; her-opens waren al
+  instant (E52.1) en blijven dat. AvatarKit 123/123, tsc groen, build-v2.sh
+  groen (exit 0).
 - blockedBy: — (zachte dep op 55.5 voor de fallback-keys; die liggen al vast in
   effects-seed.json)
 
@@ -215,7 +226,9 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
   volgorde), tsc, beide targets, koude-start-timing vóór/na in de Result-regel.
 
 ## 55.7 — Validatie-bakeoff: gpt-image-1.5 + refs + aspect-contract op de 6 nieuwe stijlen
-- status: backlog
+- status: in_progress (harness; live runs gated op REPLICATE_API_TOKEN — geen
+  lokale env aangetroffen 2026-08-02, prod-env niet autonoom getrokken)
+- owner: AI (2026-08-02)
 - team: AI
 - blockedBy: 55.1 (pad/crop in de callshape) + 55.5-dry-run-assets (prompts +
   genormaliseerde refs; prod-seed NIET nodig — harness raakt Replicate direct,
