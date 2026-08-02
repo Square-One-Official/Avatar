@@ -30,8 +30,8 @@ public enum DevModelFeature: String, CaseIterable, Sendable {
         case .cutout: return ["birefnet"]
         case .colorize: return ["deoldify"]
         case .fillBody: return ["flux-fill-pro"]
-        case .stylize: return ["nano-banana", "flux-2-pro", "gpt-image-1.5"]
-        case .generateBackground: return ["nano-banana", "gpt-image-1.5"]
+        case .stylize: return ["nano-banana", "flux-2-pro", "gpt-image-2", "gpt-image-1.5"]
+        case .generateBackground: return ["nano-banana", "gpt-image-2", "gpt-image-1.5"]
         }
     }
 }

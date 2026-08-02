@@ -159,6 +159,19 @@ export async function cropBackFromPad(resultPng: Buffer, pad: AspectPad): Promis
   const rw = meta.width ?? 0;
   const rh = meta.height ?? 0;
   if (rw <= 0 || rh <= 0) return resultPng;
+  // Weigering-guard (E55-edge-sweep): wijkt de resultaat-ratio >2% af van de
+  // canvas-ratio, dan heeft het model de gevraagde ratio genegeerd en zou de
+  // proportionele terugsnede de verkéérde regio pakken (content-verlies).
+  // Liever ongecropt terug — de client reset dan transform + herkadert (het
+  // pre-E55-gedrag) — en luid loggen zodat het in de bakeoff/prod opvalt.
+  const canvasRatio = pad.canvasW / pad.canvasH;
+  const resultRatio = rw / rh;
+  if (Math.abs(resultRatio - canvasRatio) / canvasRatio > 0.02) {
+    console.warn(
+      `[image] cropBackFromPad: resultaat-ratio ${resultRatio.toFixed(4)} ≠ canvas-ratio ${canvasRatio.toFixed(4)} — model negeerde de gevraagde ratio, crop overgeslagen`,
+    );
+    return resultPng;
+  }
   const sx = rw / pad.canvasW;
   const sy = rh / pad.canvasH;
   let width = Math.min(rw, Math.max(1, Math.round(pad.srcW * sx)));

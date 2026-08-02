@@ -421,6 +421,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!modelRef) {
     modelRef = resolveGenerationModel("stylize", req.body?.generation_model);
   }
+  // E55-edge-sweep: de default-flip (E55.2, "alle effecten") geldt voor de
+  // Effects-intents (style / custom_effect / dev-prompt). De edit-intents
+  // (hair/clothes/face) houden hun E09.1-bakeoff-winnaar nano-banana als
+  // default — "alléén het doel wijzigt, rest pixel-identiek" was precies het
+  // criterium waarop nano daar won; de registry-default flippen zou die
+  // features ongevraagd mee-migreren. Een expliciete Settings-keuze
+  // (generation_model) en de dev-override winnen hierboven al.
+  const isEditIntent = Boolean(
+    hairPreset || hairPrompt || clothesPreset || clothesPrompt || facePreset,
+  );
+  if (!modelRef && isEditIntent) {
+    modelRef = MODEL_REGISTRY.stylize.models["nano-banana"].ref;
+  }
 
   try {
     await ensureUser(user.id);

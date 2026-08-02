@@ -34,6 +34,35 @@ moet bewijzen (`--model openai/gpt-image-1.5` in de driver voor de A/B).
 Een oude dev-voorkeur "gpt-image-1.5" in UserDefaults degradeert bewust naar
 de server-default (niets geshipt; test dekt het).
 
+**Edge-case-sweep (2026-08-02, na de 2.0-swap) — gevonden & gefixt:**
+1. *Edit-intents migreerden ongevraagd mee met de default-flip*: /v1/stylize
+   dient óók hair/clothes/face (E10/E11/E32), en die deelden de registry-
+   default. E09.1 koos nano juist dáár op "alleen het doel wijzigt". Nu
+   intent-scoped: Effects-intents → gpt-image-2, edit-intents → nano-banana;
+   expliciete Settings-keuze en dev-override winnen overal (ongewijzigd).
+2. *AI-achtergrond "OpenAI" was stil kapot na de swap*:
+   BackgroundGenerationCatalog stuurde hardcoded "gpt-image-1.5" (niet meer
+   user-selectable → server degradeerde stil naar nano) → key nu "gpt-image-2".
+3. *Dev-model-picker miste 2.0*: DevModelOverrides-whitelists aangevuld.
+4. *Crop-back bij ratio-ongehoorzaamheid*: negeert het model de gevraagde
+   ratio, dan pakte de proportionele terugsnede de verkeerde regio →
+   weigering-guard (>2% afwijking = crop overslaan + luid loggen; client
+   herkadert dan zelf). Smoke-assertion toegevoegd.
+
+**Bekende rest-randgevallen (bewust open, met eigenaar):**
+- *Fallback-keys-venster*: een app-build mét de nieuwe 6 fallback-keys vóór de
+  prod-seed → offline-fallback-generatie geeft 400 op de nieuwe keys (alleen
+  als de lijst-fetch faalt maar stylize werkt — zeldzaam; disk-cache dempt).
+  → 55.8-volgorde: seed vóór de app-release (staat in de checklist).
+- *Custom-effects-disk-cache is account-agnostisch* (E55.6): na account-wissel
+  op dezelfde Mac tonen custom-kaarten van het vorige account tot de refresh
+  ze vervangt. Single-user-risico laag; nette fix = cache per user-id of
+  wissen bij logout — follow-up-story als accountwissel realistisch wordt.
+- *Importer --force* uploadt verse media zonder de oude te wissen (idempotent
+  op het effect-doc, media-rijen stapelen) — opruimen kan via de admin-UI.
+- *Zeer brede banner-achtergronden* (>16:9) snappen bij gpt-image-2 naar 16:9
+  — pre-existing E42-gedrag (was op 1.5 erger: 3:2), geen regressie.
+
 Context uit onderzoek (2026-08-02): E09.1 wees gpt-image af als default om een
 *fixbare* reden — het herkadert structureel (1.5-schema her-geverifieerd
 2026-08-02: alleen 1:1|3:2|2:3) — plus 4–5× kosten/latency. E54.2's negatieve
@@ -310,6 +339,9 @@ Checklist (volgorde is bindend):
    probe vóór seeden zit in de importer (--apply doet 'm automatisch).
 5. Seed-run: `bash backend/scripts/run-import-effects.sh` (env-pull + dry-run
    + bevestiging + optionele deactivatie van clay/wood/3d/scribble).
+   **Vóór elke app-release met deze E55-build**: de app-fallback kent nu de
+   zes nieuwe keys — seed dus eerst, anders geeft offline-fallback-generatie
+   in het venster ertussen een 400 op die keys (edge-sweep-notitie).
 6. Verifiëren: `/v1/effects` → 6 actieve stijlen, allemaal 320px
    `/render/image/`-URLs, volgorde 10–15; app-smoke: koude-start-thumbs
    (eerste open uit disk/prewarm), 2 generaties op een verplaatst/geschaald

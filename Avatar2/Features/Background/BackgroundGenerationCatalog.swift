@@ -55,7 +55,9 @@ enum BackgroundGenerationModel: String, CaseIterable, Identifiable, Sendable {
     var generationModelKey: String? {
         switch self {
         case .gemini: "nano-banana"
-        case .openAI: "gpt-image-1.5"
+        // gpt-image-2-swap (E55-amendement): 1.5 is niet meer user-selectable —
+        // de server zou 'm stil naar nano laten degraderen.
+        case .openAI: "gpt-image-2"
         case .apple: nil
         }
     }
