@@ -5,7 +5,9 @@ import {
   MODEL_REGISTRY,
   UnknownModelOverrideError,
   defaultModelRef,
+  modelMatchesInputAspect,
   resolveModelOverride,
+  resolveStylizeDefaultModel,
 } from "../lib/models.js";
 
 assert.equal(resolveModelOverride("cutout", undefined, true), null);
@@ -70,4 +72,29 @@ assert.ok(
   );
   assert.equal(resolveModelOverride("upscale", "topaz", false), null);
 }
+// E55.1: aspect-capability — gpt-image is ratio-vast, de rest matcht input;
+// pinned versies tellen als hetzelfde model; onbekende refs → true.
+{
+  assert.equal(modelMatchesInputAspect("openai/gpt-image-1.5"), false);
+  assert.equal(modelMatchesInputAspect("openai/gpt-image-1.5:deadbeef"), false);
+  assert.equal(modelMatchesInputAspect("google/nano-banana"), true);
+  assert.equal(modelMatchesInputAspect("bytedance/seedream-4"), true);
+  assert.equal(modelMatchesInputAspect("black-forest-labs/flux-2-pro"), true);
+  assert.equal(modelMatchesInputAspect("unknown/model"), true);
+}
+
+// E55.2: stylize-default = gpt-image-1.5 (besluit Thierry 2026-08-02); de
+// env-hendel accepteert alleen whitelist-keys en valt luid terug.
+{
+  assert.equal(MODEL_REGISTRY.stylize.defaultModel, "gpt-image-1.5");
+  assert.equal(defaultModelRef("stylize"), "openai/gpt-image-1.5");
+  const models = MODEL_REGISTRY.stylize.models;
+  assert.equal(resolveStylizeDefaultModel(undefined, models, "gpt-image-1.5"), "gpt-image-1.5");
+  assert.equal(resolveStylizeDefaultModel("", models, "gpt-image-1.5"), "gpt-image-1.5");
+  assert.equal(resolveStylizeDefaultModel("nano-banana", models, "gpt-image-1.5"), "nano-banana");
+  assert.equal(resolveStylizeDefaultModel("evil-model", models, "gpt-image-1.5"), "gpt-image-1.5");
+  // generate_background blijft nano-banana — de flip is een stylize-besluit.
+  assert.equal(MODEL_REGISTRY.generate_background.defaultModel, "nano-banana");
+}
+
 console.log("models.ts smoke OK");

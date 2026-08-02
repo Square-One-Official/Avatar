@@ -341,9 +341,14 @@ public final class BackendClient {
         }
     }
 
-    private struct StylizeBody: Encodable {
+    // Internal (niet private) zodat AvatarKitTests kan bewijzen dat een
+    // ontbrekende modelkeuze het veld écht weglaat (E55.2) — de server-default
+    // regeert dan, wat de vloot-rollback via STYLIZE_DEFAULT_MODEL mogelijk maakt.
+    struct StylizeBody: Encodable {
         let storageKey: String
-        let generationModel: String
+        /// E55.2: alléén de expliciete gebruikerskeuze; nil = veld weggelaten
+        /// → server-default (gpt-image-1.5, env-overridable).
+        let generationModel: String?
         let modelOverride: String?
         let cutoutW: Int?
         let cutoutH: Int?
@@ -390,7 +395,7 @@ public final class BackendClient {
         let body = try JSONEncoder().encode(
             StylizeBody(
                 storageKey: storageKey,
-                generationModel: GenerationModelStore.shared.current.rawValue,
+                generationModel: GenerationModelStore.shared.explicit?.rawValue,
                 modelOverride: DevModelOverrides.shared.override(for: .stylize),
                 cutoutW: cutoutWidth,
                 cutoutH: cutoutHeight,
@@ -415,9 +420,10 @@ public final class BackendClient {
     /// stijl-key naar het productie-`/v1/stylize`. De `styleKey` komt uit de
     /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
     /// identity-clausule); een vrij prompt-veld is dev-only en hier bewust niet
-    /// bereikbaar. nano-banana is de default;
-    /// `model_override` (dev) gaat mee als de DevModelOverrides-store een keuze
-    /// heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
+    /// bereikbaar. De default-engine is server-governed (E55.2: gpt-image-1.5,
+    /// env-overridable); `generation_model` gaat alléén mee bij een expliciete
+    /// Settings-keuze en `model_override` (dev) als de DevModelOverrides-store
+    /// een keuze heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
     ///
     /// Op 402 (geen credits) gooit dit `BackendError.noCredits` → de caller
     /// toont de paywall; andere fouten propageren voor de faaltoast.
@@ -485,7 +491,9 @@ public final class BackendClient {
             }
         }
 
-        let modelKey = generationModel ?? GenerationModelStore.shared.current.rawValue
+        // E55.2: zonder expliciete keuze géén key meesturen — de server bepaalt
+        // de feature-default (generate_background blijft nano-banana).
+        let modelKey = generationModel ?? GenerationModelStore.shared.explicit?.rawValue
         let body = try JSONEncoder().encode(
             Body(
                 userPrompt: userPrompt,
@@ -519,7 +527,7 @@ public final class BackendClient {
         struct Body: Encodable {
             let storageKey: String
             let customEffectId: String
-            let generationModel: String
+            let generationModel: String?
             let modelOverride: String?
             enum CodingKeys: String, CodingKey {
                 case storageKey = "storage_key"
@@ -530,7 +538,7 @@ public final class BackendClient {
         }
         let body = try JSONEncoder().encode(
             Body(storageKey: storageKey, customEffectId: customEffectID,
-                 generationModel: GenerationModelStore.shared.current.rawValue,
+                 generationModel: GenerationModelStore.shared.explicit?.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
         let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
