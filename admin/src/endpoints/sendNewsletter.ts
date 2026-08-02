@@ -7,6 +7,7 @@ import MessageEmail from "../emails/MessageEmail";
 import { lexicalToHtml } from "../lib/lexical";
 import { resolveRecipients } from "../lib/recipients";
 import { unsubscribeUrlFor } from "../lib/unsubscribe-token";
+import type { Announcement, Message } from "../payload-types";
 
 /**
  * POST /api/send-newsletter
@@ -57,15 +58,20 @@ const handler: PayloadHandler = async (req) => {
   if (!ann) {
     return Response.json({ error: "Record not found" }, { status: 404 });
   }
-  const newsletter = (ann as Record<string, unknown>).newsletter as
-    | { send?: boolean; subject?: string; fromName?: string; customBody?: unknown; sentAt?: string }
-    | undefined;
+  // Beide collecties hebben de gegenereerde `newsletter`-group; via de union
+  // uit payload-types blijft de shape (incl. het lexical-customBody-type)
+  // gesynchroniseerd met het CMS — de oude Record-cast botste daarmee.
+  const record: Announcement | Message = ann;
+  const newsletter = record.newsletter ?? undefined;
   // Send-gate: announcements op newsletter.send; messages op channel email/both.
+  // `send` bestaat alleen op de Announcement-group — in de announcements-tak
+  // ís record er een (collection stuurt de findByID), maar TS kan die twee
+  // variabelen niet aan elkaar knopen, vandaar de smalle cast.
   const channel = (ann as { channel?: string }).channel;
   const sendEnabled =
     collection === "messages"
       ? channel === "email" || channel === "both"
-      : newsletter?.send === true;
+      : (record as Announcement).newsletter?.send === true;
   if (!sendEnabled && !testMode) {
     return Response.json(
       { error: collection === "messages" ? "channel is not email/both" : "newsletter.send is false" },
@@ -168,14 +174,17 @@ const handler: PayloadHandler = async (req) => {
   // Batch through Resend's bulk-send API. Each call accepts up to 100
   // emails; we use 50 to leave headroom for retries.
   const BATCH = 50;
-  type Message = {
+  // Heette `Message`, maar dat schaduwde het gegenereerde CMS-type Message
+  // (payload-types) in de hele handler-body — de bron van de vier
+  // tsc-fouten. Dit is de Resend-batch-payload, dus die naam draagt 'ie nu.
+  type BatchEmail = {
     from: string;
     to: string;
     subject: string;
     html: string;
     headers: Record<string, string>;
   };
-  const batches: Message[][] = [];
+  const batches: BatchEmail[][] = [];
   for (let i = 0; i < recipients.length; i += BATCH) {
     const slice = recipients.slice(i, i + BATCH);
     const rendered = await Promise.all(slice.map(async (to) => {
