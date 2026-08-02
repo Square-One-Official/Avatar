@@ -19,11 +19,12 @@ private struct DSPanelContentHeightKey: PreferenceKey {
     }
 }
 
-public struct DSEditPanel<Content: View>: View {
+public struct DSEditPanel<Content: View, Accessory: View>: View {
     private let title: String
     private let subtitle: String?
     private let credits: String?
     private let content: Content
+    private let headerAccessory: Accessory
     private let maxWidth: CGFloat
     private let maxContentHeight: CGFloat
     @State private var contentHeight: CGFloat = 0
@@ -32,12 +33,18 @@ public struct DSEditPanel<Content: View>: View {
     /// Default nu compacter: `maxWidth` houdt het paneel weg van de randen
     /// (foto groter), `maxContentHeight` begrenst de hoogte → inhoud scrollt
     /// i.p.v. het paneel op te rekken.
+    ///
+    /// E55.4: `headerAccessory` — een compact trailing control in de titelrij
+    /// (na de credits-chip), bv. de "Create"-knop van Effects. Zelfde
+    /// back-compat-patroon als `DSEditPanelContainer`: bestaande call sites
+    /// zonder accessoire gebruiken de EmptyView-convenience hieronder.
     public init(
         title: String,
         subtitle: String? = nil,
         credits: String? = nil,
         maxWidth: CGFloat = 600,
         maxContentHeight: CGFloat = 280,
+        @ViewBuilder headerAccessory: () -> Accessory,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -45,22 +52,24 @@ public struct DSEditPanel<Content: View>: View {
         self.credits = credits
         self.maxWidth = maxWidth
         self.maxContentHeight = maxContentHeight
+        self.headerAccessory = headerAccessory()
         self.content = content()
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap4) {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                HStack {
+                HStack(spacing: DSSpacing.gap2) {
                     Text(title)
                         .dsTextStyle(.labelBase)
                         .foregroundStyle(DSColor.Foreground.primary)
+                    Spacer(minLength: 0)
                     if let credits {
-                        Spacer()
                         Text(credits)
                             .dsTextStyle(.labelSmall)
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
+                    headerAccessory
                 }
                 if let subtitle {
                     Text(subtitle)
@@ -111,6 +120,28 @@ public struct DSEditPanel<Content: View>: View {
     /// propageert) → natuurlijke maat; daarna de inhoudshoogte, gecapt.
     private var scrollHeight: CGFloat? {
         contentHeight > 0 ? min(contentHeight, maxContentHeight) : nil
+    }
+}
+
+// Bestaande call sites zonder header-accessoire blijven werken (EmptyView-slot).
+extension DSEditPanel where Accessory == EmptyView {
+    public init(
+        title: String,
+        subtitle: String? = nil,
+        credits: String? = nil,
+        maxWidth: CGFloat = 600,
+        maxContentHeight: CGFloat = 280,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title,
+            subtitle: subtitle,
+            credits: credits,
+            maxWidth: maxWidth,
+            maxContentHeight: maxContentHeight,
+            headerAccessory: { EmptyView() },
+            content: content
+        )
     }
 }
 

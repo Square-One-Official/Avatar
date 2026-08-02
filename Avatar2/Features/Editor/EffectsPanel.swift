@@ -449,11 +449,14 @@ struct EffectsPanel: View {
     private let cardHeight: CGFloat = 152
 
     var body: some View {
-        DSEditPanel(title: "Effects", credits: CreditMeter.chipLabel(for: .generativeStandard)) {
+        DSEditPanel(
+            title: "Effects",
+            credits: CreditMeter.chipLabel(for: .generativeStandard),
+            headerAccessory: { createHeaderButton }
+        ) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DSSpacing.gap2) {
                     noneCard
-                    createCard
                     ForEach(model.cards) { card in
                         styleCard(card)
                     }
@@ -503,31 +506,25 @@ struct EffectsPanel: View {
         .opacity(model.isBusy ? 0.5 : 1)
     }
 
-    /// E34: "Create effect"-kaart — opent de modal (Pro). Niet-Pro → upgrade.
-    private var createCard: some View {
-        Button {
-            if model.canCreateCustom {
-                presentation?.createEffectSheetOpen = true
-            } else {
-                entitlement.requestUpgrade()
+    /// E55.4 (was E34-kaart): "Create" opent de modal (Pro) — verhuisd van
+    /// tweede rail-kaart naar de paneelheader (besluit Thierry 2026-08-02;
+    /// gedocumenteerde Figma-afwijking — Figma toont geen custom-effects-UI).
+    /// De rail is nu puur content: None → eigen effecten → built-ins.
+    /// Gating + mailbox (`presentation?.createEffectSheetOpen`) identiek aan
+    /// de oude kaart.
+    private var createHeaderButton: some View {
+        HStack(spacing: DSSpacing.gap1) {
+            if !model.canCreateCustom {
+                DSProChip()
             }
-        } label: {
-            DSThumbnailCard(
-                label: "Create",
-                isPro: !model.canCreateCustom,
-                tileSize: cardWidth,
-                tileHeight: cardHeight
-            ) {
-                VStack(spacing: DSSpacing.gap1) {
-                    Image(systemName: "plus")
-                        .font(.system(size: DSIconSize.xl, weight: .semibold))
-                    Text("New effect")
-                        .dsTextStyle(.labelSmall)
+            DSGhostButton("Create", icon: Image(systemName: "plus"), size: .small) {
+                if model.canCreateCustom {
+                    presentation?.createEffectSheetOpen = true
+                } else {
+                    entitlement.requestUpgrade()
                 }
-                .foregroundStyle(DSColor.Foreground.muted)
             }
         }
-        .buttonStyle(.plain)
         .disabled(model.isBusy)
         .opacity(model.isBusy ? 0.5 : 1)
         .help("Create your own effect from a reference image")
