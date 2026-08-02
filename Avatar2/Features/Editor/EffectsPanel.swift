@@ -78,13 +78,14 @@ final class EffectsModel {
     /// Custom effecten (E34) — ook sessie-gecachet zodat heropenen niet flitst.
     private static var customSessionCache: [RemoteCustomEffect] = []
 
-    /// De built-in stijlen (CMS-gestuurd, E33). Start op de sessie-cache als
-    /// die al gevuld is (eerder geladen in dezelfde sessie), anders op de fallback.
-    private(set) var builtinEffects: [RemoteEffect] =
-        EffectsModel.sessionCache.isEmpty ? RemoteEffect.fallback : EffectsModel.sessionCache
-    /// De eigen custom effecten (E34). Start op de sessie-cache; leeg = nog niet
+    /// De built-in stijlen (CMS-gestuurd, E33). Hydratie-volgorde (E55.6):
+    /// sessie-cache → disk-snapshot (EffectsListCache) → hardgecodeerde
+    /// fallback — gezet in `init` zodat een koude start het paneel mét
+    /// thumbnails opent zonder op de netwerk-fetch te wachten.
+    private(set) var builtinEffects: [RemoteEffect] = []
+    /// De eigen custom effecten (E34). Zelfde hydratie; leeg = nog niet
     /// geladen / geen eigen effecten / niet-Pro.
-    private(set) var customEffects: [RemoteCustomEffect] = EffectsModel.customSessionCache
+    private(set) var customEffects: [RemoteCustomEffect] = []
 
     /// Lokaal geseede thumbnails (E34): meteen na het aanmaken tonen we het
     /// net-gedropte referentiebeeld zonder een round-trip naar de bucket-URL.
@@ -115,6 +116,26 @@ final class EffectsModel {
         self.onApply = onApply
         self.portrait = portrait
         self.coordinator = coordinator
+
+        // E55.6: lijst-hydratie zonder netwerk — sessie-cache → disk-snapshot
+        // → fallback. De disk-lees is enkele KB (sync is prima); de sessie-
+        // cache wordt meteen gevuld zodat volgende panelen de disk overslaan.
+        if EffectsModel.sessionCache.isEmpty,
+           let disk = EffectsListCache.shared.loadEffects(), !disk.isEmpty {
+            EffectsModel.sessionCache = disk
+        }
+        builtinEffects = EffectsModel.sessionCache.isEmpty
+            ? RemoteEffect.fallback
+            : EffectsModel.sessionCache
+        // Custom alleen hydrateren als het account ze mag zien (Pro) — anders
+        // zou een uitgelogde/afgeschaalde sessie andermans kaarten tonen.
+        if entitlement.isProActive || entitlement.isDevUnlimited {
+            if EffectsModel.customSessionCache.isEmpty,
+               let disk = EffectsListCache.shared.loadCustomEffects(), !disk.isEmpty {
+                EffectsModel.customSessionCache = disk
+            }
+            customEffects = EffectsModel.customSessionCache
+        }
 
         // Hydrateer uit het portret (E24.33). Cache + basis zijn key-gestuurd
         // (string), LOS van de CMS-lijst: zo blijft de hydratie correct ook als
@@ -181,30 +202,59 @@ final class EffectsModel {
     /// Mag de huidige gebruiker custom effecten maken? (Pro-only capability, E34.)
     var canCreateCustom: Bool { entitlement.isProActive || entitlement.isDevUnlimited }
 
-    /// Haal de CMS-stijllijst (E33) én de eigen custom effecten (E34) op.
-    /// Soft-fail: bij een lege/gefaalde fetch houden we de bestaande lijst zodat
-    /// het paneel bruikbaar blijft.
+    /// Haal de CMS-stijllijst (E33) én de eigen custom effecten (E34) op —
+    /// sinds E55.6 parallel (de custom-fetch wachtte serieel achter de
+    /// built-ins) en stale-while-revalidate: het paneel toont al de disk-
+    /// hydratie; dit ververst lijst + disk-snapshot op de achtergrond.
+    /// Soft-fail: bij een lege/gefaalde fetch houden we de bestaande lijst
+    /// zodat het paneel bruikbaar blijft.
     func loadEffects() async {
+        async let customRefresh: Void = loadCustomEffects()
         let fetched = (try? await entitlement.backend.effects()) ?? []
         if !fetched.isEmpty {
             EffectsModel.sessionCache = fetched
             builtinEffects = fetched
+            EffectsListCache.shared.saveEffects(fetched)
             // E52.1: warm de gedeelde thumbnail-cache (memory + disk, downsampled
             // decode). De kaarten renderen via `RemoteThumbnail`, dus geen eigen
             // NSCache/thumbnailVersion-boekhouding meer.
             ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
         }
-        await loadCustomEffects()
+        await customRefresh
     }
 
     /// Custom effecten (E34) — alleen voor Pro (de capability is Pro). Soft-fail
-    /// (incl. 403 pro_required) houdt de lijst leeg/ongewijzigd.
+    /// (incl. 403 pro_required) houdt de lijst leeg/ongewijzigd — belangrijk
+    /// zolang sql/015 nog niet op prod staat: custom-falen blokkeert nooit de
+    /// built-ins (E55.6).
     func loadCustomEffects() async {
         guard canCreateCustom else { return }
         guard let fetched = try? await entitlement.backend.customEffects() else { return }
         EffectsModel.customSessionCache = fetched
         customEffects = fetched
+        EffectsListCache.shared.saveCustomEffects(fetched)
         ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
+    }
+
+    // MARK: - Launch-prewarm (E55.6 = E52.2 voor effects)
+
+    private static var didPrewarm = false
+
+    /// Warmt lijst + thumbnails bij app-start (fire-and-forget, éénmalig per
+    /// proces), zodat zelfs de állereerste paneel-open van een sessie de
+    /// kaarten uit memory/disk schildert. Anoniem-vriendelijk endpoint, dus
+    /// veilig vóór sign-in; custom effecten volgen bij paneel-open (Pro-check
+    /// hangt aan entitlement-state die bij launch nog kan laden).
+    static func prewarm(entitlement: EntitlementModel) {
+        guard !didPrewarm else { return }
+        didPrewarm = true
+        Task(priority: .utility) { @MainActor in
+            let fetched = (try? await entitlement.backend.effects()) ?? []
+            guard !fetched.isEmpty else { return }
+            EffectsModel.sessionCache = fetched
+            EffectsListCache.shared.saveEffects(fetched)
+            ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
+        }
     }
 
     /// Lokaal geseed referentiebeeld voor een vers-gemaakt custom effect (E34):

@@ -52,3 +52,14 @@ extension RemoteCustomEffect: Decodable {
         order = try c.decodeIfPresent(Int.self, forKey: .order) ?? 0
     }
 }
+
+// E55.6: symmetrische encode voor de disk-persistentie (EffectsListCache).
+extension RemoteCustomEffect: Encodable {
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(label, forKey: .label)
+        try c.encodeIfPresent(thumbnailUrl?.absoluteString, forKey: .thumbnailUrl)
+        try c.encode(order, forKey: .order)
+    }
+}

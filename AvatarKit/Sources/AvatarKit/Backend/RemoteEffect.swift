@@ -53,14 +53,31 @@ extension RemoteEffect: Decodable {
     }
 }
 
+// E55.6: symmetrische encode zodat `EffectsListCache` de lijst op disk kan
+// persisteren (stale-while-revalidate). Zelfde keys als de decode — de cache
+// gebruikt een plain JSONEncoder/-Decoder, dus geen snake_case-strategie nodig.
+extension RemoteEffect: Encodable {
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(key, forKey: .key)
+        try c.encode(label, forKey: .label)
+        try c.encodeIfPresent(thumbnailUrl?.absoluteString, forKey: .thumbnailUrl)
+        try c.encode(order, forKey: .order)
+    }
+}
+
 extension RemoteEffect {
-    /// Offline / pre-fetch-fallback: de vier launch-effecten. De keys matchen de
-    /// server-`STYLE_PROMPTS` zodat genereren werkt vóór de CMS-lijst geladen is
-    /// en het paneel nooit leeg opent (geen thumbnails — die komen uit de CMS).
+    /// Offline / pre-fetch-fallback (E55.6: de zes Styles-2.0-keys — besluit
+    /// Thierry 2026-08-02; de oude 4 gaan op inactief). De keys matchen de
+    /// CMS-seed (`effects-seed.json`) zodat genereren werkt vóór de lijst
+    /// geladen is en het paneel nooit leeg opent (geen thumbnails — die komen
+    /// uit de CMS).
     public static let fallback: [RemoteEffect] = [
-        RemoteEffect(key: "clay", label: "Clay", thumbnailUrl: nil, order: 0),
-        RemoteEffect(key: "wood", label: "Wood", thumbnailUrl: nil, order: 1),
-        RemoteEffect(key: "3d", label: "3D", thumbnailUrl: nil, order: 2),
-        RemoteEffect(key: "scribble", label: "Scribble", thumbnailUrl: nil, order: 3),
+        RemoteEffect(key: "balloon", label: "Balloon", thumbnailUrl: nil, order: 10),
+        RemoteEffect(key: "windy", label: "Windy", thumbnailUrl: nil, order: 11),
+        RemoteEffect(key: "sticker", label: "Sticker", thumbnailUrl: nil, order: 12),
+        RemoteEffect(key: "flowers", label: "Flowers", thumbnailUrl: nil, order: 13),
+        RemoteEffect(key: "3d-head", label: "3D Head", thumbnailUrl: nil, order: 14),
+        RemoteEffect(key: "hairy", label: "Hairy", thumbnailUrl: nil, order: 15),
     ]
 }

@@ -35,6 +35,7 @@ public final class ThumbnailCache: @unchecked Sendable {
     private let memory = NSCache<NSURL, NSImage>()
     private let directory: URL
     private let maxPixelSize: Int
+    private let maxDiskBytes: Int
     private let dataProvider: DataProvider
 
     /// In-flight-dedupe: een cel-`.task` en een panel-`prefetch` die tegelijk
@@ -50,18 +51,26 @@ public final class ThumbnailCache: @unchecked Sendable {
     ///   - directory: disk-cache-map; default `Caches/CMSThumbnails`.
     ///   - maxPixelSize: decode-plafond (langste zijde, px). 640 dekt de
     ///     grootste tile (banner-preset 240 pt @2x = 480 px) met marge.
+    ///   - maxDiskBytes: E55.6-hygiëne — byte-cap op de disk-laag; oudste
+    ///     entries (mtime, disk-hits vernieuwen 'm → LRU) wijken eerst. De map
+    ///     was voorheen onbegrensd. 100 MB dekt duizenden 320px-varianten.
     ///   - dataProvider: netwerk-transport; default `URLSession.shared`.
     public init(
         directory: URL? = nil,
         maxPixelSize: Int = 640,
+        maxDiskBytes: Int = 100 * 1024 * 1024,
         dataProvider: DataProvider? = nil
     ) {
         self.directory = directory ?? Self.defaultDirectory
         self.maxPixelSize = maxPixelSize
+        self.maxDiskBytes = maxDiskBytes
         self.dataProvider = dataProvider ?? { url in
             try await URLSession.shared.data(from: url).0
         }
         try? FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
+        // Eén keer per proces-start is genoeg: de cache groeit per sessie
+        // hooguit met een paneel-lading aan varianten.
+        Task.detached(priority: .background) { [self] in enforceDiskCapNow() }
     }
 
     private static var defaultDirectory: URL {
@@ -125,8 +134,11 @@ public final class ThumbnailCache: @unchecked Sendable {
 
         let file = fileURL(for: url)
 
-        // Disk-hit: downsampled decode, dan memory vullen.
+        // Disk-hit: downsampled decode, dan memory vullen. mtime vernieuwen
+        // zodat de byte-cap (E55.6) echt LRU is — vaak gebruikte thumbnails
+        // wijken niet voor de leeftijd van hun download.
         if let data = try? Data(contentsOf: file), let image = Self.decodeDownsampled(data, maxPixelSize: maxPixelSize) {
+            try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
             memory.setObject(image, forKey: url as NSURL)
             logLoad("disk", url: url, since: start)
             return image
@@ -161,6 +173,36 @@ public final class ThumbnailCache: @unchecked Sendable {
         let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
         let name = digest.map { String(format: "%02x", $0) }.joined()
         return directory.appendingPathComponent(name).appendingPathExtension("img")
+    }
+
+    /// E55.6: houd de disk-laag onder `maxDiskBytes` — oudste mtime eerst.
+    /// Synchronen kern (aanroepbaar vanuit tests); de init draait 'm op een
+    /// background-task. Nonisolated bewust: leest alleen `directory`/cap.
+    func enforceDiskCapNow() {
+        guard maxDiskBytes > 0 else { return }
+        let fm = FileManager.default
+        guard let urls = try? fm.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
+            options: .skipsHiddenFiles
+        ) else { return }
+        var entries: [(url: URL, size: Int, date: Date)] = []
+        var total = 0
+        for url in urls {
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let size = values?.fileSize ?? 0
+            entries.append((url, size, values?.contentModificationDate ?? .distantPast))
+            total += size
+        }
+        guard total > maxDiskBytes else { return }
+        var removed = 0
+        for entry in entries.sorted(by: { $0.date < $1.date }) {
+            guard total > maxDiskBytes else { break }
+            try? fm.removeItem(at: entry.url)
+            total -= entry.size
+            removed += 1
+        }
+        Self.log.info("disk-cap: \(removed) oude thumbnails verwijderd (nu \(total) bytes)")
     }
 
     /// Downsampled decode via de CGImageSource-thumbnail-API: decodeert
