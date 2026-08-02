@@ -13,6 +13,7 @@ import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, currentCredits, ensureCompedCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
+import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE } from "../../lib/stylizePrompts.js";
 import {
   type AspectPad,
   capLongEdge,
@@ -66,17 +67,8 @@ const CUSTOM_STYLE_TEMPLATE = (description: string) => {
 const SHARPNESS_CLAUSE =
   "If the source image is soft, blurry or low-resolution, render the styled result with crisp sharp detail — do not reproduce blur or softness from the input.";
 
-/** Client-flag `preserve_framing`: stylize op volle origineel → geen reframe. */
-const FRAMING_CLAUSE =
-  "Keep the exact same crop, zoom, and position of the person in the frame — do not reframe, recenter, or change the composition.";
-
-/**
- * E54: rolverdeling wanneer een effect CMS-stijlreferenties meestuurt. Zonder
- * deze clausule moet het model zelf raden welke input de persoon is en welke
- * de stijl — met identity-bleed uit de referenties als bekend gevolg.
- */
-const STYLE_REFERENCE_CLAUSE =
-  "The first image is the person to transform. Every other image is a style example only: match its artistic style, colour palette, texture, brushwork and lighting exactly, but do not copy any person, face, pose or composition from the style examples.";
+// FRAMING_CLAUSE + STYLE_REFERENCE_CLAUSE leven sinds E55.7 in
+// lib/stylizePrompts.ts (side-effect-vrij) zodat de bakeoff-driver ze deelt.
 
 /** Max referenties richting het model; meer verwatert identity-behoud. */
 const STYLE_REF_MAX = 3;

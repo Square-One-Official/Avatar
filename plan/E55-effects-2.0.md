@@ -244,31 +244,70 @@ bij crop-back?), latency p50/p95 t.o.v. de 80s-timeout, kosten per beeld
 prompt-tweaks → idempotente 55.5-her-run, expliciete go/no-go voor de prod-flip.
 Rapportage in de e54-bakeoff-conventie (buiten repo), samenvatting hier.
 
+**Harness done (2026-08-02):** `backend/scripts/effects-bakeoff.ts` — de
+volledige matrix door de échte pipeline als lib-calls (capLongEdge →
+flattenOnGrey → padToAspect → stylizeEdit met nieuwe `gptQuality`-hendel →
+cropBackFromPad), prompt 1-op-1 (seed-prompt + STYLE_REFERENCE_CLAUSE bij refs
++ FRAMING_CLAUSE — clausules verhuisd naar side-effect-vrij
+`lib/stylizePrompts.ts`, gedeeld met /v1/stylize), refs zoals de importer ze
+seedt (curatiemap → kit-fallback, ≤1024px, cap 3 — droog geverifieerd voor
+alle 6 stijlen), strikt sequentieel met 11s spacing (Replicate-throttle-regel),
+output: PNG's + `results.json` (latency p50/p95, ratio-contract-check per run)
++ `index.html`-contactsheet. **Run (Thierry, of een AI-sessie mét token):**
+
+    cd backend
+    REPLICATE_API_TOKEN=… npx tsx scripts/effects-bakeoff.ts \
+      ~/Documents/Claude/Projects/Aaavatar/e09-bakeoff/inputs \
+      ~/Documents/Claude/Projects/Aaavatar/e55-bakeoff \
+      --arms high-refs,high-norefs,medium-refs
+
+    # kleine validatierun eerst (1 stijl × 2 portretten × 3 armen ≈ 6 calls):
+    #   … --styles balloon
+
+Standaardmatrix = 6 stijlen × 2 E09-portretten (p1/p3, zoals E54.2) × 3 armen
+= 36 runs (~7 min door de spacing). Kosten per tier: modelpagina-HTML
+(replicate-metadata-memory). Geen lokale token gevonden (2026-08-02) en de
+prod-env is bewust niet autonoom getrokken — zie de statusregel hierboven.
+
 ## 55.8 — Prod-uitrol (voorbereid door INFRA, uitgevoerd door Thierry)
-- status: backlog
+- status: ready — **alle stappen gated op Thierry**; code op v2-main staat klaar
 - team: INFRA
-- blockedBy: 55.1, 55.2, 55.5, 55.7-go (55.3/55.4/55.6 liften mee op de
-  volgende app-build, onafhankelijk van backend-deploy)
+- blockedBy: 55.7-go (55.3/55.4/55.6 liften mee op de volgende app-build,
+  onafhankelijk van backend-deploy)
+
+**Voorwerk Thierry vóór de seed-run (uit het 55.5-dry-run-rapport):**
+- Balloon: thumbnail in `Balloon/Thumbnail/` zetten.
+- Flowers + Hairy: thumbnail toevoegen én de losse refs in de map-root naar
+  `References/` verplaatsen (Flowers: de celebrity-ref er NIET in — de kit
+  sloot 'm bewust uit; Hairy: GIF's worden eerste-frame-PNG, check even).
+- Sticker: 2 losse refs in de map-root → `References/` (of kit-fallback laten).
+- Windy/3D: >4 refs — de importer capt op 4 en meldt welke hij dropt; volgorde
+  sturen = bestandsnamen hernummeren.
 
 Checklist (volgorde is bindend):
-1. `sql/015` (custom effects) op prod-Supabase; afstemmen met openstaande
+1. **Bakeoff eerst** (55.7): `effects-bakeoff.ts` draaien (commando daar),
+   contactsheet beoordelen → go/no-go + quality-tier + refs-per-stijl +
+   tariefbesluit.
+2. `sql/015` (custom effects) op prod-Supabase; afstemmen met openstaande
    `sql/018` (E14.9) — numerieke volgorde, smoke na elk.
-2. Backend-deploy (avatars-api): aspect-contract, env-default (laat
-   `STYLIZE_DEFAULT_MODEL` ongezet → gpt-image-1.5), custom-thumb-variant,
-   fail-loud thumbnailVariant.
-3. Admin-deploy (avatar-admin) mét de 837498f-port; probe vóór seeden: wegwerp-
-   media uploaden, URL-vorm = directe Supabase, weer verwijderen.
-4. `import-effects.mjs` echt draaien (Thierry, creds via vercel env); daarna
-   oude 4 op `active=false`.
-5. Verifiëren: `/v1/effects` → 6 actieve stijlen, allemaal 320px
-   `/render/image/`-URLs, volgorde klopt; app-smoke: koude-start-thumbs, 2
-   generaties, plaatsing met verplaatst/geschaald portret, 1 custom effect
-   end-to-end.
-6. Rollback-hendels op papier: `STYLIZE_DEFAULT_MODEL=nano-banana` + redeploy
-   (vloot, niet-kiezers), oude stijlen her-activeren, per-user toggle blijft.
-   (Bestaande gebruikers van oude stijlen zijn veilig: selectie is key-gebaseerd
-   en cache-hydratatie werkt zonder lijst-entry; alleen regenereren van een
-   gedeactiveerde stijl vervalt.)
+3. Backend-deploy (avatars-api, vanaf repo-root — vercel-cli-memory): brengt
+   aspect-contract, gpt-image-default (laat `STYLIZE_DEFAULT_MODEL` ongezet),
+   custom-thumb-variant, fail-loud thumbnailVariant, 422-refusal-mapping.
+4. Admin-deploy (avatar-admin, `.vercelignore`-swap) mét de 837498f-port;
+   probe vóór seeden zit in de importer (--apply doet 'm automatisch).
+5. Seed-run: `bash backend/scripts/run-import-effects.sh` (env-pull + dry-run
+   + bevestiging + optionele deactivatie van clay/wood/3d/scribble).
+6. Verifiëren: `/v1/effects` → 6 actieve stijlen, allemaal 320px
+   `/render/image/`-URLs, volgorde 10–15; app-smoke: koude-start-thumbs
+   (eerste open uit disk/prewarm), 2 generaties op een verplaatst/geschaald
+   portret (plaatsing blijft staan), 1 custom effect end-to-end (post-sql/015).
+7. Rollback-hendels: `STYLIZE_DEFAULT_MODEL=nano-banana` + redeploy (vloot,
+   niet-kiezers — NB: pas effectief voor app-builds mét 55.2; oudere builds
+   sturen hun eigen default mee), oude stijlen her-activeren via admin,
+   per-user Settings-toggle blijft. (Bestaande gebruikers van oude stijlen
+   zijn veilig: selectie is key-gebaseerd en cache-hydratatie werkt zonder
+   lijst-entry; alleen regenereren van een gedeactiveerde stijl vervalt —
+   server houdt STYLE_PROMPTS-fallback voor de oude 4 keys, dus ook dat werkt.)
 
 ---
 
