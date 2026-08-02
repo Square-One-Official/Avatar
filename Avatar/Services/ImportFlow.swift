@@ -919,6 +919,10 @@ enum ImportFlow {
                 case .transport, .rateLimited:
                     // Recoverable: Wi-Fi blip or rate limit. Try again.
                     appState.warn(Loc.magicCutoutOfflineToast)
+                case .generationRefused:
+                    // E55 (SHARED-touch: nieuwe AvatarKit-case, deze switch is
+                    // exhaustief): vuurt in de cutout-flow nooit — stylize-only.
+                    appState.warn(err.errorDescription ?? Loc.somethingWentWrong)
                 case .server(let code, let message):
                     // Log the raw status/detail for devs; show friendly copy.
                     dlog("[Magic Cutout] server error \(code) \(message ?? "")")

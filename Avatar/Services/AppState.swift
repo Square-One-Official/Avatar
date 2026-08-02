@@ -233,6 +233,12 @@ final class AppState {
             // Recoverable: try again later or check connection.
             warn(error.errorDescription ?? Loc.somethingWentWrong)
             return true
+        case .generationRefused:
+            // E55 (SHARED-touch: nieuwe AvatarKit-case, v1 switcht exhaustief):
+            // v1 heeft geen stylize-flow, dus dit hoort hier nooit te vuren —
+            // maar de copy ("try a different photo") is ook hier de juiste.
+            warn(error.errorDescription ?? Loc.somethingWentWrong)
+            return true
         case .server, .decode, .proRequired:
             // Either broken or a permission state the chip is the right
             // surface for. `proRequired` is rare (gate should have caught
