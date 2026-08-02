@@ -114,7 +114,6 @@ final class EffectsModel {
         self.entitlement = entitlement
         self.onApply = onApply
         self.portrait = portrait
-        self.cutoutImage = cutoutImage
         self.coordinator = coordinator
 
         // Hydrateer uit het portret (E24.33). Cache + basis zijn key-gestuurd
@@ -127,8 +126,15 @@ final class EffectsModel {
         let activeKey = portrait?.effectActiveRaw
         if activeKey != nil, let data = portrait?.effectBaseData, let img = NSImage(data: data) {
             self.base = img
+            // E55.3: met een actief effect ÍS de meegegeven cutout het
+            // effect-beeld — een nieuwe generatie moet op de BASIS werken,
+            // anders stapelt stijl B op A's output (repro: A toepassen →
+            // tool wisselen → paneel heropent met verse identiteit → B
+            // genereren styleerde voorheen A's cutout).
+            self.cutoutImage = img
         } else {
             self.base = baseImage
+            self.cutoutImage = cutoutImage
         }
         var hydrated: [String: NSImage] = [:]
         var hydratedPNG: [String: Data] = [:]
@@ -152,7 +158,9 @@ final class EffectsModel {
     }
 
     /// Het beeld dat naar de stylize-backend gaat — zie `StylizeQuality.effectsStylizeSource`.
-    private func stylizeSource(choice: StylizeQuality.EffectsSourceChoice) -> NSImage {
+    /// Internal (niet private) zodat de E55.3-regressietest kan bewijzen dat de
+    /// bron bij een actief effect de effect-basis is, niet de gestylede cutout.
+    func stylizeSource(choice: StylizeQuality.EffectsSourceChoice) -> NSImage {
         StylizeQuality.effectsStylizeSource(portrait: portrait, cutout: cutoutImage, choice: choice)
     }
 
