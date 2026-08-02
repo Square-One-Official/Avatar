@@ -71,10 +71,24 @@ Scope:
   --noEmit` groen, beide app-targets bouwen, Result-regel.
 
 ## 55.2 — Default-flip: server-governed default, client stuurt alleen expliciete keuze
-- status: in_progress
+- status: done
 - owner: INFRA (2026-08-02)
 - team: INFRA
 - blockedBy: 55.1 (done)
+- Result: OpenAI (gpt-image-1.5) is de stylize-default (branch `v2/e55-55.2`,
+  merge a966c78). Backend: `defaultModel: "gpt-image-1.5"` + env-hendel
+  `STYLIZE_DEFAULT_MODEL` (pure `resolveStylizeDefaultModel`, whitelist-
+  gevalideerd, luide fallback) — vloot-rollback = env + redeploy;
+  generate_background blijft nano. Client: `GenerationModelStore.explicit`
+  (nil zonder keuze); alle drie de stylize/background-bodies sturen
+  `generation_model` alléén bij expliciete keuze (StylizeBody intern voor de
+  omissie-test); Settings-copy + case-volgorde geflipt. StylizeQuality:
+  `cappedForUpload` (2048, alpha behouden) op beide effects-bronpaden.
+  NB: oudere app-builds sturen altijd hun default mee ("nano-banana") — de
+  vlootbrede flip landt met de eerstvolgende app-update; server-default dekt
+  nieuwe clients direct. Tests: AvatarKit 114/114 (store + omissie),
+  Avatar2-suite met 3 nieuwe cap-tests, models-smoke uitgebreid; `build-v2.sh`
+  alles groen.
 
 De client stuurt vandaag ALTIJD `generation_model` (code-default `.nanoBanana`),
 dus een backend-flip alleen doet niets. Herontwerp voor terugrolbaarheid:
@@ -94,9 +108,10 @@ dus een backend-flip alleen doet niets. Herontwerp voor terugrolbaarheid:
   toont Settings bij niet-kiezers OpenAI terwijl nano draait — geaccepteerd.
 
 ## 55.3 — Style-stacking-bug: stylize-bron moet de effect-basis zijn
-- status: backlog
+- status: in_progress
+- owner: FEAT (2026-08-02)
 - team: FEAT
-- blockedBy: — (parallel, vroeg doen)
+- blockedBy: —
 
 `EffectsModel.init`: `base` valt al terug op `portrait.effectBaseData` bij een
 actief effect, maar `cutoutImage` (de stylize-bron voor het `.cutout`-pad)
