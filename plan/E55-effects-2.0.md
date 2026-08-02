@@ -49,6 +49,35 @@ de server-default (niets geshipt; test dekt het).
    weigering-guard (>2% afwijking = crop overslaan + luid loggen; client
    herkadert dan zelf). Smoke-assertion toegevoegd.
 
+**Gebruikersperspectief-sweep (2026-08-02, tweede pas) — gevonden & gefixt:**
+5. *Safety-weigering toonde de generieke "probeer opnieuw"-toast*: de server
+   stuurde sinds 55.1 een getypte 422 `generation_refused`, maar de app
+   kende 'm niet — een gebruiker met een geweigerde foto bleef kansloze
+   retries van 30–60s doen. Nu: `BackendError.generationRefused` + eigen
+   copy ("try a different photo — no credits were charged") in Effects-,
+   Clothes-, Hair- én FaceActions-paneel.
+6. *Settings-copy loog na de intent-scoped defaults*: "Default — best style
+   match" bij OpenAI klopte niet meer voor hair/kleding → copy benoemt nu
+   per model wáár het de default is.
+
+**Open UX-punten (besluit/bakeoff, geen code nu):**
+- *Latency zonder cancel*: gpt-image-high = 30–70s in een toast zonder
+  voortgang of annuleren; nano was 10–20s. Draaglijk of niet hangt aan het
+  55.7-besluit high vs medium ($0.128 vs $0.047, medium ≈ nano-tempo).
+  Een cancel-knop op de WorkingToast is een aparte story als high blijft.
+- *App sluiten tijdens een lange generatie*: rondt de server af ná het
+  wegklikken, dan zijn 4 credits betaald zonder ontvangen beeld (smal
+  venster, groter naarmate generaties langer duren). Accepteren of ooit
+  server-side result-cache — noteren bij het tariefbesluit.
+- *Wees-selectie na deactivatie*: een portret met een oud effect (clay etc.)
+  actief toont na de seed géén geselecteerde kaart meer (key-cache werkt,
+  kaart is weg; terugkeren naar het effect kan alleen via cache/undo).
+  Nul echte gebruikers vandaag — alleen relevant als stijlen ooit ná launch
+  gedeactiveerd worden; dan een "ghost-kaart voor actieve onbekende key".
+- *CreateEffectSheet mist een hint* dat referenties met herkenbare gezichten
+  identity-bleed geven (de curatie-regel die het CMS-veld wél documenteert)
+  — één regel helper-copy, kan mee met een volgende FEAT-story.
+
 **Bekende rest-randgevallen (bewust open, met eigenaar):**
 - *Fallback-keys-venster*: een app-build mét de nieuwe 6 fallback-keys vóór de
   prod-seed → offline-fallback-generatie geeft 400 op de nieuwe keys (alleen

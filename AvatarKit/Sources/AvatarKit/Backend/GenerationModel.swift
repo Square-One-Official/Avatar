@@ -26,11 +26,14 @@ public enum GenerationModel: String, CaseIterable, Sendable, Identifiable {
         }
     }
 
-    /// Korte toelichting onder de optie.
+    /// Korte toelichting onder de optie. Sinds de edge-sweep zijn de defaults
+    /// intent-scoped (styles → OpenAI, hair/kleding-edits → Nano Banana), dus
+    /// de copy benoemt per model wáár het de default is — een kale "Default"
+    /// zou voor de helft van de acties liegen.
     public var detail: String {
         switch self {
-        case .openAI: "Default — best style match"
-        case .nanoBanana: "Faster — strongest identity lock"
+        case .openAI: "Default for styles — best style match"
+        case .nanoBanana: "Default for hair & clothing — fastest, strongest identity lock"
         }
     }
 }

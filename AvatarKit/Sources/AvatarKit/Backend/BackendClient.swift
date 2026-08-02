@@ -8,6 +8,12 @@ public enum BackendError: LocalizedError {
     case noCredits
     case proRequired
     case rateLimited
+    /// E55: het model weigerde deze foto (moderatie/safety, HTTP 422
+    /// `generation_refused`). Eigen case + eigen copy: de generieke
+    /// "probeer opnieuw"-toast lokte kansloze retries van 30–60s uit,
+    /// terwijl een ándere foto het echte advies is. Credits zijn veilig
+    /// (server rekent pas af ná succes).
+    case generationRefused
     case server(Int, String?)
     case decode
     case transport(Error)
@@ -23,6 +29,8 @@ public enum BackendError: LocalizedError {
         case .noCredits:     return "You're out of credits for this period."
         case .proRequired:   return "Pro subscription required."
         case .rateLimited:   return "Too many requests. Please wait a moment."
+        case .generationRefused:
+            return "This photo was declined by the safety filter. Try a different photo — no credits were charged."
         case .server(let s, let m): return m ?? "Server error (\(s))."
         case .decode:        return "Unexpected server response."
         case .transport(let e): return e.localizedDescription
@@ -1126,6 +1134,9 @@ public final class BackendClient {
             let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
             if http.statusCode == 403, msg == "pro_required" {
                 throw BackendError.proRequired
+            }
+            if http.statusCode == 422, msg == "generation_refused" {
+                throw BackendError.generationRefused
             }
             throw BackendError.server(http.statusCode, msg)
         }

@@ -114,6 +114,11 @@ final class FaceEffectsModel {
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
+        } catch BackendError.generationRefused {
+            // E55: safety-weigering → advies "andere foto", geen credits kwijt.
+            phase = .idle
+            entitlement.dismissWorkingToast()
+            entitlement.presentError(BackendError.generationRefused.errorDescription ?? "")
         } catch {
             phase = .idle
             entitlement.dismissWorkingToast()

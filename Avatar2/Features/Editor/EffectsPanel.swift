@@ -389,6 +389,12 @@ final class EffectsModel {
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.requestUpgrade()
+        } catch BackendError.generationRefused {
+            // E55: safety-weigering — eigen copy ("probeer een andere foto",
+            // geen credits verbruikt) i.p.v. de retry-uitlokkende generieke.
+            phase = .idle
+            entitlement.dismissWorkingToast()
+            entitlement.presentError(BackendError.generationRefused.errorDescription ?? "")
         } catch {
             phase = .idle
             entitlement.dismissWorkingToast()
