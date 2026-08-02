@@ -129,10 +129,17 @@ ook de stylize-bron uit `effectBaseData` afleiden; `.original`-pad checken op
 hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
 
 ## 55.4 — Create-knop naar de paneelheader
-- status: in_progress
+- status: done
 - owner: DS+FEAT (2026-08-02)
 - team: DS + FEAT
 - blockedBy: —
+- Result: `DSEditPanel` heeft een generiek `headerAccessory`-slot (trailing in
+  de titelrij, na de credits-chip; EmptyView-convenience voor back-compat —
+  bestaande call sites ongewijzigd). EffectsPanel: createCard weg uit de rail,
+  compacte `DSGhostButton("Create", +, .small)` + `DSProChip` (niet-Pro) in de
+  header met identieke gating/mailbox. Rail = None → custom → built-ins.
+  Figma-afwijking gedocumenteerd (besluit Thierry 2026-08-02). Branch
+  `v2/e55-55.4`, merge 04dba26; AvatarUI 55/55; build-v2.sh groen (exit 0).
 
 - DS: `AvatarUI/.../DSEditPanel.swift` — `headerAccessory`-ViewBuilder-slot in
   de titelrij (bestaat nog niet); backward-compat via `Accessory == EmptyView`-
@@ -184,7 +191,8 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
   Echte run + verificatie horen bij 55.8.
 
 ## 55.6 — Instant thumbnails
-- status: backlog
+- status: in_progress
+- owner: INFRA+FEAT (2026-08-02)
 - team: INFRA + FEAT
 - blockedBy: — (zachte dep op 55.5 voor de fallback-keys; die liggen al vast in
   effects-seed.json)
