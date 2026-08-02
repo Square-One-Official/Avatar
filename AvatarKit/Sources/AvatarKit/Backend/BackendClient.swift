@@ -347,7 +347,7 @@ public final class BackendClient {
     struct StylizeBody: Encodable {
         let storageKey: String
         /// E55.2: alléén de expliciete gebruikerskeuze; nil = veld weggelaten
-        /// → server-default (gpt-image-1.5, env-overridable).
+        /// → server-default (gpt-image-2 voor effects, env-overridable).
         let generationModel: String?
         let modelOverride: String?
         let cutoutW: Int?
@@ -420,7 +420,7 @@ public final class BackendClient {
     /// stijl-key naar het productie-`/v1/stylize`. De `styleKey` komt uit de
     /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
     /// identity-clausule); een vrij prompt-veld is dev-only en hier bewust niet
-    /// bereikbaar. De default-engine is server-governed (E55.2: gpt-image-1.5,
+    /// bereikbaar. De default-engine is server-governed (E55.2: gpt-image-2,
     /// env-overridable); `generation_model` gaat alléén mee bij een expliciete
     /// Settings-keuze en `model_override` (dev) als de DevModelOverrides-store
     /// een keuze heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.

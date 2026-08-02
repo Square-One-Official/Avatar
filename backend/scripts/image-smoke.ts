@@ -207,6 +207,17 @@ async function solidRed(w: number, h: number): Promise<Buffer> {
   }
 }
 
+// 10b. Weigering-guard: negeert het model de gevraagde ratio (resultaat ≠
+//      canvas-ratio), dan géén proportionele crop (verkeerde regio) maar het
+//      resultaat ongewijzigd terug — de client herkadert dan zelf.
+{
+  const src = await solidRed(800, 1000);
+  const pad = await padToAspect(src, 2 / 3); // canvas 800×1200
+  const disobedient = await solidRed(1024, 1024); // model gaf 1:1 terug
+  const out = await cropBackFromPad(disobedient, pad);
+  assert.equal(out, disobedient, "afwijkende ratio hoort de crop over te slaan");
+}
+
 // 11. capLongEdge: boven de cap geschaald (ratio + alpha behouden), eronder
 //     byte-identiek terug.
 {
