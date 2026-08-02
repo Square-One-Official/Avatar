@@ -61,7 +61,15 @@ export function thumbnailVariant(
 ): string | null {
   if (!url) return null;
   const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)/);
-  if (!m) return url;
+  if (!m) {
+    // E55.5: luid falen i.p.v. stil doorlaten. Een niet-matchende URL betekent
+    // meestal een admin-deploy zonder de generateFileURL-fix (837498f) — de
+    // app krijgt dan een full-size origineel (traag) of een MFA-geblokkeerde
+    // proxy-URL (kapot). De passthrough blijft (graceful degradation), maar
+    // nooit meer onzichtbaar.
+    console.warn(`[payload] thumbnailVariant: URL matcht de Supabase-objectvorm niet, passthrough full-size: ${url}`);
+    return url;
+  }
   return `${m[1]}/render/image/public/${m[2]}?width=${width}&quality=${quality}`;
 }
 
