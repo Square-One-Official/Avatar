@@ -27,6 +27,13 @@ export interface ModelEntry {
   ref: string;
   /** Human-readable label for the dev model-picker (E15.5). */
   label: string;
+  /**
+   * E55.1: false wanneer het model de input-ratio NIET kan aanhouden (vaste
+   * ratio-set i.p.v. `match_input_image`) — /v1/stylize pakt dan het
+   * pad→generate→crop-contract (lib/image.ts) zodat de response-ratio altijd
+   * de request-ratio is. Afwezig = true.
+   */
+  matchesInputAspect?: boolean;
 }
 
 export interface FeatureRegistration {
@@ -112,6 +119,8 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
       "gpt-image-1.5": {
         ref: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
+        // Vaste ratio-set 1:1|3:2|2:3 (schema 2026-08-02) → aspect-contract.
+        matchesInputAspect: false,
       },
       // E32.1 face-bakeoff-arm (dev-only). ByteDance Seedream 4 — unified
       // generate/edit, accepteert reference-images voor instruction-edit.
@@ -174,6 +183,7 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
       "gpt-image-1.5": {
         ref: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
+        matchesInputAspect: false,
       },
     },
     credits: 2,
@@ -185,6 +195,24 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
 export function defaultModelRef(feature: CloudFeature): string {
   const reg = MODEL_REGISTRY[feature];
   return reg.models[reg.defaultModel].ref;
+}
+
+/**
+ * E55.1: houdt het model met deze ref de input-ratio aan? Lookup over de hele
+ * registry op slug (pinned versies tellen als hetzelfde model); onbekende
+ * refs gelden als ratio-vast NIET nodig (true) — het contract is een
+ * gpt-image-eigenschap, geen default-gedrag.
+ */
+export function modelMatchesInputAspect(ref: string): boolean {
+  const slug = ref.split(":")[0];
+  for (const feature of Object.values(MODEL_REGISTRY)) {
+    for (const entry of Object.values(feature.models)) {
+      if (entry.ref.split(":")[0] === slug) {
+        return entry.matchesInputAspect !== false;
+      }
+    }
+  }
+  return true;
 }
 
 /**

@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import sharp from "sharp";
 import { checkRateLimit, requireUser } from "../../lib/auth.js";
 import {
+  defaultModelRef,
   MODEL_REGISTRY,
+  modelMatchesInputAspect,
   resolveGenerationModel,
   resolveModelOverride,
   UnknownModelOverrideError,
@@ -11,7 +13,14 @@ import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, currentCredits, ensureCompedCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
-import { flattenOnGrey } from "../../lib/image.js";
+import {
+  type AspectPad,
+  capLongEdge,
+  cropBackFromPad,
+  flattenOnGrey,
+  nearestFixedAspect,
+  padToAspect,
+} from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
 
@@ -71,6 +80,13 @@ const STYLE_REFERENCE_CLAUSE =
 
 /** Max referenties richting het model; meer verwatert identity-behoud. */
 const STYLE_REF_MAX = 3;
+
+/**
+ * E55.1: cap op de langste zijde vóór flatten/pad. Sluit aan op de
+ * client-cap (StylizeQuality, 2048) en de cutout-norm; belt-and-braces
+ * voor oudere clients die nog full-res uploaden.
+ */
+const STYLIZE_INPUT_MAX_EDGE = 2048;
 
 /**
  * In-process cache van referentie-data-URLs. Referenties wijzigen alleen bij
@@ -226,6 +242,7 @@ const FACE_PRESETS: Record<string, string> = {
  * Returns: 200 { image: <base64 PNG>, credits_remaining: int, model: <key> }
  *          400 unknown_style / missing_or_oversized_prompt / missing_image
  *          402 insufficient_credits
+ *          422 generation_refused (moderatie/safety-weigering; geen credit verbruikt)
  *          429 rate_limited · 504 model_timeout
  *
  * Pipeline (zoals colorize, met credit-gate): flatten op grijs (modellen
@@ -416,10 +433,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureUser(user.id);
 
-    // Server-side voorwerk vóór de credit-gate: flatten op grijs.
-    const flattened = await flattenOnGrey(inputBytes);
+    // Server-side voorwerk vóór de credit-gate: cap op 2048 lange zijde
+    // (E55.1 — modellen leveren toch ~1–1.5 MP; groter = alleen latency)
+    // en flatten op grijs.
+    const capped = await capLongEdge(inputBytes, STYLIZE_INPUT_MAX_EDGE);
+    const flattened = await flattenOnGrey(capped);
     const meta = await sharp(flattened).metadata();
-    const flatDataUrl = `data:image/png;base64,${flattened.toString("base64")}`;
+    const inputW = meta.width ?? 0;
+    const inputH = meta.height ?? 0;
+
+    // E55.1 aspect-contract: modellen met een vaste ratio-set (gpt-image)
+    // krijgen een naar die ratio gepadde input; het resultaat wordt na afloop
+    // proportioneel teruggesneden. Response-ratio == input-ratio, altijd.
+    const effectiveRef = modelRef ?? defaultModelRef("stylize");
+    let pad: AspectPad | null = null;
+    let modelPng = flattened;
+    if (!modelMatchesInputAspect(effectiveRef) && inputW > 0 && inputH > 0) {
+      const target = nearestFixedAspect(inputW, inputH);
+      pad = await padToAspect(flattened, target.ratio);
+      modelPng = pad.padded;
+    }
+    const flatDataUrl = `data:image/png;base64,${modelPng.toString("base64")}`;
 
     // Credit-gate (alleen niet-dev), net als colorize.
     if (!isDevUser) {
@@ -430,28 +464,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    const modelStart = Date.now();
     const resultUrl = await stylizeEdit({
       imageDataUrl: flatDataUrl,
       prompt,
       styleReferenceDataUrls,
-      width: meta.width ?? 0,
-      height: meta.height ?? 0,
+      width: pad?.canvasW ?? inputW,
+      height: pad?.canvasH ?? inputH,
       model: modelRef,
     });
+    const modelMs = Date.now() - modelStart;
     const download = await fetch(resultUrl);
     if (!download.ok) {
       throw new Error(`stylize result fetch failed: ${download.status}`);
     }
-    const resultBytes = Buffer.from(await download.arrayBuffer());
+    let resultBytes: Buffer = Buffer.from(await download.arrayBuffer());
+    if (pad) {
+      resultBytes = await cropBackFromPad(resultBytes, pad);
+    }
     const resultMeta = await sharp(resultBytes).metadata();
-    const inputW = meta.width ?? 0;
-    const inputH = meta.height ?? 0;
     const outputW = resultMeta.width ?? 0;
     const outputH = resultMeta.height ?? 0;
     const cutoutW = Number(req.body?.cutout_w) || 0;
     const cutoutH = Number(req.body?.cutout_h) || 0;
     console.info(
       `[stylize_dims] input=${inputW}x${inputH} output=${outputW}x${outputH}` +
+        ` model=${effectiveRef} model_ms=${modelMs} pad=${pad ? 1 : 0}` +
+        ` refs=${styleReferenceDataUrls.length}` +
         (cutoutW > 0 ? ` cutout=${cutoutW}x${cutoutH}` : ""),
     );
 
@@ -481,6 +520,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("/v1/stylize error:", msg);
     if (err instanceof ReplicateTimeoutError) {
       res.status(504).json({ error: "model_timeout" });
+      return;
+    }
+    // E55.1: moderatie/safety-weigering (gpt-image weigert soms portretten,
+    // ook op moderation=low) → getypte fout i.p.v. generieke 500. Credits
+    // zijn veilig: logCredit draait pas ná een geslaagde generatie.
+    if (/sensitiv|content.?polic|moderation|flagged|safety|refus/i.test(msg)) {
+      res.status(422).json({ error: "generation_refused" });
       return;
     }
     if (
