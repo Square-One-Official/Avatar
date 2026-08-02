@@ -316,6 +316,10 @@ export async function stylizeEdit(input: {
    *  én door user-created custom effects (E34 — precies één referentie); de
    *  prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
   styleReferenceDataUrls?: string[] | null;
+  /** E55.7-bakeoff-hendel: gpt-image-kwaliteitstier. Productie laat dit weg
+   *  (→ "high"); alleen de bakeoff-driver zet "medium" om de latency/kosten-
+   *  arm te meten. Wordt het ooit de default, dan hier het vaste veld flippen. */
+  gptQuality?: "high" | "medium";
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
@@ -336,6 +340,7 @@ function stylizeInputFor(
     width: number;
     height: number;
     styleReferenceDataUrls?: string[] | null;
+    gptQuality?: "high" | "medium";
   },
 ): Record<string, unknown> {
   // Het portret eerst (dat is het te bewerken beeld), stijlreferenties daarna.
@@ -385,9 +390,9 @@ function stylizeInputFor(
       input_images: images,
       // Identity-behoud staat of valt met input_fidelity=high; quality=high
       // is de eerlijke vergelijking met de andere pro-armen (en de reden
-      // voor STYLIZE_TIMEOUT_MS).
+      // voor STYLIZE_TIMEOUT_MS). `gptQuality` is de E55.7-bakeoff-hendel.
       input_fidelity: "high",
-      quality: "high",
+      quality: input.gptQuality ?? "high",
       output_format: "png",
       moderation: "low",
       // gpt-image kent geen match_input_image; kies de dichtstbijzijnde van
