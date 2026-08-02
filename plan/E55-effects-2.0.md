@@ -108,10 +108,17 @@ dus een backend-flip alleen doet niets. Herontwerp voor terugrolbaarheid:
   toont Settings bij niet-kiezers OpenAI terwijl nano draait — geaccepteerd.
 
 ## 55.3 — Style-stacking-bug: stylize-bron moet de effect-basis zijn
-- status: in_progress
+- status: done
 - owner: FEAT (2026-08-02)
 - team: FEAT
 - blockedBy: —
+- Result: gefixt in `EffectsModel.init` (branch `v2/e55-55.3`, merge 92c266a) —
+  bij een actief effect volgen `base` én de stylize-bron nu samen
+  `effectBaseData`; het `.original`-pad had de bug niet.
+  `stylizeSource(choice:)` intern voor de test; `EffectsModelSourceTests`
+  (3 tests: actief→basis, inactief→cutout, original ongemoeid). Eerste
+  build-run faalde op een ontbrekende `import AvatarKit` in de test —
+  gefixt; `build-v2.sh` daarna volledig groen (exit 0, volle log).
 
 `EffectsModel.init`: `base` valt al terug op `portrait.effectBaseData` bij een
 actief effect, maar `cutoutImage` (de stylize-bron voor het `.cutout`-pad)
@@ -138,7 +145,8 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
   pass, Result-regel.
 
 ## 55.5 — Styles 2.0-content: importer + media-URL-hardening + runbook
-- status: backlog
+- status: in_progress
+- owner: INFRA (2026-08-02)
 - team: INFRA (bouw + dry-run); echte run **gated op Thierry**
 - blockedBy: — (dry-run meteen: het gap-rapport geeft Thierry doorlooptijd voor
   mapjes fixen)
