@@ -60,6 +60,145 @@ export async function flattenOnGrey(cutoutPng: Buffer): Promise<Buffer> {
 }
 
 /**
+ * E55.1 — engine-agnostisch aspect-contract voor /v1/stylize.
+ *
+ * gpt-image kent geen `match_input_image`; het snapt naar een vaste set
+ * ratio's en herkadert daarmee élk portret dat daar niet op ligt — precies
+ * wat de client-side transform-reset triggert (ShellModel.storeEffectResult,
+ * drift ≥ 2%). Het contract hier draait dat om: pad de input naar de
+ * dichtstbijzijnde ondersteunde ratio (gecentreerde letterbox op hetzelfde
+ * studio-grijs als flattenOnGrey), laat het model op dat kader werken, en
+ * crop het resultaat proportioneel terug naar de exacte input-ratio.
+ * Response-aspect == request-aspect, voor elke engine.
+ */
+
+/** Vaste ratio-set van gpt-image (schema her-geverifieerd 2026-08-02). */
+export type FixedAspectKey = "1:1" | "3:2" | "2:3";
+
+export interface FixedAspect {
+  key: FixedAspectKey;
+  ratio: number;
+}
+
+export const GPT_IMAGE_ASPECTS: FixedAspect[] = [
+  { key: "1:1", ratio: 1 },
+  { key: "3:2", ratio: 1.5 },
+  { key: "2:3", ratio: 2 / 3 },
+];
+
+/** Kies de ondersteunde ratio die het dichtst bij width/height ligt. */
+export function nearestFixedAspect(
+  width: number,
+  height: number,
+  aspects: FixedAspect[] = GPT_IMAGE_ASPECTS,
+): FixedAspect {
+  if (width <= 0 || height <= 0) return aspects[0];
+  const ratio = width / height;
+  return [...aspects].sort(
+    (a, b) => Math.abs(a.ratio - ratio) - Math.abs(b.ratio - ratio),
+  )[0];
+}
+
+/**
+ * Boekhouding van een aspect-pad: waar de bron binnen het gepadde canvas
+ * ligt, zodat `cropBackFromPad` het modelresultaat (op wélke pixelmaat dan
+ * ook) proportioneel kan terugsnijden naar de bronregio.
+ */
+export interface AspectPad {
+  padded: Buffer;
+  srcW: number;
+  srcH: number;
+  canvasW: number;
+  canvasH: number;
+  left: number;
+  top: number;
+}
+
+/**
+ * Ratio-verschil waaronder padden niet loont: het model-snapje zelf blijft
+ * dan ruim onder de 2%-reset-drempel van de client, en een pad-strook van
+ * enkele pixels voegt alleen een naadje toe.
+ */
+const PAD_EPSILON = 0.005;
+
+/** Pad `png` gecentreerd op studio-grijs naar exact `targetRatio` (w/h). */
+export async function padToAspect(png: Buffer, targetRatio: number): Promise<AspectPad> {
+  const meta = await sharp(png).metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (w <= 0 || h <= 0) throw new Error("padToAspect: source has no dimensions");
+  const noop = { padded: png, srcW: w, srcH: h, canvasW: w, canvasH: h, left: 0, top: 0 };
+  if (targetRatio <= 0) return noop;
+  const current = w / h;
+  if (Math.abs(current - targetRatio) / targetRatio < PAD_EPSILON) return noop;
+  let canvasW = w;
+  let canvasH = h;
+  if (current < targetRatio) {
+    canvasW = Math.round(h * targetRatio);
+  } else {
+    canvasH = Math.round(w / targetRatio);
+  }
+  const left = Math.floor((canvasW - w) / 2);
+  const top = Math.floor((canvasH - h) / 2);
+  const padded = await sharp({
+    create: {
+      width: canvasW,
+      height: canvasH,
+      channels: 4,
+      background: { ...GREY, alpha: 1 },
+    },
+  })
+    .composite([{ input: png, left, top }])
+    .flatten({ background: GREY })
+    .png()
+    .toBuffer();
+  return { padded, srcW: w, srcH: h, canvasW, canvasH, left, top };
+}
+
+/**
+ * Snijd het modelresultaat terug naar de bronregio van `pad`. Het resultaat
+ * mag een andere pixelmaat hebben dan het gepadde canvas (gpt-image levert
+ * vaste outputmaten) — de mapping is proportioneel per as, geklemd op de
+ * resultaatgrenzen. No-op wanneer er niet gepad is of niets te snijden valt.
+ */
+export async function cropBackFromPad(resultPng: Buffer, pad: AspectPad): Promise<Buffer> {
+  if (pad.canvasW === pad.srcW && pad.canvasH === pad.srcH) return resultPng;
+  const meta = await sharp(resultPng).metadata();
+  const rw = meta.width ?? 0;
+  const rh = meta.height ?? 0;
+  if (rw <= 0 || rh <= 0) return resultPng;
+  const sx = rw / pad.canvasW;
+  const sy = rh / pad.canvasH;
+  let width = Math.min(rw, Math.max(1, Math.round(pad.srcW * sx)));
+  let height = Math.min(rh, Math.max(1, Math.round(pad.srcH * sy)));
+  const left = Math.min(Math.max(0, Math.round(pad.left * sx)), rw - width);
+  const top = Math.min(Math.max(0, Math.round(pad.top * sy)), rh - height);
+  if (left === 0 && top === 0 && width === rw && height === rh) return resultPng;
+  return sharp(resultPng).extract({ left, top, width, height }).png().toBuffer();
+}
+
+/**
+ * E55.1: cap de langste zijde op `maxEdge` (lanczos3, alpha behouden).
+ * Instruction-edit-modellen leveren toch ~1–1.5 MP terug; >2048px input
+ * koopt alleen upload-latency en ingest-kosten. Onder de cap komt het
+ * origineel byte-identiek terug (zelfde patroon als capPixels).
+ */
+export async function capLongEdge(png: Buffer, maxEdge: number): Promise<Buffer> {
+  const meta = await sharp(png).metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+  if (w <= 0 || h <= 0 || Math.max(w, h) <= maxEdge) return png;
+  return sharp(png)
+    .resize(
+      w >= h
+        ? { width: maxEdge, kernel: "lanczos3" }
+        : { height: maxEdge, kernel: "lanczos3" },
+    )
+    .png()
+    .toBuffer();
+}
+
+/**
  * E41.4: flatten voor de upscale-route, zónder de grijze halo die een naive
  * flatten in zachte randen bakt.
  *

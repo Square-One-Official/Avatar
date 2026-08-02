@@ -7,7 +7,15 @@
 // vrijwel puur rood houden (G/B laag) — dat ís de anti-halo-garantie.
 import assert from "node:assert";
 import sharp from "sharp";
-import { bleedFlatten, flattenOnGrey, reapplyAlpha } from "../lib/image.js";
+import {
+  bleedFlatten,
+  capLongEdge,
+  cropBackFromPad,
+  flattenOnGrey,
+  nearestFixedAspect,
+  padToAspect,
+  reapplyAlpha,
+} from "../lib/image.js";
 
 const W = 96;
 const H = 96;
@@ -97,4 +105,113 @@ function px(buf: Buffer, channels: number, x: number, y: number): number[] {
   assert.ok(data[0] === 255 && data[1] === 255 && data[2] === 255, "opake input moet ongewijzigd blijven");
 }
 
-console.log("image.ts smoke OK (bleedFlatten + reapplyAlpha)");
+// ---------------------------------------------------------------------------
+// E55.1 — aspect-contract (pad → generate → crop). Het harde criterium:
+// crop-back levert de exacte input-ratio terug (±1%, ruim onder de 2%-
+// transform-reset-drempel van de client), voor elke output-pixelmaat.
+
+/** Egaal rood opaak PNG op maat. */
+async function solidRed(w: number, h: number): Promise<Buffer> {
+  return sharp({ create: { width: w, height: h, channels: 3, background: { r: 255, g: 0, b: 0 } } })
+    .png()
+    .toBuffer();
+}
+
+// 6. nearestFixedAspect kiest de dichtstbijzijnde van 1:1 / 3:2 / 2:3.
+{
+  assert.equal(nearestFixedAspect(1000, 1000).key, "1:1");
+  assert.equal(nearestFixedAspect(1500, 1000).key, "3:2");
+  assert.equal(nearestFixedAspect(1000, 1500).key, "2:3");
+  assert.equal(nearestFixedAspect(800, 1000).key, "2:3", "0.8 ligt dichter bij 2:3 dan bij 1:1");
+  assert.equal(nearestFixedAspect(0, 0).key, "1:1", "degenerate input valt op de eerste ratio terug");
+}
+
+// 7. padToAspect: 800×1000 → 2:3-canvas (800×1200), bron gecentreerd, pad grijs.
+{
+  const src = await solidRed(800, 1000);
+  const pad = await padToAspect(src, 2 / 3);
+  assert.equal(pad.canvasW, 800);
+  assert.equal(pad.canvasH, 1200);
+  assert.equal(pad.left, 0);
+  assert.equal(pad.top, 100);
+  const { data, info } = await sharp(pad.padded).raw().toBuffer({ resolveWithObject: true });
+  const at = (x: number, y: number) => {
+    const i = (y * info.width + x) * info.channels;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+  const [pr, pg, pb] = at(400, 10); // in de pad-strook boven de bron
+  for (const v of [pr, pg, pb]) assert.ok(Math.abs(v - 200) <= 2, `pad-strook moet grijs 200 zijn, kreeg ${pr},${pg},${pb}`);
+  const [sr, sg] = at(400, 600); // midden van de bron
+  assert.ok(sr >= 250 && sg <= 5, "bronpixels moeten ongewijzigd door de pad heen");
+}
+
+// 8. Ratio al (vrijwel) goed → no-op, zelfde buffer terug.
+{
+  const src = await solidRed(1024, 1536);
+  const pad = await padToAspect(src, 2 / 3);
+  assert.equal(pad.padded, src, "exacte ratio hoort byte-identiek terug te komen");
+  assert.equal(pad.canvasW, pad.srcW);
+  const cropped = await cropBackFromPad(src, pad);
+  assert.equal(cropped, src, "crop-back is een no-op zonder pad");
+}
+
+// 9. cropBackFromPad op een model-resultaat met ándere pixelmaat: gpt-image
+//    levert het 2:3-canvas als 1024×1536 terug → terugsnijden naar bronregio
+//    moet de input-ratio exact herstellen.
+{
+  const src = await solidRed(800, 1000);
+  const pad = await padToAspect(src, 2 / 3);
+  const modelResult = await solidRed(1024, 1536);
+  const cropped = await cropBackFromPad(modelResult, pad);
+  const meta = await sharp(cropped).metadata();
+  const outRatio = (meta.width ?? 0) / (meta.height ?? 1);
+  const srcRatio = 800 / 1000;
+  assert.ok(
+    Math.abs(outRatio - srcRatio) / srcRatio < 0.01,
+    `crop-back-ratio ${outRatio.toFixed(4)} moet ±1% van bron-ratio ${srcRatio} zijn`,
+  );
+  assert.equal(meta.width, 1024, "volle canvasbreedte blijft staan (pad zat boven/onder)");
+}
+
+// 10. Oneven maten + alle drie de doel-ratio's: contract houdt overal.
+{
+  for (const [w, h] of [[801, 1001], [1001, 801], [997, 1003]] as const) {
+    const src = await solidRed(w, h);
+    const target = nearestFixedAspect(w, h);
+    const pad = await padToAspect(src, target.ratio);
+    const canvasRatio = pad.canvasW / pad.canvasH;
+    assert.ok(
+      Math.abs(canvasRatio - target.ratio) / target.ratio < 0.005,
+      `canvas-ratio ${canvasRatio.toFixed(4)} moet ~${target.key} zijn voor ${w}x${h}`,
+    );
+    // Fake model-output op de vaste gpt-maat voor die ratio.
+    const outDims = { "1:1": [1024, 1024], "3:2": [1536, 1024], "2:3": [1024, 1536] }[target.key];
+    const cropped = await cropBackFromPad(await solidRed(outDims[0], outDims[1]), pad);
+    const meta = await sharp(cropped).metadata();
+    const outRatio = (meta.width ?? 0) / (meta.height ?? 1);
+    const srcRatio = w / h;
+    assert.ok(
+      Math.abs(outRatio - srcRatio) / srcRatio < 0.015,
+      `${w}x${h} via ${target.key}: crop-back-ratio ${outRatio.toFixed(4)} wijkt >1.5% af van ${srcRatio.toFixed(4)}`,
+    );
+  }
+}
+
+// 11. capLongEdge: boven de cap geschaald (ratio + alpha behouden), eronder
+//     byte-identiek terug.
+{
+  const big = await sharp({
+    create: { width: 4096, height: 2048, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 0.5 } },
+  })
+    .png()
+    .toBuffer();
+  const capped = await capLongEdge(big, 2048);
+  const meta = await sharp(capped).metadata();
+  assert.equal(meta.width, 2048);
+  assert.equal(meta.height, 1024);
+  assert.ok((meta.channels ?? 0) >= 4 || meta.hasAlpha, "alpha moet de cap overleven");
+  const small = await solidRed(640, 480);
+  assert.equal(await capLongEdge(small, 2048), small, "onder de cap hoort byte-identiek terug");
+}
+
+console.log("image.ts smoke OK (bleedFlatten + reapplyAlpha + aspect-contract E55.1)");

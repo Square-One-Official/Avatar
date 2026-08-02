@@ -1,4 +1,5 @@
 import Replicate from "replicate";
+import { nearestFixedAspect } from "./image.js";
 import { defaultModelRef } from "./models.js";
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
@@ -389,9 +390,10 @@ function stylizeInputFor(
       quality: "high",
       output_format: "png",
       moderation: "low",
-      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde
-      // van de drie ondersteunde ratio's.
-      aspect_ratio: nearestGptAspect(input.width, input.height),
+      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde van
+      // de drie ondersteunde ratio's. Bij het E55.1-aspect-contract is de
+      // input al naar precies zo'n ratio gepad, dus dit is dan een exacte hit.
+      aspect_ratio: nearestFixedAspect(input.width, input.height).key,
     };
   }
   throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
@@ -425,18 +427,6 @@ export async function generateBackgroundImage(input: {
   )) as unknown;
 
   return extractUrl(output, "generateBackgroundImage");
-}
-
-function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" {
-  if (width <= 0 || height <= 0) return "1:1";
-  const ratio = width / height;
-  const options: Array<["1:1" | "3:2" | "2:3", number]> = [
-    ["1:1", 1],
-    ["3:2", 1.5],
-    ["2:3", 2 / 3],
-  ];
-  options.sort((a, b) => Math.abs(a[1] - ratio) - Math.abs(b[1] - ratio));
-  return options[0][0];
 }
 
 /**
