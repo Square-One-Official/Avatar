@@ -65,8 +65,9 @@ Supabase-URL → delete) en weigert te seeden op een proxy-URL-admin.
 
 ## Modelkeuze & referenties
 
-Sinds E55.2 is **gpt-image-1.5** de default-engine (beste stijlmatch met
-referenties); rollback = env `STYLIZE_DEFAULT_MODEL=nano-banana` op avatars-api
-+ redeploy. Referenties wegen op gpt-image anders dan op nano-banana — bij een
-nieuwe stijl zonder bakeoff: eerst prompt-only testen, dan refs erbij en
-vergelijken (E55.7-werkwijze).
+Sinds E55.2 (+ de 2.0-swap van 2026-08-02) is **gpt-image-2** de
+default-engine (beste stijlmatch met referenties; ruimere ratio-set → dun tot
+geen pad). Rollback = env `STYLIZE_DEFAULT_MODEL=nano-banana` (of
+`gpt-image-1.5`, registry-only) op avatars-api + redeploy. Referenties wegen
+op gpt-image anders dan op nano-banana — bij een nieuwe stijl zonder bakeoff:
+eerst prompt-only testen, dan refs erbij en vergelijken (E55.7-werkwijze).

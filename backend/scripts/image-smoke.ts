@@ -8,6 +8,7 @@
 import assert from "node:assert";
 import sharp from "sharp";
 import {
+  GPT_IMAGE_2_ASPECTS,
   bleedFlatten,
   capLongEdge,
   cropBackFromPad,
@@ -124,6 +125,15 @@ async function solidRed(w: number, h: number): Promise<Buffer> {
   assert.equal(nearestFixedAspect(1000, 1500).key, "2:3");
   assert.equal(nearestFixedAspect(800, 1000).key, "2:3", "0.8 ligt dichter bij 2:3 dan bij 1:1");
   assert.equal(nearestFixedAspect(0, 0).key, "1:1", "degenerate input valt op de eerste ratio terug");
+}
+
+// 6b. gpt-image-2-set: 3:4/9:16 vangen portretten die op 1.5 nog dik moesten
+//     padden — de kern van de dunner-pad-winst van de 2.0-swap.
+{
+  assert.equal(nearestFixedAspect(800, 1000, GPT_IMAGE_2_ASPECTS).key, "3:4");
+  assert.equal(nearestFixedAspect(1080, 1920, GPT_IMAGE_2_ASPECTS).key, "9:16");
+  assert.equal(nearestFixedAspect(1600, 1200, GPT_IMAGE_2_ASPECTS).key, "4:3");
+  assert.equal(nearestFixedAspect(1000, 1000, GPT_IMAGE_2_ASPECTS).key, "1:1");
 }
 
 // 7. padToAspect: 800×1000 → 2:3-canvas (800×1200), bron gecentreerd, pad grijs.

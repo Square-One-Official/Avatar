@@ -72,19 +72,11 @@ export async function flattenOnGrey(cutoutPng: Buffer): Promise<Buffer> {
  * Response-aspect == request-aspect, voor elke engine.
  */
 
-/** Vaste ratio-set van gpt-image (schema her-geverifieerd 2026-08-02). */
-export type FixedAspectKey = "1:1" | "3:2" | "2:3";
-
-export interface FixedAspect {
-  key: FixedAspectKey;
-  ratio: number;
-}
-
-export const GPT_IMAGE_ASPECTS: FixedAspect[] = [
-  { key: "1:1", ratio: 1 },
-  { key: "3:2", ratio: 1.5 },
-  { key: "2:3", ratio: 2 / 3 },
-];
+// Ratio-sets + types leven sinds de gpt-image-2-swap in lib/aspects.ts (pure
+// data, geen sharp) — re-export voor bestaande importeurs.
+export { GPT_IMAGE_ASPECTS, GPT_IMAGE_2_ASPECTS } from "./aspects.js";
+export type { FixedAspect, FixedAspectKey } from "./aspects.js";
+import { GPT_IMAGE_ASPECTS, type FixedAspect } from "./aspects.js";
 
 /** Kies de ondersteunde ratio die het dichtst bij width/height ligt. */
 export function nearestFixedAspect(

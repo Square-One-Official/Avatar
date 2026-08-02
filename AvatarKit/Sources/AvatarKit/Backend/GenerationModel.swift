@@ -9,7 +9,11 @@ import Foundation
 /// DevModelOverrides is dit géén dev-tool: elke gebruiker mag uit deze twee
 /// kiezen.
 public enum GenerationModel: String, CaseIterable, Sendable, Identifiable {
-    case openAI = "gpt-image-1.5"
+    // gpt-image-2-swap (besluit Thierry 2026-08-02): het OpenAI-model is
+    // sindsdien 2.0. Een eerder opgeslagen "gpt-image-1.5"-voorkeur (alleen
+    // dev-builds; niets geshipt) decodeert naar nil → `explicit` nil → de
+    // server-default regeert. Bewust geen migratie.
+    case openAI = "gpt-image-2"
     case nanoBanana = "nano-banana"
 
     public var id: String { rawValue }

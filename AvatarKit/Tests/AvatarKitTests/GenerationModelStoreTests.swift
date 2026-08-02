@@ -43,11 +43,20 @@ final class GenerationModelStoreTests: XCTestCase {
         let store = GenerationModelStore(defaults: defaults)
         store.current = .openAI
         XCTAssertEqual(GenerationModelStore(defaults: defaults).explicit, .openAI)
-        XCTAssertEqual(store.explicit?.rawValue, "gpt-image-1.5")
+        XCTAssertEqual(store.explicit?.rawValue, "gpt-image-2")
     }
 
     func testUnknownStoredValueFallsBackToServerDefault() {
         defaults.set("model-van-de-toekomst", forKey: "generation.model")
+        let store = GenerationModelStore(defaults: defaults)
+        XCTAssertNil(store.explicit)
+        XCTAssertEqual(store.current, .openAI)
+    }
+
+    func testLegacyGptImage15PreferenceDegradesToServerDefault() {
+        // gpt-image-2-swap: een oude dev-voorkeur "gpt-image-1.5" is geen
+        // geldige case meer → geen veld in de request, server-default regeert.
+        defaults.set("gpt-image-1.5", forKey: "generation.model")
         let store = GenerationModelStore(defaults: defaults)
         XCTAssertNil(store.explicit)
         XCTAssertEqual(store.current, .openAI)
