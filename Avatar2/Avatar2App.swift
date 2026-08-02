@@ -116,6 +116,10 @@ struct Avatar2App: App {
             #endif
             // E17.5: getargete berichten ophalen bij app-start (faalt stil).
             .task { await messaging.refresh() }
+            // E55.6 (= E52.2 voor effects): warm de effects-lijst + thumbnails
+            // bij launch zodat de eerste paneel-open van de sessie instant uit
+            // memory/disk schildert. Fire-and-forget, anoniem-vriendelijk.
+            .task { EffectsModel.prewarm(entitlement: entitlement) }
             // E13.5 (audit-C1): achtergrond-update-check bij launch — About
             // hoeft nooit open. Eenmalig per proces (guard in de manager) en
             // respecteert de "Automatic updates"-toggle.

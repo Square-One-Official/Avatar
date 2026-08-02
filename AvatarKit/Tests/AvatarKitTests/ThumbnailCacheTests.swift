@@ -122,4 +122,34 @@ final class ThumbnailCacheTests: XCTestCase {
         let size = try XCTUnwrap(image?.size)
         XCTAssertLessThanOrEqual(max(size.width, size.height), 64)
     }
+
+    // MARK: - Disk-byte-cap (E55.6)
+
+    /// Boven de cap wijken de oudste entries (mtime = LRU); de nieuwste blijft.
+    func testDiskCapEvictsOldestFirst() throws {
+        let fm = FileManager.default
+        // Drie bestanden van elk 1000 bytes met gespreide mtimes.
+        for (i, name) in ["oud", "midden", "nieuw"].enumerated() {
+            let file = directory.appendingPathComponent("\(name).img")
+            try Data(repeating: 0xAB, count: 1000).write(to: file)
+            try fm.setAttributes(
+                [.modificationDate: Date(timeIntervalSinceNow: Double(i - 3) * 60)],
+                ofItemAtPath: file.path
+            )
+        }
+        // Cap van 1500 bytes → de twee oudste (oud, midden) moeten wijken.
+        let cache = ThumbnailCache(directory: directory, maxDiskBytes: 1500) { _ in Data() }
+        cache.enforceDiskCapNow()
+        let remaining = try fm.contentsOfDirectory(atPath: directory.path).sorted()
+        XCTAssertEqual(remaining, ["nieuw.img"])
+    }
+
+    /// Onder de cap wordt niets verwijderd.
+    func testDiskCapLeavesSmallCacheAlone() throws {
+        let file = directory.appendingPathComponent("a.img")
+        try Data(repeating: 1, count: 100).write(to: file)
+        let cache = ThumbnailCache(directory: directory, maxDiskBytes: 1_000_000) { _ in Data() }
+        cache.enforceDiskCapNow()
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    }
 }

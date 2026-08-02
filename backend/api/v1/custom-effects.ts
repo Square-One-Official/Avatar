@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { checkRateLimit, requireUser } from "../../lib/auth.js";
+import { thumbnailVariant } from "../../lib/payload.js";
 import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, ensureUser } from "../../lib/supabase.js";
 import { resolveImageInput } from "../../lib/uploads.js";
@@ -63,7 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         effects: rows.map((row, i) => ({
           id: row.id,
           label: row.label,
-          thumbnail_url: customEffectThumbnailUrl(row.reference_path),
+          // E55.6: 320px-CDN-variant zoals de built-ins (E52.1) — de kaart is
+          // 112×152 pt; het volle ~1024px-referentiebeeld downloaden per cel
+          // was de reden dat custom-kaarten trager laadden dan CMS-kaarten.
+          thumbnail_url: thumbnailVariant(customEffectThumbnailUrl(row.reference_path), 320),
           order: i,
         })),
       });
@@ -114,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         effect: {
           id: row.id,
           label: row.label,
-          thumbnail_url: customEffectThumbnailUrl(row.reference_path),
+          thumbnail_url: thumbnailVariant(customEffectThumbnailUrl(row.reference_path), 320),
           order: 0,
         },
       });

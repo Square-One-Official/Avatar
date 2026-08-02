@@ -55,9 +55,14 @@ AvatarUI 37/37, Avatar2 123/123 (1 skip), beide app-targets bouwen,
 (geen deploy gedaan).
 
 ## 52.2 — Prefetch/warming + metingen (backlog)
-- status: backlog
+- status: backlog (effects-deel done via E55.6, 2026-08-02)
 - team: FEAT
 - blockedBy: 52.1
 
 Warming van de meest gebruikte categorieën bij app-start (achter een setting),
 signposts/metingen rond thumbnail-latency zodat regressies zichtbaar worden.
+
+NB (E55.6): voor **effects** is dit gebouwd — launch-prewarm
+(`EffectsModel.prewarm` in Avatar2App) + disk-persistentie van de lijst-JSON
+(`EffectsListCache`) + LRU-byte-cap op ThumbnailCache. Resterende scope hier:
+backgrounds/hair/clothes/face/banner-presets + de regressie-metingen.
