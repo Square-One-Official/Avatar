@@ -129,9 +129,10 @@ ook de stylize-bron uit `effectBaseData` afleiden; `.original`-pad checken op
 hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
 
 ## 55.4 — Create-knop naar de paneelheader
-- status: backlog
+- status: in_progress
+- owner: DS+FEAT (2026-08-02)
 - team: DS + FEAT
-- blockedBy: — (parallel)
+- blockedBy: —
 
 - DS: `AvatarUI/.../DSEditPanel.swift` — `headerAccessory`-ViewBuilder-slot in
   de titelrij (bestaat nog niet); backward-compat via `Accessory == EmptyView`-
@@ -145,9 +146,21 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
   pass, Result-regel.
 
 ## 55.5 — Styles 2.0-content: importer + media-URL-hardening + runbook
-- status: in_progress
+- status: done (bouw + dry-run) — **echte run gated op Thierry, zie 55.8**
 - owner: INFRA (2026-08-02)
 - team: INFRA (bouw + dry-run); echte run **gated op Thierry**
+- Result: `backend/scripts/import-effects.mjs` + `run-import-effects.sh` +
+  `admin/RUNBOOK-effects.md` (branch `v2/e55-55.5`, merge 484b598). Importer:
+  curatiemap + effects-seed.json, normalisatie (refs ≤1024/thumbs ≤800/GIF→
+  PNG-frame), idempotente upsert, dry-run default, kit-refs-fallback,
+  URL-probe, `--deactivate`. Hardening: 837498f-port (generateFileURL) in de
+  v2-main-admin + fail-loud `thumbnailVariant`. **Dry-run-rapport (2026-08-02):
+  windy/sticker/3d-head seedbaar (sticker/3d via kit-refs-fallback resp.
+  ref-cap); balloon/flowers/hairy geblokkeerd — thumbnails ontbreken
+  (Balloon/Flowers/Hairy) en Flowers/Hairy-refs staan los in de map-root
+  (Flowers bevat bewust uitgesloten celebrity-ref — NIET blind overnemen).**
+  tsc backend groen; admin-tsc: 4 pre-existing fouten los van deze change
+  (stash-geverifieerd; aparte fix-taak aangemaakt). build-v2.sh groen.
 - blockedBy: — (dry-run meteen: het gap-rapport geeft Thierry doorlooptijd voor
   mapjes fixen)
 
