@@ -1,6 +1,7 @@
 import Replicate from "replicate";
+import { GPT_IMAGE_ASPECTS } from "./aspects.js";
 import { nearestFixedAspect } from "./image.js";
-import { defaultModelRef } from "./models.js";
+import { defaultModelRef, modelFixedAspects } from "./models.js";
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 
@@ -385,21 +386,30 @@ function stylizeInputFor(
   }
   if (ref.startsWith("openai/gpt-image")) {
     const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
-    return {
+    const payload: Record<string, unknown> = {
       prompt: input.prompt,
       input_images: images,
-      // Identity-behoud staat of valt met input_fidelity=high; quality=high
-      // is de eerlijke vergelijking met de andere pro-armen (en de reden
-      // voor STYLIZE_TIMEOUT_MS). `gptQuality` is de E55.7-bakeoff-hendel.
-      input_fidelity: "high",
+      // quality=high is de eerlijke vergelijking met de andere pro-armen (en
+      // de reden voor STYLIZE_TIMEOUT_MS). `gptQuality` is de 55.7-hendel.
       quality: input.gptQuality ?? "high",
       output_format: "png",
       moderation: "low",
-      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde van
-      // de drie ondersteunde ratio's. Bij het E55.1-aspect-contract is de
-      // input al naar precies zo'n ratio gepad, dus dit is dan een exacte hit.
-      aspect_ratio: nearestFixedAspect(input.width, input.height).key,
+      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde uit
+      // de ratio-set van dít model (2.0 kent er meer dan 1.5 — registry-
+      // capability). Bij het E55.1-aspect-contract is de input al naar
+      // precies zo'n ratio gepad, dus dit is dan een exacte hit.
+      aspect_ratio: nearestFixedAspect(
+        input.width,
+        input.height,
+        modelFixedAspects(ref) ?? GPT_IMAGE_ASPECTS,
+      ).key,
     };
+    // Alleen 1.5 kent de expliciete identity-hendel; 2.0 dropte de parameter
+    // (schema 2026-08-02) en Replicate weigert onbekende input-velden.
+    if (ref.startsWith("openai/gpt-image-1.5")) {
+      payload.input_fidelity = "high";
+    }
+    return payload;
   }
   throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
 }

@@ -4,7 +4,7 @@ import { checkRateLimit, requireUser } from "../../lib/auth.js";
 import {
   defaultModelRef,
   MODEL_REGISTRY,
-  modelMatchesInputAspect,
+  modelFixedAspects,
   resolveGenerationModel,
   resolveModelOverride,
   UnknownModelOverrideError,
@@ -436,12 +436,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // E55.1 aspect-contract: modellen met een vaste ratio-set (gpt-image)
     // krijgen een naar die ratio gepadde input; het resultaat wordt na afloop
-    // proportioneel teruggesneden. Response-ratio == input-ratio, altijd.
+    // proportioneel teruggesneden. Response-ratio == input-ratio, altijd. De
+    // set komt per model uit de registry (2.0 kent er meer dan 1.5, dus padt
+    // dunner tot niets).
     const effectiveRef = modelRef ?? defaultModelRef("stylize");
+    const fixedAspects = modelFixedAspects(effectiveRef);
     let pad: AspectPad | null = null;
     let modelPng = flattened;
-    if (!modelMatchesInputAspect(effectiveRef) && inputW > 0 && inputH > 0) {
-      const target = nearestFixedAspect(inputW, inputH);
+    if (fixedAspects && inputW > 0 && inputH > 0) {
+      const target = nearestFixedAspect(inputW, inputH, fixedAspects);
       pad = await padToAspect(flattened, target.ratio);
       modelPng = pad.padded;
     }

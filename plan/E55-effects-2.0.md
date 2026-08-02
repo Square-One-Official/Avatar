@@ -21,9 +21,22 @@ moeten instant laden.
   Edit_2026-05-03_08-35-45/Effects/<Naam>/{References/,Thumbnail/}` +
   `_aaavatar-seed/effects-seed.json` (prompts/keys/orders).
 
+**Amendement (besluit Thierry, 2026-08-02 avond): gpt-image-2 i.p.v. 1.5.**
+`openai/gpt-image-2` bleek live op Replicate — ruimere ratio-set (1:1/3:2/2:3/
+4:3/3:4/16:9/9:16 → het pad/crop-contract padt dun tot nul), quality-tiers
+low/medium/high/auto en per tier iets goedkoper ($0.012/$0.047/$0.128 vs
+1.5's $0.013/$0.05/$0.136; nano $0.039 — medium ≈ nano-pariteit). 2.0 is nu
+overal de user-facing OpenAI-engine (stylize-default, Settings-key
+`gpt-image-2`, generate_background-keuze); **1.5 blijft registry-only** als
+55.7-identity-vergelijkingsarm en env-fallback, want 2.0 dropte de expliciete
+`input_fidelity`-parameter — identiteitsbehoud is het punt dat de bakeoff
+moet bewijzen (`--model openai/gpt-image-1.5` in de driver voor de A/B).
+Een oude dev-voorkeur "gpt-image-1.5" in UserDefaults degradeert bewust naar
+de server-default (niets geshipt; test dekt het).
+
 Context uit onderzoek (2026-08-02): E09.1 wees gpt-image af als default om een
-*fixbare* reden — het herkadert structureel (schema her-geverifieerd 2026-08-02:
-nog steeds alleen 1:1|3:2|2:3) — plus 4–5× kosten/latency. E54.2's negatieve
+*fixbare* reden — het herkadert structureel (1.5-schema her-geverifieerd
+2026-08-02: alleen 1:1|3:2|2:3) — plus 4–5× kosten/latency. E54.2's negatieve
 referentie-verdict gold **alleen nano-banana**; gpt-image + referenties (exact
 Thierry's werkende ChatGPT-flow) is nooit getest. Relatie met bestaande stories:
 E54.3 (tekst-distillatie) en E54.4 (model per effect) blijven optioneel backlog —

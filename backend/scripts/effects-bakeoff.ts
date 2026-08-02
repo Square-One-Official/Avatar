@@ -1,14 +1,18 @@
-// E55.7 bakeoff-driver: gpt-image-1.5 × {quality high|medium} × {refs aan|uit}
-// op de zes Styles-2.0-presets, door de ECHTE productie-pipeline als directe
-// lib-calls (capLongEdge → flattenOnGrey → padToAspect → stylizeEdit →
-// cropBackFromPad) — callshape 1-op-1 met /v1/stylize incl. IDENTITY-prompt
-// uit effects-seed.json, STYLE_REFERENCE_CLAUSE (refs-arm) en FRAMING_CLAUSE.
-// Geen HTTP/auth/credits; wel een eigen REPLICATE_API_TOKEN.
+// E55.7 bakeoff-driver: gpt-image (default 2.0) × {quality high|medium} ×
+// {refs aan|uit} op de zes Styles-2.0-presets, door de ECHTE productie-
+// pipeline als directe lib-calls (capLongEdge → flattenOnGrey → padToAspect →
+// cropBackFromPad rond stylizeEdit) — callshape 1-op-1 met /v1/stylize incl.
+// IDENTITY-prompt uit effects-seed.json, STYLE_REFERENCE_CLAUSE (refs-arm) en
+// FRAMING_CLAUSE. Geen HTTP/auth/credits; wel een eigen REPLICATE_API_TOKEN.
+//
+// Identity-vergelijking 2.0 vs 1.5 (2.0 dropte input_fidelity): draai twee
+// keer met verschillende --model en leg de contactsheets naast elkaar.
 //
 // Draai vanuit backend/ (E41.4-patroon):
 //
 //   REPLICATE_API_TOKEN=… npx tsx scripts/effects-bakeoff.ts <portraitsDir> <outDir> \
-//     [--styles balloon,windy] [--arms high-refs,high-norefs,medium-refs] [--spacing 11]
+//     [--model openai/gpt-image-1.5] [--styles balloon,windy] \
+//     [--arms high-refs,high-norefs,medium-refs] [--spacing 11]
 //
 // Portretten: PNG's in <portraitsDir> (E09-set: p1-man-beard.png etc. in
 // ~/Documents/Claude/Projects/Aaavatar/e09-bakeoff/inputs). Default pakt
@@ -22,6 +26,7 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
+import { GPT_IMAGE_ASPECTS } from "../lib/aspects.js";
 import {
   capLongEdge,
   cropBackFromPad,
@@ -29,13 +34,13 @@ import {
   nearestFixedAspect,
   padToAspect,
 } from "../lib/image.js";
+import { modelFixedAspects } from "../lib/models.js";
 import { stylizeEdit } from "../lib/replicate.js";
 import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE } from "../lib/stylizePrompts.js";
 
 const SEED_DIR =
   "/Users/thierry/Documents/Aaavatar_ChatGPT Images 2.0 Edit_2026-05-03_08-35-45/Effects";
 const SEED_JSON = join(SEED_DIR, "_aaavatar-seed", "effects-seed.json");
-const MODEL = "openai/gpt-image-1.5";
 const DEFAULT_PORTRAITS = ["p1-man-beard", "p3-woman-curly"];
 const ALL_ARMS = ["high-refs", "high-norefs", "medium-refs", "medium-norefs"] as const;
 type Arm = (typeof ALL_ARMS)[number];
@@ -60,6 +65,9 @@ const ARMS = (argValue("--arms")?.split(",") as Arm[] | undefined) ?? [
   "medium-refs",
 ];
 const SPACING_S = Number(argValue("--spacing") ?? 11);
+const MODEL = argValue("--model") ?? "openai/gpt-image-2";
+// Callshape-parity: pad naar de ratio-set van het gekozen model (registry).
+const MODEL_ASPECTS = modelFixedAspects(MODEL) ?? GPT_IMAGE_ASPECTS;
 mkdirSync(outDir, { recursive: true });
 
 type SeedEffect = { key: string; label: string; prompt: string; refs: string[] };
@@ -135,7 +143,7 @@ for (const portrait of portraitNames) {
   const meta = await sharp(flattened).metadata();
   const inputW = meta.width ?? 0;
   const inputH = meta.height ?? 0;
-  const target = nearestFixedAspect(inputW, inputH);
+  const target = nearestFixedAspect(inputW, inputH, MODEL_ASPECTS);
   const pad = await padToAspect(flattened, target.ratio);
   const inputDataUrl = `data:image/png;base64,${pad.padded.toString("base64")}`;
   const srcRatio = inputW / inputH;
@@ -197,7 +205,10 @@ for (const portrait of portraitNames) {
   }
 }
 
-writeFileSync(join(outDir, "results.json"), JSON.stringify(results, null, 2));
+writeFileSync(
+  join(outDir, "results.json"),
+  JSON.stringify({ model: MODEL, results }, null, 2),
+);
 
 // Contact-sheet voor de menselijke review (stijltrouw + identiteit).
 const cell = (r: RunResult) =>
@@ -211,7 +222,7 @@ writeFileSync(
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
 figure{margin:0}img{width:100%;border-radius:8px}figcaption{padding:6px 2px;color:#bbb}
 .err figcaption{color:#f66}</style>
-<h1>E55.7 — gpt-image-1.5 bakeoff (${new Date().toISOString().slice(0, 10)})</h1>
+<h1>E55.7 — ${MODEL} bakeoff (${new Date().toISOString().slice(0, 10)})</h1>
 <p>${results.filter((r) => r.ok).length}/${results.length} runs OK · beoordeel per arm: stijltrouw t.o.v. de referenties, identiteitsbehoud, framing.</p>
 <div class="grid">${results.map(cell).join("\n")}</div>`,
 );

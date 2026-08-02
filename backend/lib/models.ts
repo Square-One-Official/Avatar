@@ -20,6 +20,8 @@
  * adapter in lib/replicate.ts first and only then register it.
  */
 
+import { GPT_IMAGE_ASPECTS, GPT_IMAGE_2_ASPECTS, type FixedAspect } from "./aspects.js";
+
 export type CloudFeature = "cutout" | "colorize" | "fill_body" | "stylize" | "upscale" | "generate_background";
 
 export interface ModelEntry {
@@ -28,12 +30,13 @@ export interface ModelEntry {
   /** Human-readable label for the dev model-picker (E15.5). */
   label: string;
   /**
-   * E55.1: false wanneer het model de input-ratio NIET kan aanhouden (vaste
+   * E55.1: gezet wanneer het model de input-ratio NIET kan aanhouden (vaste
    * ratio-set i.p.v. `match_input_image`) — /v1/stylize pakt dan het
-   * pad→generate→crop-contract (lib/image.ts) zodat de response-ratio altijd
-   * de request-ratio is. Afwezig = true.
+   * pad→generate→crop-contract (lib/image.ts) met déze set als paddoelen,
+   * zodat de response-ratio altijd de request-ratio is. Afwezig = het model
+   * volgt de input zelf.
    */
-  matchesInputAspect?: boolean;
+  fixedAspects?: FixedAspect[];
 }
 
 export interface FeatureRegistration {
@@ -104,13 +107,17 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
   // drie zijn officiële, unversioned slugs — geen pinning nodig. De
   // payload-verschillen per arm leven in stylizeInputFor (lib/replicate.ts).
   stylize: {
-    // E55.2 (besluit Thierry 2026-08-02): gpt-image-1.5 is de default —
-    // beste stijlmatch, zeker met stijlreferenties; het E09.1-bezwaar
-    // (herkaderen) is opgelost door het E55.1-aspect-contract. Nieuwe
-    // clients sturen `generation_model` alleen bij een expliciete keuze,
-    // dus deze default regeert de vloot; env-override hieronder
-    // (STYLIZE_DEFAULT_MODEL) is de rollback-hendel zonder app-update.
-    defaultModel: "gpt-image-1.5",
+    // E55.2 + gpt-image-2-swap (besluiten Thierry 2026-08-02): het OpenAI-
+    // model is de default — beste stijlmatch, zeker met stijlreferenties;
+    // het E09.1-bezwaar (herkaderen) is opgelost door het E55.1-aspect-
+    // contract, en 2.0's ruimere ratio-set (incl. 3:4/9:16) maakt het pad
+    // dun tot nul. Nieuwe clients sturen `generation_model` alleen bij een
+    // expliciete keuze, dus deze default regeert de vloot; env-override
+    // hieronder (STYLIZE_DEFAULT_MODEL) is de rollback-hendel zonder
+    // app-update. 1.5 blijft registry-only (bakeoff-arm + env-fallback):
+    // 2.0 dropte de `input_fidelity`-parameter, dus identiteitsbehoud is
+    // het punt dat de 55.7-bakeoff moet bewijzen.
+    defaultModel: "gpt-image-2",
     models: {
       "nano-banana": {
         ref: "google/nano-banana",
@@ -120,11 +127,18 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
         ref: "black-forest-labs/flux-2-pro",
         label: "FLUX.2 [pro]",
       },
+      "gpt-image-2": {
+        ref: "openai/gpt-image-2",
+        label: "GPT Image 2",
+        fixedAspects: GPT_IMAGE_2_ASPECTS,
+      },
+      // Registry-only (niet user-selectable): 1.5 heeft nog wél de expliciete
+      // input_fidelity-hendel — de identity-vergelijkingsarm in 55.7 en de
+      // nood-fallback via STYLIZE_DEFAULT_MODEL als 2.0 daar doorheen zakt.
       "gpt-image-1.5": {
         ref: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
-        // Vaste ratio-set 1:1|3:2|2:3 (schema 2026-08-02) → aspect-contract.
-        matchesInputAspect: false,
+        fixedAspects: GPT_IMAGE_ASPECTS,
       },
       // E32.1 face-bakeoff-arm (dev-only). ByteDance Seedream 4 — unified
       // generate/edit, accepteert reference-images voor instruction-edit.
@@ -184,10 +198,16 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
         ref: "google/nano-banana",
         label: "Nano Banana (Gemini 2.5 Flash Image)",
       },
+      "gpt-image-2": {
+        ref: "openai/gpt-image-2",
+        label: "GPT Image 2",
+        fixedAspects: GPT_IMAGE_2_ASPECTS,
+      },
+      // Registry-only — zelfde reden als bij stylize.
       "gpt-image-1.5": {
         ref: "openai/gpt-image-1.5",
         label: "GPT Image 1.5",
-        matchesInputAspect: false,
+        fixedAspects: GPT_IMAGE_ASPECTS,
       },
     },
     credits: 2,
@@ -214,8 +234,9 @@ export function resolveStylizeDefaultModel(
   return fallback;
 }
 
-// Vloot-rollback-hendel (E55.8): `STYLIZE_DEFAULT_MODEL=nano-banana` + redeploy
-// zet niet-kiezers terug zonder app-update. Ongezet = code-default hierboven.
+// Vloot-rollback-hendel (E55.8): `STYLIZE_DEFAULT_MODEL=nano-banana` (of
+// `gpt-image-1.5` — registry-only maar whitelist-geldig) + redeploy zet
+// niet-kiezers om zonder app-update. Ongezet = code-default hierboven.
 MODEL_REGISTRY.stylize.defaultModel = resolveStylizeDefaultModel(
   process.env.STYLIZE_DEFAULT_MODEL,
   MODEL_REGISTRY.stylize.models,
@@ -229,21 +250,26 @@ export function defaultModelRef(feature: CloudFeature): string {
 }
 
 /**
- * E55.1: houdt het model met deze ref de input-ratio aan? Lookup over de hele
- * registry op slug (pinned versies tellen als hetzelfde model); onbekende
- * refs gelden als ratio-vast NIET nodig (true) — het contract is een
- * gpt-image-eigenschap, geen default-gedrag.
+ * E55.1: de vaste ratio-set van het model met deze ref, of null wanneer het
+ * de input-ratio zelf aanhoudt. Lookup over de hele registry op slug (pinned
+ * versies tellen als hetzelfde model); onbekende refs gelden als
+ * input-volgend — het contract is een gpt-image-eigenschap, geen default.
  */
-export function modelMatchesInputAspect(ref: string): boolean {
+export function modelFixedAspects(ref: string): FixedAspect[] | null {
   const slug = ref.split(":")[0];
   for (const feature of Object.values(MODEL_REGISTRY)) {
     for (const entry of Object.values(feature.models)) {
       if (entry.ref.split(":")[0] === slug) {
-        return entry.matchesInputAspect !== false;
+        return entry.fixedAspects ?? null;
       }
     }
   }
-  return true;
+  return null;
+}
+
+/** Houdt het model met deze ref de input-ratio aan? (afgeleide van hierboven) */
+export function modelMatchesInputAspect(ref: string): boolean {
+  return modelFixedAspects(ref) === null;
 }
 
 /**
@@ -254,8 +280,8 @@ export function modelMatchesInputAspect(ref: string): boolean {
  * Alleen deze keys mogen van een gewone gebruiker komen.
  */
 export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
-  stylize: ["nano-banana", "gpt-image-1.5"],
-  generate_background: ["nano-banana", "gpt-image-1.5"],
+  stylize: ["nano-banana", "gpt-image-2"],
+  generate_background: ["nano-banana", "gpt-image-2"],
 };
 
 /**
