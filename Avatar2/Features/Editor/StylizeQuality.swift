@@ -55,6 +55,8 @@ enum StylizeQuality {
 
     /// Prefer the full original for scene styling; fall back to cutout when absent.
     /// When `choice == .cutout`, always use the cutout (explicit user opt-in for low-res originals).
+    /// E55.2: beide paden gecapt op `uploadMaxLongEdge` — het model levert toch
+    /// ~1–1.5 MP terug, dus groter uploaden koopt alleen wachttijd.
     static func effectsStylizeSource(
         portrait: Portrait2?,
         cutout: NSImage,
@@ -62,11 +64,38 @@ enum StylizeQuality {
     ) -> NSImage {
         switch choice {
         case .cutout:
-            return cutout
+            return cappedForUpload(cutout)
         case .original:
-            if let data = portrait?.originalData, let img = NSImage(data: data) { return img }
-            return cutout
+            if let data = portrait?.originalData, let img = NSImage(data: data) {
+                return cappedForUpload(img)
+            }
+            return cappedForUpload(cutout)
         }
+    }
+
+    /// E55.2: cap op de langste zijde vóór upload (server dwingt hetzelfde af
+    /// via `capLongEdge`). Spiegelt de cutout-norm van 2048.
+    static let uploadMaxLongEdge = 2048
+
+    /// Schaal terug tot `maxLongEdge` (alpha behouden); onder de cap komt
+    /// exact dezelfde instance terug. Faalt de context-creatie (exotische
+    /// kleurruimte), dan wint het origineel — de server-cap vangt het dan op.
+    static func cappedForUpload(_ image: NSImage, maxLongEdge: Int = uploadMaxLongEdge) -> NSImage {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return image }
+        let longEdge = max(cg.width, cg.height)
+        guard longEdge > maxLongEdge else { return image }
+        let scale = Double(maxLongEdge) / Double(longEdge)
+        let w = max(1, Int((Double(cg.width) * scale).rounded()))
+        let h = max(1, Int((Double(cg.height) * scale).rounded()))
+        guard let ctx = CGContext(
+            data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+            space: cg.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        ctx.interpolationQuality = .high
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let scaled = ctx.makeImage() else { return image }
+        return NSImage(cgImage: scaled, size: NSSize(width: w, height: h))
     }
 
     /// Hair / Clothes / Face: the current cutout on the canvas.

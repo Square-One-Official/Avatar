@@ -2,10 +2,10 @@ import Foundation
 import XCTest
 @testable import AvatarKit
 
-/// E15.6: de gebruikersgerichte generatie-modelkeuze. Bewijst dat nano-banana
-/// de default is (ongewijzigd gedrag tot iemand bewust schakelt) en dat een
-/// keuze persisteert met de juiste backend-key — exact wat BackendClient.
-/// stylize als `generation_model` meestuurt.
+/// E15.6 + E55.2: de gebruikersgerichte generatie-modelkeuze. Sinds E55.2 is
+/// OpenAI de weergave-default en gaat alléén een expliciete keuze
+/// (`explicit`) als `generation_model` de deur uit — zonder keuze regeert de
+/// server-default (vloot-rollback via STYLIZE_DEFAULT_MODEL zonder app-update).
 @MainActor
 final class GenerationModelStoreTests: XCTestCase {
     private var defaults: UserDefaults!
@@ -20,25 +20,64 @@ final class GenerationModelStoreTests: XCTestCase {
         defaults.removePersistentDomain(forName: suiteName)
     }
 
-    func testDefaultIsNanoBanana() {
+    func testDefaultShowsOpenAIButSendsNothing() {
         let store = GenerationModelStore(defaults: defaults)
-        XCTAssertEqual(store.current, .nanoBanana)
-        // De rawValue is de server-side key die in de request belandt.
-        XCTAssertEqual(store.current.rawValue, "nano-banana")
+        // Settings toont de code-default…
+        XCTAssertEqual(store.current, .openAI)
+        // …maar zonder expliciete keuze gaat er géén veld mee de request in.
+        XCTAssertNil(store.explicit)
     }
 
-    func testSelectingOpenAIPersistsBackendKey() {
-        GenerationModelStore(defaults: defaults).current = .openAI
-        // Nieuwe instance leest dezelfde store: keuze overleeft.
+    func testExplicitChoicePersistsBackendKey() {
+        GenerationModelStore(defaults: defaults).current = .nanoBanana
         let reread = GenerationModelStore(defaults: defaults)
-        XCTAssertEqual(reread.current, .openAI)
-        XCTAssertEqual(reread.current.rawValue, "gpt-image-1.5")
+        XCTAssertEqual(reread.explicit, .nanoBanana)
+        XCTAssertEqual(reread.current, .nanoBanana)
+        // De rawValue is de server-side key die in de request belandt.
+        XCTAssertEqual(reread.explicit?.rawValue, "nano-banana")
     }
 
-    func testRoundTripBackToDefault() {
+    func testChoosingTheDefaultIsStillExplicit() {
+        // Wie bewust OpenAI kiest, blijft OpenAI sturen — ook als de
+        // server-default ooit via env terugflipt naar nano.
         let store = GenerationModelStore(defaults: defaults)
         store.current = .openAI
-        store.current = .nanoBanana
-        XCTAssertEqual(GenerationModelStore(defaults: defaults).current, .nanoBanana)
+        XCTAssertEqual(GenerationModelStore(defaults: defaults).explicit, .openAI)
+        XCTAssertEqual(store.explicit?.rawValue, "gpt-image-1.5")
+    }
+
+    func testUnknownStoredValueFallsBackToServerDefault() {
+        defaults.set("model-van-de-toekomst", forKey: "generation.model")
+        let store = GenerationModelStore(defaults: defaults)
+        XCTAssertNil(store.explicit)
+        XCTAssertEqual(store.current, .openAI)
+    }
+
+    // MARK: - Request-encoding (E55.2)
+
+    /// Zonder keuze moet `generation_model` volledig uit de JSON verdwijnen —
+    /// `null` zou server-side ook werken maar is contract-ruis; afwezig is
+    /// het bewijs dat de server-default regeert.
+    func testStylizeBodyOmitsGenerationModelWhenNil() throws {
+        let body = BackendClient.StylizeBody(
+            storageKey: "u/x.png", generationModel: nil, modelOverride: nil,
+            cutoutW: nil, cutoutH: nil, style: "balloon", hairPreset: nil,
+            hairPrompt: nil, clothesPreset: nil, clothesPrompt: nil,
+            facePreset: nil, softSource: nil, preserveFraming: true
+        )
+        let json = String(decoding: try JSONEncoder().encode(body), as: UTF8.self)
+        XCTAssertFalse(json.contains("generation_model"), "nil-keuze moet het veld weglaten, kreeg \(json)")
+        XCTAssertTrue(json.contains("\"style\":\"balloon\""))
+    }
+
+    func testStylizeBodyCarriesExplicitChoice() throws {
+        let body = BackendClient.StylizeBody(
+            storageKey: "u/x.png", generationModel: "nano-banana", modelOverride: nil,
+            cutoutW: nil, cutoutH: nil, style: "balloon", hairPreset: nil,
+            hairPrompt: nil, clothesPreset: nil, clothesPrompt: nil,
+            facePreset: nil, softSource: nil, preserveFraming: nil
+        )
+        let json = String(decoding: try JSONEncoder().encode(body), as: UTF8.self)
+        XCTAssertTrue(json.contains("\"generation_model\":\"nano-banana\""))
     }
 }

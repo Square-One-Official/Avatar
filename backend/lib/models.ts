@@ -104,9 +104,13 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
   // drie zijn officiële, unversioned slugs — geen pinning nodig. De
   // payload-verschillen per arm leven in stylizeInputFor (lib/replicate.ts).
   stylize: {
-    // Voorlopig; de bakeoff-uitkomst bepaalt het echte default (mag per
-    // feature verschillen — stijl ≠ kleding ≠ haar, zie E09.1).
-    defaultModel: "nano-banana",
+    // E55.2 (besluit Thierry 2026-08-02): gpt-image-1.5 is de default —
+    // beste stijlmatch, zeker met stijlreferenties; het E09.1-bezwaar
+    // (herkaderen) is opgelost door het E55.1-aspect-contract. Nieuwe
+    // clients sturen `generation_model` alleen bij een expliciete keuze,
+    // dus deze default regeert de vloot; env-override hieronder
+    // (STYLIZE_DEFAULT_MODEL) is de rollback-hendel zonder app-update.
+    defaultModel: "gpt-image-1.5",
     models: {
       "nano-banana": {
         ref: "google/nano-banana",
@@ -191,6 +195,33 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
   },
 };
 
+/**
+ * E55.2: de stylize-default is env-stuurbaar. Alleen keys uit de
+ * stylize-whitelist tellen; al het andere valt luid terug op de gegeven
+ * code-default. Pure functie zodat models-smoke alle takken kan bewijzen
+ * zonder env-gymnastiek.
+ */
+export function resolveStylizeDefaultModel(
+  raw: string | undefined,
+  models: Record<string, ModelEntry>,
+  fallback: string,
+): string {
+  if (!raw) return fallback;
+  if (models[raw]) return raw;
+  console.warn(
+    `[models] STYLIZE_DEFAULT_MODEL "${raw}" niet in de stylize-whitelist — default blijft ${fallback}`,
+  );
+  return fallback;
+}
+
+// Vloot-rollback-hendel (E55.8): `STYLIZE_DEFAULT_MODEL=nano-banana` + redeploy
+// zet niet-kiezers terug zonder app-update. Ongezet = code-default hierboven.
+MODEL_REGISTRY.stylize.defaultModel = resolveStylizeDefaultModel(
+  process.env.STYLIZE_DEFAULT_MODEL,
+  MODEL_REGISTRY.stylize.models,
+  MODEL_REGISTRY.stylize.defaultModel,
+);
+
 /** Resolve a feature's default model ref. */
 export function defaultModelRef(feature: CloudFeature): string {
   const reg = MODEL_REGISTRY[feature];
@@ -219,8 +250,8 @@ export function modelMatchesInputAspect(ref: string): boolean {
  * Door gebruikers kiesbare generatie-modellen per feature (E15.6). I.t.t.
  * `model_override` (dev-only, hele whitelist) is dit een kleine, openbare
  * keuze: de Settings-rij "Generation model" laat de gebruiker schakelen
- * tussen nano-banana (default) en het OpenAI-model. Alleen deze keys mogen
- * van een gewone gebruiker komen.
+ * tussen het OpenAI-model (stylize-default sinds E55.2) en nano-banana.
+ * Alleen deze keys mogen van een gewone gebruiker komen.
  */
 export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
   stylize: ["nano-banana", "gpt-image-1.5"],
