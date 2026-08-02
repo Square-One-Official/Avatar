@@ -33,10 +33,20 @@ de effects-scope van E52.2 (prewarm) over.
 ---
 
 ## 55.1 — Backend: engine-agnostische aspect-contract (pad → generate → crop)
-- status: in_progress
+- status: done
 - owner: INFRA (2026-08-02)
 - team: INFRA
 - blockedBy: —
+- Result: pad→generate→crop live in `/v1/stylize` (branch `v2/e55-55.1`, merge
+  9797d46). `image.ts`: `nearestFixedAspect`/`padToAspect`/`cropBackFromPad`/
+  `capLongEdge` (input-cap 2048); `models.ts`: `matchesInputAspect`-capability
+  (gpt-image false) + `modelMatchesInputAspect(ref)`; `stylize.ts`: pad vóór,
+  proportionele crop-back ná de call, `model_ms`/`pad`/`refs` in de
+  stylize_dims-log, getypte 422 `generation_refused`; `replicate.ts` deelt de
+  ratio-keuze. Schema-hercheck 2026-08-02: gpt-image-1.5 nog steeds alleen
+  1:1|3:2|2:3 → volledige route nodig. image-smoke: 6 nieuwe assertion-blokken
+  (canvas-ratio, grijs-pad, no-op-paden, crop-back ±1% over alle drie ratio's,
+  oneven maten, cap). tsc groen, `build-v2.sh` alles groen.
 
 Sluitsteen: fixt zorg 2 (plaatsing) én de gpt-image-herkadering uit zorg 1.
 **Contract: response-aspect == request-aspect voor élke engine (±1px).**
@@ -61,9 +71,10 @@ Scope:
   --noEmit` groen, beide app-targets bouwen, Result-regel.
 
 ## 55.2 — Default-flip: server-governed default, client stuurt alleen expliciete keuze
-- status: backlog
+- status: in_progress
+- owner: INFRA (2026-08-02)
 - team: INFRA
-- blockedBy: 55.1 (flippen vóór het aspect-contract = elke generatie een transform-reset)
+- blockedBy: 55.1 (done)
 
 De client stuurt vandaag ALTIJD `generation_model` (code-default `.nanoBanana`),
 dus een backend-flip alleen doet niets. Herontwerp voor terugrolbaarheid:
