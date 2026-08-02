@@ -31,6 +31,20 @@ final class DSEditPanelTests: XCTestCase {
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)
     }
 
+    // E55.4 — header-accessoireslot: de nieuwe primary init rendert mét
+    // accessoire; de EmptyView-convenience (hierboven) dekt de back-compat.
+    @MainActor
+    func testEditPanelRendertMetHeaderAccessory() {
+        let view = DSEditPanel(
+            title: "Effects",
+            credits: "⚡4",
+            headerAccessory: {
+                DSGhostButton("Create", icon: Image(systemName: "plus"), size: .small) {}
+            }
+        ) { Text("inhoud") }
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
+
     @MainActor
     func testContainerRendertMetEnZonderActiefPaneel() {
         for tool in [Tool?.none, .effects] {
