@@ -410,14 +410,16 @@ betere feedback en een cancel — niet via het medium-tier. Gebouwd:
 - blockedBy: 55.7-go (55.3/55.4/55.6 liften mee op de volgende app-build,
   onafhankelijk van backend-deploy)
 
-**Voorwerk Thierry vóór de seed-run (uit het 55.5-dry-run-rapport):**
-- Balloon: thumbnail in `Balloon/Thumbnail/` zetten.
-- Flowers + Hairy: thumbnail toevoegen én de losse refs in de map-root naar
-  `References/` verplaatsen (Flowers: de celebrity-ref er NIET in — de kit
-  sloot 'm bewust uit; Hairy: GIF's worden eerste-frame-PNG, check even).
-- Sticker: 2 losse refs in de map-root → `References/` (of kit-fallback laten).
-- Windy/3D: >4 refs — de importer capt op 4 en meldt welke hij dropt; volgorde
-  sturen = bestandsnamen hernummeren.
+**Voorwerk Thierry: ✅ afgerond (2026-08-03)** — alle 6 originele stijlen
+hebben thumbnail + geordende refs. **Plus 3 nieuwe stijlen aangeleverd**
+(Blue Drawing / Colored Lines / Urban Chic, orders 16–18): prompts door AI
+geschreven op basis van de referenties en toegevoegd aan effects-seed.json;
+refs-submapvarianten ("Reference"/"Refeferences") worden herkend; thumbnails
+volgen nog → de importer seedt ze zónder (app toont sparkles-placeholder,
+besluit Thierry 2026-08-03; latere thumbnail = `--force`-her-run of admin-UI).
+Windy/3D hebben >4 refs — de importer capt op 4 en meldt welke hij dropt;
+volgorde sturen = bestandsnamen hernummeren. Dry-run 2026-08-03: 9/9
+seedbaar, 0 blockers.
 
 Checklist (volgorde is bindend):
 1. **Bakeoff eerst** (55.7): `effects-bakeoff.ts` draaien (commando daar),
@@ -430,8 +432,11 @@ Checklist (volgorde is bindend):
    custom-thumb-variant, fail-loud thumbnailVariant, 422-refusal-mapping.
 4. Admin-deploy (avatar-admin, `.vercelignore`-swap) mét de 837498f-port;
    probe vóór seeden zit in de importer (--apply doet 'm automatisch).
-5. Seed-run: `bash backend/scripts/run-import-effects.sh` (env-pull + dry-run
-   + bevestiging + optionele deactivatie van clay/wood/3d/scribble).
+5. Seed-run: `PAYLOAD_API_KEY=… bash backend/scripts/run-import-effects.sh`
+   (dry-run + bevestiging + optionele deactivatie van clay/wood/3d/scribble).
+   **Credential-les (2026-08-03): PAYLOAD_API_KEY is Vercel-Sensitive en komt
+   uit `vercel env pull` LEEG terug** — haal 'm uit de Payload-admin
+   (Users → jouw user → API Key) of 1Password; de wrapper legt dit ook uit.
    **Vóór elke app-release met deze E55-build**: de app-fallback kent nu de
    zes nieuwe keys — seed dus eerst, anders geeft offline-fallback-generatie
    in het venster ertussen een 400 op die keys (edge-sweep-notitie).

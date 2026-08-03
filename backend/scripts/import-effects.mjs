@@ -131,7 +131,19 @@ async function normalizeImage(bytes, { maxEdge, preferPng }) {
   return { bytes: await resized.jpeg({ quality: 90 }).toBuffer(), ext: "jpg", mime: "image/jpeg" };
 }
 
+/** Eerste submap die met "ref" begint (References/Reference/Refeferences/…). */
+async function refSubdir(folderPath) {
+  try {
+    const entries = await readdir(folderPath, { withFileTypes: true });
+    const hit = entries.find((e) => e.isDirectory() && /^ref/i.test(e.name));
+    return hit ? join(folderPath, hit.name) : join(folderPath, "References");
+  } catch {
+    return join(folderPath, "References");
+  }
+}
+
 async function listImages(dir) {
+  if (!dir) return null;
   try {
     const entries = await readdir(dir);
     const files = [];
@@ -234,7 +246,10 @@ for (const effect of seed.effects) {
   if (!folder) notes.push(`geen curatiemap gevonden (kandidaten: ${effect.label}/${effect.key})`);
   const folderPath = folder ? join(SOURCE, folder) : null;
 
-  const folderRefs = folderPath ? await listImages(join(folderPath, "References")) : null;
+  // Ref-submap: de curatiemap is met de hand gegroeid — tolereer varianten
+  // ("References", "Reference", "Refeferences", "Refs") door de eerste
+  // submap te pakken die met "ref" begint (case-insensitive).
+  const folderRefs = folderPath ? await listImages(await refSubdir(folderPath)) : null;
   const folderThumbs = folderPath ? await listImages(join(folderPath, "Thumbnail")) : null;
   const loose = folderPath ? (await listImages(folderPath)) ?? [] : [];
   if (loose.length > 0) {
@@ -274,9 +289,13 @@ for (const effect of seed.effects) {
     notes.push(`${f.name} is een GIF — eerste frame wordt als PNG geüpload; check het resultaat`);
   }
 
-  // Thumbnail: verplicht uit de curatiemap.
+  // Thumbnail: uit de curatiemap. Ontbreekt 'ie (besluit Thierry 2026-08-03:
+  // nieuwe stijlen mogen vóór hun thumbnail live), dan seeden we zónder —
+  // de app toont het sparkles-placeholder tot een --force-her-run 'm koppelt.
   const thumbFile = folderThumbs?.[0] ?? null;
-  if (!thumbFile) problems.push(`geen thumbnail in ${folder ?? "?"}/Thumbnail/`);
+  if (!thumbFile) {
+    notes.push("geen thumbnail — app toont sparkles-placeholder; koppel later via --force of de admin-UI");
+  }
   if ((folderThumbs?.length ?? 0) > 1) {
     notes.push(`meerdere thumbnails — eerste gekozen: ${thumbFile.name}`);
   }
@@ -330,15 +349,21 @@ for (const effect of seed.effects) {
     console.log(`  ref ${ref.name} -> media ${doc.id}`);
   }
 
-  const thumbRaw = await readFile(thumbFile.path);
-  const thumbNorm = await normalizeImage(thumbRaw, { maxEdge: THUMB_MAX_EDGE, preferPng: true });
-  const thumbDoc = await uploadMedia(
-    thumbNorm.bytes,
-    `effect-${effect.key}-thumbnail.${thumbNorm.ext}`,
-    `${effect.label} effect thumbnail`,
-    thumbNorm.mime,
-  );
-  console.log(`  thumbnail -> media ${thumbDoc.id}`);
+  let thumbId = null;
+  if (thumbFile) {
+    const thumbRaw = await readFile(thumbFile.path);
+    const thumbNorm = await normalizeImage(thumbRaw, { maxEdge: THUMB_MAX_EDGE, preferPng: true });
+    const thumbDoc = await uploadMedia(
+      thumbNorm.bytes,
+      `effect-${effect.key}-thumbnail.${thumbNorm.ext}`,
+      `${effect.label} effect thumbnail`,
+      thumbNorm.mime,
+    );
+    thumbId = thumbDoc.id;
+    console.log(`  thumbnail -> media ${thumbId}`);
+  } else {
+    console.log("  thumbnail: overgeslagen (app-placeholder tot de curatiemap er een heeft)");
+  }
 
   const body = {
     key: effect.key,
@@ -346,7 +371,9 @@ for (const effect of seed.effects) {
     prompt: effect.prompt,
     order: effect.order,
     active: true,
-    thumbnail: thumbDoc.id,
+    // Zonder thumbnail het veld niet meesturen: een --force-her-run zonder
+    // nieuwe thumbnail mag een eerder gekoppelde ook niet WISSEN.
+    ...(thumbId ? { thumbnail: thumbId } : {}),
     styleReferences: refIds.map((id) => ({ image: id })),
   };
   const result = existingDoc
