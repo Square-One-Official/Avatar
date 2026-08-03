@@ -529,7 +529,7 @@ struct ShellView: View {
                 onApplyResult: { await model.applyEffectResult($0) },
                 onApplyAlphaPreserving: { await model.applyEffectResult($0, preserveSourceAlpha: true) },
                 onApplyIsolated: { await model.applyIsolatedResult($0) },
-                onIsolateSubject: { try await model.isolateSubject($0) },
+                onIsolateSubject: { try await model.isolateSubject($0, preferring: $1) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
                 onRename: { model.isShowingRename = true },

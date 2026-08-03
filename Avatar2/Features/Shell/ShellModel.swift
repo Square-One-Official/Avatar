@@ -762,18 +762,23 @@ final class ShellModel {
 
     /// Restore-body path: explicit re-isolation without fallback — throws on failure
     /// so callers can surface an error instead of silently applying the background.
-    func isolateSubject(_ image: NSImage) async throws -> NSImage {
-        try await reIsolateSubject(image)
+    /// `preferring` = one-shot engine-override (Enhance-chip "This image only");
+    /// nil = de globale voorkeur (zelfde als import).
+    func isolateSubject(_ image: NSImage, preferring override: CutoutEngineKind? = nil) async throws -> NSImage {
+        try await reIsolateSubject(image, preferring: override)
     }
 
     /// E24.30: her-isoleer het onderwerp uit een styled (vol) beeld met de
-    /// lokale router (zelfde engine-voorkeur als import) → transparantie terug.
-    private func reIsolateSubject(_ image: NSImage) async throws -> NSImage {
+    /// lokale router (zelfde engine-voorkeur als import, tenzij de caller een
+    /// one-shot override meegeeft) → transparantie terug.
+    private func reIsolateSubject(
+        _ image: NSImage, preferring override: CutoutEngineKind? = nil
+    ) async throws -> NSImage {
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return image
         }
-        let preferred: CutoutEngineKind =
-            PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
+        let preferred: CutoutEngineKind = override
+            ?? (PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision)
         let cut = try await router.cutout(cg, preferring: preferred)
         return nsImage(from: cut)
     }

@@ -91,7 +91,9 @@ struct EditorView: View {
     var onApplyIsolated: (NSImage) async -> Void = { _ in }
     /// Restore to original: re-run cutout engine on the original photo; throws so
     /// the caller can show an error rather than silently leaking the background.
-    var onIsolateSubject: (NSImage) async throws -> NSImage = { $0 }
+    /// Tweede parameter = one-shot engine-override (Enhance-chip "This image
+    /// only"); nil = de globale voorkeur.
+    var onIsolateSubject: (NSImage, CutoutEngineKind?) async throws -> NSImage = { img, _ in img }
     /// E22.3: goedkope live-preview (alleen canvas) voor de color-sliders.
     var onPreview: (NSImage) -> Void = { _ in }
     /// E24.14: commit van de niet-destructieve Adjust-laag (params persisteren
@@ -469,7 +471,7 @@ struct EditorView: View {
         let before = NSImage(data: portraitModel.cutoutData)
         Task { @MainActor in
             do {
-                let restored = try await onIsolateSubject(original)
+                let restored = try await onIsolateSubject(original, nil)
                 // Al geïsoleerd → direct opslaan (geen tweede matte-pass).
                 await onApplyIsolated(restored)
                 if let before {
@@ -501,12 +503,15 @@ struct EditorView: View {
     /// transparant wordt — altijd on-device en gratis, met de actieve engine
     /// (ORMBG = "High quality" indien geïnstalleerd, anders Apple Vision =
     /// "Regular quality"). Herstelt o.a. een achtergrond na een Effect.
-    private func runRemoveBackground() {
+    /// `engine` = one-shot override vanuit de chip ("Regular quality · This image
+    /// only" draait Vision zonder de globale voorkeur te wijzigen); nil = actieve
+    /// engine.
+    private func runRemoveBackground(engine: CutoutEngineKind? = nil) {
         guard !isRemovingBackground, let portraitModel else { return }
-        runLocalRemoveBackground(portraitModel: portraitModel)
+        runLocalRemoveBackground(portraitModel: portraitModel, engine: engine)
     }
 
-    private func runLocalRemoveBackground(portraitModel: Portrait2) {
+    private func runLocalRemoveBackground(portraitModel: Portrait2, engine: CutoutEngineKind? = nil) {
         guard !isRemovingBackground else { return }
         // Bron-keuze voor de matte = de beste VOLLE-kleur bron van het HUIDIGE
         // onderwerp, daarna scherp her-isoleren met de actieve engine:
@@ -548,7 +553,7 @@ struct EditorView: View {
                 entitlement?.dismissWorkingToast()
             }
             do {
-                let cut = try await onIsolateSubject(source)
+                let cut = try await onIsolateSubject(source, engine)
                 // Direct opslaan: `cut` is al geïsoleerd, dus NIET via onApplyResult
                 // (die zou 'm een tweede keer matten → achtergrond terug in het haar).
                 await onApplyIsolated(cut)
@@ -601,7 +606,7 @@ struct EditorView: View {
             // parts (arms, shoulders) into the current cutout; BiRefNet re-extracts
             // alpha.
             onFillBody: runFillBody,
-            onRemoveBackground: runRemoveBackground,
+            onRemoveBackground: { runRemoveBackground(engine: $0) },
             entitlement: entitlement,
             presentation: model.presentation,
             onAppleEdit: runAppleIntelligenceEdit,

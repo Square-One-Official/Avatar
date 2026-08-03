@@ -69,9 +69,11 @@ struct EditColorPanel: View {
     // original" (re-isolate, een andere functie).
     var onFillBody: () -> Void = {}
     /// Verwijder de achtergrond: her-isoleer het onderwerp (altijd on-device).
-    /// Draait met de actieve engine — ORMBG als "High quality" geïnstalleerd is,
-    /// anders Apple Vision ("Regular quality"). Nooit een credit.
-    var onRemoveBackground: () -> Void = {}
+    /// Parameter = one-shot engine-override: nil draait de actieve engine (ORMBG
+    /// als "High quality" geïnstalleerd is, anders Apple Vision); `.vision` is de
+    /// per-beeld "Regular quality"-keuze uit het chip-menu die de globale
+    /// voorkeur NIET wijzigt. Nooit een credit.
+    var onRemoveBackground: (CutoutEngineKind?) -> Void = { _ in }
     /// Tier 2: Image Playground bewerken met huidige cutout als seed.
     var entitlement: EntitlementModel? = nil
     /// E53.7: host voor de chip-dropdown-state (zie `openMenu`).
@@ -376,10 +378,14 @@ struct EditColorPanel: View {
         }
     }
 
-    /// Remove background — altijd on-device, nooit een credit. Met het High-
-    /// quality-model (ORMBG) geïnstalleerd is dit één simpele knop; zonder het
-    /// model kiest de gebruiker per keer Regular (Vision, direct) of High
-    /// (eenmalige download). Tijdens downloaden toont de chip voortgang.
+    /// Remove background — altijd on-device, nooit een credit. De chip houdt
+    /// ALTIJD z'n chevron-menu: zonder het model kiest de gebruiker per keer
+    /// Regular (Vision, direct) of High (eenmalige download die ook de globale
+    /// voorkeur zet); mét het High-quality-model (ORMBG) actief biedt het menu
+    /// naast High een one-shot "Regular quality · This image only" — ORMBG wint
+    /// niet op élk haar (E02.2: backlit-slierten juist bij Vision beter), dus de
+    /// per-beeld escape blijft nodig zonder de globale voorkeur om te zetten.
+    /// Tijdens downloaden toont de chip voortgang.
     /// High quality (ORMBG) actief = de import/cutout draait er al op. Reactief op
     /// de gedeelde voorkeur, dus consistent met welke engine de cutout écht kiest.
     private var highQualityActive: Bool {
@@ -390,24 +396,12 @@ struct EditColorPanel: View {
     private var removeBackgroundMenuChip: some View {
         if case .downloading(let fraction) = hiFiModel.phase {
             cutoutDownloadingChip(fraction)
-        } else if highQualityActive {
-            cutoutSimpleChip
         } else {
             cutoutChoiceChip
         }
     }
 
-    /// Model actief → één gratis knop die meteen vrijstaand maakt (High quality).
-    private var cutoutSimpleChip: some View {
-        Button { onRemoveBackground() } label: {
-            cutoutChipLabel(trailingIcon: nil)
-        }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-        .fixedSize()
-    }
-
-    /// Model nog niet gedownload → chevron opent de Regular/High-keuze.
+    /// Chevron opent het kwaliteitsmenu (variant hangt af van `highQualityActive`).
     private var cutoutChoiceChip: some View {
         Button { toggleMenu(.removeBackground) } label: {
             cutoutChipLabel(trailingIcon: "chevron.down")
@@ -448,20 +442,36 @@ struct EditColorPanel: View {
         .background(DSColor.Background.neutral, in: Capsule())
     }
 
+    @ViewBuilder
     private var removeBackgroundMenu: some View {
-        DSContextMenuPanel(minWidth: 230) {
-            DSMenuRow("Regular quality", icon: "bolt", shortcut: "Instant") {
-                openMenu = nil
-                onRemoveBackground()
+        if highQualityActive {
+            // Model actief: High is de default (globale voorkeur), Regular blijft
+            // als one-shot per beeld beschikbaar — raakt de voorkeur NIET aan.
+            DSContextMenuPanel(minWidth: 230) {
+                DSMenuRow("High quality", icon: "sparkles", shortcut: "Current") {
+                    openMenu = nil
+                    onRemoveBackground(nil)
+                }
+                DSMenuRow("Regular quality", icon: "bolt", shortcut: "This image only") {
+                    openMenu = nil
+                    onRemoveBackground(.vision)
+                }
             }
-            DSMenuRow("High quality", icon: "sparkles", shortcut: "Sharper hair · 78 MB") {
-                openMenu = nil
-                // Download het model (voortgang op de chip), zet het meteen als
-                // actieve engine — ook latere imports gebruiken het dan — en maak
-                // het beeld vrijstaand zodra het binnen is.
-                hiFiModel.download {
-                    PrivacyPreferences2.shared.engine = .downloadedModel
-                    onRemoveBackground()
+        } else {
+            DSContextMenuPanel(minWidth: 230) {
+                DSMenuRow("Regular quality", icon: "bolt", shortcut: "Instant") {
+                    openMenu = nil
+                    onRemoveBackground(nil)
+                }
+                DSMenuRow("High quality", icon: "sparkles", shortcut: "Sharper hair · 78 MB") {
+                    openMenu = nil
+                    // Download het model (voortgang op de chip), zet het meteen als
+                    // actieve engine — ook latere imports gebruiken het dan — en maak
+                    // het beeld vrijstaand zodra het binnen is.
+                    hiFiModel.download {
+                        PrivacyPreferences2.shared.engine = .downloadedModel
+                        onRemoveBackground(nil)
+                    }
                 }
             }
         }
