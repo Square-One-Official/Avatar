@@ -277,6 +277,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureCompedCredits(user.id, override.monthlyCredits);
   }
 
+  // Modelkeuze VÓÓR de prompt-opbouw (E55-uitrol-fix): de refs-beslissing in
+  // de style-tak hangt van de engine af. Precedentie ongewijzigd:
+  //   1. E01.10 dev-only `model_override` (hele whitelist) — wint altijd;
+  //   2. E15.6 gebruikersgerichte `generation_model` (nano / OpenAI);
+  //   3. anders de feature-default (gpt-image-2, env-overridable).
+  let modelRef: string | null;
+  try {
+    modelRef = resolveModelOverride("stylize", req.body?.model_override, isDevUser);
+  } catch (e) {
+    if (e instanceof UnknownModelOverrideError) {
+      res.status(400).json({ error: "unknown_model_override" });
+      return;
+    }
+    throw e;
+  }
+  if (!modelRef) {
+    modelRef = resolveGenerationModel("stylize", req.body?.generation_model);
+  }
+  // E55-edge-sweep: de default-flip geldt voor de Effects-intents; de
+  // edit-intents (hair/clothes/face) houden hun E09.1-winnaar nano-banana.
+  const isEditIntent = Boolean(
+    (req.body?.hair_preset ?? "") || (req.body?.hair_prompt ?? "") ||
+    (req.body?.clothes_preset ?? "") || (req.body?.clothes_prompt ?? "") ||
+    (req.body?.face_preset ?? ""),
+  );
+  if (!modelRef && isEditIntent) {
+    modelRef = MODEL_REGISTRY.stylize.models["nano-banana"].ref;
+  }
+  const effectiveRef = modelRef ?? defaultModelRef("stylize");
+  // E55.7/E54-les, live bevestigd bij de uitrol (2026-08-03): CMS-stijl-
+  // referenties helpen gpt-image maar SCHADEN nano-banana (stijltrouw zakt én
+  // nano volgt de ratio van een referentie i.p.v. de input — 1733x1155 in,
+  // 896x1152 uit). Oude app-builds sturen expliciet "nano-banana" mee, dus
+  // deze guard is nodig zolang die bestaan; een expliciete nano-keuze in
+  // Settings hoort 'm ook. Custom effects vallen hier bewust BUITEN: hun ene
+  // referentie is integraal onderdeel van de E34-flow (CUSTOM_STYLE_TEMPLATE).
+  const engineAcceptsStyleRefs = effectiveRef.startsWith("openai/gpt-image");
+
   // Prompt-bepaling, in volgorde: een Effects-`style` (E09.2), een hair-intent
   // (E11.2, `hair_preset`/`hair_prompt`), een clothes-intent (E10.4), een
   // face-intent (E32.1, `face_preset` — server-gemapt), of een vrij `prompt`
@@ -337,9 +375,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     prompt = mapped;
     // E54: CMS-stijlreferenties meesturen als visuele stijlgids naast de
-    // prompt. De rolclausule alléén toevoegen als er echt referenties
-    // meegaan — anders verwijst de prompt naar afbeeldingen die er niet zijn.
-    if (effect && effect.styleReferenceUrls.length > 0) {
+    // prompt — maar alléén op engines waar ze aantoonbaar helpen (gpt-image;
+    // zie de engineAcceptsStyleRefs-guard hierboven). De rolclausule alléén
+    // toevoegen als er echt referenties meegaan.
+    if (effect && effect.styleReferenceUrls.length > 0 && engineAcceptsStyleRefs) {
       styleReferenceDataUrls = await fetchStyleReferences(effect.styleReferenceUrls);
       if (styleReferenceDataUrls.length > 0) {
         prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
@@ -412,37 +451,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const inputBytes = await resolveImageInput(req, res, user.id);
   if (!inputBytes) return;
 
-  // Modelkeuze, in volgorde van precedentie:
-  //   1. E01.10 dev-only `model_override` (hele whitelist) — wint altijd;
-  //   2. E15.6 gebruikersgerichte `generation_model` (nano / OpenAI);
-  //   3. anders de feature-default (nano-banana).
-  let modelRef: string | null;
-  try {
-    modelRef = resolveModelOverride("stylize", req.body?.model_override, isDevUser);
-  } catch (e) {
-    if (e instanceof UnknownModelOverrideError) {
-      res.status(400).json({ error: "unknown_model_override" });
-      return;
-    }
-    throw e;
-  }
-  if (!modelRef) {
-    modelRef = resolveGenerationModel("stylize", req.body?.generation_model);
-  }
-  // E55-edge-sweep: de default-flip (E55.2, "alle effecten") geldt voor de
-  // Effects-intents (style / custom_effect / dev-prompt). De edit-intents
-  // (hair/clothes/face) houden hun E09.1-bakeoff-winnaar nano-banana als
-  // default — "alléén het doel wijzigt, rest pixel-identiek" was precies het
-  // criterium waarop nano daar won; de registry-default flippen zou die
-  // features ongevraagd mee-migreren. Een expliciete Settings-keuze
-  // (generation_model) en de dev-override winnen hierboven al.
-  const isEditIntent = Boolean(
-    hairPreset || hairPrompt || clothesPreset || clothesPrompt || facePreset,
-  );
-  if (!modelRef && isEditIntent) {
-    modelRef = MODEL_REGISTRY.stylize.models["nano-banana"].ref;
-  }
-
   try {
     await ensureUser(user.id);
 
@@ -460,7 +468,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // proportioneel teruggesneden. Response-ratio == input-ratio, altijd. De
     // set komt per model uit de registry (2.0 kent er meer dan 1.5, dus padt
     // dunner tot niets).
-    const effectiveRef = modelRef ?? defaultModelRef("stylize");
     const fixedAspects = modelFixedAspects(effectiveRef);
     let pad: AspectPad | null = null;
     let modelPng = flattened;
