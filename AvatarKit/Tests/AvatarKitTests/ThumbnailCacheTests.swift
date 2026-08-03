@@ -71,8 +71,11 @@ final class ThumbnailCacheTests: XCTestCase {
         XCTAssertNotNil(first)
         XCTAssertEqual(counter.count, 1)
 
-        // Warm: memory-hit — geen tweede download.
-        XCTAssertNotNil(cache.cachedImage(for: Self.url))
+        // Warm: memory- of disk-hit — geen tweede download. Bewust géén
+        // assert op `cachedImage`: NSCache mag onder geheugendruk elk moment
+        // evicten (de CI-zware suite ervóór triggerde dat af en toe — flaky
+        // sinds E32.2); het echte contract is "één download", de disk-laag
+        // vangt een geëvicte memory-entry op.
         let second = await cache.image(for: Self.url)
         XCTAssertNotNil(second)
         XCTAssertEqual(counter.count, 1)
