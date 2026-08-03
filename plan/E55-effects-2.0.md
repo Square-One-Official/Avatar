@@ -405,10 +405,22 @@ betere feedback en een cancel — niet via het medium-tier. Gebouwd:
   grens); build-v2.sh groen.
 
 ## 55.8 — Prod-uitrol (voorbereid door INFRA, uitgevoerd door Thierry)
-- status: ready — **alle stappen gated op Thierry**; code op v2-main staat klaar
+- status: done (uitgevoerd 2026-08-03, Thierry + agent samen)
 - team: INFRA
-- blockedBy: 55.7-go (55.3/55.4/55.6 liften mee op de volgende app-build,
-  onafhankelijk van backend-deploy)
+- Result: volledige uitrol live. sql/015 + 018 (Thierry, SQL-editor);
+  backend-deploy (medium-default, budgetten, aspect-contract, custom effects,
+  E32.4, pro-access — 39s build, Ready); admin-deploy (837498f-port,
+  geverifieerd 307→/mfa). **Twee verrassingen onderweg, beide gefixt:**
+  (1) élke admin-detailpagina was zwart — prod miste de Messages- én
+  banner_presets-tabellen + twee rels-kolommen uit het push:true-tijdperk
+  (Messages-CMS bleek nooit functioneel geweest op prod) → sql/019
+  (catch-up-DDL uit offline snapshot, idempotent, toegepast); (2) Supabase's
+  session-pooler (15) verzadigde kort na de deploy (EMAXCONNSESSION) →
+  importer-calls hebben nu 3-poging-backoff. Seed-run: 9/9 stijlen live
+  (orders 10–18; 6 met render-CDN-thumbnails, 3 nieuwe op placeholder),
+  oude 4 gedeactiveerd — prod-verificatie via /v1/effects ✓. Rest: app-smoke
+  door Thierry in de lopende build; thumbnails voor de 3 nieuwe stijlen
+  later via `--force`-her-run; app-release zelf loopt via GO-NO-GO-2.0.
 
 **Voorwerk Thierry: ✅ afgerond (2026-08-03)** — alle 6 originele stijlen
 hebben thumbnail + geordende refs. **Plus 3 nieuwe stijlen aangeleverd**
