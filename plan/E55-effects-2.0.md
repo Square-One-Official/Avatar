@@ -325,16 +325,16 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
     prompt). Flowers-resultaten zónder refs zijn magazine-waardig.
   - **Kosten:** high $0.128 / medium $0.047 per beeld (nano $0.039);
     matrix + smoke ≈ $4.
-  **Besluitpunten Thierry (55.8-gate):**
-  1. **Kwaliteitstier**: aanbeveling = **medium als default** (visueel ≈ high
-     op kaartformaat in 5/6 stijlen; ~1 min past bij de nieuwe toast en
-     medium ≈ nano-kostenpariteit) — high evt. later als premium-arm (E14.3-
-     precedent 7cr, "Best quality — takes ~3 min"). Alternatief: high houden →
-     maxDuration 300 + STYLIZE_TIMEOUT_MS ~250s + toast-verwachting 180s.
-  2. **Tarief**: bij medium kan vlak 4cr blijven (marge ≈ nano).
-  3. **Flowers**: prompt-only seeden (refs weglaten) of nieuwe refs cureren.
-  4. Budget-/toastwaarden bij de deploy: medium-pad → STYLIZE_TIMEOUT_MS
-     160s, maxDuration 180, `expectedGenerationSeconds` 90.
+  **Besluiten Thierry (2026-08-03) — geïmplementeerd:**
+  1. **Medium als default** ("we maken profielfoto's, die worden klein
+     getoond") — `stylizeInputFor` gpt-arm default `quality: medium`;
+     `gptQuality`-hendel blijft voor bakeoffs/een latere premium-arm (E14.3-
+     precedent 7cr "Best quality — takes ~3 min").
+  2. **Tarief blijft vlak 4cr** (medium ≈ nano-kosten).
+  3. **Flowers prompt-only** — hard in de importer (`PROMPT_ONLY_KEYS`),
+     zodat een her-run de moderatie-triggerende refs nooit terugkoppelt.
+  4. Budgetten geijkt op de meting: `STYLIZE_TIMEOUT_MS` 160s, stylize-
+     `maxDuration` 180 (vercel.json), toast-`expectedGenerationSeconds` 85.
   Harness-extra's: `--timeout`-meethendel (stylizeEdit `timeoutMs`, prod
   ongewijzigd) + eerlijke timeout-errormessage; results.json draagt het model.
 - blockedBy: 55.1 (pad/crop in de callshape) + 55.5-dry-run-assets (prompts +

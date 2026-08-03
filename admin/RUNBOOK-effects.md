@@ -66,8 +66,12 @@ Supabase-URL → delete) en weigert te seeden op een proxy-URL-admin.
 ## Modelkeuze & referenties
 
 Sinds E55.2 (+ de 2.0-swap van 2026-08-02) is **gpt-image-2** de
-default-engine (beste stijlmatch met referenties; ruimere ratio-set → dun tot
-geen pad). Rollback = env `STYLIZE_DEFAULT_MODEL=nano-banana` (of
-`gpt-image-1.5`, registry-only) op avatars-api + redeploy. Referenties wegen
-op gpt-image anders dan op nano-banana — bij een nieuwe stijl zonder bakeoff:
-eerst prompt-only testen, dan refs erbij en vergelijken (E55.7-werkwijze).
+default-engine, op **quality medium** (E55.7-bakeoff + besluit 2026-08-03:
+visueel ≈ high op profielfoto-formaat, 65s i.p.v. 169s p50, kosten ≈ nano).
+Rollback = env `STYLIZE_DEFAULT_MODEL=nano-banana` (of `gpt-image-1.5`,
+registry-only) op avatars-api + redeploy. Referenties wegen op gpt-image
+anders dan op nano-banana — bij een nieuwe stijl zonder bakeoff: eerst
+prompt-only testen, dan refs erbij en vergelijken (E55.7-werkwijze). Let op
+moderatie: referenties met gezichten/gezicht-bedekkende composities kunnen
+gpt-image's safety-filter triggeren (flowers-les — die stijl staat hard op
+prompt-only in de importer).

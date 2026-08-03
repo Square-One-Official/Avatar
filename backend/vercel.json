@@ -14,7 +14,7 @@
       "memory": 1024
     },
     "api/v1/stylize.ts": {
-      "maxDuration": 90,
+      "maxDuration": 180,
       "memory": 1024
     },
     "api/v1/upscale.ts": {

@@ -335,10 +335,10 @@ final class EffectsModel {
     /// tijd doortelt i.p.v. op 0:00 te herbeginnen.
     private var generationStart = Date()
 
-    /// Verwachte duur voor de toast-voortgang: gpt-image op high zit p50
-    /// rond de 50s plus her-isolatie — 75s belooft bewust ruim (E55.9;
-    /// bakeoff 55.7 herijkt dit getal met echte metingen).
-    static let expectedGenerationSeconds = 75
+    /// Verwachte duur voor de toast-voortgang, geijkt op de E55.7-meting
+    /// (2026-08-03): gpt-image-2 medium p50 65s + her-isolatie/apply — 85s
+    /// belooft bewust ruim ("usually ~1 min") zonder in "~2 min" te kantelen.
+    static let expectedGenerationSeconds = 85
 
     private func detachCurrentGeneration() {
         guard case .working(let key) = phase else { return }

@@ -72,6 +72,15 @@ const DIRECT_URL_RE = /^https?:\/\/[^/]+\/storage\/v1\/object\/public\//;
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 const MAX_REF_ROWS = 4; // schema-cap op styleReferences (backend stuurt max 3)
+
+/**
+ * E55.7-bakeoff (besluit Thierry 2026-08-03): deze stijlen seeden ALTIJD
+ * prompt-only — de flowers-referenties (gerbera's over een gezicht) triggeren
+ * gpt-image-2's moderatie (2/2 geweigerd op het vrouwenportret; zonder refs
+ * slaagt dezelfde stijl glansrijk). Hard in de importer gebakken zodat een
+ * her-run de refs niet per ongeluk terugkoppelt.
+ */
+const PROMPT_ONLY_KEYS = new Set(["flowers"]);
 const REF_MAX_EDGE = 1024; // zelfde maat als fetchStyleReferences' transform
 const THUMB_MAX_EDGE = 800; // kaart toont 320px-variant; 800 dekt @2x ruim
 
@@ -235,9 +244,13 @@ for (const effect of seed.effects) {
   }
 
   // Referenties: curatiemap eerst; anders de gecureerde kit-refs.
+  // Prompt-only-stijlen (E55.7-moderatiebesluit) krijgen er bewust géén.
   let refFiles;
   let refSourceLabel;
-  if (folderRefs && folderRefs.length > 0) {
+  if (PROMPT_ONLY_KEYS.has(effect.key)) {
+    refFiles = [];
+    refSourceLabel = "prompt-only (E55.7-besluit — refs triggeren moderatie)";
+  } else if (folderRefs && folderRefs.length > 0) {
     refFiles = folderRefs;
     refSourceLabel = `References/ (${folder})`;
   } else {
@@ -245,7 +258,9 @@ for (const effect of seed.effects) {
     refSourceLabel = "kit-refs (fallback — References/ leeg of afwezig)";
     if (folderRefs !== null && folderRefs.length === 0) notes.push("References/ bestaat maar is leeg");
   }
-  if (refFiles.length === 0) problems.push("geen referenties (map noch kit)");
+  if (refFiles.length === 0 && !PROMPT_ONLY_KEYS.has(effect.key)) {
+    problems.push("geen referenties (map noch kit)");
+  }
   if (refFiles.length > MAX_REF_ROWS) {
     notes.push(
       `${refFiles.length} refs > schema-cap ${MAX_REF_ROWS} — gedropt: ${refFiles

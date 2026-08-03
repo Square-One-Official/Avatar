@@ -301,11 +301,12 @@ function upscaleInputFor(ref: string, imageDataUrl: string): Record<string, unkn
  * alternatief registreren = eerst hier een tak toevoegen (zie de NOTE in
  * lib/models.ts).
  *
- * Ruimere timeout dan de 50s-default: gpt-image op hoge kwaliteit zit
- * geregeld boven de 50s. De endpoint-maxDuration (90s, vercel.json) houdt
- * 10s marge voor afronden van de response.
+ * Ruimere timeout dan de 50s-default, gedimensioneerd op de E55.7-meting
+ * (2026-08-03): gpt-image-2 medium p50 65s / p95 75s met één 149s-
+ * uitschieter → 160s dekt de staart. De endpoint-maxDuration (180s,
+ * vercel.json) houdt 20s marge voor refs-fetch, pad/crop en de response.
  */
-const STYLIZE_TIMEOUT_MS = 80_000;
+const STYLIZE_TIMEOUT_MS = 160_000;
 
 export async function stylizeEdit(input: {
   imageDataUrl: string;
@@ -395,9 +396,11 @@ function stylizeInputFor(
     const payload: Record<string, unknown> = {
       prompt: input.prompt,
       input_images: images,
-      // quality=high is de eerlijke vergelijking met de andere pro-armen (en
-      // de reden voor STYLIZE_TIMEOUT_MS). `gptQuality` is de 55.7-hendel.
-      quality: input.gptQuality ?? "high",
+      // Besluit Thierry 2026-08-03 (E55.7-bakeoff): MEDIUM als default —
+      // visueel ≈ high op profielfoto-formaat (avatars worden klein getoond),
+      // maar 65s p50 i.p.v. 169s en kosten ≈ nano ($0.047 vs $0.128).
+      // `gptQuality` blijft de hendel voor bakeoffs/een latere premium-arm.
+      quality: input.gptQuality ?? "medium",
       output_format: "png",
       moderation: "low",
       // gpt-image kent geen match_input_image; kies de dichtstbijzijnde uit
