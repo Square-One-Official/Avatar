@@ -64,6 +64,21 @@ if ((APPLY || DEACTIVATE) && !HAS_API) {
 
 const authHeaders = { Authorization: `users API-Key ${PAYLOAD_KEY}` };
 
+/**
+ * E55-uitrol-les: de admin draait op Supabase's session-pooler (pool_size 15);
+ * een lambda-burst kan 'm kort verzadigen → 500 "error initializing Payload".
+ * Elke CMS-call krijgt daarom 3 pogingen met backoff — idempotent, dus veilig.
+ */
+async function fetchWithRetry(url, init, attempts = 3) {
+  for (let i = 1; ; i++) {
+    const res = await fetch(url, init).catch((e) => ({ ok: false, status: 0, text: async () => String(e) }));
+    if (res.ok || res.status < 500 || i >= attempts) return res;
+    const wait = i * 8000;
+    console.log(`  … CMS gaf ${res.status} (poging ${i}/${attempts}) — ${wait / 1000}s wachten (pooler-verzadiging)`);
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
+
 // De vorm die de app-keten verwacht: directe publieke Supabase-URL (regex van
 // backend/lib/payload.ts thumbnailVariant). Een Payload-proxy-URL
 // (admin.aaavatar.nl/api/media/file/…) zit achter de MFA-middleware → 401
@@ -85,13 +100,13 @@ const REF_MAX_EDGE = 1024; // zelfde maat als fetchStyleReferences' transform
 const THUMB_MAX_EDGE = 800; // kaart toont 320px-variant; 800 dekt @2x ruim
 
 async function payloadGet(path) {
-  const res = await fetch(`${PAYLOAD_BASE}/api${path}`, { headers: authHeaders });
+  const res = await fetchWithRetry(`${PAYLOAD_BASE}/api${path}`, { headers: authHeaders });
   if (!res.ok) throw new Error(`GET ${path} -> ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
 async function payloadJson(method, path, body) {
-  const res = await fetch(`${PAYLOAD_BASE}/api${path}`, {
+  const res = await fetchWithRetry(`${PAYLOAD_BASE}/api${path}`, {
     method,
     headers: { ...authHeaders, "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -104,7 +119,7 @@ async function uploadMedia(bytes, filename, alt, mime) {
   const form = new FormData();
   form.append("file", new Blob([bytes], { type: mime }), filename);
   form.append("_payload", JSON.stringify({ alt }));
-  const res = await fetch(`${PAYLOAD_BASE}/api/media`, {
+  const res = await fetchWithRetry(`${PAYLOAD_BASE}/api/media`, {
     method: "POST",
     headers: authHeaders,
     body: form,
