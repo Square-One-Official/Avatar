@@ -132,6 +132,16 @@ const STYLE_PROMPTS: Record<string, string> = {
 };
 
 /**
+ * E55-edge (Thierry, 2026-08-03): een edit op een GESTYLEDE basis (3d-head,
+ * sticker, …) rendde de wijziging fotorealistisch — een katoenen bucket hat
+ * op een 3D-toy-render. Elke edit-intent krijgt daarom deze stijlmatch-
+ * clausule: op een foto is 'ie een no-op, op een gestylede basis dwingt 'ie
+ * de wijziging in dezelfde stijl.
+ */
+const STYLE_MATCH_CLAUSE =
+  "Render the change in the same visual style as the rest of the image: photorealistic only if the image itself is photorealistic; if the image is a stylized illustration, cartoon or 3D render, render the change in exactly that style.";
+
+/**
  * Hair-intent (E11.2). De E09.1-bakeoff koos nano-banana instruction-edit
  * voor kapselwissel (gezicht/expressie/kleding exact behouden). De clausule
  * spiegelt de winnende `edit-hair`-prompt. Twee paden, beide server-gemapt:
@@ -436,6 +446,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Niet-dev zonder geldige intent, of dev zonder enige prompt.
     res.status(400).json({ error: "unknown_style" });
     return;
+  }
+
+  // E55-edge: edits moeten de stijl van de basis volgen (zie STYLE_MATCH_CLAUSE).
+  if (isEditIntent) {
+    prompt = `${prompt} ${STYLE_MATCH_CLAUSE}`;
   }
 
   if (req.body?.soft_source === true) {
