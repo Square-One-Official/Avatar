@@ -78,6 +78,18 @@ de server-default (niets geshipt; test dekt het).
   identity-bleed geven (de curatie-regel die het CMS-veld wél documenteert)
   — één regel helper-copy, kan mee met een volgende FEAT-story.
 
+**Live-smoke-sweep (2026-08-03 avond, uitrol-nazorg) — gevonden & gefixt:**
+8. *Delivery-fixes* (merge 8ee9a9a + backend-deploy): grote gpt-image-2-PNG's
+   braken Vercels ~4.5MB-response-cap (afgekapte body → decode-fout →
+   "spinner → terug naar None", wél gefactureerd) → URL-handover via
+   `uploadResultImage`, upload vóór logCredit; client-timeout 120s→190s
+   (serverbudget was 160s geworden); reframe-guard tegen "afgeknipt aan de
+   bovenkant" (windy-haar groeit uit het kader — alleen resetten als het
+   oude onderwerp wél paste).
+9. *Edits op gestylede basis* rendden fotorealistisch (katoenen bucket hat
+   op een 3D-render) → STYLE_MATCH_CLAUSE op alle edit-intents (server-only,
+   deployed). Isolatie-erosie-helft → story 55.10.
+
 **Bekende rest-randgevallen (bewust open, met eigenaar):**
 - *Fallback-keys-venster*: een app-build mét de nieuwe 6 fallback-keys vóór de
   prod-seed → offline-fallback-generatie geeft 400 op de nieuwe keys (alleen
@@ -403,6 +415,22 @@ betere feedback en een cancel — niet via het medium-tier. Gebouwd:
   into your result") — zelfde curatie-regel als het CMS-veld.
 - Tests: `WorkingToastLabelTests` (mm:ss, minuut-afronding, still-working-
   grens); build-v2.sh groen.
+
+## 55.10 — Isolatie-kwaliteit bij edits op een gestylede basis
+- status: ready
+- team: FEAT+AI
+- blockedBy: —
+
+Live-smoke-vondst (Thierry, 2026-08-03 avond): na een effect + een clothing-
+edit oogde het haar "minder goed geïsoleerd". Oorzaak: elke generatieve edit
+komt opaque terug en wordt opnieuw gematteerd; gestylede randen (3D-render-
+krullen) eroderen per round-trip. Kandidaat-fix: bij re-isolatie van een
+resultaat op een portret mét actief effect (`effectActiveRaw != nil`) de
+high-quality-engine (ORMBG) verkiezen boven Vision — sluit aan op de
+per-beeld engine-keuze uit 5afb1eb. Meet vóór/na op de 3d-head + bucket-hat-
+repro. NB: de stijlmatch-helft van deze vondst is al gefixt (server,
+STYLE_MATCH_CLAUSE op alle edit-intents, commit 1239738, deployed
+2026-08-03) — een edit rendert nu in de stijl van de basis.
 
 ## 55.8 — Prod-uitrol (voorbereid door INFRA, uitgevoerd door Thierry)
 - status: done (uitgevoerd 2026-08-03, Thierry + agent samen)
