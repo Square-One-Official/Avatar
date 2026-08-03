@@ -674,6 +674,16 @@ final class ShellModel {
         let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         var stored = image
         var didReset = false
+        // E55-delivery-fix: transform vóór de mutaties, voor de reframe-guard
+        // verderop (de oude bovenrand moet tegen de óúde schaal gemeten worden).
+        let preOffsetY = portrait.offsetY
+        let preScale: Double = {
+            guard let oldCG else { return portrait.scale }
+            return AutoFramer.resolvedTransform(
+                offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale,
+                cutoutSize: CGSize(width: oldCG.width, height: oldCG.height)
+            ).scale
+        }()
         if let oldCG, let newCG, oldCG.width > 0, oldCG.height > 0,
            oldCG.width != newCG.width || oldCG.height != newCG.height {
             let oldRatio = Double(oldCG.width) / Double(oldCG.height)
@@ -722,6 +732,29 @@ final class ShellModel {
                 portrait.offsetY += delta.dy
             }
         }
+        // E55-delivery-fix ("afgeknipt aan de bovenkant"): steekt het nieuwe
+        // onderwerp boven het canvas uit terwijl het oude paste (windy blaast
+        // haar omhoog), dan her-kadreren via dezelfde stille reset-tak als de
+        // ratio-reset. Een bewust krap kader (oude rand stak al uit) blijft
+        // van de gebruiker.
+        if !didReset,
+           let oldCG,
+           let finalCG = stored.cgImage(forProposedRect: nil, context: nil, hints: nil),
+           let oldTop = ShellModel.alphaTop(of: oldCG),
+           let newTop = ShellModel.alphaTop(of: finalCG) {
+            let newResolved = AutoFramer.resolvedTransform(
+                offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale,
+                cutoutSize: CGSize(width: finalCG.width, height: finalCG.height)
+            )
+            if ShellModel.effectNeedsReframe(
+                oldTopPx: oldTop, oldScale: preScale, oldOffsetY: preOffsetY,
+                newTopPx: newTop, newScale: newResolved.scale, newOffsetY: newResolved.offsetY
+            ) {
+                portrait.offsetX = 0; portrait.offsetY = 0; portrait.scale = 0
+                didReset = true
+            }
+        }
+
         if let png = stored.pngData() {
             portrait.cutoutData = png
             // Een generatief resultaat verving de pixels → niet langer een schone

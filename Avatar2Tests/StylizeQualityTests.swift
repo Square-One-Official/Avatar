@@ -54,6 +54,49 @@ final class StylizeQualityTests: XCTestCase {
         XCTAssertEqual(h, 480)
     }
 
+    // MARK: - Reframe-guard na effect (E55-delivery-fix)
+
+    func testReframeWhenNewTopOverflowsAndOldFit() {
+        // Oud onderwerp: top op pixel 40, schaal 0.5, offset 0 → canvas-top 20 (past).
+        // Nieuw onderwerp (windy-haar): top op pixel 5, offset -30 → canvas-top -27.5.
+        XCTAssertTrue(ShellModel.effectNeedsReframe(
+            oldTopPx: 40, oldScale: 0.5, oldOffsetY: 0,
+            newTopPx: 5, newScale: 0.5, newOffsetY: -30
+        ))
+    }
+
+    func testNoReframeWhenBothFit() {
+        XCTAssertFalse(ShellModel.effectNeedsReframe(
+            oldTopPx: 40, oldScale: 0.5, oldOffsetY: 0,
+            newTopPx: 10, newScale: 0.5, newOffsetY: 0
+        ))
+    }
+
+    func testNoReframeWhenUserCroppedDeliberately() {
+        // Oude top stak al boven het canvas uit (bewuste krappe kadrering) —
+        // ook al steekt de nieuwe verder uit: van de gebruiker afblijven.
+        XCTAssertFalse(ShellModel.effectNeedsReframe(
+            oldTopPx: 0, oldScale: 1.0, oldOffsetY: -50,
+            newTopPx: 0, newScale: 1.0, newOffsetY: -120
+        ))
+    }
+
+    func testAlphaTopFindsFirstOpaqueRow() {
+        // 10×10 transparant met een opake band vanaf y=6.
+        let size = 10, bpr = size * 4
+        var buf = [UInt8](repeating: 0, count: bpr * size)
+        for y in 6..<size { for x in 0..<size {
+            let i = (y * size + x) * 4
+            buf[i] = 255; buf[i + 3] = 255
+        } }
+        let ctx = CGContext(
+            data: &buf, width: size, height: size, bitsPerComponent: 8,
+            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        XCTAssertEqual(ShellModel.alphaTop(of: ctx.makeImage()!), 6)
+    }
+
     // MARK: - Upload-cap (E55.2)
 
     func testCappedForUploadShrinksLargeImage() {

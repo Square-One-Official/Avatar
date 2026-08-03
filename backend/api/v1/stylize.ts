@@ -22,7 +22,7 @@ import {
   nearestFixedAspect,
   padToAspect,
 } from "../../lib/image.js";
-import { resolveImageInput } from "../../lib/uploads.js";
+import { resolveImageInput, uploadResultImage } from "../../lib/uploads.js";
 import { ReplicateTimeoutError, stylizeEdit } from "../../lib/replicate.js";
 
 export const config = {
@@ -517,18 +517,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         (cutoutW > 0 ? ` cutout=${cutoutW}x${cutoutH}` : ""),
     );
 
+    // E55-delivery-fix (live gezien 2026-08-03): gpt-image-2-PNG's kunnen als
+    // base64 Vercels ~4.5MB-response-cap overschrijden → stil afgekapte body,
+    // decode-fout in de app, en een generatie die wél gefactureerd werd. Grote
+    // resultaten gaan daarom via een signed Storage-URL (E42-patroon), en de
+    // upload gebeurt VÓÓR logCredit — een niet-leverbaar resultaat mag nooit
+    // een credit kosten. Kleine resultaten blijven inline (oude clients).
+    const base64 = resultBytes.toString("base64");
+    const INLINE_BASE64_MAX = 3_200_000;
+    let resultDeliveryUrl: string | null = null;
+    let ledgerRef = resultUrl;
+    if (base64.length > INLINE_BASE64_MAX) {
+      const uploaded = await uploadResultImage(user.id, resultBytes, "png");
+      resultDeliveryUrl = uploaded.url;
+      ledgerRef = uploaded.key;
+    }
+
     if (!isDevUser) {
       await logCredit({
         userId: user.id,
         delta: -MODEL_REGISTRY.stylize.credits,
         reason: "stylize",
-        ref: resultUrl,
+        ref: ledgerRef,
       });
     }
 
     const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
     res.status(200).json({
-      image: resultBytes.toString("base64"),
+      ...(resultDeliveryUrl ? { image_url: resultDeliveryUrl } : { image: base64 }),
       credits_remaining: creditsRemaining,
       model: modelRef ?? MODEL_REGISTRY.stylize.defaultModel,
       input_width: inputW,
