@@ -204,11 +204,19 @@ const FACE_CLAUSE =
   "clothing and background exactly the same. Change only the requested facial " +
   "detail and nothing else, keeping the result photorealistic and natural.";
 
+// Let op: fetchActiveFacePresets() is CMS-first — bestaat er ooit een
+// `face-presets` Payload-collectie (vandaag niet), dan overschrijft die
+// deze teksten stilzwijgend. E32.4: de whiten-teeth-prompt is herschreven
+// zonder het woord "brighten" — zonder mask is dat een globale attractor
+// (het hele beeld kwam lichter terug); het verbod op globale wijzigingen
+// is nu expliciet.
 const FACE_PRESETS: Record<string, string> = {
   "whiten-teeth":
-    "Subtly whiten and brighten the person's teeth for a natural, healthy " +
-    "smile, without making them unnaturally white. Do not open the mouth or " +
-    "change the expression; if the mouth is closed, leave it closed. " +
+    "Whiten the teeth naturally, keeping realistic enamel texture — not " +
+    "paper-white. Change nothing else about the image: do not brighten, " +
+    "lighten or recolour the skin, lips, lighting or background. Do not " +
+    "open the mouth or change the expression; if the mouth is closed and " +
+    "no teeth are visible, return the image unchanged. " +
     FACE_CLAUSE,
   "apply-makeup":
     "Apply tasteful, natural-looking make-up: subtle foundation for an even " +

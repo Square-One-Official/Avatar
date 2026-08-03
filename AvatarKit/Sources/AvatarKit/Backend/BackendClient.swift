@@ -712,7 +712,10 @@ public final class BackendClient {
     /// instruction-edit; E09.1-bakeoff koos nano voor teeth/wrinkles). De
     /// server mapt `face_preset` naar een gezicht-only edit-prompt met het
     /// harde acceptatiecriterium (identiteit/pose/haar/kleding/achtergrond
-    /// identiek). Resultaat = opaque PNG + saldo; 402 → paywall.
+    /// identiek). E32.4: `preserve_framing` gaat altijd mee, net als bij
+    /// hair/clothes — zonder de framing-clausule herkadreerde nano-banana
+    /// face-edits soms (≥2% ratio-drift → transform-reset in de client).
+    /// Resultaat = opaque PNG + saldo; 402 → paywall.
     public func editFace(
         imagePNG: Data,
         presetKey: String,
@@ -722,7 +725,8 @@ public final class BackendClient {
     ) async throws -> StylizeCallResult {
         try await runStylize(
             imagePNG: imagePNG, cutoutWidth: cutoutWidth, cutoutHeight: cutoutHeight,
-            facePreset: presetKey, softSource: softSource
+            facePreset: presetKey, softSource: softSource,
+            preserveFraming: true
         )
     }
 

@@ -174,6 +174,52 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertEqual(result.creditsRemaining, 40)
     }
 
+    // E32.4: face-edits sturen `preserve_framing` mee, net als hair/clothes —
+    // zonder de framing-clausule herkadreerde nano-banana soms, waarna de
+    // client bij ≥2% ratio-drift de transform reset ("beeld verandert van
+    // formaat"). Deze test pint de request-body van `editFace`.
+    func testEditFaceSendsPreserveFramingAndPreset() async throws {
+        stubUploadLeg()
+        BackendStubURLProtocol.setStub(.json(200, """
+            { "image": "\(base64("edited-png"))", "credits_remaining": 37 }
+            """), forPath: "/v1/stylize")
+
+        _ = try await client.editFace(
+            imagePNG: Data("input-png".utf8), presetKey: "whiten-teeth"
+        )
+
+        let stylizeRequest = BackendStubURLProtocol.requestLog.last {
+            $0.url?.path == "/v1/stylize"
+        }
+        let body = try XCTUnwrap(stylizeRequest.flatMap(bodyData(of:)))
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body) as? [String: Any]
+        )
+        XCTAssertEqual(json["face_preset"] as? String, "whiten-teeth")
+        XCTAssertEqual(json["preserve_framing"] as? Bool, true)
+        XCTAssertNil(json["style"])
+        XCTAssertNil(json["hair_preset"])
+    }
+
+    /// URLSession levert een POST-body bij de URLProtocol als stream aan;
+    /// deze helper leest 'm terug naar Data voor body-asserties.
+    private func bodyData(of request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 4096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        while stream.hasBytesAvailable {
+            let read = stream.read(buffer, maxLength: bufferSize)
+            if read <= 0 { break }
+            data.append(buffer, count: read)
+        }
+        return data
+    }
+
     // MARK: - POST /v1/upscale
 
     func testUpscaleDecodesBackendShape() async throws {
