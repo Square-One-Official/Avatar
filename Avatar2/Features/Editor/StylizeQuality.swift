@@ -199,4 +199,42 @@ extension ShellModel {
         guard hypot(dx, dy) >= minDriftPixels else { return nil }
         return (Double(dx) * scale, Double(dy) * scale)
     }
+
+    /// Bovenrand (minY, pixelcoördinaten) van de opake pixels — de goedkope
+    /// helft van een alpha-bbox; meer hebben we voor de reframe-guard niet
+    /// nodig. Zelfde scan-opzet als `alphaCentroid`.
+    nonisolated static func alphaTop(of cg: CGImage, threshold: UInt8 = 8) -> CGFloat? {
+        let w = cg.width, h = cg.height
+        guard w > 0, h > 0 else { return nil }
+        let bpr = w * 4
+        var buf = [UInt8](repeating: 0, count: bpr * h)
+        guard let ctx = CGContext(
+            data: &buf, width: w, height: h, bitsPerComponent: 8,
+            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        for y in 0..<h {
+            for x in 0..<w where buf[y * bpr + x * 4 + 3] > threshold {
+                return CGFloat(y)
+            }
+        }
+        return nil
+    }
+
+    /// E55-delivery-fix ("afgeknipt aan de bovenkant"): een stijl kan het
+    /// onderwerp vergroten (windy blaast haar omhoog); met de oude transform
+    /// steekt de nieuwe bovenrand dan boven het canvas uit terwijl de oude
+    /// wél paste. Alleen in dát geval hoort een her-kadrering — een bewust
+    /// krap gekadreerd portret (oude rand stak al uit) blijft van de
+    /// gebruiker. Canvascoördinaat = offsetY + pixelY × scale (EditorCanvasView).
+    nonisolated static func effectNeedsReframe(
+        oldTopPx: CGFloat, oldScale: Double, oldOffsetY: Double,
+        newTopPx: CGFloat, newScale: Double, newOffsetY: Double,
+        tolerance: Double = 8
+    ) -> Bool {
+        let oldTopCanvas = oldOffsetY + Double(oldTopPx) * oldScale
+        let newTopCanvas = newOffsetY + Double(newTopPx) * newScale
+        return newTopCanvas < -tolerance && oldTopCanvas >= -2
+    }
 }

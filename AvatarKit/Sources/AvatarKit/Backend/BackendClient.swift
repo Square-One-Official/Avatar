@@ -333,7 +333,11 @@ public final class BackendClient {
     }
 
     private struct StylizeResponse: Decodable {
-        let image: String
+        /// Inline base64 (kleine resultaten) — of nil wanneer de server het
+        /// resultaat via `image_url` levert (E55-delivery-fix: gpt-image-2-
+        /// PNG's kunnen Vercels ~4.5MB-response-cap overschrijden).
+        let image: String?
+        let imageUrl: String?
         let creditsRemaining: Int
         let inputWidth: Int?
         let inputHeight: Int?
@@ -417,11 +421,24 @@ public final class BackendClient {
                 preserveFraming: preserveFraming ? true : nil
             )
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
+        let resp: StylizeResponse = try await request(
+            "/v1/stylize", method: "POST", body: body, timeoutInterval: 190
+        )
+        let data = try await resolveStylizeImageData(resp)
         return StylizeCallResult(data: data, creditsRemaining: resp.creditsRemaining, dimensions: resp.dimensions)
+    }
+
+    /// E55-delivery-fix: het resultaat komt inline (base64, klein) óf via een
+    /// signed Storage-URL (groot — Vercels ~4.5MB-cap). Beide paden leveren
+    /// dezelfde PNG-bytes op.
+    private func resolveStylizeImageData(_ resp: StylizeResponse) async throws -> Data {
+        if let base64 = resp.image, let data = Data(base64Encoded: base64) {
+            return data
+        }
+        if let raw = resp.imageUrl, let url = URL(string: raw) {
+            return try await Self.downloadResultImage(from: url)
+        }
+        throw BackendError.decode
     }
 
     /// Effects (E09.2; CMS-gestuurd sinds E33) — stuurt het huidige portret + een
@@ -549,10 +566,10 @@ public final class BackendClient {
                  generationModel: GenerationModelStore.shared.explicit?.rawValue,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
-        let resp: StylizeResponse = try await request("/v1/stylize", method: "POST", body: body)
-        guard let data = Data(base64Encoded: resp.image) else {
-            throw BackendError.decode
-        }
+        let resp: StylizeResponse = try await request(
+            "/v1/stylize", method: "POST", body: body, timeoutInterval: 190
+        )
+        let data = try await resolveStylizeImageData(resp)
         return StylizeCallResult(data: data, creditsRemaining: resp.creditsRemaining, dimensions: nil)
     }
 
@@ -1045,12 +1062,13 @@ public final class BackendClient {
         _ path: String,
         method: String,
         body: Data? = nil,
-        extraHeaders: [String: String] = [:]
+        extraHeaders: [String: String] = [:],
+        timeoutInterval: TimeInterval = 120
     ) async throws -> R {
         guard let token = auth.accessToken else { throw BackendError.notSignedIn }
         return try await send(
             path: path, method: method, body: body, token: token,
-            extraHeaders: extraHeaders
+            extraHeaders: extraHeaders, timeoutInterval: timeoutInterval
         )
     }
 
@@ -1073,7 +1091,8 @@ public final class BackendClient {
         method: String,
         body: Data?,
         token: String?,
-        extraHeaders: [String: String] = [:]
+        extraHeaders: [String: String] = [:],
+        timeoutInterval: TimeInterval = 120
     ) async throws -> R {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
         req.httpMethod = method
@@ -1111,7 +1130,11 @@ public final class BackendClient {
         }
         #endif
         req.httpBody = body
-        req.timeoutInterval = 120  // Magic Cutout calls can take ~15-30s
+        // Default 120s (Magic Cutout ~15-30s); stylize geeft 190s mee —
+        // E55-delivery-fix: het serverbudget is 160s + upload/download-marge,
+        // en een client die eerder opgeeft dan de server laat de gebruiker
+        // betalen voor een resultaat dat nooit aankomt.
+        req.timeoutInterval = timeoutInterval
 
         let (data, response): (Data, URLResponse)
         do {
