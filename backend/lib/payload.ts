@@ -53,6 +53,14 @@ function payloadBase(): string | null {
  * CDN swap degrades gracefully. Een eventuele querystring op de object-URL
  * (Payload's S3-plugin hangt er sinds de E54-admin-deploy `?prefix=media`
  * aan) wordt genegeerd: het pad identificeert het object volledig.
+ *
+ * `width` is een MAX-EDGE, geen breedte: we vragen een vierkante box
+ * (`width`×`width`) op met `resize=contain`, wat proportioneel binnenin past
+ * zonder te padden (geverifieerd 2026-08-03: 800×800 → 320×320, en een
+ * 320×160-box → 160×160). Zónder `height`/`resize` valt Supabase terug op
+ * cover mét de originele hoogte: een 800×800-bron kwam er als 320×800 uit —
+ * een center-crop die de linker- en rechterhelft weggooide. Dat trof elke
+ * CMS-thumbnail én de stijl-referenties die naar het model gaan.
  */
 export function thumbnailVariant(
   url: string | null,
@@ -70,7 +78,7 @@ export function thumbnailVariant(
     console.warn(`[payload] thumbnailVariant: URL matcht de Supabase-objectvorm niet, passthrough full-size: ${url}`);
     return url;
   }
-  return `${m[1]}/render/image/public/${m[2]}?width=${width}&quality=${quality}`;
+  return `${m[1]}/render/image/public/${m[2]}?width=${width}&height=${width}&resize=contain&quality=${quality}`;
 }
 
 /**

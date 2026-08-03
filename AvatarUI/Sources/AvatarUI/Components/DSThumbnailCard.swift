@@ -21,7 +21,8 @@ public struct DSThumbnailCard<Icon: View>: View {
     private let icon: Icon
 
     /// `tileHeight` defaults to `tileSize` (square). Pass an explicit height
-    /// for portrait-shaped cards (e.g. Effects: 112 × 152).
+    /// for portrait-shaped cards (e.g. Face: 112 × 152). Effects is 1:1
+    /// (144 × 144) sinds 2026-08-03.
     public init(
         label: String,
         isPro: Bool = false,

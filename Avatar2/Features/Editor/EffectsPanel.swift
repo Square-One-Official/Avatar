@@ -576,8 +576,13 @@ struct EffectsPanel: View {
         ))
     }
 
-    private let cardWidth: CGFloat = 112
-    private let cardHeight: CGFloat = 152
+    // Vierkante tiles (1:1), ruimer dan de Face-rail — besluit Thierry
+    // 2026-08-03. De CMS-bronnen zijn vierkant (800×800), dus `scaledToFill`
+    // vult de tile exact: niets gecropt, niets ingezoomd. Dat gold pas ná de
+    // `thumbnailVariant`-fix in backend/lib/payload.ts — daarvóór leverde
+    // Supabase een 320×800 center-crop en oogden de kaarten portret.
+    private let cardWidth: CGFloat = 144
+    private let cardHeight: CGFloat = 144
 
     var body: some View {
         DSEditPanel(
