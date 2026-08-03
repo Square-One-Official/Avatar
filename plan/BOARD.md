@@ -38,7 +38,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | **done** (27.1–27.11) |
 | [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.5) |
 | [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.8); follow-up "Restore body"-strings gedaan in E49.2 (op branch, merge pending) |
-| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) |
+| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) · 32.2–32.4 done (Whiten teeth: on-device arm + dropdown + cloud-fixes, 2026-08-03) · 32.5 backlog |
 | [E34 Social Preview & Banner](E34-social-preview.md) | FEAT+AI+INFRA | **done** (34.1–34.7); 34.8–34.10 AI-generatie backlog |
 | [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
 | [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **done** (36.1–36.5); 36.6 backlog (zoekveld) |

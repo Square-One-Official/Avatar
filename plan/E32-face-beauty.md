@@ -50,3 +50,65 @@ en het default-model/prompts bevestigen vóór de productie-deploy.
 
 **Aandachtspunten:** geen result-cache (anders dan Effects) — een face-edit is een eenmalige,
 undo'bare bewerking op het huidige beeld. Default-model volgt 32.0; nu nano-banana als baseline.
+
+## 32.2 — TeethWhitener: on-device tandenbleek-engine
+- status: done
+- owner: AI (Claude, 2026-08-03)
+- DoD: beide targets bouwen + tests groen + Result-regel
+
+Aanleiding (klacht Thierry 2026-08-03): de cloud-arm van Whiten teeth maakte het hele beeld
+lichter, veranderde het formaat en bleekte nauwelijks. Oorzaken: (1) volledige her-render zonder
+mask — de prompt zei bovendien letterlijk "brighten"; (2) nano levert ~1 MP terug en face was de
+enige edit-intent zónder `preserve_framing` → ratio-drift ≥2% reset de transform; (3) de
+voorzichtige prompt bleekte te weinig. Besluit Thierry: twee armen — On device (gratis) + Cloud
+(Pro, 4 cr) via een dropdown op de kaart (→ 32.3); cloud-fixes in 32.4.
+
+**Result:** [TeethWhitener.swift](../AvatarKit/Sources/AvatarKit/Engines/TeethWhitener.swift)
+(ClothesMaskGenerator-patroon): Vision-landmarks (rev3 gepind) → innerLips-polygon →
+aperture-check (mond dicht = `.mouthNotVisible`, bewuste no-op) → polygon-masker + feather →
+emaille-kleurpoort (CIColorCubeWithColorSpace, sRGB-getuned: luminantievloer adaptief op het
+mondgemiddelde, sat ≤ 0.42, niet rood/blauw-dominant) → adaptieve sterkte uit de gemeten
+tandkleur (desaturatie geklemd 0.20–0.65, gamma-lift richting luma 0.82, macht ≥ 0.75) →
+`CIBlendWithMask`-composiet. Afmetingen + alpha per constructie identiek; alleen mond-RGB
+verandert. Pure seams getest in
+[TeethWhitenerTests.swift](../AvatarKit/Tests/AvatarKitTests/TeethWhitenerTests.swift) (9 tests);
+`swift test` AvatarKit 133/133 groen ✓. Follow-up (backlog): face-parsing-CoreML-model voor echte
+tandsegmentatie via het OrmbgModelStore-downloadpatroon.
+
+## 32.3 — Whiten teeth-dropdown (On device / Cloud) + stale-base-fix
+- status: done
+- owner: FEAT (Claude, 2026-08-03)
+- DoD: beide targets bouwen + tests groen + Result-regel
+
+**Result:** [FaceActionsPanel.swift](../Avatar2/Features/Editor/FaceActionsPanel.swift): de
+Whiten-kaart opent een DSContextMenuPanel-dropdown (EditColorPanel-overlaypatroon, zweeft óver de
+kaart — onder/boven zou door DSEditPanels ScrollView geclipt worden): "On device · Free" →
+`applyLocalTeethWhiten` (TeethWhitener, geen gate/credits; `.noFaceFound` → toast die naar Cloud
+verwijst, `.mouthNotVisible` → vriendelijke no-op-toast) en "Cloud · Best · 4 credits (Pro)" → het
+bestaande `editFace`-pad. Whiten-kaart zonder blanket Pro-badge (heeft een gratis arm) + chevron.
+Stale-base-defect gefixt voor álle drie presets: `FaceEffectsModel` bevroor base/portrait bij
+init; nu per tik van de view (ClothesModel-patroon) — een tweede edit bouwt op de eerste.
+Apply-invariant gepind in ShellModelTests
+(`testApplyEffectResultIdentiekeAfmetingenLaatTransformEnFormaatStaan`): identieke afmetingen +
+bron-alpha → geen resize/transform-reset. Board-callsite ongewijzigd (optionele params).
+
+## 32.4 — Cloud-arm-fixes: promptherschrijving + preserve_framing
+- status: done (deploy naar prod blijft gated op Thierry, zie 32.1 "Nog te doen vóór live")
+- owner: INFRA (Claude, 2026-08-03)
+- DoD: beide targets bouwen + tests groen + Result-regel
+
+**Result:** [stylize.ts](../backend/api/v1/stylize.ts): whiten-teeth-prompt herschreven op basis
+van de E09.1-winnaar — "brighten" (globale attractor zonder mask) eruit, expliciet verbod op
+skin/lips/lighting/background-wijzigingen + gesloten-mond-no-op; CMS-override-risico
+gedocumenteerd bij `FACE_PRESETS` (geen `face-presets`-collectie in admin — hardcoded is wat
+draait). [BackendClient.swift](../AvatarKit/Sources/AvatarKit/Backend/BackendClient.swift):
+`editFace` stuurt nu `preserveFraming: true` (spiegel van hair/clothes) → server hangt de
+FRAMING_CLAUSE aan; met ratio binnen 2% resize't de client terug naar de cutout-maat i.p.v. de
+transform te resetten. Request-body gepind in BackendClientDecodeTests
+(`testEditFaceSendsPreserveFramingAndPreset`). `tsc --noEmit` ✓.
+
+## 32.5 — Mond-composiet van het cloud-resultaat (stretch)
+- status: backlog
+- Alleen oppakken als de toondrift na 32.4 in de praktijk blijft: hergebruik het
+  TeethWhitener-masker om alléén de mondregio van het cloud-resultaat in het origineel te
+  composieten (alignment-gate + full-frame-fallback; naadrisico eerlijk beoordelen).
