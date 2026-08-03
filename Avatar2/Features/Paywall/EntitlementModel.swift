@@ -49,11 +49,31 @@ final class EntitlementModel {
     private(set) var errorToast: String?
 
     /// Lopende cloud-actie-toast — statische titel + cycling copy per feature.
+    /// E55.9: plus verstreken-tijd (startedAt) en een verwachte duur zodat de
+    /// toast bij lange generaties (gpt-image high, 40–70s) een eerlijke
+    /// voortgangsindicatie toont i.p.v. alleen een spinner.
     struct WorkingContext: Equatable {
         let title: String
         let messages: [String]
+        var startedAt: Date = Date()
+        var expectedSeconds: Int? = nil
+
+        /// `startedAt` is presentatie-metadata, geen toast-identiteit: twee
+        /// keer dezelfde actie presenteren is dezelfde toast (en mag de
+        /// dsMotion-transitie niet hertriggeren), en de bestaande
+        /// gelijkheids-tests horen niet op sub-seconde `Date()`-verschillen
+        /// te breken.
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.title == rhs.title
+                && lhs.messages == rhs.messages
+                && lhs.expectedSeconds == rhs.expectedSeconds
+        }
     }
     private(set) var workingContext: WorkingContext?
+    /// E55.9: cancel-actie bij de working-toast. Los van de Equatable-context
+    /// (closures vergelijken niet); gezet door de flow die kan detachen
+    /// (Effects), nil = geen Cancel-knop.
+    private(set) var workingCancelHandler: (() -> Void)?
 
     /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
     enum CloudGate: Equatable { case signIn }
@@ -356,12 +376,23 @@ final class EntitlementModel {
         await refresh()
     }
 
-    func presentWorking(title: String, messages: [String]) {
-        workingContext = WorkingContext(title: title, messages: messages)
+    func presentWorking(
+        title: String,
+        messages: [String],
+        startedAt: Date = Date(),
+        expectedSeconds: Int? = nil,
+        onCancel: (() -> Void)? = nil
+    ) {
+        workingContext = WorkingContext(
+            title: title, messages: messages,
+            startedAt: startedAt, expectedSeconds: expectedSeconds
+        )
+        workingCancelHandler = onCancel
     }
 
     func dismissWorkingToast() {
         workingContext = nil
+        workingCancelHandler = nil
     }
 
     // MARK: - Privacy Tier Picker gate

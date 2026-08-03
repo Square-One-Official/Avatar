@@ -61,10 +61,10 @@ de server-default (niets geshipt; test dekt het).
    per model wáár het de default is.
 
 **Open UX-punten (besluit/bakeoff, geen code nu):**
-- *Latency zonder cancel*: gpt-image-high = 30–70s in een toast zonder
-  voortgang of annuleren; nano was 10–20s. Draaglijk of niet hangt aan het
-  55.7-besluit high vs medium ($0.128 vs $0.047, medium ≈ nano-tempo).
-  Een cancel-knop op de WorkingToast is een aparte story als high blijft.
+- *Latency zonder cancel*: → **besloten en gebouwd, zie 55.9** (Thierry
+  2026-08-03: kwaliteit blijft high; wachttijd draaglijk via feedback +
+  cancel-als-detach, niet via een lager kwaliteitstier — de medium-armen in
+  55.7 zijn daarmee informatief, niet beslissend).
 - *App sluiten tijdens een lange generatie*: rondt de server af ná het
   wegklikken, dan zijn 4 credits betaald zonder ontvangen beeld (smal
   venster, groter naarmate generaties langer duren). Accepteren of ooit
@@ -339,6 +339,34 @@ Standaardmatrix = 6 stijlen × 2 E09-portretten (p1/p3, zoals E54.2) × 3 armen
 = 36 runs (~7 min door de spacing). Kosten per tier: modelpagina-HTML
 (replicate-metadata-memory). Geen lokale token gevonden (2026-08-02) en de
 prod-env is bewust niet autonoom getrokken — zie de statusregel hierboven.
+
+## 55.9 — Generatie-feedback + cancel-als-detach (besluit Thierry 2026-08-03)
+- status: done
+- owner: FEAT (2026-08-03)
+- team: FEAT
+- blockedBy: —
+
+Besluit: kwaliteit blijft **high**; de 40–70s-wachttijd wordt draaglijk via
+betere feedback en een cancel — niet via het medium-tier. Gebouwd:
+- **WorkingToast**: verstreken tijd (mm:ss, TimelineView), dunne voortgangs-
+  balk richting de verwachte duur (cap 92% — nooit "vol" beloven), hint
+  "usually ~1 min" die voorbij de verwachting eerlijk "still working…" wordt;
+  `WorkingContext` + `presentWorking` uitgebreid (startedAt/expectedSeconds/
+  onCancel — bestaande call sites ongewijzigd via defaults).
+- **Cancel = detachen** (EffectsModel): de server rekent pas af ná succes en
+  de call loopt door, dus "echt" annuleren = betalen zonder resultaat.
+  Cancel geeft de editor meteen terug; het resultaat landt stil in de
+  kaart-cache + `portrait.effectCache` (persist). Opnieuw tikken op die
+  kaart tijdens de run = re-attach van de toast (verstreken tijd telt door,
+  géén dubbele generatie/credits); fouten na detach zijn stil (niets
+  afgeschreven). Verwachting nu 75s — 55.7 herijkt met echte p50/p95.
+- **"Klaar"-stip** op gegenereerde-maar-niet-actieve kaarten (checkmark,
+  topTrailing) — maakt de gratis instant-cache zichtbaar én is de
+  landingsplek van een gedetachte generatie.
+- **CreateEffectSheet**: gezichts-hint ("faces in the reference can bleed
+  into your result") — zelfde curatie-regel als het CMS-veld.
+- Tests: `WorkingToastLabelTests` (mm:ss, minuut-afronding, still-working-
+  grens); build-v2.sh groen.
 
 ## 55.8 — Prod-uitrol (voorbereid door INFRA, uitgevoerd door Thierry)
 - status: ready — **alle stappen gated op Thierry**; code op v2-main staat klaar
