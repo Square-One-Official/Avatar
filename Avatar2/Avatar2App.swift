@@ -178,7 +178,7 @@ struct Avatar2App: App {
                     case .outOfCredits:
                         OutOfCreditsToastView(model: entitlement)
                     case let .working(ctx):
-                        WorkingToastView(context: ctx) {
+                        WorkingToastView(context: ctx, onCancel: entitlement.workingCancelHandler) {
                             entitlement.dismissWorkingToast()
                         }
                     case .none:

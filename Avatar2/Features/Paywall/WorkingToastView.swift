@@ -9,6 +9,9 @@ import SwiftUI
 
 struct WorkingToastView: View {
     let context: EntitlementModel.WorkingContext
+    /// E55.9: optionele Cancel-actie (Effects detacht de generatie — resultaat
+    /// landt stil in de kaart-cache). nil = geen knop (korte acties).
+    var onCancel: (() -> Void)? = nil
     let onClose: () -> Void
 
     @State private var index = 0
@@ -61,6 +64,38 @@ struct WorkingToastView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .id(index)
                     .transition(.opacity)
+
+                // E55.9: bij lange generaties (expectedSeconds gezet) een
+                // eerlijke tijdsindicatie — verstreken tijd + een balk richting
+                // de verwachte duur (cap 92%: nooit "vol" beloven terwijl het
+                // model nog rekent) — plus optioneel Cancel. Besluit Thierry
+                // 2026-08-03: kwaliteit blijft high; de wachttijd wordt
+                // draaglijk via feedback, niet via een lager kwaliteitstier.
+                if context.expectedSeconds != nil || onCancel != nil {
+                    TimelineView(.periodic(from: context.startedAt, by: 1)) { timeline in
+                        let elapsed = max(0, Int(timeline.date.timeIntervalSince(context.startedAt)))
+                        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                            if let expected = context.expectedSeconds {
+                                ProgressView(value: min(Double(elapsed) / Double(expected), 0.92))
+                                    .progressViewStyle(.linear)
+                                    .controlSize(.small)
+                                    .tint(DSColor.Foreground.subtle)
+                            }
+                            HStack(spacing: DSSpacing.gap2) {
+                                Text(Self.elapsedLabel(elapsed, expected: context.expectedSeconds))
+                                    .dsTextStyle(.labelSmall)
+                                    .foregroundStyle(DSColor.Foreground.muted)
+                                    .monospacedDigit()
+                                Spacer(minLength: 0)
+                                if let onCancel {
+                                    DSGhostButton("Cancel", size: .small, action: onCancel)
+                                        .help("Keep working — the style finishes in the background and lands on its card")
+                                }
+                            }
+                        }
+                        .padding(.top, DSSpacing.gap2)
+                    }
+                }
             }
             .padding(DSSpacing.gap4)
         }
@@ -83,5 +118,23 @@ struct WorkingToastView: View {
             guard !Task.isCancelled else { return }
             DSMotion.animate(DSMotion.base) { index += 1 }
         }
+    }
+
+    /// "0:12" en, mét verwachting, "0:12 · usually ~1 min". Intern (geen
+    /// private) zodat de unit test de randen (0s, >expected, minuut-afronding)
+    /// kan dekken zonder de view te hosten.
+    static func elapsedLabel(_ elapsed: Int, expected: Int?) -> String {
+        let stamp = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
+        guard let expected else { return stamp }
+        let hint: String
+        if expected >= 60 {
+            let minutes = Int((Double(expected) / 60).rounded())
+            hint = minutes <= 1 ? "usually ~1 min" : "usually ~\(minutes) min"
+        } else {
+            hint = "usually ~\(expected)s"
+        }
+        // Voorbij de verwachting geen "usually" meer beloven — dan is
+        // "nog bezig" het eerlijke verhaal.
+        return elapsed <= expected ? "\(stamp) · \(hint)" : "\(stamp) · still working…"
     }
 }

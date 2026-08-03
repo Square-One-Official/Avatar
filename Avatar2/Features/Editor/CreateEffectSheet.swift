@@ -52,6 +52,14 @@ struct CreateEffectSheet: View {
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.subtle)
                         .fixedSize(horizontal: false, vertical: true)
+                    // E55.9 (besluit Thierry 2026-08-03): dezelfde curatie-regel
+                    // die het CMS-veld al documenteert, nu ook voor gebruikers —
+                    // een herkenbaar gezicht in de referentie lekt door in het
+                    // resultaat (identity-bleed, E54.2-bakeoff).
+                    Text("Tip: pick a style image without a recognizable face — faces in the reference can bleed into your result.")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             footer

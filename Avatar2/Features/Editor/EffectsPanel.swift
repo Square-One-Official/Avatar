@@ -277,8 +277,16 @@ final class EffectsModel {
 
     /// Tik op een effect-kaart: actief → None; gecachet → instant uit cache;
     /// anders → genereren. Tijdens een lopende generatie negeren we tikken.
+    /// E55.9: tikken op een kaart waarvan de generatie ge-cancel'd (gedetacht)
+    /// doorloopt = de wacht-toast weer aankoppelen, NIET opnieuw genereren —
+    /// anders zou de cancel-knop een dubbele generatie (en dubbele credits)
+    /// uitlokken.
     func toggle(_ card: EffectCard) {
         guard !isBusy else { return }
+        if detachedKey == card.key {
+            reattach(card)
+            return
+        }
         if selectedKey == card.key {
             selectNone()
             return
@@ -307,7 +315,60 @@ final class EffectsModel {
     /// Refresh-icoon op de actieve kaart: bewust opnieuw genereren (kost credits).
     func regenerate(_ card: EffectCard) {
         guard !isBusy else { return }
+        if detachedKey == card.key {
+            reattach(card)
+            return
+        }
         Task { await generate(card, feature: .effectRegenerate) }
+    }
+
+    // MARK: - Cancel = detachen (E55.9)
+
+    /// De kaart-key waarvan de generatie op de achtergrond doorloopt nadat de
+    /// gebruiker op Cancel drukte. De server rekent pas af ná succes en de call
+    /// loopt gewoon door — "echt" annuleren zou dus credits kosten zonder
+    /// resultaat. Detachen is het eerlijke alternatief: de editor is meteen
+    /// weer vrij en het resultaat landt stil in de kaart-cache (badge; tikken
+    /// = gratis instant toepassen).
+    private var detachedKey: String?
+    /// Startmoment van de lopende generatie, zodat een re-attach de verstreken
+    /// tijd doortelt i.p.v. op 0:00 te herbeginnen.
+    private var generationStart = Date()
+
+    /// Verwachte duur voor de toast-voortgang: gpt-image op high zit p50
+    /// rond de 50s plus her-isolatie — 75s belooft bewust ruim (E55.9;
+    /// bakeoff 55.7 herijkt dit getal met echte metingen).
+    static let expectedGenerationSeconds = 75
+
+    private func detachCurrentGeneration() {
+        guard case .working(let key) = phase else { return }
+        detachedKey = key
+        phase = .idle
+        entitlement.dismissWorkingToast()
+    }
+
+    private func reattach(_ card: EffectCard) {
+        detachedKey = nil
+        phase = .working(card.key)
+        presentGenerationToast(startedAt: generationStart)
+    }
+
+    private func presentGenerationToast(startedAt: Date) {
+        entitlement.presentWorking(
+            title: "Applying style",
+            messages: [
+                "Mixing the palette…",
+                "Laying on the texture…",
+                "Top quality takes a moment…",
+                "Tweaking the shadows…",
+                "This one's going to look good…",
+                "Adding the finishing touches…",
+                "Almost there…",
+            ],
+            startedAt: startedAt,
+            expectedSeconds: Self.expectedGenerationSeconds,
+            onCancel: { [weak self] in self?.detachCurrentGeneration() }
+        )
     }
 
     private func generate(_ card: EffectCard, feature: AIFeature = .effectGenerate) async {
@@ -329,17 +390,16 @@ final class EffectsModel {
         }
         let (cutoutW, cutoutH) = StylizeQuality.cutoutDimensions(for: cutoutBefore)
         phase = .working(card.key)
-        entitlement.presentWorking(
-            title: "Applying style",
-            messages: [
-                "Mixing the palette…",
-                "Laying on the texture…",
-                "Tweaking the shadows…",
-                "This one's going to look good…",
-                "Adding the finishing touches…",
-                "Almost there…",
-            ]
-        )
+        generationStart = Date()
+        presentGenerationToast(startedAt: generationStart)
+        // E55.9: is de generatie ondertussen gedetacht (Cancel), dan géén
+        // apply/selectie/undo/toast meer — alleen stil cachen zodat de kaart
+        // de badge krijgt en tikken straks gratis en instant is.
+        func consumeDetach() -> Bool {
+            guard detachedKey == card.key else { return false }
+            detachedKey = nil
+            return true
+        }
         do {
             let softSource = StylizeQuality.requestsSoftSourcePrompt(for: source)
             // Cutout én origineel: geen reframe — achtergrond zit los van het cutout.
@@ -363,6 +423,7 @@ final class EffectsModel {
                 resultData = response.data
             }
             guard let image = NSImage(data: resultData) else {
+                if consumeDetach() { return }
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 entitlement.presentError("The styled image came back unreadable.")
@@ -371,6 +432,14 @@ final class EffectsModel {
             StylizeQuality.logStylizeDimensions(input: source, output: image, cutoutBefore: cutoutBefore)
             cache[card.key] = image
             if let png = image.pngData() { pngCache[card.key] = png }
+            if consumeDetach() {
+                // Gedetacht afgerond: resultaat is betaald én bewaard — persist
+                // zet 'm in portrait.effectCache (overleeft ook paneel-wissel),
+                // de kaart-badge maakt 'm vindbaar, saldo stil verversen.
+                persist()
+                await entitlement.refresh()
+                return
+            }
             let prev = selectedKey
             selectedKey = card.key
             await onApply(image)
@@ -380,22 +449,28 @@ final class EffectsModel {
             persist()
             await entitlement.refresh()
         } catch BackendError.noCredits {
+            if consumeDetach() { return }
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.handleOutOfCredits()
         } catch BackendError.proRequired {
             // E34: de custom-effect-tak is Pro-only; een verlopen abonnement
             // tijdens de sessie landt hier i.p.v. op een generieke foutmelding.
+            if consumeDetach() { return }
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.requestUpgrade()
         } catch BackendError.generationRefused {
             // E55: safety-weigering — eigen copy ("probeer een andere foto",
             // geen credits verbruikt) i.p.v. de retry-uitlokkende generieke.
+            if consumeDetach() { return }
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.presentError(BackendError.generationRefused.errorDescription ?? "")
         } catch {
+            // Gedetacht + gefaald: stil — de gebruiker is verder gegaan en er
+            // is niets afgeschreven (server rekent pas af ná succes).
+            if consumeDetach() { return }
             phase = .idle
             entitlement.dismissWorkingToast()
             entitlement.presentError("Couldn't apply that style. Please try again.")
@@ -601,6 +676,18 @@ struct EffectsPanel: View {
                 onRefresh: isSelected ? { model.regenerate(card) } : nil
             ) {
                 thumbnail(for: card)
+            }
+            // E55.9: "klaar"-stip op gegenereerde-maar-niet-actieve kaarten —
+            // maakt de gratis instant-cache zichtbaar, en is de landingsplek
+            // van een ge-cancel'de (gedetachte) generatie.
+            .overlay(alignment: .topTrailing) {
+                if model.isCached(card), !isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: DSIconSize.sm))
+                        .foregroundStyle(DSColor.Background.card, DSColor.Foreground.subtle)
+                        .padding(DSSpacing.gap1_5)
+                        .help("Generated — applying it again is instant and free")
+                }
             }
         }
         .buttonStyle(.plain)
