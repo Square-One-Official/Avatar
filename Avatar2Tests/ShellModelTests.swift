@@ -204,6 +204,32 @@ final class ShellModelTests: XCTestCase {
         }
     }
 
+    /// E32.3: het on-device Whiten teeth-pad levert per constructie een
+    /// resultaat met identieke afmetingen en de bron-alpha (TeethWhitener
+    /// verandert alleen RGB binnen het mondgebied). Deze test pint de
+    /// apply-invariant waar dat pad op leunt: geen resize, geen
+    /// transform-reset, geen formaatsprong.
+    func testApplyEffectResultIdentiekeAfmetingenLaatTransformEnFormaatStaan() async throws {
+        let (model, portrait, _) = try makeSelectedModel(cutout: cutoutImage())
+        portrait.offsetX = 12
+        portrait.offsetY = -8
+        portrait.scale = 0.8
+
+        await model.applyEffectResult(cutoutImage(shade: 220), preserveSourceAlpha: true)
+
+        XCTAssertEqual(portrait.offsetX, 12, accuracy: 0.001,
+                       "0% ratio-drift → geen AutoFramer-reset")
+        XCTAssertEqual(portrait.offsetY, -8, accuracy: 0.001)
+        XCTAssertEqual(portrait.scale, 0.8, accuracy: 0.001,
+                       "gelijke resolutie → schaal ongemoeid")
+        let stored = try XCTUnwrap(
+            NSImage(data: portrait.cutoutData)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil)
+        )
+        XCTAssertEqual(stored.width, 128, "afmetingen blijven exact behouden")
+        XCTAssertEqual(stored.height, 128)
+    }
+
     /// Een VOL generatief resultaat (onderwerp + achtergrond) bewaart het volle
     /// beeld als edit-bron voor een latere "Remove background", her-isoleert, en
     /// stempelt de bron met de signature van de zojuist opgeslagen cutout —
