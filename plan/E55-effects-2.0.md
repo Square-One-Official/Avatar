@@ -296,11 +296,47 @@ hetzelfde lek. DoD: unit test op de repro, beide targets, tests groen.
 - DoD: `swift test` voor EffectsListCache (round-trip, corrupt bestand, SWR-
   volgorde), tsc, beide targets, koude-start-timing vóór/na in de Result-regel.
 
-## 55.7 — Validatie-bakeoff: gpt-image-1.5 + refs + aspect-contract op de 6 nieuwe stijlen
-- status: in_progress (harness; live runs gated op REPLICATE_API_TOKEN — geen
-  lokale env aangetroffen 2026-08-02, prod-env niet autonoom getrokken)
-- owner: AI (2026-08-02)
+## 55.7 — Validatie-bakeoff: gpt-image (2.0) + refs + aspect-contract op de 6 nieuwe stijlen
+- status: done (runs 2026-08-03, autorisatie Thierry; besluitpunten hieronder)
+- owner: AI (2026-08-02/03)
 - team: AI
+- Result: **36-run-matrix gedraaid** (6 stijlen × p1/p3 × {high-refs,
+  high-norefs, medium-refs}, gpt-image-2, volledige prod-pipeline incl.
+  pad/crop; token uit v1-`backend/.env.local` — de Vercel-env is Sensitive en
+  pull't leeg). Beeldmateriaal + contactsheet:
+  `~/Documents/Claude/Projects/Aaavatar/e55-bakeoff/` (34/36 OK).
+  **Bevindingen:**
+  - **Identiteit: behouden in álle 34 runs** — beide portretten herkenbaar in
+    elke stijl/arm, zónder input_fidelity. Het 2.0-identity-risico is van
+    tafel. ✅ GO.
+  - **Stijltrouw: uitstekend**; refs verhogen de commitment (balloon: alleen
+    refs-arm levert het volledige zwevende-ballonhoofd; windy: extremere
+    g-force; hairy: matte-render-look van de ref). Sticker/3d-head: alle
+    armen sterk, refs sturen vooral de smaak. → **refs AAN per default**.
+  - **Aspect-contract: 34/34** ratio-OK; kleine inputs (612/740px) kwamen
+    als 1024–1536 terug (gratis res-winst).
+  - **Latency (de hoofdvondst): high p50 169s / p95 214s / max 236s —
+    2,5× trager dan medium (p50 65s / p95 75s, één 149s-uitschieter) en ver
+    voorbij elk 90s-budget; p95+overhead schuurt tegen Vercels 300s-plafond.**
+    Het 55.9-besluit ("high blijft") is genomen op de aanname 40–70s;
+    de meting zegt ~3 min per effect.
+  - **Moderation: flowers-refs → 2/2 geweigerd op p3** (E005; norefs-arm
+    slaagde — de gerbera-over-gezicht-REFS zijn de trigger, niet portret of
+    prompt). Flowers-resultaten zónder refs zijn magazine-waardig.
+  - **Kosten:** high $0.128 / medium $0.047 per beeld (nano $0.039);
+    matrix + smoke ≈ $4.
+  **Besluitpunten Thierry (55.8-gate):**
+  1. **Kwaliteitstier**: aanbeveling = **medium als default** (visueel ≈ high
+     op kaartformaat in 5/6 stijlen; ~1 min past bij de nieuwe toast en
+     medium ≈ nano-kostenpariteit) — high evt. later als premium-arm (E14.3-
+     precedent 7cr, "Best quality — takes ~3 min"). Alternatief: high houden →
+     maxDuration 300 + STYLIZE_TIMEOUT_MS ~250s + toast-verwachting 180s.
+  2. **Tarief**: bij medium kan vlak 4cr blijven (marge ≈ nano).
+  3. **Flowers**: prompt-only seeden (refs weglaten) of nieuwe refs cureren.
+  4. Budget-/toastwaarden bij de deploy: medium-pad → STYLIZE_TIMEOUT_MS
+     160s, maxDuration 180, `expectedGenerationSeconds` 90.
+  Harness-extra's: `--timeout`-meethendel (stylizeEdit `timeoutMs`, prod
+  ongewijzigd) + eerlijke timeout-errormessage; results.json draagt het model.
 - blockedBy: 55.1 (pad/crop in de callshape) + 55.5-dry-run-assets (prompts +
   genormaliseerde refs; prod-seed NIET nodig — harness raakt Replicate direct,
   callshape 1-op-1 incl. IDENTITY_CLAUSE/STYLE_REFERENCE_CLAUSE/flattenOnGrey/

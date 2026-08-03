@@ -23,8 +23,10 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 const REPLICATE_TIMEOUT_MS = 50_000;
 
 export class ReplicateTimeoutError extends Error {
-  constructor(public readonly model: string) {
-    super(`replicate.run(${model}) timed out after ${REPLICATE_TIMEOUT_MS}ms`);
+  // E55.7-fix: meld de ÉCHTE gebruikte timeout — de message hardcodede de
+  // 50s-default en loog dus bij features met een eigen budget (stylize 80s).
+  constructor(public readonly model: string, timeoutMs: number = REPLICATE_TIMEOUT_MS) {
+    super(`replicate.run(${model}) timed out after ${timeoutMs}ms`);
     this.name = "ReplicateTimeoutError";
   }
 }
@@ -39,7 +41,7 @@ async function runWithTimeout<T>(
     return await Promise.race([
       p,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new ReplicateTimeoutError(model)), timeoutMs);
+        timer = setTimeout(() => reject(new ReplicateTimeoutError(model, timeoutMs)), timeoutMs);
       }),
     ]);
   } finally {
@@ -321,13 +323,17 @@ export async function stylizeEdit(input: {
    *  (→ "high"); alleen de bakeoff-driver zet "medium" om de latency/kosten-
    *  arm te meten. Wordt het ooit de default, dan hier het vaste veld flippen. */
   gptQuality?: "high" | "medium";
+  /** E55.7-bakeoff-hendel: timeout-override zodat de driver échte p50/p95
+   *  kan meten voorbij het prod-budget (gpt-image-2 bleek >80s te kunnen).
+   *  Productie laat dit weg (→ STYLIZE_TIMEOUT_MS). */
+  timeoutMs?: number;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
   const output = (await runWithRetry(
     "stylizeEdit",
     () => replicate.run(ref as `${string}/${string}`, { input: payload }),
-    STYLIZE_TIMEOUT_MS,
+    input.timeoutMs ?? STYLIZE_TIMEOUT_MS,
   )) as unknown;
 
   return extractUrl(output, "stylizeEdit");

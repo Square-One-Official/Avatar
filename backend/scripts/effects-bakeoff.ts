@@ -66,6 +66,9 @@ const ARMS = (argValue("--arms")?.split(",") as Arm[] | undefined) ?? [
 ];
 const SPACING_S = Number(argValue("--spacing") ?? 11);
 const MODEL = argValue("--model") ?? "openai/gpt-image-2";
+// Meet-timeout (s): ruim boven het 80s-prod-budget zodat trage runs hun échte
+// duur laten zien i.p.v. als timeout te sneuvelen — dat getal ís de meting.
+const TIMEOUT_S = Number(argValue("--timeout") ?? 240);
 // Callshape-parity: pad naar de ratio-set van het gekozen model (registry).
 const MODEL_ASPECTS = modelFixedAspects(MODEL) ?? GPT_IMAGE_ASPECTS;
 mkdirSync(outDir, { recursive: true });
@@ -173,6 +176,7 @@ for (const portrait of portraitNames) {
           height: pad.canvasH,
           model: MODEL,
           gptQuality: quality,
+          timeoutMs: TIMEOUT_S * 1000,
         });
         const dl = await fetch(url);
         if (!dl.ok) throw new Error(`result fetch ${dl.status}`);
