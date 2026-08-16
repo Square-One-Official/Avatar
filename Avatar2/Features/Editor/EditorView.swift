@@ -370,6 +370,18 @@ struct EditorView: View {
         DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Clothing"),
     ]
 
+    /// GTM-cut: Face is compile-time uit. Effects blijft de USP.
+    static func isToolbarToolVisible(_ tool: EditorTool) -> Bool {
+        switch tool {
+        case .face: return AppFeatureFlags.faceEnabled
+        default: return true
+        }
+    }
+
+    static var visibleToolbarItems: [DSToolbarItem<EditorTool>] {
+        toolbarItems.filter { isToolbarToolVisible($0.id) }
+    }
+
     // E31.5: de capsule-overflow `⋯` is leeg. Background (dat Figma in deze
     // overflow zette) verhuisde — bewuste afwijking, besluit Thierry — naar de
     // frame-lokale toolbar (canvas-gerelateerd). Geen andere secundaire tools →
@@ -526,7 +538,7 @@ struct EditorView: View {
         // E28.5: de toolbars zijn altijd zichtbaar in de editor (één portret =
         // altijd het actieve canvas).
         DSEditPanelContainer(
-            tools: Self.toolbarItems,
+            tools: Self.visibleToolbarItems,
             activeTool: toolSelection,
             overflowTools: Self.overflowItems,
             overflowActions: overflowActions,
@@ -816,7 +828,7 @@ struct EditorView: View {
                 DSEditPanel(title: "Enhance", maxContentHeight: editPanelMaxHeight) {
                     editColorPanel
                 }
-            } else if tool == .face, let entitlement {
+            } else if tool == .face, AppFeatureFlags.faceEnabled, let entitlement {
                 // E21.1: beauty-acties, gesplitst uit Edit. E32.1: de Beauty-
                 // acties zijn gewired op de face-intent van /v1/stylize
                 // (nano-banana instruction-edit) i.p.v. een stub-gate. `.id` op

@@ -18,4 +18,23 @@ final class EditorToolTests: XCTestCase {
             ["Edit", "Effects", "Face", "Clothing", "Hair", "Background", "Images"]
         )
     }
+
+    /// GTM-cut 2026-08-16: launch-hidden flags fail closed (no DEBUG launch-arg).
+    func testLaunchFeatureFlagsHideGTMCut() {
+        XCTAssertFalse(AppFeatureFlags.bannersEnabled)
+        XCTAssertFalse(AppFeatureFlags.faceEnabled)
+        XCTAssertFalse(AppFeatureFlags.customEffectsEnabled)
+        XCTAssertFalse(AppFeatureFlags.generateBackgroundEnabled)
+        XCTAssertFalse(AppFeatureFlags.boostOnlineEnabled)
+    }
+
+    func testToolbarKeepsEffectsAndHidesFace() {
+        XCTAssertTrue(EditorView.isToolbarToolVisible(.effects))
+        XCTAssertTrue(EditorView.isToolbarToolVisible(.hair))
+        XCTAssertTrue(EditorView.isToolbarToolVisible(.clothing))
+        XCTAssertTrue(EditorView.isToolbarToolVisible(.edit))
+        XCTAssertFalse(EditorView.isToolbarToolVisible(.face))
+        XCTAssertFalse(EditorView.visibleToolbarItems.contains { $0.id == .face })
+        XCTAssertTrue(EditorView.visibleToolbarItems.contains { $0.id == .effects })
+    }
 }

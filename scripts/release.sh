@@ -50,10 +50,26 @@ fi
 
 echo "📦 Releasing Avatar v${VERSION} (build ${BUILD})"
 
-# 1. Bump version in project.yml
-echo "→ Bumping version in project.yml..."
-sed -i '' "s/MARKETING_VERSION: .*/MARKETING_VERSION: \"${VERSION}\"/" "$PROJECT_DIR/project.yml"
-sed -i '' "s/CURRENT_PROJECT_VERSION: .*/CURRENT_PROJECT_VERSION: \"${BUILD}\"/" "$PROJECT_DIR/project.yml"
+# 1. Versie-bump: alléén het root-blok (v1). Avatar2 heeft eigen overrides
+#    (E13.1); een globale sed zou die meepakken.
+echo "→ Bumping version in project.yml (v1 root-blok)..."
+cd "$PROJECT_DIR"
+RELEASE_VERSION="$VERSION" RELEASE_BUILD="$BUILD" python3 - <<'PYEOF'
+import os, re, pathlib
+p = pathlib.Path("project.yml")
+s = p.read_text()
+
+def bump_first(pattern, replacement, s):
+    m = re.search(pattern, s)
+    assert m, f"vond geen {pattern!r}"
+    return s[:m.start()] + replacement + s[m.end():]
+
+s = bump_first(r'MARKETING_VERSION: "[^"]*"',
+               f'MARKETING_VERSION: "{os.environ["RELEASE_VERSION"]}"', s)
+s = bump_first(r'CURRENT_PROJECT_VERSION: "[^"]*"',
+               f'CURRENT_PROJECT_VERSION: "{os.environ["RELEASE_BUILD"]}"', s)
+p.write_text(s)
+PYEOF
 
 # 2. Regenerate Xcode project
 echo "→ xcodegen generate..."

@@ -921,7 +921,7 @@ struct BoardView: View {
                         HairPanel(baseImage: base, entitlement: entitlement,
                                   onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
-                    case .face:
+                    case .face where AppFeatureFlags.faceEnabled:
                         FaceActionsPanel(
                             baseImage: base,
                             entitlement: entitlement,
@@ -938,7 +938,7 @@ struct BoardView: View {
                 .dsPanelSurface(cornerRadius: DSRadius.xl)
             }
 
-            DSBottomToolbar(items: EditorView.toolbarItems, selection: $editTool)
+            DSBottomToolbar(items: EditorView.visibleToolbarItems, selection: $editTool)
         }
     }
 

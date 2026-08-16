@@ -20,14 +20,14 @@ Tot een port gedraaid is testen agents in-app tegen een Vercel-preview-deploy va
 **Result:** Port gedraaid 2026-06-12: branch v1/backend-port-2026-06-12 met send-recovery-email (E01.7, stond sinds 19 mei ongecommit) + de zeven E01.10-backendbestanden byte-identiek aan v2-main (diff-geverifieerd), ff-merge naar main (b27cdd5..3bc2a76) en gepusht → Vercel-productie-deploy; tsc-typecheck + models-smoke groen op main; productie-smoke OK (/v1/auth/send-recovery-email: 400 invalid_email waar eerst 404; /v1/colorize zonder auth: 401). Bewust niet mee: backend/sql/012 (device_grants account_link) — hoort bij account-link-werk dat nergens in tracked code bestaat, geen dependency van het endpoint; blijft als los punt in de hoofd-checkout. v2-main-kant ongewijzigd.
 
 ## 13.1 — Apart updatekanaal
-- status: backlog
-- owner: —
-- blockedBy: alle FEAT-epics
+- status: in_progress
+- owner: INFRA
+- blockedBy: —
 - DoD: beide targets bouwen, tests groen
 
 Eigen appcast voor 2.0-beta; v1-gebruikers merken niets.
 
-**Result:** _(invullen bij done)_
+**Result:** Avatar2 SUFeedURL → `https://api.aaavatar.nl/appcast-v2.xml`; eigen versielijn 2.0.0/100; `release-v2.sh` (prerelease, lockstep `_appcast-v2.xml`); `release.sh` bumpt alleen nog het v1-root-blok. Prod-smoke 2026-08-16: `/appcast-v2.xml` 200 (leeg channel), `/appcast.xml` 200 (v1 1.2.1). Eerste signed beta + Sparkle-e2e blijven Mac-gated (notarisatie).
 
 ## 13.2 — Migratiepad
 - status: backlog
@@ -37,12 +37,12 @@ Eigen appcast voor 2.0-beta; v1-gebruikers merken niets.
 
 v1-library → Portrait2-store (read-only import).
 
-**Result:** _(invullen bij done)_
+**Result:** _(code nog niet op deze GitHub-v2-main; live e2e blijft gated op Thierry met een echte v1-zip)_
 
 ## 13.3 — Go/no-go-checklist
-- status: backlog
-- owner: —
-- blockedBy: 13.1, 13.2
+- status: in_progress
+- owner: INFRA
+- blockedBy: 13.1
 - DoD: beide targets bouwen, tests groen
 
 Bakeoff-besluiten verwerkt, beide apps groen, onboarding+main flow compleet, Stripe-identiteitstest
@@ -50,9 +50,9 @@ Bakeoff-besluiten verwerkt, beide apps groen, onboarding+main flow compleet, Str
 
 Checklist-items uit E01.7 (INFRA, 2026-06-12):
 - [ ] E2E mismatch-pad testen tegen productie. (Deploy-helft is klaar: /v1/auth/send-recovery-email
-      staat sinds de E13.0-port van 2026-06-12 op productie.)
+      staat sinds de E13.0-port van 2026-06-12 op productie.) → [GO-NO-GO-2.0.md](GO-NO-GO-2.0.md) §6.
 
-**Result:** _(invullen bij done)_
+**Result:** [GO-NO-GO-2.0.md](GO-NO-GO-2.0.md) — GTM-cut surface. API-smokes 2026-08-16 groen. Mac/signing/Stripe-checkout blijven Thierry-gated.
 
 ## 13.4 — Backend-port ronde 2 (v2-main → main) — KLAARGEZET
 - status: done (productie-deploy 2026-06-14) — DB-migraties blijven wacht-op-Thierry

@@ -8,9 +8,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, v2-main]
   push:
-    branches: [main]
+    branches: [main, v2-main]
 
 permissions:
   contents: read
@@ -65,36 +65,45 @@ jobs:
         working-directory: admin
 
   appcast-lint:
-    name: Sparkle appcast.xml lint
+    name: Sparkle appcast lint (v1 + v2)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Validate appcast structure + Sparkle fields
-        # Python's `ElementTree.parse()` raises on malformed XML so we
-        # get the well-formedness check for free (no `xmllint` needed —
-        # libxml2-utils isn't on the ubuntu-24.04 runner image). Each
-        # `<item>` must also carry an `<enclosure>` with a URL and an
-        # `sparkle:edSignature` so Sparkle won't refuse the update on
-        # the user's Mac. Catches a forgotten signature paste during
-        # release prep.
         run: |
           python3 <<'PY'
-          import xml.etree.ElementTree as ET, sys
-          ns = {"sparkle": "http://www.andymatuschak.org/xml-namespaces/sparkle"}
-          root = ET.parse("appcast.xml").getroot()
-          missing = []
-          for item in root.iter("item"):
-              title = (item.findtext("title") or "?").strip()
-              enc = item.find("enclosure")
-              if enc is None:
-                  missing.append((title, "no <enclosure>")); continue
-              if not enc.attrib.get("url"):
-                  missing.append((title, "enclosure missing url"))
-              if not enc.attrib.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature"):
-                  missing.append((title, "enclosure missing sparkle:edSignature"))
-          if missing:
-              for t, why in missing:
-                  print(f"::error file=appcast.xml::{t}: {why}")
-              sys.exit(1)
-          print(f"appcast.xml ok — {sum(1 for _ in root.iter('item'))} item(s) validated")
+          import xml.etree.ElementTree as ET, sys, pathlib
+
+          SPARKLE_ED = "{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature"
+
+          def lint(path, allow_empty):
+              root = ET.parse(path).getroot()
+              items = list(root.iter("item"))
+              missing = []
+              for item in items:
+                  title = (item.findtext("title") or "?").strip()
+                  enc = item.find("enclosure")
+                  if enc is None:
+                      missing.append((title, "no <enclosure>")); continue
+                  if not enc.attrib.get("url"):
+                      missing.append((title, "enclosure missing url"))
+                  if not enc.attrib.get(SPARKLE_ED):
+                      missing.append((title, "enclosure missing sparkle:edSignature"))
+              if missing:
+                  for t, why in missing:
+                      print(f"::error file={path}::{t}: {why}")
+                  sys.exit(1)
+              if not allow_empty and not items:
+                  print(f"::error file={path}::expected at least one item")
+                  sys.exit(1)
+              print(f"{path} ok — {len(items)} item(s)")
+
+          lint("appcast.xml", allow_empty=False)
+          v2 = pathlib.Path("appcast-v2.xml")
+          if v2.exists():
+              lint("appcast-v2.xml", allow_empty=True)
+              backend = pathlib.Path("backend/api/_appcast-v2.xml")
+              if backend.exists() and v2.read_text() != backend.read_text():
+                  print("::error file=backend/api/_appcast-v2.xml::out of lockstep with appcast-v2.xml")
+                  sys.exit(1)
           PY

@@ -218,10 +218,9 @@ targets:
         NSPrincipalClass: NSApplication
         LSApplicationCategoryType: public.app-category.photography
         ITSAppUsesNonExemptEncryption: false
-        # E01.11: Sparkle (self-hosted feed, gedeeld met v1). Zelfde
-        # EdDSA-publieke sleutel → updates getekend met dezelfde private key
-        # (release-infra, E13.1). Bouwen vergt geen signing; publiceren wel.
-        SUFeedURL: "https://api.aaavatar.nl/appcast.xml"
+        # E13.1: eigen Sparkle-kanaal. Zelfde EdDSA-sleutel als v1; v1 blijft
+        # op /appcast.xml en ziet 2.0-releases nooit.
+        SUFeedURL: "https://api.aaavatar.nl/appcast-v2.xml"
         SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
@@ -246,6 +245,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2
         PRODUCT_NAME: Aaavatar 2
+        # Eigen versielijn (E13.1): ruim boven élk v1-buildnummer zodat een
+        # dev-binary die ooit op het gedeelde feed stond nooit een downgrade ziet.
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "100"
         # Expliciete modulenaam: PRODUCT_NAME bevat een spatie en zou anders
         # "Aaavatar_2" worden — Avatar2Tests doet `@testable import Avatar2`.
         PRODUCT_MODULE_NAME: Avatar2

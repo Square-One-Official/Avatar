@@ -12,3 +12,5 @@ batch — een placeholder stilletjes als definitief behandelen mag niet.
 | 3 | Background-print-presets (cracked stone, leopard, etc.) | App / Choose Background (4017:1099, "Image"-rij) | tegels 36×36 / canvas 1024² | E07.1 gebruikt gegenereerde gradient-presets als placeholder; ontworpen prints volgen als asset-batch |
 | 4 | Effects-stijl-previews (clay / wood / 3d / scribble) | App / Effects | 4× thumbnail 84×84 | E09.2 gebruikt een neutrale tegel + sparkles-glyph als placeholder; echte stijl-previews volgen als asset-batch |
 | 5 | Frame-lokale zwevende toolbar (Frame ▾ / Background / grid) | **n.v.t. — geen Figma-referentie** (capsule-frame 4114:978 toont 'm niet; team-vondst, E31) | zwevende capsule boven het portret, knoppen h32 | **placeholder-design** (E31.4, `CanvasActionToolbar`) — gebouwd in de geest van het hoofddesign; Thierry levert het echte design later (Figma-TODO) |
+
+**GTM-besluit (2026-08-16):** de 2.0-beta gaat live **met deze placeholders**. Dat is een geaccepteerd launch-risico, geen stille promotie tot definitieve assets. De batch blijft later één levering.
