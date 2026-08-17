@@ -10,12 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.37.0",
+    "@upstash/redis": "^1.38.2",
     "jose": "^5.9.0",
     "replicate": "^1.0.0",
-    "sharp": "^0.33.0",
+    "sharp": "^0.35.3",
     "stripe": "^17.0.0"
   },
   "devDependencies": {
