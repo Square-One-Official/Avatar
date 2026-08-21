@@ -93,4 +93,39 @@ struct AutoFramerTests {
         #expect(abs(r.offsetY - Double(fit.offset.height)) < 0.0001)
         #expect(r.offsetX != 999)
     }
+
+    @Test func sharedFramingKeepsEqualIPDAndFillsBottom() {
+        // Close-up (grote IPD, korte romp) vs medium shot (kleine IPD, lange romp).
+        let closeUp = AutoFramer.FramingSubject(
+            faceRect: CGRect(x: 0, y: 0, width: 240, height: 240),
+            eyeCenter: CGPoint(x: 120, y: 100),
+            interEyeDistance: 120,
+            bodyBottomY: 220,
+            cutoutSize: CGSize(width: 400, height: 300)
+        )
+        let medium = AutoFramer.FramingSubject(
+            faceRect: CGRect(x: 0, y: 0, width: 200, height: 200),
+            eyeCenter: CGPoint(x: 100, y: 100),
+            interEyeDistance: 60,
+            bodyBottomY: 800,
+            cutoutSize: CGSize(width: 400, height: 900)
+        )
+        let transforms = AutoFramer.computeSharedTransforms([closeUp, medium])
+        #expect(transforms.count == 2)
+
+        let closeIPD = closeUp.interEyeDistance! * transforms[0].scale
+        let mediumIPD = medium.interEyeDistance! * transforms[1].scale
+        #expect(abs(closeIPD - mediumIPD) < 0.001)
+
+        let requiredBottom = 1024 * (1.0 + FramingConstants.bodyOvershoot)
+        let closeBottom = closeUp.bodyBottomY * transforms[0].scale + transforms[0].offset.height
+        let mediumBottom = medium.bodyBottomY * transforms[1].scale + transforms[1].offset.height
+        #expect(closeBottom >= requiredBottom - 0.001)
+        #expect(mediumBottom >= requiredBottom - 0.001)
+
+        let closeEyeY = closeUp.eyeCenter!.y * transforms[0].scale + transforms[0].offset.height
+        let mediumEyeY = medium.eyeCenter!.y * transforms[1].scale + transforms[1].offset.height
+        #expect(abs(closeEyeY - 1024 * FramingConstants.targetEyeCenterY) < 0.001)
+        #expect(abs(mediumEyeY - 1024 * FramingConstants.targetEyeCenterY) < 0.001)
+    }
 }

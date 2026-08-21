@@ -50,7 +50,6 @@ final class Folder2DefaultBackgroundTests: XCTestCase {
 
         FolderImportSupport.attachImport(
             portrait: portrait,
-            section: .portraits,
             selectedFolderID: folder.persistentModelID,
             modelContext: context
         )
@@ -59,7 +58,31 @@ final class Folder2DefaultBackgroundTests: XCTestCase {
         XCTAssertEqual(portrait.background, .color("#445566"))
     }
 
-    func testAttachImportNegeertHomeEnAllPortraits() throws {
+    /// persist() draait nádat runCutout `section` op `.editor` zette. De
+    /// map-bestemming moet uit `openOrigin` komen, niet uit `section` —
+    /// anders landt een drop in een Custom-folder unfiled + transparant.
+    func testFolderIDKomtUitOpenOriginNietUitSection() throws {
+        let context = try makeContext()
+        let folder = Folder2(name: "Custom")
+        context.insert(folder)
+        let id = folder.persistentModelID
+
+        XCTAssertEqual(
+            FolderImportSupport.folderID(from: .portraits(id)),
+            id,
+            "drop vanuit een map → die map, ook als section al .editor is"
+        )
+        XCTAssertNil(
+            FolderImportSupport.folderID(from: .portraits(nil)),
+            "All portraits → unfiled"
+        )
+        XCTAssertNil(
+            FolderImportSupport.folderID(from: .home),
+            "Home-import mag een achtergebleven selectedFolderID niet gebruiken"
+        )
+    }
+
+    func testAttachImportZonderFolderIDDoetNiets() throws {
         let context = try makeContext()
         let folder = Folder2(name: "OPP")
         folder.setDefaultBackground(.color("#445566"))
@@ -69,20 +92,11 @@ final class Folder2DefaultBackgroundTests: XCTestCase {
 
         FolderImportSupport.attachImport(
             portrait: portrait,
-            section: .home,
-            selectedFolderID: folder.persistentModelID,
-            modelContext: context
-        )
-        XCTAssertNil(portrait.folder)
-        XCTAssertEqual(portrait.background, .transparent)
-
-        FolderImportSupport.attachImport(
-            portrait: portrait,
-            section: .portraits,
             selectedFolderID: nil,
             modelContext: context
         )
         XCTAssertNil(portrait.folder)
+        XCTAssertEqual(portrait.background, .transparent)
     }
 
     func testAttachImportZonderDefaultAlleenMap() throws {
@@ -94,7 +108,6 @@ final class Folder2DefaultBackgroundTests: XCTestCase {
 
         FolderImportSupport.attachImport(
             portrait: portrait,
-            section: .portraits,
             selectedFolderID: folder.persistentModelID,
             modelContext: context
         )

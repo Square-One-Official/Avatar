@@ -1,12 +1,12 @@
 // Canvas action-toolbar (E24.1–24.4, verslankt in E24.9, popover-stijl E24.12)
 // — scène/beeld-acties bovenaan het portret. Top-level items, secundaire
 // acties in dropdowns:
-//   Frame ▾ (Auto-frame[primair]/Crop/Fix angle/Flip + Shape) · Background.
+//   Frame ▾ (Auto-frame[primair]/Crop/Flip + Shape) · Background.
 // E31.2: Adjust → onderste capsule-knop "Enhance". E31.3: AI ▾ (Restore body
 // e.a.) is hier weg → de Enhance-paneel-acties (E24.27 + Restore body).
 //
 // E31.4: deze frame-lokale toolbar bevat nu PUUR frame/scène/compositie-controls
-// (Frame-vorm · Background · grid · Flip · Auto-frame/Crop/Fix). FIGMA-TODO:
+// (Frame-vorm · Background · grid · Flip · Auto-frame/Crop). FIGMA-TODO:
 // hier is GÉÉN Figma-referentie voor (de capsule 4114:978 toont 'm niet — het is
 // een team-vondst); dit is een PLACEHOLDER-DESIGN in de geest van het hoofd-
 // design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
@@ -23,7 +23,7 @@
 // E32: deze toolbar deelt nu exact dezelfde DS-componenten als de onderste
 // toolbar (`DSCapsuleToolButton` + `.dsToolbarCapsule`), alleen op `.compact`-
 // maat; de chevron is een gedeelde SF `chevron.down`. De dropdowns
-// delen de paneel-radius (xl4) met de onderste DSEditPanel.
+// delen de menu-radius (lg = 8) met `DSContextMenuPanel`.
 
 import AvatarUI
 import SwiftUI
@@ -44,7 +44,6 @@ enum CanvasToolbarLayout {
 struct CanvasActionToolbar<Background: View>: View {
     var onCrop: (() -> Void)?
     var onAutoFrame: () -> Void = {}
-    var onFixAngle: (() -> Void)?
     var onFlip: () -> Void = {}
     /// E24.16: huidige frame-vorm + setter (Circle/Square-keuze in Frame ▾).
     var frameShape: ExportShape = .circle
@@ -57,7 +56,7 @@ struct CanvasActionToolbar<Background: View>: View {
     /// Vision-detectie loopt voor auto-frame (subtiele spinner op Frame-knop).
     var isAutoFraming: Bool = false
     /// E31.7: de board hergebruikt deze toolbar maar zonder de editor-only
-    /// transform-acties (Auto-frame/Crop/Fix-angle) en zonder de grid-toggle —
+    /// transform-acties (Auto-frame/Crop) en zonder de grid-toggle —
     /// die hebben geen effect op een statische board-node. Default true →
     /// single-editor ongewijzigd.
     var showFramingActions: Bool = true
@@ -145,8 +144,8 @@ struct CanvasActionToolbar<Background: View>: View {
                     .padding(padding)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Zelfde 8pt-radius als rechtermuis- en avatar-menu's.
+                    .dsPanelSurface(cornerRadius: DSRadius.lg)
                     .offset(y: buttonSize.height + dropdownGap)
                     .zIndex(10)
                     .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
@@ -175,7 +174,6 @@ struct CanvasActionToolbar<Background: View>: View {
             if showFramingActions {
                 menuRow("Auto-frame & center", icon: .autoFrame, action: onAutoFrame)
                 menuRow("Crop", icon: .crop, action: onCrop)
-                menuRow("Fix camera angle", icon: .fixAngle, action: onFixAngle)
             }
             menuRow("Flip horizontal", icon: .flip, action: onFlip)
 

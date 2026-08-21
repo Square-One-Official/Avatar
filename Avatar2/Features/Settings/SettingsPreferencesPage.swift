@@ -21,6 +21,7 @@ struct SettingsPreferencesPage: View {
     // E13.2: migratie-import uit een Aaavatar 1-back-up.
     @Environment(\.modelContext) private var modelContext
     var entitlement: EntitlementModel? = nil
+    @Bindable var presentation: UIPresentationStore
     @State private var importResult: String?
 
     private var appearance: AppearancePreference {
@@ -57,6 +58,7 @@ struct SettingsPreferencesPage: View {
                 }
             }
             .padding(.top, DSSpacing.gap8)
+            .dsDropdownDismissOverlay(isPresented: $presentation.settingsThemeMenuOpen)
         }
         .padding(.top, ShellMetrics.settingsPageTopInset)
         .padding(.leading, DSSpacing.gap6)
@@ -65,7 +67,11 @@ struct SettingsPreferencesPage: View {
 
     // Figma-dropdown: pill (bg neutral, r-xl, 40 hoog) met label + chevron.
     private var themeMenu: some View {
-        ThemeMenuPill(selection: $appearanceRaw, label: appearance.label)
+        ThemeMenuPill(
+            selection: $appearanceRaw,
+            label: appearance.label,
+            isPresented: $presentation.settingsThemeMenuOpen
+        )
     }
 
     private func runImport() {
@@ -85,15 +91,12 @@ struct SettingsPreferencesPage: View {
 private struct ThemeMenuPill: View {
     @Binding var selection: String
     let label: String
+    @Binding var isPresented: Bool
 
     @State private var isHovering = false
 
     var body: some View {
-        Menu {
-            ForEach(AppearancePreference.allCases) { option in
-                Button(option.label) { selection = option.rawValue }
-            }
-        } label: {
+        DSDropdownButton(isPresented: $isPresented, anchorHeight: 40, minWidth: 160) {
             HStack(spacing: DSSpacing.gap2) {
                 Text(label)
                     .dsTextStyle(.labelBase)
@@ -109,10 +112,18 @@ private struct ThemeMenuPill: View {
             .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl))
             .onHover { isHovering = $0 }
             .dsMotion(DSMotion.micro, value: isHovering)
+        } menu: {
+            ForEach(AppearancePreference.allCases) { option in
+                DSMenuRow(
+                    option.label,
+                    icon: option.icon,
+                    shortcut: option.rawValue == selection ? "✓" : nil
+                ) {
+                    selection = option.rawValue
+                    isPresented = false
+                }
+            }
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .fixedSize()
     }
 }

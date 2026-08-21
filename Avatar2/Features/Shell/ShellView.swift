@@ -1,10 +1,9 @@
 // Main shell-wortel (E05). 5.1 = first-use-empty-state, 5.2 = import
 // (drag-drop over het hele venster + bestandskiezer → PipelineRouter).
-// E04.5-fix (bevindingen 2/3/6): tijdens een drag vervangt de Figma-
-// dropzone de first-use-inhoud (gedrag: heel venster blijft droptarget);
-// de status-pill hangt op vensterniveau rechtsonder (positie uit de
-// frames); de Name/Role-header staat in de flow bóven de canvas-kaart —
-// nooit over de foto.
+// Drop-chrome framed de contentkolom (niet een zwevend 465×456-vlak);
+// heel venster blijft droptarget. Status-pill hangt rechtsonder; de
+// Name/Role-header staat in de flow bóven de canvas-kaart — nooit over
+// de foto.
 
 import AvatarUI
 import SwiftUI
@@ -41,11 +40,17 @@ struct ShellView: View {
                         BannerStudioView(doc: doc, model: model, entitlement: entitlement)
                     } else {
                         canvas
-                            .opacity(model.isDropTargeted ? 0 : 1)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
+                .opacity(showsFileDropzone ? DSOpacity.disabled : DSOpacity.strong)
+                .overlay {
+                    dropzoneLayer
+                        .padding(.leading, model.isLeftNavVisible ? LeftNavView.layoutWidth : 0)
+                        .padding(.trailing, ShellMetrics.windowEdgeInset)
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                }
             }
 
             if studioFullBleed {
@@ -67,6 +72,8 @@ struct ShellView: View {
                     mainArea
                         .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
+                        .opacity(showsFileDropzone ? DSOpacity.disabled : DSOpacity.strong)
+                        .overlay { dropzoneLayer }
                 }
             }
         }
@@ -266,21 +273,11 @@ struct ShellView: View {
                let f = Double(args[i + 1]) {
                 model.debugScaleSubject(factor: f)
             }
-            // E27.4: open de board-view (alle portretten op één canvas).
-            if args.contains("--board") { model.showPortraits(); model.setPortraitsViewMode(.canvas) }
+            // E27.4: `--board` opende de canvas-lens; de library is nu grid-only.
+            if args.contains("--board") { model.showPortraits() }
             // PoC (left-nav): open de Portraits-galerij direct voor de smoke.
             if args.contains("--portraits") { model.section = .portraits }
-            // Smoke: forceer een specifieke lens op de Portraits-surface
-            // (`--lens grid|list|gallery|canvas`) — deterministisch i.p.v. klikken.
-            if let i = args.firstIndex(of: "--lens"), args.indices.contains(i + 1) {
-                model.showPortraits()
-                switch args[i + 1] {
-                case "list": model.setPortraitsViewMode(.list)
-                case "gallery": model.setPortraitsViewMode(.gallery)
-                case "canvas": model.setPortraitsViewMode(.canvas)
-                default: model.setPortraitsViewMode(.grid)
-                }
-            }
+            if args.contains("--lens") { model.showPortraits() }
             // PoC (left-nav): forceer de left-nav dicht (collapsed-screenshot).
             if args.contains("--hide-leftnav") { model.isLeftNavVisible = false }
             // PoC (left-nav): open "Manage backgrounds" direct voor de smoke.
@@ -323,12 +320,6 @@ struct ShellView: View {
         }
         .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
             handleDrop(providers)
-        }
-        .overlay {
-            if model.isDropTargeted && !model.isShowingSettings && !model.isShowingSocialPreview && !model.isShowingBannerPreview {
-                DropzoneOverlay()
-                    .allowsHitTesting(false)
-            }
         }
         .overlay(alignment: .bottomTrailing) {
             if let label = isolatingStatusLabel, !model.isShowingSocialPreview {
@@ -389,10 +380,6 @@ struct ShellView: View {
                 // PoC (left-nav): Home — het overzicht (laatste + eerdere /
                 // first-use). De top-right-chrome blijft hier weg.
                 HomeView(model: model, entitlement: entitlement)
-                    // Tijdens een drag fade't de hele Home-inhoud uit zodat alleen
-                    // de dropzone-overlay (op mainArea-niveau) zichtbaar blijft —
-                    // zelfde gedrag als de editor-canvas.
-                    .opacity(model.isDropTargeted ? 0 : 1)
                     .transition(.opacity)
             } else if model.section == .portraits {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
@@ -413,7 +400,6 @@ struct ShellView: View {
                         Color.clear
                     } else {
                         canvas
-                            .opacity(model.isDropTargeted ? 0 : 1)
                     }
                 }
                 .transition(.opacity)
@@ -505,8 +491,7 @@ struct ShellView: View {
 
     @ViewBuilder
     private var canvas: some View {
-        // De board/canvas is nu een Portraits-LENS (LibraryViewMode.canvas), geen
-        // studio-modus meer → de studio toont altijd de enkel-portret-editor.
+        // Studio toont altijd de enkel-portret-editor. De library is grid-only.
         editorCanvas
     }
 
@@ -539,9 +524,6 @@ struct ShellView: View {
         } else {
             switch model.canvas {
             case .empty:
-                // Drag-fade (first-use-inhoud weg, alleen dropzone over) wordt nu
-                // centraal door de `.opacity(isDropTargeted)` op de canvas geregeld,
-                // zodat álle states uniform faden i.p.v. alleen first-use.
                 if model.showsFirstUseEmptyState {
                     FirstUseEmptyState(onChooseFile: { model.presentOpenPanel() }, entitlement: entitlement)
                 } else {
@@ -600,24 +582,46 @@ struct ShellView: View {
         model.selectedPortrait.flatMap { NSImage(data: $0.cutoutData) }
     }
 
-    /// Figma App / Dropzone (4017:1622): Frame 11 465×456 gecentreerd,
-    /// r-4xl, dashed b-medium in lime, vulling lime ~5% (gesampled — het
-    /// frame exposeert er geen variabele voor), "Drop it" in H3 primary.
+    /// File-drop chrome for the main column — pane frame, not a floating square.
+    private var showsFileDropzone: Bool {
+        model.isDropTargeted
+            && !model.isShowingSettings
+            && !model.isShowingSocialPreview
+            && !model.isShowingBannerPreview
+    }
+
+    @ViewBuilder
+    private var dropzoneLayer: some View {
+        if showsFileDropzone {
+            DropzoneOverlay()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .transition(.opacity)
+        }
+    }
+
     private struct DropzoneOverlay: View {
+        /// Gallery/home pad at `gap6`; stroke sits just outside the tiles.
+        private let inset: CGFloat = DSSpacing.gap5
+
         var body: some View {
+            let shape = RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
             ZStack {
-                RoundedRectangle(cornerRadius: DSRadius.xl4)
+                DSColor.Background.app.opacity(DSOpacity.medium)
+                shape
                     .fill(DSColor.Action.primary.opacity(0.05))
-                RoundedRectangle(cornerRadius: DSRadius.xl4)
-                    .strokeBorder(
-                        DSColor.Action.primary,
-                        style: StrokeStyle(lineWidth: DSBorderWidth.medium, dash: [2, 4])
-                    )
+                    .overlay {
+                        shape.strokeBorder(
+                            DSColor.Action.primary,
+                            style: StrokeStyle(lineWidth: DSBorderWidth.medium, dash: [2, 4])
+                        )
+                    }
+                    .padding(inset)
                 Text("Drop it")
                     .dsTextStyle(.h3)
                     .foregroundStyle(DSColor.Foreground.primary)
             }
-            .frame(width: 465, height: 456)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

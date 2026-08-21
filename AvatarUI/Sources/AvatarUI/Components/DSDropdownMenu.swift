@@ -80,3 +80,44 @@ private struct DSDropdownDismissOverlay: ViewModifier {
         }
     }
 }
+
+/// Knop + `DSContextMenuPanel` (8pt-radius). Vervangt native SwiftUI `Menu`,
+/// dat de systeem-menuradius tekent i.p.v. onze DS-kaart.
+public struct DSDropdownButton<Label: View, Menu: View>: View {
+    @Binding private var isPresented: Bool
+    private let anchorHeight: CGFloat
+    private let minWidth: CGFloat
+    private let placement: DSDropdownPlacement
+    private let label: Label
+    private let menu: Menu
+
+    public init(
+        isPresented: Binding<Bool>,
+        anchorHeight: CGFloat = 32,
+        minWidth: CGFloat = 160,
+        placement: DSDropdownPlacement = .below,
+        @ViewBuilder label: () -> Label,
+        @ViewBuilder menu: () -> Menu
+    ) {
+        self._isPresented = isPresented
+        self.anchorHeight = anchorHeight
+        self.minWidth = minWidth
+        self.placement = placement
+        self.label = label()
+        self.menu = menu()
+    }
+
+    public var body: some View {
+        Button { isPresented.toggle() } label: {
+            label
+        }
+        .buttonStyle(.plain)
+        .dsDropdownMenu(
+            isPresented: $isPresented,
+            anchorHeight: anchorHeight,
+            placement: placement
+        ) {
+            DSContextMenuPanel(minWidth: minWidth) { menu }
+        }
+    }
+}

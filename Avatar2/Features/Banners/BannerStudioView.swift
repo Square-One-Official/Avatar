@@ -15,7 +15,7 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .background: return "Background"
-        case .shaders:    return "Effects"
+        case .shaders:    return "Shaders"
         case .text:       return "Text"
         case .logo:       return "Logo"
         case .size:       return "Size"
@@ -35,9 +35,9 @@ enum BannerTool: Hashable, CaseIterable, Identifiable {
     var summary: String {
         switch self {
         case .background: return "Color or gradient here — click the canvas to add a photo background."
-        case .shaders:    return "Procedural effects applied to the whole banner."
+        case .shaders:    return "Procedural shaders applied to the whole banner."
         case .text:       return "Click the canvas to add text — drag to move, use the toolbar to style."
-        case .logo:       return "Tap the canvas to place a logo — drag to move, corners to scale."
+        case .logo:       return "Click Add logo, or click the canvas to place one — drag to move, corners to scale."
         case .size:       return "Platform sizes — LinkedIn, X, wide."
         }
     }
@@ -272,8 +272,8 @@ struct BannerStudioView: View {
 
     // MARK: Canvas
 
-    /// Bottom-panelen (Background/Effects/Size) sluiten bij canvas-tik; Logo niet
-    /// (geen paneel — canvas-tik opent Finder).
+    /// Bottom-panelen (Background/Shaders/Size) sluiten bij canvas-tik. Logo
+    /// blijft open — canvas-tik plaatst of selecteert het logo. Text is momentaan.
     private var closesPanelOnCanvasTap: Bool {
         switch model.presentation.bannerActiveTool {
         case .background, .shaders, .size: true
@@ -433,7 +433,12 @@ struct BannerStudioView: View {
             case .text:
                 EmptyView()
             case .logo:
-                EmptyView()
+                BannerLogoPanel(
+                    doc: doc,
+                    selection: $selection,
+                    presentation: model.presentation,
+                    subtitle: showHint ? tool.summary : nil
+                )
             case .size:
                 BannerSizePanel(doc: doc, subtitle: showHint ? tool.summary : nil)
             case .shaders:

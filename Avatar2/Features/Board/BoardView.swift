@@ -47,16 +47,7 @@ struct BoardView: View {
 
     /// De enige geselecteerde node (nil bij 0 of ≥2) — de in-place-edit-target.
     private var boardToolbarItems: [DSToolbarItem<EditorTool>] {
-        let flags = entitlement.featureFlags
-        return EditorView.toolbarItems.filter { item in
-            switch item.id {
-            case .effects:    return flags.effectsEnabled
-            case .face:       return flags.faceEnabled
-            case .hair:       return flags.hairEnabled
-            case .clothing:   return flags.clothesEnabled
-            default:          return true
-            }
-        }
+        EditorView.toolbarItems.filter { $0.id.isEnabled(remote: entitlement.featureFlags) }
     }
 
     private var selectedNode: Portrait2? {
@@ -847,6 +838,19 @@ struct BoardView: View {
             // E32.1: gedeelde compacte pil (SF-Symbol-init) i.p.v. de inline-knop.
             if selection.count >= 2 {
                 DSCapsuleToolButton(
+                    Image(systemName: "square.resize"),
+                    label: "Match framing",
+                    size: .compact,
+                    action: {
+                        PortraitSetActions.matchFraming(
+                            selectedPortraits, undoManager: undoManager
+                        ) { model.setBusyMessage = $0 }
+                    }
+                )
+
+                Divider().frame(height: 16).overlay(DSColor.Foreground.divider)
+
+                DSCapsuleToolButton(
                     Image(systemName: isMatchingLight ? "circle.dotted" : "sun.max"),
                     label: isMatchingLight ? "Matching…" : "Match lighting",
                     size: .compact,
@@ -1224,9 +1228,11 @@ struct BoardView: View {
     private func singleEditBottomBar(_ node: Portrait2) -> some View {
         VStack(spacing: DSSpacing.gap2) {
             // Actief paneel boven de balk.
-            if let base = NSImage(data: node.cutoutData) {
+            if let tool = editTool,
+               tool.isEnabled(remote: entitlement.featureFlags),
+               let base = NSImage(data: node.cutoutData) {
                 Group {
-                    switch editTool {
+                    switch tool {
                     case .edit:
                         EditColorPanel(
                             source: base,

@@ -1,7 +1,7 @@
-// Set-brede acties (Align, Match lighting, bulk-export) — gelift uit de
-// verwijderde rechter set-sidebar zodat ze nu via de gedeelde selectie +
-// rechtermuis op Home én Portraits beschikbaar zijn (Finder-stijl). Ze werken op
-// de huidige multi-selectie i.p.v. de hele set; elke actie is één undo-groep.
+// Set-brede acties (Match framing, Match lighting, bulk-export, Set background)
+// — via de gedeelde selectie + rechtermuis op Home én Portraits (Finder-stijl).
+// Ze werken op de huidige multi-selectie i.p.v. de hele set; elke actie is
+// één undo-groep.
 
 import AppKit
 import AvatarKit
@@ -11,34 +11,37 @@ import SwiftUI
 
 @MainActor
 enum PortraitSetActions {
-    /// Auto-frame (E06.5) elk geselecteerd portret als één undo-stap.
-    static func align(_ targets: [Portrait2], undoManager: UndoManager?, onBusy: @escaping (String?) -> Void) {
+    /// Zelfde ooglijn + camera-afstand over de selectie, zonder lege onderkant.
+    /// Eén undo-stap. Editor Auto-frame blijft per-portret (`AutoFramer.apply`).
+    static func matchFraming(_ targets: [Portrait2], undoManager: UndoManager?, onBusy: @escaping (String?) -> Void) {
         guard !targets.isEmpty else { return }
-        onBusy("Aligning…")
+        onBusy("Matching framing…")
         Task {
             defer { onBusy(nil) }
-            // 1. Bereken alle transforms (off-main per cutout).
-            var items: [(Portrait2, TransformUndo.Snapshot, AutoFramer.Transform)] = []
+            var portraits: [Portrait2] = []
+            var befores: [TransformUndo.Snapshot] = []
+            var images: [CGImage] = []
             for portrait in targets {
                 guard let cg = NSImage(data: portrait.cutoutData)?
                     .cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
-                let before = TransformUndo.snapshot(of: portrait)
-                let transform = await AutoFramer.transform(forCutout: cg)
-                items.append((portrait, before, transform))
+                portraits.append(portrait)
+                befores.append(TransformUndo.snapshot(of: portrait))
+                images.append(cg)
             }
-            // 2. Schrijf + registreer in één undo-groep.
+            let transforms = await AutoFramer.sharedTransforms(for: images)
             undoManager?.beginUndoGrouping()
-            undoManager?.setActionName("Align")
+            undoManager?.setActionName("Match Framing")
             DSMotion.animate(DSMotion.springTransform) {
-                for (portrait, before, transform) in items {
+                for (index, portrait) in portraits.enumerated() {
+                    let transform = transforms[index]
                     portrait.offsetX = transform.offset.width
                     portrait.offsetY = transform.offset.height
                     portrait.scale = transform.scale
                     portrait.touch()
                     TransformUndo.register(
                         undoManager, portrait: portrait,
-                        undoTo: before, redoTo: TransformUndo.snapshot(of: portrait),
-                        actionName: "Align"
+                        undoTo: befores[index], redoTo: TransformUndo.snapshot(of: portrait),
+                        actionName: "Match Framing"
                     )
                 }
             }
@@ -77,6 +80,29 @@ enum PortraitSetActions {
             }
             undoManager?.endUndoGrouping()
         }
+    }
+
+    /// Zelfde achtergrond op alle targets, één undo-groep.
+    static func setBackground(
+        _ targets: [Portrait2],
+        _ background: PortraitBackground,
+        undoManager: UndoManager?
+    ) {
+        guard !targets.isEmpty else { return }
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName("Background")
+        for portrait in targets {
+            let before = portrait.background
+            guard before != background else { continue }
+            portrait.setBackground(background)
+            ReversibleChange.register(
+                undoManager, target: portrait,
+                from: before, to: background, actionName: "Background"
+            ) { p, bg in
+                p.setBackground(bg)
+            }
+        }
+        undoManager?.endUndoGrouping()
     }
 
     /// Exporteer de selectie naar een gekozen map (free = watermerk).

@@ -534,9 +534,9 @@ struct EditColorPanel: View {
     }
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+        VStack(alignment: .leading, spacing: DSSpacing.gap0_5) {
             Text(label)
-                .dsTextStyle(.bodySmall)
+                .dsTextStyle(.labelSmall)
                 .foregroundStyle(DSColor.Foreground.muted)
             DSSlider(
                 value: value,

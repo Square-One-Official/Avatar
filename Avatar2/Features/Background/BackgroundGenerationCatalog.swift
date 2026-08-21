@@ -51,6 +51,14 @@ enum BackgroundGenerationModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    var menuIcon: String {
+        switch self {
+        case .apple: "apple.logo"
+        case .gemini: "sparkles"
+        case .openAI: "cloud"
+        }
+    }
+
     /// Server-side MODEL_REGISTRY key (cloud only).
     var generationModelKey: String? {
         switch self {

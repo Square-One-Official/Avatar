@@ -23,6 +23,7 @@ public struct DSColorPicker: View {
     @State private var alpha: Double = 1
     @State private var hexText: String = ""
     @State private var format: Format = .hex
+    @State private var formatMenuOpen = false
     @State private var seeded = false
 
     public init(color: Binding<Color>, supportsAlpha: Bool = true) {
@@ -49,6 +50,7 @@ public struct DSColorPicker: View {
         .padding(DSSpacing.gap5)
         .frame(width: 300)
         .dsPanelSurface(cornerRadius: DSRadius.xl)
+        .dsDropdownDismissOverlay(isPresented: $formatMenuOpen)
         .onAppear {
             guard !seeded else { return }
             seedFromColor(); seeded = true
@@ -152,9 +154,7 @@ public struct DSColorPicker: View {
     }
 
     private var formatMenu: some View {
-        Menu {
-            ForEach(Format.allCases) { f in Button(f.rawValue) { format = f } }
-        } label: {
+        DSDropdownButton(isPresented: $formatMenuOpen, anchorHeight: 30, minWidth: 100) {
             HStack(spacing: DSSpacing.gap1) {
                 Text(format.rawValue).dsTextStyle(.labelSmall)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
@@ -163,9 +163,18 @@ public struct DSColorPicker: View {
             .padding(.horizontal, DSSpacing.gap2)
             .frame(height: 30)
             .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.md))
+        } menu: {
+            ForEach(Format.allCases) { f in
+                DSMenuRow(
+                    f.rawValue,
+                    icon: "number",
+                    shortcut: f == format ? "✓" : nil
+                ) {
+                    format = f
+                    formatMenuOpen = false
+                }
+            }
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
         .fixedSize()
     }
 

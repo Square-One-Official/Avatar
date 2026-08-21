@@ -21,9 +21,12 @@ struct FloatingOverlayHost: View {
     var body: some View {
         ZStack {
             portraitContextLayer
+            selectionBackgroundPickerLayer
             leftNavFolderMenuLayer
             bannerGalleryMenuLayer
         }
+        .focusedSceneValue(\.portraitSet, portraitSetAction)
+        .background { escapeBackgroundPicker }
         .alert(alertTitle, isPresented: Binding(
             get: { model.presentation.alert != nil },
             set: { if !$0 { model.presentation.alert = nil; alertDraft = "" } }
@@ -73,10 +76,75 @@ struct FloatingOverlayHost: View {
                             targetIDs: targets.map(\.persistentModelID),
                             draft: ""
                         )
+                    },
+                    onRequestSetBackground: { _ in
+                        model.presentation.openSelectionBackgroundPicker(anchor: request.anchor)
                     }
                 )
             }
         }
+    }
+
+    // MARK: - Selection background picker
+
+    @ViewBuilder private var selectionBackgroundPickerLayer: some View {
+        if model.presentation.selectionBackgroundPickerOpen {
+            let targets = portraits.filter { model.isPortraitSelected($0) }
+            DSContextMenuOverlay(
+                anchor: model.presentation.selectionBackgroundPickerAnchor,
+                onDismiss: { model.presentation.selectionBackgroundPickerOpen = false },
+                menuWidth: 460,
+                menuHeight: 480
+            ) {
+                BackgroundPanel(
+                    portrait: targets.first,
+                    onApply: { background in
+                        PortraitSetActions.setBackground(
+                            targets, background, undoManager: undoManager
+                        )
+                    },
+                    presentation: model.presentation,
+                    entitlement: entitlement
+                )
+                .padding(DSSpacing.gap4)
+                .frame(width: 440)
+                .fixedSize(horizontal: false, vertical: true)
+                .dsPanelSurface(cornerRadius: DSRadius.xl4)
+            }
+        }
+    }
+
+    private var escapeBackgroundPicker: some View {
+        Button("") { model.presentation.selectionBackgroundPickerOpen = false }
+            .keyboardShortcut(.escape, modifiers: [])
+            .opacity(0)
+            .disabled(!model.presentation.selectionBackgroundPickerOpen)
+    }
+
+    private var selectedPortraits: [Portrait2] {
+        portraits.filter { model.isPortraitSelected($0) }
+    }
+
+    private var portraitSetAction: PortraitSetAction {
+        PortraitSetAction(
+            selectedCount: model.selectedPortraitIDs.count,
+            matchFraming: {
+                PortraitSetActions.matchFraming(
+                    selectedPortraits, undoManager: undoManager
+                ) { model.setBusyMessage = $0 }
+            },
+            matchLighting: {
+                guard let reference = FolderSetScope.matchLightingReference(selectedPortraits) else { return }
+                PortraitSetActions.matchLighting(
+                    selectedPortraits, reference: reference, undoManager: undoManager
+                ) { model.setBusyMessage = $0 }
+            },
+            setBackground: {
+                let anchor = model.presentation.portraitContextMenu?.anchor
+                    ?? model.presentation.selectionBackgroundPickerAnchor
+                model.presentation.openSelectionBackgroundPicker(anchor: anchor)
+            }
+        )
     }
 
     // MARK: - Left nav folder menu
@@ -95,9 +163,9 @@ struct FloatingOverlayHost: View {
                         model.showPortraits(folderID: folderID)
                         model.selectAllPortraits(items.map(\.persistentModelID))
                     }
-                    DSMenuRow("Align set", icon: "align.horizontal.left", disabled: items.isEmpty) {
+                    DSMenuRow("Match framing", icon: "square.resize", shortcut: "⌥⌘F", disabled: items.isEmpty) {
                         model.presentation.leftNavFolderMenu = nil
-                        PortraitSetActions.align(items, undoManager: undoManager) { model.setBusyMessage = $0 }
+                        PortraitSetActions.matchFraming(items, undoManager: undoManager) { model.setBusyMessage = $0 }
                     }
                     DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
                         model.presentation.leftNavFolderMenu = nil

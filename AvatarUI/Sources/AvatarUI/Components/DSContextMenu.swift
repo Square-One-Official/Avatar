@@ -111,15 +111,21 @@ public struct DSContextMenuPanel<Content: View>: View {
 public struct DSContextMenuOverlay<Menu: View>: View {
     private let anchor: CGRect
     private let onDismiss: () -> Void
+    private let menuWidth: CGFloat
+    private let menuHeight: CGFloat
     private let menu: Menu
 
     public init(
         anchor: CGRect,
         onDismiss: @escaping () -> Void,
+        menuWidth: CGFloat = 220,
+        menuHeight: CGFloat = 260,
         @ViewBuilder menu: () -> Menu
     ) {
         self.anchor = anchor
         self.onDismiss = onDismiss
+        self.menuWidth = menuWidth
+        self.menuHeight = menuHeight
         self.menu = menu()
     }
 
@@ -136,12 +142,12 @@ public struct DSContextMenuOverlay<Menu: View>: View {
         }
     }
 
-    private func clampedX(in size: CGSize, menuWidth: CGFloat = 220) -> CGFloat {
+    private func clampedX(in size: CGSize) -> CGFloat {
         let pad = DSSpacing.gap2
         return min(max(anchor.minX, pad), max(pad, size.width - menuWidth - pad))
     }
 
-    private func clampedY(in size: CGSize, menuHeight: CGFloat = 260) -> CGFloat {
+    private func clampedY(in size: CGSize) -> CGFloat {
         let pad = DSSpacing.gap2
         // Point-anchor (rechtermuis): open net onder de klik. Rect-anchor: onder het element.
         let baseY = anchor.height > 0 ? anchor.maxY : anchor.minY

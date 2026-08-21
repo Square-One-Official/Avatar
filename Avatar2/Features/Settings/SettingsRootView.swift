@@ -64,7 +64,7 @@ struct SettingsRootView: View {
             Group {
                 switch page {
                 case .preferences:
-                    SettingsPreferencesPage()
+                    SettingsPreferencesPage(presentation: model.presentation)
                 case .aiModels:
                     SettingsAIModelsPage(entitlement: entitlement)
                 case .account:

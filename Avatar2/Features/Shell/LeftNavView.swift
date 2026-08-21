@@ -35,6 +35,7 @@ struct LeftNavView: View {
 
     @State private var draftName = ""
     @State private var dropTargetedFolderID: PersistentIdentifier?
+    @FocusState private var userRowFocused: Bool
 
     private static let contextMenuSpace = "leftNavContextMenu"
 
@@ -108,6 +109,20 @@ struct LeftNavView: View {
                 }
             }
         }
+        .background {
+            if model.presentation.leftNavUserMenuOpen {
+                Button("Close account menu") {
+                    model.presentation.leftNavUserMenuOpen = false
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+            }
+        }
+        .onChange(of: model.presentation.leftNavUserMenuOpen) { _, open in
+            if !open { userRowFocused = true }
+        }
         .coordinateSpace(name: Self.contextMenuSpace)
         .dsMotion(DSMotion.fast, value: model.presentation.leftNavUserMenuOpen)
         .task { await entitlement.refresh() }
@@ -137,7 +152,7 @@ struct LeftNavView: View {
                 if folders.isEmpty {
                     Text("No folders yet")
                         .dsTextStyle(.labelSmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
+                        .foregroundStyle(DSColor.Foreground.subtle)
                         .padding(.leading, LeftNavExpandableHeader.folderTextLeadingInset + LeftNavExpandableHeader.folderNestIndent)
                         .padding(.vertical, DSSpacing.gap1)
                 }
@@ -223,7 +238,7 @@ struct LeftNavView: View {
             if !upgradeBannerQuotaText.isEmpty {
                 Text(upgradeBannerQuotaText)
                     .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
             }
         }
         .padding(DSSpacing.gap3)
@@ -258,10 +273,11 @@ struct LeftNavView: View {
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.primary)
                     .lineLimit(1)
+                    .help(userDisplayName)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: DSIconSize.xs, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
             }
             .padding(.horizontal, DSSpacing.gap2)
             .frame(height: Self.userRowHeight)
@@ -270,46 +286,30 @@ struct LeftNavView: View {
             .dsHoverHighlight(cornerRadius: DSRadius.lg)
         }
         .buttonStyle(.plain)
+        .focused($userRowFocused)
+        .accessibilityLabel(userDisplayName)
+        .accessibilityHint("Account menu")
     }
 
     private var userMenu: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-            menuRow("Settings", icon: "gearshape") {
+        DSContextMenuPanel(minWidth: 220) {
+            DSMenuRow("Settings", icon: "gearshape") {
                 model.presentation.leftNavUserMenuOpen = false
                 model.isShowingSettings = true
             }
-            menuRow("Manage backgrounds", icon: "photo.on.rectangle") {
+            DSMenuRow("Manage backgrounds", icon: "photo.on.rectangle") {
                 model.presentation.leftNavUserMenuOpen = false
                 model.isShowingManageBackgrounds = true
             }
             if entitlement.isSignedIn {
                 Divider().padding(.vertical, 2)
-                menuRow("Sign out", icon: "rectangle.portrait.and.arrow.right", destructive: true) {
+                DSMenuRow("Sign out", icon: "rectangle.portrait.and.arrow.right", destructive: true) {
                     model.presentation.leftNavUserMenuOpen = false
                     entitlement.signOutAccount()
                 }
             }
         }
-        .padding(DSSpacing.gap1)
         .frame(width: 220)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
-    }
-
-    private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: DSSpacing.gap2) {
-                Image(systemName: icon).font(.system(size: DSIconSize.sm, weight: .medium)).frame(width: 18)
-                Text(title).dsTextStyle(.labelBase)
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(destructive ? DSColor.Signal.error : DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .dsHoverHighlight(cornerRadius: DSRadius.md)
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Afgeleide gebruikerslabels
@@ -337,6 +337,9 @@ private struct LeftNavExpandableHeader: View {
     let onCreateFolder: () -> Void
 
     @State private var rowHovering = false
+    @FocusState private var chevronFocused: Bool
+
+    private var chevronRevealed: Bool { rowHovering || chevronFocused }
 
     /// Vaste breedte links zodat label niet verschuift bij icon ↔ chevron.
     /// Zelfde 18 pt als `LeftNavRow`-iconen → label kolom lijn-ligt met Home/Banners.
@@ -366,17 +369,21 @@ private struct LeftNavExpandableHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityAction(named: isExpanded ? "Collapse folders" : "Expand folders") {
+                onToggleExpanded()
+            }
 
             Button(action: onCreateFolder) {
                 Image(systemName: "plus")
                     .font(.system(size: DSIconSize.sm, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .dsHoverHighlight(cornerRadius: DSRadius.md)
             .help("Create folder")
+            .accessibilityLabel("Create folder")
         }
         .foregroundStyle(isSelected ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
         .padding(.horizontal, DSSpacing.gap2)
@@ -404,25 +411,28 @@ private struct LeftNavExpandableHeader: View {
                 }
                 .buttonStyle(.plain)
             }
-            .opacity(rowHovering ? 0 : 1)
-            .scaleEffect(rowHovering ? 0.94 : 1, anchor: .center)
-            .allowsHitTesting(!rowHovering)
+            .opacity(chevronRevealed ? 0 : 1)
+            .scaleEffect(chevronRevealed ? 0.94 : 1, anchor: .center)
+            .allowsHitTesting(!chevronRevealed)
 
             Button(action: onToggleExpanded) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: DSIconSize.xs, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
                     .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .dsHoverHighlight(cornerRadius: DSRadius.md)
-            .opacity(rowHovering ? 1 : 0)
-            .scaleEffect(rowHovering ? 1 : 0.94, anchor: .center)
-            .allowsHitTesting(rowHovering)
+            .focused($chevronFocused)
+            .opacity(chevronRevealed ? 1 : 0)
+            .scaleEffect(chevronRevealed ? 1 : 0.94, anchor: .center)
+            .allowsHitTesting(chevronRevealed)
+            .accessibilityLabel(isExpanded ? "Collapse folders" : "Expand folders")
+            .help(isExpanded ? "Collapse folders" : "Expand folders")
         }
         .frame(width: Self.leadingSlotSize, height: Self.leadingSlotSize)
-        .dsMotion(DSMotion.micro, value: rowHovering)
+        .dsMotion(DSMotion.micro, value: chevronRevealed)
     }
 
     private var rowBackground: Color {
@@ -450,6 +460,7 @@ private struct LeftNavFolderRow: View {
                 Text(name)
                     .dsTextStyle(.labelBase)
                     .lineLimit(1)
+                    .help(name)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(isSelected || isDropTargeted ? DSColor.Foreground.primary : DSColor.Foreground.subtle)
@@ -461,7 +472,7 @@ private struct LeftNavFolderRow: View {
             .overlay {
                 if isDropTargeted {
                     RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
-                        .strokeBorder(DSColor.Action.primary, lineWidth: DSBorderWidth.medium)
+                        .strokeBorder(DSColor.Action.primaryForeground, lineWidth: DSBorderWidth.medium)
                 }
             }
             .contentShape(Rectangle())

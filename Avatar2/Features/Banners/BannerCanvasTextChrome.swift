@@ -101,6 +101,7 @@ struct BannerCanvasTextChrome: View {
                         onMenusOpenChange: { toolbarMenusOpen = $0 }
                     )
                 }
+                textContextMenuOverlay
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .dsMotion(DSMotion.fast, value: showToolbar)
@@ -117,9 +118,15 @@ struct BannerCanvasTextChrome: View {
                     // `draftString` de laag, dus dít is de laatst vastgelegde tekst.
                     // Type-to-edit heeft de snapshot al gezet vóór het overschrijven.
                     if textBeforeEdit == nil { textBeforeEdit = draftString }
+                    presentation.bannerTextContextMenu = nil
                 } else {
                     textBeforeEdit = nil
                     boxFocused = true
+                }
+            }
+            .onDisappear {
+                if presentation.bannerTextContextMenu?.id == layerID.uuidString {
+                    presentation.bannerTextContextMenu = nil
                 }
             }
         }
@@ -145,6 +152,30 @@ struct BannerCanvasTextChrome: View {
 
     // MARK: - Chrome
 
+    @ViewBuilder
+    private var textContextMenuOverlay: some View {
+        if let request = presentation.bannerTextContextMenu,
+           request.id == layerID.uuidString {
+            DSContextMenuOverlay(anchor: request.anchor, onDismiss: {
+                presentation.bannerTextContextMenu = nil
+            }) {
+                DSContextMenuPanel(minWidth: 160) {
+                    DSMenuRow("Delete", icon: "trash", destructive: true) {
+                        presentation.bannerTextContextMenu = nil
+                        removeLayer()
+                    }
+                }
+            }
+            .background {
+                Button("Close menu") { presentation.bannerTextContextMenu = nil }
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
     private func selectionBox(_ rect: CGRect) -> some View {
         Rectangle()
             .strokeBorder(DSColor.Action.primary, lineWidth: 1.5)
@@ -155,10 +186,11 @@ struct BannerCanvasTextChrome: View {
             .focused($boxFocused)
             .onDeleteCommand { removeLayer() }
             .onKeyPress(phases: .down) { press in handleTypeToEdit(press) }
-            .contextMenu {
-                Button(role: .destructive) { removeLayer() } label: {
-                    Label("Delete", systemImage: "trash")
-                }
+            .contextMenuTrigger(in: .named(BannerCanvasOverlay.space)) { frame in
+                presentation.bannerFloatingMenu = nil
+                presentation.bannerTextContextMenu = AnchoredMenuRequest(
+                    id: layerID.uuidString, anchor: frame
+                )
             }
             .allowsHitTesting(!isEditing)
             .position(x: rect.midX, y: rect.midY)

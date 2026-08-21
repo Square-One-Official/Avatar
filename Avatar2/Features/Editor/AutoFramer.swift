@@ -29,6 +29,15 @@ enum AutoFramer {
         var offset: CGSize
     }
 
+    /// Landmark-invoer voor set-brede Match framing (gelijke IPD + geen lege onderkant).
+    struct FramingSubject: Equatable {
+        var faceRect: CGRect?
+        var eyeCenter: CGPoint?
+        var interEyeDistance: CGFloat?
+        var bodyBottomY: CGFloat
+        var cutoutSize: CGSize
+    }
+
     // MARK: - Pure math (v1 AutoAligner.computeTransform)
 
     static func computeTransform(
@@ -94,6 +103,93 @@ enum AutoFramer {
         if scale > 0 { return (offsetX, offsetY, scale) }
         let t = fitTransform(cutoutSize: cutoutSize, canvas: canvas)
         return (Double(t.offset.width), Double(t.offset.height), Double(t.scale))
+    }
+
+    /// Gedeelde schaal voor een set: dezelfde camera-afstand (gelijke IPD op
+    /// het canvas) én geen lege onderkant. Per portret geldt
+    /// `scale = canonical × sharedBoost`, waarbij `sharedBoost` groot genoeg
+    /// is zodat het kortste lichaam nog tot voorbij de canvasonderkant reikt.
+    /// Portretten zonder gezicht vallen terug op `fitTransform` (niet meegenomen
+    /// in de boost). Editor Auto-frame blijft `computeTransform` (per portret).
+    static func computeSharedTransforms(
+        _ subjects: [FramingSubject],
+        canvas: CGSize = FramingConstants.editCanvas
+    ) -> [Transform] {
+        struct Prep {
+            var hasFace: Bool
+            var anchorX: CGFloat
+            var anchorY: CGFloat
+            var targetCX: CGFloat
+            var targetCY: CGFloat
+            var canonicalScale: CGFloat
+            var bodyMinScale: CGFloat?
+            var cutoutSize: CGSize
+        }
+
+        let requiredBottom = canvas.height * (1.0 + FramingConstants.bodyOvershoot)
+        let preps: [Prep] = subjects.map { subject in
+            guard let faceRect = subject.faceRect, faceRect.height > 0 else {
+                return Prep(
+                    hasFace: false, anchorX: 0, anchorY: 0,
+                    targetCX: 0, targetCY: 0, canonicalScale: 1,
+                    bodyMinScale: nil, cutoutSize: subject.cutoutSize
+                )
+            }
+
+            let anchorX: CGFloat
+            let anchorY: CGFloat
+            let targetCX: CGFloat
+            let targetCY: CGFloat
+            let canonicalScale: CGFloat
+
+            if let eyeCenter = subject.eyeCenter,
+               let ied = subject.interEyeDistance, ied > 0 {
+                anchorX = eyeCenter.x
+                anchorY = eyeCenter.y
+                targetCX = canvas.width * FramingConstants.targetEyeCenterX
+                targetCY = canvas.height * FramingConstants.targetEyeCenterY
+                canonicalScale = (canvas.height * FramingConstants.targetInterEyeRatio) / ied
+            } else {
+                anchorX = faceRect.midX
+                anchorY = faceRect.midY
+                targetCX = canvas.width * FramingConstants.targetFaceCenterX
+                targetCY = canvas.height * FramingConstants.targetFaceCenterY
+                canonicalScale = (canvas.height * FramingConstants.targetFaceHeightRatio) / faceRect.height
+            }
+
+            var bodyMinScale: CGFloat?
+            if subject.bodyBottomY > anchorY {
+                bodyMinScale = (requiredBottom - targetCY) / (subject.bodyBottomY - anchorY)
+            }
+
+            return Prep(
+                hasFace: true, anchorX: anchorX, anchorY: anchorY,
+                targetCX: targetCX, targetCY: targetCY,
+                canonicalScale: canonicalScale, bodyMinScale: bodyMinScale,
+                cutoutSize: subject.cutoutSize
+            )
+        }
+
+        let sharedBoost = preps.reduce(CGFloat(1)) { current, prep in
+            guard prep.hasFace, let minScale = prep.bodyMinScale, prep.canonicalScale > 0 else {
+                return current
+            }
+            return max(current, minScale / prep.canonicalScale)
+        }
+
+        return preps.map { prep in
+            guard prep.hasFace else {
+                return fitTransform(cutoutSize: prep.cutoutSize, canvas: canvas)
+            }
+            let scale = prep.canonicalScale * sharedBoost
+            return Transform(
+                scale: scale,
+                offset: CGSize(
+                    width: prep.targetCX - prep.anchorX * scale,
+                    height: prep.targetCY - prep.anchorY * scale
+                )
+            )
+        }
     }
 
     /// Geen gezicht: cutout passend met marge, gecentreerd (v1-fallback).
@@ -210,8 +306,7 @@ enum AutoFramer {
     }
 
     /// Berekent (off-main) het auto-frame-transform voor een cutout —
-    /// gebruikt door de set-brede "Align set" (E05.7) die zelf de
-    /// undo-groepering en het schrijven verzorgt.
+    /// gebruikt door de editor "Auto-frame & center" (E06.5).
     static func transform(forCutout image: CGImage) async -> Transform {
         let m = await Task.detached(priority: .userInitiated) {
             Self.metrics(for: image)
@@ -223,6 +318,23 @@ enum AutoFramer {
             cutoutSize: CGSize(width: image.width, height: image.height),
             bodyBottomY: m.bodyBottomY
         )
+    }
+
+    /// Off-main detectie + `computeSharedTransforms` voor Match framing.
+    static func sharedTransforms(for images: [CGImage]) async -> [Transform] {
+        let subjects: [FramingSubject] = await Task.detached(priority: .userInitiated) {
+            images.map { image in
+                let m = Self.metrics(for: image)
+                return FramingSubject(
+                    faceRect: m.faceRect,
+                    eyeCenter: m.eyeCenter,
+                    interEyeDistance: m.interEyeDistance,
+                    bodyBottomY: m.bodyBottomY,
+                    cutoutSize: CGSize(width: image.width, height: image.height)
+                )
+            }
+        }.value
+        return computeSharedTransforms(subjects)
     }
 
     // MARK: - Actie

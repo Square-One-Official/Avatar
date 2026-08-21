@@ -238,6 +238,9 @@ struct Avatar2App: App {
             CommandGroup(after: .newItem) {
                 UploadPortraitCommands()
             }
+            CommandGroup(after: .pasteboard) {
+                PortraitSetCommands()
+            }
             // UXS-12 (UX12): "Check for Updates…" hoort in het app-menu — dat is
             // waar macOS-gebruikers 'm zoeken. Zat alleen in Settings → About,
             // dus de conventionele plek was leeg. Zelfde UpdateManager, dus geen

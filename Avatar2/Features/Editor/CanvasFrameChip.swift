@@ -1,7 +1,7 @@
 // FigJam-stijl naam-chip linksboven het frame (E33). Vervangt de gecentreerde
-// PortraitHeader in de enkel-editor: toont de portretnaam als pill; dubbelklik
-// opent de rename-modal (FigJam-conventie). Het frame is altijd actief — de chip
-// deelt één rij met Frame/Background/grid naast de kaart.
+// PortraitHeader in de enkel-editor: toont de portretnaam als pill; één klik
+// opent de rename-modal. Het frame is altijd actief — de chip deelt één rij
+// met Frame/Background/grid naast de kaart.
 // Naam/fallback-logica 1-op-1 uit de oude PortraitHeader.
 
 import AvatarUI
@@ -11,8 +11,6 @@ struct CanvasFrameChip: View {
     var name: String?
     var onRename: () -> Void
 
-    @State private var hovering = false
-
     private var displayName: String {
         let n = name ?? ""
         return n.isEmpty ? "Name" : n
@@ -20,14 +18,42 @@ struct CanvasFrameChip: View {
     private var hasName: Bool { !(name ?? "").isEmpty }
 
     var body: some View {
-        Text(displayName)
-            .dsTextStyle(.bodyMedium)
+        Button(action: onRename) {
+            Text(displayName)
+                .dsTextStyle(.bodyMedium)
+                .lineLimit(1)
+                .frame(height: 28)
+                .padding(.horizontal, DSSpacing.gap3)
+        }
+        .buttonStyle(FrameChipButtonStyle(hasName: hasName))
+        .help("Rename")
+        .accessibilityLabel(hasName ? "Rename \(displayName)" : "Set name")
+    }
+}
+
+/// Zelfde 1-klik ButtonStyle-patroon als de Frame/Background-pillen ernaast.
+private struct FrameChipButtonStyle: ButtonStyle {
+    let hasName: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        FrameChipChrome(hasName: hasName, configuration: configuration)
+    }
+}
+
+private struct FrameChipChrome: View {
+    let hasName: Bool
+    let configuration: ButtonStyle.Configuration
+    @State private var hovering = false
+
+    var body: some View {
+        configuration.label
             .foregroundStyle(hasName ? DSColor.Foreground.primary : DSColor.Foreground.muted)
-            .lineLimit(1)
-            .frame(height: 28)
-            .padding(.horizontal, DSSpacing.gap3)
             .background(
-                DSColor.neutralSurface(pressed: false, hovering: hovering, base: DSColor.Background.neutralStronger),
+                DSColor.neutralSurface(
+                    pressed: configuration.isPressed,
+                    hovering: hovering,
+                    base: DSColor.Background.neutralStronger
+                ),
                 in: Capsule(style: .continuous)
             )
             .overlay(
@@ -37,7 +63,6 @@ struct CanvasFrameChip: View {
             .contentShape(Capsule(style: .continuous))
             .onHover { hovering = $0 }
             .dsMotion(DSMotion.micro, value: hovering)
-            .onDoubleClick { onRename() }
-            .help("Double-click to rename")
+            .dsMotion(DSMotion.micro, value: configuration.isPressed)
     }
 }

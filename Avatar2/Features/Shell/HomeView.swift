@@ -73,25 +73,27 @@ struct HomeView: View {
     @ViewBuilder
     private func portraitSection(_ title: String, _ items: [Portrait2]) -> some View {
         if !items.isEmpty {
-            Text(title)
-                .dsTextStyle(.labelLarge)
-                .foregroundStyle(DSColor.Foreground.subtle)
-            LazyVGrid(columns: columns, spacing: ShellMetrics.portraitGridSpacing) {
-                ForEach(items) { portrait in
-                    PortraitGridTile(
-                        portrait: portrait, folders: folders, model: model,
-                        isSelected: model.isPortraitSelected(portrait),
-                        ordered: { portraits.map(\.persistentModelID) },
-                        selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
-                        onContextMenu: { frame in
-                            model.preparePortraitContextMenu(on: portrait)
-                            model.presentation.openPortraitContextMenu(
-                                portraitID: portrait.persistentModelID,
-                                anchor: frame,
-                                scope: .home
-                            )
-                        }
-                    )
+            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                Text(title)
+                    .dsTextStyle(.labelLarge)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                LazyVGrid(columns: columns, spacing: ShellMetrics.portraitGridSpacing) {
+                    ForEach(items) { portrait in
+                        PortraitGridTile(
+                            portrait: portrait, folders: folders, model: model,
+                            isSelected: model.isPortraitSelected(portrait),
+                            ordered: { portraits.map(\.persistentModelID) },
+                            selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+                            onContextMenu: { frame in
+                                model.preparePortraitContextMenu(on: portrait)
+                                model.presentation.openPortraitContextMenu(
+                                    portraitID: portrait.persistentModelID,
+                                    anchor: frame,
+                                    scope: .home
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -121,7 +123,7 @@ struct HomeView: View {
     private var overview: some View {
         ZStack(alignment: .bottom) {
             ScrollView {
-                VStack(alignment: .leading, spacing: DSSpacing.gap5) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap6) {
                     // UXS-9: "Home" is de paginatitel; Recent/Earlier zijn
                     // sectiekoppen daaronder (waren allebei paginatitel-stijl,
                     // wat suggereerde dat het losse schermen waren).
@@ -173,7 +175,7 @@ struct HomeView: View {
                     .foregroundStyle(DSColor.Foreground.subtle)
                 Spacer()
                 Button { model.showBanners() } label: {
-                    Text("See all").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                    Text("See all").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
                 }
                 .buttonStyle(.plain)
             }
@@ -190,7 +192,9 @@ struct HomeView: View {
                         }
                     }
                     .padding(.bottom, DSSpacing.gap1)
+                    .scrollRowTrailingInset()
                 }
+                .horizontalScrollEdgeFade()
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap4) {
@@ -199,7 +203,9 @@ struct HomeView: View {
                         }
                     }
                     .padding(.bottom, DSSpacing.gap1)
+                    .scrollRowTrailingInset()
                 }
+                .horizontalScrollEdgeFade()
             }
         }
     }
@@ -216,7 +222,7 @@ struct HomeView: View {
                             Image(systemName: "plus")
                             Text("Make a banner").dsTextStyle(.labelSmall)
                         }
-                        .foregroundStyle(DSColor.Foreground.muted)
+                        .foregroundStyle(DSColor.Foreground.subtle)
                     }
                 Text("New").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle).lineLimit(1)
             }
@@ -245,6 +251,7 @@ struct HomeView: View {
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.subtle)
                     .lineLimit(1)
+                    .help(preset.label)
             }
         }
         .buttonStyle(.plain)
@@ -288,6 +295,7 @@ struct HomeView: View {
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.subtle)
                     .lineLimit(1)
+                    .help(doc.name.isEmpty ? "Untitled banner" : doc.name)
             }
         }
         .buttonStyle(.plain)

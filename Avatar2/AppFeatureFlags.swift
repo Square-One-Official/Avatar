@@ -18,10 +18,34 @@ enum AppFeatureFlags {
     ///
     /// In DEBUG aan te zetten met de launch-arg `--enable-banners` (smoke-runs,
     /// banner-development) zonder de release-default te raken.
-    static let bannersEnabled: Bool = {
+    static let bannersEnabled: Bool = enabledInDebug(flag: "banners")
+
+    /// Face-paneel (beauty-edits). Staat UIT tot de face-bakeoff (E32.0) een
+    /// go geeft. CMS-flag `face_enabled` is een extra kill-switch daarbovenop.
+    /// DEBUG: `--enable-face` of `--open-panel face`.
+    static let faceEnabled: Bool = enabledInDebug(flag: "face", openPanel: "face")
+
+    /// Hair-paneel (kapselwissel). Zelfde release-gate als Face.
+    /// DEBUG: `--enable-hair` of `--open-panel hair`.
+    static let hairEnabled: Bool = enabledInDebug(flag: "hair", openPanel: "hair")
+
+    /// Clothing-paneel (kledingwissel). Zelfde release-gate als Face.
+    /// DEBUG: `--enable-clothes` of `--open-panel clothing`.
+    static let clothesEnabled: Bool = enabledInDebug(flag: "clothes", openPanel: "clothing")
+
+    /// DEBUG-only: `--enable-<flag>`, of `--open-panel <value>` zodat bestaande
+    /// smoke-runs het paneel nog kunnen openen zonder extra args.
+    private static func enabledInDebug(flag: String, openPanel: String? = nil) -> Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--enable-banners") { return true }
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("--enable-\(flag)") { return true }
+        if let openPanel,
+           let i = args.firstIndex(of: "--open-panel"),
+           args.indices.contains(i + 1),
+           args[i + 1] == openPanel {
+            return true
+        }
         #endif
         return false
-    }()
+    }
 }

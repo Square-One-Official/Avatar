@@ -44,7 +44,7 @@ struct BannerSizePanel: View {
                     .frame(height: 30, alignment: .center)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(preset.label).dsTextStyle(.labelBase).foregroundStyle(DSColor.Foreground.primary)
-                    Text(preset.detail).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                    Text(preset.detail).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
                 }
                 Spacer(minLength: 0)
                 if selected {

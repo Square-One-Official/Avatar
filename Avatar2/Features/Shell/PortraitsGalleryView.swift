@@ -1,9 +1,7 @@
-// PoC (left-nav): Portraits-grid — toont de beelden van de in de sidebar
-// geselecteerde map (of álle beelden) in een NET rooster van max 3 naast
-// elkaar. De mappen zelf wonen nu in de left-nav (inklapbare Portraits-sectie),
-// niet meer als kaarten hier. Dubbelklik opent een portret in de editor;
-// rechtermuis verplaatst het naar een map of verwijdert het. Net-nieuw scherm —
-// DS-tokens, in de geest van het hoofddesign.
+// Portraits-library: de beelden van de in de sidebar geselecteerde map
+// (of álle beelden) in een vast 3-koloms rooster. Geen list/gallery/canvas-
+// switcher — grid is de enige weergave. Dubbelklik opent de editor;
+// rechtermuis verplaatst naar een map of verwijdert.
 
 import AppKit
 import AvatarKit
@@ -18,10 +16,8 @@ struct PortraitsGalleryView: View {
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \Folder2.createdAt, order: .forward) private var folders: [Folder2]
 
-    /// Gemeten hoogte van de zwevende header → top-inset voor elke lens.
-    @State private var headerHeight: CGFloat = 0
     /// E53.7: leeft in de gedeelde store, niet in view-@State — de gallery-view
-    /// wordt bij lens-/tabwissel opnieuw gebouwd en sloeg het menu anders weg.
+    /// wordt bij tabwissel opnieuw gebouwd en sloeg het menu anders weg.
     private var folderBackgroundPickerOpen: Binding<Bool> {
         Binding(
             get: { model.presentation.folderBackgroundPickerOpen },
@@ -48,86 +44,34 @@ struct PortraitsGalleryView: View {
     }
 
     var body: some View {
-        // Header (titel + switcher) ZWEEFT bovenaan; elke lens krijgt een top-inset
-        // ter grootte van de (gemeten) header zodat z'n inhoud er nooit achter valt.
-        //
-        // Waarom niet een VStack-broer of `.safeAreaInset`: de full-bleed board-lens
-        // (BoardView) is verticaal gulzig — als VStack-broer drukt 'ie de header van
-        // het scherm (titel + switcher verdwenen, alleen de subtitle lekt op y≈0) en
-        // als safeAreaInset-content klapt de inset in. De scroll-lenzen gedragen zich
-        // wél netjes, maar één uniforme, board-proof layout is robuuster: de header
-        // als bovenliggende laag (vult nooit mee, verdwijnt dus nooit) + een top-inset
-        // per lens. De board fit z'n nodes onder de inset; de scroll-lenzen scrollen
-        // eronder.
-        // De buitenste GeometryReader is hier een MIN-WIDTH-firewall, geen
-        // gulzigaard: hij voedt z'n kinderen ALTIJD een concrete maat (geo.size),
-        // dus de board-lens krijgt een exacte `.frame(width:height:)` i.p.v. via
-        // `.frame(maxWidth:.infinity)` terug te vallen op z'n grote ideale boardSize
-        // wanneer de ouder een nil-breedte voorstelt. Dát terugvallen lekte de
-        // board-breedte omhoog en perste de vaste 236pt-nav in elkaar (de echte
-        // oorzaak; het weghalen van BoardView's eigen GeometryReader in d00387e
-        // raakte 'm niet). Met een exacte maat kan geen enkele lens de nav of de
-        // header nog verdringen.
-        GeometryReader { geo in
-            ZStack(alignment: .top) {
-                lensContent
-                    .opacity(model.isDropTargeted ? 0 : 1)
-                    .frame(width: geo.size.width,
-                           height: max(0, geo.size.height - headerHeight),
-                           alignment: .top)
-                    .clipped()
-                    .padding(.top, headerHeight)
+        VStack(spacing: 0) {
+            header
+            ZStack {
+                if items.isEmpty {
+                    emptyState
+                } else {
+                    gridBody
+                }
                 if folderBackgroundPickerOpen.wrappedValue {
                     Color.clear
                         .contentShape(Rectangle())
-                        .frame(width: geo.size.width, height: geo.size.height)
                         .onTapGesture { folderBackgroundPickerOpen.wrappedValue = false }
                 }
-                header
-                    .background(
-                        GeometryReader { hGeo in
-                            Color.clear.preference(key: HeaderHeightKey.self, value: hGeo.size.height)
-                        }
-                    )
             }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
-        .onPreferenceChange(HeaderHeightKey.self) { headerHeight = $0 }
-        // E50.1: ⌘A selecteert de hele zichtbare scope (huidige map of alles) in
-        // de grid/list/gallery-lens — zelfde patroon als de board-lens, die z'n
-        // eigen ⌘A op de canvas-selectie registreert (BoardView; daarom hier
-        // uitgesloten, anders twee registraties op dezelfde shortcut).
+        // E50.1: ⌘A selecteert de hele zichtbare scope (huidige map of alles).
         .background {
-            if model.portraitsViewMode != .canvas && !items.isEmpty {
+            if !items.isEmpty {
                 Button("") { model.selectAllPortraits(items.map(\.persistentModelID)) }
                     .keyboardShortcut("a", modifiers: .command)
                     .opacity(0)
             }
         }
         .coordinateSpace(name: PortraitContextMenuSpace.name)
-        .dsMotion(DSMotion.fast, value: model.portraitsViewMode)
-        .dsMotion(DSMotion.fast, value: model.isDropTargeted)
         .onChange(of: model.folderBackgroundPickerID) { _, id in
             guard id == model.selectedFolderID else { return }
             folderBackgroundPickerOpen.wrappedValue = true
             model.folderBackgroundPickerID = nil
-        }
-    }
-
-    @ViewBuilder private var lensContent: some View {
-        if items.isEmpty {
-            emptyState
-        } else {
-            switch model.portraitsViewMode {
-            case .grid: gridBody
-            case .list:
-                ListLens(items: items, model: model, folders: folders)
-            case .gallery:
-                GalleryLens(items: items, model: model, folders: folders)
-            // Canvas = de vrije board-lens, gescope op de huidige map.
-            case .canvas: BoardView(folderID: model.selectedFolderID, model: model,
-                                    entitlement: entitlement, onOpen: { model.openPortrait($0) })
-            }
         }
     }
 
@@ -157,63 +101,59 @@ struct PortraitsGalleryView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DSSpacing.gap4) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap5) {
-                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    Text(selectedFolder?.name ?? "All portraits")
-                        .dsTextStyle(.h3)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                    Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-                if let folder = selectedFolder {
-                    FolderDefaultBackgroundControl(
-                        folder: folder,
-                        entitlement: entitlement,
-                        presentation: model.presentation,
-                        isPickerOpen: folderBackgroundPickerOpen
-                    )
-                }
+        VStack(alignment: .leading, spacing: DSSpacing.gap5) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                Text(selectedFolder?.name ?? "All portraits")
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.subtle)
             }
-            Spacer(minLength: 0)
-            // Finder-stijl lens-switcher — de header rendert 'm, dus alleen op
-            // de Portraits-surface zichtbaar.
-            LibraryViewSwitcher(mode: model.portraitsViewMode) { model.setPortraitsViewMode($0) }
+            if let folder = selectedFolder {
+                FolderDefaultBackgroundControl(
+                    folder: folder,
+                    entitlement: entitlement,
+                    presentation: model.presentation,
+                    isPickerOpen: folderBackgroundPickerOpen
+                )
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DSSpacing.gap6)
         .padding(.top, DSSpacing.gap8)
         .padding(.bottom, DSSpacing.gap6)
-        // Eigen dekvlak: als top-inset zweeft de header over de lens-inhoud
-        // (de canvas, of een gescrollde grid), dus hij heeft een achtergrond nodig.
         .background(DSColor.Background.app)
     }
 
     private var emptyState: some View {
-        VStack(spacing: DSSpacing.gap2) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: DSIconSize.xxl, weight: .light))
-                .foregroundStyle(DSColor.Foreground.muted)
-            Text(model.selectedFolderID == nil ? "No portraits yet" : "This folder is empty")
-                .dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
-            if selectedFolder?.defaultBackground != nil, model.selectedFolderID != nil {
-                Text("Drop a portrait here — it will use this folder's default background.")
-                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+        VStack(spacing: DSSpacing.gap4) {
+            VStack(spacing: DSSpacing.gap2) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: DSIconSize.xxl, weight: .light))
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                Text(model.selectedFolderID == nil ? "No portraits yet" : "This folder is empty")
+                    .dsTextStyle(.labelLarge).foregroundStyle(DSColor.Foreground.subtle)
+                Text(emptyStateBody)
+                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.subtle)
                     .multilineTextAlignment(.center)
-            } else {
-                Text("Right-click a portrait to move it into a folder.")
-                    .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            DSPrimaryButton("Upload portrait") { model.presentOpenPanel() }
         }
+        .padding(DSSpacing.gap8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-}
 
-/// Meet de zwevende-header-hoogte zodat elke lens er precies onder begint.
-private struct HeaderHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+    private var emptyStateBody: String {
+        if selectedFolder?.defaultBackground != nil, model.selectedFolderID != nil {
+            return "Drop a photo here — it will use this folder's default background."
+        }
+        if model.selectedFolderID != nil {
+            return "Drop a photo here or upload one."
+        }
+        return "Drop a photo or upload one to make a portrait."
+    }
 }
 
 /// Gedeelde portret-tegel (Home + Portraits-grid). Vierkant, met naam/rol eronder.
@@ -243,9 +183,13 @@ struct PortraitGridTile: View {
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
+                    .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
                     .strokeBorder(
-                        (isSelected || hovering) ? DSColor.Action.primary : DSColor.Foreground.divider,
-                        lineWidth: (isSelected || hovering) ? DSBorderWidth.medium : DSBorderWidth.thin
+                        (isSelected || hovering) ? DSColor.Action.primaryForeground : .clear,
+                        lineWidth: DSBorderWidth.medium
                     )
             )
             // Selectie-vinkje (Finder-stijl) rechtsboven.
@@ -288,6 +232,7 @@ struct PortraitGridTile: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
                     .dsTextStyle(.labelBase).foregroundStyle(.white).lineLimit(1)
+                    .help(portrait.name.isEmpty ? "Untitled" : portrait.name)
                 if !portrait.role.isEmpty {
                     Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }

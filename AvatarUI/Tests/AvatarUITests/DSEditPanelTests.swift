@@ -26,6 +26,19 @@ final class DSEditPanelTests: XCTestCase {
     }
 
     @MainActor
+    func testCapsuleToolButtonIconOnlyRendertZonderLegeNaam() {
+        let view = DSCapsuleToolButton(
+            isActive: true,
+            size: .compact,
+            action: {}
+        ) {
+            Image(systemName: "square.grid.2x2")
+        }
+        .accessibilityLabel("Grid")
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
+
+    @MainActor
     func testEditPanelRendert() {
         let view = DSEditPanel(title: "Effects") { Text("inhoud") }
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)

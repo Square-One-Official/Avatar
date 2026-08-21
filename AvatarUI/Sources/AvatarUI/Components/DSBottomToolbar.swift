@@ -287,7 +287,20 @@ public struct DSCapsuleToolButton<Icon: View>: View {
             .frame(height: size.height)
         }
         .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, surface: surface, pressScale: size.pressScale))
-        .accessibilityLabel(Text(label ?? ""))
+        .modifier(CapsuleToolAccessibilityLabel(label: label))
+    }
+}
+
+/// Alleen een AX-naam zetten als de pil een zichtbaar label heeft. Een lege
+/// string als naam slaat icon-only call-sites plat (lens-switcher).
+private struct CapsuleToolAccessibilityLabel: ViewModifier {
+    let label: String?
+    func body(content: Content) -> some View {
+        if let label, !label.isEmpty {
+            content.accessibilityLabel(label)
+        } else {
+            content
+        }
     }
 }
 

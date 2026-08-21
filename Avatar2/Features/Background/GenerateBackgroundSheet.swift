@@ -108,6 +108,7 @@ struct GenerateBackgroundSheet: View {
             viewStep
         }
         .dsPanelSurface(cornerRadius: DSRadius.xl2, solid: true)
+        .dsDropdownDismissOverlay(isPresented: $form.modelMenuOpen)
     }
 
     private var stepDivider: some View {
@@ -134,20 +135,12 @@ struct GenerateBackgroundSheet: View {
     }
 
     private var modelMenu: some View {
-        Menu {
-            ForEach(availableModels) { option in
-                Button {
-                    form.model = option
-                    if option == .apple { form.expandedStep = nil }
-                } label: {
-                    if option == form.model {
-                        Label(option.label, systemImage: "checkmark")
-                    } else {
-                        Text(option.label)
-                    }
-                }
-            }
-        } label: {
+        DSDropdownButton(
+            isPresented: $form.modelMenuOpen,
+            anchorHeight: 28,
+            minWidth: 150,
+            placement: .below
+        ) {
             HStack(spacing: DSSpacing.gap1) {
                 Text(form.model.label)
                     .dsTextStyle(.labelBase)
@@ -159,8 +152,19 @@ struct GenerateBackgroundSheet: View {
             .padding(.horizontal, DSSpacing.gap2)
             .frame(height: 28)
             .background(DSColor.Background.neutral, in: Capsule())
+        } menu: {
+            ForEach(availableModels) { option in
+                DSMenuRow(
+                    option.label,
+                    icon: option.menuIcon,
+                    shortcut: option == form.model ? "✓" : nil
+                ) {
+                    form.model = option
+                    if option == .apple { form.expandedStep = nil }
+                    form.modelMenuOpen = false
+                }
+            }
         }
-        .menuStyle(.borderlessButton)
         .fixedSize()
         .disabled(form.isGenerating)
     }
@@ -559,6 +563,7 @@ final class BackgroundGenerationForm {
     var errorMessage: String?
     var showApplePlayground = false
     var expandedStep: GenerateBackgroundStep?
+    var modelMenuOpen = false
     let coordinator = BackgroundGenerationCoordinator()
 
     init(model: BackgroundGenerationModel) {

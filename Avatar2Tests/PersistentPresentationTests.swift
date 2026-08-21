@@ -108,6 +108,10 @@ final class PersistentPresentationTests: XCTestCase {
         XCTAssertEqual(store.editorChipMenu, .boost)
         XCTAssertTrue(store.folderBackgroundPickerOpen)
 
+        store.openSelectionBackgroundPicker(anchor: CGRect(x: 8, y: 12, width: 40, height: 40))
+        XCTAssertTrue(store.selectionBackgroundPickerOpen)
+        XCTAssertEqual(store.selectionBackgroundPickerAnchor, CGRect(x: 8, y: 12, width: 40, height: 40))
+
         // Eén tegelijk: een ander chip-menu vervangt het vorige, sluit niet alles.
         store.editorChipMenu = .removeBackground
         XCTAssertEqual(store.editorChipMenu, .removeBackground)
@@ -121,7 +125,12 @@ final class PersistentPresentationTests: XCTestCase {
         store.editorBackgroundTypeMenuOpen = true
         store.editorChipMenu = .boost
         store.folderBackgroundPickerOpen = true
+        store.selectionBackgroundPickerOpen = true
         store.leftNavUserMenuOpen = true
+        store.effectsContextMenu = AnchoredMenuRequest(id: "custom:1", anchor: .zero)
+        store.bannerTextContextMenu = AnchoredMenuRequest(id: UUID().uuidString, anchor: .zero)
+        store.bannerTextFieldMenu = .font(UUID())
+        store.settingsThemeMenuOpen = true
         // Taak-state (geen vluchtig menu) blijft juist wél staan.
         store.createEffectSheetOpen = true
 
@@ -130,7 +139,12 @@ final class PersistentPresentationTests: XCTestCase {
         XCTAssertFalse(store.editorBackgroundTypeMenuOpen)
         XCTAssertNil(store.editorChipMenu)
         XCTAssertFalse(store.folderBackgroundPickerOpen)
+        XCTAssertFalse(store.selectionBackgroundPickerOpen)
         XCTAssertFalse(store.leftNavUserMenuOpen)
+        XCTAssertNil(store.effectsContextMenu)
+        XCTAssertNil(store.bannerTextContextMenu)
+        XCTAssertNil(store.bannerTextFieldMenu)
+        XCTAssertFalse(store.settingsThemeMenuOpen)
         XCTAssertTrue(store.createEffectSheetOpen, "een open taak-modal is geen vluchtig menu")
     }
 

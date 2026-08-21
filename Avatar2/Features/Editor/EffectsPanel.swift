@@ -576,13 +576,13 @@ struct EffectsPanel: View {
         ))
     }
 
-    // Vierkante tiles (1:1), ruimer dan de Face-rail — besluit Thierry
-    // 2026-08-03. De CMS-bronnen zijn vierkant (800×800), dus `scaledToFill`
-    // vult de tile exact: niets gecropt, niets ingezoomd. Dat gold pas ná de
-    // `thumbnailVariant`-fix in backend/lib/payload.ts — daarvóór leverde
-    // Supabase een 320×800 center-crop en oogden de kaarten portret.
-    private let cardWidth: CGFloat = 144
-    private let cardHeight: CGFloat = 144
+    // Vierkante tiles (1:1): CMS-bronnen zijn 800×800, dus `scaledToFill`
+    // vult de tile exact. 96pt i.p.v. 144 — compact genoeg dat None + de
+    // vier launch-stijlen in het paneel passen, groot genoeg voor een gezicht.
+    private let cardWidth: CGFloat = 96
+    private let cardHeight: CGFloat = 96
+
+    fileprivate static let contextMenuSpace = "effectsContextMenu"
 
     var body: some View {
         DSEditPanel(
@@ -604,6 +604,8 @@ struct EffectsPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .horizontalScrollEdgeFade()
         }
+        .coordinateSpace(name: Self.contextMenuSpace)
+        .overlay { effectsContextMenuOverlay }
         // E33/E34: CMS-lijst + eigen effecten ophalen bij openen. Soft-fail.
         .task { await model.loadEffects() }
         .onAppear { model.undoManager = undoManager }
@@ -615,6 +617,31 @@ struct EffectsPanel: View {
             model.addCustomEffect(
                 result.effect, referenceImage: result.referenceImage, apply: result.apply
             )
+        }
+        .onDisappear { presentation?.effectsContextMenu = nil }
+    }
+
+    @ViewBuilder
+    private var effectsContextMenuOverlay: some View {
+        if let request = presentation?.effectsContextMenu,
+           let card = model.cards.first(where: { $0.key == request.id && $0.kind == .custom }) {
+            DSContextMenuOverlay(anchor: request.anchor, onDismiss: {
+                presentation?.effectsContextMenu = nil
+            }) {
+                DSContextMenuPanel(minWidth: 180) {
+                    DSMenuRow("Delete effect", icon: "trash", destructive: true, disabled: model.isBusy) {
+                        presentation?.effectsContextMenu = nil
+                        model.deleteCustomEffect(card)
+                    }
+                }
+            }
+            .background {
+                Button("Close menu") { presentation?.effectsContextMenu = nil }
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
         }
     }
 
@@ -698,9 +725,9 @@ struct EffectsPanel: View {
         .buttonStyle(.plain)
         .disabled(model.isBusy)
         .opacity(model.isBusy && !model.isWorking(card) ? 0.5 : 1)
-        // E34: eigen effecten zijn verwijderbaar via het contextmenu.
-        .modifier(DeletableCustom(card: card, isBusy: model.isBusy) {
-            model.deleteCustomEffect(card)
+        // E34: eigen effecten zijn verwijderbaar via het DS-rechtermuismenu.
+        .modifier(DeletableCustom(card: card, presentation: presentation) { frame in
+            presentation?.effectsContextMenu = AnchoredMenuRequest(id: card.key, anchor: frame)
         })
     }
 
@@ -736,20 +763,15 @@ struct EffectsPanel: View {
     }
 }
 
-/// E34: contextmenu-delete, alleen op eigen (custom) effecten.
+/// E34: DS-rechtermuis-delete, alleen op eigen (custom) effecten.
 private struct DeletableCustom: ViewModifier {
     let card: EffectCard
-    let isBusy: Bool
-    let onDelete: () -> Void
+    let presentation: UIPresentationStore?
+    let onTrigger: (CGRect) -> Void
 
     func body(content: Content) -> some View {
-        if card.kind == .custom {
-            content.contextMenu {
-                Button(role: .destructive) { onDelete() } label: {
-                    Label("Delete effect", systemImage: "trash")
-                }
-                .disabled(isBusy)
-            }
+        if card.kind == .custom, presentation != nil {
+            content.contextMenuTrigger(in: .named(EffectsPanel.contextMenuSpace), onTrigger: onTrigger)
         } else {
             content
         }

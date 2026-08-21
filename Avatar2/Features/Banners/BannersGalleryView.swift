@@ -101,7 +101,7 @@ struct BannersGalleryView: View {
                     .foregroundStyle(DSColor.Foreground.primary)
                 Text("\(banners.count) \(banners.count == 1 ? "banner" : "banners")")
                     .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
             }
             Spacer(minLength: 0)
             DSPrimaryButton("Make banner") { makeBanner() }
@@ -154,42 +154,55 @@ private struct BannerGridTile: View {
 
     @State private var hovering = false
 
+    private var displayName: String {
+        banner.name.isEmpty ? "Untitled banner" : banner.name
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Color.clear
-                .aspectRatio(1500.0 / 500.0, contentMode: .fit)
-                .overlay {
-                    ZStack {
-                        DSColor.Background.inset
-                        if let data = banner.previewImageData, let img = NSImage(data: data) {
-                            Image(nsImage: img).resizable().scaledToFill()
-                        } else {
-                            Image(systemName: "rectangle.on.rectangle.angled")
-                                .font(.system(size: DSIconSize.xl, weight: .light))
-                                .foregroundStyle(DSColor.Foreground.muted)
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                Color.clear
+                    .aspectRatio(1500.0 / 500.0, contentMode: .fit)
+                    .overlay {
+                        ZStack {
+                            DSColor.Background.inset
+                            if let data = banner.previewImageData, let img = NSImage(data: data) {
+                                Image(nsImage: img).resizable().scaledToFill()
+                            } else {
+                                Image(systemName: "rectangle.on.rectangle.angled")
+                                    .font(.system(size: DSIconSize.xl, weight: .light))
+                                    .foregroundStyle(DSColor.Foreground.subtle)
+                            }
                         }
                     }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
-                        .strokeBorder(
-                            hovering ? DSColor.Action.primary : DSColor.Foreground.divider,
-                            lineWidth: hovering ? DSBorderWidth.medium : DSBorderWidth.thin
-                        )
-                )
-                .contentShape(Rectangle())
-                .onHover { hovering = $0 }
-                .dsMotion(DSMotion.micro, value: hovering)
-                .onTapGesture { onOpen() }
-                .help("Click to open")
-                .contextMenuTrigger(in: .named("bannersContextMenu"), onTrigger: onContextMenu)
+                    .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
+                            .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DSRadius.xl2, style: .continuous)
+                            .strokeBorder(
+                                hovering ? DSColor.Action.primaryForeground : .clear,
+                                lineWidth: DSBorderWidth.medium
+                            )
+                    )
+                    .contentShape(Rectangle())
 
-            Text(banner.name.isEmpty ? "Untitled banner" : banner.name)
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.subtle)
-                .lineLimit(1)
+                Text(displayName)
+                    .dsTextStyle(.labelBase)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                    .lineLimit(1)
+                    .help(displayName)
+            }
         }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .dsMotion(DSMotion.micro, value: hovering)
+        .accessibilityLabel(displayName)
+        .accessibilityHint("Opens the banner in the studio")
+        .help("Open \(displayName)")
+        .contextMenuTrigger(in: .named("bannersContextMenu"), onTrigger: onContextMenu)
     }
 }
 
@@ -209,23 +222,23 @@ private struct BannersEmptyState: View {
                 VStack(spacing: DSSpacing.gap2) {
                     Image(systemName: "rectangle.on.rectangle.angled")
                         .font(.system(size: DSIconSize.xxl, weight: .light))
-                        .foregroundStyle(DSColor.Foreground.muted)
+                        .foregroundStyle(DSColor.Foreground.subtle)
                     Text("Make your first banner")
                         .dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
                     Text("A wide cover for LinkedIn, X and more — also usable behind your profile picture.")
-                        .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+                        .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.subtle)
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                 }
                 DSPrimaryButton("Make banner") { onMake() }
 
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                     Text("Or start from a preset")
-                        .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+                        .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: DSSpacing.gap3)], spacing: DSSpacing.gap3) {
                         ForEach(presetsModel.presets) { preset in
                             Button { onPreset(preset.layers) } label: { presetCard(preset) }
                                 .buttonStyle(.plain)
-                                .dsHoverScale()
+                                .dsHoverScale(1.02)
                         }
                     }
                 }
@@ -253,6 +266,7 @@ private struct BannersEmptyState: View {
                 .dsTextStyle(.labelSmall)
                 .foregroundStyle(DSColor.Foreground.subtle)
                 .lineLimit(1)
+                .help(preset.label)
         }
     }
 

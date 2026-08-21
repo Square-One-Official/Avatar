@@ -1,5 +1,8 @@
 // DS-slider (E22.3 / 24.11) — zichtbare thumb + lime actieve track. Vervangt
 // SwiftUI's Slider waar de systeem-thumb op lichte surfaces wegvalt.
+//
+// Visueel dun (3pt track, 12pt thumb) in een 24pt hit-area — de oude 20pt
+// capsule-track las als een volume-balk, niet als een moderne value-slider.
 
 import SwiftUI
 
@@ -31,12 +34,14 @@ public struct DSSlider: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(DSColor.Background.neutralStronger)
+                    .frame(height: Self.trackHeight)
                 Capsule()
                     .fill(DSColor.Action.primary)
-                    .frame(width: max(0, x))
+                    .frame(width: max(Self.trackHeight, x), height: Self.trackHeight)
                 thumb
                     .position(x: x, y: height / 2)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -55,16 +60,31 @@ public struct DSSlider: View {
                     }
             )
         }
-        .frame(height: 20)
+        .frame(height: Self.hitHeight)
+        .accessibilityElement()
+        .accessibilityValue(Text("\(accessibilityPercent) percent"))
+        .accessibilityAdjustableAction { direction in
+            let step = (range.upperBound - range.lowerBound) / 20
+            switch direction {
+            case .increment:
+                value = min(range.upperBound, value + step)
+            case .decrement:
+                value = max(range.lowerBound, value - step)
+            @unknown default:
+                break
+            }
+        }
     }
 
     private var thumb: some View {
         Circle()
-            .fill(.white)
-            .frame(width: 14, height: 14)
-            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-            .overlay(Circle().strokeBorder(DSColor.Foreground.primaryStaticBlack.opacity(0.28), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
+            .fill(Color.white)
+            .frame(width: Self.thumbDiameter, height: Self.thumbDiameter)
+            .overlay(
+                Circle()
+                    .strokeBorder(DSColor.Foreground.primaryStaticBlack.opacity(0.18), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(isEditing ? 0.28 : 0.16), radius: isEditing ? 2 : 1, y: 1)
             .allowsHitTesting(false)
     }
 
@@ -73,7 +93,9 @@ public struct DSSlider: View {
     /// afgekapte thumb tegen de panelrand (het duidelijkst op Temperature, die
     /// als enige een signed range heeft en dus vaak op een extreem staat).
     /// De baan loopt nu van `thumbRadius` tot `width - thumbRadius`.
-    private static let thumbDiameter: CGFloat = 18   // 14 kern + 2×2 rand
+    private static let trackHeight: CGFloat = 3
+    private static let hitHeight: CGFloat = 24
+    private static let thumbDiameter: CGFloat = 12
     private static var thumbRadius: CGFloat { thumbDiameter / 2 }
 
     private func thumbX(for width: CGFloat) -> CGFloat {
@@ -85,6 +107,10 @@ public struct DSSlider: View {
         let span = range.upperBound - range.lowerBound
         guard span > 0 else { return 0 }
         return ((value - range.lowerBound) / span).clamped01
+    }
+
+    private var accessibilityPercent: Int {
+        Int((fraction * 100).rounded())
     }
 
     private func setValue(at x: CGFloat, width: CGFloat) {

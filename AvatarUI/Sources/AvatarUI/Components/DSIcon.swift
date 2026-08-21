@@ -19,7 +19,7 @@ public struct DSIcon: View {
         // App-bar / chrome
         case share, settings, undo, redo, add, close
         // Canvas-controls
-        case crop, autoFrame, fixAngle, flip, restoreBody
+        case crop, autoFrame, flip, restoreBody
         // Canvas-toolbar (frame-pil + dropdowns)
         case frame, grid, shapeCircle, shapeSquare
         // Face-edits (FaceActionsPanel-presetkaarten)
@@ -77,7 +77,6 @@ public struct DSIcon: View {
         case .close:       return "xmark"               // Ph.x
         case .crop:        return "crop"                // Ph.crop
         case .autoFrame:   return "viewfinder"          // Ph.cornersOut
-        case .fixAngle:    return "camera"              // Ph.perspective
         case .flip:        return "arrow.left.and.right.righttriangle.left.righttriangle.right" // Ph.flipHorizontal
         case .restoreBody: return "arrow.up.left.and.arrow.down.right" // Ph.arrowsOutCardinal
         case .frame:       return "rectangle.dashed"    // Ph.frameCorners

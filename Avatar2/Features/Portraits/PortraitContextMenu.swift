@@ -1,4 +1,4 @@
-// Gedeeld rechtermuis-menu voor portret-tegels (Home + alle Portraits-lenzen).
+// Gedeeld rechtermuis-menu voor portret-tegels (Home + Portraits-grid).
 // DS-paneel i.p.v. native `.contextMenu`. Toont enkel-item-acties, of bulk-acties
 // zodra er ≥2 geselecteerd zijn en op een geselecteerd item wordt geklikt
 // (Finder-stijl).
@@ -24,12 +24,13 @@ struct PortraitDSContextMenu: View {
     let onDismiss: () -> Void
     let onRequestDelete: ([Portrait2]) -> Void
     let onRequestNewFolder: ([Portrait2]) -> Void
+    let onRequestSetBackground: ([Portrait2]) -> Void
 
     @State private var moveFlyoutOpen = false
 
     var body: some View {
         HStack(alignment: .top, spacing: DSSpacing.gap1) {
-            DSContextMenuPanel(minWidth: isBulk ? 230 : 190) {
+            DSContextMenuPanel(minWidth: isBulk ? 250 : 190) {
                 if isBulk {
                     bulkRows
                 } else {
@@ -73,15 +74,18 @@ struct PortraitDSContextMenu: View {
         DSMenuRow("Move \(n) to folder", icon: "folder", showsChevron: true) {
             moveFlyoutOpen.toggle()
         }
-        DSMenuRow("Align \(n)", icon: "align.horizontal.left") {
+        DSMenuRow("Match framing", icon: "square.resize", shortcut: "⌥⌘F") {
             onDismiss()
-            PortraitSetActions.align(targets, undoManager: undoManager) { model.setBusyMessage = $0 }
+            PortraitSetActions.matchFraming(targets, undoManager: undoManager) { model.setBusyMessage = $0 }
         }
-        DSMenuRow("Match lighting to this", icon: "sun.max") {
+        DSMenuRow("Match lighting", icon: "sun.max", shortcut: "⌥⌘L") {
             onDismiss()
             PortraitSetActions.matchLighting(
                 targets, reference: portrait, undoManager: undoManager
             ) { model.setBusyMessage = $0 }
+        }
+        DSMenuRow("Set background…", icon: "photo", shortcut: "⇧⌘B") {
+            onRequestSetBackground(targets)
         }
         Divider().padding(.vertical, 2)
         DSMenuRow("Delete \(n)", icon: "trash", destructive: true) {

@@ -43,6 +43,19 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .images: Image(systemName: "photo.on.rectangle.angled")
         }
     }
+
+    /// Compile-time `AppFeatureFlags` én remote CMS-flags. Face/Hair/Clothing
+    /// zijn release-tijd UIT (net als banners); Effects volgt alleen de CMS.
+    func isEnabled(remote flags: RemoteFeatureFlags) -> Bool {
+        switch self {
+        case .effects:    return flags.effectsEnabled
+        case .face:       return AppFeatureFlags.faceEnabled && flags.faceEnabled
+        case .hair:       return AppFeatureFlags.hairEnabled && flags.hairEnabled
+        case .clothing:   return AppFeatureFlags.clothesEnabled && flags.clothesEnabled
+        case .background: return flags.backgroundsEnabled
+        default:          return true
+        }
+    }
 }
 
 struct EditorView: View {
@@ -85,12 +98,12 @@ struct EditorView: View {
     var onApplyResult: (NSImage) async -> Void = { _ in }
     /// Face-edits: bewaart de cutout-alpha als masker i.p.v. Vision opnieuw.
     var onApplyAlphaPreserving: (NSImage) async -> Void = { _ in }
-    /// Remove background / Restore to original: het beeld is AL geïsoleerd →
-    /// direct opslaan zonder de her-isolatie-pass van `onApplyResult` (die zou een
-    /// al-uitgesneden beeld een tweede keer matten → achtergrond terug in het haar).
+    /// Remove background: het beeld is AL geïsoleerd → direct opslaan zonder de
+    /// her-isolatie-pass van `onApplyResult` (die zou een al-uitgesneden beeld een
+    /// tweede keer matten → achtergrond terug in het haar).
     var onApplyIsolated: (NSImage) async -> Void = { _ in }
-    /// Restore to original: re-run cutout engine on the original photo; throws so
-    /// the caller can show an error rather than silently leaking the background.
+    /// Remove background: re-run cutout engine; throws so the caller can show an
+    /// error rather than silently leaking the background.
     /// Tweede parameter = one-shot engine-override (Enhance-chip "This image
     /// only"); nil = de globale voorkeur.
     var onIsolateSubject: (NSImage, CutoutEngineKind?) async throws -> NSImage = { img, _ in img }
@@ -99,7 +112,7 @@ struct EditorView: View {
     /// E24.14: commit van de niet-destructieve Adjust-laag (params persisteren
     /// op het portret + canvas hercomputeren). Undo loopt via dezelfde closure.
     var onCommitAdjust: (PortraitAdjust) -> Void = { _ in }
-    /// E33: dubbelklik op de naam-chip opent de rename-modal (ShellView levert de
+    /// E33: klik op de naam-chip opent de rename-modal (ShellView levert de
     /// closure die `model.isShowingRename` zet — zoals de oude PortraitHeader-knop).
     var onRename: () -> Void = {}
     /// E-fix: niet-nil → render de isolating-reveal ín het frame en zet de
@@ -139,8 +152,6 @@ struct EditorView: View {
     /// E27.3: pan-drag bezig (gelift uit EditorCanvasView) zodat de screen-space
     /// transform-overlay de handles tijdens het pannen even verbergt.
     @State private var canvasSubjectPanning = false
-    /// E06.2: tijdens indrukken toont het canvas de originele importfoto.
-    @State private var isComparing = false
     /// E10.3: loopt tijdens de cloud-upscale ("Boost resolution").
     @State private var isBoosting = false
     /// Loopt tijdens Remove background (lokaal of cloud). Voorkomt dubbele calls.
@@ -181,7 +192,7 @@ struct EditorView: View {
         return 280
     }
 
-    /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
+    /// Originele importfoto; nil voor rijen van vóór E06.2.
     /// Perf (P2): gememoïseerd (originalData is na import onveranderlijk).
     private var originalImage: NSImage? { decodedOriginal }
 
@@ -329,11 +340,11 @@ struct EditorView: View {
     }
 
     // E31.1: de onderste toolbar is de Figma-capsule (4114:978) — gelabelde
-    // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt + een
-    // overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
-    // "Enhance" (31.2 verhuist het Adjust/Light-paneel hierheen) en `.clothing`
-    // heet "Shirt" (Figma-capsule). Face is een bewuste toevoeging t.o.v. Figma
-    // (besluit 31.6). Images → app-bar (E22.1).
+    // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt. Eigen labels
+    // i.p.v. EditorTool.label: `.edit` heet hier "Enhance" (31.2 verhuist het
+    // Adjust/Light-paneel hierheen) en `.clothing` heet "Shirt" (Figma-capsule).
+    // Face is een bewuste toevoeging t.o.v. Figma (besluit 31.6). Images →
+    // app-bar (E22.1).
     // E31.7: gedeeld met de board (BoardView) zodat single-editor én board
     // dezelfde capsule-items tonen. Label "Clothing" (besluit Thierry: canoniek
     // voor beide views — verving "Shirt").
@@ -345,22 +356,16 @@ struct EditorView: View {
         DSToolbarItem(id: .clothing, icon: EditorTool.clothing.icon, label: "Clothing"),
     ]
 
-    // E31.5: de capsule-overflow `⋯` is leeg.
-    private static let overflowItems: [DSToolbarItem<EditorTool>] = []
+    /// Feature-flag-gefilterde toolbar (E33+). Face/Hair/Clothing zijn
+    /// compile-time UIT tot de release-flag omgaat; daarbovenop kan de CMS
+    /// een zichtbare tool nog uitzetten. Default (offline) = remote allEnabled,
+    /// maar de compile-time poort blijft dicht.
+    private var remoteFlags: RemoteFeatureFlags {
+        entitlement?.featureFlags ?? .allEnabled
+    }
 
-    /// Feature-flag-gefilterde toolbar (E33+). Verbergt tools waarvan de
-    /// remote flag uit staat. Default (offline/CMS down) = alles zichtbaar.
     private var activeToolbarItems: [DSToolbarItem<EditorTool>] {
-        let flags = entitlement?.featureFlags ?? .allEnabled
-        return Self.toolbarItems.filter { item in
-            switch item.id {
-            case .effects:    return flags.effectsEnabled
-            case .face:       return flags.faceEnabled
-            case .hair:       return flags.hairEnabled
-            case .clothing:   return flags.clothesEnabled
-            default:          return true
-            }
-        }
+        Self.toolbarItems.filter { $0.id.isEnabled(remote: remoteFlags) }
     }
 
     /// Onderschept .images: ring aan = sidebar open; andere tools sluiten de
@@ -371,7 +376,12 @@ struct EditorView: View {
     /// eerste paneel-open sprong/snelde (de tweede was wél goed).
     private var toolSelection: Binding<EditorTool?> {
         Binding(
-            get: { isSidebarVisible ? .images : model.presentation.editorActiveTool },
+            get: {
+                if isSidebarVisible { return .images }
+                guard let tool = model.presentation.editorActiveTool,
+                      tool.isEnabled(remote: remoteFlags) else { return nil }
+                return tool
+            },
             set: { newValue in
                 switch newValue {
                 case .images:
@@ -382,6 +392,10 @@ struct EditorView: View {
                     model.presentation.editorActiveTool = nil
                 default:
                     isSidebarVisible = false
+                    guard let newValue, newValue.isEnabled(remote: remoteFlags) else {
+                        model.presentation.editorActiveTool = nil
+                        return
+                    }
                     model.presentation.editorActiveTool = newValue
                 }
             }
@@ -397,10 +411,6 @@ struct EditorView: View {
 
     var body: some View {
         editorBody
-            // E06.6: undo/redo + hold-to-compare hangen nu ín de toolbar-strip
-            // (DSBottomToolbar-accessoireslot, E03.19) op de 56-pitch zoals
-            // frame App / Edit 4008:7340 — zie `toolbarAccessories`. De
-            // tijdelijke bottomTrailing-overlay is hiermee weg.
             // Zoom-bediening zit nu in het View-menu (macOS-menubalk) i.p.v. een
             // zwevende HUD op de canvas — publiceer de acties als focused scene
             // value zodat de menu-items werken zolang deze editor in beeld is.
@@ -422,68 +432,6 @@ struct EditorView: View {
                     await performBoostResolution()
                 }
             }
-    }
-
-    @ViewBuilder
-    private var toolbarAccessories: some View {
-        if originalImage != nil {
-            // E-fix: hold-to-compare hangt op een Button — de eigen tap-gesture
-            // van de Button won het van een gewone `.gesture`, dus de drag vuurde
-            // nooit. `.simultaneousGesture` laat de press-down/up wél door zodat
-            // ingedrukt-houden het origineel toont.
-            DSToolButton(Image(systemName: "rectangle.2.swap"), label: "Hold to compare original", isActive: isComparing, surface: .ghost) {}
-                .opacity(isComparing ? 0.85 : 1)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in isComparing = true }
-                        .onEnded { _ in isComparing = false }
-                )
-        }
-    }
-
-    /// E-fix: de capsule-overflow (`⋯`, Figma Bottom toolbar 4114:983) — acties
-    /// die geen eigen paneel hebben. "Restore to original" verschijnt zodra er een
-    /// origineel is opgeslagen.
-    private var overflowActions: [DSToolbarAction] {
-        guard originalImage != nil else { return [] }
-        return [
-            DSToolbarAction(
-                id: "restore-original",
-                icon: Image(systemName: "arrow.counterclockwise"),
-                label: "Restore to original",
-                // UXS-4: gooit het huidige bewerkte beeld weg → destructive-tint
-                // i.p.v. de systeem-accentkleur die het systeem-Menu gaf.
-                isDestructive: true,
-                action: restoreToOriginal
-            ),
-        ]
-    }
-
-    /// Restore to original: re-run cutout engine on the original photo so that body
-    /// parts clipped during initial segmentation are recovered. Uses a dedicated async
-    /// path (onIsolateSubject) instead of routing through applyEffectResult, which has
-    /// a silent ?? fallback that would leak the original background on failure.
-    /// E31.8 (audit C4): eigen undo-naam "Restore to original" — registreerde eerst
-    /// per ongeluk "Restore body" (de oude chip-naam van fill-in-body, een ándere
-    /// actie), waardoor het undo-menu over de actie loog.
-    private func restoreToOriginal() {
-        guard let original = originalImage, let portraitModel else { return }
-        let before = NSImage(data: portraitModel.cutoutData)
-        Task { @MainActor in
-            do {
-                let restored = try await onIsolateSubject(original, nil)
-                // Al geïsoleerd → direct opslaan (geen tweede matte-pass).
-                await onApplyIsolated(restored)
-                if let before {
-                    ImageEnhanceUndo.register(
-                        undoManager, target: portraitModel, apply: onApplyIsolated,
-                        undoTo: before, redoTo: restored, actionName: "Restore to original"
-                    )
-                }
-            } catch {
-                entitlement?.presentError("Could not restore to the original — subject isolation failed.")
-            }
-        }
     }
 
     /// Tier 2: vervang cutout met Image Playground-resultaat (undo'baar).
@@ -668,12 +616,6 @@ struct EditorView: View {
         DSEditPanelContainer(
             tools: activeToolbarItems,
             activeTool: toolSelection,
-            overflowTools: Self.overflowItems,
-            overflowActions: overflowActions,
-            overflowOpen: Binding(
-                get: { model.presentation.editorOverflowMenuOpen },
-                set: { model.presentation.editorOverflowMenuOpen = $0 }
-            ),
             // E-fix: de feature-tools werken op de afgewerkte cutout — tijdens de
             // isolating-fase is die er nog niet, dus dim ze tot het resultaat staat.
             toolsEnabled: isolating == nil
@@ -695,13 +637,10 @@ struct EditorView: View {
             .clipped()
             .ignoresSafeArea()
             // E27.10 (audit C2): zoom-%-chip linksonder — vrij van de bottom-
-            // toolbar (midden) en de undo/redo-cluster (rechts), zoals de oude
-            // HUD-plek (27.2). Klik = fit.
+            // toolbar (midden), zoals de oude HUD-plek (27.2). Klik = fit.
             .overlay(alignment: .bottomLeading) { zoomChip }
         } panel: { tool in
             canvasPanel(tool)
-        } toolbarAccessory: {
-            toolbarAccessories
         }
         #if DEBUG
         .onAppear {
@@ -746,55 +685,23 @@ struct EditorView: View {
                         // hoeken die het dot-grid eronder tonen).
                         backgroundLayer
                             .clipShape(frameClipShape)
-                        // E06.2: hold-to-compare toont de originele importfoto
-                        // (aspect-fit, geen transform) bovenop het cutout-canvas.
-                        if isComparing, let original = originalImage {
-                            Image(nsImage: original)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                // UXS-17 (UX18): de oude hint was kale zwevende
-                                // tekst en las als debug-overlay; die is met de
-                                // toolbar-unificatie verdwenen, maar daarmee gaf
-                                // niets meer aan dát je naar het origineel kijkt.
-                                // Een DS-capsule die alleen tijdens de hold staat
-                                // — geen permanente chrome, dus ook geen
-                                // "verberg na N keer"-teller nodig.
-                                .overlay(alignment: .top) {
-                                    Text("Original")
-                                        .dsTextStyle(.labelSmall)
-                                        .foregroundStyle(DSColor.Foreground.primary)
-                                        .padding(.horizontal, DSSpacing.gap3)
-                                        .frame(height: 26)
-                                        .background(.ultraThinMaterial, in: Capsule())
-                                        .overlay(
-                                            Capsule().strokeBorder(
-                                                DSColor.Foreground.divider,
-                                                lineWidth: DSBorderWidth.thin
-                                            )
-                                        )
-                                        .padding(DSSpacing.gap4)
-                                        .accessibilityLabel("Showing the original photo")
-                                }
-                        } else {
-                            // E06.4: pan/snap-canvas + subject-schaal via handles.
-                            // E27.1: de VIEW-zoom zit niet meer hier maar als camera
-                            // op de DSCanvasCard (scène-niveau). Deze view doet alleen
-                            // nog onderwerp-transform + selectie.
-                            // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
-                            // de frame-vorm, zodat de selectie-handles eromheen niet
-                            // mee-geclipt worden.
-                            EditorCanvasView(
-                                image: portrait, portrait: portraitModel,
-                                gridEnabled: canvasGridEnabled,
-                                isSelected: $canvasSubjectSelected,
-                                isPanning: $canvasSubjectPanning,
-                                frameShape: portraitModel?.frameShape ?? .circle,
-                                // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
-                                cameraScale: camera.scale
-                            )
-                            .transition(reduceMotion ? .opacity : .blurFade)
-                        }
+                        // E06.4: pan/snap-canvas + subject-schaal via handles.
+                        // E27.1: de VIEW-zoom zit niet meer hier maar als camera
+                        // op de DSCanvasCard (scène-niveau). Deze view doet alleen
+                        // nog onderwerp-transform + selectie.
+                        // E24.16: het cutout-beeld clipt EditorCanvasView zelf tot
+                        // de frame-vorm, zodat de selectie-handles eromheen niet
+                        // mee-geclipt worden.
+                        EditorCanvasView(
+                            image: portrait, portrait: portraitModel,
+                            gridEnabled: canvasGridEnabled,
+                            isSelected: $canvasSubjectSelected,
+                            isPanning: $canvasSubjectPanning,
+                            frameShape: portraitModel?.frameShape ?? .circle,
+                            // E27.3: de uitlijn-gids constant houden onder de camera-zoom.
+                            cameraScale: camera.scale
+                        )
+                        .transition(reduceMotion ? .opacity : .blurFade)
                     }
                 }
                 // E-fix: animeer de overstap isolating ↔ result-canvas (snappy
@@ -836,7 +743,7 @@ struct EditorView: View {
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
             // door uit te zoomen. Posities volgen onderwerp-transform + camera.
             .overlay {
-                if canvasSubjectSelected, !isComparing, let portraitModel {
+                if canvasSubjectSelected, let portraitModel {
                     GeometryReader { geo in
                         let layout = EditorCanvasChromeMetrics.coverLayout(viewport: geo.size)
                         CanvasTransformOverlay(
@@ -975,7 +882,9 @@ struct EditorView: View {
         // E-fix: cursor boven het bottom-paneel → de catcher laat scroll dóór
         // (het paneel scrollt i.p.v. de canvas).
         Group {
-            if tool == .images {
+            if !tool.isEnabled(remote: remoteFlags) {
+                EmptyView()
+            } else if tool == .images {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
             } else if tool == .edit {
@@ -1054,7 +963,9 @@ struct EditorView: View {
     #if DEBUG
     private func debugEditorOnAppear() {
         if let tool = Self.debugInitialTool {
-            model.presentation.editorActiveTool = tool
+            if tool.isEnabled(remote: remoteFlags) {
+                model.presentation.editorActiveTool = tool
+            }
             Self.debugInitialTool = nil
         }
         // E18.12: smoke-haak — toon de aan-staat van de lokale toggles.

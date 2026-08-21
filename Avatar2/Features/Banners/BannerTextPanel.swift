@@ -35,6 +35,7 @@ struct BannerTextPanel: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .dsDropdownDismissOverlay(isPresented: fieldMenuDismiss)
         }
         .onChange(of: pickerColor) { _, c in
             guard case .bannerText(let id) = presentation.colorPicker else { return }
@@ -82,30 +83,24 @@ struct BannerTextPanel: View {
             }
 
             section("Font") {
-                Menu {
+                DSDropdownButton(
+                    isPresented: fieldMenuOpen(.font(value.id)),
+                    anchorHeight: 32,
+                    minWidth: 200
+                ) {
+                    fieldMenuLabel(BannerFontCatalog.label(for: value.fontName))
+                } menu: {
                     ForEach(BannerFontCatalog.curated) { entry in
-                        Button(entry.label) {
+                        DSMenuRow(
+                            entry.label,
+                            icon: "textformat",
+                            shortcut: value.fontName == entry.fontName ? "✓" : nil
+                        ) {
                             layer.wrappedValue.fontName = entry.fontName
+                            presentation.bannerTextFieldMenu = nil
                         }
                     }
-                } label: {
-                    HStack(spacing: DSSpacing.gap2) {
-                        Text(BannerFontCatalog.label(for: value.fontName))
-                            .dsTextStyle(.labelBase)
-                            .foregroundStyle(DSColor.Foreground.primary)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: DSIconSize.xs, weight: .semibold))
-                            .foregroundStyle(DSColor.Foreground.muted)
-                    }
-                    .padding(.horizontal, DSSpacing.gap3)
-                    .padding(.vertical, DSSpacing.gap2)
-                    .background(
-                        RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                            .fill(DSColor.Background.neutral)
-                    )
                 }
-                .menuStyle(.borderlessButton)
-                .fixedSize(horizontal: true, vertical: false)
             }
 
             section("Size") {
@@ -121,28 +116,24 @@ struct BannerTextPanel: View {
 
             HStack(alignment: .top, spacing: DSSpacing.gap4) {
                 section("Weight") {
-                    Menu {
+                    DSDropdownButton(
+                        isPresented: fieldMenuOpen(.weight(value.id)),
+                        anchorHeight: 32,
+                        minWidth: 160
+                    ) {
+                        fieldMenuLabel(weightLabel(value.weightRaw))
+                    } menu: {
                         ForEach(Self.weights, id: \.0) { w in
-                            Button(w.1) { layer.wrappedValue.weightRaw = w.0 }
+                            DSMenuRow(
+                                w.1,
+                                icon: "bold",
+                                shortcut: value.weightRaw == w.0 ? "✓" : nil
+                            ) {
+                                layer.wrappedValue.weightRaw = w.0
+                                presentation.bannerTextFieldMenu = nil
+                            }
                         }
-                    } label: {
-                        HStack(spacing: DSSpacing.gap2) {
-                            Text(weightLabel(value.weightRaw))
-                                .dsTextStyle(.labelBase)
-                                .foregroundStyle(DSColor.Foreground.primary)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: DSIconSize.xs, weight: .semibold))
-                                .foregroundStyle(DSColor.Foreground.muted)
-                        }
-                        .padding(.horizontal, DSSpacing.gap3)
-                        .padding(.vertical, DSSpacing.gap2)
-                        .background(
-                            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                                .fill(DSColor.Background.neutral)
-                        )
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize(horizontal: true, vertical: false)
                 }
 
                 section("Color") {
@@ -230,6 +221,37 @@ struct BannerTextPanel: View {
 
     private func weightLabel(_ raw: Int) -> String {
         Self.weights.first { $0.0 == raw }?.1 ?? "Regular"
+    }
+
+    private var fieldMenuDismiss: Binding<Bool> {
+        Binding(
+            get: { presentation.bannerTextFieldMenu != nil },
+            set: { if !$0 { presentation.bannerTextFieldMenu = nil } }
+        )
+    }
+
+    private func fieldMenuOpen(_ kind: BannerTextFieldMenu) -> Binding<Bool> {
+        Binding(
+            get: { presentation.bannerTextFieldMenu == kind },
+            set: { presentation.bannerTextFieldMenu = $0 ? kind : nil }
+        )
+    }
+
+    private func fieldMenuLabel(_ title: String) -> some View {
+        HStack(spacing: DSSpacing.gap2) {
+            Text(title)
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: DSIconSize.xs, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.muted)
+        }
+        .padding(.horizontal, DSSpacing.gap3)
+        .padding(.vertical, DSSpacing.gap2)
+        .background(
+            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
+                .fill(DSColor.Background.neutral)
+        )
     }
 
     private func colorSwatch(_ layer: Binding<BannerTextLayer>) -> some View {

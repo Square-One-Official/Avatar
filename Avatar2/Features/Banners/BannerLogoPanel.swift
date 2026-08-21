@@ -32,7 +32,7 @@ struct BannerLogoPanel: View {
 
     @ViewBuilder private var logoSection: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text("Logo").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+            Text("Logo").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
             if let data = doc.logoImageData, let img = NSImage(data: data), doc.layers.logo != nil {
                 HStack(spacing: DSSpacing.gap3) {
                     Image(nsImage: img)
@@ -48,9 +48,11 @@ struct BannerLogoPanel: View {
                     }
                     Spacer(minLength: 0)
                     Button { removeLogo() } label: {
-                        Image(systemName: "trash").font(.system(size: DSIconSize.sm)).foregroundStyle(DSColor.Foreground.muted)
+                        Image(systemName: "trash").font(.system(size: DSIconSize.sm)).foregroundStyle(DSColor.Foreground.subtle)
                     }
-                    .buttonStyle(.plain).help("Remove logo")
+                    .buttonStyle(.plain)
+                    .help("Remove logo")
+                    .accessibilityLabel("Remove logo")
                 }
             } else {
                 DSNeutralButton("Add logo") { addLogo() }
@@ -84,7 +86,7 @@ struct BannerLogoPanel: View {
 
     @ViewBuilder private var brandSection: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text("Brand colors").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+            Text("Brand colors").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
             HStack(spacing: DSSpacing.gap2) {
                 Button { presentation.colorPicker = .bannerLogoBrand } label: {
                     Circle()
@@ -97,8 +99,9 @@ struct BannerLogoPanel: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .dsHoverScale()
+                .dsHoverScale(1.02)
                 .help("Add brand color")
+                .accessibilityLabel("Add brand color")
                 .dsDropdownMenu(
                     isPresented: Binding(
                         get: { presentation.colorPicker == .bannerLogoBrand },
@@ -121,7 +124,7 @@ struct BannerLogoPanel: View {
                 }
                 if brand.hexColors.isEmpty {
                     Text("Add brand colors with the picker.")
-                        .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.muted)
+                        .dsTextStyle(.bodySmall).foregroundStyle(DSColor.Foreground.subtle)
                 }
             }
             .onChange(of: pickerColor) { _, c in

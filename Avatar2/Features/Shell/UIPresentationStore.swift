@@ -20,6 +20,12 @@ enum BannerFloatingMenu: Hashable, Sendable {
     case imageInfo
 }
 
+/// Font-/weight-dropdowns in het Banner Text-paneel (geen native `Menu`).
+enum BannerTextFieldMenu: Hashable, Sendable {
+    case font(UUID)
+    case weight(UUID)
+}
+
 /// Contextmenu-scope — bepaalt welk menu-template `FloatingOverlayHost` rendert.
 enum ContextMenuScope: Hashable, Sendable {
     case home, portraitsGallery, portraitsList, portraitsCanvas, board, leftNavFolder
@@ -31,6 +37,12 @@ struct ContextMenuRequest: Equatable, Sendable {
     var bannerID: PersistentIdentifier?
     var anchor: CGRect
     var scope: ContextMenuScope
+}
+
+/// Rechtermuis-menu zonder SwiftData-id (effect-key of banner-tekstlaag).
+struct AnchoredMenuRequest: Equatable, Sendable {
+    var id: String
+    var anchor: CGRect
 }
 
 enum PersistentColorPicker: Equatable, Sendable {
@@ -84,9 +96,6 @@ final class UIPresentationStore {
     var editorBackgroundColorPickerOpen = false
     /// Boost-/Remove background-chip-dropdown in het Edit-paneel (E41.2).
     var editorChipMenu: ChipMenu?
-    /// De `⋯`-overflow van de onderste capsule (UXS-4: DS-dropdown i.p.v. een
-    /// systeem-Menu, dus de open-state leeft hier).
-    var editorOverflowMenuOpen = false
 
     // MARK: Board session
     var boardCanvasMenu: CanvasToolbarMenu?
@@ -97,6 +106,12 @@ final class UIPresentationStore {
     // MARK: Banner studio session
     var bannerActiveTool: BannerTool?
     var bannerFloatingMenu: BannerFloatingMenu?
+    /// Rechtermuis op een geselecteerde banner-tekstlaag (Delete).
+    var bannerTextContextMenu: AnchoredMenuRequest?
+    var bannerTextFieldMenu: BannerTextFieldMenu?
+
+    // MARK: Settings
+    var settingsThemeMenuOpen = false
 
     // MARK: Left nav
     var leftNavUserMenuOpen = false
@@ -112,6 +127,9 @@ final class UIPresentationStore {
     /// Map-standaardachtergrond-dropdown in de gallery-kop (E53.7: was
     /// PortraitsGalleryView-@State en verdween bij elke view-recreatie).
     var folderBackgroundPickerOpen = false
+    /// Gallery/home multi-select achtergrond-picker (Set background…).
+    var selectionBackgroundPickerOpen = false
+    var selectionBackgroundPickerAnchor: CGRect = .zero
 
     // MARK: Social preview
     var previewPicker: PreviewPicker?
@@ -127,6 +145,8 @@ final class UIPresentationStore {
     /// daarna op nil) — de sheet leeft op de stabiele host, het EffectsModel in
     /// het paneel, dus de store is de brievenbus tussen die twee.
     var createdCustomEffect: CreateEffectResult?
+    /// Rechtermuis op een eigen effect-kaart (Delete effect).
+    var effectsContextMenu: AnchoredMenuRequest?
 
     // MARK: Alerts & confirms
     var alert: PresentationAlert?
@@ -136,6 +156,12 @@ final class UIPresentationStore {
 
     func dismissPortraitContextMenu() {
         portraitContextMenu = nil
+    }
+
+    func openSelectionBackgroundPicker(anchor: CGRect) {
+        portraitContextMenu = nil
+        selectionBackgroundPickerAnchor = anchor
+        selectionBackgroundPickerOpen = true
     }
 
     func openPortraitContextMenu(
@@ -166,15 +192,19 @@ final class UIPresentationStore {
         editorCanvasMenu = nil
         editorBackgroundTypeMenuOpen = false
         editorChipMenu = nil
-        editorOverflowMenuOpen = false
         boardCanvasMenu = nil
         boardBatchMenu = nil
         bannerFloatingMenu = nil
+        bannerTextContextMenu = nil
+        bannerTextFieldMenu = nil
+        settingsThemeMenuOpen = false
+        effectsContextMenu = nil
         leftNavUserMenuOpen = false
         leftNavFolderMenu = nil
         portraitContextMenu = nil
         bannerGalleryMenu = nil
         folderBackgroundPickerOpen = false
+        selectionBackgroundPickerOpen = false
         colorPicker = nil
     }
 }

@@ -10,30 +10,6 @@ import Observation
 import SwiftData
 import UniformTypeIdentifiers
 
-/// De Finder-stijl "lens" op de Portraits-collectie. Alleen actief op de
-/// Portraits-surface; Home blijft een vaste, lens-vrije dashboard.
-enum LibraryViewMode: String, CaseIterable, Identifiable {
-    // Volgorde = de switcher-volgorde (allCases). Grid is de default → staat links.
-    case grid, canvas, list, gallery
-    var id: String { rawValue }
-    var symbol: String {
-        switch self {
-        case .canvas:  "rectangle.3.group"
-        case .grid:    "square.grid.2x2"
-        case .list:    "list.bullet"
-        case .gallery: "rectangle.split.3x1"
-        }
-    }
-    var label: String {
-        switch self {
-        case .canvas:  "Canvas"
-        case .grid:    "Grid"
-        case .list:    "List"
-        case .gallery: "Gallery"
-        }
-    }
-}
-
 @MainActor
 @Observable
 final class ShellModel {
@@ -258,7 +234,7 @@ final class ShellModel {
     }
 
     /// E50.1: ⌘A / "Select all in folder" — vervang de selectie door de hele
-    /// zichtbare scope (`ordered` = de lens-volgorde). Het anker komt op het
+    /// zichtbare scope (`ordered` = de grid-volgorde). Het anker komt op het
     /// eerste item zodat een ⇧-klik daarna zich Finder-achtig gedraagt.
     /// Lege scope = no-op (selectie blijft zoals hij was).
     func selectAllPortraits(_ ordered: [PersistentIdentifier]) {
@@ -287,19 +263,6 @@ final class ShellModel {
 
     /// Pro-status voor het bulk-export-watermerk (`entitlement` is privé).
     var isPro: Bool { entitlement.isProActive }
-
-    // MARK: - Portraits view-mode (Finder-stijl lens; alleen op de Portraits-surface)
-
-    /// De gekozen lens op de Portraits-grid. Persistent (UserDefaults), globaal
-    /// (niet per map). Default `.grid` — wat er nu staat. Home is lens-vrij.
-    /// Default-lens op de Portraits-surface = grid (besluit Thierry). NIET meer
-    /// cross-launch persistent — elke start opent in grid; binnen de sessie
-    /// onthoudt het model je gekozen lens.
-    var portraitsViewMode: LibraryViewMode = .grid
-
-    func setPortraitsViewMode(_ mode: LibraryViewMode) {
-        portraitsViewMode = mode
-    }
 
     /// In-window Settings (visuele pass punt 14): vervangt de canvas-
     /// weergave als view-state; de topbar (quota + gear) blijft staan.
@@ -496,10 +459,13 @@ final class ShellModel {
         guard let modelContext, let png = cutout.pngData() else { return }
         let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
         modelContext.insert(portrait)
+        // `section` is hier al `.editor` (runCutout opent de studio vóór de
+        // cutout klaar is). De map-bestemming zit in `openOrigin`, dat wél
+        // vóór die switch is vastgelegd — anders landt de import unfiled
+        // zonder de map-default achtergrond.
         FolderImportSupport.attachImport(
             portrait: portrait,
-            section: section,
-            selectedFolderID: selectedFolderID,
+            selectedFolderID: FolderImportSupport.folderID(from: openOrigin),
             modelContext: modelContext
         )
         select(portrait)

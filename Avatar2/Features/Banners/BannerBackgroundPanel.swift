@@ -25,9 +25,9 @@ struct BannerBackgroundPanel: View {
                 if isImageFillActive {
                     zoomRow
                 }
-                Text("Click the canvas to add a photo — drag to reframe when selected.")
+                    Text("Click the canvas to add a photo — drag to reframe when selected.")
                     .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -36,7 +36,7 @@ struct BannerBackgroundPanel: View {
 
     @ViewBuilder private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text(title).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
+            Text(title).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
             content()
         }
     }
@@ -69,7 +69,7 @@ struct BannerBackgroundPanel: View {
                     }
             }
             .buttonStyle(.plain)
-            .dsHoverScale()
+            .dsHoverScale(1.02)
             .help("Pick a color")
             .dsDropdownMenu(
                 isPresented: Binding(
@@ -113,13 +113,13 @@ struct BannerBackgroundPanel: View {
                         .overlay(
                             RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
                                 .strokeBorder(
-                                    isSelectedGradient(colors) ? DSColor.Action.primary : DSColor.Foreground.divider,
+                                    isSelectedGradient(colors) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
                                     lineWidth: isSelectedGradient(colors) ? DSBorderWidth.medium : DSBorderWidth.thin
                                 )
                         )
                 }
                 .buttonStyle(.plain)
-                .dsHoverScale()
+                .dsHoverScale(1.02)
             }
         }
     }
@@ -139,7 +139,7 @@ struct BannerBackgroundPanel: View {
                     }
             }
             .buttonStyle(.plain)
-            .dsHoverScale()
+            .dsHoverScale(1.02)
             .help("Upload image")
 
             GenerateBackgroundSwatch(
@@ -209,13 +209,13 @@ struct BannerBackgroundPanel: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: DSRadius.lg)
                         .strokeBorder(
-                            selected ? DSColor.Action.primary : DSColor.Foreground.divider,
+                            selected ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
                             lineWidth: selected ? DSBorderWidth.medium : DSBorderWidth.thin
                         )
                 )
         }
         .buttonStyle(.plain)
-        .dsHoverScale()
+        .dsHoverScale(1.02)
     }
 
     // MARK: Swatch
@@ -227,13 +227,13 @@ struct BannerBackgroundPanel: View {
                 .frame(width: swatch, height: swatch)
                 .overlay(
                     Circle().strokeBorder(
-                        isSelectedSolid(color) ? DSColor.Action.primary : DSColor.Foreground.divider,
+                        isSelectedSolid(color) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
                         lineWidth: isSelectedSolid(color) ? DSBorderWidth.medium : DSBorderWidth.thin
                     )
                 )
         }
         .buttonStyle(.plain)
-        .dsHoverScale()
+        .dsHoverScale(1.02)
     }
 
     // MARK: State + apply

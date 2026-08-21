@@ -17,17 +17,17 @@ struct BannerShaderPanel: View {
     @State private var didLoad = false
 
     var body: some View {
-        DSEditPanel(title: "Effects", subtitle: subtitle) {
+        DSEditPanel(title: "Shaders", subtitle: subtitle) {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                Text("Add effect")
+                Text("Add shader")
                     .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                    .foregroundStyle(DSColor.Foreground.subtle)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
                         ForEach(ShaderCatalog.all) { effect in
                             Button { add(effect) } label: { effectChip(effect) }
                                 .buttonStyle(.plain)
-                                .dsHoverScale()
+                                .dsHoverScale(1.02)
                                 .help("Add \(effect.displayName)")
                         }
                     }
@@ -38,9 +38,9 @@ struct BannerShaderPanel: View {
                 .horizontalScrollEdgeFade()
 
                 if layers.isEmpty {
-                    Text("No effects yet — add one above. Applied to the whole banner.")
+                    Text("No shaders yet — add one above. Applied to the whole banner.")
                         .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
+                        .foregroundStyle(DSColor.Foreground.subtle)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     ForEach(Array($layers.enumerated()), id: \.element.id) { index, $layer in
@@ -131,7 +131,7 @@ struct BannerShaderPanel: View {
                     HStack(spacing: DSSpacing.gap2) {
                         Text(p.label)
                             .dsTextStyle(.labelSmall)
-                            .foregroundStyle(DSColor.Foreground.muted)
+                            .foregroundStyle(DSColor.Foreground.subtle)
                             .frame(width: 64, alignment: .leading)
                         DSSlider(value: paramBinding(layer, p), in: p.range)
                     }
