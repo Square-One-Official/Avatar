@@ -28,10 +28,12 @@ echo "==> tests Avatar2 (unit, gehost in Aaavatar 2.app)"
 xcodebuild -project Avatar.xcodeproj -scheme Avatar2 \
   -configuration Debug -derivedDataPath "$DERIVED" test | tail -1
 
+# --parallel: sequential AvatarKit Vision cutout tests can stall the XCTest
+# waiter indefinitely on some Macs; parallel finishes cleanly (~2–3 min).
 echo "==> tests AvatarKit"
-swift test --package-path AvatarKit
+swift test --package-path AvatarKit --parallel
 
 echo "==> tests AvatarUI"
-swift test --package-path AvatarUI
+swift test --package-path AvatarUI --parallel
 
 echo "==> alles groen"
