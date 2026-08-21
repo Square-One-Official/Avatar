@@ -417,7 +417,7 @@ betere feedback en een cancel — niet via het medium-tier. Gebouwd:
   grens); build-v2.sh groen.
 
 ## 55.10 — Isolatie-kwaliteit bij edits op een gestylede basis
-- status: ready
+- status: deferred (niet in 2.0 release — besluit 2026-08-21)
 - team: FEAT+AI
 - blockedBy: —
 
@@ -431,6 +431,11 @@ per-beeld engine-keuze uit 5afb1eb. Meet vóór/na op de 3d-head + bucket-hat-
 repro. NB: de stijlmatch-helft van deze vondst is al gefixt (server,
 STYLE_MATCH_CLAUSE op alle edit-intents, commit 1239738, deployed
 2026-08-03) — een edit rendert nu in de stijl van de basis.
+
+**Release-besluit (2026-08-21):** niet blokkerend. Stijlmatch is live; Face
+gebruikt al `preserveSourceAlpha`; workaround = Remove background → High
+quality. Alleen heropenen als beta-smoke de 3d-head + clothes-repro nog hard
+raakt.
 
 ## 55.8 — Prod-uitrol (voorbereid door INFRA, uitgevoerd door Thierry)
 - status: done (uitgevoerd 2026-08-03, Thierry + agent samen)

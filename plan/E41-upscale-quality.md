@@ -70,7 +70,7 @@ commit-/chat-historie.
   DoD groen.
 
 ## 41.3 — Crystal-upscaler versie-hash pinnen
-- status: in_progress (heropend 2026-07-02 22:xx)
+- status: wontfix (2026-08-21 — pin 422 op Replicate; Topaz is Boost-default)
 - team: INFRA
 - blockedBy: —
 

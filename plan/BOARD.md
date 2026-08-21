@@ -27,7 +27,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E06 Editor-framework](E06-editor-framework.md) | FEAT | **done** (6.1–6.6) |
 | [E07 Background](E07-background.md) | FEAT | **done** (7.1–7.2) |
 | [E08 Barebones-flows](E08-barebones.md) | FEAT | **done** (8.1 → E15, 8.2–8.3) |
-| [E09 Effects](E09-effects.md) | FEAT+AI | **done** (9.1–9.2); **9.3 done** (eigen effecten, gemerged 2026-07-31 — prod-uitrol wacht op Thierry: sql/015 + backend-deploy) |
+| [E09 Effects](E09-effects.md) | FEAT+AI | **done** (9.1–9.3); custom effects live (sql/015 + deploy, E55.8 2026-08-03) |
 | [E10 Clothes](E10-clothes.md) | FEAT+AI | **done** (10.1–10.4) |
 | [E11 Hair](E11-hair.md) | FEAT+AI | **done** (11.1–11.2) |
 | [E12 Light & Retouch](E12-light-retouch.md) | FEAT | **done** (12.1–12.2) |
@@ -38,7 +38,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E27 Canvas-viewport & board-camera](E27-canvas-viewport.md) | FEAT | **done** (27.1–27.11) |
 | [E29 Multi-select & batch](E29-multiselect-batch.md) | FEAT+AI | **done** (29.1–29.5) |
 | [E31 Toolbar-unificatie](E31-toolbar-unification.md) | FEAT+DS | **done** (31.1–31.8); follow-up "Restore body"-strings gedaan in E49.2 (op branch, merge pending) |
-| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **32.1 in_progress** (code klaar, deploy wacht op 32.0-bakeoff) · 32.2–32.4 done (Whiten teeth: on-device arm + dropdown + cloud-fixes, 2026-08-03) · 32.5 backlog |
+| [E32 Face beauty-acties](E32-face-beauty.md) | FEAT+INFRA+AI | **scoped out of 2.0 release** (2026-08-21) — 32.0/32.1/32.5 off board; Whiten teeth on-device (32.2–32.3) blijft; cloud face-presets post-release |
 | [E34 Social Preview & Banner](E34-social-preview.md) | FEAT+AI+INFRA | **done** (34.1–34.7); 34.8–34.10 AI-generatie backlog |
 | [E35 Banners-bibliotheek](E35-banners.md) | FEAT+INFRA | **done** (35.1–35.5) — uitgebreid door E36–E40 |
 | [E36 Home & gallery-IA](E36-home-gallery-ia.md) | FEAT+DS | **done** (36.1–36.5); 36.6 backlog (zoekveld) |
@@ -46,7 +46,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E38 Shaders-engine](E38-shaders-engine.md) | AI+DS+FEAT | **done** (38.1–38.4, Figma-stijl Metal-shaders; DoD hergeverifieerd 2026-07-02 na E37.19) |
 | [E39 CMS banner-presets](E39-cms-banner-presets.md) | INFRA+FEAT | **done** (39.1–39.2; 39.1 afgerond met prod-verificatie + decode-tests, 2026-07-02) |
 | [E40 Banner als portret-achtergrond](E40-banner-as-portrait-background.md) | FEAT | **done** (40.1–40.2; 40.1 gehard 2026-07-02 — linked-check nu via `BannerDeletion.isLinked`, E46-les) |
-| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4, 41.5 herzien: Boost = on-device gratis óf Topaz 3cr+6MP-cap; backend live op prod 2026-07-12, app gemerged) |
+| [E41 Boost Resolution](E41-upscale-quality.md) | INFRA+FEAT | **done** (41.1–41.2, 41.4, 41.5; Boost = on-device gratis óf Topaz 3cr+6MP-cap; backend live). **41.3 wontfix** — crystal-pin 422 op Replicate; Topaz is default, smoke-exceptie blijft |
 | [E42 AI background generation](E42-ai-background-generation.md) | FEAT+INFRA+AI | **done** (42.1–42.3, 42.5–42.7); 42.4 backlog (wide T2I bakeoff) |
 | [E43 Backend-deploy-sanering & AI-achtergrond-herstel](E43-backend-deploy-sanering.md) | INFRA | **done** (43.1–43.2 + 43.5, prod uitgevoerd 2026-07-02); 43.3–43.4 backlog |
 | [E44 Cloud-actie betrouwbaarheid](E44-cloud-betrouwbaarheid.md) | FEAT+INFRA | **done** (44.1–44.2, prod-deploy 2026-07-02); 44.3 backlog |
@@ -59,4 +59,4 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
 | [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1 done** (polish-sprint P0's, 2026-08-01) · **53.3 done** (live AX-geverifieerd) · **53.6 done** (shell-chrome; was al gebouwd, nu geverifieerd + gesloten) · **53.7 done** (persistente presentatie) — **53.2 done** (UX1 + UX2: fit-to-window, userZoomed-guard en gedeelde zoom-chip); **53.4 done** (reduce-motion-sweep + guard in build-v2.sh); **53.5 done** (P1/P2-restlijst, 15 stories); **53.8 done** (Playground-sheet op ShellView-host); **53.9 done** (icoongrootte-tokens + guard) — **E53 compleet** |
 | [E54 CMS-stijlreferenties voor Effects](E54-effect-stijlreferenties.md) | INFRA+AI | **54.1 + 54.2 done** (bakeoff 2026-07-12: refs verslechteren stijltrouw op nano-banana → default-flip afgeblazen, koppel-rijen losgehaald); 54.3 (tekst-distillatie) en 54.4 blijven optioneel backlog — grotendeels vervangen door E55 |
-| [E55 Effects 2.0](E55-effects-2.0.md) | INFRA+FEAT+DS+AI | **55.1–55.6 + 55.9 done** (aspect-contract, gpt-image-2-default server-governed, stacking-fix, Create→header, importer+hardening, instant thumbnails, generatie-feedback+cancel; incl. 2×edge-sweep); **55.7 done** (bakeoff 2026-08-03: identiteit ✅ 34/34, refs aan; besluiten: medium-default, 4cr, flowers prompt-only); **55.8 done** (uitrol 2026-08-03: 9 stijlen live, oude 4 uit; bijvangst sql/019 — Messages/banner_presets ontbraken op prod); live-smoke-nazorg done (delivery-fixes 8ee9a9a + stijlmatch-clausule, beide deployed); **55.10 ready** (isolatie-erosie bij edits op gestylede basis) — rest: 3 thumbnails later |
+| [E55 Effects 2.0](E55-effects-2.0.md) | INFRA+FEAT+DS+AI | **55.1–55.9 done** (incl. uitrol 9 stijlen + live-smoke stijlmatch). **55.10 deferred** — niet release-blokkerend (stijlmatch shipped; remat-ORMBG-prefer post-release). Rest: 3 thumbnails later |

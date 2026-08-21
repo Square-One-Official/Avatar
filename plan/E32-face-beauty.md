@@ -8,7 +8,7 @@ Pro/dev-gebruiker returnde de gate `true` en gebeurde er niets → dode knop. E3
 effecten echt, hergebruikt de bestaande `/v1/stylize` instruction-edit-route (zoals hair/clothes).
 
 ## 32.0 — Modelonderzoek / face-bakeoff
-- status: ready (handmatig, owner AI + Thierry)
+- status: scoped_out (2.0 release — besluit 2026-08-21)
 - DoD: `plan/e32-face-bakeoff.md` met aanbeveling-per-effect-tabel (identiteit + "change nothing
   else" + kwaliteit/kosten), analoog aan `plan/e09-1-bakeoff.md`.
 
@@ -24,7 +24,7 @@ call — `image_input`/`size`/`aspect_ratio`); `face_preset` callable op `/v1/st
 `face_preset` aanpassen (per-preset-mapping in `stylize.ts` of de feature-default).
 
 ## 32.1 — Face-intent end-to-end (backend + client + UI)
-- status: in_progress
+- status: scoped_out (2.0 release — besluit 2026-08-21; code staat, cloud face-presets post-release)
 - owner: FEAT+INFRA (AI-agent)
 - DoD: beide targets bouwen + tests groen + Result-regel
 
@@ -108,7 +108,7 @@ transform te resetten. Request-body gepind in BackendClientDecodeTests
 (`testEditFaceSendsPreserveFramingAndPreset`). `tsc --noEmit` ✓.
 
 ## 32.5 — Mond-composiet van het cloud-resultaat (stretch)
-- status: backlog
+- status: scoped_out (2.0 release — besluit 2026-08-21; was backlog/stretch)
 - Alleen oppakken als de toondrift na 32.4 in de praktijk blijft: hergebruik het
   TeethWhitener-masker om alléén de mondregio van het cloud-resultaat in het origineel te
   composieten (alignment-gate + full-frame-fallback; naadrisico eerlijk beoordelen).
