@@ -1,18 +1,10 @@
 import SwiftUI
 
-struct PressableButtonStyle: ButtonStyle {
-    var pressedScale: CGFloat = 0.97
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? pressedScale : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
 #if !APP_STORE
 struct SidebarUpdateCard: View {
     @Environment(UpdateManager.self) private var updater
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovering = false
 
     var body: some View {
@@ -20,11 +12,11 @@ struct SidebarUpdateCard: View {
             VStack(spacing: 10) {
                 VStack(spacing: 2) {
                     Text(Loc.updatedTo(version))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.headline)
                         .foregroundStyle(Color.accentColor)
                         .lineLimit(1)
                     Text(Loc.relaunchToApply)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -33,7 +25,7 @@ struct SidebarUpdateCard: View {
                     updater.relaunchAndInstall()
                 } label: {
                     Text(Loc.relaunch)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 7)
@@ -54,7 +46,8 @@ struct SidebarUpdateCard: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(reduceTransparency ? AnyShapeStyle(Color.appSurface)
+                                             : AnyShapeStyle(.ultraThinMaterial))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -63,8 +56,10 @@ struct SidebarUpdateCard: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.15), value: hovering)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .motionAwareAnimation(.easeOut(duration: 0.15), value: hovering)
+            .transition(reduceMotion
+                        ? .opacity
+                        : .move(edge: .bottom).combined(with: .opacity))
         }
     }
 }

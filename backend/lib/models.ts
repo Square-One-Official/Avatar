@@ -91,15 +91,14 @@ export const MODEL_REGISTRY: Record<CloudFeature, FeatureRegistration> = {
     credits: 2,
     requiresCloud: true,
   },
-  // Instruction-edit (stijlen + retouch). De drie entries zijn de E09.1
-  // bakeoff-armen; /v1/stylize is dev-only tot de bakeoff een definitief
-  // default per feature heeft aangewezen (E09.2 haalt de gate weg). Alle
-  // drie zijn officiële, unversioned slugs — geen pinning nodig. De
-  // payload-verschillen per arm leven in stylizeInputFor (lib/replicate.ts).
+  // Instruction-edit (stijlen + retouch). Productie-default is GPT Image
+  // 1.5; de overige keys zijn E09.1/E32.1 bakeoff-armen voor dev-overrides.
+  // Alle refs zijn officiële unversioned slugs. Payload-verschillen per
+  // arm leven in stylizeInputFor (lib/replicate.ts).
   stylize: {
-    // Voorlopig; de bakeoff-uitkomst bepaalt het echte default (mag per
-    // feature verschillen — stijl ≠ kleding ≠ haar, zie E09.1).
-    defaultModel: "nano-banana",
+    // Productie-default: GPT Image 1.5 (OpenAI). nano-banana blijft in de
+    // whitelist voor dev-overrides (E09.1 bakeoff-geschiedenis).
+    defaultModel: "gpt-image-1.5",
     models: {
       "nano-banana": {
         ref: "google/nano-banana",
@@ -154,11 +153,12 @@ export function defaultModelRef(feature: CloudFeature): string {
  * Door gebruikers kiesbare generatie-modellen per feature (E15.6). I.t.t.
  * `model_override` (dev-only, hele whitelist) is dit een kleine, openbare
  * keuze: de Settings-rij "Generation model" laat de gebruiker schakelen
- * tussen nano-banana (default) en het OpenAI-model. Alleen deze keys mogen
- * van een gewone gebruiker komen.
+ * tussen het OpenAI-default en (optioneel) andere armen. Alleen deze keys
+ * mogen van een gewone gebruiker komen. nano-banana is geen user-keuze
+ * meer — stille fallback naar de default als een oude client 'm stuurt.
  */
 export const USER_SELECTABLE_MODELS: Partial<Record<CloudFeature, string[]>> = {
-  stylize: ["nano-banana", "gpt-image-1.5"],
+  stylize: ["gpt-image-1.5"],
 };
 
 /**

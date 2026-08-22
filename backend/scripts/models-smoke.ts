@@ -5,6 +5,7 @@ import {
   MODEL_REGISTRY,
   UnknownModelOverrideError,
   defaultModelRef,
+  resolveGenerationModel,
   resolveModelOverride,
 } from "../lib/models.js";
 
@@ -20,10 +21,15 @@ assert.throws(() => resolveModelOverride("cutout", "evil-model", true), UnknownM
 assert.equal(resolveModelOverride("cutout", "evil-model", false), null);
 assert.equal(defaultModelRef("fill_body"), "black-forest-labs/flux-fill-pro");
 // E09.1: de drie bakeoff-armen zijn whitelisted voor dev-overrides
+assert.equal(defaultModelRef("stylize"), "openai/gpt-image-1.5");
 assert.equal(resolveModelOverride("stylize", "nano-banana", true), "google/nano-banana");
 assert.equal(resolveModelOverride("stylize", "flux-2-pro", true), "black-forest-labs/flux-2-pro");
 assert.equal(resolveModelOverride("stylize", "gpt-image-1.5", true), "openai/gpt-image-1.5");
 assert.equal(resolveModelOverride("stylize", "gpt-image-1.5", false), null);
+// User-facing generation_model: default key is a no-op; nano-banana is
+// no longer selectable and is ignored (falls back to GPT Image).
+assert.equal(resolveGenerationModel("stylize", "gpt-image-1.5"), null);
+assert.equal(resolveGenerationModel("stylize", "nano-banana"), null);
 // E32.1: de Seedream face-bakeoff-arm is whitelisted voor dev-overrides
 assert.equal(resolveModelOverride("stylize", "seedream", true), "bytedance/seedream-4");
 assert.equal(resolveModelOverride("stylize", "seedream", false), null);

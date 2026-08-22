@@ -9,6 +9,7 @@ struct ProUpsellToastView: View {
     let onUpgrade: () -> Void
     let onDismiss: () -> Void
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var hovering = false
 
     private var brand: Color { .appBrand }
@@ -19,16 +20,19 @@ struct ProUpsellToastView: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.thickMaterial)
+                    .fill(reduceTransparency
+                          ? AnyShapeStyle(Color.appSurface)
+                          : AnyShapeStyle(.thickMaterial))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.primary.opacity(hovering ? 0.18 : 0.10))
             )
-            .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 6)
+            .shadow(color: .black.opacity(reduceTransparency ? 0 : 0.18),
+                    radius: 18, x: 0, y: 6)
             .frame(maxWidth: 460)
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.15), value: hovering)
+            .motionAwareAnimation(.easeOut(duration: 0.15), value: hovering)
     }
 
     // MARK: - Layout
@@ -36,11 +40,11 @@ struct ProUpsellToastView: View {
     private var singleRowLayout: some View {
         HStack(spacing: 12) {
             Image(systemName: toast.showsUpgrade ? "sparkles" : "info.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(toast.showsUpgrade ? brand : .secondary)
 
             Text(toast.message)
-                .font(.system(size: 13))
+                .font(.callout)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -61,7 +65,7 @@ struct ProUpsellToastView: View {
     private var upgradePill: some View {
         Button(action: onUpgrade) {
             Text(Loc.proQuotaUpgradeCTA)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
@@ -74,11 +78,12 @@ struct ProUpsellToastView: View {
     private var dismissButton: some View {
         Button(action: onDismiss) {
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(Loc.dismiss)
     }
 }

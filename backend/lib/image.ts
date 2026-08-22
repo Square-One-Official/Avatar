@@ -15,7 +15,7 @@ export const MAX_DECODED_IMAGE_BYTES = 12 * 1024 * 1024;
 
 /**
  * Flatten a transparent-background cutout PNG onto a neutral grey
- * background so identity-preserving instruction editors (Nano Banana,
+ * background so identity-preserving instruction editors (GPT Image,
  * Flux Kontext, etc.) get a normal RGB photo to work with.
  *
  * Why grey, not white: white-on-white-shirt collapses contrast at the

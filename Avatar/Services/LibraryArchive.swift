@@ -440,6 +440,7 @@ enum LibraryArchive {
         portrait.createdAt = rec.createdAt
         portrait.updatedAt = rec.updatedAt
         context.insert(portrait)
+        PortraitSpotlight.index(portrait)
     }
 
     private static func sha256Hex(_ data: Data) -> String {

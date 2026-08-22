@@ -9,6 +9,7 @@ import SwiftUI
 struct PillSegmentedControl<Tag: Hashable>: View {
     @Binding var selection: Tag
     let segments: [Segment]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     struct Segment: Identifiable {
         let tag: Tag
@@ -41,7 +42,7 @@ struct PillSegmentedControl<Tag: Hashable>: View {
         let isSelected = selection == segment.tag
         Button {
             // Spring matches Apple's UIKit segment animation — alive but no overshoot.
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+            Motion.run(reduceMotion, .spring(response: 0.32, dampingFraction: 0.78)) {
                 selection = segment.tag
             }
         } label: {
@@ -49,7 +50,7 @@ struct PillSegmentedControl<Tag: Hashable>: View {
                 Image(systemName: segment.symbol)
                     .imageScale(.small)
                 Text(segment.label)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .font(.callout.weight(isSelected ? .semibold : .regular))
             }
             .foregroundStyle(isSelected ? Color.primary : Color.secondary)
             .padding(.vertical, 6)

@@ -127,25 +127,10 @@ private struct PrivacyAndAISection: View {
                 }
             }
 
-            Divider().padding(.vertical, 4)
-
-            // Audit MEDIUM #27. Forward-looking opt-out: today nothing
-            // beyond what Supabase Auth always logs leaves the app, but
-            // any future telemetry surface (Sparkle system profile,
-            // crash reporting, usage events) must read this flag.
-            Toggle(isOn: Binding(
-                get: { prefs.shareAnonymousDiagnostics },
-                set: { prefs.shareAnonymousDiagnostics = $0 }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Loc.privacyDiagnosticsTitle)
-                    Text(Loc.privacyDiagnosticsDesc)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .toggleStyle(.switch)
+            // `shareAnonymousDiagnostics` stays persisted for a future
+            // telemetry surface (audit MEDIUM #27) but has no consumer
+            // today — hiding the toggle avoids a Privacy control that
+            // changes nothing.
         }
     }
 }
@@ -371,62 +356,63 @@ private struct MagicCutoutSection: View {
     @Environment(AppState.self) private var appState
     @Environment(PrivacyPreferences.self) private var privacyPrefs
 
-    /// Local-only privacy posture greys this section out and pins the
-    /// switch off. The user has already chosen "no photos leave the
-    /// Mac" upstream; toggling Magic Cutout on inside that mode would
-    /// be incoherent. Caption explains why.
+    /// Local-only already chose "no photos leave the Mac"; showing a
+    /// greyed Pro upsell here reads as a paywall, not a privacy choice.
     private var lockedByPrivacy: Bool { !privacyPrefs.cloudAllowed }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(Loc.magicCutoutTitle).font(.headline)
 
-            HStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(Loc.magicCutoutSubtitle)
-                            .font(.body.weight(.medium))
-                        if !appState.proEntitlement.isPro {
-                            Text(Loc.magicCutoutProBadge)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(.tint))
-                        }
-                    }
-                    Text(Loc.magicCutoutDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Toggle("", isOn: Binding(
-                    get: { !lockedByPrivacy && appState.proEntitlement.isPro && enabled },
-                    set: { newValue in
-                        guard !lockedByPrivacy else { return }
-                        if appState.proEntitlement.isPro {
-                            enabled = newValue
-                        } else if newValue {
-                            appState.pendingMagicCutoutEnable = true
-                            appState.showProUpgradeSheetInSettings = true
-                        }
-                    }
-                ))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .disabled(lockedByPrivacy)
-            }
-
             if lockedByPrivacy {
-                Text(Loc.privacyDisabledInLocalOnly)
+                Text(Loc.magicCutoutLocalOnlySummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(Loc.enableCloudAIInPrivacySettings) {
+                    privacyPrefs.mode = .cloudAllowed
+                }
+                .controlSize(.regular)
+            } else {
+                HStack(alignment: .center, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(Loc.magicCutoutSubtitle)
+                                .font(.body.weight(.medium))
+                            if !appState.proEntitlement.isPro {
+                                Text(Loc.magicCutoutProBadge)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(.tint))
+                            }
+                        }
+                        Text(Loc.magicCutoutDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Toggle(Loc.magicCutoutSubtitle, isOn: Binding(
+                        get: { appState.proEntitlement.isPro && enabled },
+                        set: { newValue in
+                            if appState.proEntitlement.isPro {
+                                enabled = newValue
+                            } else if newValue {
+                                appState.pendingMagicCutoutEnable = true
+                                appState.showProUpgradeSheetInSettings = true
+                            }
+                        }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .accessibilityLabel(Loc.magicCutoutSubtitle)
+                }
             }
         }
-        .opacity(lockedByPrivacy ? 0.55 : 1)
     }
 }
 
@@ -589,6 +575,7 @@ private struct BackgroundSettingsCard: View {
                 }
                 .buttonStyle(.plain)
                 .help(Loc.setAsDefault)
+                .accessibilityLabel(Loc.setAsDefault)
 
                 Button {
                     context.delete(preset)
@@ -598,6 +585,7 @@ private struct BackgroundSettingsCard: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(preset.isDefault)
+                .accessibilityLabel(Loc.delete)
             }
             .font(.caption)
         }
@@ -606,6 +594,16 @@ private struct BackgroundSettingsCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.appSurface)
         )
+        .contextMenu {
+            Button(Loc.setAsDefault) { setDefault() }
+            Divider()
+            Button(Loc.delete, role: .destructive) {
+                guard !preset.isDefault else { return }
+                context.delete(preset)
+                try? context.save()
+            }
+            .disabled(preset.isDefault)
+        }
     }
 
     private func setDefault() {
@@ -654,7 +652,7 @@ struct AccountSettings: View {
                     endPoint: .bottomTrailing
                 ))
             Text(initial)
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.white)
         }
         .frame(width: 64, height: 64)
@@ -674,7 +672,7 @@ struct AccountSettings: View {
                             .font(.body.weight(.medium))
                         if appState.proEntitlement.isPro {
                             Text(Loc.proPlanName)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -717,7 +715,7 @@ struct AccountSettings: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Loc.creditsCount(appState.proEntitlement.credits))
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.title2.weight(.semibold))
                         Text(Loc.creditsBalanceLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -897,7 +895,7 @@ private struct LinkDeviceCard: View {
             }
             .padding(8)
         }
-        .animation(.easeOut(duration: 0.18), value: feedback)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: feedback)
     }
 
     @ViewBuilder

@@ -16,6 +16,8 @@ struct ExportSheet: View {
     @State private var doneMessage: String?
     @State private var errorMessage: String?
     @State private var globalShape: ExportShape = .square
+    /// Paths written by the last successful export / Share pass — drives ShareLink.
+    @State private var shareURLs: [URL] = []
 
     /// Single-portrait flow used by the Editor toolbar.
     init(portrait: Portrait, background: BackgroundPreset?) {
@@ -63,6 +65,8 @@ struct ExportSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(PressableButtonStyle())
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(Loc.close)
             }
             .padding()
 
@@ -94,9 +98,24 @@ struct ExportSheet: View {
                     StatusChip(severity: .danger, message: errorMessage, style: .soft)
                 }
                 Spacer()
+                if !shareURLs.isEmpty {
+                    ShareLink(items: shareURLs) {
+                        Label(Loc.share, systemImage: "square.and.arrow.up")
+                    }
+                    .help(Loc.shareHelp)
+                } else {
+                    Button {
+                        runExport(toTemporaryForShare: true)
+                    } label: {
+                        Label(Loc.share, systemImage: "square.and.arrow.up")
+                    }
+                    .help(Loc.shareHelp)
+                    .disabled(selected.isEmpty || isExporting || portraits.isEmpty)
+                }
                 Button(Loc.close) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
                 Button {
-                    runExport()
+                    runExport(toTemporaryForShare: false)
                 } label: {
                     if isExporting {
                         ProgressView().controlSize(.small)
@@ -117,13 +136,26 @@ struct ExportSheet: View {
         }
     }
 
-    private func runExport() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = Loc.exportHere
-        guard panel.runModal() == .OK, let dir = panel.url else { return }
+    private func runExport(toTemporaryForShare: Bool) {
+        let dir: URL
+        if toTemporaryForShare {
+            dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("AaavatarShare-\(UUID().uuidString)", isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            } catch {
+                errorMessage = Loc.exportFailed(error.localizedDescription)
+                return
+            }
+        } else {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.prompt = Loc.exportHere
+            guard panel.runModal() == .OK, let chosen = panel.url else { return }
+            dir = chosen
+        }
 
         let jobs: [ExportJob] = presets
             .filter { selected.contains($0.id) }
@@ -164,6 +196,7 @@ struct ExportSheet: View {
         isExporting = true
         errorMessage = nil
         doneMessage = nil
+        shareURLs = []
 
         Task.detached(priority: .userInitiated) {
             let result = ExportRunner.run(
@@ -177,9 +210,22 @@ struct ExportSheet: View {
                 if !allFailures.isEmpty {
                     errorMessage = Loc.exportFailed(allFailures.joined(separator: ", "))
                 }
-                doneMessage = Loc.filesSaved(result.written)
+                if !result.urls.isEmpty {
+                    shareURLs = result.urls
+                    doneMessage = Loc.filesSaved(result.written)
+                    if toTemporaryForShare {
+                        presentSharePicker(urls: result.urls)
+                    }
+                }
             }
         }
+    }
+
+    private func presentSharePicker(urls: [URL]) {
+        guard let content = NSApp.keyWindow?.contentView else { return }
+        let picker = NSSharingServicePicker(items: urls)
+        let rect = NSRect(x: content.bounds.midX, y: content.bounds.midY, width: 1, height: 1)
+        picker.show(relativeTo: rect, of: content, preferredEdge: .minY)
     }
 }
 
@@ -200,7 +246,11 @@ private struct PortraitExportData: @unchecked Sendable {
 }
 
 private enum ExportRunner {
-    struct Result { let written: Int; let failed: [String] }
+    struct Result {
+        let written: Int
+        let failed: [String]
+        let urls: [URL]
+    }
 
     static func run(
         portraits: [PortraitExportData],
@@ -209,6 +259,7 @@ private enum ExportRunner {
     ) -> Result {
         var written = 0
         var failed: [String] = []
+        var urls: [URL] = []
         for portrait in portraits {
             let safeName = sanitize(portrait.name.isEmpty ? Loc.portrait : portrait.name)
             for job in jobs {
@@ -227,12 +278,13 @@ private enum ExportRunner {
                 do {
                     try ExportService.writePNG(img, to: url)
                     written += 1
+                    urls.append(url)
                 } catch {
                     failed.append("\(portrait.name)/\(job.name)")
                 }
             }
         }
-        return Result(written: written, failed: failed)
+        return Result(written: written, failed: failed, urls: urls)
     }
 
     private static func sanitize(_ s: String) -> String {
@@ -271,7 +323,7 @@ private struct PresetCard: View {
             }
             .frame(height: 80)
 
-            Text(preset.name).font(.system(size: 13, weight: .medium))
+            Text(preset.name).font(.callout.weight(.medium))
             Text("\(preset.width) × \(preset.height)")
                 .font(.caption)
                 .foregroundStyle(.secondary)

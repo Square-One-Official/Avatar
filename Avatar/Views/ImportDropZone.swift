@@ -16,12 +16,12 @@ struct ImportDropZone: View {
 
             VStack(spacing: 4) {
                 Text(Loc.dropHere)
-                    .font(.system(size: 15))
+                    .font(.body)
                     .foregroundStyle(.secondary)
 
                 Button(action: pickFiles) {
                     Text(Loc.orBrowseFiles)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundStyle(dropZoneBlue)
                         .underline()
                 }
@@ -37,7 +37,7 @@ struct ImportDropZone: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(dropZoneBlue.opacity(hovering ? 0.18 : 0))
                 .padding(40)
-                .animation(.easeOut(duration: 0.18), value: hovering)
+                .motionAwareAnimation(.easeOut(duration: 0.18), value: hovering)
         )
         .onDrop(of: [.fileURL, .image], isTargeted: $hovering) { providers in
             PortraitDropHandler.handle(providers: providers,
@@ -59,7 +59,7 @@ struct ImportDropZone: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
+        .motionAwareAnimation(.easeOut(duration: 0.20), value: appState.errorBanner)
     }
 
     private func pickFiles() {
@@ -102,7 +102,7 @@ private struct CardStack: View {
         .frame(width: 280, height: 168)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .animation(.spring(duration: 0.55, bounce: 0.28), value: hovering)
+        .motionAwareAnimation(.spring(duration: 0.55, bounce: 0.28), value: hovering)
     }
 }
 

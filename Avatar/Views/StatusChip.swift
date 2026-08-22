@@ -78,11 +78,11 @@ struct StatusChip: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: severity.icon)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(severity.ink)
 
             Text(message)
-                .font(.system(size: 13, weight: .medium))
+                .font(.callout.weight(.medium))
                 .foregroundStyle(severity.ink)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -90,7 +90,7 @@ struct StatusChip: View {
             if let action {
                 Button(action: action.run) {
                     Text(action.label)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(severity.ink)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -105,12 +105,13 @@ struct StatusChip: View {
             if let onDismiss {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(severity.ink.opacity(0.7))
                         .frame(width: 18, height: 18)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Loc.dismiss)
             }
         }
         .padding(.horizontal, 14)

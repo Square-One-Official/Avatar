@@ -19,7 +19,7 @@ struct OnboardingStepPrivacy: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.onboardingPrivacyTitle)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                 Text(Loc.onboardingPrivacyBody)
                     .font(.callout)
                     .foregroundStyle(.secondary)

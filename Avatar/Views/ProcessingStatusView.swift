@@ -9,6 +9,8 @@ import SwiftUI
 struct ProcessingStatusView: View {
     @State private var index = 0
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var messages: [String] {
         Loc.processingStatuses(for: appState.processingKind)
@@ -50,13 +52,13 @@ struct ProcessingStatusView: View {
         .frame(minWidth: 220)
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
-        .background(.regularMaterial)
+        .background(reduceTransparency ? AnyShapeStyle(Color.appSurface) : AnyShapeStyle(.regularMaterial))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .task(id: index) {
             let nanos = UInt64(currentDwell * 1_000_000_000)
             try? await Task.sleep(nanoseconds: nanos)
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.3)) {
+            Motion.run(reduceMotion, .easeOut(duration: 0.3)) {
                 index += 1
             }
         }

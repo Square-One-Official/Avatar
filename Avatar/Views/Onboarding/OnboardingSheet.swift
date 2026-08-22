@@ -77,7 +77,7 @@ struct OnboardingSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
-        .animation(.easeOut(duration: 0.22), value: step)
+        .motionAwareAnimation(.easeOut(duration: 0.22), value: step)
     }
 
     // MARK: - Step transitions

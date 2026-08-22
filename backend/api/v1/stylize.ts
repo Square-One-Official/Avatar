@@ -277,8 +277,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Modelkeuze, in volgorde van precedentie:
   //   1. E01.10 dev-only `model_override` (hele whitelist) — wint altijd;
-  //   2. E15.6 gebruikersgerichte `generation_model` (nano / OpenAI);
-  //   3. anders de feature-default (nano-banana).
+  //   2. E15.6 gebruikersgerichte `generation_model` (OpenAI default);
+  //   3. anders de feature-default (gpt-image-1.5).
   let modelRef: string | null;
   try {
     modelRef = resolveModelOverride("stylize", req.body?.model_override, isDevUser);

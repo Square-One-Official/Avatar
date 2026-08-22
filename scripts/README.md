@@ -95,6 +95,31 @@ reference for if/when coremltools adds `torchvision::deform_conv2d`
 support — at that point delete the abort block at the top of `main()`
 and BiRefNet becomes available again.
 
+## `bakeoff-local-effects.py`
+
+Spike: run the four Effects styles (clay / wood / 3D / scribble) locally
+with Qwen-Image-Edit-2511 (Apache 2.0, 4-bit MLX, ~18 GB) and compare
+against production gpt-image-1.5. Does **not** ship in the app. Prompts
+are copied 1-op-1 from `backend/api/v1/stylize.ts`.
+
+Requires Apple Silicon, Python 3.10+, and ~16 GB unified memory
+(32 GB is comfortable). Drop 3–4 portraits in
+`Avatar/Debug/Fixtures` (gitignored).
+
+```bash
+uv venv --python 3.12 build/bakeoff-local-effects/.venv
+source build/bakeoff-local-effects/.venv/bin/activate
+uv pip install -r scripts/requirements-local-effects.txt
+python3 scripts/bakeoff-local-effects.py
+```
+
+Output (gitignored): `build/bakeoff-local-effects/index.html` contact
+sheet, `metrics.json`, `VERDICT.md`. Optional gpt-image-1.5 column via
+`REPLICATE_API_TOKEN` or `--cloud-dir`. `--qwen-only` skips the cloud
+arm. `--force` re-runs cells that already exist.
+
+Open the sheet, score identity + style, then fill `VERDICT.md`.
+
 ## Publishing
 
 ```bash

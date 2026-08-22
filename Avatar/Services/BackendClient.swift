@@ -269,15 +269,15 @@ final class BackendClient {
     }
 
     // MARK: POST /v1/stylize
-    /// Effects / Hair / Clothes edit — runs nano-banana instruction-edit
-    /// by default, optionally gpt-image-1.5. Server-side prompt mapping
-    /// for every user-visible intent, so the client never sends raw
-    /// instructions on someone else's Replicate account.
+    /// Effects / Hair / Clothes edit — runs gpt-image-1.5 instruction-edit
+    /// by default. Server-side prompt mapping for every user-visible
+    /// intent, so the client never sends raw instructions on someone
+    /// else's Replicate account.
     ///
     /// Server contract (see backend/api/v1/stylize.ts):
     ///   - exactly one of: style / hair_preset / hair_prompt /
     ///     clothes_preset / clothes_prompt.
-    ///   - generation_model optional ("nano-banana" | "gpt-image-1.5").
+    ///   - generation_model optional ("gpt-image-1.5").
     ///   - 4 credits per call (MODEL_REGISTRY.stylize.credits).
     enum StylizeIntent {
         /// Effects gallery: one of `clay`, `wood`, `3d`, `scribble`.
@@ -297,8 +297,9 @@ final class BackendClient {
         /// in production.
         case facePreset(String)
     }
-    /// E15.6 user-selectable model arm. Server defaults to nano-banana
-    /// when this is nil.
+    /// E15.6 user-selectable model arm. Server defaults to gpt-image-1.5
+    /// when this is nil. `nanoBanana` is accepted for older clients but
+    /// ignored server-side (falls back to the OpenAI default).
     enum StylizeModel: String {
         case nanoBanana = "nano-banana"
         case gptImage = "gpt-image-1.5"

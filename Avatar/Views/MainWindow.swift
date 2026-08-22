@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import CoreSpotlight
 
 struct MainWindow: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var context
+    @Environment(\.undoManager) private var undoManager
     @Query(sort: \Portrait.updatedAt, order: .reverse) private var portraits: [Portrait]
     @Query private var backgrounds: [BackgroundPreset]
 
@@ -31,11 +33,13 @@ struct MainWindow: View {
     /// the end of the flow doesn't fight the sheet's own dismiss
     /// transition.
     @State private var showOnboardingSheet = false
+    @State private var librarySearch = ""
+    @State private var isSearchPresented = false
 
     var body: some View {
         @Bindable var state = appState
-        NavigationSplitView {
-            LibraryView()
+        NavigationSplitView(columnVisibility: sidebarVisibility) {
+            LibraryView(search: librarySearch)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 260, max: 360)
         } detail: {
             ZStack(alignment: .bottom) {
@@ -59,19 +63,29 @@ struct MainWindow: View {
                         .zIndex(2)
                 }
             }
-            .animation(.easeOut(duration: 0.22), value: state.proUpsellToast)
+            .motionAwareAnimation(.easeOut(duration: 0.22), value: state.proUpsellToast)
         }
-        .toolbar(removing: .sidebarToggle)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+        .searchable(
+            text: $librarySearch,
+            isPresented: $isSearchPresented,
+            placement: .toolbar,
+            prompt: Text(Loc.searchPlaceholder)
+        )
+        .onChange(of: appState.librarySearchFocusToken) { _, _ in
+            isSearchPresented = true
+        }
+        .toolbar(id: "mainWindow") {
+            ToolbarItem(id: "import", placement: .primaryAction) {
                 if state.selectedPortraitID != nil {
                     Button {
-                        pickFile()
+                        PortraitLibrary.importFromOpenPanel(context: context, appState: appState)
                     } label: {
                         Label(Loc.importPhoto, systemImage: "plus")
                     }
                     .help(Loc.importPhotoHelp)
                 }
+            }
+            ToolbarItem(id: "exportSelection", placement: .primaryAction) {
                 if state.selectedPortraitIDs.count > 1 {
                     Button {
                         state.libraryExportPortraitIDs = state.selectedPortraitIDs
@@ -136,12 +150,32 @@ struct MainWindow: View {
         .onOpenURL { url in
             URLSchemeHandler.handle(url, appState: appState)
         }
+        .focusedSceneValue(\.appState, appState)
+        .onReceive(NotificationCenter.default.publisher(for: .aaavatarRequestImport)) { _ in
+            PortraitLibrary.importFromOpenPanel(context: context, appState: appState)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aaavatarSelectPortrait)) { note in
+            guard let id = note.object as? UUID else { return }
+            appState.selectedPortraitIDs = [id]
+        }
+        .onChange(of: appState.importRequestToken) { _, _ in
+            PortraitLibrary.importFromOpenPanel(context: context, appState: appState)
+        }
+        .onChange(of: appState.deleteRequestToken) { _, _ in
+            deleteSelection()
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            guard let idString = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                  let id = UUID(uuidString: idString) else { return }
+            appState.selectedPortraitIDs = [id]
+        }
         .task {
             // Refresh Pro entitlement on launch so the badge/credits are accurate.
             // Supabase restores the file-backed session asynchronously, so this
             // first call typically fires before `auth.isSignedIn` flips true —
             // the `onChange` below catches that transition and re-fires.
             appState.refreshEntitlement()
+            PortraitSpotlight.reindexAll(portraits: portraits)
 
             // Storage migration (build 6+): a returning user whose previous
             // session lived in the Keychain has nothing in the new file
@@ -181,9 +215,11 @@ struct MainWindow: View {
             // Announcements + NEW badges. Badges fetch anonymously so a
             // signed-out user still sees the pill; the pending-pop-up
             // path only runs once we have a session, since the seen-
-            // state filter requires a user id.
+            // state filter requires a user id. Skip the modal in
+            // local-only — CMS campaigns mostly pitch cloud features.
             await appState.announcements.refreshBadges()
-            if appState.auth.isSignedIn {
+            if appState.auth.isSignedIn,
+               appState.privacyPrefs.cloudAllowed {
                 await appState.announcements.fetchPending()
             }
         }
@@ -197,10 +233,28 @@ struct MainWindow: View {
                     // once and would silently swallow the second.
                     try? await Task.sleep(for: .milliseconds(450))
                     await appState.announcements.refreshBadges()
-                    await appState.announcements.fetchPending()
+                    if appState.privacyPrefs.cloudAllowed {
+                        await appState.announcements.fetchPending()
+                    }
                 }
             }
         }
+        .onChange(of: appState.privacyPrefs.mode) { _, mode in
+            if mode == .localOnly {
+                // Drop an in-flight cloud pitch without marking it seen,
+                // so allowing cloud AI later can still surface it.
+                appState.announcements.current = nil
+            } else if appState.auth.isSignedIn {
+                Task { await appState.announcements.fetchPending() }
+            }
+        }
+    }
+
+    private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: { appState.sidebarHidden ? .detailOnly : .all },
+            set: { appState.sidebarHidden = ($0 == .detailOnly) }
+        )
     }
 
     private func background(for portrait: Portrait) -> BackgroundPreset? {
@@ -211,18 +265,14 @@ struct MainWindow: View {
         return backgrounds.first(where: { $0.isDefault }) ?? backgrounds.first
     }
 
-    private func pickFile() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        if panel.runModal() == .OK, let url = panel.url {
-            guard FreeTierGate.allowedImportCount(requested: 1,
-                                                  appState: appState) > 0 else { return }
-            ImportFlow.importFile(url: url, context: context, appState: appState)
-        }
-        #endif
+    private func deleteSelection() {
+        let selected = portraits.filter { appState.selectedPortraitIDs.contains($0.id) }
+        PortraitLibrary.delete(
+            selected,
+            context: context,
+            appState: appState,
+            undoManager: undoManager
+        )
     }
 }
 
@@ -232,6 +282,8 @@ struct MainWindow: View {
 struct MultiSelectionView: View {
     let portraits: [Portrait]
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var context
+    @Environment(\.undoManager) private var undoManager
     @Query private var backgrounds: [BackgroundPreset]
 
     private let columns = [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 16)]
@@ -245,15 +297,38 @@ struct MultiSelectionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text(Loc.portraitsSelected(portraits.count))
-                    .font(.system(size: 13))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 4)
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(sortedPortraits) { portrait in
                         Cell(portrait: portrait, background: background(for: portrait))
+                            .contentShape(Rectangle())
                             .onTapGesture {
                                 appState.selectedPortraitIDs = [portrait.id]
+                            }
+                            .onDrag {
+                                PortraitDragExport.itemProvider(
+                                    primary: portrait,
+                                    selected: sortedPortraits,
+                                    backgroundResolver: { background(for: $0) },
+                                    appState: appState
+                                )
+                            }
+                            .contextMenu {
+                                Button(Loc.export) {
+                                    appState.libraryExportPortraitIDs = [portrait.id]
+                                }
+                                Divider()
+                                Button(Loc.delete, role: .destructive) {
+                                    PortraitLibrary.delete(
+                                        [portrait],
+                                        context: context,
+                                        appState: appState,
+                                        undoManager: undoManager
+                                    )
+                                }
                             }
                     }
                 }
@@ -262,6 +337,20 @@ struct MultiSelectionView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appCanvas)
+        .contextMenu {
+            Button("\(Loc.export) \(portraits.count) \(Loc.portraitsPlural)") {
+                appState.libraryExportPortraitIDs = Set(portraits.map(\.id))
+            }
+            Divider()
+            Button("\(Loc.delete) \(portraits.count) \(Loc.portraitsPlural)", role: .destructive) {
+                PortraitLibrary.delete(
+                    portraits,
+                    context: context,
+                    appState: appState,
+                    undoManager: undoManager
+                )
+            }
+        }
     }
 
     private func background(for portrait: Portrait) -> BackgroundPreset? {
@@ -283,10 +372,10 @@ struct MultiSelectionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
                     )
                 Text(portrait.name.isEmpty ? Loc.unnamed : portrait.name)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .padding(.horizontal, 2)

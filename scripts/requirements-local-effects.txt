@@ -1,0 +1,10 @@
+# Python deps for `scripts/bakeoff-local-effects.py`.
+# Apple Silicon + Python 3.10+ (mlx-gen will not import on x86 or 3.9).
+#
+#   uv venv --python 3.12 build/bakeoff-local-effects/.venv
+#   source build/bakeoff-local-effects/.venv/bin/activate
+#   uv pip install -r scripts/requirements-local-effects.txt
+#
+mlx-gen>=0.18.2
+pillow>=10.0
+requests>=2.32

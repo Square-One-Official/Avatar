@@ -76,8 +76,8 @@ enum ProcessingKind {
     case cutout
     case fillBody
     case colorize
-    /// Effects / hair / clothes edits via `/v1/stylize` (nano-banana
-    /// instruction-edit by default; gpt-image-1.5 alternate arm). Long
+    /// Effects / hair / clothes edits via `/v1/stylize` (gpt-image-1.5
+    /// instruction-edit by default). Long
     /// dwell time — the model is slower than colorise.
     case stylize
     /// Real-ESRGAN 2× resolution boost via `/v1/upscale`. Quick and
@@ -118,6 +118,26 @@ final class AppState {
     /// sidebar context-menu and the top-right toolbar Export button can trigger
     /// the same sheet without each owning duplicate state.
     var libraryExportPortraitIDs: Set<UUID> = []
+
+    /// Editor inspector column. Lifted out of `EditorView` so the View menu
+    /// and `⌘⌥I` can toggle it from anywhere in the key window.
+    var showInspector: Bool = true
+    /// When true, `NavigationSplitView` shows the detail column only.
+    var sidebarHidden: Bool = false
+    /// Bumped to focus the library search field (`⌘F`).
+    private(set) var librarySearchFocusToken: Int = 0
+    /// Bumped to run an `NSOpenPanel` import from the File menu (`⌘N`/`⌘O`).
+    private(set) var importRequestToken: Int = 0
+    /// Bumped to delete the current library selection from the Edit menu.
+    private(set) var deleteRequestToken: Int = 0
+
+    func focusLibrarySearch() { librarySearchFocusToken += 1 }
+    func requestImport() { importRequestToken += 1 }
+    func requestDelete() { deleteRequestToken += 1 }
+    func requestExport() {
+        guard !selectedPortraitIDs.isEmpty else { return }
+        libraryExportPortraitIDs = selectedPortraitIDs
+    }
     var isImporting = false
     var isProcessing = false {
         didSet {

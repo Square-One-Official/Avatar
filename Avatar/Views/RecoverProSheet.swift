@@ -29,7 +29,7 @@ struct RecoverProSheet: View {
             // Headline block — mirrors WelcomeSignInSheet's hierarchy.
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.recoverProTitle)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
 
                 Text(Loc.recoverProBody)
                     .font(.callout)
@@ -51,7 +51,7 @@ struct RecoverProSheet: View {
 
                 TextField("name@example.com", text: $email)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 14))
+                    .font(.callout)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 9)
                     .background(
@@ -82,7 +82,7 @@ struct RecoverProSheet: View {
                                 .controlSize(.small)
                         }
                         Text(Loc.recoverProSendCta)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 9)
@@ -112,8 +112,8 @@ struct RecoverProSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
-        .animation(.easeOut(duration: 0.18), value: didSend)
-        .animation(.easeOut(duration: 0.18), value: errorMessage)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: didSend)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: errorMessage)
         .onAppear { emailFocused = true }
     }
 

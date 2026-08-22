@@ -16,7 +16,7 @@ struct OnboardingStepAuth: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.welcomeTitle)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                 Text(Loc.welcomeBody)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -61,7 +61,7 @@ struct OnboardingStepAuth: View {
             .padding(.horizontal, 28)
             .padding(.bottom, 22)
         }
-        .animation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in
             // Auto-advance on sign-in — the user expressed clear intent,
             // they shouldn't have to come back and click "Continue".

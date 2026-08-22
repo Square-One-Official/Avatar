@@ -45,6 +45,13 @@ enum Loc {
     static var name: String            { en ? "Name" : "Naam" }
     static var add: String             { en ? "Add" : "Toevoegen" }
     static var close: String           { en ? "Close" : "Sluiten" }
+    static var dismiss: String         { en ? "Dismiss" : "Sluiten" }
+    static var find: String            { en ? "Find" : "Zoek" }
+    static var openEllipsis: String    { en ? "Open…" : "Open…" }
+    static var showSidebar: String     { en ? "Show Sidebar" : "Toon zijbalk" }
+    static var hideSidebar: String     { en ? "Hide Sidebar" : "Verberg zijbalk" }
+    static var showInspector: String   { en ? "Show Inspector" : "Toon inspector" }
+    static var hideInspector: String   { en ? "Hide Inspector" : "Verberg inspector" }
     static var error: String           { en ? "Error" : "Fout" }
     static var retry: String           { en ? "Retry" : "Probeer opnieuw" }
     static var relaunch: String        { en ? "Relaunch" : "Opnieuw starten" }
@@ -332,8 +339,8 @@ enum Loc {
         en ? "Recommended for privacy" : "Aanbevolen voor privacy"
     }
     static var onboardingPrivacyLocalBody: String {
-        en ? "Your photos never leave this Mac. Background removal runs entirely on-device. Magic Cutout, Fill in Body, and Colorize are turned off."
-           : "Je foto's verlaten deze Mac nooit. Achtergrond verwijderen gebeurt volledig op je apparaat. Magic Cutout, Fill in Body en Colorize staan uit."
+        en ? "Your photos never leave this Mac. Background removal runs entirely on-device. Magic Cutout, Fill in Body, and Colorize are turned off. Free accounts may still check import limits online — no photo bytes are uploaded."
+           : "Je foto's verlaten deze Mac nooit. Achtergrond verwijderen gebeurt volledig op je apparaat. Magic Cutout, Fill in Body en Colorize staan uit. Gratis accounts kunnen nog online importlimieten checken — er gaan geen foto-bytes mee."
     }
     static var onboardingPrivacyCloudTitle: String {
         en ? "Allow cloud AI" : "Cloud-AI toestaan"
@@ -365,8 +372,8 @@ enum Loc {
         en ? "Download enhanced model" : "Verbeterd model downloaden"
     }
     static var onboardingEngineDownloadedBody: String {
-        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Download from Settings when you're ready."
-           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Downloaden via Instellingen wanneer je er klaar voor bent."
+        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Choosing this starts the download now — you can cancel or remove it later in Settings."
+           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Als je dit kiest, start de download meteen — je kunt later annuleren of verwijderen in Instellingen."
     }
 
     // MARK: Onboarding — Generic
@@ -387,8 +394,8 @@ enum Loc {
         en ? "Privacy & AI" : "Privacy & AI"
     }
     static var privacyAndAIDesc: String {
-        en ? "Choose whether AI features run locally on this Mac or in the cloud. Local-only disables Magic Cutout, Fill in Body, and Colorize."
-           : "Kies of AI-functies lokaal op deze Mac draaien of in de cloud. Alleen-lokaal schakelt Magic Cutout, Fill in Body en Colorize uit."
+        en ? "Choose whether AI features run locally on this Mac or in the cloud. Local-only disables Magic Cutout, Fill in Body, and Colorize. Your photos stay on this Mac either way; free accounts may still check import limits online."
+           : "Kies of AI-functies lokaal op deze Mac draaien of in de cloud. Alleen-lokaal schakelt Magic Cutout, Fill in Body en Colorize uit. Je foto's blijven hoe dan ook op deze Mac; gratis accounts kunnen nog online importlimieten checken."
     }
     static var privacyModePickerLabel: String { en ? "Mode" : "Modus" }
     static var privacyEnginePickerLabel: String { en ? "Engine" : "Engine" }
@@ -396,10 +403,20 @@ enum Loc {
         en ? "Disabled in Local-only mode."
            : "Uitgeschakeld in modus Alleen lokaal."
     }
-    // Audit MEDIUM #27. Toggle copy is intentionally honest: today the
-    // app sends no telemetry beyond what Supabase Auth always logs, so
-    // the description names the forward-looking contract rather than
-    // pretending current behaviour changes.
+    static var magicCutoutLocalOnlySummary: String {
+        en ? "Magic Cutout needs cloud AI. Switch mode above to Allow cloud AI, then turn this on."
+           : "Magic Cutout heeft cloud-AI nodig. Kies hierboven Cloud-AI toestaan, en zet dit daarna aan."
+    }
+    static var enableCloudAIInPrivacySettings: String {
+        en ? "Allow cloud AI"
+           : "Cloud-AI toestaan"
+    }
+    static var cloudFeatureRequiresCloudAI: String {
+        en ? "This feature uses cloud AI. Switch to Allow cloud AI in Settings → Privacy & AI."
+           : "Deze functie gebruikt cloud-AI. Kies Cloud-AI toestaan in Instellingen → Privacy & AI."
+    }
+    // Audit MEDIUM #27. Toggle copy kept for a future telemetry surface;
+    // the Settings UI hides the control until something reads the flag.
     static var privacyDiagnosticsTitle: String {
         en ? "Share anonymous diagnostics"
            : "Anonieme diagnostiek delen"
@@ -1022,13 +1039,20 @@ enum Loc {
     }
 
     // MARK: Library
-    static var searchPlaceholder: String { en ? "Search by name or tag" : "Zoek op naam of tag" }
+    static var searchPlaceholder: String { en ? "Search by name or role" : "Zoek op naam of rol" }
     static var noPortraitsYet: String  { en ? "No portraits yet" : "Nog geen portretten" }
     static var noResults: String       { en ? "No results" : "Geen resultaten" }
     static var importToStart: String   { en ? "Import a photo to get started." : "Importeer een foto om te beginnen." }
     static var adjustSearch: String    { en ? "Adjust your search." : "Pas je zoekopdracht aan." }
     static var processing: String      { en ? "Processing…" : "Verwerken…" }
     static var unnamed: String         { en ? "(unnamed)" : "(naamloos)" }
+    static var share: String           { en ? "Share…" : "Deel…" }
+    static var shareHelp: String {
+        en ? "Share the selected export presets"
+           : "Deel de geselecteerde exportpresets"
+    }
+    static var quickLook: String       { en ? "Quick Look" : "Quick Look" }
+    static var dockRecent: String      { en ? "Recent Portraits" : "Recente portretten" }
 
     // MARK: Main window
     static var importPhoto: String     { en ? "Import photo" : "Importeer foto" }
@@ -1071,6 +1095,18 @@ enum Loc {
     }
     static var proQuotaUpgradeAfterBadge: String {
         en ? "to unlock more" : "om meer te ontgrendelen"
+    }
+    /// Upsell line when Privacy mode is Local-only — avoid pitching
+    /// Magic Cutout; unlimited portraits still apply on-device.
+    static var proQuotaUpgradeBeforeBadgeLocalOnly: String {
+        en ? "Upgrade to" : "Upgrade naar"
+    }
+    static var proQuotaUpgradeAfterBadgeLocalOnly: String {
+        en ? "for unlimited portraits" : "voor onbeperkt portretten"
+    }
+    static var proQuotaTooltipLocalOnly: String {
+        en ? "Free accounts get \(FreeTier.maxPortraits) portraits on this Mac. Upgrade to Pro for unlimited. Cloud AI stays off until you allow it in Settings → Privacy & AI."
+           : "Gratis accounts krijgen \(FreeTier.maxPortraits) portretten op deze Mac. Upgrade naar Pro voor onbeperkt. Cloud-AI blijft uit tot je die toestaat in Instellingen → Privacy & AI."
     }
     static var proQuotaSubtitle: String {
         en ? "Upgrade to Pro to unlock more"

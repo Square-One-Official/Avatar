@@ -23,18 +23,18 @@ struct GoogleSignInButton: View {
                             .controlSize(.small)
                             .tint(labelColor)
                     } else {
-                        GoogleGMark(size: 18)
+                        GoogleGMark(size: 14)
                     }
                 }
-                .frame(width: 18, height: 18)
+                .frame(width: 14, height: 14)
 
                 Text(Loc.signInWithGoogle)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.callout.weight(.medium))
                     .foregroundStyle(labelColor)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(height: 28)
             .background(
                 Capsule(style: .continuous)
                     .fill(surfaceColor)
@@ -47,8 +47,8 @@ struct GoogleSignInButton: View {
         .buttonStyle(PressableButtonStyle(pressedScale: 0.985))
         .disabled(isLoading)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .animation(.easeOut(duration: 0.18), value: isLoading)
+        .motionAwareAnimation(.easeOut(duration: 0.15), value: hovering)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: isLoading)
     }
 
     // MARK: Theming

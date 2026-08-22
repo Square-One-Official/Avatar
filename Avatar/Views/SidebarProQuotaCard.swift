@@ -8,6 +8,7 @@ import SwiftUI
 /// pending update relaunch always reads as the higher-priority CTA.
 struct SidebarProQuotaCard: View {
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyPreferences.self) private var privacyPrefs
     @State private var hovering = false
 
     private var capacity: Int { FreeTier.maxPortraits }
@@ -16,6 +17,7 @@ struct SidebarProQuotaCard: View {
     }
 
     private var brand: Color { .appBrand }
+    private var localOnly: Bool { !privacyPrefs.cloudAllowed }
 
     var body: some View {
         Button {
@@ -25,16 +27,20 @@ struct SidebarProQuotaCard: View {
                 QuotaDots(remaining: remaining, capacity: capacity, fillColor: brand)
 
                 Text(Loc.proQuotaTotalRemaining(remaining: remaining, total: capacity))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(Color.primary)
                     .lineLimit(1)
 
                 HStack(spacing: 4) {
-                    Text(Loc.proQuotaUpgradeBeforeBadge)
+                    Text(localOnly
+                         ? Loc.proQuotaUpgradeBeforeBadgeLocalOnly
+                         : Loc.proQuotaUpgradeBeforeBadge)
                     InlineProBadge()
-                    Text(Loc.proQuotaUpgradeAfterBadge)
+                    Text(localOnly
+                         ? Loc.proQuotaUpgradeAfterBadgeLocalOnly
+                         : Loc.proQuotaUpgradeAfterBadge)
                 }
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(Color.secondary)
                 .lineLimit(1)
             }
@@ -64,9 +70,9 @@ struct SidebarProQuotaCard: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 10)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: remaining)
-        .help(Loc.proQuotaTooltip)
+        .motionAwareAnimation(.easeOut(duration: 0.15), value: hovering)
+        .motionAwareAnimation(.spring(response: 0.32, dampingFraction: 0.78), value: remaining)
+        .help(localOnly ? Loc.proQuotaTooltipLocalOnly : Loc.proQuotaTooltip)
     }
 }
 
@@ -76,7 +82,7 @@ struct SidebarProQuotaCard: View {
 private struct InlineProBadge: View {
     var body: some View {
         Text("Pro")
-            .font(.system(size: 10, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(Color.appSuccessInk)
             .padding(.horizontal, 6)
             .padding(.vertical, 1)

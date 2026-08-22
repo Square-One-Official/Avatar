@@ -30,7 +30,7 @@ struct WelcomeSignInSheet: View {
             // Headline block
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.welcomeTitle)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.title2.weight(.semibold))
 
                 Text(Loc.welcomeBody)
                     .font(.callout)
@@ -98,7 +98,7 @@ struct WelcomeSignInSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
-        .animation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
         .sheet(isPresented: $showRecoverProSheet) {
             RecoverProSheet()
                 .environment(appState)

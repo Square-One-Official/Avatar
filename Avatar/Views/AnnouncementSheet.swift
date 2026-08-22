@@ -54,7 +54,7 @@ struct AnnouncementSheet: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 Text(announcement.title)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -79,7 +79,7 @@ struct AnnouncementSheet: View {
                         dismiss()
                     } label: {
                         Text(cta.label)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 9)
                     }

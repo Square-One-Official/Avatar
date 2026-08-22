@@ -79,10 +79,11 @@ struct ProUpgradeSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
-        .animation(.easeOut(duration: 0.18), value: errorMessage)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: errorMessage)
         // Spring matches PillSegmentedControl elsewhere in the app — same
         // motion vocabulary so the sheet feels native to the product.
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: appState.selectedSubscriptionInterval)
+        .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.78),
+                   value: appState.selectedSubscriptionInterval)
         .onAppear {
             if reduceMotion {
                 packsMounted = true
@@ -91,7 +92,7 @@ struct ProUpgradeSheet: View {
                 // false) takes effect before flipping to true.
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(20))
-                    withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+                    Motion.run(reduceMotion, .spring(response: 0.36, dampingFraction: 0.82)) {
                         packsMounted = true
                     }
                 }
@@ -116,13 +117,14 @@ struct ProUpgradeSheet: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.secondary.opacity(0.12)))
             }
             .buttonStyle(PressableButtonStyle())
             .keyboardShortcut(.cancelAction)
+            .accessibilityLabel(Loc.close)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -221,7 +223,7 @@ struct ProUpgradeSheet: View {
     private var yearlyBadge: AnyView {
         AnyView(
             Text(Loc.yearlyPlanSavings)
-                .font(.system(size: 9, weight: .bold))
+                .font(.caption2.weight(.bold))
                 .tracking(0.3)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
@@ -270,7 +272,7 @@ struct ProUpgradeSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(interval.wrappedValue == .year ? ProTier.pro.annualPriceEUR : ProTier.pro.monthlyPriceEUR)
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .font(.largeTitle.weight(.semibold))
                     .contentTransition(.numericText())
                 Text(interval.wrappedValue == .year ? Loc.proPerYear : Loc.proPerMonth)
                     .font(.callout)
@@ -328,10 +330,10 @@ struct ProUpgradeSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
                         Text(packLabel(pack))
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.callout.weight(.semibold))
                         if pack.isBestValue {
                             Text(Loc.packBestValueBadge)
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .tracking(0.3)
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 6)
@@ -343,18 +345,18 @@ struct ProUpgradeSheet: View {
                         credits: pack.credits,
                         perCredit: formatPerCredit(pack)
                     ))
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
                 Text(pack.priceEUR)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.title3.weight(.semibold))
                 // Selection indicator. Filled circle when selected, ring
                 // otherwise — same affordance as the macOS "radio" pattern.
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18, weight: .regular))
+                    .font(.title3)
                     .foregroundStyle(isSelected ? brandColor : Color.secondary.opacity(0.4))
-                    .animation(.easeOut(duration: 0.16), value: isSelected)
+                    .motionAwareAnimation(.easeOut(duration: 0.16), value: isSelected)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)

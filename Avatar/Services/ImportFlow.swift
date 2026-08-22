@@ -494,6 +494,12 @@ enum ImportFlow {
         // here — belt and suspenders against the 429s users were seeing
         // from rapid double-clicks.
         guard !appState.isProcessing else { return }
+        // Defense in depth: UI hides apply in local-only, but any future
+        // call site must still fail closed before a signed upload.
+        guard appState.privacyPrefs.cloudAllowed else {
+            appState.note(Loc.cloudFeatureRequiresCloudAI)
+            return
+        }
         guard appState.proEntitlement.isPro else {
             appState.showProUpgradeSheet = true
             return
@@ -692,6 +698,10 @@ enum ImportFlow {
         undoManager: UndoManager? = nil
     ) {
         guard !appState.isProcessing else { return }
+        guard appState.privacyPrefs.cloudAllowed else {
+            appState.note(Loc.cloudFeatureRequiresCloudAI)
+            return
+        }
         guard appState.proEntitlement.isPro else {
             appState.showProUpgradeSheet = true
             return
@@ -988,6 +998,7 @@ enum ImportFlow {
                 portrait.cutoutUsedMagic = usedMagic
                 context.insert(portrait)
                 try? context.save()
+                PortraitSpotlight.index(portrait)
                 appState.selectedPortraitID = portrait.id
                 appState.isProcessing = false
                 dlog("[Import] DONE id=\(portrait.id)")

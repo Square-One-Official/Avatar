@@ -22,7 +22,7 @@ struct LibraryImportSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.libraryImportSheetTitle)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                 Text(Loc.libraryImportSheetSummary(
                     new: preview.newCount,
                     conflicts: preview.conflictCount
@@ -85,7 +85,7 @@ struct LibraryImportSheet: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: selection == value ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(selection == value ? Color.accentColor : Color.secondary)
-                    .font(.system(size: 16))
+                    .font(.title3)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.body.weight(.medium))

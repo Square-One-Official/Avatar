@@ -10,7 +10,7 @@ import SwiftUI
 struct NewBadge: View {
     var body: some View {
         Text("NEW")
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .font(.caption2.weight(.bold))
             .tracking(0.3)
             .foregroundStyle(.white)
             .padding(.horizontal, 5)
@@ -23,10 +23,19 @@ struct NewBadge: View {
 private struct NewBadgeOverlayModifier: ViewModifier {
     let componentId: String
     @Environment(AnnouncementService.self) private var service
+    @Environment(PrivacyPreferences.self) private var privacyPrefs
+
+    private var visible: Bool {
+        if !privacyPrefs.cloudAllowed,
+           BadgeComponent.cloudOnlyFeatures.contains(componentId) {
+            return false
+        }
+        return service.isBadgeActive(for: componentId)
+    }
 
     func body(content: Content) -> some View {
         content.overlay(alignment: .topTrailing) {
-            if service.isBadgeActive(for: componentId) {
+            if visible {
                 NewBadge()
                     // Tug the pill out of the host's bounds so it
                     // floats over the corner like a notification dot.
@@ -34,7 +43,7 @@ private struct NewBadgeOverlayModifier: ViewModifier {
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
-        .animation(.easeOut(duration: 0.18), value: service.isBadgeActive(for: componentId))
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: visible)
     }
 }
 

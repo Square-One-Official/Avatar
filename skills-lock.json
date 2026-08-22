@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "macos-design-guidelines": {
+      "source": "ehmo/platform-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/macos/SKILL.md",
+      "computedHash": "fdbeb208feb60e5ed08226e4e1e714eade6cfe6530ad27c792992823de63ca0d"
+    },
     "stripe-best-practices": {
       "source": "docs.stripe.com",
       "sourceType": "well-known",

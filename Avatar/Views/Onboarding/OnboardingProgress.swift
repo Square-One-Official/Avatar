@@ -18,7 +18,7 @@ struct OnboardingProgress: View {
                     .frame(maxWidth: .infinity)
             }
         }
-        .animation(.easeOut(duration: 0.22), value: current)
-        .animation(.easeOut(duration: 0.22), value: total)
+        .motionAwareAnimation(.easeOut(duration: 0.22), value: current)
+        .motionAwareAnimation(.easeOut(duration: 0.22), value: total)
     }
 }

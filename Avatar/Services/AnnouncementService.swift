@@ -110,4 +110,10 @@ enum BadgeComponent {
     static let colorize = "colorize"
     static let exportSheet = "export-sheet"
     static let backgrounds = "backgrounds"
+
+    /// Features that require cloud AI. NEW pills for these stay hidden
+    /// while Privacy mode is Local-only so we don't advertise uploads.
+    static let cloudOnlyFeatures: Set<String> = [
+        magicCutout, fillBody, colorize
+    ]
 }

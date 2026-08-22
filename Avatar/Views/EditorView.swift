@@ -8,6 +8,7 @@ struct EditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.undoManager) private var undoManager
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \BackgroundPreset.createdAt) private var backgrounds: [BackgroundPreset]
     @Query private var allPortraits: [Portrait]
 
@@ -17,7 +18,6 @@ struct EditorView: View {
     /// Captured on first change, committed when a different action starts.
     @State private var sliderUndoSnapshot: PortraitUndoManager.Snapshot? = nil
     @State private var sliderActionName: String? = nil
-    @State private var showExport = false
     @State private var showBulkAlignConfirm = false
     @State private var bulkSkippedCount: Int? = nil
 
@@ -68,7 +68,6 @@ struct EditorView: View {
     // portrait without going back to an empty state. ImportFlow auto-selects
     // the new portrait, so the editor switches to it on completion.
     @State private var isDropping = false
-    @State private var showInspector = true
 
     #if os(macOS)
     private let haptics = NSHapticFeedbackManager.defaultPerformer
@@ -88,12 +87,15 @@ struct EditorView: View {
 
     var body: some View {
         canvasArea
-            .inspector(isPresented: $showInspector) {
+            .inspector(isPresented: Binding(
+                get: { appState.showInspector },
+                set: { appState.showInspector = $0 }
+            )) {
                 controlsPanel
                     .inspectorColumnWidth(min: 320, ideal: 340, max: 400)
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .navigation) {
+            .toolbar(id: "editor") {
+                ToolbarItem(id: "undo", placement: .navigation) {
                     Button {
                         commitSliderUndo()
                         undoManager?.undo()
@@ -102,7 +104,9 @@ struct EditorView: View {
                     }
                     .disabled(!(undoManager?.canUndo ?? false) && sliderUndoSnapshot == nil)
                     .help(Loc.undoHelp)
+                }
 
+                ToolbarItem(id: "redo", placement: .navigation) {
                     Button {
                         commitSliderUndo()
                         undoManager?.redo()
@@ -113,7 +117,7 @@ struct EditorView: View {
                     .help(Loc.redoHelp)
                 }
 
-                ToolbarItemGroup(placement: .primaryAction) {
+                ToolbarItem(id: "alignment", placement: .primaryAction) {
                     Menu {
                         Toggle(isOn: $showAlignmentGuide) {
                             Label(Loc.alignmentShowGuide, systemImage: "rectangle.dashed")
@@ -129,27 +133,26 @@ struct EditorView: View {
                         Label(Loc.alignmentGuide, systemImage: "viewfinder")
                     }
                     .help(Loc.alignmentGuideHelp)
+                }
 
+                ToolbarItem(id: "inspector", placement: .primaryAction) {
                     Button {
-                        showInspector.toggle()
+                        appState.showInspector.toggle()
                     } label: {
                         Label(Loc.inspector, systemImage: "sidebar.trailing")
                     }
                     .help(Loc.inspectorHelp)
-                    .keyboardShortcut("i", modifiers: [.command, .option])
+                }
 
+                ToolbarItem(id: "export", placement: .primaryAction) {
                     Button {
-                        showExport = true
+                        appState.requestExport()
                     } label: {
                         Label(Loc.export, systemImage: "square.and.arrow.up")
                     }
                     .help(Loc.exportHelp)
-                    .keyboardShortcut("e", modifiers: .command)
                     .buttonStyle(.borderedProminent)
                 }
-            }
-            .sheet(isPresented: $showExport) {
-                ExportSheet(portrait: portrait, background: selectedBackground)
             }
             .onDrop(of: [.fileURL, .image], isTargeted: $isDropping) { providers in
                 PortraitDropHandler.handle(providers: providers,
@@ -180,9 +183,9 @@ struct EditorView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: isDropping)
-            .animation(.easeOut(duration: 0.15), value: appState.isProcessing)
-            .animation(.easeOut(duration: 0.20), value: appState.errorBanner)
+            .motionAwareAnimation(.easeOut(duration: 0.15), value: isDropping)
+            .motionAwareAnimation(.easeOut(duration: 0.15), value: appState.isProcessing)
+            .motionAwareAnimation(.easeOut(duration: 0.20), value: appState.errorBanner)
     }
 
     // MARK: - Canvas
@@ -396,7 +399,7 @@ struct EditorView: View {
             }
             .id(editorTab)
             .transition(
-                .opacity.animation(.easeOut(duration: 0.18))
+                .opacity
             )
         }
         .background(Color.appCanvas)
@@ -468,7 +471,10 @@ struct EditorView: View {
                 .frame(width: 16)
             TextField(placeholder, text: text)
                 .textFieldStyle(.plain)
-                .onChange(of: text.wrappedValue) { _, _ in try? context.save() }
+                .onChange(of: text.wrappedValue) { _, _ in
+                    try? context.save()
+                    PortraitSpotlight.index(portrait)
+                }
         }
     }
 
@@ -482,7 +488,7 @@ struct EditorView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .tracking(0.4)
                 .textCase(.uppercase)
                 .foregroundStyle(.secondary)
@@ -560,19 +566,20 @@ struct EditorView: View {
                 }
             }
 
-            // Fill in Body and Colorize are cloud-only features. Hide
-            // (don't grey-out) when local-only so the user isn't teased
-            // with paywall theatre for something that's a deliberate
-            // privacy opt-out, not a paywall gate. The settings panel is
-            // where they switch posture if they change their mind.
-            if appState.privacyPrefs.cloudAllowed {
+            // Fill in Body / Colorize apply are cloud-only. Hide apply
+            // when local-only so we don't tease a paywall for a privacy
+            // opt-out. Undo of an already-applied cloud result stays
+            // available — that only restores local pixels, no upload.
+            if appState.privacyPrefs.cloudAllowed || portrait.isFillBodyApplied {
                 enhanceCard(
                     title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
                     systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "bandage.fill",
                     disabled: portrait.cutoutPNG == nil || appState.isProcessing,
                     help: Loc.fillBodyHelp,
                     active: portrait.isFillBodyApplied,
-                    showProBadge: !appState.proEntitlement.isPro && !portrait.isFillBodyApplied
+                    showProBadge: appState.privacyPrefs.cloudAllowed
+                        && !appState.proEntitlement.isPro
+                        && !portrait.isFillBodyApplied
                 ) {
                     if portrait.isFillBodyApplied {
                         ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
@@ -580,14 +587,18 @@ struct EditorView: View {
                         ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
                     }
                 }
+            }
 
+            if appState.privacyPrefs.cloudAllowed || portrait.isColorized {
                 enhanceCard(
                     title: portrait.isColorized ? Loc.colorizeUndo : Loc.colorize,
                     systemImage: portrait.isColorized ? "arrow.uturn.backward" : "paintpalette",
                     disabled: portrait.cutoutPNG == nil || appState.isProcessing,
                     help: portrait.isColorized ? Loc.colorizeUndoHelp : Loc.colorizeHelp,
                     active: portrait.isColorized,
-                    showProBadge: !appState.proEntitlement.isPro && !portrait.isColorized
+                    showProBadge: appState.privacyPrefs.cloudAllowed
+                        && !appState.proEntitlement.isPro
+                        && !portrait.isColorized
                 ) {
                     if portrait.isColorized {
                         ImportFlow.undoColorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
@@ -637,7 +648,7 @@ struct EditorView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .regular))
+                .font(.title3)
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(active ? Color.accentColor : Color.primary)
                 .frame(width: 28, height: 28)
@@ -655,7 +666,7 @@ struct EditorView: View {
             }
             if let trailing = trailingSystemImage {
                 Image(systemName: trailing)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
         }
@@ -686,7 +697,7 @@ struct EditorView: View {
 
             if isAdjustmentsDirty {
                 Button {
-                    withAnimation(.easeOut(duration: 0.18)) { resetAdjustments() }
+                    Motion.run(reduceMotion, .easeOut(duration: 0.18)) { resetAdjustments() }
                 } label: {
                     Label(Loc.resetAdjustments, systemImage: "arrow.counterclockwise")
                 }
@@ -730,13 +741,13 @@ struct EditorView: View {
                     .fill(Color.accentColor)
                     .frame(width: 6, height: 6)
                     .opacity(isDirty ? 1 : 0)
-                    .animation(.easeOut(duration: 0.12), value: isDirty)
+                    .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
                 Spacer()
                 Text(String(format: "%+.0f", (value.wrappedValue - neutral) * displayScale))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .opacity(isDirty ? 1 : 0)
-                    .animation(.easeOut(duration: 0.12), value: isDirty)
+                    .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
             }
             ZStack {
                 Slider(
@@ -775,7 +786,7 @@ struct EditorView: View {
                         .fill(Color.secondary.opacity(isDirty ? 0 : 0.55))
                         .frame(width: 1.5, height: 6)
                         .position(x: geo.size.width * fraction, y: geo.size.height / 2)
-                        .animation(.easeOut(duration: 0.12), value: isDirty)
+                        .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
                 }
                 .allowsHitTesting(false)
             }
@@ -934,7 +945,7 @@ struct BoundingBoxOverlay: View {
                     }
                 }
                 .opacity(isVisible ? 1 : 0)
-                .animation(.easeOut(duration: 0.12), value: isVisible)
+                .motionAwareAnimation(.easeOut(duration: 0.12), value: isVisible)
             }
         }
         // Stable coordinate space for handle drag gestures — prevents
@@ -1081,7 +1092,7 @@ struct GuideLinesOverlay: View {
                      active: snappedY)
             }
             .opacity(isVisible ? 1 : 0)
-            .animation(.easeOut(duration: 0.12), value: isVisible)
+            .motionAwareAnimation(.easeOut(duration: 0.12), value: isVisible)
         }
         .allowsHitTesting(false)
     }
@@ -1159,7 +1170,7 @@ struct AlignmentGuideOverlay: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.25), radius: 1)
             .opacity(isVisible ? 1 : 0)
-            .animation(.easeOut(duration: 0.15), value: isVisible)
+            .motionAwareAnimation(.easeOut(duration: 0.15), value: isVisible)
         }
         .allowsHitTesting(false)
     }
@@ -1409,6 +1420,7 @@ struct BackgroundChip: View {
     let onDelete: () -> Void
 
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
     @State private var isRenaming = false
     @State private var editName: String = ""
@@ -1434,21 +1446,21 @@ struct BackgroundChip: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.3),
                                       lineWidth: isSelected ? 2.5 : 1)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSelected)
+                        .motionAwareAnimation(.spring(response: 0.25, dampingFraction: 0.8), value: isSelected)
                 }
                 .scaleEffect(isSelected ? 1.04 : 1.0)
-                .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isSelected)
+                .motionAwareAnimation(.spring(response: 0.25, dampingFraction: 0.8), value: isSelected)
                 .shadow(color: .black.opacity(isSelected ? 0.18 : 0.06),
                         radius: isSelected ? 6 : 2, y: isSelected ? 3 : 1)
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .scaleEffect(isPressed ? 0.97 : 1.0)
-                .animation(.easeOut(duration: 0.12), value: isPressed)
+                .motionAwareAnimation(.easeOut(duration: 0.12), value: isPressed)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { _ in if !isPressed { isPressed = true } }
                         .onEnded { _ in
                             isPressed = false
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            Motion.run(reduceMotion, .spring(response: 0.25, dampingFraction: 0.8)) {
                                 onSelect()
                             }
                         }
@@ -1464,7 +1476,7 @@ struct BackgroundChip: View {
 
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.title3)
                         .foregroundStyle(.white, Color.accentColor)
                         .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
                         .padding(4)
@@ -1711,7 +1723,7 @@ struct AddBackgroundButton: View {
                         )
                         .overlay {
                             Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .shadow(color: .black.opacity(0.35), radius: 1, y: 0.5)
                         }
@@ -1733,7 +1745,7 @@ struct AddBackgroundButton: View {
                     pane = .main
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 22, height: 22)
                         .contentShape(Rectangle())

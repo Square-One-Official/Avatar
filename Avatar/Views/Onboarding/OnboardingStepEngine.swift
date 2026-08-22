@@ -34,7 +34,7 @@ struct OnboardingStepEngine: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(Loc.onboardingEngineTitle)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                 Text(Loc.onboardingEngineBody)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -103,7 +103,7 @@ struct OnboardingStepEngine: View {
             .padding(.bottom, 4)
             .keyboardShortcut(.defaultAction)
         }
-        .animation(.easeOut(duration: 0.18), value: stateIdentity)
+        .motionAwareAnimation(.easeOut(duration: 0.18), value: stateIdentity)
     }
 
     // MARK: - Inline status row
@@ -241,7 +241,7 @@ struct ChoiceCard: View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.headline)
                     .foregroundStyle(isSelected ? Color.appBrand : .secondary)
                     .frame(width: 24)
 

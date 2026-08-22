@@ -232,6 +232,9 @@ private func paint(_ view: NSView, colorScheme: ColorScheme?) {
     window.appearance = target
     window.backgroundColor = .appCanvas
     window.titlebarAppearsTransparent = true
+    if window.frameAutosaveName.isEmpty {
+        window.setFrameAutosaveName("MainWindow")
+    }
     // The NSTableView backing SwiftUI's sidebar List caches its drawing and
     // doesn't always pick up a new effectiveAppearance — its selection pill
     // ends up rendered against the previous palette. Walk the content tree
@@ -335,6 +338,7 @@ final class SystemAppearanceObserver {
 
 @main
 struct AvatarApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appState = AppState()
     @State private var systemAppearance = SystemAppearanceObserver()
     #if !APP_STORE
@@ -388,6 +392,9 @@ struct AvatarApp: App {
                 .preferredColorScheme(colorScheme)
                 .id(appState.language)
                 .handlesExternalEvents(preferring: ["aaavatar"], allowing: ["aaavatar"])
+                .onAppear {
+                    appDelegate.configure(appState: appState, container: sharedModelContainer)
+                }
                 .task {
                     SeedData.seedIfNeeded(context: sharedModelContainer.mainContext)
                     #if !APP_STORE
@@ -412,9 +419,11 @@ struct AvatarApp: App {
                     }
                 }
         }
+        .defaultSize(width: 1100, height: 720)
+        .defaultPosition(.center)
         .modelContainer(sharedModelContainer)
         .commands {
-            CommandGroup(replacing: .newItem) { }
+            AvatarCommands()
             #if DEBUG
             // Subject-Lift V1/V2 benchmark harness. Reads fixtures from
             // Avatar/Debug/Fixtures/ (or $AVATAR_BENCH_FIXTURES) and writes

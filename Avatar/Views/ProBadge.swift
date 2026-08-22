@@ -4,7 +4,7 @@ import SwiftUI
 struct ProBadge: View {
     var body: some View {
         Text("PRO")
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .font(.caption2.weight(.bold))
             .tracking(0.3)
             .foregroundStyle(.white)
             .padding(.horizontal, 5)
