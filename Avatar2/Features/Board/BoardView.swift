@@ -710,7 +710,7 @@ struct BoardView: View {
             .overlay(alignment: .top) {
                 if batchMenu == .adjust, let first = selectedPortraits.first,
                    let img = NSImage(data: first.cutoutData) {
-                    EditColorPanel(
+                    AdjustPanel(
                         source: img,
                         initial: first.adjust,
                         onCommit: { _, after in applyAdjustToAll(after) }
@@ -869,8 +869,8 @@ struct BoardView: View {
     /// E31.7: top-toolbar bij precies één selectie = dezelfde frame-lokale
     /// `CanvasActionToolbar` als de single-editor, getrimd tot board-relevante
     /// controls (Frame ▾ met Shape + Flip · Background-panel). Auto-frame/Grid
-    /// (editor-only transform/overlay) zijn verborgen. Adjust zit nu onder
-    /// "Enhance" in de bottom-capsule — net als de editor.
+    /// (editor-only transform/overlay) zijn verborgen. Color-sliders zitten
+    /// onder "Adjust" in de bottom-capsule — net als de editor.
     private func singleEditTopBar(_ node: Portrait2) -> some View {
         CanvasActionToolbar(
             onFlip: { flipNode(node) },
@@ -891,10 +891,9 @@ struct BoardView: View {
     }
 
     /// E31.7: bottom-toolbar bij precies één selectie = dezelfde `DSBottomToolbar`-
-    /// capsule als de single-editor, met de GEDEELDE items (Enhance · Effects ·
-    /// Face · Hair · Clothing). Het actieve paneel zweeft als dropdown erboven.
-    /// "Enhance" (.edit) opent het kleur/Adjust-paneel — Adjust verhuisde hierheen
-    /// uit de oude top-bar.
+    /// capsule als de single-editor, met de GEDEELDE items (Enhance · Adjust ·
+    /// Effects · Face · Hair · Clothing). Het actieve paneel zweeft als dropdown
+    /// erboven. Enhance = AI één-tik; Adjust = compacte color-sliders.
     private func singleEditBottomBar(_ node: Portrait2) -> some View {
         VStack(spacing: DSSpacing.gap2) {
             // Actief paneel boven de balk.
@@ -903,11 +902,14 @@ struct BoardView: View {
                     switch editTool {
                     case .edit:
                         EditColorPanel(
-                            source: base,
-                            initial: node.adjust,
-                            onCommit: { _, after in applyAdjustToAll(after) },
                             onRetouch: { retouchNode(node) },
                             showRetouch: true
+                        )
+                    case .adjust:
+                        AdjustPanel(
+                            source: base,
+                            initial: node.adjust,
+                            onCommit: { _, after in applyAdjustToAll(after) }
                         )
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
