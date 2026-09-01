@@ -377,6 +377,8 @@
       <div class="links">
         <a href="#waarom">Waarom het verwarrend wordt</a>
         <a href="#model">Het simpele model</a>
+        <a href="#waarom-pr">Waarom alles een PR wordt</a>
+        <a href="#xcode">Xcode en branches</a>
         <a href="#woorden">De belangrijkste woorden</a>
         <a href="#regels">De zes werkregels</a>
         <a href="#fix">Werkwijze voor een fix</a>
@@ -467,6 +469,138 @@
           <div class="place">GitHub PR</div><div class="muted">Voorgestelde wijzigingen, checks en review.</div><div class="muted">Nog niet; pas na merge.</div>
           <div class="place">Hoofdbranch</div><div class="muted">Alles wat officieel is samengevoegd.</div><div class="muted">Ja, voor ontwikkeling.</div>
           <div class="place">Productie</div><div class="muted">De daadwerkelijk uitgerolde website, backend of appbuild.</div><div class="muted">Ja, voor gebruikers.</div>
+        </div>
+      </section>
+
+      <section id="waarom-pr">
+        <h2>Waarom lijkt alles een pull request te worden?</h2>
+        <p class="lead">
+          Dat is geen toeval en geen fout van jou. Cursor Cloud Agents zijn zo ingericht dat
+          elke taak eindigt als een <strong>aparte branch + pull request</strong>.
+        </p>
+        <div class="grid two">
+          <article class="card">
+            <span class="card-number">?</span>
+            <h3>Wat een Cloud Agent standaard doet</h3>
+            <ol>
+              <li>Start vanaf een basisbranch (bij jullie vaak <code>v2-main</code>).</li>
+              <li>Maakt een <strong>nieuwe featurebranch</strong> aan.</li>
+              <li>Schrijft code, commit en pusht naar GitHub.</li>
+              <li>Opent of werkt een <strong>pull request</strong> bij.</li>
+            </ol>
+            <p>Daardoor zie je na elke sessie weer een nieuwe PR, ook bij een “kleine” vraag.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">!</span>
+            <h3>Waarom dat zo is ontworpen</h3>
+            <ul>
+              <li><strong>Veiligheid:</strong> de agent mag niet zomaar direct op <code>main</code> of <code>v2-main</code> schrijven.</li>
+              <li><strong>Review:</strong> jij (of een collega) beslist wat er echt in de gedeelde basis komt.</li>
+              <li><strong>Isolatie:</strong> parallelle sessies raken elkaar niet meteen.</li>
+              <li><strong>Terugdraaien:</strong> een mislukte taak gooi je weg door de PR te sluiten.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="callout">
+          <strong>Belangrijk onderscheid:</strong> een PR is een <em>voorstel</em>.
+          Pas na <strong>merge</strong> zit het werk in de gedeelde nieuwste versie.
+          “De agent heeft een PR gemaakt” betekent dus nog niet “dit staat al in mijn Xcode-project”.
+        </div>
+        <div class="grid three" style="margin-top:18px">
+          <div class="card">
+            <span class="tag warn">Veel PRs</span>
+            <h3>Normaal effect</h3>
+            <p>Elke Cloud-sessie = vaak één PR. Tien sessies kunnen tien open PRs geven, ook als het om overlappend werk gaat.</p>
+          </div>
+          <div class="card">
+            <span class="tag warn">Niet automatisch gemerged</span>
+            <h3>Jij blijft de poortwachter</h3>
+            <p>Cloud Agents mergen meestal niet zelf naar <code>v2-main</code>. Zonder jouw merge blijft Xcode op de oude basis staan.</p>
+          </div>
+          <div class="card">
+            <span class="tag good">Oplossing</span>
+            <h3>Eén canonieke PR</h3>
+            <p>Bij overlappende sessies: wijs één integratie-PR aan, merge die, en sluit of supersede de rest. Haal daarna lokaal de hoofdbranch opnieuw op.</p>
+          </div>
+        </div>
+        <div class="card prompt" style="margin-top:18px">
+<pre>Als je wilt dat Cursor minder “PR-chaos” veroorzaakt, zeg dit expliciet:
+
+- Werk verder op bestaande branch/PR [nummer of naam], open geen nieuwe PR.
+- Of: alleen onderzoeken, geen commits/PR.
+- Of: integreer open PRs A/B/C in één canonieke PR naar v2-main.
+
+Zonder die instructie maakt een Cloud Agent vaak een nieuwe branch + PR.</pre>
+        </div>
+      </section>
+
+      <section id="xcode">
+        <h2>Waarom Xcode “nog niet werkt” terwijl Cursor al iets heeft gedaan</h2>
+        <p class="lead">
+          Xcode toont alleen de bestanden van de <strong>branch die jij lokaal hebt uitgecheckt</strong>.
+          Een Cloud Agent werkt op een andere machine en een andere branch. Die wereld is niet automatisch jouw Xcode.
+        </p>
+        <div class="callout bad">
+          <strong>Typische situatie (zoals op jouw screenshot):</strong>
+          Cursor/Xcode staat op <code>cursor/enhance-adjust-split-74d1</code>,
+          terwijl de geïntegreerde, nieuwste combinatie op
+          <code>cursor/unify-menu-containers-7e40</code> (PR #37) staat, en de gedeelde basis <code>v2-main</code> is.
+          Dan mis je bestanden, gidsen en fixes — of zie je rode fouten zoals
+          “Failed to open document… BannerCanvasDrop.swift”.
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <h3>Wat Xcode wél ziet</h3>
+            <ul>
+              <li>De lokale checkout van één gekozen branch.</li>
+              <li>Alleen bestanden die op die branch bestaan.</li>
+              <li>Alleen commits die je lokaal hebt opgehaald (<code>git fetch</code> / pull / checkout).</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Wat Xcode níet automatisch ziet</h3>
+            <ul>
+              <li>Commits van een Cloud Agent op een andere branch.</li>
+              <li>Open PRs die nog niet gemerged zijn.</li>
+              <li>Een HTML-gids of Swift-fix die alleen op een featurebranch staat.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="steps" style="margin-top:18px">
+          <div class="step"><div><strong>Bepaal welke versie je wilt bouwen.</strong><p>Voor dagelijks v2-werk: <code>v2-main</code>. Om een open agent-PR te testen: die specifieke featurebranch. Voor de huidige integratie: <code>cursor/unify-menu-containers-7e40</code>.</p></div></div>
+          <div class="step"><div><strong>Haal remote branches op en check die branch uit.</strong><p>In Terminal in de repo: <code>git fetch origin</code> en daarna <code>git checkout cursor/unify-menu-containers-7e40</code> (of <code>v2-main</code> na merge). In Cursor/Xcode moet de branchkiezer precies die naam tonen.</p></div></div>
+          <div class="step"><div><strong>Regenereer het Xcode-project als paden of targets zijn veranderd.</strong><p>In de juiste appmap (vaak <code>Avatar2/</code>): <code>xcodegen generate</code>, daarna het <code>.xcodeproj</code> opnieuw openen. Verouderde open tabs naar verdwenen bestanden geven “Failed to open document”.</p></div></div>
+          <div class="step"><div><strong>Bouw opnieuw en negeer rode issues van een oude branch.</strong><p>Issues in de sidebar horen bij de huidige checkout. Wissel van branch → project opnieuw openen → clean build. Anders diagnoseer je gisteren’s code.</p></div></div>
+        </div>
+        <div class="grid two" style="margin-top:18px">
+          <div class="card">
+            <h3>Als een bestand “niet gevonden” is</h3>
+            <p>Controleer eerst:</p>
+            <ol>
+              <li>Welke branch staat in de branchkiezer?</li>
+              <li>Bestaat het bestand op die branch? (<code>git ls-files | grep Bestandsnaam</code>)</li>
+              <li>Staat het alleen in een andere PR/branch?</li>
+              <li>Is er een stale tab open naar een oud pad?</li>
+            </ol>
+          </div>
+          <div class="card prompt">
+<pre>Lokale herstelstappen (macOS):
+
+git fetch origin
+git checkout cursor/unify-menu-containers-7e40
+# of na merge van PR #37:
+# git checkout v2-main && git pull origin v2-main
+
+cd Avatar2   # of de map met project.yml
+xcodegen generate
+open Avatar2.xcodeproj   # echte naam controleren
+
+Daarna: Product → Clean Build Folder, opnieuw bouwen.</pre>
+          </div>
+        </div>
+        <div class="callout good">
+          <strong>Onthoud:</strong> Cloud Agent → GitHub PR → jij merget → jij checkt lokaal uit → Xcode bouwt die code.
+          Stap 2–4 overslaan voelt alsof “Xcode niet werkt”, terwijl je gewoon een andere kopie bekijkt.
         </div>
       </section>
 
@@ -722,12 +856,14 @@ Bewijs dat deze wijziging echt in de bedoelde versie zit:
             <li>Ik heb eerst remote updates opgehaald.</li>
             <li>Ik heb open PR’s en sessies gecontroleerd.</li>
             <li>Mijn taak heeft één branch en één PR.</li>
+            <li>Ik snap dat een Cloud Agent-PR nog niet in Xcode zit.</li>
+            <li>Mijn Xcode-branchkiezer toont precies de branch die ik wil bouwen.</li>
             <li>Mijn branch raakt geen parallel beheerde kernbestanden.</li>
             <li>Elke screenshot noemt branch en commit.</li>
             <li>Ik weet wat Vercel wel en niet test.</li>
             <li>Ik heb relevant gedrag getest.</li>
             <li>De PR is mergebaar en beoordeeld.</li>
-            <li>Na merge heb ik de hoofdbranch opnieuw opgehaald.</li>
+            <li>Na merge heb ik de hoofdbranch opnieuw opgehaald en Xcode heropend.</li>
           </ul>
         </div>
         <div class="hero-rule">

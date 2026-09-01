@@ -4,6 +4,15 @@ Native macOS app voor HR die portretfoto's van medewerkers consistent verwerkt: 
 
 Vervangt de Figma-workflow.
 
+## Cursor / Git-workflow
+
+Uitleg waarom Cloud Agents altijd een PR maken, hoe dat samenhangt met Xcode, en hoe je van idee naar `v2-main` werkt zonder chaos:
+
+- [`docs/cursor-git-workflow-guide.md`](docs/cursor-git-workflow-guide.md) (leesbaar op GitHub)
+- [`docs/cursor-git-workflow-guide.html`](docs/cursor-git-workflow-guide.html) (visueel, open lokaal in de browser)
+
+> Deze gids staat op featurebranch `cursor/unify-menu-containers-7e40` (PR #37) tot die is gemerged. Op `main` krijg je anders “File not found”.
+
 ## Vereisten
 
 - macOS 14 (Sonoma) of nieuwer — vereist voor Apple's `VNGenerateForegroundInstanceMaskRequest` (subject lift)
