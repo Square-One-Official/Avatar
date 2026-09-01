@@ -11,15 +11,15 @@ import SwiftUI
 struct EditColorPanel: View {
     /// One-click retouch (lokaal) — verhuisd uit Face (Thierry, 2026-06-23). Toont
     /// als eerste chip wanneer `showRetouch`.
-    var onRetouch: () -> Void = {}
-    var onStudioLight: () -> Void = {}
+    var onRetouch: (() -> Void)?
+    var onStudioLight: (() -> Void)?
     /// Portrait-modus (achtergrond-blur) aan/uit — verhuist niet, blurt de
     /// achtergrondLAAG en houdt het onderwerp scherp (macOS-webcam-Portrait).
-    var onPortrait: () -> Void = {}
-    var onColorise: () -> Void = {}
-    var onBoost: () -> Void = {}
+    var onPortrait: (() -> Void)?
+    var onColorise: (() -> Void)?
+    var onBoost: (() -> Void)?
     // E31.3: Restore body verhuisde mee uit de frame-toolbar-AI-dropdown.
-    var onRestoreBody: () -> Void = {}
+    var onRestoreBody: (() -> Void)?
     var isPro: Bool = false
     /// E24.28: of de lokale "Studio Light"-toggle momenteel AAN staat.
     var studioLightOn: Bool = false
@@ -35,17 +35,27 @@ struct EditColorPanel: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DSSpacing.gap2) {
                 // One-click retouch verhuisde hierheen uit Face — eerste chip.
-                if showRetouch {
+                if showRetouch, let onRetouch {
                     quickAction("One click retouch", icon: "wand.and.stars", isOn: retouchOn, action: onRetouch)
                 }
-                quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
+                if let onStudioLight {
+                    quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
+                }
                 // Portrait: vervaagt de achtergrond (origineel/custom), onderwerp scherp.
-                quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
-                quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
-                quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
-                            credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                if let onPortrait {
+                    quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
+                }
+                if let onColorise {
+                    quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro, action: onColorise)
+                }
+                if let onBoost {
+                    quickAction("Boost", icon: "arrow.up.backward.and.arrow.down.forward",
+                                credit: CreditMeter.chipLabel(for: .upscale), action: onBoost)
+                }
                 // E31.3: Restore body uit de oude frame-toolbar-AI-dropdown.
-                quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                if let onRestoreBody {
+                    quickAction("Restore body", icon: "person.crop.rectangle", pro: !isPro, action: onRestoreBody)
+                }
             }
             .padding(.vertical, DSSpacing.gap1)
             .scrollRowTrailingInset()

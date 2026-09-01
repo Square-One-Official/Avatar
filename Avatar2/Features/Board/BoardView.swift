@@ -219,16 +219,25 @@ struct BoardView: View {
             .onChange(of: portraits.count) { _, _ in assignInitialLayout(); fitIfNeeded() }
             // E30.1: één-selectie → richt de gedeelde edit-pipeline op die node;
             // bij 0 of ≥2 sluit het bottom-tool-paneel.
-            .onChange(of: selection) { _, sel in
+            .onChange(of: selection) { previous, sel in
                 // Sluit altijd alle dropdowns bij selectie-wissel — anders
                 // heropen de batch-bar met een nog-open dropdown.
                 batchMenu = nil
                 canvasMenu = nil
+                editTool = nil
+                for id in previous {
+                    if let node = portraits.first(where: { $0.persistentModelID == id }) {
+                        thumbs.setPreview(nil, for: node)
+                    }
+                }
                 if sel.count == 1, let id = sel.first,
                    let node = portraits.first(where: { $0.persistentModelID == id }) {
                     model.select(node)
-                } else {
-                    editTool = nil
+                }
+            }
+            .onChange(of: editTool) { previous, current in
+                if previous == .adjust, current != .adjust, let node = selectedNode {
+                    thumbs.setPreview(nil, for: node)
                 }
             }
         }
@@ -920,8 +929,13 @@ struct BoardView: View {
                             AdjustPanel(
                                 source: base,
                                 initial: node.adjust,
-                                onCommit: { _, after in applyAdjustToAll(after) }
+                                onPreview: { thumbs.setPreview($0, for: node) },
+                                onCommit: { _, after in
+                                    thumbs.setPreview(nil, for: node)
+                                    applyAdjustToAll(after)
+                                }
                             )
+                            .id(node.persistentModelID)
                         }
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
