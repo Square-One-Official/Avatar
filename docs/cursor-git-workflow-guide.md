@@ -102,20 +102,31 @@ Dan mis je bestanden, gidsen en fixes — of zie je fouten zoals
 ### Herstelstappen
 
 1. Bepaal welke versie je wilt bouwen (`v2-main`, of de integratiebranch van PR #37).
-2. Haal op en check uit:
+2. Ga naar de **repo-root** (de map met `docs/`, `Avatar2/`, `backend/`, `README.md` — niet alleen `Avatar2/`):
    ```bash
+   cd "/pad/naar/Avatar"   # jouw lokale clone-root
    git fetch origin
    git checkout cursor/unify-menu-containers-7e40
    # of na merge van PR #37:
    # git checkout v2-main && git pull origin v2-main
    ```
-3. Regenereer het project indien nodig:
+3. Open de gids vanaf de **repo-root** (niet vanuit `Avatar2/`):
+   ```bash
+   open docs/cursor-git-workflow-guide.html
+   # of: open docs/cursor-git-workflow-guide.md
+   #
+   # Zit je al in Avatar2/? Dan:
+   # open ../docs/cursor-git-workflow-guide.html
+   ```
+4. Regenereer het Xcode-project **in** `Avatar2/`:
    ```bash
    cd Avatar2
    xcodegen generate
    open *.xcodeproj
    ```
-4. Clean Build Folder, opnieuw bouwen. Sluit stale tabs naar verdwenen bestanden.
+5. Clean Build Folder, opnieuw bouwen. Sluit stale tabs naar verdwenen bestanden.
+
+**Veelvoorkomende vergissing:** je zit al in `.../Avatar2`, typt opnieuw `cd Avatar2` → `no such file`, en zoekt de gids in `Avatar2/docs/` → die map bestaat niet. De gids staat op `docs/` in de repo-root.
 
 **Keten:** Cloud Agent → GitHub PR → jij merget → jij checkt lokaal uit → Xcode bouwt die code.
 

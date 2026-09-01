@@ -20,10 +20,16 @@ Op `main` of een andere oude branch krijg je **File not found**.
 - HTML: https://github.com/Square-One-Official/Avatar/blob/cursor/unify-menu-containers-7e40/docs/cursor-git-workflow-guide.html
 - Markdown: https://github.com/Square-One-Official/Avatar/blob/cursor/unify-menu-containers-7e40/docs/cursor-git-workflow-guide.md
 
-**Lokaal openen:**
+**Lokaal openen** (vanaf de **repo-root**, niet vanuit `Avatar2/`):
 
 ```bash
+# Repo-root = map met docs/, Avatar2/, backend/, README.md
+cd "/pad/naar/Avatar"
+
 git fetch origin
 git checkout cursor/unify-menu-containers-7e40
 open docs/cursor-git-workflow-guide.html
+
+# Zit je al in Avatar2/? Gebruik dan:
+# open ../docs/cursor-git-workflow-guide.html
 ```
