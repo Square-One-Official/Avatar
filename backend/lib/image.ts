@@ -358,6 +358,390 @@ export interface FaceBox {
   height: number;
 }
 
+export interface FillBodyEdges {
+  left: boolean;
+  right: boolean;
+  bottom: boolean;
+}
+
+export interface FillBodyMapping {
+  canvasWidth: number;
+  canvasHeight: number;
+  originalX: number;
+  originalY: number;
+  originalWidth: number;
+  originalHeight: number;
+}
+
+export interface FillBodyGeometry {
+  shouldFill: boolean;
+  edges: FillBodyEdges;
+  leftPadding: number;
+  rightPadding: number;
+  bottomPadding: number;
+  seam: number;
+}
+
+export type MinimalBodyFillPreparation =
+  | {
+      shouldFill: false;
+      cutout: Buffer;
+      edges: FillBodyEdges;
+      mapping: FillBodyMapping;
+    }
+  | {
+      shouldFill: true;
+      padded: Buffer;
+      mask: Buffer;
+      personLayer: Buffer;
+      edges: FillBodyEdges;
+      mapping: FillBodyMapping;
+    };
+
+/**
+ * Detect meaningful alpha contact with the three body-extension edges. Top is
+ * deliberately excluded: Fill in body may complete shoulders, arms and torso,
+ * but must never invent hair or facial pixels.
+ *
+ * Contact must occur on the outermost pixel row/column; an inward band alone
+ * is not a crop. Requiring a contiguous run filters isolated antialiasing
+ * specks. Side detection ignores the upper 30% so hair touching an image edge
+ * does not turn into an unintended horizontal outpaint.
+ */
+export function computeMinimalBodyFillGeometry(
+  alpha: Uint8Array,
+  width: number,
+  height: number,
+): FillBodyGeometry {
+  if (width <= 0 || height <= 0 || alpha.length < width * height) {
+    return {
+      shouldFill: false,
+      edges: { left: false, right: false, bottom: false },
+      leftPadding: 0,
+      rightPadding: 0,
+      bottomPadding: 0,
+      seam: 0,
+    };
+  }
+
+  const alphaThreshold = 16;
+  const sideStartY = Math.min(height - 1, Math.round(height * 0.3));
+
+  const sideTouches = (fromRight: boolean): boolean => {
+    const x = fromRight ? width - 1 : 0;
+    let currentRun = 0;
+    let longestRun = 0;
+    for (let y = sideStartY; y < height; y++) {
+      if (alpha[y * width + x]! >= alphaThreshold) {
+        currentRun++;
+        longestRun = Math.max(longestRun, currentRun);
+      } else {
+        currentRun = 0;
+      }
+    }
+    const sampledRows = height - sideStartY;
+    return longestRun >= Math.max(3, Math.round(sampledRows * 0.025));
+  };
+
+  let currentBottomRun = 0;
+  let longestBottomRun = 0;
+  for (let x = 0; x < width; x++) {
+    if (alpha[(height - 1) * width + x]! >= alphaThreshold) {
+      currentBottomRun++;
+      longestBottomRun = Math.max(longestBottomRun, currentBottomRun);
+    } else {
+      currentBottomRun = 0;
+    }
+  }
+
+  const edges: FillBodyEdges = {
+    left: sideTouches(false),
+    right: sideTouches(true),
+    bottom: longestBottomRun >= Math.max(3, Math.round(width * 0.025)),
+  };
+  const shouldFill = edges.left || edges.right || edges.bottom;
+
+  return {
+    shouldFill,
+    edges,
+    // Repair one clipped body segment rather than creating a full portrait.
+    leftPadding: edges.left ? Math.max(12, Math.round(width * 0.12)) : 0,
+    rightPadding: edges.right ? Math.max(12, Math.round(width * 0.12)) : 0,
+    bottomPadding: edges.bottom ? Math.max(16, Math.round(height * 0.14)) : 0,
+    seam: shouldFill
+      ? Math.max(4, Math.min(10, Math.round(Math.min(width, height) * 0.008)))
+      : 0,
+  };
+}
+
+/**
+ * Prepare a minimal edge-aware FLUX Fill canvas while retaining the original
+ * source pixels and their exact position in the returned native-size canvas.
+ */
+export async function prepareMinimalBodyFill(
+  cutoutPng: Buffer,
+  options?: { face?: FaceBox },
+): Promise<MinimalBodyFillPreparation> {
+  const src = sharp(cutoutPng).ensureAlpha();
+  const meta = await src.metadata();
+  if (!meta.width || !meta.height) {
+    throw new Error("prepareMinimalBodyFill: source has no dimensions");
+  }
+
+  const alpha = await sharp(cutoutPng)
+    .ensureAlpha()
+    .extractChannel("alpha")
+    .raw()
+    .toBuffer();
+  const geometry = computeMinimalBodyFillGeometry(alpha, meta.width, meta.height);
+  if (!geometry.shouldFill) {
+    return {
+      shouldFill: false,
+      cutout: cutoutPng,
+      edges: geometry.edges,
+      mapping: {
+        canvasWidth: meta.width,
+        canvasHeight: meta.height,
+        originalX: 0,
+        originalY: 0,
+        originalWidth: meta.width,
+        originalHeight: meta.height,
+      },
+    };
+  }
+
+  // Keep generation near one megapixel, but preserve the clean source at
+  // native resolution in personLayer and in the final mapping.
+  const nativeCanvasWidth = meta.width + geometry.leftPadding + geometry.rightPadding;
+  const nativeCanvasHeight = meta.height + geometry.bottomPadding;
+  const sourceScale = Math.min(1, 1024 / Math.max(nativeCanvasWidth, nativeCanvasHeight));
+  const drawW = Math.max(1, Math.round(meta.width * sourceScale));
+  const drawH = Math.max(1, Math.round(meta.height * sourceScale));
+  const modelLeftPadding = geometry.edges.left
+    ? Math.max(1, Math.round(geometry.leftPadding * sourceScale))
+    : 0;
+  const modelRightPadding = geometry.edges.right
+    ? Math.max(1, Math.round(geometry.rightPadding * sourceScale))
+    : 0;
+  const modelBottomPadding = geometry.edges.bottom
+    ? Math.max(1, Math.round(geometry.bottomPadding * sourceScale))
+    : 0;
+  const seam = Math.max(1, Math.round(geometry.seam * sourceScale));
+  const modelCanvasWidth = drawW + modelLeftPadding + modelRightPadding;
+  const modelCanvasHeight = drawH + modelBottomPadding;
+  const mapping: FillBodyMapping = {
+    canvasWidth: nativeCanvasWidth,
+    canvasHeight: nativeCanvasHeight,
+    originalX: geometry.leftPadding,
+    originalY: 0,
+    originalWidth: meta.width,
+    originalHeight: meta.height,
+  };
+
+  const resized = await sharp(cutoutPng)
+    .ensureAlpha()
+    .resize(drawW, drawH, { fit: "fill" })
+    .png()
+    .toBuffer();
+
+  const personLayer = await sharp({
+    create: {
+      width: nativeCanvasWidth,
+      height: nativeCanvasHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: cutoutPng, left: geometry.leftPadding, top: 0 }])
+    .png()
+    .toBuffer();
+
+  const padded = await sharp({
+    create: {
+      width: modelCanvasWidth,
+      height: modelCanvasHeight,
+      channels: 4,
+      background: { ...GREY, alpha: 1 },
+    },
+  })
+    .composite([{ input: resized, left: modelLeftPadding, top: 0 }])
+    .flatten({ background: GREY })
+    .png()
+    .toBuffer();
+
+  const whiteRect = async (width: number, height: number): Promise<Buffer> =>
+    sharp({
+      create: {
+        width: Math.max(1, width),
+        height: Math.max(1, height),
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    }).png().toBuffer();
+
+  const fillLayers: sharp.OverlayOptions[] = [];
+  if (geometry.edges.left) {
+    fillLayers.push({
+      input: await whiteRect(modelLeftPadding + seam, modelCanvasHeight),
+      left: 0,
+      top: 0,
+    });
+  }
+  if (geometry.edges.right) {
+    fillLayers.push({
+      input: await whiteRect(modelRightPadding + seam, modelCanvasHeight),
+      left: Math.max(0, modelLeftPadding + drawW - seam),
+      top: 0,
+    });
+  }
+  if (geometry.edges.bottom) {
+    fillLayers.push({
+      input: await whiteRect(modelCanvasWidth, modelBottomPadding + seam),
+      left: 0,
+      top: Math.max(0, drawH - seam),
+    });
+  }
+
+  const featheredMask = await sharp({
+    create: {
+      width: modelCanvasWidth,
+      height: modelCanvasHeight,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  }).composite(fillLayers).blur(2).png().toBuffer();
+
+  const trimmed = await sharp(cutoutPng)
+    .ensureAlpha()
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .toBuffer({ resolveWithObject: true });
+  const guard = computeMinimalFaceGuardRect({
+    face: options?.face,
+    inputWidth: meta.width,
+    inputHeight: meta.height,
+    bboxOriginX: -(trimmed.info.trimOffsetLeft ?? 0),
+    bboxOriginY: -(trimmed.info.trimOffsetTop ?? 0),
+    bboxWidth: trimmed.info.width,
+    bboxHeight: trimmed.info.height,
+    sourceScale,
+    left: modelLeftPadding,
+    top: 0,
+    canvasWidth: modelCanvasWidth,
+    canvasHeight: modelCanvasHeight,
+  });
+  const faceGuard = await sharp({
+    create: {
+      width: guard.width,
+      height: guard.height,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 },
+    },
+  }).png().toBuffer();
+  const mask = await sharp(featheredMask)
+    .composite([{ input: faceGuard, left: guard.left, top: guard.top }])
+    .png()
+    .toBuffer();
+
+  return {
+    shouldFill: true,
+    padded,
+    mask,
+    personLayer,
+    edges: geometry.edges,
+    mapping,
+  };
+}
+
+function computeMinimalFaceGuardRect(args: {
+  face?: FaceBox;
+  inputWidth: number;
+  inputHeight: number;
+  bboxOriginX: number;
+  bboxOriginY: number;
+  bboxWidth: number;
+  bboxHeight: number;
+  sourceScale: number;
+  left: number;
+  top: number;
+  canvasWidth: number;
+  canvasHeight: number;
+}): { left: number; top: number; width: number; height: number } {
+  const {
+    face, inputWidth, inputHeight, bboxOriginX, bboxOriginY, bboxWidth,
+    bboxHeight, sourceScale, left, top, canvasWidth, canvasHeight,
+  } = args;
+
+  let x: number;
+  let y: number;
+  let width: number;
+  let height: number;
+  if (face) {
+    x = left + face.x * inputWidth * sourceScale;
+    y = top + face.y * inputHeight * sourceScale;
+    width = face.width * inputWidth * sourceScale;
+    height = face.height * inputHeight * sourceScale;
+  } else {
+    x = left + bboxOriginX * sourceScale;
+    y = top + bboxOriginY * sourceScale;
+    width = bboxWidth * sourceScale;
+    height = bboxHeight * sourceScale * 0.55;
+  }
+
+  const padTop = height * (face ? 0.9 : 0);
+  const padBottom = height * (face ? 0.35 : 0);
+  const padSides = width * (face ? 0.55 : 0);
+  const guardLeft = Math.max(0, Math.round(x - padSides));
+  const guardTop = Math.max(0, Math.round(y - padTop));
+  const guardRight = Math.min(canvasWidth, Math.round(x + width + padSides));
+  const guardBottom = Math.min(canvasHeight, Math.round(y + height + padBottom));
+  return {
+    left: guardLeft,
+    top: guardTop,
+    width: Math.max(1, guardRight - guardLeft),
+    height: Math.max(1, guardBottom - guardTop),
+  };
+}
+
+/**
+ * Restore the uploaded source pixels byte-for-byte over the generated result.
+ * Only pixels outside the original alpha remain model-generated.
+ */
+export async function restoreMinimalBodyFillSubject(
+  filledCutout: Buffer,
+  personLayer: Buffer,
+  mapping: FillBodyMapping,
+): Promise<Buffer> {
+  const base = await sharp(filledCutout)
+    .ensureAlpha()
+    .resize(mapping.canvasWidth, mapping.canvasHeight, { fit: "fill" })
+    .png()
+    .toBuffer();
+  const alpha = await sharp(personLayer)
+    .ensureAlpha()
+    .extractChannel("alpha")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const knockout = Buffer.alloc(alpha.data.length * 4);
+  for (let i = 0; i < alpha.data.length; i++) {
+    knockout[i * 4 + 3] = alpha.data[i]! > 0 ? 255 : 0;
+  }
+  const knockoutPng = await sharp(knockout, {
+    raw: {
+      width: alpha.info.width,
+      height: alpha.info.height,
+      channels: 4,
+    },
+  }).png().toBuffer();
+
+  return sharp(base)
+    .composite([
+      { input: knockoutPng, blend: "dest-out" },
+      { input: personLayer, blend: "over" },
+    ])
+    .png()
+    .toBuffer();
+}
+
 export async function padForOutpaint(
   cutoutPng: Buffer,
   options?: { face?: FaceBox }

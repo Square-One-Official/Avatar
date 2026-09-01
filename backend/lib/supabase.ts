@@ -64,6 +64,40 @@ export async function logCredit(opts: {
   if (error) throw error;
 }
 
+/** Atomically reserve credits for one paid operation. */
+export async function trySpendCredits(opts: {
+  userId: string;
+  amount: number;
+  reason: string;
+  ref: string;
+}): Promise<number | null> {
+  const { data, error } = await supabase.rpc("try_spend_credits", {
+    p_user: opts.userId,
+    p_amount: opts.amount,
+    p_reason: opts.reason,
+    p_ref: opts.ref,
+  });
+  if (error) throw error;
+  return typeof data === "number" ? data : null;
+}
+
+/** Refund a previously reserved operation; the database keeps this idempotent. */
+export async function refundCreditSpend(opts: {
+  userId: string;
+  amount: number;
+  reason: string;
+  ref: string;
+}): Promise<boolean> {
+  const { data, error } = await supabase.rpc("refund_credit_spend", {
+    p_user: opts.userId,
+    p_amount: opts.amount,
+    p_reason: opts.reason,
+    p_ref: opts.ref,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 /**
  * E14.9 — top a comped Pro account (CMS `pro-access`, mode "pro") up to its
  * monthly credit allowance.
