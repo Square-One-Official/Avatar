@@ -420,7 +420,7 @@ struct BoardView: View {
                 menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
             }
         }
-        .padding(DSSpacing.gap1)
+        .padding(DSMenuLayout.listInset)
         // Past zich aan de inhoud aan (de bulk-labels zijn langer), met een vloer
         // van 190 zodat het enkel-menu niet te smal wordt. `.fixedSize()` in
         // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
@@ -715,7 +715,7 @@ struct BoardView: View {
                         initial: first.adjust,
                         onCommit: { _, after in applyAdjustToAll(after) }
                     )
-                    .padding(DSSpacing.gap4)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: 360)
                     .fixedSize(horizontal: false, vertical: true)
                     .dsMenuSurface()
@@ -753,7 +753,7 @@ struct BoardView: View {
         .overlay(alignment: .top) {
             if isOpen {
                 BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) })
-                    .padding(DSSpacing.gap4)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
                     .dsMenuSurface()
@@ -900,13 +900,15 @@ struct BoardView: View {
                 Group {
                     switch editTool {
                     case .edit:
-                        EditColorPanel(
-                            source: base,
-                            initial: node.adjust,
-                            onCommit: { _, after in applyAdjustToAll(after) },
-                            onRetouch: { retouchNode(node) },
-                            showRetouch: true
-                        )
+                        DSEditPanel(title: "Enhance", maxWidth: 420) {
+                            EditColorPanel(
+                                source: base,
+                                initial: node.adjust,
+                                onCommit: { _, after in applyAdjustToAll(after) },
+                                onRetouch: { retouchNode(node) },
+                                showRetouch: true
+                            )
+                        }
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
                                      onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Apply effect") })
@@ -920,20 +922,25 @@ struct BoardView: View {
                                   onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
                     case .face where AppFeatureFlags.faceEnabled:
-                        FaceActionsPanel(
-                            baseImage: base,
-                            entitlement: entitlement,
-                            onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
-                            isPro: entitlement.isProActive
-                        )
-                        .id(node.persistentModelID)
+                        DSEditPanel(
+                            title: "Face",
+                            credits: CreditMeter.chipLabel(for: .generativeStandard),
+                            maxWidth: 420
+                        ) {
+                            FaceActionsPanel(
+                                baseImage: base,
+                                entitlement: entitlement,
+                                onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
+                                isPro: entitlement.isProActive
+                            )
+                            .id(node.persistentModelID)
+                        }
                     default:
                         EmptyView()
                     }
                 }
                 .frame(width: 420)
                 .fixedSize(horizontal: false, vertical: true)
-                .dsMenuSurface()
             }
 
             DSBottomToolbar(items: EditorView.visibleToolbarItems, selection: $editTool)

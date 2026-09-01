@@ -208,7 +208,7 @@ struct SidebarView: View {
             Divider().padding(.vertical, 2)
             menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTarget = portrait }
         }
-        .padding(DSSpacing.gap1)
+        .padding(DSMenuLayout.listInset)
         .frame(width: 190)
         // Dezelfde container-chrome als Frame, Background, Effects en Enhance.
         // Ook account-/avatarachtige sidebar-menu's blijven zo één familie.

@@ -59,10 +59,10 @@ struct CanvasActionToolbar<Background: View>: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
-            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
+            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240) {
                 frameMenu
             }
-            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
+            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320) {
                 background()
             }
             // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen
@@ -102,7 +102,7 @@ struct CanvasActionToolbar<Background: View>: View {
     @ViewBuilder
     private func toolbarItem<Content: View>(
         _ menu: CanvasToolbarMenu, _ title: String, icon: Ph,
-        chevron: Bool, width: CGFloat, padding: CGFloat,
+        chevron: Bool, width: CGFloat,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         // E32: gedeelde compact-pil i.p.v. de inline `menuButton`. De Phosphor-
@@ -123,7 +123,7 @@ struct CanvasActionToolbar<Background: View>: View {
         .overlay(alignment: .top) {
             if activeMenu == menu {
                 content()
-                    .padding(padding)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
                     // Zelfde massieve Card, rand, xl4-radius en schaduw als

@@ -46,11 +46,9 @@ public struct DSColorPicker: View {
                 if supportsAlpha { opacityField }
             }
         }
-        .padding(DSSpacing.gap5)
+        .padding(DSMenuLayout.contentInset)
         .frame(width: 300)
-        // De color picker is bewust de enige materiaal-popover; alle primaire
-        // menucontainers gebruiken standaard de massieve Effects/Enhance-card.
-        .dsPanelSurface(cornerRadius: DSRadius.xl, solid: false)
+        .dsMenuSurface()
         .onAppear {
             guard !seeded else { return }
             seedFromColor(); seeded = true

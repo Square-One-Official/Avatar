@@ -844,7 +844,12 @@ struct EditorView: View {
                 }
             } else if tool == .background {
                 // E07.1: achtergrond-paneel (kleur/brand/eyedropper/upload).
+                // BackgroundPanel levert alleen inhoud; geef deze entry point
+                // dezelfde inset + surface als Effects/Enhance.
                 BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground)
+                    .padding(DSMenuLayout.contentInset)
+                    .frame(maxWidth: 600)
+                    .dsMenuSurface()
             } else if tool == .clothing, let entitlement {
                 // E10.4: kleding-paneel gewired op de clothes-intent van
                 // /v1/stylize (nano-banana instruction-edit). `.id` op het portret:

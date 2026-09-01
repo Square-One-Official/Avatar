@@ -5,10 +5,20 @@
 
 import SwiftUI
 
+/// Eén expliciet layoutcontract voor alle custom menucontainers.
+///
+/// `contentInset` hoort bij panel/dropdown-inhoud; compacte lijstmenu's houden
+/// dezelfde chrome maar gebruiken `listInset` zodat 32-pt menu-rijen niet door
+/// overmatige witruimte worden verdrongen.
+public enum DSMenuLayout {
+    public static let cornerRadius = DSRadius.xl4
+    public static let contentInset = DSSpacing.gap5 + DSSpacing.gap2
+    public static let listInset = DSSpacing.gap2
+}
+
 public extension View {
-    /// Past het gedeelde paneel-oppervlak toe (rand + radius + schaduw).
-    /// `cornerRadius` schaalt mee met de kaartgrootte (groot paneel = xl4,
-    /// compacte dropdown = xl).
+    /// Low-level surface-primitive voor uitzonderingen buiten het custom
+    /// menucontract. Primaire menu's gebruiken `dsMenuSurface()`.
     /// `solid`: true (default) = de canonieke massieve Card van Effects/Enhance;
     /// false = opt-in in-window blur voor geneste, materiaalachtige popovers.
     func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = true) -> some View {
@@ -18,10 +28,11 @@ public extension View {
     /// Canonieke container voor zwevende editor-menu's en edit-panelen.
     ///
     /// Eén vaste, massieve Card-surface voorkomt dat Frame, Background en
-    /// account/context-menu's visueel afwijken van Effects en Enhance. Houd
-    /// glas alleen voor expliciete, geneste popovers zoals de color picker.
-    func dsMenuSurface(cornerRadius: CGFloat = DSRadius.xl4) -> some View {
-        dsPanelSurface(cornerRadius: cornerRadius, solid: true)
+    /// account/context-menu's visueel afwijken van Effects en Enhance.
+    /// De radius is bewust niet configureerbaar: custom menu's delen altijd
+    /// hetzelfde 24-pt containerprofiel.
+    func dsMenuSurface() -> some View {
+        dsPanelSurface(cornerRadius: DSMenuLayout.cornerRadius, solid: true)
     }
 }
 
