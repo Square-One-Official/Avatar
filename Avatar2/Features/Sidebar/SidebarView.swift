@@ -208,9 +208,11 @@ struct SidebarView: View {
             Divider().padding(.vertical, 2)
             menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTarget = portrait }
         }
-        .padding(DSSpacing.gap1)
+        .padding(DSMenuLayout.listInset)
         .frame(width: 190)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
+        // Dezelfde container-chrome als Frame, Background, Effects en Enhance.
+        // Ook account-/avatarachtige sidebar-menu's blijven zo één familie.
+        .dsMenuSurface()
     }
 
     /// E19.4: klik-afhandeling met cmd/shift voor multi-select; gewone klik =

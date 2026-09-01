@@ -46,9 +46,9 @@ public struct DSColorPicker: View {
                 if supportsAlpha { opacityField }
             }
         }
-        .padding(DSSpacing.gap5)
+        .padding(DSMenuLayout.contentInset)
         .frame(width: 300)
-        .dsPanelSurface(cornerRadius: DSRadius.xl)
+        .dsMenuSurface()
         .onAppear {
             guard !seeded else { return }
             seedFromColor(); seeded = true

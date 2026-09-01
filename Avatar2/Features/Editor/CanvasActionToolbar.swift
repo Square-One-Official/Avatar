@@ -12,9 +12,10 @@
 // design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
 // later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
-// `.popover` met pijltje). Solide `dsPanelSurface` (identiek aan DSEditPanel) —
-// glas/withinWindow zat onder de portret-Images. De open-staat leeft als
-// binding zodat een klik op de canvas (EditorView) de dropdown sluit.
+// `.popover` met pijltje). Eén gedeelde, massieve `dsMenuSurface` — exact
+// hetzelfde oppervlak als de bottom-panelen (DSEditPanel); de massieve laag
+// blijft bovendien boven camera-geschaalde portret-Images. De open-staat leeft
+// als binding zodat een canvas-klik de dropdown sluit.
 //
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
@@ -59,10 +60,12 @@ struct CanvasActionToolbar<Background: View>: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
-            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240, padding: DSSpacing.gap2) {
+            // 264 houdt na de gedeelde 28-pt inset genoeg ruimte voor
+            // “Auto-frame & center” zonder afkappen.
+            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 264) {
                 frameMenu
             }
-            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320, padding: DSSpacing.gap4) {
+            toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320) {
                 background()
             }
             // E24.26: grid/thirds-toggle. E31.7: verborgen op de board (geen
@@ -98,11 +101,11 @@ struct CanvasActionToolbar<Background: View>: View {
 
     /// E24.12: een toolbar-knop met zijn caret-loze, zwevende dropdown-kaart
     /// eronder (overlay, niet door de capsule geclipt). De kaart deelt het
-    /// `dsPanelSurface`-oppervlak met de bottom-panelen.
+    /// `dsMenuSurface`-oppervlak met de bottom-panelen.
     @ViewBuilder
     private func toolbarItem<Content: View>(
         _ menu: CanvasToolbarMenu, _ title: String, icon: Ph,
-        chevron: Bool, width: CGFloat, padding: CGFloat,
+        chevron: Bool, width: CGFloat,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         // E32: gedeelde compact-pil i.p.v. de inline `menuButton`. De Phosphor-
@@ -123,13 +126,12 @@ struct CanvasActionToolbar<Background: View>: View {
         .overlay(alignment: .top) {
             if activeMenu == menu {
                 content()
-                    .padding(padding)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    // Solide card (niet glas): NSVisualEffectView/withinWindow
-                    // verliest op macOS de AppKit-laagstrijd van Image-portretten
-                    // → menu kwam ónder de foto's. Match DSEditPanel (solid).
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+                    // Zelfde massieve Card, rand, xl4-radius en schaduw als
+                    // Effects/Enhance via DSEditPanel.
+                    .dsMenuSurface()
                     // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding

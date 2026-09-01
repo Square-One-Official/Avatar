@@ -219,16 +219,25 @@ struct BoardView: View {
             .onChange(of: portraits.count) { _, _ in assignInitialLayout(); fitIfNeeded() }
             // E30.1: één-selectie → richt de gedeelde edit-pipeline op die node;
             // bij 0 of ≥2 sluit het bottom-tool-paneel.
-            .onChange(of: selection) { _, sel in
+            .onChange(of: selection) { previous, sel in
                 // Sluit altijd alle dropdowns bij selectie-wissel — anders
                 // heropen de batch-bar met een nog-open dropdown.
                 batchMenu = nil
                 canvasMenu = nil
+                editTool = nil
+                for id in previous {
+                    if let node = portraits.first(where: { $0.persistentModelID == id }) {
+                        thumbs.setPreview(nil, for: node)
+                    }
+                }
                 if sel.count == 1, let id = sel.first,
                    let node = portraits.first(where: { $0.persistentModelID == id }) {
                     model.select(node)
-                } else {
-                    editTool = nil
+                }
+            }
+            .onChange(of: editTool) { previous, current in
+                if previous == .adjust, current != .adjust, let node = selectedNode {
+                    thumbs.setPreview(nil, for: node)
                 }
             }
         }
@@ -426,14 +435,14 @@ struct BoardView: View {
                 menuRow("Delete", icon: "trash", destructive: true) { menuTarget = nil; deleteTargets = [portrait] }
             }
         }
-        .padding(DSSpacing.gap1)
+        .padding(DSMenuLayout.listInset)
         // Past zich aan de inhoud aan (de bulk-labels zijn langer), met een vloer
         // van 190 zodat het enkel-menu niet te smal wordt. `.fixedSize()` in
         // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
         // precies, zonder vaste overbreedte.
         .frame(minWidth: 190, alignment: .leading)
-        // Solide card — context-menu moet boven portret-nodes blijven.
-        .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
+        .dsMenuSurface()
+        // AppKit-laag boven camera-geschaalde portret-nodes houden.
         .compositingGroup()
     }
 
@@ -718,16 +727,15 @@ struct BoardView: View {
             .overlay(alignment: .top) {
                 if batchMenu == .adjust, let first = selectedPortraits.first,
                    let img = NSImage(data: first.cutoutData) {
-                    EditColorPanel(
+                    AdjustPanel(
                         source: img,
                         initial: first.adjust,
                         onCommit: { _, after in applyAdjustToAll(after) }
                     )
-                    .padding(DSSpacing.gap4)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: 360)
                     .fixedSize(horizontal: false, vertical: true)
-                    // Solide card — zie CanvasActionToolbar (glas zat onder portretten).
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+                    .dsMenuSurface()
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
@@ -763,11 +771,10 @@ struct BoardView: View {
         .overlay(alignment: .top) {
             if isOpen {
                 BackgroundPanel(portrait: display, onApply: { applyBackgroundToAll($0) })
-                    .padding(DSSpacing.gap4)
+                    .padding(DSMenuLayout.contentInset)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
-                    // Solide card — zie CanvasActionToolbar (glas zat onder portretten).
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+                    .dsMenuSurface()
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
@@ -879,8 +886,8 @@ struct BoardView: View {
     /// E31.7: top-toolbar bij precies één selectie = dezelfde frame-lokale
     /// `CanvasActionToolbar` als de single-editor, getrimd tot board-relevante
     /// controls (Frame ▾ met Shape + Flip · Background-panel). Auto-frame/Grid
-    /// (editor-only transform/overlay) zijn verborgen. Adjust zit nu onder
-    /// "Enhance" in de bottom-capsule — net als de editor.
+    /// (editor-only transform/overlay) zijn verborgen. Color-sliders zitten
+    /// onder "Adjust" in de bottom-capsule — net als de editor.
     private func singleEditTopBar(_ node: Portrait2) -> some View {
         CanvasActionToolbar(
             onFlip: { flipNode(node) },
@@ -901,10 +908,9 @@ struct BoardView: View {
     }
 
     /// E31.7: bottom-toolbar bij precies één selectie = dezelfde `DSBottomToolbar`-
-    /// capsule als de single-editor, met de GEDEELDE items (Enhance · Effects ·
-    /// Face · Hair · Clothing). Het actieve paneel zweeft als dropdown erboven.
-    /// "Enhance" (.edit) opent het kleur/Adjust-paneel — Adjust verhuisde hierheen
-    /// uit de oude top-bar.
+    /// capsule als de single-editor, met de GEDEELDE items (Enhance · Adjust ·
+    /// Effects · Face · Hair · Clothing). Het actieve paneel zweeft als dropdown
+    /// erboven. Enhance = AI één-tik; Adjust = compacte color-sliders.
     private func singleEditBottomBar(_ node: Portrait2) -> some View {
         VStack(spacing: DSSpacing.gap2) {
             // Actief paneel boven de balk.
@@ -912,13 +918,25 @@ struct BoardView: View {
                 Group {
                     switch editTool {
                     case .edit:
-                        EditColorPanel(
-                            source: base,
-                            initial: node.adjust,
-                            onCommit: { _, after in applyAdjustToAll(after) },
-                            onRetouch: { retouchNode(node) },
-                            showRetouch: true
-                        )
+                        DSEditPanel(title: "Enhance", maxWidth: 420) {
+                            EditColorPanel(
+                                onRetouch: { retouchNode(node) },
+                                showRetouch: true
+                            )
+                        }
+                    case .adjust:
+                        DSEditPanel(title: "Adjust", maxWidth: 420) {
+                            AdjustPanel(
+                                source: base,
+                                initial: node.adjust,
+                                onPreview: { thumbs.setPreview($0, for: node) },
+                                onCommit: { _, after in
+                                    thumbs.setPreview(nil, for: node)
+                                    applyAdjustToAll(after)
+                                }
+                            )
+                            .id(node.persistentModelID)
+                        }
                     case .effects:
                         EffectsPanel(baseImage: base, entitlement: entitlement, portrait: node,
                                      onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Apply effect") })
@@ -932,21 +950,27 @@ struct BoardView: View {
                                   onApply: { undoableApplyToNode($0, node, actionName: "Change hair") })
                             .id(node.persistentModelID)
                     case .face where AppFeatureFlags.faceEnabled:
-                        FaceActionsPanel(
-                            baseImage: base,
-                            entitlement: entitlement,
-                            onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
-                            isPro: entitlement.isProActive
-                        )
-                        .id(node.persistentModelID)
+                        DSEditPanel(
+                            title: "Face",
+                            credits: CreditMeter.chipLabel(for: .generativeStandard),
+                            maxWidth: 420
+                        ) {
+                            FaceActionsPanel(
+                                baseImage: base,
+                                entitlement: entitlement,
+                                onApply: { undoableApplyToNodePreservingAlpha($0, node, actionName: "Face edit") },
+                                isPro: entitlement.isProActive
+                            )
+                            .id(node.persistentModelID)
+                        }
                     default:
                         EmptyView()
                     }
                 }
                 .frame(width: 420)
                 .fixedSize(horizontal: false, vertical: true)
-                // Solide card — zelfde fix als Background-dropdown (boven portretten).
-                .dsPanelSurface(cornerRadius: DSRadius.xl, solid: true)
+                // Elk child-paneel bezit precies één dsMenuSurface; hier alleen
+                // de samengestelde laag boven de portret-nodes houden.
                 .zIndex(1000)
                 .compositingGroup()
             }

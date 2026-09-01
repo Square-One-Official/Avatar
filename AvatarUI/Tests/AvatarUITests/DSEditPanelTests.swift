@@ -31,6 +31,12 @@ final class DSEditPanelTests: XCTestCase {
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)
     }
 
+    func testCustomMenusDelenHetzelfdeLayoutContract() {
+        XCTAssertEqual(DSMenuLayout.cornerRadius, DSRadius.xl4)
+        XCTAssertEqual(DSMenuLayout.contentInset, DSSpacing.gap5 + DSSpacing.gap2)
+        XCTAssertEqual(DSMenuLayout.listInset, DSSpacing.gap2)
+    }
+
     @MainActor
     func testContainerRendertMetEnZonderActiefPaneel() {
         for tool in [Tool?.none, .effects] {

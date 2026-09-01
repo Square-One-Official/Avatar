@@ -1,20 +1,38 @@
-// Gedeelde paneel-/popover-oppervlak (E24.12). Eén DS-stijl voor ZOWEL de
-// canvas-toolbar-dropdowns (caret-loos, custom float) ALS de bottom-panelen
-// (DSEditPanel), zodat top en bottom identiek ogen: subtiel glas (in-window-
-// blur + donkere card-tint), een dunne rand (divider) en de DS-radius +
-// schaduw. Vervangt de inline-stijl die DSEditPanel had en die de systeem-
-// `.popover` (mét pijltje) niet kon delen.
+// Gedeeld paneel-/popover-oppervlak (E24.12). `dsPanelSurface` bevat de
+// primitives voor zowel glas als solid; `dsMenuSurface` is de canonieke,
+// massieve menu-/editpanelstijl zodat top- en bottom-menu's identiek ogen:
+// donkere Card, dunne divider-rand, DS-radius en schaduw.
 
 import SwiftUI
 
+/// Eén expliciet layoutcontract voor alle custom menucontainers.
+///
+/// `contentInset` hoort bij panel/dropdown-inhoud; compacte lijstmenu's houden
+/// dezelfde chrome maar gebruiken `listInset` zodat 32-pt menu-rijen niet door
+/// overmatige witruimte worden verdrongen.
+public enum DSMenuLayout {
+    public static let cornerRadius = DSRadius.xl4
+    public static let contentInset = DSSpacing.gap5 + DSSpacing.gap2
+    public static let listInset = DSSpacing.gap2
+}
+
 public extension View {
-    /// Past het gedeelde paneel-oppervlak toe (rand + radius + schaduw).
-    /// `cornerRadius` schaalt mee met de kaartgrootte (groot paneel = xl4,
-    /// compacte dropdown = xl).
-    /// `solid`: true = massieve card-achtergrond (edit-panelen onderaan);
-    /// false (default) = in-window blur + card-tint (toolbar-dropdowns).
-    func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = false) -> some View {
+    /// Low-level surface-primitive voor uitzonderingen buiten het custom
+    /// menucontract. Primaire menu's gebruiken `dsMenuSurface()`.
+    /// `solid`: true (default) = de canonieke massieve Card van Effects/Enhance;
+    /// false = opt-in in-window blur voor geneste, materiaalachtige popovers.
+    func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = true) -> some View {
         modifier(DSPanelSurface(cornerRadius: cornerRadius, solid: solid))
+    }
+
+    /// Canonieke container voor zwevende editor-menu's en edit-panelen.
+    ///
+    /// Eén vaste, massieve Card-surface voorkomt dat Frame, Background en
+    /// account/context-menu's visueel afwijken van Effects en Enhance.
+    /// De radius is bewust niet configureerbaar: custom menu's delen altijd
+    /// hetzelfde 24-pt containerprofiel.
+    func dsMenuSurface() -> some View {
+        dsPanelSurface(cornerRadius: DSMenuLayout.cornerRadius, solid: true)
     }
 }
 

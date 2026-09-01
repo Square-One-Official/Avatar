@@ -88,12 +88,11 @@ public struct DSEditPanel<Content: View>: View {
             // overal volledig zichtbaar (scrollt bij overflow; de scrollbar +
             // de paneel-rand zijn de enige rand-affordance).
         }
-        .padding(DSSpacing.gap5)
-        .padding(DSSpacing.gap2)
+        .padding(DSMenuLayout.contentInset)
         .frame(maxWidth: maxWidth)
         // Solid achtergrond (geen glas): edit-panelen liggen over de foto
         // en moeten massief zijn zodat de inhoud niet door het portret scheemert.
-        .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+        .dsMenuSurface()
     }
 
     /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet

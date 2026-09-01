@@ -8,14 +8,14 @@ import XCTest
 final class EditorToolTests: XCTestCase {
 
     func testAlleToolsCompleetGedefinieerd() {
-        XCTAssertEqual(EditorTool.allCases.count, 7)
+        XCTAssertEqual(EditorTool.allCases.count, 8)
         for tool in EditorTool.allCases {
             XCTAssertFalse(tool.label.isEmpty)
             XCTAssertFalse(tool.pendingStory.isEmpty)
         }
         XCTAssertEqual(
             EditorTool.allCases.map(\.label),
-            ["Edit", "Effects", "Face", "Clothing", "Hair", "Background", "Images"]
+            ["Edit", "Adjust", "Effects", "Face", "Clothing", "Hair", "Background", "Images"]
         )
     }
 
@@ -33,8 +33,13 @@ final class EditorToolTests: XCTestCase {
         XCTAssertTrue(EditorView.isToolbarToolVisible(.hair))
         XCTAssertTrue(EditorView.isToolbarToolVisible(.clothing))
         XCTAssertTrue(EditorView.isToolbarToolVisible(.edit))
+        XCTAssertTrue(EditorView.isToolbarToolVisible(.adjust))
         XCTAssertFalse(EditorView.isToolbarToolVisible(.face))
         XCTAssertFalse(EditorView.visibleToolbarItems.contains { $0.id == .face })
         XCTAssertTrue(EditorView.visibleToolbarItems.contains { $0.id == .effects })
+        XCTAssertTrue(EditorView.visibleToolbarItems.contains { $0.id == .adjust })
+        // Enhance · Adjust · Effects … — Adjust direct na Enhance.
+        let ids = EditorView.visibleToolbarItems.map(\.id)
+        XCTAssertEqual(ids.prefix(3).map { $0 }, [.edit, .adjust, .effects])
     }
 }
