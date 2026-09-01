@@ -127,6 +127,40 @@ Dan mis je bestanden, gidsen en fixes — of zie je fouten zoals
 
 **Veelvoorkomende vergissing:** je zit al in `.../Avatar2`, typt opnieuw `cd Avatar2` → `no such file`, en zoekt de gids in `Avatar2/docs/` → die map bestaat niet. De gids staat op `docs/` in de repo-root.
 
+### Valkuil: lokale `v2-main` ≠ GitHub `v2-main`
+
+Branchnaam `v2-main` alleen is niet genoeg. Controleer altijd de commit:
+
+```bash
+git fetch origin
+git log -1 --oneline                 # wat jij lokaal hebt
+git log -1 --oneline origin/v2-main  # wat op GitHub staat
+```
+
+Als die SHA’s verschillen, bouw je nog oude code — ook al zegt Xcode “v2-main”.
+
+Typisch signaal: `git log -1` toont een lokale checkpoint zoals  
+`checkpoint before checking out cursor/...` in plaats van  
+`Integrate current v2 editor and menu sessions (#37)`.
+
+**Herstel (sluit Xcode eerst):**
+
+```bash
+cd "/pad/naar/Avatar"                # repo-root
+git fetch origin
+git checkout v2-main
+git reset --hard origin/v2-main      # zet lokale v2-main gelijk aan GitHub
+git log -1 --oneline                 # moet nu gelijk zijn aan origin/v2-main
+xcodegen generate
+rm -rf ~/Library/Developer/Xcode/DerivedData/Avatar-*
+open Avatar.xcodeproj
+```
+
+Daarna in Xcode: scheme `Avatar2` → Clean Build Folder → Run.
+
+> `git reset --hard` gooit niet-gecommitte lokale wijzigingen op die branch weg.
+> Heb je lokale bestanden die je wilt bewaren: eerst `git status` en eventueel `git stash -u`.
+
 **Keten:** Cloud Agent → GitHub PR → jij merget → jij checkt lokaal uit → Xcode bouwt die code.
 
 ---
