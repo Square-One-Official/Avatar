@@ -124,6 +124,8 @@ struct AdjustPanel: View {
                         if editing {
                             dragStart = current
                         } else if let before = dragStart {
+                            previewTask?.cancel()
+                            previewTask = nil
                             onCommit(before, current)
                             dragStart = nil
                         }
@@ -162,6 +164,10 @@ struct AdjustPanel: View {
             saturation = initial.saturation
             temperature = initial.temperature
             seeded = true
+        }
+        .onDisappear {
+            previewTask?.cancel()
+            previewTask = nil
         }
     }
 
