@@ -93,7 +93,7 @@ public struct DSEditPanel<Content: View>: View {
         .frame(maxWidth: maxWidth)
         // Solid achtergrond (geen glas): edit-panelen liggen over de foto
         // en moeten massief zijn zodat de inhoud niet door het portret scheemert.
-        .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+        .dsMenuSurface()
     }
 
     /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet

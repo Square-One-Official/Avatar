@@ -210,7 +210,9 @@ struct SidebarView: View {
         }
         .padding(DSSpacing.gap1)
         .frame(width: 190)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
+        // Dezelfde container-chrome als Frame, Background, Effects en Enhance.
+        // Ook account-/avatarachtige sidebar-menu's blijven zo één familie.
+        .dsMenuSurface()
     }
 
     /// E19.4: klik-afhandeling met cmd/shift voor multi-select; gewone klik =

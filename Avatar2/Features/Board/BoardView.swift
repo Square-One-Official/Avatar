@@ -426,7 +426,7 @@ struct BoardView: View {
         // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
         // precies, zonder vaste overbreedte.
         .frame(minWidth: 190, alignment: .leading)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
+        .dsMenuSurface()
     }
 
     private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
@@ -718,8 +718,7 @@ struct BoardView: View {
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32.1: zelfde paneel-radius (xl4) als de rest.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    .dsMenuSurface()
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
@@ -757,8 +756,7 @@ struct BoardView: View {
                     .padding(DSSpacing.gap4)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32.1: zelfde paneel-radius (xl4) als de rest.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    .dsMenuSurface()
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
@@ -935,7 +933,7 @@ struct BoardView: View {
                 }
                 .frame(width: 420)
                 .fixedSize(horizontal: false, vertical: true)
-                .dsPanelSurface(cornerRadius: DSRadius.xl)
+                .dsMenuSurface()
             }
 
             DSBottomToolbar(items: EditorView.visibleToolbarItems, selection: $editTool)

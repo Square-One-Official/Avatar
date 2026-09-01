@@ -1,9 +1,7 @@
-// Gedeelde paneel-/popover-oppervlak (E24.12). Eén DS-stijl voor ZOWEL de
-// canvas-toolbar-dropdowns (caret-loos, custom float) ALS de bottom-panelen
-// (DSEditPanel), zodat top en bottom identiek ogen: subtiel glas (in-window-
-// blur + donkere card-tint), een dunne rand (divider) en de DS-radius +
-// schaduw. Vervangt de inline-stijl die DSEditPanel had en die de systeem-
-// `.popover` (mét pijltje) niet kon delen.
+// Gedeeld paneel-/popover-oppervlak (E24.12). `dsPanelSurface` bevat de
+// primitives voor zowel glas als solid; `dsMenuSurface` is de canonieke,
+// massieve menu-/editpanelstijl zodat top- en bottom-menu's identiek ogen:
+// donkere Card, dunne divider-rand, DS-radius en schaduw.
 
 import SwiftUI
 
@@ -15,6 +13,15 @@ public extension View {
     /// false (default) = in-window blur + card-tint (toolbar-dropdowns).
     func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = false) -> some View {
         modifier(DSPanelSurface(cornerRadius: cornerRadius, solid: solid))
+    }
+
+    /// Canonieke container voor zwevende editor-menu's en edit-panelen.
+    ///
+    /// Eén vaste, massieve Card-surface voorkomt dat Frame, Background en
+    /// account/context-menu's visueel afwijken van Effects en Enhance. Houd
+    /// glas alleen voor expliciete, geneste popovers zoals de color picker.
+    func dsMenuSurface(cornerRadius: CGFloat = DSRadius.xl4) -> some View {
+        dsPanelSurface(cornerRadius: cornerRadius, solid: true)
     }
 }
 

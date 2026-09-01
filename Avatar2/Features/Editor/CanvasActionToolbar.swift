@@ -12,9 +12,9 @@
 // design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
 // later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
-// `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
-// aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
-// een klik op de canvas (EditorView) de dropdown sluit, net als de panelen.
+// `.popover` met pijltje). Eén gedeelde, massieve `dsMenuSurface` — exact
+// hetzelfde oppervlak als de bottom-panelen (DSEditPanel). De open-staat leeft
+// als binding zodat een klik op de canvas (EditorView) de dropdown sluit.
 //
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
@@ -98,7 +98,7 @@ struct CanvasActionToolbar<Background: View>: View {
 
     /// E24.12: een toolbar-knop met zijn caret-loze, zwevende dropdown-kaart
     /// eronder (overlay, niet door de capsule geclipt). De kaart deelt het
-    /// `dsPanelSurface`-oppervlak met de bottom-panelen.
+    /// `dsMenuSurface`-oppervlak met de bottom-panelen.
     @ViewBuilder
     private func toolbarItem<Content: View>(
         _ menu: CanvasToolbarMenu, _ title: String, icon: Ph,
@@ -126,8 +126,9 @@ struct CanvasActionToolbar<Background: View>: View {
                     .padding(padding)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Zelfde massieve Card, rand, xl4-radius en schaduw als
+                    // Effects/Enhance via DSEditPanel.
+                    .dsMenuSurface()
                     // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
