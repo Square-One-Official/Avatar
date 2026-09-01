@@ -11,7 +11,7 @@ Uitleg waarom Cloud Agents altijd een PR maken, hoe dat samenhangt met Xcode, en
 - [`docs/cursor-git-workflow-guide.md`](docs/cursor-git-workflow-guide.md) (leesbaar op GitHub)
 - [`docs/cursor-git-workflow-guide.html`](docs/cursor-git-workflow-guide.html) (visueel, open lokaal in de browser)
 
-> Deze gids staat op featurebranch `cursor/unify-menu-containers-7e40` (PR #37) tot die is gemerged. Op `main` krijg je anders “File not found”.
+> Staat op `v2-main`. Pad: `docs/` in de **repo-root** — niet `Avatar2/docs/`. Zit je in `Avatar2/`? Open dan `../docs/cursor-git-workflow-guide.html`.
 
 ## Vereisten
 
