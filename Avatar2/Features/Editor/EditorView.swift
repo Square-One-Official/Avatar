@@ -15,13 +15,16 @@ import SwiftUI
 
 enum EditorTool: String, CaseIterable, Identifiable {
     // E21.1: Face-tool tussen Effects en Clothing (beauty-acties uit Edit).
-    case edit, effects, face, clothing, hair, background, images
+    // Adjust: handmatige color-sliders, gesplitst uit Enhance zodat het portret
+    // zichtbaar blijft tijdens aanpassen.
+    case edit, adjust, effects, face, clothing, hair, background, images
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .edit: "Edit"
+        case .adjust: "Adjust"
         case .effects: "Effects"
         case .face: "Face"
         case .clothing: "Clothing"
@@ -35,6 +38,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var dsSymbol: DSIcon.Symbol {
         switch self {
         case .edit: .edit
+        case .adjust: .adjust
         case .effects: .effects
         case .face: .face
         case .clothing: .clothing
@@ -48,6 +52,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var icon: Image {
         switch self {
         case .edit: Image(systemName: "paintpalette")  // E22.3: kleur-glyph
+        case .adjust: Image(systemName: "slider.horizontal.3")
         case .effects: Image(systemName: "sparkles")
         case .face: Image(systemName: "face.smiling")
         case .clothing: Image(systemName: "tshirt.fill")
@@ -62,6 +67,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var pendingStory: String {
         switch self {
         case .edit: "E06.3"
+        case .adjust: "E31.8"
         case .effects: "E09.2"
         case .face: "E21.1"
         case .clothing: "E10.2"
@@ -194,13 +200,22 @@ struct EditorView: View {
     }()
     #endif
 
-    /// Edit-paneel-cap. Smoke-haak (`--expand-panel`, alleen DEBUG) toont alle
-    /// rijen zonder scrollen zodat de toggle-staten te capturen zijn.
+    /// Enhance-paneel-cap (AI-chips). Smoke-haak (`--expand-panel`, alleen DEBUG)
+    /// toont alle rijen zonder scrollen zodat de toggle-staten te capturen zijn.
     private var editPanelMaxHeight: CGFloat {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--expand-panel") { return 700 }
         #endif
-        return 280
+        return 120
+    }
+
+    /// Adjust-paneel-cap — compact (icoonrij + één slider) zodat het portret
+    /// zichtbaar blijft tijdens slepen.
+    private var adjustPanelMaxHeight: CGFloat {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--expand-panel") { return 700 }
+        #endif
+        return 180
     }
 
     /// Originele importfoto (hold-to-compare); nil voor rijen van vóór E06.2.
@@ -366,16 +381,17 @@ struct EditorView: View {
     }
 
     // E31.1: de onderste toolbar is de Figma-capsule (4114:978) — gelabelde
-    // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt + een
-    // overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
-    // "Enhance" (31.2 verhuist het Adjust/Light-paneel hierheen) en `.clothing`
-    // heet "Shirt" (Figma-capsule). Face is een bewuste toevoeging t.o.v. Figma
-    // (besluit 31.6). Images → app-bar (E22.1).
+    // icoon+label-pillen Enhance · Adjust · Effects · Face · Hair · Clothing +
+    // een overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
+    // "Enhance" (AI één-tik-acties) en `.adjust` is de compacte slider-tool
+    // (gesplitst zodat het portret zichtbaar blijft). Face is een bewuste
+    // toevoeging t.o.v. Figma (besluit 31.6). Images → app-bar (E22.1).
     // E31.7: gedeeld met de board (BoardView) zodat single-editor én board
     // dezelfde capsule-items tonen. Label "Clothing" (besluit Thierry: canoniek
     // voor beide views — verving "Shirt").
     static let toolbarItems: [DSToolbarItem<EditorTool>] = [
         DSToolbarItem(id: .edit, icon: EditorTool.edit.icon, label: "Enhance"),
+        DSToolbarItem(id: .adjust, icon: EditorTool.adjust.icon, label: "Adjust"),
         DSToolbarItem(id: .effects, icon: EditorTool.effects.icon, label: "Effects"),
         DSToolbarItem(id: .face, icon: EditorTool.face.icon, label: "Face"),
         DSToolbarItem(id: .hair, icon: EditorTool.hair.icon, label: "Hair"),
@@ -503,24 +519,9 @@ struct EditorView: View {
         }
     }
 
-    /// E24.3: color-sliders voor de Adjust-popover (de AI-dropdown staat apart
-    /// in de canvas-toolbar, dus hier zonder Auto-enhance-menu).
+    /// Enhance: AI één-tik-acties (sliders zitten in `adjustPanel`).
     private var editColorPanel: some View {
         EditColorPanel(
-            source: rawCutout,
-            initial: portraitModel?.adjust ?? .neutral,
-            onPreview: onPreview,
-            onCommit: { before, after in
-                // E24.14: niet-destructief — persisteer alléén de params; het
-                // canvas hercomputeert (adjust(raw)). cutoutData blijft rauw.
-                onCommitAdjust(after)
-                if let portraitModel {
-                    AdjustUndo.register(
-                        undoManager, target: portraitModel, apply: onCommitAdjust,
-                        undoTo: before, redoTo: after, actionName: "Adjust"
-                    )
-                }
-            },
             onRetouch: { toggleLocalEnhance("One click retouch") { PortraitEnhancer.magicRetouch($0) } },
             onStudioLight: { toggleLocalEnhance("Studio Light") { PortraitEnhancer.improveLighting($0) } },
             onPortrait: { togglePortraitBlur() },
@@ -534,9 +535,27 @@ struct EditorView: View {
             studioLightOn: localToggleBaselines["Studio Light"] != nil,
             portraitOn: portraitModel?.portraitBlur == true,
             retouchOn: localToggleBaselines["One click retouch"] != nil,
-            showRetouch: true,
-            // E24.27: AI-één-tik-acties zitten nu IN het Light & color-paneel.
-            showAutoEnhance: true
+            showRetouch: true
+        )
+    }
+
+    /// Adjust: compacte icoonrij + één actieve color-slider.
+    private var adjustPanel: some View {
+        AdjustPanel(
+            source: rawCutout,
+            initial: portraitModel?.adjust ?? .neutral,
+            onPreview: onPreview,
+            onCommit: { before, after in
+                // E24.14: niet-destructief — persisteer alléén de params; het
+                // canvas hercomputeert (adjust(raw)). cutoutData blijft rauw.
+                onCommitAdjust(after)
+                if let portraitModel {
+                    AdjustUndo.register(
+                        undoManager, target: portraitModel, apply: onCommitAdjust,
+                        undoTo: before, redoTo: after, actionName: "Adjust"
+                    )
+                }
+            }
         )
     }
 
@@ -720,8 +739,8 @@ struct EditorView: View {
                                 onSetFrameShape: setFrameShape,
                                 activeMenu: $canvasMenu,
                                 gridEnabled: $canvasGridEnabled,
-                                // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar — nu
-                                // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
+                                // E31.2/31.3: Adjust + AI-acties zijn uit de frame-toolbar —
+                                // Enhance (one-tap) en Adjust (sliders) in de bottom-capsule.
                                 background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
                             )
                             // Boven handles + portret wanneer Background/Frame open is.
@@ -842,13 +861,14 @@ struct EditorView: View {
                 // Sidebar-toggle: geen bottom-paneel, foto blijft groot.
                 EmptyView()
             } else if tool == .edit {
-                // E31.2: de capsule-knop "Enhance" opent het volledige Light &
-                // color / Adjust-paneel (E24.27: sliders + Auto-enhance-acties),
-                // functioneel ongewijzigd verhuisd uit de frame-toolbar. Gebruikt
-                // `editColorPanel` (showAutoEnhance + studioLightOn-state) i.p.v.
-                // een uitgeklede inline-variant.
+                // Enhance: AI één-tik-acties. Color-sliders zitten in Adjust.
                 DSEditPanel(title: "Enhance", maxContentHeight: editPanelMaxHeight) {
                     editColorPanel
+                }
+            } else if tool == .adjust {
+                // Compact Adjust: icoonrij + één slider, portret blijft zichtbaar.
+                DSEditPanel(title: "Adjust", maxContentHeight: adjustPanelMaxHeight) {
+                    adjustPanel
                 }
             } else if tool == .face, AppFeatureFlags.faceEnabled, let entitlement {
                 // E21.1: beauty-acties, gesplitst uit Edit. E32.1: de Beauty-
