@@ -156,6 +156,7 @@
 		B3B24CB78F4451A09882A78E /* GoogleGMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = E550B398D542F0234C2B9396 /* GoogleGMark.swift */; };
 		B58A68284A2307E2EBC20536 /* AvatarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 88A34C4687B11CA414F1E7E6 /* AvatarKit */; };
 		B64A1678796BB93D290579D2 /* EditColorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */; };
+		942A3A1840604B22954DA0DD /* AdjustPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BCF3D3CE284B0AB84E4039 /* AdjustPanel.swift */; };
 		B6E6633C3A2A74AF59456F58 /* ProEntitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81A841E6FEC3AA3A21B4DC50 /* ProEntitlement.swift */; };
 		B75EB071FBBE2203B62354C2 /* Portrait2Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4C6433C0A7DD0C9E89C753 /* Portrait2Tests.swift */; };
 		B77A1F8EE216E673B1250E57 /* PortraitUndoManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7194822E14F9864C38869D98 /* PortraitUndoManager.swift */; };
@@ -364,6 +365,7 @@
 		E2236BDA9B1318863EB306B4 /* IsolatingCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatingCanvas.swift; sourceTree = "<group>"; };
 		E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellMetrics.swift; sourceTree = "<group>"; };
 		E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditColorPanel.swift; sourceTree = "<group>"; };
+		A0BCF3D3CE284B0AB84E4039 /* AdjustPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustPanel.swift; sourceTree = "<group>"; };
 		E550B398D542F0234C2B9396 /* GoogleGMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleGMark.swift; sourceTree = "<group>"; };
 		EA293E7F1CF952594B0EB25E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEnhanceUndo.swift; sourceTree = "<group>"; };
@@ -457,6 +459,7 @@
 		321B2081449B5D7591ADF91C /* Editor */ = {
 			isa = PBXGroup;
 			children = (
+				A0BCF3D3CE284B0AB84E4039 /* AdjustPanel.swift */,
 				04DD6F25623AC483A733A2EA /* AdjustUndo.swift */,
 				8483B0B526A772D660C1ECB8 /* AutoFramer.swift */,
 				944A04C42B02792DA0CA60F7 /* BackgroundBlur.swift */,
@@ -999,6 +1002,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				942A3A1840604B22954DA0DD /* AdjustPanel.swift in Sources */,
 				37DBE53613C79814FFD858A2 /* AdjustUndo.swift in Sources */,
 				88F219E35BB48BDC77DA3BAF /* AutoFramer.swift in Sources */,
 				176CE067B4B66A16D80C4383 /* Avatar2App.swift in Sources */,
