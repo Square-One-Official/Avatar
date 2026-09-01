@@ -611,6 +611,15 @@ Veelvoorkomende vergissing:
   Juist vanuit Avatar2: open ../docs/cursor-git-workflow-guide.html</pre>
           </div>
         </div>
+        <div class="callout bad">
+          <strong>Valkuil: lokale <code>v2-main</code> ≠ GitHub <code>v2-main</code>.</strong>
+          Alleen de branchnaam zien in Xcode is niet genoeg. Als
+          <code>git log -1</code> een lokale checkpoint toont
+          (bijv. “checkpoint before checking out…”) terwijl
+          <code>origin/v2-main</code> op een nieuwere merge staat, bouw je nog oude menu’s.
+          Fix: <code>git fetch origin && git checkout v2-main && git reset --hard origin/v2-main</code>,
+          daarna <code>xcodegen generate</code>, DerivedData wissen, Clean Build, Run.
+        </div>
         <div class="callout good">
           <strong>Onthoud:</strong> Cloud Agent → GitHub PR → jij merget → jij checkt lokaal uit → Xcode bouwt die code.
           Stap 2–4 overslaan voelt alsof “Xcode niet werkt”, terwijl je gewoon een andere kopie bekijkt.
