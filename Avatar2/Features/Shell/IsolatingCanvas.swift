@@ -17,7 +17,12 @@ struct IsolatingCanvas: View {
 
     var body: some View {
         DSCanvasCard {
-            IsolatingFrameLayer(original: original, cutout: cutout)
+            ZStack {
+                // Een eerste import heeft nog geen portret-achtergrond.
+                // Behoud hier daarom de bestaande generieke reveal.
+                DSColor.Background.app
+                IsolatingFrameLayer(original: original, cutout: cutout)
+            }
         }
         .frame(maxWidth: 456, maxHeight: 456)
         .padding(.vertical, DSSpacing.gap8)

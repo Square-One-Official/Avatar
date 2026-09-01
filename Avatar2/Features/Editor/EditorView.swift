@@ -353,6 +353,18 @@ struct EditorView: View {
         }
     }
 
+    /// Achtergrond tijdens de isolating-reveal. Een ingestelde achtergrond
+    /// blijft zichtbaar; zonder instelling behouden we de bestaande generieke
+    /// app-achtergrond van de animatie.
+    @ViewBuilder
+    private var isolatingBackgroundLayer: some View {
+        if hasBackground {
+            backgroundLayer
+        } else {
+            DSColor.Background.app
+        }
+    }
+
     // E31.1: de onderste toolbar is de Figma-capsule (4114:978) — gelabelde
     // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt + een
     // overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
@@ -563,7 +575,7 @@ struct EditorView: View {
                         // de importlaag. Zodra het origineel wegfadet, onthult de alpha
                         // van de cutout direct deze achtergrond in plaats van tijdelijk
                         // de algemene transparante/app-achtergrond te tonen.
-                        backgroundLayer
+                        isolatingBackgroundLayer
                             .clipShape(frameClipShape)
                         IsolatingFrameLayer(
                             original: isolating.original,
