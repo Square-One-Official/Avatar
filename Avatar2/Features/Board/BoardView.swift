@@ -129,6 +129,10 @@ struct BoardView: View {
                         .offset(camera.offset)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .clipped()
+                        // Flatten camera-geschaalde Image-nodes tot één laag zodat
+                        // toolbar/Background-dropdowns er betrouwbaar bóven liggen
+                        // (anders winnen portret-CALayers van nested overlays).
+                        .compositingGroup()
                         .background {
                             CanvasInteractionCatcher(
                                 camera: $camera,
@@ -161,6 +165,8 @@ struct BoardView: View {
                     }
                 }
                 .padding(.top, 70)
+                // Background/Frame-menu's moeten boven de portret-rij blijven.
+                .zIndex(1000)
             }
             // E30.1: bij één-selectie de editor-bottom-tools (Effects/Face/
             // Clothing/Hair) op de node — zodat in-place editen op de board kan.
@@ -426,7 +432,9 @@ struct BoardView: View {
         // `contextMenuOverlay` krimpt naar deze ideale breedte → de labels passen
         // precies, zonder vaste overbreedte.
         .frame(minWidth: 190, alignment: .leading)
-        .dsPanelSurface(cornerRadius: DSRadius.lg)
+        // Solide card — context-menu moet boven portret-nodes blijven.
+        .dsPanelSurface(cornerRadius: DSRadius.lg, solid: true)
+        .compositingGroup()
     }
 
     private func menuRow(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
@@ -718,12 +726,13 @@ struct BoardView: View {
                     .padding(DSSpacing.gap4)
                     .frame(width: 360)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32.1: zelfde paneel-radius (xl4) als de rest.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Solide card — zie CanvasActionToolbar (glas zat onder portretten).
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
-                    .zIndex(10)
+                    .zIndex(1000)
+                    .compositingGroup()
                 }
             }
         }
@@ -757,12 +766,13 @@ struct BoardView: View {
                     .padding(DSSpacing.gap4)
                     .frame(width: 320)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32.1: zelfde paneel-radius (xl4) als de rest.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Solide card — zie CanvasActionToolbar (glas zat onder portretten).
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
-                    .zIndex(10)
+                    .zIndex(1000)
+                    .compositingGroup()
             }
         }
     }
@@ -935,7 +945,10 @@ struct BoardView: View {
                 }
                 .frame(width: 420)
                 .fixedSize(horizontal: false, vertical: true)
-                .dsPanelSurface(cornerRadius: DSRadius.xl)
+                // Solide card — zelfde fix als Background-dropdown (boven portretten).
+                .dsPanelSurface(cornerRadius: DSRadius.xl, solid: true)
+                .zIndex(1000)
+                .compositingGroup()
             }
 
             DSBottomToolbar(items: EditorView.visibleToolbarItems, selection: $editTool)
