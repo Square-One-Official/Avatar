@@ -12,9 +12,9 @@
 // design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
 // later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
-// `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
-// aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
-// een klik op de canvas (EditorView) de dropdown sluit, net als de panelen.
+// `.popover` met pijltje). Solide `dsPanelSurface` (identiek aan DSEditPanel) —
+// glas/withinWindow zat onder de portret-Images. De open-staat leeft als
+// binding zodat een klik op de canvas (EditorView) de dropdown sluit.
 //
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
@@ -126,13 +126,17 @@ struct CanvasActionToolbar<Background: View>: View {
                     .padding(padding)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    // E32: zelfde paneel-radius (xl4 = 24) als de onderste DSEditPanel.
-                    .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                    // Solide card (niet glas): NSVisualEffectView/withinWindow
+                    // verliest op macOS de AppKit-laagstrijd van Image-portretten
+                    // → menu kwam ónder de foto's. Match DSEditPanel (solid).
+                    .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
                     // Onder de capsule: pil-hoogte + capsule-inset + lucht (= 44).
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
-                    .zIndex(10)
+                    // Hoog boven portret-/handle-lagen in hetzelfde stacking context.
+                    .zIndex(1000)
+                    .compositingGroup()
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
         }

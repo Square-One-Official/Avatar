@@ -620,6 +620,10 @@ struct EditorView: View {
             // om het midden.
             .scaleEffect(camera.scale, anchor: .center)
             .offset(camera.offset)
+            // Flatten de camera-geschaalde portretkaart vóór screen-space chrome.
+            // Zonder dit winnen Image-CALayers soms van de Background-dropdown
+            // (menu onder de foto i.p.v. erboven).
+            .compositingGroup()
             // E27.3: de selectie-handles + kader als SCREEN-SPACE overlay op de
             // (camera-getransformeerde) kaart — vaste schermgrootte, en doordat ze
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
@@ -704,6 +708,8 @@ struct EditorView: View {
                                 // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
                                 background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
                             )
+                            // Boven handles + portret wanneer Background/Frame open is.
+                            .zIndex(canvasMenu != nil ? 1000 : 1)
                             .fixedSize()
                             .position(x: cx, y: visTop + DSSpacing.gap6)
                             // Emil: nooit vanaf scale(0); scale-vanuit-0.96 + opacity, origin top.
