@@ -559,8 +559,12 @@ struct EditorView: View {
                         // E-fix: bij een vervangende import speelt de isolating-reveal
                         // ÍN het frame — de scaffold (toolbar + naam-frame) blijft staan
                         // i.p.v. plaats te maken voor een full-screen IsolatingCanvas.
-                        // De reveal clipt naar de frame-vorm; de eindovergang naar het
-                        // result-canvas is een blur-fade (zie .transition + .animation).
+                        // Houd de ingestelde achtergrond tijdens het hele proces onder
+                        // de importlaag. Zodra het origineel wegfadet, onthult de alpha
+                        // van de cutout direct deze achtergrond in plaats van tijdelijk
+                        // de algemene transparante/app-achtergrond te tonen.
+                        backgroundLayer
+                            .clipShape(frameClipShape)
                         IsolatingFrameLayer(
                             original: isolating.original,
                             cutout: isolating.cutout,
