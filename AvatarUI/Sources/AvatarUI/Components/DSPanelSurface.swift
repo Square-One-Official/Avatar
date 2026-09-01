@@ -9,9 +9,9 @@ public extension View {
     /// Past het gedeelde paneel-oppervlak toe (rand + radius + schaduw).
     /// `cornerRadius` schaalt mee met de kaartgrootte (groot paneel = xl4,
     /// compacte dropdown = xl).
-    /// `solid`: true = massieve card-achtergrond (edit-panelen onderaan);
-    /// false (default) = in-window blur + card-tint (toolbar-dropdowns).
-    func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = false) -> some View {
+    /// `solid`: true (default) = de canonieke massieve Card van Effects/Enhance;
+    /// false = opt-in in-window blur voor geneste, materiaalachtige popovers.
+    func dsPanelSurface(cornerRadius: CGFloat = DSRadius.xl4, solid: Bool = true) -> some View {
         modifier(DSPanelSurface(cornerRadius: cornerRadius, solid: solid))
     }
 

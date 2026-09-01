@@ -48,7 +48,9 @@ public struct DSColorPicker: View {
         }
         .padding(DSSpacing.gap5)
         .frame(width: 300)
-        .dsPanelSurface(cornerRadius: DSRadius.xl)
+        // De color picker is bewust de enige materiaal-popover; alle primaire
+        // menucontainers gebruiken standaard de massieve Effects/Enhance-card.
+        .dsPanelSurface(cornerRadius: DSRadius.xl, solid: false)
         .onAppear {
             guard !seeded else { return }
             seedFromColor(); seeded = true
