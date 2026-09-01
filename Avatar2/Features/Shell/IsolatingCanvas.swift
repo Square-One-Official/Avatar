@@ -1,8 +1,10 @@
 // Isolating-animatie (E05.3 + E04.5-fix, Figma: App / Image added
 // 4017:1817 + App / Isolating animation 4017:1762). De foto leeft in de
 // canvas-kaart (DSCanvasCard, bevinding 6/11) — vast 1:1 (exportformaat);
-// fase 1 toont het origineel gevuld, fase 2 fadet een app-achtergrondlaag
-// over het origineel terwijl de cutout erbovenop ligt. De status-pill
+// fase 1 toont het origineel gevuld, fase 2 fadet het origineel weg
+// terwijl de cutout erbovenop ligt. De achtergrond wordt door de parent
+// geleverd, zodat een reeds ingestelde achtergrond tijdens de reveal
+// zichtbaar blijft. De status-pill
 // (Figma "Recording") hangt op vensterniveau in ShellView (bevinding 3).
 
 import AvatarUI
@@ -15,15 +17,22 @@ struct IsolatingCanvas: View {
 
     var body: some View {
         DSCanvasCard {
-            IsolatingFrameLayer(original: original, cutout: cutout)
+            ZStack {
+                // Een eerste import heeft nog geen portret-achtergrond.
+                // Behoud hier daarom de bestaande generieke reveal.
+                DSColor.Background.app
+                IsolatingFrameLayer(original: original, cutout: cutout)
+            }
         }
         .frame(maxWidth: 456, maxHeight: 456)
         .padding(.vertical, DSSpacing.gap8)
     }
 }
 
-/// De reveal-laag (E05.3): origineel gevuld → een app-achtergrondlaag fadet
-/// erover terwijl de cutout erbovenop verschijnt. Gedeeld door de full-screen
+/// De reveal-laag (E05.3): origineel gevuld → het origineel fadet naar
+/// transparant terwijl de cutout erbovenop verschijnt. Daardoor blijft de
+/// achtergrond van de parent zichtbaar in plaats van dat deze tijdelijk door
+/// de algemene app-achtergrond wordt vervangen. Gedeeld door de full-screen
 /// `IsolatingCanvas` (eerste import) én de in-frame editor-isolating (E-fix:
 /// bij een VERVANGENDE import blijft de editor-scaffold staan en speelt de
 /// reveal ín het frame i.p.v. het hele scherm te vervangen). De clip-vorm
@@ -34,14 +43,11 @@ struct IsolatingFrameLayer: View {
     let cutout: NSImage?
     var clipShape: AnyShape = AnyShape(Rectangle())
 
-    @State private var backgroundFaded = false
+    @State private var originalFaded = false
 
     var body: some View {
         portraitLayer(original)
-            .overlay {
-                DSColor.Background.app
-                    .opacity(backgroundFaded ? 1 : 0)
-            }
+            .opacity(originalFaded ? 0 : 1)
             .overlay {
                 if let cutout {
                     portraitLayer(cutout)
@@ -51,7 +57,7 @@ struct IsolatingFrameLayer: View {
             .onChange(of: cutout != nil, initial: true) { _, hasCutout in
                 guard hasCutout else { return }
                 withAnimation(.easeInOut(duration: IsolatingTiming.backgroundFade)) {
-                    backgroundFaded = true
+                    originalFaded = true
                 }
             }
     }

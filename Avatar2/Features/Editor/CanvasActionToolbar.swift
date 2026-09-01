@@ -13,8 +13,9 @@
 // later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
 // `.popover` met pijltje). Eén gedeelde, massieve `dsMenuSurface` — exact
-// hetzelfde oppervlak als de bottom-panelen (DSEditPanel). De open-staat leeft
-// als binding zodat een klik op de canvas (EditorView) de dropdown sluit.
+// hetzelfde oppervlak als de bottom-panelen (DSEditPanel); de massieve laag
+// blijft bovendien boven camera-geschaalde portret-Images. De open-staat leeft
+// als binding zodat een canvas-klik de dropdown sluit.
 //
 // E20/E24-iconen: de MENU-iconen (toolbar + dropdowns) zijn Phosphor (hangt aan
 // het app-target, niet AvatarUI — zie project.yml). De icon-buttons in de
@@ -135,7 +136,9 @@ struct CanvasActionToolbar<Background: View>: View {
                     .offset(y: DSToolbarSize.compact.height
                               + DSToolbarSize.compact.containerPadding
                               + DSSpacing.gap2)
-                    .zIndex(10)
+                    // Hoog boven portret-/handle-lagen in hetzelfde stacking context.
+                    .zIndex(1000)
+                    .compositingGroup()
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             }
         }

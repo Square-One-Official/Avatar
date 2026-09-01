@@ -353,6 +353,18 @@ struct EditorView: View {
         }
     }
 
+    /// Achtergrond tijdens de isolating-reveal. Een ingestelde achtergrond
+    /// blijft zichtbaar; zonder instelling behouden we de bestaande generieke
+    /// app-achtergrond van de animatie.
+    @ViewBuilder
+    private var isolatingBackgroundLayer: some View {
+        if hasBackground {
+            backgroundLayer
+        } else {
+            DSColor.Background.app
+        }
+    }
+
     // E31.1: de onderste toolbar is de Figma-capsule (4114:978) — gelabelde
     // icoon+label-pillen Enhance · Effects · Face · Hair · Shirt + een
     // overflow `⋯`. Eigen labels i.p.v. EditorTool.label: `.edit` heet hier
@@ -559,8 +571,12 @@ struct EditorView: View {
                         // E-fix: bij een vervangende import speelt de isolating-reveal
                         // ÍN het frame — de scaffold (toolbar + naam-frame) blijft staan
                         // i.p.v. plaats te maken voor een full-screen IsolatingCanvas.
-                        // De reveal clipt naar de frame-vorm; de eindovergang naar het
-                        // result-canvas is een blur-fade (zie .transition + .animation).
+                        // Houd de ingestelde achtergrond tijdens het hele proces onder
+                        // de importlaag. Zodra het origineel wegfadet, onthult de alpha
+                        // van de cutout direct deze achtergrond in plaats van tijdelijk
+                        // de algemene transparante/app-achtergrond te tonen.
+                        isolatingBackgroundLayer
+                            .clipShape(frameClipShape)
                         IsolatingFrameLayer(
                             original: isolating.original,
                             cutout: isolating.cutout,
@@ -620,6 +636,10 @@ struct EditorView: View {
             // om het midden.
             .scaleEffect(camera.scale, anchor: .center)
             .offset(camera.offset)
+            // Flatten de camera-geschaalde portretkaart vóór screen-space chrome.
+            // Zonder dit winnen Image-CALayers soms van de Background-dropdown
+            // (menu onder de foto i.p.v. erboven).
+            .compositingGroup()
             // E27.3: de selectie-handles + kader als SCREEN-SPACE overlay op de
             // (camera-getransformeerde) kaart — vaste schermgrootte, en doordat ze
             // buiten de camera-clip vallen worden grote-onderwerp-hoeken zichtbaar
@@ -704,6 +724,8 @@ struct EditorView: View {
                                 // de capsule-knop "Enhance" (sliders + one-tap incl. Restore body).
                                 background: { BackgroundPanel(portrait: portraitModel, onApply: undoableSetBackground).onHover { pointerOverChrome = $0 } }
                             )
+                            // Boven handles + portret wanneer Background/Frame open is.
+                            .zIndex(canvasMenu != nil ? 1000 : 1)
                             .fixedSize()
                             .position(x: cx, y: visTop + DSSpacing.gap6)
                             // Emil: nooit vanaf scale(0); scale-vanuit-0.96 + opacity, origin top.
