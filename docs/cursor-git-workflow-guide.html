@@ -586,16 +586,29 @@ Zonder die instructie maakt een Cloud Agent vaak een nieuwe branch + PR.</pre>
           <div class="card prompt">
 <pre>Lokale herstelstappen (macOS):
 
+# 1) Ga naar de REPO-ROOT (niet per se de map Avatar2/)
+#    Repo-root = map waarin je o.a. ziet: docs/  Avatar2/  backend/  README.md
+cd "/pad/naar/Avatar"          # jouw lokale clone-root
+
 git fetch origin
-git checkout cursor/unify-menu-containers-7e40
-# of na merge van PR #37:
-# git checkout v2-main && git pull origin v2-main
+git checkout v2-main
+git pull origin v2-main
 
-cd Avatar2   # of de map met project.yml
+# 2) De gids staat in docs/ op de repo-root — NIET in Avatar2/docs/
+open docs/cursor-git-workflow-guide.html
+# Alternatief: open docs/cursor-git-workflow-guide.md
+
+# 3) Xcode-project zit wél in Avatar2/
+cd Avatar2
 xcodegen generate
-open Avatar2.xcodeproj   # echte naam controleren
+open *.xcodeproj
 
-Daarna: Product → Clean Build Folder, opnieuw bouwen.</pre>
+Daarna: Product → Clean Build Folder, opnieuw bouwen.
+
+Veelvoorkomende vergissing:
+- Je zit al in .../Avatar2 en typt opnieuw "cd Avatar2" → "no such file"
+- Je zoekt docs/cursor-git-workflow-guide.html IN Avatar2/ → bestaat niet
+  Juist vanuit Avatar2: open ../docs/cursor-git-workflow-guide.html</pre>
           </div>
         </div>
         <div class="callout good">

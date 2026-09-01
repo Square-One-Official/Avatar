@@ -11,19 +11,26 @@ Visuele uitleg (Nederlands) over Cursor Cloud Agents, branches, pull requests, V
 
 ### Belangrijk
 
-Dit bestand staat op de featurebranch van PR #37 (`cursor/unify-menu-containers-7e40`) totdat die is gemerged naar `v2-main`.
+De gids staat op **`v2-main`** (gemerged via PR #37).
 
-Op `main` of een andere oude branch krijg je **File not found**.
+Op `main` of een checkout die alleen in `Avatar2/` zoekt krijg je **File not found** — de bestanden zitten in `docs/` op de **repo-root**.
 
-**Direct op GitHub (juiste branch):**
+**Direct op GitHub:**
 
-- HTML: https://github.com/Square-One-Official/Avatar/blob/cursor/unify-menu-containers-7e40/docs/cursor-git-workflow-guide.html
-- Markdown: https://github.com/Square-One-Official/Avatar/blob/cursor/unify-menu-containers-7e40/docs/cursor-git-workflow-guide.md
+- HTML: https://github.com/Square-One-Official/Avatar/blob/v2-main/docs/cursor-git-workflow-guide.html
+- Markdown: https://github.com/Square-One-Official/Avatar/blob/v2-main/docs/cursor-git-workflow-guide.md
 
-**Lokaal openen:**
+**Lokaal openen** (vanaf de **repo-root**, niet vanuit `Avatar2/`):
 
 ```bash
+# Repo-root = map met docs/, Avatar2/, backend/, README.md
+cd "/pad/naar/Avatar"
+
 git fetch origin
-git checkout cursor/unify-menu-containers-7e40
+git checkout v2-main
+git pull origin v2-main
 open docs/cursor-git-workflow-guide.html
+
+# Zit je al in Avatar2/? Gebruik dan:
+# open ../docs/cursor-git-workflow-guide.html
 ```
