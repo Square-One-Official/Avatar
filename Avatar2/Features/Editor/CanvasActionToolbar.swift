@@ -59,7 +59,9 @@ struct CanvasActionToolbar<Background: View>: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.gap1) {
-            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 240) {
+            // 264 houdt na de gedeelde 28-pt inset genoeg ruimte voor
+            // “Auto-frame & center” zonder afkappen.
+            toolbarItem(.frame, "Frame", icon: .frameCorners, chevron: true, width: 264) {
                 frameMenu
             }
             toolbarItem(.background, "Background", icon: .image, chevron: false, width: 320) {
