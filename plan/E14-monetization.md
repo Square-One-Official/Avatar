@@ -368,7 +368,7 @@ ingelogde free-pad (incl. comped-Pro-payload) én op het pure-anonieme pad, dat 
 hardcoded `free_imports_remaining: 3` stuurde; fingerprint wordt nu éénmaal bovenin gelezen
 (`readDeviceFingerprint`, soft). Responseshape ongewijzigd → geen app-wijziging. 5 node:test-
 tests (`npx tsx --test backend/tests/free-imports.test.ts`), `tsc --noEmit` schoon,
-billing-tests ongewijzigd groen. **Niet gedaan: prod-deploy** — avatars-api uitrollen via het
-E43-pad (Thierry); tot dan blijft de sidebar uitgelogd "3 left" zeggen en loopt E14.10 via het
-stale-pad.
+billing-tests ongewijzigd groen. **Prod-deploy gedaan (2026-09-02 22:14):** avatars-api via
+`vercel --prod` vanaf de repo-root (dpl_DzqMkM2AELghisbGH7JUpmt8PRJf), alias `api.aaavatar.nl`
+verwijst ernaar; anonieme `/v1/account` levert de device-teller live.
 
