@@ -16,3 +16,5 @@ Definitieve asset-batch mag later in één keer, niet release-blokkerend.
 | 4 | Effects-stijl-previews | App / Effects | thumbnails | CMS/CDN thumbs live for 6/9 styles; sparkles OK for rest |
 | 5 | Frame-lokale zwevende toolbar | **n.v.t.** | zwevende capsule | placeholder-design OK for beta (E31.4) |
 | 6 | Enhance Portrait-tegel scène-foto's (3× Pexels **berg-/natuurlandschap** achter de blur/diepte-preview) | **n.v.t.** (E53.10, besluit Thierry 2026-09-02) | 3× 512×512 JPEG, `Avatar2/Assets.xcassets/EnhanceScenePlaceholder{1,2,3}.imageset` | procedurele bokeh-placeholders (`EnhancePreviewScenes`); Thierry kiest definitieve Pexels-foto's, zelfde namen vervangen |
+
+**GTM-besluit (2026-08-16):** de 2.0-beta gaat live **met deze placeholders**. Dat is een geaccepteerd launch-risico, geen stille promotie tot definitieve assets. De batch blijft later één levering.

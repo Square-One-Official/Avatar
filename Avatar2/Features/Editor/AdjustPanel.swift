@@ -392,7 +392,7 @@ struct AdjustPanel: View {
                                 .frame(width: 44, height: 44)
                         }
                         Image(systemName: property.icon)
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.system(size: DSIconSize.lg, weight: .medium))
                             .foregroundStyle(isSelected || hovering
                                              ? DSColor.Action.primaryForeground
                                              : DSColor.Foreground.primary)

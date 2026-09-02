@@ -38,7 +38,7 @@ private struct PrivacyTierRadioRow: View {
                         // Lime fill is theme-constant → always on-action ink
                         // (not Foreground.primary, which is white in dark).
                         DSIcon.image(tier.icon)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: DSIconSize.sm, weight: .semibold))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(DSColor.Action.onAction)
                     }

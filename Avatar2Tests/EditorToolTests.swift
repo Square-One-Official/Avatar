@@ -51,4 +51,14 @@ final class EditorToolTests: XCTestCase {
         XCTAssertNil(AdjustPanel.parseDisplay(""))
         XCTAssertNil(AdjustPanel.parseDisplay("abc"))
     }
+
+    /// GTM-cut (v2-main 2026-08-16): release-tijd flags fail closed zonder
+    /// DEBUG-launch-arg — de test-host draait zonder `--enable-*`.
+    func testLaunchFeatureFlagsFailClosed() {
+        XCTAssertFalse(AppFeatureFlags.bannersEnabled)
+        XCTAssertFalse(AppFeatureFlags.faceEnabled)
+        XCTAssertFalse(AppFeatureFlags.hairEnabled)
+        XCTAssertFalse(AppFeatureFlags.clothesEnabled)
+        XCTAssertFalse(AppFeatureFlags.matchLightingEnabled)
+    }
 }

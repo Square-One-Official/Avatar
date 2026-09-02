@@ -234,4 +234,11 @@ extension DSEditPanelTests {
         XCTAssertGreaterThan(p.b, 180, "dropdown-overlay hoort over de kaart-rand te vallen, niet geclipt: \(p)")
         XCTAssertLessThan(p.r, 80, "geclipt overlay zou het rode canvas tonen: \(p)")
     }
+
+    /// v2-main #37: alle custom menucontainers delen één layoutcontract.
+    func testCustomMenusDelenHetzelfdeLayoutContract() {
+        XCTAssertEqual(DSMenuLayout.cornerRadius, DSRadius.xl4)
+        XCTAssertEqual(DSMenuLayout.contentInset, DSSpacing.gap5 + DSSpacing.gap2)
+        XCTAssertEqual(DSMenuLayout.listInset, DSSpacing.gap2)
+    }
 }

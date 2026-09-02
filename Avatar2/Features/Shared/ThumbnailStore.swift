@@ -18,6 +18,8 @@ final class ThumbnailStore {
     /// Gedecodeerde thumbnails (geobserveerd → een lookup in `body` wordt getrackt,
     /// dus een async-voltooiing her-rendert exact de requester).
     private var images: [String: NSImage] = [:]
+    /// Tijdelijke, niet-gepersisteerde editor-preview per board-node.
+    private var previews: [PersistentIdentifier: NSImage] = [:]
     /// Invoeg-volgorde voor FIFO-eviction (niet geobserveerd: puur boekhouding).
     @ObservationIgnored private var order: [String] = []
     /// Keys waarvoor al een decode loopt — voorkomt dubbele Tasks bij her-evaluatie
@@ -35,6 +37,7 @@ final class ThumbnailStore {
     /// cutout (`adjusted: false`) zoals voorheen. Side-effect-in-body is bewust:
     /// `inFlight` maakt 'm idempotent (één decode per (id, versie, maat)).
     func thumbnail(for portrait: Portrait2, maxDimension: CGFloat, adjusted: Bool = true) -> NSImage? {
+        if let preview = previews[portrait.persistentModelID] { return preview }
         let key = Self.key(portrait, maxDimension)
         if let image = images[key] { return image }
         guard !inFlight.contains(key) else { return nil }
@@ -89,6 +92,10 @@ final class ThumbnailStore {
             self?.finish(key: key, boxed: boxed)
         }
         return nil
+    }
+
+    func setPreview(_ image: NSImage?, for portrait: Portrait2) {
+        previews[portrait.persistentModelID] = image
     }
 
     private static func key(_ portrait: Portrait2, _ maxDimension: CGFloat) -> String {

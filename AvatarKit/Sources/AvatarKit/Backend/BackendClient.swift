@@ -72,6 +72,14 @@ public final class BackendClient {
         self.baseURL = Self.resolveBaseURL()
     }
 
+    #if DEBUG
+    /// Waar de `dev.apiBase`-override gelezen wordt. Tests wijzen dit naar een
+    /// eigen suite: `swift test --parallel` draait testmethoden in aparte
+    /// processen die `UserDefaults.standard` op schijf delen, waardoor de
+    /// override-tests elkaars waarde zagen (race).
+    static var devOverrideDefaults: UserDefaults = .standard
+    #endif
+
     /// Productie = `api.aaavatar.nl`. In DEBUG kan een override de client
     /// tegen een Vercel-preview richten (E01.15): env `AAAVATAR_API_BASE` of
     /// UserDefaults `dev.apiBase`. Een Release-build
@@ -82,7 +90,7 @@ public final class BackendClient {
         let production = URL(string: "https://api.aaavatar.nl")!
         #if DEBUG
         let raw = ProcessInfo.processInfo.environment["AAAVATAR_API_BASE"]
-            ?? UserDefaults.standard.string(forKey: "dev.apiBase")
+            ?? devOverrideDefaults.string(forKey: "dev.apiBase")
         if let raw, !raw.isEmpty, let override = URL(string: raw) {
             print("[BackendClient] DEBUG baseURL override → \(override.absoluteString)")
             return override

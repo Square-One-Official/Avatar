@@ -35,7 +35,14 @@
   retroactief uitgesloten raken.
 - **Voorstel:** voor puur-marketing-/re-engagement-cohorten de dispatch optioneel laten filteren op
   `confirmed_at IS NOT NULL` (ontgrendel dan ook de `payload_app`-SELECT-grant in sql 014).
-  Transactionele/welkom-mails blijven ongefilterd. Te bevestigen door Thierry vóór live.
+  Transactionele/welkom-mails blijven ongefilterd. Te bevestigen door Thierry **vóór de eerste
+  marketing-dispatch**, niet vóór de app-GTM.
+
+### Face-bakeoff (E32.0) — GEPARKEERD (GTM-cut)
+- Face staat compile-time UIT (`AppFeatureFlags.faceEnabled`). Bakeoff is geen go-live-item.
+
+### Assets-placeholders (ASSETS.md) — BESLIST 2026-08-16 (GTM)
+- **Besluit:** beta shippen met de vijf geregistreerde placeholders. Batch later; niet behandelen als definitief.
 
 ## Beslist
 

@@ -13,19 +13,20 @@ final class BackendClientBaseURLTests: XCTestCase {
     }
 
     private let key = "dev.apiBase"
-    private var previous: String?
+    /// Eigen, per-test UserDefaults-suite: `swift test --parallel` draait
+    /// methoden in aparte processen die `.standard` op schijf delen, dus een
+    /// gedeelde sleutel racet tussen de override- en de leeg-override-test.
+    private var suiteName = ""
+    private var defaults: UserDefaults { BackendClient.devOverrideDefaults }
 
     override func setUp() {
-        previous = UserDefaults.standard.string(forKey: key)
-        UserDefaults.standard.removeObject(forKey: key)
+        suiteName = "nl.squareone.aaavatar2.tests.\(UUID().uuidString)"
+        BackendClient.devOverrideDefaults = UserDefaults(suiteName: suiteName)!
     }
 
     override func tearDown() {
-        if let previous {
-            UserDefaults.standard.set(previous, forKey: key)
-        } else {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+        defaults.removePersistentDomain(forName: suiteName)
+        BackendClient.devOverrideDefaults = .standard
     }
 
     func testDefaultsToProduction() {
@@ -38,7 +39,7 @@ final class BackendClientBaseURLTests: XCTestCase {
         // gezet, dus de UserDefaults-tak wordt geraakt.
         try XCTSkipUnless(ProcessInfo.processInfo.environment["AAAVATAR_API_BASE"] == nil,
                           "AAAVATAR_API_BASE env override active; UserDefaults-pad niet meetbaar")
-        UserDefaults.standard.set("https://preview.example.com", forKey: key)
+        defaults.set("https://preview.example.com", forKey: key)
         let client = BackendClient(auth: StubAuth())
         #if DEBUG
         XCTAssertEqual(client.baseURL.absoluteString, "https://preview.example.com")
@@ -48,7 +49,7 @@ final class BackendClientBaseURLTests: XCTestCase {
     }
 
     func testEmptyOverrideIgnored() {
-        UserDefaults.standard.set("", forKey: key)
+        defaults.set("", forKey: key)
         let client = BackendClient(auth: StubAuth())
         XCTAssertEqual(client.baseURL.absoluteString, "https://api.aaavatar.nl")
     }
