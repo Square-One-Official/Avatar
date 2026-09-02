@@ -102,6 +102,7 @@ struct FirstUseEmptyState: View {
                             onChooseFile()
                         }
                         .buttonStyle(.plain)
+                        .dsFocusEffectDisabled()
                         .dsTextStyle(.labelBase)
                         .foregroundStyle(DSColor.Action.primaryForeground)
                     }

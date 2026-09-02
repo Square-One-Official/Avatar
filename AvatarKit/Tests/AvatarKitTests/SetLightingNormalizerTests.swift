@@ -144,3 +144,158 @@ final class SetLightingNormalizerTests: XCTestCase {
         return (r / n, g / n, b / n)
     }
 }
+
+// MARK: - E50.3: Adjust-suggestie + doelkeuze
+
+extension SetLightingNormalizerTests {
+    private func stats(
+        exposure: Double = 0.65, kelvin: Double = 5800, tint: Double = 0, contrast: Double = 0.35
+    ) -> SetLightingNormalizer.Stats {
+        SetLightingNormalizer.Stats(exposure: exposure, kelvin: kelvin, tint: tint, contrast: contrast)
+    }
+
+    func testSuggestionIsNeutralForIdenticalStats() {
+        let s = stats()
+        XCTAssertEqual(SetLightingNormalizer.adjustSuggestion(from: s, to: s), .neutral)
+    }
+
+    func testSuggestionIsNeutralWithinTolerance() {
+        let a = stats()
+        let b = stats(exposure: 0.67, kelvin: 5900, contrast: 0.37)
+        XCTAssertTrue(SetLightingNormalizer.isWithinTolerance(a, b))
+        XCTAssertEqual(SetLightingNormalizer.adjustSuggestion(from: a, to: b), .neutral)
+    }
+
+    func testDarkSourceGetsPositiveBrightnessClamped() {
+        let s = SetLightingNormalizer.adjustSuggestion(from: stats(exposure: 0.2), to: stats(exposure: 0.8))
+        XCTAssertEqual(s.brightness, SetLightingNormalizer.brightnessRange.upperBound, accuracy: 1e-9)
+        XCTAssertEqual(s.contrast, 1, "belichting loopt tegen de klem → geen contrast erbovenop")
+        XCTAssertEqual(s.temperature, 0)
+        let mild = SetLightingNormalizer.adjustSuggestion(from: stats(exposure: 0.5), to: stats(exposure: 0.6))
+        XCTAssertGreaterThan(mild.brightness, 0)
+        XCTAssertLessThan(mild.brightness, 0.35)
+    }
+
+    func testBrightSourceGetsNegativeBrightness() {
+        let s = SetLightingNormalizer.adjustSuggestion(from: stats(exposure: 0.8), to: stats(exposure: 0.6))
+        XCTAssertLessThan(s.brightness, 0)
+    }
+
+    func testFlatSourceGetsMoreContrastClamped() {
+        let s = SetLightingNormalizer.adjustSuggestion(from: stats(contrast: 0.15), to: stats(contrast: 0.35))
+        XCTAssertEqual(s.contrast, SetLightingNormalizer.contrastRange.upperBound, accuracy: 1e-9)
+        let mild = SetLightingNormalizer.adjustSuggestion(from: stats(contrast: 0.30), to: stats(contrast: 0.36))
+        XCTAssertGreaterThan(mild.contrast, 1)
+        XCTAssertLessThanOrEqual(mild.contrast, SetLightingNormalizer.contrastRange.upperBound)
+    }
+
+    func testContrastySourceGetsLessContrastClamped() {
+        let s = SetLightingNormalizer.adjustSuggestion(from: stats(contrast: 0.45), to: stats(contrast: 0.20))
+        XCTAssertEqual(s.contrast, SetLightingNormalizer.contrastRange.lowerBound, accuracy: 1e-9)
+    }
+
+    func testTemperatureIsClampedToSliderRange() {
+        let s = SetLightingNormalizer.adjustSuggestion(from: stats(kelvin: 3500), to: stats(kelvin: 8000))
+        XCTAssertEqual(abs(s.temperature), SetLightingNormalizer.temperatureRange.upperBound, accuracy: 1e-9)
+    }
+
+    func testSuggestionModelIsExactInLinearLight() {
+        // Model: out = (lin(in) − 0.5)·c + 0.5 + b. Los op voor p80 én p20 van de
+        // referentie en controleer dat beide precies landen (klein verschil,
+        // zodat geen klem meespeelt).
+        let src = stats(exposure: 0.55, contrast: 0.32)
+        let ref = stats(exposure: 0.60, contrast: 0.30)
+        let s = SetLightingNormalizer.adjustSuggestion(from: src, to: ref)
+        XCTAssertNotEqual(s, .neutral, "buiten de exposure-tolerantie")
+        XCTAssertLessThan(s.contrast, SetLightingNormalizer.contrastRange.upperBound, "geen klem in het spel")
+        func model(_ v: Double) -> Double { (SetLightingNormalizer.linear(v) - 0.5) * s.contrast + 0.5 + s.brightness }
+        XCTAssertEqual(model(0.55), SetLightingNormalizer.linear(0.60), accuracy: 1e-6)
+        XCTAssertEqual(model(0.23), SetLightingNormalizer.linear(0.30), accuracy: 1e-6)
+    }
+
+    func testRefineLandsOnTargetExposure() throws {
+        let dark = solid(0.5, size: 64)
+        let ref = try XCTUnwrap(SetLightingNormalizer.referenceStats(of: solid(0.6, size: 64)))
+        let src = try XCTUnwrap(SetLightingNormalizer.referenceStats(of: dark))
+        let suggestion = SetLightingNormalizer.adjustSuggestion(from: src, to: ref)
+        XCTAssertGreaterThan(suggestion.brightness, 0)
+        let refined = SetLightingNormalizer.refine(suggestion, raw: dark, to: ref)
+        let rendered = try XCTUnwrap(PortraitEnhancer.colorAdjust(
+            dark, brightness: refined.brightness, contrast: refined.contrast,
+            saturation: 1, temperatureShift: refined.temperature
+        ))
+        let after = try XCTUnwrap(SetLightingNormalizer.referenceStats(of: rendered))
+        XCTAssertEqual(after.exposure, ref.exposure, accuracy: 0.03, "verfijnde brightness landt op de referentie-exposure")
+    }
+
+    func testRefineDoesNotTouchNeutralComponents() throws {
+        let img = solid(0.5, size: 32)
+        let ref = try XCTUnwrap(SetLightingNormalizer.referenceStats(of: solid(0.5, size: 32)))
+        XCTAssertEqual(SetLightingNormalizer.refine(.neutral, raw: img, to: ref), .neutral)
+    }
+
+    func testQualityScorePrefersWellLit() {
+        let good = SetLightingNormalizer.qualityScore(stats(exposure: 0.65))
+        XCTAssertEqual(good, 0)
+        XCTAssertEqual(SetLightingNormalizer.qualityScore(stats(exposure: 0.68, contrast: 0.56)), 0, "studiolicht telt als goed belicht")
+        XCTAssertLessThan(good, SetLightingNormalizer.qualityScore(stats(exposure: 0.2)))
+        XCTAssertLessThan(good, SetLightingNormalizer.qualityScore(stats(exposure: 0.95)))
+        XCTAssertLessThan(good, SetLightingNormalizer.qualityScore(stats(kelvin: 3200)))
+    }
+
+    func testBestLitTieBreaksOnCrispestLight() throws {
+        // Beide goed belicht, duidelijk anders (kelvin 700 uiteen); de contrastrijkste wint.
+        let flat = stats(kelvin: 5100, contrast: 0.32)
+        let studio = stats(kelvin: 5800, contrast: 0.56)
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget([flat, studio])).target, .portrait(1))
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget([studio, flat])).target, .portrait(0))
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget([flat, studio], preferred: 0)).target, .portrait(0), "expliciete voorkeur gaat vóór")
+    }
+
+    func testChooseTargetPrefersMajorityPattern() throws {
+        let set = [stats(), stats(exposure: 0.66), stats(exposure: 0.25), stats(kelvin: 5850)]
+        let choice = try XCTUnwrap(SetLightingNormalizer.chooseTarget(set))
+        guard case .centroid(let centroid) = choice.target else { return XCTFail("verwacht het patroon van de set") }
+        XCTAssertEqual(choice.adjust, [2], "alleen de buitenstaander wordt aangepast")
+        XCTAssertEqual(centroid.exposure, 0.65, accuracy: 0.02)
+    }
+
+    func testChooseTargetTwoDifferentPicksBestLit() throws {
+        let choice = try XCTUnwrap(SetLightingNormalizer.chooseTarget([stats(exposure: 0.2), stats(exposure: 0.65)]))
+        XCTAssertEqual(choice.target, .portrait(1))
+        XCTAssertEqual(choice.adjust, [0])
+    }
+
+    func testChooseTargetTwoIdenticalAdjustsNothing() throws {
+        let choice = try XCTUnwrap(SetLightingNormalizer.chooseTarget([stats(), stats()]))
+        guard case .centroid = choice.target else { return XCTFail("twee gelijke = één patroon") }
+        XCTAssertEqual(choice.adjust, [])
+    }
+
+    func testChooseTargetAllDifferentPicksBestLit() throws {
+        let set = [
+            stats(exposure: 0.15, kelvin: 3500),
+            stats(exposure: 0.65, kelvin: 5800),
+            stats(exposure: 0.95, kelvin: 8500),
+            stats(exposure: 0.40, kelvin: 4200),
+        ]
+        let choice = try XCTUnwrap(SetLightingNormalizer.chooseTarget(set))
+        XCTAssertEqual(choice.target, .portrait(1))
+        XCTAssertEqual(choice.adjust, [0, 2, 3])
+    }
+
+    func testChooseTargetPreferredBreaksTies() throws {
+        // Beide ideaal belicht (score 0) maar duidelijk anders (kelvin 600 uiteen).
+        let set = [stats(kelvin: 5200), stats(kelvin: 5800)]
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget(set, preferred: 1)).target, .portrait(1))
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget(set, preferred: 0)).target, .portrait(0))
+        XCTAssertEqual(try XCTUnwrap(SetLightingNormalizer.chooseTarget(set)).target, .portrait(0), "zonder voorkeur: laagste index")
+    }
+
+    func testChooseTargetEdgeCases() throws {
+        XCTAssertNil(SetLightingNormalizer.chooseTarget([]))
+        let single = try XCTUnwrap(SetLightingNormalizer.chooseTarget([stats()]))
+        XCTAssertEqual(single.target, .portrait(0))
+        XCTAssertEqual(single.adjust, [])
+    }
+}

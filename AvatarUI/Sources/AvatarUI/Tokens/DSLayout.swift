@@ -62,12 +62,11 @@ public enum DSRadius {
     /// enige constante die bijgesteld hoeft te worden.
     public static let window: CGFloat = 12
 
-    /// Concentrische binnenradius voor een kaart die op `inset` van de
-    /// vensterrand staat: binnenradius = vensterradius − inset, zodat de
-    /// twee rondingen parallel lopen. Dé regel voor elke kaart-aan-de-rand
-    /// (sidebar, toekomstige panelen).
-    public static func concentric(inset: CGFloat) -> CGFloat {
-        max(window - inset, 0)
+    /// Concentrische binnenradius: `outer − inset`, zodat de twee rondingen
+    /// parallel lopen. Default `outer` is de vensterradius (kaart-aan-de-rand).
+    /// Geef `outer:` mee voor elk ander nest (menu-rij in een menu-kaart).
+    public static func concentric(inset: CGFloat, outer: CGFloat = window) -> CGFloat {
+        max(outer - inset, 0)
     }
 }
 

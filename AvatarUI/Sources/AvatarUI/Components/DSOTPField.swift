@@ -35,6 +35,7 @@ public struct DSOTPField: View {
             TextField("", text: $code)
                 .textFieldStyle(.plain)
                 .focused($isFocused)
+                .dsFocusEffectDisabled()
                 .opacity(DSOpacity.hidden)
                 .onChange(of: code) { _, newValue in
                     code = String(newValue.filter(\.isNumber).prefix(length))

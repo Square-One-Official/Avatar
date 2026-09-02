@@ -1,10 +1,7 @@
-// Edit-paneel (E22.3) — live handmatige color-correctie. Vier sliders
-// (Brightness/Contrast/Saturation/Temperature) passen meteen toe op de canvas
-// (goedkope preview via onPreview); op het loslaten van een slider commit een
-// undo-bare stap (onCommit before→after). Reset zet alles neutraal.
-// De één-tik-acties (One click retouch/Studio Light/Colorise/Boost/Fill in body)
-// staan als compacte chips bovenin het Enhance-paneel. One-click retouch verhuisde
-// hierheen uit het Face-paneel (Thierry, 2026-06-23).
+// Edit-paneel (E22.3) — Enhance: één-tik-acties als vast tegel-raster
+// (naast én onder elkaar, geen horizontale scroll). Adjust gebruikt
+// `AdjustPanel` voor brightness/contrast/saturation/temperature.
+// One-click retouch verhuisde hierheen uit het Face-paneel (Thierry, 2026-06-23).
 
 import AvatarKit
 import AvatarUI
@@ -32,14 +29,46 @@ enum BoostMode: Equatable, Sendable {
 /// E53.7: internal (niet private) omdat de state in `UIPresentationStore` leeft.
 enum ChipMenu: Hashable, Sendable { case boost, removeBackground }
 
-/// Levert de scherm-bounds van elke menu-chip omhoog naar het paneel, zodat het
-/// dropdown-paneel BUITEN de gemaskeerde scroll-rij (en dus ongecliped) onder de
-/// juiste chip kan zweven.
-private struct ChipAnchorKey: PreferenceKey {
-    static let defaultValue: [ChipMenu: Anchor<CGRect>] = [:]
-    static func reduce(value: inout [ChipMenu: Anchor<CGRect>],
-                       nextValue: () -> [ChipMenu: Anchor<CGRect>]) {
-        value.merge(nextValue()) { $1 }
+/// Copy voor Colorise op een foto die al in kleur is. Eén bron voor tegel,
+/// tooltip en dialog.
+enum ColoriseAlreadyColourCopy {
+    static let title = "Already in colour"
+    static let message = "This still costs 1 credit."
+    static let confirm = "Use 1 credit"
+    static let help = "Already in colour. Still costs 1 credit."
+    static let defaultHelp = "Turn a black-and-white photo into colour."
+}
+
+/// Tegels in het Enhance-raster. Geen `LazyVGrid`: die clipt cell-overlays, waardoor
+/// Boost/Remove-background hun dropdown (die naar boven opent) onzichtbaar was.
+private enum EnhanceActionID: Hashable, Sendable {
+    case retouch, studioLight, portrait, colorise, boost, fillBody, removeBackground, appleIntelligence
+
+    var previewAction: EnhanceTilePreview.Action {
+        switch self {
+        case .retouch: .retouch
+        case .studioLight: .studioLight
+        case .portrait: .portrait
+        case .colorise: .colorise
+        case .boost: .boost
+        case .fillBody: .fillBody
+        case .removeBackground: .removeBackground
+        case .appleIntelligence: .appleIntelligence
+        }
+    }
+
+    /// E53.10: hover-beweging per tegel (zie `EnhanceTileMotion`).
+    var motion: EnhanceTileMotion {
+        switch self {
+        case .retouch: .wipeHorizontal(rest: 0.5, from: .trailing)
+        case .studioLight: .spotlight
+        case .portrait: .depthPull
+        case .colorise: .wipeHorizontal(rest: 0.5, from: .trailing)
+        case .boost: .resolve
+        case .fillBody: .wipeVertical(rest: Double(EnhanceTilePreview.fillBodySplit))
+        case .removeBackground: .dissolve
+        case .appleIntelligence: .none
+        }
     }
 }
 
@@ -47,6 +76,8 @@ struct EditColorPanel: View {
     /// E24.14: de RAUWE cutout (zonder Adjust-laag). De sliders renderen er live
     /// bovenop; de commit persisteert alléén de params (niet-destructief).
     let source: NSImage
+    /// Originele foto / achtergrond voor de Portrait-tegel-preview (lokale blur).
+    var previewBackdrop: NSImage? = nil
     /// E24.14: de persisted Adjust-stand bij het openen — heropenen toont 'm.
     var initial: PortraitAdjust = .neutral
     var onPreview: (NSImage) -> Void = { _ in }
@@ -61,6 +92,10 @@ struct EditColorPanel: View {
     /// achtergrondLAAG en houdt het onderwerp scherp (macOS-webcam-Portrait).
     var onPortrait: () -> Void = {}
     var onColorise: () -> Void = {}
+    /// True when the current cutout already looks like a colour photo.
+    /// Colorise toont dan de titel uit `ColoriseAlreadyColourCopy` i.p.v. stil
+    /// een credit te verbranden op een near-no-op.
+    var alreadyInColour: Bool = false
     /// E41.2: Boost met de gekozen modus (lokaal/gratis of online/1 credit).
     var onBoost: (BoostMode) -> Void = { _ in }
     // E31.3: verhuisde mee uit de frame-toolbar-AI-dropdown. E31.8 (audit C4):
@@ -100,6 +135,8 @@ struct EditColorPanel: View {
     /// `false` omdat ze die closures niet bedraden (default-leeg = dode chips);
     /// `showRetouch`/`showRemoveBackground` houden hun eigen chip zichtbaar.
     var showAutoEnhance: Bool = true
+    /// Enhance toont tegels zonder sliders; Adjust gebruikt `AdjustPanel`.
+    var showSliders: Bool = true
 
     /// E29.5: de chip-rij rendert zodra er minstens één ECHT bedrade chip is —
     /// nooit meer een rij met alleen dode default-closures.
@@ -139,6 +176,9 @@ struct EditColorPanel: View {
     /// alleen de laatste stand landt (coalescing).
     @State private var previewTask: Task<Void, Never>?
     @State private var showHybridCoachmark = false
+    @State private var previewLayers: [EnhanceActionID: EnhanceTileLayers] = [:]
+    /// Scène achter de Portrait-tegel; één keer per paneel gekozen (E53.10).
+    @State private var portraitScene: NSImage? = EnhancePreviewScenes.random()
 
     private var advancedAllowed: Bool {
         PrivacyPreferences2.shared.allowsThirdPartyCloud
@@ -184,72 +224,46 @@ struct EditColorPanel: View {
         ).map(SendableCGImage.init)
     }
 
+    private var visibleActionIDs: [EnhanceActionID] {
+        var ids: [EnhanceActionID] = []
+        if showRetouch { ids.append(.retouch) }
+        if showAutoEnhance {
+            ids.append(contentsOf: [.studioLight, .portrait, .colorise, .boost, .fillBody])
+        }
+        if showRemoveBackground { ids.append(.removeBackground) }
+        if showAppleEdit { ids.append(.appleIntelligence) }
+        return ids
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-            // E24.27: één-tik AI-acties bovenin als compacte DS-chips (Pro/credit
-            // waar van toepassing) → divider → de manuele sliders eronder.
+        VStack(alignment: .leading, spacing: DSSpacing.gap5) {
+            // E24.27: één-tik AI-acties als vast tegel-raster (Pro/credit waar
+            // van toepassing). Color-sliders zitten in Adjust.
             if showsQuickActions {
-                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: DSSpacing.gap2) {
-                            if showRetouch {
-                                quickAction("One click retouch", icon: "wand.and.stars", isOn: retouchOn, action: onRetouch)
-                            }
-                            if showAutoEnhance {
-                                quickAction("Studio Light", icon: "sun.max", isOn: studioLightOn, action: onStudioLight)
-                                quickAction("Portrait", icon: "camera.aperture", isOn: portraitOn, action: onPortrait)
-                                // UXS-14: prijs uit CreditMeter, net als de
-                                // buur-chips — deze toonde alleen een Pro-slot,
-                                // dus de kosten waren pas ná de klik zichtbaar.
-                                quickAction("Colorise", icon: "paintbrush.pointed", pro: !isPro,
-                                            credit: CreditMeter.chipLabel(for: .colorize), action: onColorise)
-                                boostMenuChip
-                                // E31.8 (audit C4): canonieke naam + de echte
-                                // 2-credit-prijs via CreditMeter (getest label).
-                                quickAction("Fill in body", icon: "person.crop.rectangle", pro: !isPro,
-                                            credit: CreditMeter.chipLabel(for: .fillBody), action: onFillBody)
-                            }
-                            if showRemoveBackground {
-                                removeBackgroundMenuChip
-                            }
-                            if showAppleEdit {
-                                ImagePlaygroundEditChip(
-                                    entitlement: entitlement,
-                                    sourceImage: source,
-                                    onEdited: onAppleEdit
-                                )
-                            }
-                        }
-                        .padding(.vertical, DSSpacing.gap1)
-                        .scrollRowTrailingInset()
-                    }
-                    .horizontalScrollEdgeFade()
+                VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+                    actionGrid
 
                     if showHybridCoachmark {
                         hybridCoachmark
                     }
                 }
-                Divider()
+                if showSliders { Divider() }
             }
 
-            slider("Brightness", value: $brightness, range: -0.4...0.4)
-            slider("Contrast", value: $contrast, range: 0.6...1.4)
-            slider("Saturation", value: $saturation, range: 0...2)
-            slider("Temperature", value: $temperature, range: -1...1)
+            if showSliders {
+                slider("Brightness", value: $brightness, range: -0.4...0.4)
+                slider("Contrast", value: $contrast, range: 0.6...1.4)
+                slider("Saturation", value: $saturation, range: 0...2)
+                slider("Temperature", value: $temperature, range: -1...1)
 
-            HStack(spacing: DSSpacing.gap3) {
-                DSGhostButton("Reset") { reset() }
-                    .disabled(!hasAdjustments)
-                Spacer()
+                HStack(spacing: DSSpacing.gap3) {
+                    DSGhostButton("Reset") { reset() }
+                        .disabled(!hasAdjustments)
+                    Spacer()
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // De Boost-/Remove background-dropdowns leven BUITEN de gemaskeerde
-        // scroll-rij (zie comment bij `openMenu`); hier zwevend bovenop het
-        // paneel zodat ze niet door de rij-clip worden afgekapt.
-        .overlayPreferenceValue(ChipAnchorKey.self) { anchors in
-            chipMenuOverlay(anchors)
-        }
         .onChange(of: hiFiModel.phase) { _, phase in
             if phase == .failed {
                 entitlement?.presentError(
@@ -273,35 +287,161 @@ struct EditColorPanel: View {
             temperature = initial.temperature
             seeded = true
         }
+        .task(id: ObjectIdentifier(source)) {
+            await loadTilePreviews()
+        }
     }
 
-    /// E24.27/24.28: compacte één-tik-actie-chip met optionele Pro-badge/credit
-    /// en — voor toggle-acties — een duidelijke active-state (lime fill + check).
-    private func quickAction(_ label: String, icon: String, pro: Bool = false,
-                             credit: String? = nil, isOn: Bool = false,
-                             action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: isOn ? "checkmark" : icon).font(.system(size: DSIconSize.sm, weight: .medium))
-                Text(label).dsTextStyle(.labelSmall)
-                // E31.8: Pro-badge en credit-prijs zijn onafhankelijk — een
-                // betaalde Pro-actie toont beide (Pro-gate én wat 'ie kost).
-                if pro {
-                    DSProChip()
-                }
-                if let credit {
-                    DSBadge(credit, type: .neutral, compact: true)
-                }
-            }
-            // E24.28: lime fill + onAction-tekst als de toggle AAN staat.
-            .foregroundStyle(isOn ? DSColor.Action.onAction : DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .background(isOn ? DSColor.Action.primary : DSColor.Background.neutral, in: Capsule())
+    /// Vast 3-koloms raster zonder `LazyVGrid`, zodat de Boost-/Remove-dropdowns
+    /// (die naar boven openen — Enhance zit onderin het venster) niet worden
+    /// weggeclipt door de cel. De paneel-kaart clipt overlays zelf ook niet
+    /// (`dsPanelSurface`): het menu is breder dan de tegel en valt over de rand.
+    private var actionGrid: some View {
+        let columns = EnhanceTileMetrics.columns
+        let ids = visibleActionIDs
+        let rows = stride(from: 0, to: ids.count, by: columns).map {
+            Array(ids[$0..<min($0 + columns, ids.count)])
         }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-        .fixedSize()
+        return VStack(spacing: EnhanceTileMetrics.gridSpacing) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                let lifted = (openMenu == .boost && row.contains(.boost))
+                    || (openMenu == .removeBackground && row.contains(.removeBackground))
+                HStack(alignment: .center, spacing: EnhanceTileMetrics.gridSpacing) {
+                    ForEach(row, id: \.self) { id in
+                        actionTileView(id)
+                            .frame(maxWidth: .infinity)
+                    }
+                    if row.count < columns {
+                        ForEach(0..<(columns - row.count), id: \.self) { index in
+                            Color.clear
+                                .frame(maxWidth: .infinity, minHeight: EnhanceTileMetrics.height)
+                                .accessibilityHidden(true)
+                                .id("enhance-pad-\(index)")
+                        }
+                    }
+                }
+                .zIndex(lifted ? 10 : 0)
+            }
+        }
+        .dsDropdownDismissOverlay(isPresented: menuOpenBinding)
+    }
+
+    private var menuOpenBinding: Binding<Bool> {
+        Binding(
+            get: { openMenu != nil },
+            set: { if !$0 { openMenu = nil } }
+        )
+    }
+
+    private func menuBinding(_ menu: ChipMenu) -> Binding<Bool> {
+        Binding(
+            get: { openMenu == menu },
+            set: { openMenu = $0 ? menu : (openMenu == menu ? nil : openMenu) }
+        )
+    }
+
+    private func menuPlacement(for id: EnhanceActionID) -> DSDropdownPlacement {
+        guard let index = visibleActionIDs.firstIndex(of: id) else { return .above }
+        // Rij 1: ruimte onder de tegel (tweede rij). Rij 2+: Enhance zit
+        // onderin het venster, dus open naar boven over de rij erboven.
+        return index < EnhanceTileMetrics.columns ? .below : .above
+    }
+
+    @ViewBuilder
+    private func actionTileView(_ id: EnhanceActionID) -> some View {
+        switch id {
+        case .retouch:
+            actionTile("Retouch", id: .retouch, isOn: retouchOn, action: onRetouch)
+        case .studioLight:
+            actionTile("Studio Light", id: .studioLight, isOn: studioLightOn, action: onStudioLight)
+        case .portrait:
+            actionTile("Portrait", id: .portrait, isOn: portraitOn, action: onPortrait)
+        case .colorise:
+            actionTile(
+                "Colorise",
+                id: .colorise,
+                pro: !isPro,
+                credit: "\(CreditMeter.credits(for: .colorize))",
+                privacy: CloudFeatureChrome.isLocalOnly ? .thirdParty : nil,
+                isMuted: CloudFeatureChrome.isLocalOnly,
+                help: alreadyInColour
+                    ? ColoriseAlreadyColourCopy.help
+                    : ColoriseAlreadyColourCopy.defaultHelp,
+                accessibilitySubtitle: alreadyInColour ? ColoriseAlreadyColourCopy.title : nil,
+                action: onColorise
+            )
+        case .boost:
+            boostMenuChip
+        case .fillBody:
+            actionTile(
+                "Fill in body",
+                id: .fillBody,
+                pro: !isPro,
+                credit: "\(CreditMeter.credits(for: .fillBody))",
+                privacy: CloudFeatureChrome.isLocalOnly ? .thirdParty : nil,
+                isMuted: CloudFeatureChrome.isLocalOnly,
+                action: onFillBody
+            )
+        case .removeBackground:
+            removeBackgroundMenuChip
+        case .appleIntelligence:
+            appleIntelligenceTile
+        }
+    }
+
+    /// Vaste preview-kaart. ON / menu-open = lime ring, geen lime fill over de foto.
+    private func actionTile(
+        _ label: String,
+        id: EnhanceActionID,
+        pro: Bool = false,
+        credit: String? = nil,
+        isOn: Bool? = nil,
+        showsMenu: Bool = false,
+        isMenuOpen: Bool = false,
+        privacy: DSPrivacyExecutionTier? = nil,
+        isMuted: Bool = false,
+        help: String? = nil,
+        accessibilitySubtitle: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        EnhanceActionTile(
+            title: label,
+            credit: credit,
+            pro: pro,
+            showsMenu: showsMenu,
+            isOn: isOn == true,
+            isMenuOpen: isMenuOpen,
+            privacy: privacy,
+            layers: previewLayers[id],
+            motion: id.motion,
+            fallback: source,
+            help: help,
+            accessibilitySubtitle: accessibilitySubtitle,
+            action: {
+                if !showsMenu { openMenu = nil }
+                action()
+            }
+        )
+        .cloudFeatureMuted(isMuted)
+    }
+
+    private var appleIntelligenceTile: some View {
+        actionTile(
+            "Apple Intelligence",
+            id: .appleIntelligence,
+            privacy: CloudFeatureChrome.isLocalOnly ? .thirdParty : nil,
+            isMuted: CloudFeatureChrome.isLocalOnly,
+            action: {
+                guard let entitlement, entitlement.allowAIFeature(
+                    .imagePlaygroundEdit,
+                    retry: {
+                        ImagePlaygroundPresenter.shared.present(sourceImage: source, onCompleted: onAppleEdit)
+                    }
+                ) else { return }
+                ImagePlaygroundPresenter.shared.present(sourceImage: source, onCompleted: onAppleEdit)
+            }
+        )
+        .accessibilityLabel("Edit with Apple Intelligence")
     }
 
     private var hybridCoachmark: some View {
@@ -320,6 +460,7 @@ struct EditColorPanel: View {
                     .foregroundStyle(DSColor.Foreground.muted)
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
         }
         .padding(.horizontal, DSSpacing.gap1)
     }
@@ -329,35 +470,36 @@ struct EditColorPanel: View {
         showHybridCoachmark = true
     }
 
-    /// E41.2: Boost-chip — alleen de knop; het dropdown-paneel rendert in
-    /// `chipMenuOverlay` (buiten de scroll-clip).
+    /// E41.2: Boost-tegel. Dropdown hangt aan de tegel (niet onder het paneel),
+    /// zodat hij zichtbaar blijft in het Enhance-raster onderin het venster.
     private var boostMenuChip: some View {
-        Button {
+        actionTile(
+            "Boost",
+            id: .boost,
+            credit: boostMode == .online ? "\(CreditMeter.credits(for: .upscaleHigh))" : nil,
+            showsMenu: true,
+            isMenuOpen: openMenu == .boost,
+            // E53.10: geen slot-icoon meer; cloud alleen wanneer Local only aan
+            // staat én de gekozen modus cloud nodig heeft (zelfde regel als
+            // Colorise/Fill in body).
+            privacy: (boostMode == .online && CloudFeatureChrome.isLocalOnly) ? .thirdParty : nil,
+            isMuted: boostMode == .online && CloudFeatureChrome.isLocalOnly
+        ) {
             toggleMenu(.boost)
-        } label: {
-            HStack(spacing: DSSpacing.gap1) {
-                Image(systemName: "arrow.up.backward.and.arrow.down.forward").font(.system(size: DSIconSize.sm, weight: .medium))
-                Text("Boost").dsTextStyle(.labelSmall)
-                Text(boostMode.costLabel)
-                    .dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.muted)
-                DSPrivacyBadge(tier: boostMode == .local ? .onDevice : .thirdParty)
-                Image(systemName: "chevron.down").font(.system(size: DSIconSize.xxs, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 32)
-            .background(DSColor.Background.neutral, in: Capsule())
         }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-        .fixedSize()
-        .anchorPreference(key: ChipAnchorKey.self, value: .bounds) { [ChipMenu.boost: $0] }
+        .accessibilityHint("Shows boost options")
+        .dsDropdownMenu(
+            isPresented: menuBinding(.boost),
+            anchorHeight: EnhanceTileMetrics.height,
+            placement: menuPlacement(for: .boost)
+        ) {
+            boostMenu
+        }
     }
 
     /// Het Boost-dropdown-paneel (gerenderd in de overlay, niet op de chip).
     private var boostMenu: some View {
-        DSContextMenuPanel(minWidth: 230) {
+        DSContextMenuPanel(minWidth: 268) {
             DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free · On device") {
                 openMenu = nil
                 boostMode = .local
@@ -369,7 +511,7 @@ struct EditColorPanel: View {
                 title: "Online",
                 shortcut: advancedAllowed
                     ? "Best · \(BoostMode.online.costLabel)"
-                    : "Sharper · Advanced privacy"
+                    : "Sharper · Cloud"
             ) {
                 openMenu = nil
                 boostMode = .online
@@ -403,43 +545,40 @@ struct EditColorPanel: View {
 
     /// Chevron opent het kwaliteitsmenu (variant hangt af van `highQualityActive`).
     private var cutoutChoiceChip: some View {
-        Button { toggleMenu(.removeBackground) } label: {
-            cutoutChipLabel(trailingIcon: "chevron.down")
+        actionTile(
+            "Remove background",
+            id: .removeBackground,
+            showsMenu: true,
+            isMenuOpen: openMenu == .removeBackground
+        ) {
+            toggleMenu(.removeBackground)
         }
-        .buttonStyle(.plain)
-        .dsHoverScale()
-        .fixedSize()
-        .anchorPreference(key: ChipAnchorKey.self, value: .bounds) { [ChipMenu.removeBackground: $0] }
+        .accessibilityHint("Shows quality options")
+        .dsDropdownMenu(
+            isPresented: menuBinding(.removeBackground),
+            anchorHeight: EnhanceTileMetrics.height,
+            placement: menuPlacement(for: .removeBackground)
+        ) {
+            removeBackgroundMenu
+        }
     }
 
     private func cutoutDownloadingChip(_ fraction: Double) -> some View {
-        HStack(spacing: DSSpacing.gap1) {
-            Image(systemName: "arrow.down.circle").font(.system(size: DSIconSize.sm, weight: .medium))
-            Text("Downloading… \(Int(fraction * 100))%")
+        let shape = RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
+        return VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+            Text("Downloading…")
+                .dsTextStyle(.labelBase)
+            Text("\(Int(fraction * 100))%")
                 .dsTextStyle(.labelSmall)
                 .monospacedDigit()
                 .foregroundStyle(DSColor.Foreground.muted)
+            Spacer(minLength: 0)
         }
         .foregroundStyle(DSColor.Foreground.primary)
-        .padding(.horizontal, DSSpacing.gap2)
-        .frame(height: 32)
-        .background(DSColor.Background.neutral, in: Capsule())
-        .fixedSize()
-    }
-
-    private func cutoutChipLabel(trailingIcon: String?) -> some View {
-        HStack(spacing: DSSpacing.gap1) {
-            Image(systemName: "scissors").font(.system(size: DSIconSize.sm, weight: .medium))
-            Text("Remove background").dsTextStyle(.labelSmall)
-            if let trailingIcon {
-                Image(systemName: trailingIcon).font(.system(size: DSIconSize.xxs, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
-            }
-        }
-        .foregroundStyle(DSColor.Foreground.primary)
-        .padding(.horizontal, DSSpacing.gap2)
-        .frame(height: 32)
-        .background(DSColor.Background.neutral, in: Capsule())
+        .padding(DSSpacing.gap3)
+        .frame(maxWidth: .infinity, minHeight: EnhanceTileMetrics.height, maxHeight: EnhanceTileMetrics.height, alignment: .topLeading)
+        .background(DSColor.Background.neutral, in: shape)
+        .accessibilityLabel("Downloading high quality model, \(Int(fraction * 100)) percent")
     }
 
     @ViewBuilder
@@ -481,56 +620,19 @@ struct EditColorPanel: View {
         openMenu = (openMenu == menu) ? nil : menu
     }
 
-    /// Rendert het open dropdown-paneel zwevend onder de bijbehorende chip, plus
-    /// een transparante vanglaag die bij een tik erbuiten sluit. Leeft buiten de
-    /// gemaskeerde scroll-rij, dus wordt niet afgekapt.
-    @ViewBuilder
-    private func chipMenuOverlay(_ anchors: [ChipMenu: Anchor<CGRect>]) -> some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .topLeading) {
-                if openMenu != nil {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture { openMenu = nil }
-                }
-                if openMenu == .boost, let anchor = anchors[.boost] {
-                    floatingMenu(boostMenu, at: proxy[anchor], in: proxy.size)
-                }
-                if openMenu == .removeBackground, let anchor = anchors[.removeBackground] {
-                    floatingMenu(removeBackgroundMenu, at: proxy[anchor], in: proxy.size)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        // Dicht: laat alle tikken door naar de sliders eronder. Open: vang ze
-        // (vanglaag sluit, menu-rijen reageren).
-        .allowsHitTesting(openMenu != nil)
-        .dsMotion(DSMotion.fast, value: openMenu)
-    }
-
-    private func floatingMenu<Menu: View>(_ menu: Menu, at chip: CGRect, in size: CGSize) -> some View {
-        let menuWidth: CGFloat = 230
-        let x = max(0, min(chip.minX, size.width - menuWidth))
-        return menu
-            .fixedSize()
-            .offset(x: x, y: chip.maxY + DSSpacing.gap2)
-            .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
-    }
-
     /// Online-pad altijd zichtbaar; muted wanneer Advanced tier nog niet actief is.
     private func onlineHybridMenuRow(
         title: String,
         shortcut: String,
         action: @escaping () -> Void
     ) -> some View {
-        DSMenuRow(title, icon: "cloud", shortcut: shortcut, action: action)
-            .opacity(advancedAllowed ? 1 : 0.55)
-            .overlay(alignment: .trailing) {
-                if !advancedAllowed {
-                    DSPrivacyBadge(tier: .thirdParty)
-                        .padding(.trailing, DSSpacing.gap2)
-                }
+        DSMenuRow(title, icon: "cloud", shortcut: shortcut, accessory: {
+            if !advancedAllowed {
+                DSPrivacyBadge(tier: .thirdParty)
+                    .accessibilityHidden(true)
             }
+        }, action: action)
+        .opacity(advancedAllowed ? 1 : 0.55)
     }
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
@@ -560,5 +662,43 @@ struct EditColorPanel: View {
         brightness = 0; contrast = 1; saturation = 1; temperature = 0
         onPreview(source)
         onCommit(before, .neutral)
+    }
+
+    /// E53.10: per tegel álle lagen (base/reveal/subject/focus) off-main.
+    /// Backdrop: Portrait = gebundelde scène, Remove background = originele foto.
+    @MainActor
+    private func loadTilePreviews() async {
+        guard let subject = source.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        let boxedSubject = SendableCGImage(cgImage: subject)
+        let boxedOriginal = previewBackdrop
+            .flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
+            .map { SendableCGImage(cgImage: $0) }
+        let boxedScene = portraitScene
+            .flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
+            .map { SendableCGImage(cgImage: $0) }
+        let jobs: [(EnhanceActionID, EnhanceTilePreview.Action, SendableCGImage?)] =
+            visibleActionIDs.map { id in
+                let backdrop: SendableCGImage? = switch id {
+                case .portrait: boxedScene
+                case .removeBackground: boxedOriginal
+                default: nil
+                }
+                return (id, id.previewAction, backdrop)
+            }
+        await withTaskGroup(of: (EnhanceActionID, EnhanceTileLayers?).self) { group in
+            for (id, action, backdrop) in jobs {
+                group.addTask {
+                    let layers = EnhanceTilePreview.renderLayers(
+                        action: action,
+                        subject: boxedSubject.cgImage,
+                        backdrop: backdrop?.cgImage
+                    )
+                    return (id, layers.map(EnhanceTileLayers.init))
+                }
+            }
+            for await (id, layers) in group {
+                if let layers { previewLayers[id] = layers }
+            }
+        }
     }
 }

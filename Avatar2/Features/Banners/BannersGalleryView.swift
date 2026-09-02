@@ -197,6 +197,7 @@ private struct BannerGridTile: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
         .dsMotion(DSMotion.micro, value: hovering)
         .accessibilityLabel(displayName)
@@ -238,6 +239,7 @@ private struct BannersEmptyState: View {
                         ForEach(presetsModel.presets) { preset in
                             Button { onPreset(preset.layers) } label: { presetCard(preset) }
                                 .buttonStyle(.plain)
+                                .dsFocusEffectDisabled()
                                 .dsHoverScale(1.02)
                         }
                     }

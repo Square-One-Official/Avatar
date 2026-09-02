@@ -1,5 +1,6 @@
 // PoC (left-nav): Home — het overzicht (Granola-stijl). Toont het laatst
-// toegevoegde portret groot, met de eerdere eronder in een net rooster.
+// GEOPENDE portret groot (hero, dubbele kolombreedte, vierkant) met de rest
+// eronder in een net rooster, op tijd verdeeld in Recent/Earlier.
 // Onderin een "Upload new portrait"-balk i.p.v. een ask-anything-veld. Bij een
 // lege store toont Home onze bestaande first-use-empty-state (avatars) met een
 // welkomsttekst erboven. Net-nieuw scherm — DS-tokens, in de geest van het
@@ -40,24 +41,47 @@ struct HomeView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Hero: het laatst geopende portret (`lastOpenedAt`, gezet door
+    /// `openPortrait`); zonder open-historie het nieuwste. Staat als enige,
+    /// groot, boven de secties en komt daar niet nog eens in voor.
+    private var heroPortrait: Portrait2? {
+        HomeSections.heroIndex(portraits.map {
+            HomeSections.Entry(updatedAt: $0.updatedAt, lastOpenedAt: $0.lastOpenedAt)
+        }).map { portraits[$0] }
+    }
+
+    /// Alles behalve de hero, in rasterorde (updatedAt, jongste eerst).
+    private var restPortraits: [Portrait2] {
+        guard let hero = heroPortrait else { return portraits }
+        return portraits.filter { $0.persistentModelID != hero.persistentModelID }
+    }
+
     /// UXS-9 (UX8): secties op TIJD, niet op "de nieuwste is speciaal". Recent =
     /// bewerkt in de laatste week (max `recentSectionLimit`); de rest is Earlier.
     /// De oude indeling zette altijd precies één portret in Recent — ook als dat
     /// van maanden geleden was — en noemde al het andere Earlier.
     private var recentPortraits: [Portrait2] {
         let cutoff = Date().addingTimeInterval(-ShellMetrics.recentSectionWindow)
-        return Array(portraits.filter { $0.updatedAt >= cutoff }
+        return Array(restPortraits.filter { $0.updatedAt >= cutoff }
             .prefix(ShellMetrics.recentSectionLimit))
     }
 
     private var earlierPortraits: [Portrait2] {
         let recentIDs = Set(recentPortraits.map(\.persistentModelID))
-        return portraits.filter { !recentIDs.contains($0.persistentModelID) }
+        return restPortraits.filter { !recentIDs.contains($0.persistentModelID) }
+    }
+
+    /// Zichtbare volgorde op Home (hero, dan Recent, dan Earlier) — voor
+    /// ⇧-bereikselectie, zodat het bereik klopt met wat je ziet.
+    private var homeOrder: [PersistentIdentifier] {
+        ([heroPortrait].compactMap { $0 } + recentPortraits + earlierPortraits).map(\.persistentModelID)
     }
 
     var body: some View {
         Group {
-            if portraits.isEmpty {
+            // Een batch-drop op een lege store toont meteen het overzicht met
+            // de import-tegels (first-use zou de reveal verbergen).
+            if portraits.isEmpty && model.libraryImportJobs.isEmpty {
                 firstUse
             } else {
                 overview
@@ -71,31 +95,59 @@ struct HomeView: View {
     /// Eén grid-sectie (kop + tegels) — Recent en Earlier delen exact dezelfde
     /// celmaat en hover-behandeling, want het zijn dezelfde kaarten.
     @ViewBuilder
-    private func portraitSection(_ title: String, _ items: [Portrait2]) -> some View {
-        if !items.isEmpty {
+    private func portraitSection(
+        _ title: String, _ items: [Portrait2], imports: [ShellModel.LibraryImportJob] = []
+    ) -> some View {
+        if !items.isEmpty || !imports.isEmpty {
             VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                 Text(title)
                     .dsTextStyle(.labelLarge)
                     .foregroundStyle(DSColor.Foreground.subtle)
                 LazyVGrid(columns: columns, spacing: ShellMetrics.portraitGridSpacing) {
+                    // Batch-import: tijdelijke tegels vóór de echte (zie
+                    // PortraitsGalleryView voor de volgorde-afspraak).
+                    ForEach(imports) { job in
+                        LibraryImportTile(job: job)
+                    }
                     ForEach(items) { portrait in
-                        PortraitGridTile(
-                            portrait: portrait, folders: folders, model: model,
-                            isSelected: model.isPortraitSelected(portrait),
-                            ordered: { portraits.map(\.persistentModelID) },
-                            selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
-                            onContextMenu: { frame in
-                                model.preparePortraitContextMenu(on: portrait)
-                                model.presentation.openPortraitContextMenu(
-                                    portraitID: portrait.persistentModelID,
-                                    anchor: frame,
-                                    scope: .home
-                                )
-                            }
-                        )
+                        tile(portrait)
                     }
                 }
             }
+        }
+    }
+
+    /// Eén portret-kaart op Home (hero of rastercel) — zelfde klik/selectie/
+    /// menu-gedrag; alleen `prominent` verschilt.
+    private func tile(_ portrait: Portrait2, prominent: Bool = false) -> some View {
+        PortraitGridTile(
+            portrait: portrait, folders: folders, model: model,
+            isSelected: model.isPortraitSelected(portrait),
+            ordered: { homeOrder },
+            selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+            onContextMenu: { frame in
+                model.preparePortraitContextMenu(on: portrait)
+                model.presentation.openPortraitContextMenu(
+                    portraitID: portrait.persistentModelID,
+                    anchor: frame,
+                    scope: .home
+                )
+            },
+            prominent: prominent
+        )
+    }
+
+    /// De hero op precies twee rasterkolommen + één gap: een HStack met twee
+    /// gelijke flexibele helften en de grid-spacing ertussen geeft
+    /// (W − gap) / 2, wat exact 2·kolom + gap is in het 4-koloms rooster. Zo
+    /// lijnt de rechterrand van de hero uit met de tweede kolom eronder, zonder
+    /// GeometryReader. Vierkant via de tegel zelf (aspectRatio 1).
+    @ViewBuilder
+    private func heroSection(_ portrait: Portrait2) -> some View {
+        HStack(alignment: .top, spacing: ShellMetrics.portraitGridSpacing) {
+            tile(portrait, prominent: true)
+                .frame(maxWidth: .infinity)
+            Color.clear.frame(maxWidth: .infinity)
         }
     }
 
@@ -121,18 +173,38 @@ struct HomeView: View {
     // MARK: - Overzicht (niet-lege store)
 
     private var overview: some View {
+        VStack(spacing: 0) {
+            header
+            overviewBody
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// UXS-9: "Home" is de paginatitel; Recent/Earlier zijn sectiekoppen
+    /// daaronder. Vaste kop met dezelfde insets als de Portraits-gallery
+    /// (ShellMetrics.pageTitle*), zodat de titel niet verspringt bij tabwissel.
+    private var header: some View {
+        Text("Home")
+            .dsTextStyle(.h3)
+            .foregroundStyle(DSColor.Foreground.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DSSpacing.gap6)
+            .padding(.top, ShellMetrics.pageTitleTopInset)
+            .padding(.bottom, ShellMetrics.pageTitleBottomInset)
+            .background(DSColor.Background.app)
+    }
+
+    private var overviewBody: some View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap6) {
-                    // UXS-9: "Home" is de paginatitel; Recent/Earlier zijn
-                    // sectiekoppen daaronder (waren allebei paginatitel-stijl,
-                    // wat suggereerde dat het losse schermen waren).
-                    Text("Home")
-                        .dsTextStyle(.h3)
-                        .foregroundStyle(DSColor.Foreground.primary)
-                        .padding(.top, DSSpacing.gap6)
-
-                    portraitSection("Recent", recentPortraits)
+                    if let hero = heroPortrait {
+                        heroSection(hero)
+                    }
+                    portraitSection(
+                        "Recent", recentPortraits,
+                        imports: model.visibleLibraryImportJobs(folderID: nil)
+                    )
                     portraitSection("Earlier", earlierPortraits)
 
                     // Banners-sectie achter de feature-flag (release zonder banners).
@@ -178,6 +250,7 @@ struct HomeView: View {
                     Text("See all").dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
             }
             .padding(.top, DSSpacing.gap2)
 
@@ -228,6 +301,7 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
     }
 
@@ -255,6 +329,7 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
     }
 
@@ -299,6 +374,7 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
     }
     private var uploadBar: some View {
@@ -320,7 +396,28 @@ struct HomeView: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         // ⌘U zelf leeft app-breed in het File-menu (UploadPortraitCommands,
         // E49.2); de knop houdt alleen het badge als visuele hint.
+    }
+}
+
+// MARK: - Sectie-logica (testbaar, zonder SwiftData)
+
+/// Pure keuze van de Home-hero, gespiegeld in `HomeSectionsTests`.
+enum HomeSections {
+    struct Entry {
+        let updatedAt: Date
+        let lastOpenedAt: Date?
+    }
+
+    /// Index van de hero in `entries` (rasterorde: updatedAt, jongste eerst):
+    /// het laatst geopende portret; heeft niets een open-historie, dan het
+    /// eerste (= nieuwste). Leeg → nil.
+    static func heroIndex(_ entries: [Entry]) -> Int? {
+        guard !entries.isEmpty else { return nil }
+        let opened = entries.enumerated().compactMap { i, e in e.lastOpenedAt.map { (i, $0) } }
+        if let best = opened.max(by: { $0.1 < $1.1 }) { return best.0 }
+        return 0
     }
 }

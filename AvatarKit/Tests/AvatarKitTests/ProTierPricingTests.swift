@@ -37,6 +37,18 @@ final class ProTierPricingTests: XCTestCase {
         XCTAssertEqual(ProTier.pro.annualPrice, ProTier.pro.monthlyPrice * 10)
     }
 
+    /// Billing-pagina: Stripe levert centen. `€0` (100%-korting-factuur) mag
+    /// geen ",00" dragen, `€12,99` wél twee decimalen; de valuta komt van de
+    /// wire en mag geen EUR-aanname zijn.
+    func testMinorUnitsFormatting() {
+        let nl = Locale(identifier: "nl_NL")
+        let zero = ProTier.formatMinorUnits(0, currencyCode: "eur", locale: nl)
+        XCTAssertTrue(zero.contains("€") && zero.contains("0") && !zero.contains(",00"), "kreeg: \(zero)")
+        XCTAssertTrue(ProTier.formatMinorUnits(1299, currencyCode: "eur", locale: nl).contains("12,99"))
+        let us = ProTier.formatMinorUnits(1299, currencyCode: "usd", locale: Locale(identifier: "en_US"))
+        XCTAssertEqual(us, "$12.99")
+    }
+
     func testDisplayPricesAreNonEmpty() {
         XCTAssertFalse(ProTier.pro.monthlyPriceDisplay.isEmpty)
         XCTAssertFalse(ProTier.pro.annualPriceDisplay.isEmpty)

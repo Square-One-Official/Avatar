@@ -12,7 +12,7 @@
 // design (geregistreerd in plan/ASSETS.md #5). Thierry levert het echte design
 // later; pas dan 1-op-1 natrekken.
 // E24.12: de dropdowns zijn caret-loze, zwevende DS-kaarten (geen systeem-
-// `.popover` met pijltje). Eén gedeeld oppervlak (`dsPanelSurface`) — identiek
+// `.popover` met pijltje). Eén gedeeld oppervlak (`dsMenuSurface`) — identiek
 // aan de bottom-panelen (DSEditPanel). De open-staat leeft als binding zodat
 // een klik op de canvas (EditorView) de dropdown sluit, net als de panelen.
 //
@@ -23,7 +23,7 @@
 // E32: deze toolbar deelt nu exact dezelfde DS-componenten als de onderste
 // toolbar (`DSCapsuleToolButton` + `.dsToolbarCapsule`), alleen op `.compact`-
 // maat; de chevron is een gedeelde SF `chevron.down`. De dropdowns
-// delen de menu-radius (lg = 8) met `DSContextMenuPanel`.
+// delen de 24pt-card (`dsMenuSurface`) met Effects/Enhance.
 
 import AvatarUI
 import SwiftUI
@@ -74,7 +74,9 @@ struct CanvasActionToolbar<Background: View>: View {
 
     var body: some View {
         HStack(spacing: rowSpacing) {
-            toolbarItem(.frame, "Frame", icon: .frame, chevron: true, width: 240, padding: DSSpacing.gap2) {
+            // 264 houdt na de gedeelde inset genoeg ruimte voor
+            // “Auto-frame & center” zonder afkappen.
+            toolbarItem(.frame, "Frame", icon: .frame, chevron: true, width: 264, padding: DSSpacing.gap2) {
                 frameMenu
             }
             // 440: het Notion-stijl tab-paneel (4 tabs + Original/None-pills,
@@ -144,10 +146,12 @@ struct CanvasActionToolbar<Background: View>: View {
                     .padding(padding)
                     .frame(width: width)
                     .fixedSize(horizontal: false, vertical: true)
-                    // Zelfde 8pt-radius als rechtermuis- en avatar-menu's.
-                    .dsPanelSurface(cornerRadius: DSRadius.lg)
+                    // Zelfde 24pt-card als Effects/Enhance en account-menu's.
+                    .dsMenuSurface()
                     .offset(y: buttonSize.height + dropdownGap)
-                    .zIndex(10)
+                    // Hoog boven portret-/handle-lagen in hetzelfde stacking context.
+                    .zIndex(1000)
+                    .compositingGroup()
                     .transition(.dsScaleFade(anchor: .top, reduceMotion: reduceMotion))
             }
         }
@@ -213,6 +217,7 @@ struct CanvasActionToolbar<Background: View>: View {
             .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     /// E49.4: dropdown-rij-icoon — vaste 16pt-doos zoals voorheen; erft de
@@ -243,6 +248,7 @@ struct CanvasActionToolbar<Background: View>: View {
             .dsHoverHighlight(cornerRadius: DSRadius.md)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .opacity(action == nil ? 0.45 : 1)
         .disabled(action == nil)
     }

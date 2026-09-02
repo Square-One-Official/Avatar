@@ -51,6 +51,7 @@ struct BannerLogoPanel: View {
                         Image(systemName: "trash").font(.system(size: DSIconSize.sm)).foregroundStyle(DSColor.Foreground.subtle)
                     }
                     .buttonStyle(.plain)
+                    .dsFocusEffectDisabled()
                     .help("Remove logo")
                     .accessibilityLabel("Remove logo")
                 }
@@ -76,6 +77,7 @@ struct BannerLogoPanel: View {
                                 .frame(width: 14, height: 10)
                         }
                         .buttonStyle(.plain)
+                        .dsFocusEffectDisabled()
                     }
                 }
             }
@@ -99,6 +101,7 @@ struct BannerLogoPanel: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsHoverScale(1.02)
                 .help("Add brand color")
                 .accessibilityLabel("Add brand color")

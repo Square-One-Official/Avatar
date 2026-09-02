@@ -18,6 +18,7 @@ public struct DSTextField: View {
     private let placeholder: String
     private let icon: Image?
     private let validation: DSValidationState
+    private let autofocus: Bool
     @Binding private var text: String
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
@@ -27,12 +28,14 @@ public struct DSTextField: View {
         placeholder: String,
         icon: Image? = nil,
         validation: DSValidationState = .normal,
+        autofocus: Bool = false,
         text: Binding<String>
     ) {
         self.label = label
         self.placeholder = placeholder
         self.icon = icon
         self.validation = validation
+        self.autofocus = autofocus
         self._text = text
     }
 
@@ -61,6 +64,7 @@ public struct DSTextField: View {
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .focused($isFocused)
+                .dsFocusEffectDisabled()
             }
             .padding(.horizontal, DSSpacing.gap4)
             .padding(.vertical, DSSpacing.gap2_5)
@@ -74,6 +78,9 @@ public struct DSTextField: View {
         }
         .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
         .dsMotion(DSMotion.fast, value: validation)
+        .onAppear {
+            if autofocus { isFocused = true }
+        }
     }
 
     private var borderColor: Color {

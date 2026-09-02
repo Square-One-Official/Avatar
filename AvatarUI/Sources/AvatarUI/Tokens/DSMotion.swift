@@ -4,17 +4,34 @@ import AppKit
 /// Bewegings-tokens (duur + curve) voor de hele app — één bron van waarheid,
 /// net als DSColor/DSLayout/DSTypography. Honoreert "Verminder beweging".
 public enum DSMotion {
+    /// Controlepunten van de DS-ease-out — één bron voor SwiftUI (`easeOut`)
+    /// én AppKit (`CAMediaTimingFunction`, zie DSFloatingWindow).
+    public static let easeOutControlPoints: (Float, Float, Float, Float) = (0.23, 1, 0.32, 1)
+
     /// Sterkere ease-out dan SwiftUI's ingebouwde (die mist 'punch').
     /// cubic-bezier(0.23, 1, 0.32, 1).
     public static func easeOut(_ duration: Double) -> Animation {
-        .timingCurve(0.23, 1, 0.32, 1, duration: duration)
+        let c = easeOutControlPoints
+        return .timingCurve(Double(c.0), Double(c.1), Double(c.2), Double(c.3), duration: duration)
+    }
+
+    /// Duur-tokens in seconden — voor AppKit-animaties die geen `Animation`
+    /// kunnen aannemen (NSAnimationContext). De SwiftUI-tokens hieronder zijn
+    /// hiervan afgeleid, zodat beide werelden dezelfde timing hebben.
+    public enum Duration {
+        public static let micro    = 0.10
+        public static let fast     = 0.15
+        public static let base     = 0.20
+        public static let emphasis = 0.25
+        public static let enter    = emphasis
+        public static let exit     = base
     }
 
     // Semantische duur-tokens (vervangen de losse 0.1–0.45 literals).
-    public static let micro    = easeOut(0.10) // hover/press-dim, tooltip, drag-handle
-    public static let fast     = easeOut(0.15) // validatie, active-ring, grid-fade
-    public static let base     = easeOut(0.20) // kleine toasts, toggles, banners
-    public static let emphasis = easeOut(0.25) // stap-/sectiewissels (onboarding)
+    public static let micro    = easeOut(Duration.micro)    // hover/press-dim, tooltip, drag-handle
+    public static let fast     = easeOut(Duration.fast)     // validatie, active-ring, grid-fade
+    public static let base     = easeOut(Duration.base)     // kleine toasts, toggles, banners
+    public static let emphasis = easeOut(Duration.emphasis) // stap-/sectiewissels (onboarding)
 
     // Springs — expliciete bounce (Jakub: bounce 0 = professioneel, geen overshoot).
     public static let springSmall     = Animation.spring(duration: 0.30, bounce: 0) // kleine moves, status-toast

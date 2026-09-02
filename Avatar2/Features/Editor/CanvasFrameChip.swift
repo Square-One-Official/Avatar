@@ -1,8 +1,8 @@
 // FigJam-stijl naam-chip linksboven het frame (E33). Vervangt de gecentreerde
 // PortraitHeader in de enkel-editor: toont de portretnaam als pill; één klik
-// opent de rename-modal. Het frame is altijd actief — de chip deelt één rij
+// opent de rename-modal. Lege naam → "Add name" (zelfde copy als het
+// editor-broodkruim). Het frame is altijd actief — de chip deelt één rij
 // met Frame/Background/grid naast de kaart.
-// Naam/fallback-logica 1-op-1 uit de oude PortraitHeader.
 
 import AvatarUI
 import SwiftUI
@@ -13,7 +13,7 @@ struct CanvasFrameChip: View {
 
     private var displayName: String {
         let n = name ?? ""
-        return n.isEmpty ? "Name" : n
+        return n.isEmpty ? "Add name" : n
     }
     private var hasName: Bool { !(name ?? "").isEmpty }
 
@@ -26,8 +26,8 @@ struct CanvasFrameChip: View {
                 .padding(.horizontal, DSSpacing.gap3)
         }
         .buttonStyle(FrameChipButtonStyle(hasName: hasName))
-        .help("Rename")
-        .accessibilityLabel(hasName ? "Rename \(displayName)" : "Set name")
+        .help(hasName ? "Rename" : "Add name")
+        .accessibilityLabel(hasName ? "Rename \(displayName)" : "Add name")
     }
 }
 

@@ -108,6 +108,7 @@ struct SignInSheet: View {
                 entitlement.dismissAuthError()
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsTextStyle(.bodySmall)
             .foregroundStyle(DSColor.Foreground.subtle)
         }

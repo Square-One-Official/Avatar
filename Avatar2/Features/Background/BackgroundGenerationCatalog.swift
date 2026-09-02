@@ -189,24 +189,16 @@ enum BackgroundGenerationCatalog {
 
     @MainActor
     static func defaultModel() -> BackgroundGenerationModel {
-        if PrivacyPreferences2.shared.effectiveTier >= .thirdParty {
-            return storedModel(default: .gemini)
-        }
-        if AppleIntelligenceAvailability.supportsApplePrivateCloud {
-            return .apple
-        }
-        return .gemini
+        .gemini
     }
 
     @MainActor
     static func availableModels() -> [BackgroundGenerationModel] {
-        BackgroundGenerationModel.allCases.filter(\.isSelectable)
+        [.gemini]
     }
 
     @MainActor
-    static var hasGenerationPath: Bool {
-        !availableModels().isEmpty
-    }
+    static var hasGenerationPath: Bool { true }
 
     static func canGenerate(
         prompt: String,

@@ -3,9 +3,9 @@
 // `nil` (de kaart toont z'n placeholder-achtergrond) en start een achtergrond-
 // decode; bij voltooiing muteert de geobserveerde `images`-dict → de board
 // her-rendert en pakt de net-gedecodeerde thumb op. Gekeyd op
-// (id, updatedAt, maxPixelSize) — net als `SidebarThumbnailCache` — dus elke
-// edit die `updatedAt` bumpt (geverifieerd: alle cutout-/adjust-paden roepen
-// `touch()`) ververst vanzelf. Een FIFO-cap begrenst het geheugen bij honderden
+// (id, revision, maxPixelSize) — dus elke edit die `Portrait2.revision` bumpt
+// (`touch()` én `bumpRevision()`; geverifieerd: alle cutout-/adjust-paden roepen
+// een van beide) ververst vanzelf. Een FIFO-cap begrenst het geheugen bij honderden
 // nodes. Gedeeld board + (later) sidebar.
 
 import AppKit
@@ -56,7 +56,7 @@ final class ThumbnailStore {
     /// Portrait-blur op de board. GÉÉN Adjust-laag: die geldt alleen voor het
     /// onderwerp (net als in de editor/export blijft de achtergrond rauw). `nil`
     /// zolang 'ie decodeert of als er geen origineel is. Gekeyd op (id, maat) —
-    /// `originalData` is na import onveranderlijk, dus geen `updatedAt` nodig.
+    /// `originalData` is na import onveranderlijk, dus geen `revision` nodig.
     func original(for portrait: Portrait2, maxDimension: CGFloat) -> NSImage? {
         guard let data = portrait.originalData else { return nil }
         let key = "orig-\(portrait.persistentModelID)-\(Int(maxDimension.rounded()))"
@@ -94,7 +94,7 @@ final class ThumbnailStore {
     private static func key(_ portrait: Portrait2, _ maxDimension: CGFloat) -> String {
         // De volledige identifier i.p.v. z'n 64-bit `hashValue` — even stabiel
         // binnen de sessie, maar zonder de (theoretische) hash-collisie tussen nodes.
-        "\(portrait.persistentModelID)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension.rounded()))"
+        "\(portrait.persistentModelID)-\(portrait.revision)-\(Int(maxDimension.rounded()))"
     }
 
     /// Decodeer buiten de main-actor: `nonisolated async` draait op de coöperatieve

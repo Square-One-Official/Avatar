@@ -499,6 +499,47 @@ Checklist (volgorde is bindend):
 
 ---
 
+## 55.11 — Sticker: gesloten omtrek + gecentreerd (die-cut-compositie)
+- status: done (2026-09-02; werkboom v2/e50-50.3, nog niet gecommit/gemerged)
+- team: INFRA+FEAT
+- blockedBy: —
+- Result: **Server**: `lib/stylizePrompts.ts` kent `DIE_CUT_STYLE_KEYS`
+  (`sticker`) + `DIE_CUT_COMPOSITION_CLAUSE` + `composeEffectPrompt()`;
+  `/v1/stylize` laat voor die keys de `FRAMING_CLAUSE` weg (ook bij
+  `preserve_framing`) en plakt de compositie-clausule erachter; `/v1/effects`
+  levert `composition: "die_cut" | "portrait"`; bakeoff-driver deelt de
+  composer; `tests/stylize-prompts.test.ts` (4 groen, `npx tsx --test`).
+  **Client**: `RemoteEffect.composition`/`isDieCut` (AvatarKit, decode-
+  fallback portrait + roundtrip-tests); `EffectFraming` (keep/fitContent/
+  autoFrame, `forSwitch` + `inverse`); EffectsPanel geeft per wissel de
+  kadrering mee; `ShellModel.applyEffectResult(framing:)` reset de transform
+  en `AutoFramer.apply(mode: .freestanding)` past de alpha-bbox gecentreerd
+  met ademruimte (geen ooglijn/body-overshoot); undo keert de kadrering om;
+  Board-editor idem. **Live-check** (gpt-image-2 medium+refs, p1/p3, 44s/37s):
+  beide rondom gesloten, gecentreerd met marge — vgl. de 55.7-renders waar
+  de sticker aan de onderrand vlak afgesneden was.
+
+**Repro (Thierry, 2026-09-02):** Sticker op een portret waarvan de romp tot
+de onderrand loopt → witte rand stopt onderaan in een rechte snede, hoofd
+schuift omhoog; verwacht: volledige omtrek rond het hoofd, gecentreerd
+(zoals de CMS-thumbnail). **Oorzaak:** Effects sturen `preserve_framing`
+hard aan → `FRAMING_CLAUSE` ("keep the exact same crop") dwingt het model
+de cutout-onderrand als sticker-onderkant over te nemen; daarna behield de
+client de portret-transform (centroid-compensatie) zodat de losse snede in
+het frame bleef hangen. De thumbnail (thumbPrompt, zónder framing-clausule)
+liet het gewenste beeld al zien.
+
+**Rev. 2 (Thierry-smoke 2026-09-02, "gaat nog om het lichaam"):** de eerste
+clausule sneed door de bovenborst → sticker mét shirt. Nu HEAD ONLY: omtrek
+van haar + gezicht, sluit door de hals net onder de kin, expliciet geen
+schouders/shirt/romp. Live-check p1/p3 (medium+refs, 46s/38s): beide een
+hoofd-sticker, rondom gesloten, gecentreerd. Prod-deploy avatars-api ✓.
+
+**Bewust niet gedaan:** geen CMS-veld/DDL (server-constante volstaat, één
+plek + bakeoff-parity); geen extra grijze marge-pad rond de input — de
+prompt alleen bleek in de live-check voldoende. Wordt een tweede die-cut-
+stijl toegevoegd: key aan `DIE_CUT_STYLE_KEYS` toevoegen, klaar.
+
 ## Risico's
 - **Latency**: gpt-image quality=high geregeld >50s; 80s-timeout / 90s
   Vercel-cap — timing-logs (55.1) + p95 (55.7) beslissen high vs medium.

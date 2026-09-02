@@ -79,6 +79,11 @@ public enum PortraitEnhancer {
     /// contrast/saturation via CIColorControls, temperature via
     /// temperatureAndTint. Neutrale defaults: brightness 0, contrast 1,
     /// saturation 1, temperatureShift 0 (−1…1 ≈ ±1500K). nil bij renderfout.
+    /// Let op (E50.3-meting): CIColorControls rekent in LINEAIR licht —
+    /// brightness telt op (tilt zwart mee), contrast draait om 0.5 lineair
+    /// (≈ sRGB 0.735). Een belichtings-gain (CIExposureAdjust) is hier bewust
+    /// NIET ingevoerd: de Match-lighting-feature is geschrapt en de slider
+    /// houdt z'n uitgeleverde gedrag.
     public static func colorAdjust(
         _ image: CGImage,
         brightness: Double,

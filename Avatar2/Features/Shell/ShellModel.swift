@@ -107,9 +107,16 @@ final class ShellModel {
         closeBannerStudio()
     }
 
+    /// Enhance-paneel + chip-dropdowns horen bij de huidige editorsessie.
+    private func leaveEditorIfNeeded() {
+        guard section == .editor else { return }
+        presentation.endEditorSession()
+    }
+
     /// Naar het overzicht (Home).
     func showHome() {
         leaveBannerStudioIfOpen()
+        leaveEditorIfNeeded()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -119,6 +126,7 @@ final class ShellModel {
     /// Naar de Portraits-grid van een map (nil = alle beelden).
     func showPortraits(folderID: PersistentIdentifier? = nil) {
         leaveBannerStudioIfOpen()
+        leaveEditorIfNeeded()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -139,6 +147,7 @@ final class ShellModel {
         // points zijn al verborgen, dit is de vangnet-guard.
         guard AppFeatureFlags.bannersEnabled else { showHome(); return }
         leaveBannerStudioIfOpen()
+        leaveEditorIfNeeded()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
@@ -191,10 +200,17 @@ final class ShellModel {
     /// herkomst zodat `goBack()` naar de juiste surface terugkeert.
     func openPortrait(_ portrait: Portrait2) {
         leaveBannerStudioIfOpen()
+        // Nieuw beeld vanuit library/home: Enhance mag niet open blijven
+        // van het vorige portret. In-editor `select` (sidebar) laat het paneel
+        // staan.
+        presentation.endEditorSession()
         isShowingSettings = false
         isShowingSocialPreview = false
         clearPortraitSelection()
         openOrigin = (section == .portraits) ? .portraits(selectedFolderID) : .home
+        // Home-hero = laatst geopend. Geen `touch()`: openen is geen bewerking,
+        // dus de rasterorde (updatedAt) en thumbnail-caches blijven staan.
+        portrait.lastOpenedAt = .now
         select(portrait)
         section = .editor
     }
@@ -258,8 +274,42 @@ final class ShellModel {
         }
     }
 
-    /// Set-brede voortgang (Align/Match/Export) als toast; ShellView toont 'm.
-    var setBusyMessage: String?
+    /// E50.3: feedback van de set-brede acties (Match/Align/Background/Export):
+    /// `.busy` = voortgang, `.done` = bon met optionele Undo. ShellView toont 'm.
+    enum SetActionToast: Equatable {
+        case busy(String)
+        case done(SetActionReceipt)
+    }
+    var setActionToast: SetActionToast?
+
+    var isSetActionBusy: Bool {
+        if case .busy = setActionToast { return true }
+        return false
+    }
+
+    /// Reporter voor `PortraitSetActions`. `busy(nil)` wist alléén een lopende
+    /// busy-staat — de `defer { busy(nil) }` van de actie mag de zojuist gemelde
+    /// `.done`-bon niet wegvegen. `portraitDidChange` ververst het canvas als een
+    /// batch of z'n undo/redo het geselecteerde portret raakt.
+    var setActionReporter: SetActionReporter {
+        SetActionReporter(
+            busy: { [weak self] message in
+                guard let self else { return }
+                if let message {
+                    setActionToast = .busy(message)
+                } else if case .busy = setActionToast {
+                    setActionToast = nil
+                }
+            },
+            done: { [weak self] receipt in self?.setActionToast = .done(receipt) },
+            portraitDidChange: { [weak self] portrait in
+                guard let self, selectedPortrait === portrait else { return }
+                refreshCanvasFromSelection()
+            }
+        )
+    }
+
+    func dismissSetActionToast() { setActionToast = nil }
 
     /// Pro-status voor het bulk-export-watermerk (`entitlement` is privé).
     var isPro: Bool { entitlement.isProActive }
@@ -277,8 +327,8 @@ final class ShellModel {
     }
 
     /// E19.1: Share/export-popup (DS) i.p.v. direct het macOS share-sheet.
-    /// Snapshot van het portret op open-moment — stabiele `.sheet(item:)`-identiteit
-    /// (layout-wissels zoals Edit↔Preview flikkeren anders de modal).
+    /// Snapshot van het portret op open-moment. Overlay op ShellView (geen
+    /// `.sheet`) zodat een vensterwissel de dialog niet afbreekt.
     struct ExportSession: Identifiable, Equatable {
         let id: PersistentIdentifier
     }
@@ -387,15 +437,12 @@ final class ShellModel {
         await runCutout(on: cgImage)
     }
 
-    /// E36.5 (audit-B5): default-portretnaam uit de bron-URL — bestandsnaam
-    /// zonder extensie, gehumaniseerd: `-`/`_` → spatie, dubbele spaties
-    /// samengevouwen. `p1-man-beard.png` → "p1 man beard".
+    /// E36.5 (audit-B5) + naam-extractie: default-portretnaam = de
+    /// persoonsnaam uit de bestandsnaam (`Thierry_Emmery_headshot_2024.jpg` →
+    /// "Thierry Emmery"); camera-ruis als `IMG_4821.HEIC` levert "" op zodat
+    /// het Name-veld "Add name" toont i.p.v. "IMG 4821". Zie PortraitNameGuess.
     static func defaultPortraitName(from url: URL) -> String {
-        url.deletingPathExtension().lastPathComponent
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-            .split(separator: " ")
-            .joined(separator: " ")
+        PortraitNameGuess.name(from: url)
     }
 
     private func runCutout(on importedImage: CGImage, defaultName: String = "") async {
@@ -430,7 +477,7 @@ final class ShellModel {
         do {
             let preferred: CutoutEngineKind =
                 PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
-            let cutoutCG = try await router.cutout(cgImage, preferring: preferred)
+            let cutoutCG = try await performCutout(cgImage, preferring: preferred)
             let cutout = nsImage(from: cutoutCG)
             // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
             // animeert, het model wacht dezelfde duur en stapt dan door.
@@ -448,6 +495,288 @@ final class ShellModel {
         } catch {
             setCanvas(.failed("Couldn't find a person in that photo. Try another portrait."))
         }
+    }
+
+    /// Eén cutout-pad voor single- én batch-import. DEBUG: `debugCutoutOverride`
+    /// vervangt de engine zodat de import-/persist-flows zonder Vision en zonder
+    /// echte foto te testen zijn.
+    private func performCutout(_ image: CGImage, preferring preferred: CutoutEngineKind) async throws -> CGImage {
+        #if DEBUG
+        if let debugCutoutOverride { return try await debugCutoutOverride(image) }
+        #endif
+        return try await router.cutout(image, preferring: preferred)
+    }
+
+    #if DEBUG
+    /// Test-haak: vervangt de engine-cutout (zie `performCutout`).
+    @ObservationIgnored var debugCutoutOverride: ((CGImage) async throws -> CGImage)?
+    /// Test-haak: de tegel-wachtrij van buitenaf zetten (lens-filter testen).
+    var libraryImportJobsForTesting: [LibraryImportJob] {
+        get { libraryImportJobs }
+        set { libraryImportJobs = newValue }
+    }
+    #endif
+
+    // MARK: - Batch-import in de bibliotheek (drop van meerdere bestanden)
+
+    /// Bron van één gedropt/gekozen beeld: een bestand (de bestandsnaam reist
+    /// mee als default-portretnaam) of losse beeld-bytes (drop uit een browser).
+    enum ImportSource: Sendable {
+        case file(URL)
+        case data(Data)
+    }
+
+    /// Eén beeld uit een batch-drop, zolang het nog niet als `Portrait2` in de
+    /// store staat. De bibliotheek toont er een tijdelijke tegel voor
+    /// (`LibraryImportTile`) op de plek waar het portret straks landt; die
+    /// speelt dezelfde isolating-crossfade als de studio (`IsolatingTiming`),
+    /// waarna de tegel verdwijnt en het échte portret z'n plek inneemt.
+    struct LibraryImportJob: Identifiable {
+        enum Phase {
+            /// Wacht op z'n beurt — de batch is sequentieel (één cutout tegelijk:
+            /// geheugen, én de tegels lichten één voor één op).
+            case queued
+            /// Cutout rekent — "Removing background…".
+            case isolating
+            /// Cutout klaar. De payload is de uiteindelijke tegel-compositie
+            /// (cutout op de map-achtergrond, zelfde render als de echte tegel)
+            /// waar het origineel naartoe fadet.
+            case revealing(NSImage)
+            /// Geen persoon gevonden — de tegel blijft even staan en verdwijnt.
+            case failed
+        }
+
+        let id = UUID()
+        /// Genormaliseerd (sRGB) bronbeeld voor de engine.
+        let cgImage: CGImage
+        /// Hetzelfde beeld als NSImage voor de tegel.
+        let original: NSImage
+        let name: String
+        /// Bestemming: de map waarin gedropt is; nil (Home / All portraits) =
+        /// unfiled, zonder map-default-achtergrond — net als het single-pad.
+        let folderID: PersistentIdentifier?
+        var phase: Phase = .queued
+    }
+
+    /// Lopende batch-imports in drop-volgorde (de kop wordt verwerkt).
+    private(set) var libraryImportJobs: [LibraryImportJob] = []
+    /// Voortgang van de lopende batch voor de status-pill; nil = geen batch.
+    private(set) var libraryImportProgress: (done: Int, total: Int)?
+    @ObservationIgnored private var isLibraryImportRunning = false
+    /// Zijde (px) van de tegel-compositie die tijdens de reveal en als
+    /// placeholder van de verse tegel dient. Retina-tegel op de 3-koloms-grid.
+    private static let libraryImportPreviewSide = 640
+
+    /// Tegel-composities van zojuist gepersisteerde batch-imports. De echte
+    /// tegel toont 'm als placeholder tot z'n eigen (async, off-main) render
+    /// klaar is — anders flitst de tegel even leeg op het moment dat de
+    /// import-tegel door het portret wordt vervangen. Op instantie gematcht
+    /// (én op id, voor een na autosave opnieuw opgehaalde instance).
+    private var freshImportPreviews: [(portrait: Portrait2, preview: NSImage)] = []
+
+    func freshImportPreview(for portrait: Portrait2) -> NSImage? {
+        freshImportPreviews.first {
+            $0.portrait === portrait || $0.portrait.persistentModelID == portrait.persistentModelID
+        }?.preview
+    }
+
+    /// Import-tegels voor een bibliotheek-lens. `nil` (Home / All portraits)
+    /// toont alles; een map alleen haar eigen imports. OMGEKEERDE drop-volgorde:
+    /// de kop van de wachtrij (die nú verwerkt wordt) staat zo direct naast de
+    /// bovenkant van het echte grid (jongste eerst) — als 'ie klaar is, landt
+    /// het portret exact op de plek van z'n tegel en schuift er niets.
+    func visibleLibraryImportJobs(folderID: PersistentIdentifier?) -> [LibraryImportJob] {
+        guard let folderID else { return libraryImportJobs.reversed() }
+        return libraryImportJobs.filter { $0.folderID == folderID }.reversed()
+    }
+
+    /// Meerdere beelden tegelijk (drop van een heel team): NIET de studio openen —
+    /// de gebruiker blijft in de bibliotheek en ziet elk beeld in z'n eigen tegel
+    /// vrijstaand gemaakt worden. Eén beeld volgt het bestaande single-pad
+    /// (`importImage`: opent de studio met de reveal in het frame). Een tweede
+    /// drop tijdens een lopende batch sluit achteraan aan.
+    func importImages(_ sources: [ImportSource]) async {
+        if sources.count == 1, let only = sources.first {
+            switch only {
+            case .file(let url): await importImage(from: url)
+            case .data(let data): await importImage(data: data)
+            }
+            return
+        }
+        // De studio kent geen batch → terug naar de herkomst-lens, waar de
+        // tegels te zien zijn. Bestemming = de map van die lens.
+        if section == .editor { goBack() }
+        if section == .banners { showHome() }
+        let folderID: PersistentIdentifier? = section == .portraits ? selectedFolderID : nil
+
+        var jobs: [LibraryImportJob] = []
+        for source in sources {
+            // Decode + sRGB-normalisatie (E02.5) off-main; 14 grote JPEG's op
+            // main zouden de drop-animatie laten haperen.
+            guard let decoded = await Self.decodeImport(source) else { continue }
+            let name: String
+            if case .file(let url) = source { name = Self.defaultPortraitName(from: url) } else { name = "" }
+            jobs.append(LibraryImportJob(
+                cgImage: decoded.cgImage, original: nsImage(from: decoded.cgImage),
+                name: name, folderID: folderID
+            ))
+        }
+        guard !jobs.isEmpty else {
+            setActionToast = .done(SetActionReceipt(
+                title: "Those files don't look like images we can read.",
+                actionName: nil, undoManager: nil
+            ))
+            return
+        }
+        libraryImportJobs.append(contentsOf: jobs)
+        let progress = libraryImportProgress ?? (done: 0, total: 0)
+        libraryImportProgress = (done: progress.done, total: progress.total + jobs.count)
+
+        guard !isLibraryImportRunning else { return }
+        isLibraryImportRunning = true
+        while let job = libraryImportJobs.first(where: { if case .queued = $0.phase { return true } else { return false } }) {
+            await processLibraryImport(job)
+        }
+        isLibraryImportRunning = false
+        libraryImportProgress = nil
+    }
+
+    private func processLibraryImport(_ job: LibraryImportJob) async {
+        // E14.2: dezelfde importgate als het single-pad, per beeld. Cap bereikt →
+        // de paywall staat open; de rest van de batch vervalt (geen 11× paywall).
+        guard await entitlement.claimImport() else {
+            libraryImportJobs.removeAll { if case .queued = $0.phase { return true } else { return false } }
+            return
+        }
+        updateLibraryImport(job.id) { $0.phase = .isolating }
+        let preferred: CutoutEngineKind =
+            PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
+        do {
+            let cutoutCG = try await performCutout(job.cgImage, preferring: preferred)
+            guard let encoded = await Self.encodeLibraryImport(
+                cutout: cutoutCG, original: job.cgImage,
+                background: folderDefaultBackground(for: job.folderID)
+            ) else { throw LibraryImportFailure.encodeFailed }
+
+            // Reveal (E05.3-timing): het origineel fadet in de tegel weg naar de
+            // uiteindelijke compositie; het model wacht dezelfde duur.
+            updateLibraryImport(job.id) { $0.phase = .revealing(encoded.preview) }
+            try? await Task.sleep(
+                for: .seconds(IsolatingTiming.backgroundFade + IsolatingTiming.settle)
+            )
+            entitlement.markFirstCutoutCompleted()
+            if let modelContext {
+                let portrait = Portrait2(
+                    name: job.name, cutoutData: encoded.cutoutPNG, originalData: encoded.originalPNG
+                )
+                modelContext.insert(portrait)
+                FolderImportSupport.attachImport(
+                    portrait: portrait, selectedFolderID: job.folderID, modelContext: modelContext
+                )
+                freshImportPreviews.append((portrait, encoded.preview))
+                if freshImportPreviews.count > 32 { freshImportPreviews.removeFirst() }
+            }
+            // Tegel weg + portret erin in dezelfde main-actor-beurt → één layout-pass.
+            libraryImportJobs.removeAll { $0.id == job.id }
+            advanceLibraryImportProgress()
+            evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
+        } catch {
+            updateLibraryImport(job.id) { $0.phase = .failed }
+            advanceLibraryImportProgress()
+            // De mislukte tegel blijft even leesbaar staan ("Couldn't find a
+            // person") en ruimt zichzelf op; de batch loopt intussen door.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2.5))
+                self?.libraryImportJobs.removeAll { $0.id == job.id }
+            }
+        }
+    }
+
+    private enum LibraryImportFailure: Error { case encodeFailed }
+
+    private func updateLibraryImport(_ id: UUID, _ change: (inout LibraryImportJob) -> Void) {
+        guard let index = libraryImportJobs.firstIndex(where: { $0.id == id }) else { return }
+        change(&libraryImportJobs[index])
+    }
+
+    private func advanceLibraryImportProgress() {
+        guard let progress = libraryImportProgress else { return }
+        libraryImportProgress = (done: progress.done + 1, total: progress.total)
+    }
+
+    private func folderDefaultBackground(for folderID: PersistentIdentifier?) -> PortraitBackground? {
+        guard let folderID, let folder = modelContext?.model(for: folderID) as? Folder2 else { return nil }
+        return folder.defaultBackground
+    }
+
+    /// Gedecodeerd + sRGB-genormaliseerd bronbeeld (off-main gemaakt, daarna
+    /// alleen op main gelezen — zelfde box-patroon als `SendableNSImage`).
+    private struct DecodedImport: @unchecked Sendable { let cgImage: CGImage }
+
+    private nonisolated static func decodeImport(_ source: ImportSource) async -> DecodedImport? {
+        await Task.detached(priority: .userInitiated) { () -> DecodedImport? in
+            let imageSource: CGImageSource?
+            switch source {
+            case .file(let url): imageSource = CGImageSourceCreateWithURL(url as CFURL, nil)
+            case .data(let data): imageSource = CGImageSourceCreateWithData(data as CFData, nil)
+            }
+            guard let imageSource, let cg = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
+            return DecodedImport(cgImage: SRGBNormalizer.normalized(cg))
+        }.value
+    }
+
+    /// Cutout- en origineel-PNG plus de tegel-compositie — OFF-MAIN. Het single-
+    /// pad encodeert op main (één beeld); bij een batch zou dat 14× de UI bevriezen.
+    /// De compositie is exact wat `PortraitComposite` straks voor het portret
+    /// rendert (zelfde renderer, scale 0 = padded fit, map-achtergrond), zodat de
+    /// reveal eindigt in het beeld dat de echte tegel toont.
+    private struct EncodedLibraryImport: @unchecked Sendable {
+        let cutoutPNG: Data
+        let originalPNG: Data?
+        let preview: NSImage
+    }
+
+    private nonisolated static func encodeLibraryImport(
+        cutout: CGImage, original: CGImage, background: PortraitBackground?
+    ) async -> EncodedLibraryImport? {
+        let cutoutBox = SendableCGImage(cgImage: cutout)
+        let originalBox = SendableCGImage(cgImage: original)
+        var backgroundColorHex: String?
+        var backgroundImageData: Data?
+        switch background {
+        case .color(let hex): backgroundColorHex = hex
+        case .image(let data): backgroundImageData = data
+        case .transparent, .original, nil: break
+        }
+        let colorHex = backgroundColorHex
+        let imageData = backgroundImageData
+        let side = libraryImportPreviewSide
+        return await Task.detached(priority: .userInitiated) { () -> EncodedLibraryImport? in
+            guard let cutoutPNG = pngData(cutoutBox.cgImage) else { return nil }
+            let originalPNG = pngData(originalBox.cgImage)
+            let spec = PortraitThumbnailRenderer.Spec(
+                cutoutData: cutoutPNG, originalData: originalPNG,
+                backgroundImageData: imageData, backgroundColorHex: colorHex,
+                useOriginalBackground: false, portraitBlur: false,
+                offsetX: 0, offsetY: 0, scale: 0,
+                brightness: 0, contrast: 1, saturation: 1, temperature: 0,
+                side: side
+            )
+            let previewCG = PortraitThumbnailRenderer.render(spec) ?? cutoutBox.cgImage
+            let preview = NSImage(cgImage: previewCG, size: NSSize(width: previewCG.width, height: previewCG.height))
+            return EncodedLibraryImport(cutoutPNG: cutoutPNG, originalPNG: originalPNG, preview: preview)
+        }.value
+    }
+
+    /// PNG-bytes via ImageIO (nonisolated; `NSImage.pngData()` is main-gebonden).
+    private nonisolated static func pngData(_ image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data, UTType.png.identifier as CFString, 1, nil
+        ) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
     }
 
     // MARK: - Set/sidebar (E05.4)
@@ -481,6 +810,14 @@ final class ShellModel {
         // board-highlight + de naam/rol-header reageren DIRECT. De zware full-res
         // decode + Adjust-laag draait OFF-MAIN (decodeCanvas), zodat de main-thread
         // niet ~1s blokkeert; het canvas volgt async (generatie-getoetst).
+        if selectedPortrait?.persistentModelID != portrait.persistentModelID {
+            // Boost/Remove-background-dropdown is aan dit beeld gebonden;
+            // Enhance-paneel zelf blijft open bij een in-editor switch.
+            presentation.editorChipMenu = nil
+            presentation.editorCanvasMenu = nil
+            presentation.editorBackgroundTypeMenuOpen = false
+            presentation.editorBackgroundColorPickerOpen = false
+        }
         selectedPortrait = portrait
         portraitName = portrait.name
         portraitRole = portrait.role
@@ -512,7 +849,11 @@ final class ShellModel {
     /// het model — beide moeten dus mee, anders blijft de oude foto staan.
     /// E24.14: destructieve ops bewerken de RAUWE cutout; de Adjust-laag blijft
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
-    func applyEffectResult(_ image: NSImage, preserveSourceAlpha: Bool = false) async {
+    /// `framing` (Sticker-fix): kadrering van de wissel — `.keep` (default)
+    /// behoudt de transform; die-cut-resultaten komen als `.fitContent`.
+    func applyEffectResult(
+        _ image: NSImage, preserveSourceAlpha: Bool = false, framing: EffectFraming = .keep
+    ) async {
         guard let portrait = selectedPortrait else {
             setCanvas(.result(image))
             return
@@ -545,7 +886,7 @@ final class ShellModel {
             // Al een schone cutout (boost/flip/enhance) — geen vol bron-beeld.
             portrait.editSourceData = nil
             portrait.editSourceCutoutSig = 0
-            storeEffectResult(image, on: portrait)
+            storeEffectResult(image, on: portrait, framing: framing)
         } else {
             // Vol AI-resultaat (onderwerp + toegevoegde achtergrond) → bewaar het
             // ZODAT "Remove background" het later met ORMBG schoon kan her-isoleren
@@ -554,7 +895,7 @@ final class ShellModel {
             // het edit-bronbeeld als stale herkent.
             portrait.editSourceData = image.pngData()
             let restored = (try? await reIsolateSubject(image)) ?? image
-            storeEffectResult(restored, on: portrait)
+            storeEffectResult(restored, on: portrait, framing: framing)
             // Stempel op de nu-opgeslagen cutout; 0 als de PNG-encode faalde (dan is
             // editSourceData ook nil → sowieso genegeerd door Remove background).
             portrait.editSourceCutoutSig = portrait.editSourceData != nil
@@ -576,6 +917,108 @@ final class ShellModel {
             return
         }
         storeEffectResult(image, on: portrait)
+    }
+
+    /// Complete state for the Fill in body undo entry. The transform belongs in
+    /// the same snapshot as the pixels: restoring only the PNG would reintroduce
+    /// the framing jump this dedicated path is designed to prevent.
+    struct FillBodyState: Equatable {
+        let cutoutData: Data
+        let transform: TransformUndo.Snapshot
+        let cutoutDerivesFromOriginal: Bool
+    }
+
+    /// Apply an edge-aware body-fill result without the generic effect path.
+    /// The backend mapping identifies the original source rectangle inside the
+    /// expanded PNG. Compensating the subject transform keeps every original
+    /// pixel at the same screen coordinate while the new edge becomes visible.
+    /// Pixels and transform are published in one MainActor turn; no deferred
+    /// AutoFramer task is started.
+    func applyFillBodyResult(
+        _ image: NSImage,
+        mapping: BackendClient.FillBodyResult.Mapping,
+        to portrait: Portrait2,
+        expectedCutoutSignature: Int
+    ) -> (before: FillBodyState, after: FillBodyState)? {
+        guard selectedPortrait === portrait,
+              Portrait2.cutoutSignature(portrait.cutoutData) == expectedCutoutSignature,
+              let oldCG = NSImage(data: portrait.cutoutData)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let transform = Self.compensatedFillBodyTransform(
+                oldSize: CGSize(width: oldCG.width, height: oldCG.height),
+                newSize: CGSize(width: newCG.width, height: newCG.height),
+                mapping: mapping,
+                current: TransformUndo.snapshot(of: portrait)
+              ),
+              let png = image.pngData()
+        else { return nil }
+
+        let before = fillBodyState(of: portrait)
+        let after = FillBodyState(
+            cutoutData: png,
+            transform: transform,
+            cutoutDerivesFromOriginal: false
+        )
+        applyFillBodyState(after, to: portrait)
+        return (before, after)
+    }
+
+    func applyFillBodyState(_ state: FillBodyState, to portrait: Portrait2) {
+        portrait.cutoutData = state.cutoutData
+        portrait.offsetX = state.transform.offsetX
+        portrait.offsetY = state.transform.offsetY
+        portrait.scale = state.transform.scale
+        portrait.cutoutDerivesFromOriginal = state.cutoutDerivesFromOriginal
+        portrait.touch()
+        if selectedPortrait === portrait, let raw = NSImage(data: state.cutoutData) {
+            setCanvas(.result(Self.adjustedImage(raw, portrait.adjust)))
+        }
+    }
+
+    private func fillBodyState(of portrait: Portrait2) -> FillBodyState {
+        FillBodyState(
+            cutoutData: portrait.cutoutData,
+            transform: TransformUndo.snapshot(of: portrait),
+            cutoutDerivesFromOriginal: portrait.cutoutDerivesFromOriginal
+        )
+    }
+
+    nonisolated static func compensatedFillBodyTransform(
+        oldSize: CGSize,
+        newSize: CGSize,
+        mapping: BackendClient.FillBodyResult.Mapping,
+        current: TransformUndo.Snapshot
+    ) -> TransformUndo.Snapshot? {
+        guard oldSize.width > 0, oldSize.height > 0,
+              newSize.width > 0, newSize.height > 0,
+              mapping.canvasWidth == Int(newSize.width.rounded()),
+              mapping.canvasHeight == Int(newSize.height.rounded()),
+              mapping.originalWidth > 0, mapping.originalHeight > 0,
+              mapping.originalX >= 0, mapping.originalY >= 0,
+              mapping.originalX + mapping.originalWidth <= mapping.canvasWidth,
+              mapping.originalY + mapping.originalHeight <= mapping.canvasHeight
+        else { return nil }
+
+        let scaleX = Double(mapping.originalWidth) / oldSize.width
+        let scaleY = Double(mapping.originalHeight) / oldSize.height
+        guard scaleX > 0, scaleY > 0,
+              abs(scaleX - scaleY) / max(scaleX, scaleY) < 0.02
+        else { return nil }
+
+        let sourceScale = (scaleX + scaleY) / 2
+        let resolved = AutoFramer.resolvedTransform(
+            offsetX: current.offsetX,
+            offsetY: current.offsetY,
+            scale: current.scale,
+            cutoutSize: oldSize
+        )
+        let newScale = resolved.scale / sourceScale
+        return TransformUndo.Snapshot(
+            offsetX: resolved.offsetX - Double(mapping.originalX) * newScale,
+            offsetY: resolved.offsetY - Double(mapping.originalY) * newScale,
+            scale: newScale
+        )
     }
 
     /// Past de alpha-laag van een bestaande cutout toe op een opaque (vol-achtergrond)
@@ -629,7 +1072,9 @@ final class ShellModel {
 
     /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
     /// her-render het canvas met de niet-destructieve Adjust-laag erbovenop.
-    private func storeEffectResult(_ image: NSImage, on portrait: Portrait2) {
+    private func storeEffectResult(
+        _ image: NSImage, on portrait: Portrait2, framing: EffectFraming = .keep
+    ) {
         // E24.36 + quality rev2: generatieve edits houden de ratio aan maar niet
         // de pixelmaat (~1 MP van nano-banana). Hybride correctie:
         //   • ratio drift ≥ 2% → reset + AutoFramer;
@@ -638,8 +1083,19 @@ final class ShellModel {
         let oldCG = NSImage(data: portrait.cutoutData)?
             .cgImage(forProposedRect: nil, context: nil, hints: nil)
         let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        var stored = image
+        var stored = image.normalizedToPixelSize()
         var didReset = false
+        // Sticker-fix: expliciete her-kadrering — de oude transform hoort bij
+        // een ander soort beeld (romp-tot-onderrand ↔ vrijstaande vorm), dus
+        // geen centroid-compensatie/top-guard maar dezelfde stille reset-tak.
+        if framing != .keep {
+            portrait.offsetX = 0; portrait.offsetY = 0; portrait.scale = 0
+            didReset = true
+        }
+        // Boost / hogere-res cutout met dezelfde ratio: schaal bijstellen en
+        // niét herkadreren. effectNeedsReframe is voor stylize die haar laat
+        // groeien; een uniforme upscale moet positie + crop behouden.
+        var keptHigherRes = false
         // E55-delivery-fix: transform vóór de mutaties, voor de reframe-guard
         // verderop (de oude bovenrand moet tegen de óúde schaal gemeten worden).
         let preOffsetY = portrait.offsetY
@@ -661,12 +1117,11 @@ final class ShellModel {
                 portrait.offsetX = 0; portrait.offsetY = 0; portrait.scale = 0
                 didReset = true
             } else if newPixels > oldPixels {
+                keptHigherRes = true
                 if portrait.scale > 0 {
-                    let factor = min(
-                        Double(oldCG.width) / Double(newCG.width),
-                        Double(oldCG.height) / Double(newCG.height)
+                    portrait.scale = Self.adjustedScaleForResolutionChange(
+                        oldWidth: oldCG.width, newWidth: newCG.width, currentScale: portrait.scale
                     )
-                    portrait.scale *= factor
                 }
             } else {
                 let oldSize = CGSize(width: oldCG.width, height: oldCG.height)
@@ -703,7 +1158,7 @@ final class ShellModel {
         // haar omhoog), dan her-kadreren via dezelfde stille reset-tak als de
         // ratio-reset. Een bewust krap kader (oude rand stak al uit) blijft
         // van de gebruiker.
-        if !didReset,
+        if !didReset, !keptHigherRes,
            let oldCG,
            let finalCG = stored.cgImage(forProposedRect: nil, context: nil, hints: nil),
            let oldTop = ShellModel.alphaTop(of: oldCG),
@@ -737,7 +1192,8 @@ final class ShellModel {
         // wordt wél correct teruggedraaid.)
         if didReset, let cg = stored.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             let p = portrait
-            Task { await AutoFramer.apply(to: p, image: cg) }
+            let mode: AutoFramer.Mode = framing == .fitContent ? .freestanding : .portrait
+            Task { await AutoFramer.apply(to: p, image: cg, mode: mode) }
         }
     }
 
@@ -873,10 +1329,11 @@ final class ShellModel {
     }
 
     /// E18.4: her-afleidt het canvas uit de cutoutData van het geselecteerde
-    /// portret. Set-brede edits (Match lighting, Align Set) wijzigen alleen
-    /// cutoutData via CutoutDataUndo — niet het canvas. Wordt aangeroepen na
-    /// elke undo/redo zodat zo'n wijziging (en het terugdraaien ervan) ook op
-    /// het canvas zichtbaar wordt. No-op buiten de result-staat.
+    /// portret. Set-brede edits (Match lighting → Adjust-laag, Match framing →
+    /// transform) wijzigen het model — niet het canvas. Wordt aangeroepen na
+    /// elke undo/redo (en via `SetActionReporter.portraitDidChange`) zodat zo'n
+    /// wijziging én het terugdraaien ervan op het canvas zichtbaar wordt.
+    /// No-op buiten de result-staat.
     /// E24.14: render altijd mét de Adjust-laag erbovenop.
     func refreshCanvasFromSelection() {
         guard case .result = canvas,
@@ -972,12 +1429,13 @@ final class ShellModel {
     func debugScaleSubject(factor: Double) {
         guard let p = selectedPortrait, let img = NSImage(data: p.cutoutData) else { return }
         let canvas = FramingConstants.editCanvas
-        guard img.size.width > 0, img.size.height > 0 else { return }
-        let fit = min(canvas.width / img.size.width, canvas.height / img.size.height)
+        let layout = img.pixelLayoutSize
+        guard layout.width > 0, layout.height > 0 else { return }
+        let fit = min(canvas.width / layout.width, canvas.height / layout.height)
             * FramingConstants.frameFitPadding
         let scale = fit * factor
-        p.offsetX = (canvas.width - img.size.width * scale) / 2
-        p.offsetY = (canvas.height - img.size.height * scale) / 2
+        p.offsetX = (canvas.width - layout.width * scale) / 2
+        p.offsetY = (canvas.height - layout.height * scale) / 2
         p.scale = scale
         p.touch()
     }

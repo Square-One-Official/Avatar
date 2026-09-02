@@ -4,8 +4,24 @@
 // (primary), omschrijving Content/Body/Small (subtle), sluitknop = small
 // ghost Icon-Only Button (16pt X). Onderin 3pt timer-track: bg neutral,
 // vulling foreground/action/primary.
+// E50.3: optionele actie-rij (kleine ghost-knop rechtsonder, zoals de Cancel in
+// WorkingToastView) voor "… · Undo"-meldingen na set-brede acties. Figma toont
+// alleen titel + omschrijving + sluitknop; de actie-rij is een interpretatie in
+// de geest van dat ontwerp (zelfde chrome, geen extra rij als er geen actie is).
 
 import SwiftUI
+
+/// Eén optionele actie in een toast (bv. "Undo"). De handler sluit de toast
+/// niet zelf — de call site beslist (meestal: actie uitvoeren + `onClose`).
+public struct DSToastAction {
+    public let label: String
+    public let handler: () -> Void
+
+    public init(_ label: String, handler: @escaping () -> Void) {
+        self.label = label
+        self.handler = handler
+    }
+}
 
 public struct DSToast: View {
     private let title: String
@@ -22,6 +38,8 @@ public struct DSToast: View {
     /// nil = geen sluit-affordance. Een sluitknop die niets doet mag niet
     /// bestaan (UXS-2), dus zonder actie renderen we de knop óók niet.
     private let onClose: (() -> Void)?
+    /// E50.3: optionele actie-knop (rechtsonder). nil = geen actie-rij.
+    private let action: DSToastAction?
 
     /// Resterende fractie van `autoDismiss`, 1 → 0.
     @State private var remaining: Double = 1
@@ -33,7 +51,8 @@ public struct DSToast: View {
         progress: Double? = nil,
         isLoading: Bool = false,
         autoDismiss: Duration? = nil,
-        onClose: (() -> Void)? = nil
+        onClose: (() -> Void)? = nil,
+        action: DSToastAction? = nil
     ) {
         self.title = title
         self.description = description
@@ -41,11 +60,20 @@ public struct DSToast: View {
         self.isLoading = isLoading
         self.autoDismiss = autoDismiss
         self.onClose = onClose
+        self.action = action
     }
 
     /// Hertelt de timer zodra de inhoud wijzigt: een vervángende melding krijgt
     /// de volle duur i.p.v. de resterende tijd van z'n voorganger (UX4).
-    private var contentKey: String { "\(title)|\(description ?? "")" }
+    private var contentKey: String {
+        Self.timerKey(title: title, description: description, actionLabel: action?.label)
+    }
+
+    /// De timer-sleutel: titel + omschrijving + actie-label. Intern (geen private)
+    /// zodat de test kan toetsen dat een andere actie de timer hertelt.
+    static func timerKey(title: String, description: String?, actionLabel: String?) -> String {
+        "\(title)|\(description ?? "")|\(actionLabel ?? "")"
+    }
 
     private var trackProgress: Double? {
         autoDismiss == nil ? progress : remaining
@@ -80,6 +108,13 @@ public struct DSToast: View {
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.subtle)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let action {
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        DSGhostButton(action.label, size: .small, action: action.handler)
+                    }
+                    .padding(.top, DSSpacing.gap2)
                 }
             }
             .padding(DSSpacing.gap4)

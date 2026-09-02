@@ -14,6 +14,19 @@ enum EditorCanvasChromeMetrics {
         }
     }
 
+    /// Screen-space selectie-ring: 2pt stroke, 2pt buiten de zichtbare kaartrand.
+    static let selectionRingOutset: CGFloat = 2
+    static let selectionRingLineWidth: CGFloat = 2
+
+    /// Corner-radius van de frame-ring in screen-space. `nil` = cirkel.
+    static func selectionRingCornerRadius(
+        isCircle: Bool,
+        cameraScale: CGFloat,
+        cardCornerRadius: CGFloat
+    ) -> CGFloat? {
+        isCircle ? nil : cardCornerRadius * cameraScale + selectionRingOutset
+    }
+
     /// Kaart vult het venster (cover): geen witte randen links/rechts.
     static func coverLayout(viewport: CGSize) -> Layout {
         let side = max(viewport.width, viewport.height)

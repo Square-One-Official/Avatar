@@ -24,6 +24,7 @@ public struct DSToggle: View {
             EmptyView()
         }
         .buttonStyle(DSToggleTrackStyle(isOn: isOn))
+        .dsFocusEffectDisabled()
         .opacity(isEnabled ? DSOpacity.strong : DSOpacity.disabled)
         .accessibilityRepresentation {
             Toggle(isOn: $isOn) { EmptyView() }

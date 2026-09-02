@@ -3,7 +3,8 @@
 // de traffic-lights; daaronder Home (overzicht) en een INKLAPBARE Portraits-
 // sectie die de mappen toont (+ een plus om een map te maken, rechtermuis om te
 // hernoemen/verwijderen). Onderin de upgrade-banner + quota en een klikbare
-// gebruikersrij (Settings / Manage backgrounds / Sign out). Net-nieuw scherm
+// gebruikersrij: hoofdknop = sign-in (uitgelogd) of menu, chevron = menu
+// (Settings / Manage backgrounds / Sign out). Net-nieuw scherm
 // (geen Figma-bron) — gebouwd op de bestaande DS-tokens.
 
 import AvatarUI
@@ -33,9 +34,11 @@ struct LeftNavView: View {
     /// Hoogte van de klikbare profielrij (zonder de omringende padding).
     private static let userRowHeight: CGFloat = 40
 
-    @State private var draftName = ""
     @State private var dropTargetedFolderID: PersistentIdentifier?
+    /// Klik buiten accountrij + menu (waar dan ook in het venster) sluit het menu.
+    @State private var userMenuClickScope = DSOutsideClickScope()
     @FocusState private var userRowFocused: Bool
+    @State private var userRowHovering = false
 
     private static let contextMenuSpace = "leftNavContextMenu"
 
@@ -102,6 +105,9 @@ struct LeftNavView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { model.presentation.leftNavUserMenuOpen = false }
                     userMenu
+                        .dsDismissOnOutsideClick(userMenuClickScope, isActive: true) {
+                            model.presentation.leftNavUserMenuOpen = false
+                        }
                         .fixedSize()
                         .padding(.horizontal, DSSpacing.gap2)
                         .padding(.bottom, DSSpacing.gap2 + Self.userRowHeight + DSSpacing.gap2)
@@ -126,9 +132,6 @@ struct LeftNavView: View {
         .coordinateSpace(name: Self.contextMenuSpace)
         .dsMotion(DSMotion.fast, value: model.presentation.leftNavUserMenuOpen)
         .task { await entitlement.refresh() }
-        .onChange(of: model.presentation.alert) { _, alert in
-            if case .createFolder(let draft) = alert { draftName = draft }
-        }
     }
 
     // MARK: - Portraits (inklapbaar) + mappen
@@ -191,17 +194,7 @@ struct LeftNavView: View {
     }
 
     private func beginCreateFolder() {
-        draftName = ""
         model.presentation.alert = .createFolder(draft: "")
-    }
-
-    private func confirmCreateFolder() {
-        let name = draftName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let folder = Folder2(name: name)
-        modelContext.insert(folder)
-        model.isPortraitsExpanded = true
-        model.showPortraits(folderID: folder.persistentModelID)
     }
 
     /// Verplaats de gesleepte portretten naar `folder` (haalt het echte Portrait2
@@ -258,37 +251,70 @@ struct LeftNavView: View {
 
     // MARK: - Gebruikersrij + menu
 
+    /// Twee hit areas, zoals de Portraits-kop: de hoofdknop (avatar + naam)
+    /// start sign-in wanneer niemand is ingelogd en opent anders het menu; de
+    /// chevron rechts opent altijd het accountmenu.
     private var userRow: some View {
-        Button { model.presentation.leftNavUserMenuOpen.toggle() } label: {
-            HStack(spacing: DSSpacing.gap2) {
-                Circle()
-                    .fill(DSColor.Background.neutralStronger)
-                    .frame(width: 28, height: 28)
-                    .overlay(
-                        Text(userInitial)
-                            .dsTextStyle(.labelSmall)
-                            .foregroundStyle(DSColor.Foreground.primary)
-                    )
-                Text(userDisplayName)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                    .lineLimit(1)
-                    .help(userDisplayName)
-                Spacer(minLength: 0)
+        HStack(spacing: DSSpacing.gap2) {
+            Button {
+                if entitlement.isSignedIn {
+                    model.presentation.leftNavUserMenuOpen.toggle()
+                } else {
+                    model.presentation.leftNavUserMenuOpen = false
+                    entitlement.presentSignIn()
+                }
+            } label: {
+                HStack(spacing: DSSpacing.gap2) {
+                    Circle()
+                        .fill(DSColor.Background.neutralStronger)
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Text(userInitial)
+                                .dsTextStyle(.labelSmall)
+                                .foregroundStyle(DSColor.Foreground.primary)
+                        )
+                    Text(userDisplayName)
+                        .dsTextStyle(.labelBase)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                        .lineLimit(1)
+                        .help(userDisplayName)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: Self.userRowHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
+            .accessibilityLabel(userDisplayName)
+            .accessibilityHint(entitlement.isSignedIn ? "Account menu" : "Sign in")
+
+            Button { model.presentation.leftNavUserMenuOpen.toggle() } label: {
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: DSIconSize.xs, weight: .semibold))
                     .foregroundStyle(DSColor.Foreground.subtle)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: Self.userRowHeight)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .dsHoverHighlight(cornerRadius: DSRadius.lg)
+            .buttonStyle(.plain)
+            .focused($userRowFocused)
+            .dsFocusEffectDisabled()
+            .dsHoverHighlight(cornerRadius: DSRadius.md)
+            .help("Account menu")
+            .accessibilityLabel("Account menu")
         }
-        .buttonStyle(.plain)
-        .focused($userRowFocused)
-        .accessibilityLabel(userDisplayName)
-        .accessibilityHint("Account menu")
+        .padding(.horizontal, DSSpacing.gap2)
+        .frame(height: Self.userRowHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(userRowBackground, in: RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { userRowHovering = $0 }
+        .dsMotion(DSMotion.micro, value: userRowHovering)
+        .dsOutsideClickInside(userMenuClickScope)
+    }
+
+    private var userRowBackground: Color {
+        userRowHovering ? DSColor.Background.neutral : .clear
     }
 
     private var userMenu: some View {
@@ -309,7 +335,6 @@ struct LeftNavView: View {
                 }
             }
         }
-        .frame(width: 220)
     }
 
     // MARK: - Afgeleide gebruikerslabels
@@ -369,6 +394,7 @@ private struct LeftNavExpandableHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .accessibilityAction(named: isExpanded ? "Collapse folders" : "Expand folders") {
                 onToggleExpanded()
             }
@@ -381,6 +407,7 @@ private struct LeftNavExpandableHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverHighlight(cornerRadius: DSRadius.md)
             .help("Create folder")
             .accessibilityLabel("Create folder")
@@ -410,6 +437,7 @@ private struct LeftNavExpandableHeader: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
             }
             .opacity(chevronRevealed ? 0 : 1)
             .scaleEffect(chevronRevealed ? 0.94 : 1, anchor: .center)
@@ -423,8 +451,10 @@ private struct LeftNavExpandableHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverHighlight(cornerRadius: DSRadius.md)
             .focused($chevronFocused)
+            .dsFocusEffectDisabled()
             .opacity(chevronRevealed ? 1 : 0)
             .scaleEffect(chevronRevealed ? 1 : 0.94, anchor: .center)
             .allowsHitTesting(chevronRevealed)
@@ -478,6 +508,7 @@ private struct LeftNavFolderRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
         .dsMotion(DSMotion.micro, value: hovering || isDropTargeted)
     }
@@ -518,6 +549,7 @@ private struct LeftNavRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
         .dsMotion(DSMotion.micro, value: hovering)
     }

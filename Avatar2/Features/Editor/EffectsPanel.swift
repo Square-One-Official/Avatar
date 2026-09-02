@@ -92,7 +92,8 @@ final class EffectsModel {
     private var localThumbnails: [String: NSImage] = [:]
 
     private let entitlement: EntitlementModel
-    private let onApply: (NSImage) async -> Void
+    /// Beeld + kadrering (Sticker-fix: die-cut → content-fit, zie EffectFraming).
+    private let onApply: (NSImage, EffectFraming) async -> Void
     private let portrait: Portrait2?
     private let coordinator: StylizeQualityCoordinator?
     private let cutoutImage: NSImage
@@ -110,7 +111,7 @@ final class EffectsModel {
         portrait: Portrait2?,
         cutoutImage: NSImage,
         coordinator: StylizeQualityCoordinator?,
-        onApply: @escaping (NSImage) async -> Void
+        onApply: @escaping (NSImage, EffectFraming) async -> Void
     ) {
         self.entitlement = entitlement
         self.onApply = onApply
@@ -186,6 +187,18 @@ final class EffectsModel {
     }
 
     var creditCost: Int { CreditMeter.credits(for: .generativeStandard) }
+
+    /// Die-cut-stijl (sticker)? Bron = `/v1/effects` (`composition`); custom
+    /// effecten en een None-selectie zijn nooit die-cut.
+    func isDieCut(_ key: String?) -> Bool {
+        guard let key else { return false }
+        return builtinEffects.first { $0.key == key }?.isDieCut ?? false
+    }
+
+    /// Kadrering voor een wissel van `previous` naar `next` (zie EffectFraming).
+    func framing(from previous: String?, to next: String?) -> EffectFraming {
+        .forSwitch(toDieCut: isDieCut(next), fromDieCut: isDieCut(previous))
+    }
 
     var isBusy: Bool { if case .working = phase { return true } else { return false } }
 
@@ -269,7 +282,7 @@ final class EffectsModel {
         selectedKey = nil
         phase = .idle
         Task {
-            await onApply(base)
+            await onApply(base, framing(from: prev, to: nil))
             registerSelectionUndo(from: prev, to: nil)
             persist()
         }
@@ -301,7 +314,7 @@ final class EffectsModel {
                     title: "Applying style",
                     messages: ["Cutting out the subject…", "Almost there…"]
                 )
-                await onApply(cached)
+                await onApply(cached, framing(from: prev, to: card.key))
                 phase = .idle
                 entitlement.dismissWorkingToast()
                 registerSelectionUndo(from: prev, to: card.key)
@@ -367,12 +380,16 @@ final class EffectsModel {
             ],
             startedAt: startedAt,
             expectedSeconds: Self.expectedGenerationSeconds,
+            cancelHint: "Keep working — the style finishes in the background and lands on its card",
             onCancel: { [weak self] in self?.detachCurrentGeneration() }
         )
     }
 
     private func generate(_ card: EffectCard, feature: AIFeature = .effectGenerate) async {
-        guard entitlement.allowAIFeature(feature) else { return }
+        guard entitlement.allowAIFeature(feature, retry: { [weak self] in
+            guard let self else { return }
+            Task { await self.generate(card, feature: feature) }
+        }) else { return }
 
         let defaultChoice = StylizeQuality.defaultEffectsSourceChoice(portrait: portrait)
         let (_, effectsChoice) = await coordinator?.gateBeforeStylize(
@@ -442,7 +459,7 @@ final class EffectsModel {
             }
             let prev = selectedKey
             selectedKey = card.key
-            await onApply(image)
+            await onApply(image, framing(from: prev, to: card.key))
             phase = .idle
             entitlement.dismissWorkingToast()
             registerSelectionUndo(from: prev, to: card.key)
@@ -547,7 +564,7 @@ struct EffectsPanel: View {
     /// E53.7: de "Create effect"-modal leeft op de stabiele host (ShellView), dus
     /// het paneel schrijft zijn open-state hier i.p.v. in eigen @State.
     var presentation: UIPresentationStore?
-    var onApply: (NSImage) async -> Void = { _ in }
+    var onApply: (NSImage, EffectFraming) async -> Void = { _, _ in }
 
     @State private var model: EffectsModel
     @Environment(\.undoManager) private var undoManager
@@ -558,7 +575,7 @@ struct EffectsPanel: View {
         portrait: Portrait2? = nil,
         coordinator: StylizeQualityCoordinator? = nil,
         presentation: UIPresentationStore? = nil,
-        onApply: @escaping (NSImage) async -> Void = { _ in }
+        onApply: @escaping (NSImage, EffectFraming) async -> Void = { _, _ in }
     ) {
         self.baseImage = baseImage
         self.entitlement = entitlement
@@ -577,10 +594,10 @@ struct EffectsPanel: View {
     }
 
     // Vierkante tiles (1:1): CMS-bronnen zijn 800×800, dus `scaledToFill`
-    // vult de tile exact. 96pt i.p.v. 144 — compact genoeg dat None + de
-    // vier launch-stijlen in het paneel passen, groot genoeg voor een gezicht.
-    private let cardWidth: CGFloat = 96
-    private let cardHeight: CGFloat = 96
+    // vult de tile exact. 144pt — zelfde visuele massa als de Enhance-kaarten
+    // (~147 × 128 in het 520pt-paneel); de rail scrollt horizontaal.
+    private let cardWidth: CGFloat = 144
+    private let cardHeight: CGFloat = 144
 
     fileprivate static let contextMenuSpace = "effectsContextMenu"
 
@@ -665,6 +682,7 @@ struct EffectsPanel: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(model.isBusy)
         .opacity(model.isBusy ? 0.5 : 1)
     }
@@ -689,6 +707,7 @@ struct EffectsPanel: View {
             }
         }
         .disabled(model.isBusy)
+        .cloudFeatureMuted()
         .opacity(model.isBusy ? 0.5 : 1)
         .help("Create your own effect from a reference image")
     }
@@ -723,7 +742,9 @@ struct EffectsPanel: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(model.isBusy)
+        .cloudFeatureMuted()
         .opacity(model.isBusy && !model.isWorking(card) ? 0.5 : 1)
         // E34: eigen effecten zijn verwijderbaar via het DS-rechtermuismenu.
         .modifier(DeletableCustom(card: card, presentation: presentation) { frame in

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { CMS_LIST_CACHE_CONTROL, fetchActiveEffects, thumbnailVariant } from "../../lib/payload.js";
+import { isDieCutStyle } from "../../lib/stylizePrompts.js";
 
 /**
  * GET /v1/effects (E33)
@@ -18,7 +19,10 @@ import { CMS_LIST_CACHE_CONTROL, fetchActiveEffects, thumbnailVariant } from "..
  * an empty list so a CMS hiccup degrades to the client's built-in fallback
  * effects rather than a 5xx.
  *
- * Response: { effects: [ { key, label, thumbnail_url, order } ] }
+ * Response: { effects: [ { key, label, thumbnail_url, order, composition } ] }
+ * `composition` is "die_cut" voor stijlen waarvan het resultaat één
+ * vrijstaande gesloten vorm is (sticker) — de client kadert die als
+ * content-fit i.p.v. de portret-transform te hergebruiken; anders "portrait".
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -36,6 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // E52.1: verkleinde variant voor de 112×152 pt stijl-kaart (@2x → 320 px).
         thumbnail_url: thumbnailVariant(e.thumbnailUrl, 320),
         order: e.order,
+        composition: isDieCutStyle(e.key) ? "die_cut" : "portrait",
       })),
     });
   } catch (err) {

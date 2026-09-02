@@ -43,6 +43,9 @@ struct SettingsPreferencesPage: View {
                         themeMenu
                     }
                 }
+                // Open menu boven de Migration-kaart eronder tekenen; de
+                // zIndex van de knop zelf reikt niet buiten deze kaart.
+                .zIndex(presentation.settingsThemeMenuOpen ? 1 : 0)
 
                 // E13.2: migratiepad vanuit Aaavatar 1. Bewust hier en niet in
                 // onboarding: de back-up-export moet eerst in v1 gebeuren, dus

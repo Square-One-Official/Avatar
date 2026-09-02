@@ -59,6 +59,7 @@ struct BannerSizePanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     private func isSelected(_ size: CGSize) -> Bool {

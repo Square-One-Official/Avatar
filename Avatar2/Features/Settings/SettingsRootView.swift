@@ -66,9 +66,11 @@ struct SettingsRootView: View {
                 case .preferences:
                     SettingsPreferencesPage(presentation: model.presentation)
                 case .aiModels:
-                    SettingsAIModelsPage(entitlement: entitlement)
+                    SettingsAIModelsPage()
                 case .account:
                     SettingsAccountPage(entitlement: entitlement, model: model)
+                case .billing:
+                    SettingsBillingPage(entitlement: entitlement)
                 case .about:
                     SettingsAboutPage()
                 }
@@ -108,9 +110,16 @@ private struct SettingsNavButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { isHovering = $0 }
         .accessibilityAddTraits(isActive ? .isSelected : [])
     }
+}
+
+/// Gedeelde maten van de Settings-content (Figma "Settings section").
+enum SettingsLayout {
+    /// Kaartbreedte in het 1000-frame; pagina-headers lijnen hierop uit.
+    static let sectionWidth: CGFloat = 608
 }
 
 /// Figma "Settings section" (608 breed, bg Card, r-2xl): H3-titel op 24
@@ -130,9 +139,10 @@ struct SettingsSectionCard<Rows: View>: View {
         .padding(DSSpacing.gap6)
         // 608 in het 1000-frame; krimpt mee met kleinere vensters zodat
         // de dropdown/toggle rechts nooit buiten beeld valt.
-        .frame(maxWidth: 608, alignment: .leading)
-        .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
+        .frame(maxWidth: SettingsLayout.sectionWidth, alignment: .leading)
+        // Geen clipShape: een open dropdown (Theme-menu) hangt als overlay
+        // onder het anker en moet buiten de kaart kunnen uitsteken.
+        .background(DSColor.Background.card, in: RoundedRectangle(cornerRadius: DSRadius.xl2))
     }
 }
 

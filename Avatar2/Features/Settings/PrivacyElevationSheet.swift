@@ -1,4 +1,4 @@
-// Just-in-time elevation modal: legt uit welke tier nodig is en stuurt naar Settings.
+// Just-in-time elevation modal: one-click Turn on Cloud.
 
 import AvatarUI
 import SwiftUI
@@ -10,7 +10,7 @@ struct PrivacyElevationRequest: Equatable {
 
 struct PrivacyElevationSheet: View {
     let request: PrivacyElevationRequest
-    var onOpenSettings: () -> Void
+    var onEnableCloud: () -> Void
     var onDismiss: () -> Void
 
     private var creditSuffix: String {
@@ -26,11 +26,11 @@ struct PrivacyElevationSheet: View {
             }
             .padding(.bottom, DSSpacing.gap2)
 
-            DSIcon(request.requiredTier.icon, size: 32, weight: .regular)
+            DSIcon(AIPrivacyTier.thirdParty.icon, size: 32, weight: .regular)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .padding(.bottom, DSSpacing.gap4)
 
-            Text("\(request.feature.uiLabel) requires \(request.requiredTier.title)")
+            Text("Turn on Cloud to use \(request.feature.uiLabel)")
                 .dsTextStyle(.h4)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .multilineTextAlignment(.center)
@@ -44,7 +44,7 @@ struct PrivacyElevationSheet: View {
 
             HStack(spacing: DSSpacing.gap3) {
                 DSNeutralButton("Not now", action: onDismiss)
-                DSPrimaryButton("Privacy settings", action: onOpenSettings)
+                DSPrimaryButton("Turn on Cloud", action: onEnableCloud)
             }
             .padding(.top, DSSpacing.gap8)
         }

@@ -53,22 +53,17 @@ struct ShellView: View {
                 }
             }
 
-            if studioFullBleed {
-                HStack(alignment: .top, spacing: 0) {
-                    if model.isLeftNavVisible {
-                        leftNavSlot
-                            .padding(.vertical, ShellMetrics.windowEdgeInset)
-                            .transition(.move(edge: .leading))
-                    }
-                    Spacer(minLength: 0)
+            // Zelfde HStack in Edit en Preview — twee takken recreëren de
+            // sidebar (fade) en laten de zoom-chip meeschuiven bij canvas-exit.
+            HStack(alignment: .top, spacing: ShellMetrics.sidebarContentSpacing) {
+                if model.isLeftNavVisible {
+                    leftNavSlot
+                        .padding(.vertical, ShellMetrics.windowEdgeInset)
+                        .transition(.move(edge: .leading))
                 }
-            } else {
-                HStack(spacing: ShellMetrics.sidebarContentSpacing) {
-                    if model.isLeftNavVisible {
-                        leftNavSlot
-                            .padding(.vertical, ShellMetrics.windowEdgeInset)
-                            .transition(.move(edge: .leading))
-                    }
+                if studioFullBleed {
+                    Spacer(minLength: 0)
+                } else {
                     mainArea
                         .safeAreaPadding(.top, ShellMetrics.contentTopSafeArea)
                         .padding(.trailing, ShellMetrics.windowEdgeInset)
@@ -77,6 +72,8 @@ struct ShellView: View {
                 }
             }
         }
+        // Edit↔Preview niet animeren: anders fadet de sidebar en flitst de zoom-chip.
+        .transaction(value: studioFullBleed) { $0.animation = nil }
         // UXS-29(v2): de unified toolbar (stabilise) geeft het venster een hoge
         // top-safe-area. De shell negeert die op root-niveau zodat de zwevende
         // sidebar-kaart op z'n gap3-inset vanaf de vénstertop blijft (met de
@@ -109,11 +106,6 @@ struct ShellView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in
             model.refreshCanvasFromSelection()
-        }
-        // E19.1: Share/export-popup (DS) — item-snapshot voorkomt dismiss/represent
-        // bij shell layout-wissels (Edit↔Preview, studioFullBleed).
-        .dsPersistentSheet(item: $model.exportSession) { session in
-            ExportSheet(portraitID: session.id, isPro: entitlement.isProActive)
         }
         // E24.21: gedeelde rename-modal vanuit de Name/Role-knop op het canvas.
         .dsPersistentSheet(isPresented: $model.isShowingRename) {
@@ -156,8 +148,39 @@ struct ShellView: View {
         // eerder vanuit de chip in het Enhance-paneel, dus een tab-wissel gooide
         // een lopende generatie weg.
         .imagePlaygroundHost()
+        // E19.5/E50.3: toast voor de set-acties — eerst voortgang, dan de
+        // "klaar"-bon met Undo (8 s, hover pauzeert). Undo draait alleen terug
+        // als de actie nog bovenop de undo-stack ligt; anders sluit de toast.
+        // Zwevend child window (dsFloatingToast): de z-volgorde t.o.v. de
+        // contextmenu's is "laatst verschenen bovenop" i.p.v. de vaste
+        // overlay-volgorde (een menu dat ná de toast opende viel eronder).
+        .overlay(alignment: .bottomTrailing) { setActionToastLayer }
         // E53.7: contextmenu's + store-gedreven alerts/confirms.
         .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
+        // E19.1: Share/export-popup (DS). Overlay i.p.v. `.sheet` — SwiftUI
+        // breekt een sheet-venster af bij app-/vensterwissel en presenteert
+        // 'm opnieuw bij terugkeer (sluit-open-animatie). Overlay blijft in
+        // de view tree; `exportSession` op ShellModel is de bron. Boven
+        // FloatingOverlayHost zodat een lege overlay-ZStack clicks niet eet.
+        .overlay {
+            if let session = model.exportSession {
+                ZStack {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                    ExportSheet(
+                        portraitID: session.id,
+                        isPro: entitlement.isProActive,
+                        onClose: { model.exportSession = nil }
+                    )
+                    Button("Close") { model.exportSession = nil }
+                        .keyboardShortcut(.escape, modifiers: [])
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
+                }
+                .accessibilityAddTraits(.isModal)
+            }
+        }
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
@@ -165,18 +188,6 @@ struct ShellView: View {
                 .background(DSColor.Background.app)
                 .appliedAppearancePreference()
         }
-        // E19.5: voortgangs-toast voor de set-acties (Align/Match/Export).
-        .overlay(alignment: .bottomTrailing) {
-            if let message = model.setBusyMessage {
-                // UXS-2: geen sluitknop — deze set-actie loopt tot 'ie klaar is
-                // en heeft geen annuleer-pad. Een knop die niets doet is erger
-                // dan geen knop.
-                DSToast(title: message)
-                    .padding(DSSpacing.gap5)
-                    .transition(.dsSlide(.trailing, reduceMotion: reduceMotion))
-            }
-        }
-        .dsMotion(DSMotion.enter, value: model.setBusyMessage)
         .onChange(of: entitlement.openSettingsPage) { _, page in
             if let page {
                 model.openSettings(page: page)
@@ -222,6 +233,16 @@ struct ShellView: View {
                     await model.importImage(from: URL(fileURLWithPath: path))
                 }
             }
+            // Batch-drop-smoke: `--import-batch-after <pad1,pad2,…> [sec]` —
+            // simuleert een Finder-drop van meerdere bestanden (batch-pad).
+            if let i = args.firstIndex(of: "--import-batch-after"), args.indices.contains(i + 1) {
+                let paths = args[i + 1].split(separator: ",").map(String.init)
+                let delay = (args.indices.contains(i + 2) ? TimeInterval(args[i + 2]) : nil) ?? 3
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(delay))
+                    await model.importImages(paths.map { .file(URL(fileURLWithPath: $0)) })
+                }
+            }
             // Drop-import-smoke: `--record-states <logpad>` — logt ~15s lang elke
             // 50ms sectie + canvas-state + selectie, om de importflow-volgorde
             // te verifiëren zonder screen-recording-permissie.
@@ -242,7 +263,8 @@ struct ShellView: View {
                         case .failed(let msg): canvasDesc = "failed(\(msg))"
                         }
                         let line = "section=\(model.section) canvas=\(canvasDesc) " +
-                            "selected=\(model.selectedPortrait?.name ?? "nil")"
+                            "selected=\(model.selectedPortrait?.name ?? "nil") " +
+                            "imports=\(model.libraryImportJobs.count)"
                         if line != last {
                             lines.append(String(format: "%06dms %@", ms, line))
                             last = line
@@ -308,7 +330,11 @@ struct ShellView: View {
                 // Sandbox: schrijf in de container-tmp en log het pad.
                 let url = FileManager.default.temporaryDirectory
                     .appendingPathComponent(URL(fileURLWithPath: args[i + 1]).lastPathComponent)
-                if let data = PortraitExporter.makePNG(for: portrait, watermark: !pro, shape: portrait.frameShape) {
+                // Losse bindings: één expressie liet de type-checker time-outen.
+                let watermark = !pro
+                let shape = portrait.frameShape
+                let png: Data? = PortraitExporter.makePNG(for: portrait, watermark: watermark, shape: shape)
+                if let data = png {
                     try? data.write(to: url)
                     NSLog("EXPORT_PNG_WRITTEN \(url.path)")
                 }
@@ -383,7 +409,10 @@ struct ShellView: View {
                     .transition(.opacity)
             } else if model.section == .portraits {
                 // PoC (left-nav): de Portraits-grid van de geselecteerde map.
+                // Identiteit per map: een mapwissel wisselt de view (en dus de
+                // scale+fade van de gallery) i.p.v. alleen de inhoud te hertekenen.
                 PortraitsGalleryView(model: model, entitlement: entitlement)
+                    .id(model.selectedFolderID)
                     .transition(.opacity)
             } else if model.section == .banners {
                 // E35.3: Banners-bibliotheek.
@@ -408,6 +437,7 @@ struct ShellView: View {
         // E53.4: de reduce-motion-check zit in `dsMotion` zelf, niet in een
         // ternary per view — één plek die je kunt vertrouwen.
         .dsMotion(DSMotion.emphasis, value: model.section)
+        .dsMotion(DSMotion.emphasis, value: model.selectedFolderID)
         .dsMotion(DSMotion.emphasis, value: model.isShowingSocialPreview)
         .dsMotion(DSMotion.emphasis, value: model.isShowingBannerPreview)
         .dsMotion(DSMotion.emphasis, value: model.editingBanner != nil)
@@ -483,10 +513,16 @@ struct ShellView: View {
 
     private var isolatingStatusLabel: String? {
         switch model.canvas {
-        case .processing: "Removing background..."
-        case .revealing: "Cutting out hair..."
-        default: nil
+        case .processing: return "Removing background..."
+        case .revealing: return "Cutting out hair..."
+        default: break
         }
+        // Batch-import in de bibliotheek: één pill voor de hele reeks.
+        if let progress = model.libraryImportProgress, progress.total > 0 {
+            let current = min(progress.done + 1, progress.total)
+            return "Removing background... \(current) of \(progress.total)"
+        }
+        return nil
     }
 
     @ViewBuilder
@@ -512,6 +548,7 @@ struct ShellView: View {
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
                 onApplyResult: { await model.applyEffectResult($0) },
+                onApplyEffect: { await model.applyEffectResult($0, framing: $1) },
                 onApplyAlphaPreserving: { await model.applyEffectResult($0, preserveSourceAlpha: true) },
                 onApplyIsolated: { await model.applyIsolatedResult($0) },
                 onIsolateSubject: { try await model.isolateSubject($0, preferring: $1) },
@@ -629,31 +666,67 @@ struct ShellView: View {
         // Punt 14: tijdens Settings geen imports — de canvas-weergave is
         // niet zichtbaar, een stille import zou verwarren.
         guard !model.isShowingSettings, !model.isShowingSocialPreview else { return false }
-        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) {
+        // ÁLLE gedropte items (bug: alleen `providers.first` werd geïmporteerd —
+        // een team van 14 leverde één portret op). Bestanden gaan vóór losse
+        // beeld-data (een Finder-drop levert beide type-identifiers voor
+        // hetzelfde bestand). Eén beeld → single-pad (studio), meer → batch in
+        // de bibliotheek (`ShellModel.importImages`).
+        let files = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }
+        let images = files.isEmpty
+            ? providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
+            : []
+        guard !files.isEmpty || !images.isEmpty else { return false }
+        Task { @MainActor in
+            let sources = await DroppedImageSources.load(files: files, images: images)
+            guard !sources.isEmpty else { return }
+            await model.importImages(sources)
+        }
+        return true
+    }
+}
+
+/// Laadt de gedropte `NSItemProvider`s (callback-API) tot `ImportSource`s, in
+/// drop-volgorde. Bij meerdere bestanden vallen niet-beelden (een .txt tussen
+/// de foto's) stil af; een enkel bestand gaat ongefilterd door zodat het
+/// single-pad z'n "doesn't look like an image"-melding kan geven.
+private enum DroppedImageSources {
+    static func load(files: [NSItemProvider], images: [NSItemProvider]) async -> [ShellModel.ImportSource] {
+        var sources: [ShellModel.ImportSource] = []
+        for provider in files {
+            guard let url = await fileURL(from: provider) else { continue }
+            if files.count > 1, !isLikelyImageFile(url) { continue }
+            sources.append(.file(url))
+        }
+        for provider in images {
+            if let data = await imageData(from: provider) { sources.append(.data(data)) }
+        }
+        return sources
+    }
+
+    static func isLikelyImageFile(_ url: URL) -> Bool {
+        // Onbekende extensie → doorlaten; de decoder beslist.
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return true }
+        return type.conforms(to: .image)
+    }
+
+    private static func fileURL(from provider: NSItemProvider) async -> URL? {
+        await withCheckedContinuation { continuation in
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
-                let url: URL?
                 if let data = item as? Data {
-                    url = URL(dataRepresentation: data, relativeTo: nil)
+                    continuation.resume(returning: URL(dataRepresentation: data, relativeTo: nil))
                 } else {
-                    url = item as? URL
-                }
-                guard let url else { return }
-                Task { @MainActor in
-                    await model.importImage(from: url)
+                    continuation.resume(returning: item as? URL)
                 }
             }
-            return true
         }
-        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }) {
+    }
+
+    private static func imageData(from provider: NSItemProvider) async -> Data? {
+        await withCheckedContinuation { continuation in
             provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
-                guard let data else { return }
-                Task { @MainActor in
-                    await model.importImage(data: data)
-                }
+                continuation.resume(returning: data)
             }
-            return true
         }
-        return false
     }
 }
 
@@ -686,5 +759,48 @@ struct SettingsCommands: View {
         Button("Settings…") { openSettings?.open() }
             .keyboardShortcut(",", modifiers: .command)
             .disabled(openSettings == nil)
+    }
+}
+
+// MARK: - Set-actie-toast
+
+extension ShellView {
+    /// Zwevend child window (zie DSFloatingWindow) — apart van `body` gehouden
+    /// omdat de modifier-keten daar al tegen de type-check-limiet aanzit.
+    @ViewBuilder
+    fileprivate var setActionToastLayer: some View {
+        if let toast = model.setActionToast {
+            DSFloatingWindowAnchor(
+                placement: .corner(.bottomTrailing, padding: DSSpacing.gap5),
+                mode: .toast,
+                identity: toast
+            ) {
+                setActionToast(toast)
+            }
+        }
+    }
+
+    @ViewBuilder
+    fileprivate func setActionToast(_ toast: ShellModel.SetActionToast) -> some View {
+        switch toast {
+        case .busy(let message):
+            // UXS-2: geen sluitknop — deze set-actie loopt tot 'ie klaar is
+            // en heeft geen annuleer-pad. Een knop die niets doet is erger
+            // dan geen knop.
+            DSToast(title: message, isLoading: true)
+        case .done(let receipt):
+            DSToast(
+                title: receipt.title,
+                description: receipt.toastDescription,
+                autoDismiss: .seconds(8),
+                onClose: { model.dismissSetActionToast() },
+                action: receipt.canUndo
+                    ? DSToastAction("Undo", handler: {
+                        receipt.performUndo()
+                        model.dismissSetActionToast()
+                    })
+                    : nil
+            )
+        }
     }
 }

@@ -18,6 +18,8 @@ struct PreviewPickerPanel<Content: View, Footer: View>: View {
 
     private let panelWidth: CGFloat = 320
     private let maxPanelHeight: CGFloat = 360
+    /// Klik buiten de kaart (ook buiten de preview) sluit de kiezer.
+    @State private var clickScope = DSOutsideClickScope()
 
     init(
         anchor: CGRect,
@@ -51,6 +53,7 @@ struct PreviewPickerPanel<Content: View, Footer: View>: View {
                 .frame(width: panelWidth, alignment: .topLeading)
                 .fixedSize(horizontal: false, vertical: true)
                 .dsPanelSurface(cornerRadius: DSRadius.xl4)
+                .dsDismissOnOutsideClick(clickScope, isActive: true, onDismiss: onDismiss)
                 .offset(x: clampedX(in: geo.size), y: clampedY(in: geo.size))
             }
         }
@@ -99,6 +102,7 @@ struct PreviewTapTarget: ViewModifier {
                 }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(!enabled)
         .onHover { hovering = enabled && $0 }
         .background {

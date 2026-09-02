@@ -375,6 +375,79 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(EntitlementModel.infoToastDuration, .seconds(4))
     }
 
+    func testInfoToastAppearsAfterWorkingStateEnds() {
+        let model = EntitlementModel(auth: AuthService())
+        model.presentWorking(title: "Filling in body", messages: ["…"])
+        model.presentInfo(title: "Body completed", description: "Press ⌘Z to undo.")
+        XCTAssertEqual(
+            model.activeToast,
+            .working(EntitlementModel.WorkingContext(title: "Filling in body", messages: ["…"])),
+            "working feedback keeps priority until the result is fully applied"
+        )
+
+        model.dismissWorkingToast()
+        XCTAssertEqual(
+            model.activeToast,
+            .info(EntitlementModel.InfoToast(
+                title: "Body completed",
+                description: "Press ⌘Z to undo."
+            ))
+        )
+    }
+
+    func testWorkingTokenKanGeenNieuwereOperatieDismisssen() {
+        let model = EntitlementModel(auth: AuthService())
+        let first = model.presentWorking(title: "First", messages: ["…"])
+        let second = model.presentWorking(title: "Second", messages: ["…"])
+
+        model.dismissWorkingToast(id: first)
+        XCTAssertEqual(model.activeToast, .working(.init(title: "Second", messages: ["…"])))
+
+        model.dismissWorkingToast(id: second)
+        XCTAssertNil(model.activeToast)
+    }
+
+    func testExclusieveFillBodyStatusBlokkeertAndereAIFeatures() {
+        let model = EntitlementModel(auth: AuthService())
+        model.presentWorking(
+            title: "Filling in body",
+            messages: ["…"],
+            isDismissible: false,
+            blocksOtherAIFeatures: true
+        )
+
+        XCTAssertFalse(model.allowAIFeature(.boostOnline))
+    }
+
+    /// Een niet-dismissible, blokkerende toast moet via Cancel alsnog uit
+    /// kunnen: de handler hangt aan het model (Avatar2App geeft 'm aan
+    /// WorkingToastView door) en wordt bij dismiss opgeruimd, zodat een
+    /// volgende toast niet met een oude cancel-actie start.
+    func testWorkingToastCancelHandlerWordtDoorgegevenEnOpgeruimd() {
+        let model = EntitlementModel(auth: AuthService())
+        var cancelled = 0
+        let id = model.presentWorking(
+            title: "Filling in body",
+            messages: ["…"],
+            isDismissible: false,
+            blocksOtherAIFeatures: true,
+            cancelHint: "Stop filling in",
+            onCancel: { cancelled += 1 }
+        )
+        XCTAssertNotNil(model.workingCancelHandler)
+        XCTAssertEqual(model.workingContext?.cancelHint, "Stop filling in")
+
+        model.workingCancelHandler?()
+        XCTAssertEqual(cancelled, 1)
+
+        model.dismissWorkingToast(id: id)
+        XCTAssertNil(model.workingCancelHandler)
+        XCTAssertNil(model.activeToast)
+
+        model.presentWorking(title: "Colorising", messages: ["…"])
+        XCTAssertNil(model.workingCancelHandler, "een toast zonder Cancel erft geen oude handler")
+    }
+
     /// E44.2: een 200-response met onbruikbare bytes (guard-pad in
     /// EditorView's Boost/Colorise/Fill-in-body) moet een zichtbare fout
     /// tonen ÉN het saldo verversen — de server kan op dat pad al een credit

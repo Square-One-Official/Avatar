@@ -21,4 +21,20 @@ final class DSSegmentedControlTests: XCTestCase {
 
         XCTAssertNotNil(ImageRenderer(content: view).cgImage)
     }
+
+    @MainActor
+    func testKeyboardFocusableZonderSysteemringRendert() {
+        let view = DSSegmentedControl(
+            selection: .constant(.a),
+            segments: [
+                .init(tag: Tab.a, label: "Backgrounds"),
+                .init(tag: Tab.b, label: "Effects"),
+            ]
+        )
+        .dsKeyboardFocusable()
+        .dsFocusEffectDisabled()
+        .frame(width: 280)
+
+        XCTAssertNotNil(ImageRenderer(content: view).cgImage)
+    }
 }

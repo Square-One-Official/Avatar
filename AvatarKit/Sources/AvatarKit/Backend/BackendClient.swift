@@ -74,7 +74,7 @@ public final class BackendClient {
 
     /// Productie = `api.aaavatar.nl`. In DEBUG kan een override de client
     /// tegen een Vercel-preview richten (E01.15): env `AAAVATAR_API_BASE` of
-    /// UserDefaults `dev.apiBase` (Advanced-settings). Een Release-build
+    /// UserDefaults `dev.apiBase`. Een Release-build
     /// negeert beide → altijd productie. TLS-pinning raakt dit niet: alleen
     /// `api.aaavatar.nl` is gepind; andere hosts (zoals *.vercel.app) vallen
     /// terug op OS-trust (TLSPinningDelegate).
@@ -229,6 +229,9 @@ public final class BackendClient {
     private struct FillBodyResponse: Decodable {
         let cutout: String
         let creditsRemaining: Int
+        let didFill: Bool
+        let mapping: FillBodyResult.Mapping
+        let filledEdges: FillBodyResult.Edges
     }
     /// Normalised face rectangle (0..1, top-left origin) of the input cutout.
     /// The backend uses this to lock the face region as never-paint in the
@@ -249,7 +252,58 @@ public final class BackendClient {
             self.height = height
         }
     }
-    public func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+    public struct FillBodyResult: Sendable {
+        public struct Mapping: Decodable, Sendable, Equatable {
+            public let canvasWidth: Int
+            public let canvasHeight: Int
+            public let originalX: Int
+            public let originalY: Int
+            public let originalWidth: Int
+            public let originalHeight: Int
+
+            public init(
+                canvasWidth: Int,
+                canvasHeight: Int,
+                originalX: Int,
+                originalY: Int,
+                originalWidth: Int,
+                originalHeight: Int
+            ) {
+                self.canvasWidth = canvasWidth
+                self.canvasHeight = canvasHeight
+                self.originalX = originalX
+                self.originalY = originalY
+                self.originalWidth = originalWidth
+                self.originalHeight = originalHeight
+            }
+        }
+
+        public struct Edges: Decodable, Sendable, Equatable {
+            public let left: Bool
+            public let right: Bool
+            public let bottom: Bool
+
+            public init(left: Bool, right: Bool, bottom: Bool) {
+                self.left = left
+                self.right = right
+                self.bottom = bottom
+            }
+        }
+
+        public let data: Data
+        public let creditsRemaining: Int
+        public let didFill: Bool
+        public let mapping: Mapping
+        public let filledEdges: Edges
+    }
+
+    /// Detailed v2 contract: includes whether work was necessary and where the
+    /// original pixels live in the expanded result. Deploy the backend contract
+    /// before the app update so an old response cannot be applied ambiguously.
+    public func fillBodyDetailed(
+        imagePNG: Data,
+        faceBox: FaceBox? = nil
+    ) async throws -> FillBodyResult {
         let storageKey = try await uploadInputPNG(imagePNG)
         struct Body: Encodable {
             let storageKey: String
@@ -269,7 +323,20 @@ public final class BackendClient {
         guard let data = Data(base64Encoded: resp.cutout) else {
             throw BackendError.decode
         }
-        return (data, resp.creditsRemaining)
+        return FillBodyResult(
+            data: data,
+            creditsRemaining: resp.creditsRemaining,
+            didFill: resp.didFill,
+            mapping: resp.mapping,
+            filledEdges: resp.filledEdges
+        )
+    }
+
+    /// Backward-compatible tuple API used by v1. New call sites should use
+    /// `fillBodyDetailed` so they can preserve composition and handle no-op.
+    public func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+        let result = try await fillBodyDetailed(imagePNG: imagePNG, faceBox: faceBox)
+        return (result.data, result.creditsRemaining)
     }
 
     // MARK: POST /v1/colorize
@@ -407,7 +474,7 @@ public final class BackendClient {
         let body = try JSONEncoder().encode(
             StylizeBody(
                 storageKey: storageKey,
-                generationModel: GenerationModelStore.shared.explicit?.rawValue,
+                generationModel: nil,
                 modelOverride: DevModelOverrides.shared.override(for: .stylize),
                 cutoutW: cutoutWidth,
                 cutoutH: cutoutHeight,
@@ -446,9 +513,8 @@ public final class BackendClient {
     /// CMS-lijst (`effects()`); de server mapt 'm naar de stijlprompt (incl.
     /// identity-clausule); een vrij prompt-veld is dev-only en hier bewust niet
     /// bereikbaar. De default-engine is server-governed (E55.2: gpt-image-2,
-    /// env-overridable); `generation_model` gaat alléén mee bij een expliciete
-    /// Settings-keuze en `model_override` (dev) als de DevModelOverrides-store
-    /// een keuze heeft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
+    /// env-overridable). De app stuurt geen gebruikers-`generation_model`;
+    /// `model_override` (dev) blijft. Resultaat = opaque styled PNG + bijgewerkt creditsaldo.
     ///
     /// Op 402 (geen credits) gooit dit `BackendError.noCredits` → de caller
     /// toont de paywall; andere fouten propageren voor de faaltoast.
@@ -516,9 +582,9 @@ public final class BackendClient {
             }
         }
 
-        // E55.2: zonder expliciete keuze géén key meesturen — de server bepaalt
-        // de feature-default (generate_background blijft nano-banana).
-        let modelKey = generationModel ?? GenerationModelStore.shared.explicit?.rawValue
+        // Feature-default is server-side (generate_background = nano-banana)
+        // unless the sheet passed an explicit engine key (Gemini).
+        let modelKey = generationModel
         let body = try JSONEncoder().encode(
             Body(
                 userPrompt: userPrompt,
@@ -563,7 +629,7 @@ public final class BackendClient {
         }
         let body = try JSONEncoder().encode(
             Body(storageKey: storageKey, customEffectId: customEffectID,
-                 generationModel: GenerationModelStore.shared.explicit?.rawValue,
+                 generationModel: nil,
                  modelOverride: DevModelOverrides.shared.override(for: .stylize))
         )
         let resp: StylizeResponse = try await request(
@@ -816,6 +882,14 @@ public final class BackendClient {
         // Het endpoint stuurt `deleted:false` alleen met een 5xx (dan is de
         // server-throw hierboven al gebeurd), maar guard defensief.
         guard resp.deleted else { throw BackendError.server(500, "delete_failed") }
+    }
+
+    // MARK: GET /v1/billing (Settings › Billing & Invoices)
+    /// Huidig plan (lijstprijs, korting, volgende afschrijving) + factuur-
+    /// historie uit Stripe. Vereist een sessie; zonder Stripe-customer stuurt
+    /// de server `plan: null, invoices: []` (Starter).
+    public func billing() async throws -> BillingPayload {
+        try await request("/v1/billing", method: "GET")
     }
 
     // MARK: POST /v1/checkout/topup

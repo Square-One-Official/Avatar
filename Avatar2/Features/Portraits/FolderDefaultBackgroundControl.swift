@@ -36,6 +36,7 @@ struct FolderDefaultBackgroundControl: View {
                 .contentShape(RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
         .help(FolderDefaultBackgroundControl.help(for: folder.defaultBackground))
         .dsDropdownMenu(isPresented: $isPickerOpen, anchorHeight: Self.thumbHeight, gap: DSSpacing.gap2) {
@@ -44,6 +45,7 @@ struct FolderDefaultBackgroundControl: View {
                 folder: folder,
                 onApply: { background in
                     folder.setDefaultBackground(background)
+                    isPickerOpen = false
                 },
                 presentation: presentation,
                 entitlement: entitlement
@@ -51,7 +53,9 @@ struct FolderDefaultBackgroundControl: View {
             .padding(DSSpacing.gap4)
             .frame(width: 440)
             .fixedSize(horizontal: false, vertical: true)
-            .dsPanelSurface(cornerRadius: DSRadius.xl4)
+            .dsMenuSurface()
+            .zIndex(1000)
+            .compositingGroup()
         }
     }
 

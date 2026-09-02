@@ -8,11 +8,14 @@
 
 import SwiftUI
 
-/// De vier Settings-pagina's. Volgorde = sub-nav-volgorde.
+/// De Settings-pagina's. Volgorde = sub-nav-volgorde. Billing & Invoices
+/// (2026-09-02) is de vijfde: geen Figma-frame, gebouwd naar het referentie-
+/// ontwerp dat Thierry aandroeg — zie SettingsBillingPage.
 enum SettingsPage: String, CaseIterable, Identifiable {
     case preferences
     case aiModels
     case account
+    case billing
     case about
 
     var id: String { rawValue }
@@ -22,6 +25,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .preferences: return "Preferences"
         case .aiModels: return "AI & Models"
         case .account: return "Account"
+        case .billing: return "Billing & Invoices"
         case .about: return "About"
         }
     }

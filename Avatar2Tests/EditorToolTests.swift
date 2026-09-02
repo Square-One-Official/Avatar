@@ -9,13 +9,13 @@ import XCTest
 final class EditorToolTests: XCTestCase {
 
     func testAlleToolsCompleetGedefinieerd() {
-        XCTAssertEqual(EditorTool.allCases.count, 7)
+        XCTAssertEqual(EditorTool.allCases.count, 8)
         for tool in EditorTool.allCases {
             XCTAssertFalse(tool.label.isEmpty)
         }
         XCTAssertEqual(
             EditorTool.allCases.map(\.label),
-            ["Edit", "Effects", "Face", "Clothing", "Hair", "Background", "Images"]
+            ["Edit", "Adjust", "Effects", "Face", "Clothing", "Hair", "Background", "Images"]
         )
     }
 
@@ -24,6 +24,7 @@ final class EditorToolTests: XCTestCase {
     func testUnreleasedToolsHiddenWhenRemoteAllowsThem() {
         let flags = RemoteFeatureFlags.allEnabled
         XCTAssertTrue(EditorTool.edit.isEnabled(remote: flags))
+        XCTAssertTrue(EditorTool.adjust.isEnabled(remote: flags))
         XCTAssertTrue(EditorTool.effects.isEnabled(remote: flags))
         XCTAssertFalse(EditorTool.face.isEnabled(remote: flags))
         XCTAssertFalse(EditorTool.hair.isEnabled(remote: flags))
@@ -40,5 +41,14 @@ final class EditorToolTests: XCTestCase {
         )
         XCTAssertFalse(EditorTool.effects.isEnabled(remote: flags))
         XCTAssertTrue(EditorTool.edit.isEnabled(remote: flags))
+    }
+
+    func testAdjustNumericParseAcceptsSignedDisplay() {
+        XCTAssertEqual(AdjustPanel.parseDisplay("0"), 0)
+        XCTAssertEqual(AdjustPanel.parseDisplay("+12"), 12)
+        XCTAssertEqual(AdjustPanel.parseDisplay("-7"), -7)
+        XCTAssertEqual(AdjustPanel.parseDisplay("  +40 "), 40)
+        XCTAssertNil(AdjustPanel.parseDisplay(""))
+        XCTAssertNil(AdjustPanel.parseDisplay("abc"))
     }
 }

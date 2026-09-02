@@ -181,8 +181,7 @@ struct BannerCanvasTextChrome: View {
             .strokeBorder(DSColor.Action.primary, lineWidth: 1.5)
             .frame(width: rect.width + 8, height: rect.height + 8)
             .contentShape(Rectangle())
-            .focusable(!isEditing)
-            .focusEffectDisabled()
+            .dsKeyboardFocusable(!isEditing)
             .focused($boxFocused)
             .onDeleteCommand { removeLayer() }
             .onKeyPress(phases: .down) { press in handleTypeToEdit(press) }

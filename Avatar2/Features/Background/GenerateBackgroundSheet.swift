@@ -31,11 +31,7 @@ struct GenerateBackgroundSheet: View {
         self.entitlement = entitlement
         self.applyAfterSave = applyAfterSave
         self.onSaved = onSaved
-        _form = State(initialValue: BackgroundGenerationForm(model: BackgroundGenerationCatalog.defaultModel()))
-    }
-
-    private var availableModels: [BackgroundGenerationModel] {
-        BackgroundGenerationCatalog.availableModels()
+        _form = State(initialValue: BackgroundGenerationForm(model: .gemini))
     }
 
     var body: some View {
@@ -45,19 +41,14 @@ struct GenerateBackgroundSheet: View {
                 .padding(.top, DSSpacing.gap5)
                 .padding(.bottom, DSSpacing.gap3)
 
-            if availableModels.isEmpty {
-                emptyTierHint
-                    .padding(.horizontal, DSSpacing.gap5)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: DSSpacing.gap3) {
-                        stepsCard
-                        promptBlock
-                    }
-                    .padding(.horizontal, DSSpacing.gap5)
+            ScrollView {
+                VStack(alignment: .leading, spacing: DSSpacing.gap3) {
+                    stepsCard
+                    promptBlock
                 }
-                .frame(maxHeight: 420)
+                .padding(.horizontal, DSSpacing.gap5)
             }
+            .frame(maxHeight: 420)
 
             actionRow
                 .padding(DSSpacing.gap5)
@@ -65,9 +56,7 @@ struct GenerateBackgroundSheet: View {
         .frame(width: 400)
         .background(DSColor.Background.app)
         .appliedAppearancePreference()
-        .onAppear { alignDefaultModel() }
         .onDisappear { form.coordinator.cancel() }
-        .background { applePlaygroundBridge }
     }
 
     // MARK: - Header
@@ -90,83 +79,19 @@ struct GenerateBackgroundSheet: View {
         }
     }
 
-    private var emptyTierHint: some View {
-        Text("Enable Apple Private Cloud or Advanced privacy in Settings to generate backgrounds.")
-            .dsTextStyle(.bodySmall)
-            .foregroundStyle(DSColor.Foreground.muted)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
     // MARK: - Steps card
 
     private var stepsCard: some View {
         VStack(spacing: 0) {
-            modelRow
-            stepDivider
             styleStep
             stepDivider
             viewStep
         }
         .dsPanelSurface(cornerRadius: DSRadius.xl2, solid: true)
-        .dsDropdownDismissOverlay(isPresented: $form.modelMenuOpen)
     }
 
     private var stepDivider: some View {
         Divider().overlay(DSColor.Foreground.divider).padding(.leading, DSSpacing.gap3)
-    }
-
-    private var modelRow: some View {
-        HStack(spacing: DSSpacing.gap2) {
-            stepIcon("sparkles")
-            Text("Model")
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.muted)
-            Spacer(minLength: DSSpacing.gap2)
-            if availableModels.count > 1 {
-                modelMenu
-            } else {
-                Text(form.model.label)
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-            }
-        }
-        .padding(.horizontal, DSSpacing.gap3)
-        .padding(.vertical, DSSpacing.gap2_5)
-    }
-
-    private var modelMenu: some View {
-        DSDropdownButton(
-            isPresented: $form.modelMenuOpen,
-            anchorHeight: 28,
-            minWidth: 150,
-            placement: .below
-        ) {
-            HStack(spacing: DSSpacing.gap1) {
-                Text(form.model.label)
-                    .dsTextStyle(.labelBase)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: DSIconSize.xxs, weight: .semibold))
-                    .foregroundStyle(DSColor.Foreground.muted)
-            }
-            .foregroundStyle(DSColor.Foreground.primary)
-            .padding(.horizontal, DSSpacing.gap2)
-            .frame(height: 28)
-            .background(DSColor.Background.neutral, in: Capsule())
-        } menu: {
-            ForEach(availableModels) { option in
-                DSMenuRow(
-                    option.label,
-                    icon: option.menuIcon,
-                    shortcut: option == form.model ? "✓" : nil
-                ) {
-                    form.model = option
-                    if option == .apple { form.expandedStep = nil }
-                    form.modelMenuOpen = false
-                }
-            }
-        }
-        .fixedSize()
-        .disabled(form.isGenerating)
     }
 
     private var styleStep: some View {
@@ -174,16 +99,12 @@ struct GenerateBackgroundSheet: View {
             step: .style,
             icon: "photo.on.rectangle.angled",
             title: "Style",
-            summary: styleSummary
+            summary: form.style.label
         ) {
-            if form.usesCloudModel {
-                styleGrid
-                if form.style == .custom {
-                    DSTextField(placeholder: "Describe a style…", text: $form.customStyleText)
-                        .disabled(form.isGenerating)
-                }
-            } else {
-                appleStepHint
+            styleGrid
+            if form.style == .custom {
+                DSTextField(placeholder: "Describe a style…", text: $form.customStyleText)
+                    .disabled(form.isGenerating)
             }
         }
     }
@@ -195,24 +116,8 @@ struct GenerateBackgroundSheet: View {
             title: "View",
             summary: form.selectedView.label
         ) {
-            if form.usesCloudModel {
-                viewGrid
-            } else {
-                appleStepHint
-            }
+            viewGrid
         }
-    }
-
-    private var styleSummary: String {
-        form.usesCloudModel ? form.style.label : "Apple Intelligence"
-    }
-
-    private var appleStepHint: some View {
-        Text("Chosen in Apple Intelligence when you continue.")
-            .dsTextStyle(.bodySmall)
-            .foregroundStyle(DSColor.Foreground.muted)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func collapsibleStep<Content: View>(
@@ -249,6 +154,7 @@ struct GenerateBackgroundSheet: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .disabled(form.isGenerating)
 
             if isExpanded {
@@ -322,6 +228,7 @@ struct GenerateBackgroundSheet: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(form.isGenerating)
     }
 
@@ -354,6 +261,7 @@ struct GenerateBackgroundSheet: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(form.isGenerating)
     }
 
@@ -370,53 +278,31 @@ struct GenerateBackgroundSheet: View {
 
     private var promptBlock: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1_5) {
-            if form.usesCloudModel {
-                DSTextField(
-                    placeholder: "Describe a background…",
-                    validation: form.errorMessage == nil ? .normal : .error,
-                    text: $form.prompt
-                )
-                .disabled(form.isGenerating)
-            }
+            DSTextField(
+                placeholder: "Describe a background…",
+                validation: form.errorMessage == nil ? .normal : .error,
+                text: $form.prompt
+            )
+            .disabled(form.isGenerating)
             if let errorMessage = form.errorMessage {
                 Text(errorMessage)
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Signal.error)
             }
             HStack(spacing: DSSpacing.gap1) {
-                DSPrivacyBadge(tier: form.model.privacyTier == .appleCloud ? .appleCloud : .thirdParty)
-                Text(modelFooter)
+                DSPrivacyBadge(tier: .thirdParty)
+                Text("\(context.creditCost) credits · processed securely online")
                     .dsTextStyle(.labelSmall)
                     .foregroundStyle(DSColor.Foreground.subtle)
             }
         }
     }
 
-    private var modelFooter: String {
-        switch form.model {
-        case .apple:
-            return "0 credits · Apple Intelligence"
-        case .gemini, .openAI:
-            return "\(context.creditCost) credits · processed securely online"
-        }
-    }
-
     // MARK: - Actions
-
-    private var footerNoteText: String {
-        switch form.model {
-        case .apple:
-            return "Powered by Apple Intelligence. May create unexpected results."
-        case .gemini:
-            return "Powered by Gemini. May create unexpected results."
-        case .openAI:
-            return "Powered by OpenAI. May create unexpected results."
-        }
-    }
 
     private var actionRow: some View {
         VStack(spacing: DSSpacing.gap2) {
-            Text(footerNoteText)
+            Text("May create unexpected results.")
                 .dsTextStyle(.bodySmall)
                 .foregroundStyle(DSColor.Foreground.subtle)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -426,7 +312,7 @@ struct GenerateBackgroundSheet: View {
                 }
                 .disabled(form.isGenerating)
                 DSPrimaryButton(
-                    form.isGenerating ? "Generating…" : generateButtonTitle,
+                    form.isGenerating ? "Generating…" : "Generate",
                     fullWidth: true
                 ) {
                     Task { await generate() }
@@ -436,65 +322,14 @@ struct GenerateBackgroundSheet: View {
         }
     }
 
-    private var generateButtonTitle: String {
-        form.model == .apple ? "Continue" : "Generate"
-    }
-
-    // MARK: - Apple bridge
-
-    @ViewBuilder
-    private var applePlaygroundBridge: some View {
-        #if canImport(ImagePlayground)
-        if #available(macOS 15.1, *) {
-            Color.clear
-                .frame(width: 0, height: 0)
-                .appleBackgroundPlaygroundSheet(
-                    isPresented: $form.showApplePlayground,
-                    onCompletion: handleAppleCompletion,
-                    onCancellation: { form.showApplePlayground = false }
-                )
-        }
-        #endif
-    }
-
-    private func alignDefaultModel() {
-        let models = availableModels
-        guard !models.isEmpty else { return }
-        if !models.contains(form.model) {
-            form.model = models.first ?? .gemini
-        }
-    }
-
-    private func handleAppleCompletion(_ url: URL) {
-        form.showApplePlayground = false
-        guard let raw = ImagePlaygroundEntry.pngData(from: url),
-              let stored = form.coordinator.persistToLibrary(raw) else {
-            form.errorMessage = "Couldn't save the image."
-            return
-        }
-        BackgroundGenerationCatalog.storeModel(.apple)
-        onSaved(stored)
-    }
-
     @MainActor
     private func generate() async {
         guard let entitlement else { return }
-
-        if form.model == .apple {
-            guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
-            #if canImport(ImagePlayground)
-            if #available(macOS 15.1, *) {
-                form.showApplePlayground = true
-            }
-            #endif
-            return
-        }
 
         guard entitlement.allowAIFeature(.backgroundGenerate) else { return }
 
         form.errorMessage = nil
         form.isGenerating = true
-        BackgroundGenerationCatalog.storeModel(form.model)
         defer { form.isGenerating = false }
 
         do {
@@ -590,7 +425,7 @@ final class BackgroundGenerationForm {
 /// Gedeelde privacy-gate + presentatie voor de generate-entrypoints
 /// (icon-swatch in het banner-paneel, gelabelde knop in het portret-paneel).
 @MainActor
-private func presentGenerateBackground(
+func presentGenerateBackground(
     context: BackgroundGenerationContext,
     entitlement: EntitlementModel?,
     applyAfterSave: Bool,
@@ -599,14 +434,17 @@ private func presentGenerateBackground(
     guard let entitlement else { return }
     switch PrivacyPreferences2.shared.effectiveTier {
     case .onDevice:
-        // E49.2: de allowAIFeature-call toont de elevation-modal — dan NIET
-        // ook nog de generate-sheet openen (dubbele modal-bug).
-        _ = entitlement.allowAIFeature(.backgroundGenerate)
+        _ = entitlement.allowAIFeature(.backgroundGenerate, retry: {
+            presentGenerateBackground(
+                context: context,
+                entitlement: entitlement,
+                applyAfterSave: applyAfterSave,
+                onSaved: onSaved
+            )
+        })
         return
-    case .appleCloud:
-        guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
-    case .thirdParty:
-        break
+    case .appleCloud, .thirdParty:
+        guard entitlement.allowAIFeature(.backgroundGenerate) else { return }
     }
     GenerateBackgroundPresenter.shared.present(
         context: context,
@@ -631,20 +469,17 @@ struct GenerateBackgroundSwatch: View {
                     .overlay { swatchIcon }
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverScale()
             .help("Generate a background")
+            .cloudFeatureMuted()
         }
     }
 
     @ViewBuilder
     private var swatchIcon: some View {
-        if PrivacyPreferences2.shared.effectiveTier >= .thirdParty {
-            DSIcon(.privacyAdvanced, size: 14, weight: .bold)
-                .foregroundStyle(DSColor.Foreground.subtle)
-        } else {
-            DSIcon(.privacyAppleCloud, size: 14, weight: .bold)
-                .foregroundStyle(DSColor.Foreground.subtle)
-        }
+        DSIcon(.privacyAdvanced, size: 14, weight: .bold)
+            .foregroundStyle(DSColor.Foreground.subtle)
     }
 
     private func openSheet() {
@@ -679,6 +514,7 @@ struct GenerateBackgroundButton: View {
                 )
             }
             .help("Generate a background with AI")
+            .cloudFeatureMuted()
         }
     }
 }

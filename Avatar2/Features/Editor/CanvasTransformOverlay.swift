@@ -38,12 +38,13 @@ struct CanvasTransformOverlay: View {
     var body: some View {
         let t = resolvedTransform()
         let factor = side / FramingConstants.editCanvas.width
+        let layout = image.pixelLayoutSize
         // Onderwerp-box in canvas-punten (vóór camera).
-        let imgW = image.size.width * t.scale * factor
-        let imgH = image.size.height * t.scale * factor
+        let imgW = layout.width * t.scale * factor
+        let imgH = layout.height * t.scale * factor
         let centerCanvas = CGPoint(
-            x: (t.offsetX + image.size.width * t.scale / 2) * factor,
-            y: (t.offsetY + image.size.height * t.scale / 2) * factor
+            x: (t.offsetX + layout.width * t.scale / 2) * factor,
+            y: (t.offsetY + layout.height * t.scale / 2) * factor
         )
         // Camera-mapping: scherm = midden + scale·(p − midden) + offset.
         let vp = cardCenter ?? CGPoint(x: side / 2, y: side / 2)
@@ -132,7 +133,7 @@ struct CanvasTransformOverlay: View {
     private func fitTransform() -> (offsetX: Double, offsetY: Double, scale: Double) {
         // Canonieke padded-fit: AutoFramer.fitTransform (gedeeld met
         // EditorCanvasView — voorheen hier 1-op-1 gedupliceerd).
-        let t = AutoFramer.fitTransform(cutoutSize: image.size)
+        let t = AutoFramer.fitTransform(cutoutSize: image.pixelLayoutSize)
         return (t.offset.width, t.offset.height, t.scale)
     }
 
@@ -145,10 +146,11 @@ struct CanvasTransformOverlay: View {
             max(baseline * FramingConstants.minZoomFactor, newScale)
         )
         guard clamped != cur.scale else { return }
-        let cxU = cur.offsetX + image.size.width * cur.scale / 2
-        let cyU = cur.offsetY + image.size.height * cur.scale / 2
-        portrait.offsetX = cxU - image.size.width * clamped / 2
-        portrait.offsetY = cyU - image.size.height * clamped / 2
+        let layout = image.pixelLayoutSize
+        let cxU = cur.offsetX + layout.width * cur.scale / 2
+        let cyU = cur.offsetY + layout.height * cur.scale / 2
+        portrait.offsetX = cxU - layout.width * clamped / 2
+        portrait.offsetY = cyU - layout.height * clamped / 2
         portrait.scale = clamped
     }
 

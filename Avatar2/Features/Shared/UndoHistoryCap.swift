@@ -1,6 +1,6 @@
 // E49.3: begrens de undo-history van het venster. `levelsOfUndo` stond
 // nergens gezet (NSUndoManager-default = onbegrensd), terwijl beeld-edits
-// (CutoutDataUndo/ImageEnhanceUndo) volledige PNG-`Data` in hun closures
+// (ImageEnhanceUndo) volledige PNG-`Data` in hun closures
 // vasthouden — een lange sessie stapelde zo multi-MB payloads zonder plafond.
 // Twintig stappen dekt ruim een editorsessie en houdt het geheugen begrensd.
 

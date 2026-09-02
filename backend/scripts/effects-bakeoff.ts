@@ -36,7 +36,7 @@ import {
 } from "../lib/image.js";
 import { modelFixedAspects } from "../lib/models.js";
 import { stylizeEdit } from "../lib/replicate.js";
-import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE } from "../lib/stylizePrompts.js";
+import { composeEffectPrompt } from "../lib/stylizePrompts.js";
 
 const SEED_DIR =
   "/Users/thierry/Documents/Aaavatar_ChatGPT Images 2.0 Edit_2026-05-03_08-35-45/Effects";
@@ -160,9 +160,12 @@ for (const portrait of portraitNames) {
       // Prompt exact als /v1/stylize voor Effects: CMS-prompt (eindigt op de
       // identity-clausule) + rolclausule bij refs + framing (preserve_framing
       // staat in productie hard aan voor Effects).
-      let prompt = style.prompt;
-      if (refs.length > 0) prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
-      prompt = `${prompt} ${FRAMING_CLAUSE}`;
+      const prompt = composeEffectPrompt({
+        basePrompt: style.prompt,
+        styleKey: style.key,
+        hasStyleReferences: refs.length > 0,
+        preserveFraming: true,
+      });
 
       const name = `${style.key}-${portrait}-${arm}`;
       const t0 = Date.now();

@@ -23,8 +23,8 @@ public struct RemoteAppConfig: Sendable {
     /// Tot 6 portret-voorbeelden in de cirkels op het lege canvas
     /// (waren gekleurde `person.fill`-placeholder-cirkels).
     public let emptyStateAvatarUrls: [URL]
-    /// CMS-gestuurde gradient-presets voor het Background-paneel.
-    /// Leeg = app toont de 5 hardgecodeerde presets als fallback.
+    /// CMS-gestuurde extra gradient-presets voor het Background-paneel.
+    /// Leeg = app toont alleen de 10 lokale mesh-presets.
     public let gradientPresets: [RemoteGradientPreset]
     /// Bullets in de Pro-kaart op het Paywall-scherm.
     /// Leeg = app toont de Engelse hardgecodeerde teksten als fallback.

@@ -47,6 +47,14 @@ final class BrandColorKitTests: XCTestCase {
         XCTAssertEqual(kit.hexColors, ["#1040FF", "#8D1212"])
     }
 
+    func testAddPlacesNewestLastInStorageNewestFirstWhenReversed() {
+        let kit = BrandColorKit(defaults: makeDefaults(["#1040FF"]))
+        kit.add("#8B1010")
+        XCTAssertEqual(kit.hexColors, ["#1040FF", "#8B1010"])
+        XCTAssertEqual(kit.hexColors.reversed().first, "#8B1010",
+                       "Gallery toont newest naast de plus via reversed()")
+    }
+
     func testRemoveDeletesAndPersists() {
         let defaults = makeDefaults(["#8B1010", "#1040FF"])
         let kit = BrandColorKit(defaults: defaults)

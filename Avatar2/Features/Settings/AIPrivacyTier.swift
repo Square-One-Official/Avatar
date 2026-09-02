@@ -1,5 +1,6 @@
-// Drie privacy-tiers voor AI-bewerkingen (Privacy Tier Picker). Vervangt de
-// binaire localOnly/cloudAllowed-modus; legacy rawValues blijven leesbaar bij migratie.
+// Privacy-tiers voor AI-bewerkingen. Intern blijven drie waarden bestaan
+// (Image Playground vereist nog `appleCloud`); de UI toont alleen Local only
+// en Cloud (besluit Thierry 2026-09-02 — Figma toont nog drie rijen).
 
 import AvatarUI
 import Foundation
@@ -12,6 +13,9 @@ enum AIPrivacyTier: Int, CaseIterable, Codable, Sendable, Comparable {
     static func < (lhs: AIPrivacyTier, rhs: AIPrivacyTier) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
+
+    /// Settings + onboarding: twee keuzes. `appleCloud` migreert naar Cloud.
+    static var userFacingChoices: [AIPrivacyTier] { [.onDevice, .thirdParty] }
 
     var storageKey: String {
         switch self {
@@ -30,22 +34,24 @@ enum AIPrivacyTier: Int, CaseIterable, Codable, Sendable, Comparable {
         }
     }
 
+    /// Opgeslagen Apple-Private-Cloud-keuze telt als Cloud.
+    var userFacing: AIPrivacyTier {
+        self == .onDevice ? .onDevice : .thirdParty
+    }
+
     var title: String {
         switch self {
-        case .onDevice: return "On-device"
-        case .appleCloud: return "Apple Private Cloud"
-        case .thirdParty: return "Advanced"
+        case .onDevice: return "Local only"
+        case .appleCloud, .thirdParty: return "Cloud"
         }
     }
 
     var description: String {
         switch self {
         case .onDevice:
-            return "Your photos stay on your Mac. Edit, retouch and export. Fully offline."
-        case .appleCloud:
-            return "More creative AI through Apple, with Apple's privacy promise. Not used for training."
-        case .thirdParty:
-            return "The strongest results: sharper edges, styles and face edits. Processed securely, never used for training."
+            return "Photos stay on this Mac. Edit, retouch and export. Cloud features stay off until you turn them on."
+        case .appleCloud, .thirdParty:
+            return "The strongest AI results. Processed securely, never used for training. We pick the best model for each edit."
         }
     }
 

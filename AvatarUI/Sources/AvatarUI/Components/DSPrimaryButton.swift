@@ -52,5 +52,6 @@ public struct DSPrimaryButton: View {
                 .background(isEnabled ? DSColor.Background.action : DSColor.Background.neutralStronger, in: Capsule())
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .dsFocusEffectDisabled()
     }
 }

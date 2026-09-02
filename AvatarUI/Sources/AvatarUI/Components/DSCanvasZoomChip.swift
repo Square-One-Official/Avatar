@@ -59,6 +59,7 @@ public struct DSCanvasZoomChip: View {
                 .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .help(help)
         .padding(DSSpacing.gap4)
     }

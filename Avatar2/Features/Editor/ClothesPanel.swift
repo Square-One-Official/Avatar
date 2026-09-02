@@ -51,7 +51,14 @@ final class ClothesModel {
         portrait: Portrait2? = nil
     ) async {
         guard !isBusy else { return }
-        guard entitlement.allowAIFeature(.clothesEdit) else { return }
+        guard entitlement.allowAIFeature(.clothesEdit, retry: { [weak self] in
+            guard let self else { return }
+            Task {
+                await self.apply(
+                    presetKey: presetKey, freeText: freeText, base: base, portrait: portrait
+                )
+            }
+        }) else { return }
 
         let source = StylizeQuality.editStylizeSource(cutout: base)
         _ = await coordinator?.gateBeforeStylize(
@@ -183,10 +190,12 @@ struct ClothesPanel: View {
                             .opacity(prompt.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                     }
                     .buttonStyle(.plain)
+                    .dsFocusEffectDisabled()
                     .disabled(prompt.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .cloudFeatureMuted()
             .disabled(model.isBusy)
         }
         .task {

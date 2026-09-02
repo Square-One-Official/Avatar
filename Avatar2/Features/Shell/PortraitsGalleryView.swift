@@ -43,11 +43,19 @@ struct PortraitsGalleryView: View {
         return portraits.filter { $0.folder?.persistentModelID == id }
     }
 
+    /// Batch-import: tijdelijke tegels voor beelden die in deze lens landen en
+    /// nog vrijstaand gemaakt worden (zie `ShellModel.importImages`).
+    private var importJobs: [ShellModel.LibraryImportJob] {
+        model.visibleLibraryImportJobs(folderID: model.selectedFolderID)
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: 0) {
             header
             ZStack {
-                if items.isEmpty {
+                if items.isEmpty && importJobs.isEmpty {
                     emptyState
                 } else {
                     gridBody
@@ -73,11 +81,21 @@ struct PortraitsGalleryView: View {
             folderBackgroundPickerOpen.wrappedValue = true
             model.folderBackgroundPickerID = nil
         }
+        // Zelfde entree als Home (scale+fade vanuit het midden), zodat
+        // Home → Portraits → map één en dezelfde beweging is. ShellView geeft
+        // de gallery een identiteit per map, dus dit vuurt ook bij mapwissel.
+        .transition(.dsScaleFade(anchor: .center, reduceMotion: reduceMotion))
     }
 
     private var gridBody: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
+                // Lopende imports vóór het echte grid (omgekeerde drop-volgorde:
+                // de tegel die nú verwerkt wordt grenst aan de jongste portretten
+                // en wordt in-place door z'n portret vervangen).
+                ForEach(importJobs) { job in
+                    LibraryImportTile(job: job)
+                }
                 ForEach(items) { portrait in
                     PortraitGridTile(
                         portrait: portrait, folders: folders, model: model,
@@ -121,9 +139,13 @@ struct PortraitsGalleryView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DSSpacing.gap6)
-        .padding(.top, DSSpacing.gap8)
-        .padding(.bottom, DSSpacing.gap6)
+        .padding(.top, ShellMetrics.pageTitleTopInset)
+        .padding(.bottom, ShellMetrics.pageTitleBottomInset)
         .background(DSColor.Background.app)
+        // Het Gallery-dropdown steekt onder de header uit over het grid.
+        // Zonder deze z-index winnen de portret-Images de AppKit-laagstrijd
+        // (menu onder de foto's) én vangt de dismiss-scrim de tegel-klikken.
+        .zIndex(folderBackgroundPickerOpen.wrappedValue ? 1000 : 0)
     }
 
     private var emptyState: some View {
@@ -168,6 +190,9 @@ struct PortraitGridTile: View {
     /// De huidige selectie als modellen (voor bulk-acties) — lazy, bij menu-actie.
     let selectedTargets: () -> [Portrait2]
     let onContextMenu: (CGRect) -> Void
+    /// Home-hero: dezelfde kaart op dubbele kolombreedte — grotere labels,
+    /// ruimere inzet en een groter selectie-vinkje; verder identiek.
+    var prominent: Bool = false
 
     @State private var hovering = false
 
@@ -195,8 +220,8 @@ struct PortraitGridTile: View {
             // Selectie-vinkje (Finder-stijl) rechtsboven.
             .overlay(alignment: .topTrailing) {
                 if isSelected {
-                    DSSelectionCheckBadge(size: 20)
-                        .padding(DSSpacing.gap2)
+                    DSSelectionCheckBadge(size: prominent ? 22 : 20)
+                        .padding(prominent ? DSSpacing.gap3 : DSSpacing.gap2)
                 }
             }
             .contentShape(Rectangle())
@@ -224,20 +249,26 @@ struct PortraitGridTile: View {
     @ViewBuilder
     private var composed: some View {
         ZStack(alignment: .bottomLeading) {
-            PortraitCompositeMeasured(portrait: portrait)
+            // Verse batch-import: de al gerenderde reveal-compositie als
+            // placeholder tot de eigen render klaar is (geen lege flits).
+            PortraitCompositeMeasured(
+                portrait: portrait, placeholder: model.freshImportPreview(for: portrait)
+            )
 
             // UXS-3: gedeelde scrim i.p.v. een eigen ramp — zie DSCardLabelScrim.
             DSCardLabelScrim()
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(portrait.name.isEmpty ? "Untitled" : portrait.name)
-                    .dsTextStyle(.labelBase).foregroundStyle(.white).lineLimit(1)
+                    .dsTextStyle(prominent ? .labelLarge : .labelBase).foregroundStyle(.white).lineLimit(1)
                     .help(portrait.name.isEmpty ? "Untitled" : portrait.name)
                 if !portrait.role.isEmpty {
-                    Text(portrait.role).dsTextStyle(.labelSmall).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                    Text(portrait.role)
+                        .dsTextStyle(prominent ? .labelBase : .labelSmall)
+                        .foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
             }
-            .padding(DSSpacing.gap3)
+            .padding(prominent ? DSSpacing.gap4 : DSSpacing.gap3)
         }
     }
 }
@@ -248,7 +279,7 @@ struct PortraitGridTile: View {
 /// naam+rol als label, button-trait (+selected), en drie acties — activeren
 /// = openen (zelfde pad als de plain klik), "Select"/"Deselect" (zelfde pad
 /// als ⌘-klik) en "Show Context Menu" (zelfde pad als rechtsklik, verankerd
-/// op de gemeten kaart-frame in de context-menu-coordinate-space). Zonder dit
+/// op de gemeten kaart-frame in SwiftUI `.global`). Zonder dit
 /// bestonden de kaarten niet voor de AX-boom (audit UX28, live geverifieerd).
 struct PortraitCardAccessibility: ViewModifier {
     let portrait: Portrait2
@@ -257,7 +288,7 @@ struct PortraitCardAccessibility: ViewModifier {
     let ordered: () -> [PersistentIdentifier]
     let onContextMenu: (CGRect) -> Void
 
-    /// Kaart-frame in `PortraitContextMenuSpace` — anker voor de AX-menu-actie.
+    /// Kaart-frame in SwiftUI `.global` — zelfde space als `DSContextMenuOverlay`.
     @State private var frame: CGRect = .zero
 
     func body(content: Content) -> some View {
@@ -265,7 +296,7 @@ struct PortraitCardAccessibility: ViewModifier {
             .background {
                 GeometryReader { geo in
                     Color.clear.onChange(
-                        of: geo.frame(in: PortraitContextMenuSpace.coordinateSpace),
+                        of: geo.frame(in: .global),
                         initial: true
                     ) { _, new in frame = new }
                 }
@@ -309,6 +340,8 @@ extension View {
 /// zelfde visuele maat, scherp op 2×/3× schermen.
 struct PortraitCompositeMeasured: View {
     let portrait: Portrait2
+    /// Getoond zolang de compositie nog rendert (i.p.v. de kale inset).
+    var placeholder: NSImage? = nil
 
     @Environment(\.displayScale) private var displayScale
     @State private var sidePoints: CGFloat = 0
@@ -320,7 +353,7 @@ struct PortraitCompositeMeasured: View {
     var body: some View {
         Group {
             if sidePoints > 0 {
-                PortraitComposite(portrait: portrait, maxDimension: pixelSide)
+                PortraitComposite(portrait: portrait, maxDimension: pixelSide, placeholder: placeholder)
             } else {
                 DSColor.Background.inset
             }
@@ -347,10 +380,12 @@ private struct PortraitCompositeMeasuredSideKey: PreferenceKey {
 /// als de export/editor (achtergrond + de OPGESLAGEN transform/zoom + Adjust),
 /// als een vierkant — zo matchen de framing/cropping en de achtergrond in elke
 /// thumbnail exact wat de editor toont (i.p.v. een kale, anders-gekadreerde
-/// cutout). Resultaat wordt gecachet op (portret, updatedAt, maat).
+/// cutout). Resultaat wordt gecachet op (portret, revision, maat).
 struct PortraitComposite: View {
     let portrait: Portrait2
     let maxDimension: CGFloat
+    /// Getoond zolang de eigen render nog loopt (verse batch-import).
+    var placeholder: NSImage? = nil
 
     @State private var image: NSImage?
 
@@ -361,6 +396,8 @@ struct PortraitComposite: View {
             DSColor.Background.inset
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
+            } else if let placeholder {
+                Image(nsImage: placeholder).resizable().scaledToFill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -368,7 +405,7 @@ struct PortraitComposite: View {
     }
 
     private var cacheKey: String {
-        "\(portrait.persistentModelID.hashValue)-\(portrait.updatedAt.timeIntervalSince1970)-\(Int(maxDimension))"
+        "\(portrait.persistentModelID.hashValue)-\(portrait.revision)-\(Int(maxDimension))"
     }
 
     private func load() async {

@@ -79,6 +79,7 @@ struct BannerTextPanel: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .help("Delete text")
             }
 
@@ -217,6 +218,7 @@ struct BannerTextPanel: View {
             )
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     private func weightLabel(_ raw: Int) -> String {
@@ -267,6 +269,7 @@ struct BannerTextPanel: View {
                 .overlay(Circle().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale()
         .help("Text color")
         .dsDropdownMenu(

@@ -34,6 +34,7 @@ public struct DSSearchField: View {
             .dsTextStyle(.bodyMedium)
             .foregroundStyle(DSColor.Foreground.primary)
             .focused($isFocused)
+            .dsFocusEffectDisabled()
         }
         .padding(.horizontal, DSSpacing.gap4)
         .frame(height: 48)

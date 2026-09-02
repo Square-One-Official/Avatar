@@ -11,27 +11,16 @@
 //   (manifest-zip; de ±175 MB uit figma-design-review.md klopte niet).
 // - "8 GB RAM" uit het Figma-frame weggelaten: elke ondersteunde Mac haalt
 //   dat; voegt geen keuze-informatie toe in Settings.
+// - Figma toont drie privacy-rijen (On-device / Apple Private Cloud /
+//   Advanced). Besluit Thierry 2026-09-02: twee keuzes, Local only / Cloud.
 
 import AvatarKit
 import AvatarUI
 import SwiftUI
 
 struct SettingsAIModelsPage: View {
-    /// E15.5: dev-detectie voor de Advanced-sectie.
-    var entitlement: EntitlementModel?
-
     private let prefs = PrivacyPreferences2.shared
     @State private var model = HighFidelityModelState()
-    /// E15.5: tick om de pickers te laten herrenderen na een keuze.
-    @State private var overridesTick = 0
-    /// E15.6: gebruikersgerichte generatie-modelkeuze (nano / OpenAI).
-    @State private var generationModel = GenerationModelStore.shared.current
-    /// E01.15: DEBUG backend-override (lokaal tegen Vercel-preview). Bindt
-    /// direct op de UserDefaults-keys die BackendClient.resolveBaseURL leest.
-    @AppStorage("dev.apiBase") private var devApiBase: String = ""
-    @AppStorage("dev.vercelBypass") private var devVercelBypass: String = ""
-
-    private let overrides = DevModelOverrides.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -43,13 +32,6 @@ struct SettingsAIModelsPage: View {
                 privacyTierCard
                 localModelsCard
                 privacyFeatureMatrixCard
-                if prefs.allowsThirdPartyCloud {
-                    generationModelCard
-                }
-                // E15.5: alléén voor dev-accounts.
-                if entitlement?.isDevUnlimited == true {
-                    advancedCard
-                }
             }
             .padding(.top, DSSpacing.gap8)
         }
@@ -59,11 +41,7 @@ struct SettingsAIModelsPage: View {
         .task { model.refreshInstalledState() }
     }
 
-    private var disabledTiers: Set<AIPrivacyTier> {
-        AppleIntelligenceAvailability.supportsApplePrivateCloud ? [] : [.appleCloud]
-    }
-
-    // MARK: Privacy tier (Privacy Tier Picker)
+    // MARK: Privacy tier (Local only / Cloud)
 
     private var privacyTierCard: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -78,25 +56,14 @@ struct SettingsAIModelsPage: View {
                 selection: Binding(
                     get: { prefs.tier },
                     set: { prefs.tier = $0 }
-                ),
-                disabledTiers: disabledTiers
+                )
             )
             .padding(.top, DSSpacing.gap4)
-
-            if AppleIntelligenceAvailability.supportsApplePrivateCloud {
-                Text("Use the sparkle button in Background to generate images with Apple Intelligence.")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
-                    .padding(.top, DSSpacing.gap3)
-            }
         }
         .padding(DSSpacing.gap6)
         .frame(maxWidth: 608, alignment: .leading)
         .background(DSColor.Background.card)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-        .refreshAppleIntelligenceAvailability {
-            PrivacyPreferences2.shared.reapplyFingerprintPolicy()
-        }
     }
 
     // MARK: Feature matrix
@@ -107,112 +74,6 @@ struct SettingsAIModelsPage: View {
             .frame(maxWidth: 608, alignment: .leading)
             .background(DSColor.Background.card)
             .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-    }
-
-    // MARK: Generation model (E15.6, Advanced tier only)
-
-    private var generationModelCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Generation model")
-                .dsTextStyle(.labelBase)
-                .foregroundStyle(DSColor.Foreground.primary)
-            Text("Used for AI styles, clothing and hair")
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-
-            VStack(spacing: DSSpacing.gap2) {
-                ForEach(GenerationModel.allCases) { option in
-                    generationOptionRow(option)
-                }
-            }
-            .padding(.top, DSSpacing.gap4)
-        }
-        .padding(DSSpacing.gap6)
-        .frame(maxWidth: 608, alignment: .leading)
-        .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-    }
-
-    private func generationOptionRow(_ option: GenerationModel) -> some View {
-        SettingsCheckmarkRow(
-            title: option.label,
-            subtitle: option.detail,
-            isSelected: generationModel == option
-        ) {
-            generationModel = option
-            GenerationModelStore.shared.current = option
-        }
-    }
-
-    // MARK: Advanced (E15.5, dev-only model-picker)
-
-    private var advancedCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: DSSpacing.gap2) {
-                Text("Advanced")
-                    .dsTextStyle(.labelBase)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                DSBadge("Dev only", type: .neutral)
-            }
-
-            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                // Lokale cutout-engine (Vision / gedownload model) — chips
-                // i.p.v. Menu (Menu's blokkeerden de first-render-window).
-                pickerColumn(title: "Cut out engine (local)") {
-                    optionChip("Regular quality", selected: prefs.engine == .appleVision) {
-                        prefs.engine = .appleVision
-                    }
-                    optionChip("High quality", selected: prefs.engine == .downloadedModel) {
-                        prefs.engine = .downloadedModel
-                    }
-                }
-                // Per cloud-feature het override-model.
-                ForEach(DevModelFeature.allCases, id: \.self) { feature in
-                    pickerColumn(title: feature.label) {
-                        let current = overrides.override(for: feature)
-                        optionChip("Default", selected: current == nil) { setOverride(nil, feature) }
-                        ForEach(feature.modelKeys, id: \.self) { key in
-                            optionChip(key, selected: current == key) { setOverride(key, feature) }
-                        }
-                    }
-                }
-                // E01.15: backend-endpoint-override (lokaal tegen Vercel-preview).
-                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                    Text("Backend endpoint (dev)")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.subtle)
-                    DSTextField(placeholder: "https://…preview.vercel.app", text: $devApiBase)
-                    DSTextField(placeholder: "Vercel protection bypass secret", text: $devVercelBypass)
-                    Text("Empty = production. Restart the app to apply a change.")
-                        .dsTextStyle(.bodySmall)
-                        .foregroundStyle(DSColor.Foreground.muted)
-                }
-            }
-            .padding(.top, DSSpacing.gap4)
-            .id(overridesTick)
-        }
-        .padding(DSSpacing.gap6)
-        .frame(maxWidth: 608, alignment: .leading)
-        .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
-    }
-
-    private func setOverride(_ key: String?, _ feature: DevModelFeature) {
-        overrides.setOverride(key, for: feature)
-        overridesTick += 1
-    }
-
-    private func pickerColumn(title: String, @ViewBuilder chips: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            Text(title)
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.subtle)
-            HStack(spacing: DSSpacing.gap2) { chips() }
-        }
-    }
-
-    private func optionChip(_ text: String, selected: Bool, _ action: @escaping () -> Void) -> some View {
-        OptionChipButton(text: text, selected: selected, action: action)
     }
 
     // MARK: Local models (frame "list")
@@ -323,36 +184,6 @@ struct SettingsAIModelsPage: View {
                 model.download { prefs.engine = .downloadedModel }
             }
         }
-    }
-}
-
-private struct OptionChipButton: View {
-    let text: String
-    let selected: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    private var background: Color {
-        if selected { return DSColor.Action.primary }
-        if isHovering { return DSColor.Background.neutralStronger }
-        return DSColor.Background.neutral
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .dsTextStyle(.labelSmall)
-                .foregroundStyle(selected ? DSColor.Action.onAction : DSColor.Foreground.primary)
-                .lineLimit(1)
-                .padding(.horizontal, DSSpacing.gap3)
-                .frame(height: 30)
-                .background(background)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 && !selected }
-        .dsMotion(DSMotion.micro, value: isHovering)
     }
 }
 

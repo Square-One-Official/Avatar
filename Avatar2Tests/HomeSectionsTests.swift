@@ -72,6 +72,46 @@ import Testing
         #expect(Set(recent).intersection(Set(earlier)).isEmpty)
     }
 
+    // MARK: - Hero (laatst geopend)
+
+    private func entry(updated: Date, opened: Date? = nil) -> HomeSections.Entry {
+        HomeSections.Entry(updatedAt: updated, lastOpenedAt: opened)
+    }
+
+    /// De hero is het laatst GEOPENDE portret, niet het laatst bewerkte.
+    @Test func heroIsLaatstGeopend() {
+        let now = Date()
+        let entries = [
+            entry(updated: now, opened: now.addingTimeInterval(-3 * 3600)),
+            entry(updated: now.addingTimeInterval(-3600), opened: now.addingTimeInterval(-60)),
+            entry(updated: now.addingTimeInterval(-7200), opened: nil),
+        ]
+        #expect(HomeSections.heroIndex(entries) == 1)
+    }
+
+    /// Zonder open-historie (verse import / migratie) valt de hero terug op
+    /// het nieuwste portret — de eerste in rasterorde.
+    @Test func heroValtTerugOpNieuwste() {
+        let now = Date()
+        let entries = [entry(updated: now), entry(updated: now.addingTimeInterval(-3600))]
+        #expect(HomeSections.heroIndex(entries) == 0)
+    }
+
+    /// Een portret dat ooit geopend is wint van nooit-geopende, ook als die
+    /// nieuwer zijn.
+    @Test func ooitGeopendWintVanNooitGeopend() {
+        let now = Date()
+        let entries = [
+            entry(updated: now),
+            entry(updated: now.addingTimeInterval(-400 * 24 * 3600), opened: now.addingTimeInterval(-300 * 24 * 3600)),
+        ]
+        #expect(HomeSections.heroIndex(entries) == 1)
+    }
+
+    @Test func legeStoreHeeftGeenHero() {
+        #expect(HomeSections.heroIndex([]) == nil)
+    }
+
     /// Home en de gallery moeten dezelfde celmaat gebruiken — dat was juist het
     /// verschil (4 vs 3 kolommen) waardoor dezelfde kaart per scherm anders oogde.
     @Test func gridMetricsZijnGedeeld() {

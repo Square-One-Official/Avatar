@@ -109,20 +109,6 @@ final class ExportSheetTests: XCTestCase {
         XCTAssertEqual(alpha(rep, 256, 256), 1, accuracy: 0.01, "onderwerp (padded fit) opaak in het midden")
     }
 
-    // MARK: - Platform-hints (sheet-copy)
-
-    func testPlatformHintSquareNoemtCrop() {
-        let hint = ExportSheet.platformHintText(for: .square)
-        XCTAssertTrue(hint.localizedCaseInsensitiveContains("crop"))
-        XCTAssertTrue(hint.localizedCaseInsensitiveContains("LinkedIn"))
-    }
-
-    func testPlatformHintCircleNoemtTransparentCorners() {
-        let hint = ExportSheet.platformHintText(for: .circle)
-        XCTAssertTrue(hint.localizedCaseInsensitiveContains("transparent"))
-        XCTAssertFalse(hint.localizedCaseInsensitiveContains("Looks right on LinkedIn"))
-    }
-
     // MARK: - Grootteschatting (sheet-caption)
 
     func testGrootteschattingSchaaltMonotoonMetDeMaat() {

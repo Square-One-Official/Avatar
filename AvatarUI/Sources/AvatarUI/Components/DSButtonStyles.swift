@@ -8,6 +8,7 @@ import SwiftUI
 struct DSStateOpacityButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         StateOpacityBody(configuration: configuration)
+            .dsFocusEffectDisabled()
     }
 
     private struct StateOpacityBody: View {

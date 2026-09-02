@@ -47,16 +47,48 @@ final class EntitlementModel {
     /// E18.3: generieke fout-toast voor cloud-acties (Effects/Hair/Clothing/
     /// Boost) i.p.v. inline tekst onder de menutitel.
     private(set) var errorToast: String?
+    struct InfoToast: Equatable {
+        let title: String
+        let description: String?
+    }
+    private(set) var infoToast: InfoToast?
 
     /// Lopende cloud-actie-toast — statische titel + cycling copy per feature.
     /// E55.9: plus verstreken-tijd (startedAt) en een verwachte duur zodat de
     /// toast bij lange generaties (gpt-image high, 40–70s) een eerlijke
     /// voortgangsindicatie toont i.p.v. alleen een spinner.
     struct WorkingContext: Equatable {
+        let id: UUID
         let title: String
         let messages: [String]
         var startedAt: Date = Date()
         var expectedSeconds: Int? = nil
+        var isDismissible = true
+        var blocksOtherAIFeatures = false
+        /// Hover-hint bij de Cancel-knop — wat annuleren voor déze flow
+        /// betekent (Effects: detachen, Fill in body: afbreken). nil = geen
+        /// hint. Copy hoort bij de flow, niet bij de toast-view.
+        var cancelHint: String? = nil
+
+        init(
+            id: UUID = UUID(),
+            title: String,
+            messages: [String],
+            startedAt: Date = Date(),
+            expectedSeconds: Int? = nil,
+            isDismissible: Bool = true,
+            blocksOtherAIFeatures: Bool = false,
+            cancelHint: String? = nil
+        ) {
+            self.id = id
+            self.title = title
+            self.messages = messages
+            self.startedAt = startedAt
+            self.expectedSeconds = expectedSeconds
+            self.isDismissible = isDismissible
+            self.blocksOtherAIFeatures = blocksOtherAIFeatures
+            self.cancelHint = cancelHint
+        }
 
         /// `startedAt` is presentatie-metadata, geen toast-identiteit: twee
         /// keer dezelfde actie presenteren is dezelfde toast (en mag de
@@ -67,6 +99,9 @@ final class EntitlementModel {
             lhs.title == rhs.title
                 && lhs.messages == rhs.messages
                 && lhs.expectedSeconds == rhs.expectedSeconds
+                && lhs.isDismissible == rhs.isDismissible
+                && lhs.blocksOtherAIFeatures == rhs.blocksOtherAIFeatures
+                && lhs.cancelHint == rhs.cancelHint
         }
     }
     private(set) var workingContext: WorkingContext?
@@ -83,8 +118,10 @@ final class EntitlementModel {
     /// tab-/vensterwissel (OTP + e-mail blijven staan).
     var signInFlow = SignInFlowState()
 
-    /// Privacy Tier Picker: elevation modal wanneer feature hogere tier vereist.
+    /// Privacy elevation modal wanneer een feature Cloud vereist.
     var privacyElevation: PrivacyElevationRequest?
+    /// Actie om te herhalen nadat de gebruiker Cloud aanzet.
+    var privacyElevationRetry: (() -> Void)?
     /// Deep-link naar Settings (ShellView opent deze pagina).
     var openSettingsPage: SettingsPage?
 
@@ -147,7 +184,7 @@ final class EntitlementModel {
         isProActive && account?.subscriptionStatus == .active
     }
 
-    /// E15.5: dev-allowlisted account → toont de Advanced model-picker.
+    /// E15.5: dev-allowlisted account → unlimited credits, geen credit-gate.
     var isDevUnlimited: Bool {
         #if DEBUG
         if debugForceDevUnlimited { return true }
@@ -156,7 +193,7 @@ final class EntitlementModel {
     }
 
     #if DEBUG
-    /// Smoke-run-haak (E15.5): forceer de Advanced-sectie zichtbaar.
+    /// Smoke-run-haak (E15.5): forceer de dev-unlimited-vlag.
     var debugForceDevUnlimited = false
     #endif
 
@@ -224,6 +261,50 @@ final class EntitlementModel {
     func signOutAccount() {
         auth.signOut()
         account = nil
+        billing = nil
+        billingError = nil
+    }
+
+    // MARK: - Billing & Invoices (Settings)
+
+    /// `GET /v1/billing`: plan + facturen uit Stripe. nil tot de eerste
+    /// geslaagde load (en na uitloggen); een refresh houdt de vorige payload
+    /// staan zodat de pagina niet flitst als je terugkomt uit de portal.
+    private(set) var billing: BillingPayload?
+    private(set) var isLoadingBilling = false
+    private(set) var billingError: String?
+
+    func refreshBilling() async {
+        guard auth.isSignedIn else {
+            billing = nil
+            billingError = nil
+            return
+        }
+        guard !isLoadingBilling else { return }
+        isLoadingBilling = true
+        defer { isLoadingBilling = false }
+        do {
+            billing = try await backend.billing()
+            billingError = nil
+        } catch {
+            billingError = "Couldn't load your billing details. Check your connection and try again."
+        }
+    }
+
+    /// Factuur openen in de browser: PDF als Stripe die heeft, anders de
+    /// gehoste factuurpagina. Zelfde scheme-guard als checkout/portal.
+    func openInvoice(_ invoice: BillingPayload.Invoice) {
+        if let url = Self.invoiceURL(for: invoice) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Pure keuze (testbaar): PDF > hosted, alleen web-schemes.
+    static func invoiceURL(for invoice: BillingPayload.Invoice) -> URL? {
+        [invoice.pdfUrl, invoice.hostedUrl]
+            .compactMap { $0 }
+            .compactMap(URL.init(string:))
+            .first { $0.isAllowedExternalScheme }
     }
 
     // MARK: - Delete account (E15.7, audit C7 — GDPR art. 17)
@@ -334,17 +415,20 @@ final class EntitlementModel {
         case error(String)
         case outOfCredits
         case working(WorkingContext)
+        case info(InfoToast)
     }
 
     /// Pure reducer — los van de view zodat de prioriteit testbaar is.
     static func resolveToast(
         error: String?,
         outOfCredits: Bool,
-        working: WorkingContext?
+        working: WorkingContext?,
+        info: InfoToast? = nil
     ) -> ActiveToast? {
         if let error { return .error(error) }
         if outOfCredits { return .outOfCredits }
         if let working { return .working(working) }
+        if let info { return .info(info) }
         return nil
     }
 
@@ -352,16 +436,26 @@ final class EntitlementModel {
         Self.resolveToast(
             error: errorToast,
             outOfCredits: isShowingOutOfCreditsToast,
-            working: workingContext
+            working: workingContext,
+            info: infoToast
         )
     }
 
     func presentError(_ message: String) {
+        infoToast = nil
         errorToast = message
     }
 
     func dismissErrorToast() {
         errorToast = nil
+    }
+
+    func presentInfo(title: String, description: String? = nil) {
+        infoToast = InfoToast(title: title, description: description)
+    }
+
+    func dismissInfoToast() {
+        infoToast = nil
     }
 
     /// E44.2 (audit B2): zichtbaar faalpad voor een geslaagde server-call
@@ -376,21 +470,32 @@ final class EntitlementModel {
         await refresh()
     }
 
+    @discardableResult
     func presentWorking(
         title: String,
         messages: [String],
         startedAt: Date = Date(),
         expectedSeconds: Int? = nil,
+        isDismissible: Bool = true,
+        blocksOtherAIFeatures: Bool = false,
+        cancelHint: String? = nil,
         onCancel: (() -> Void)? = nil
-    ) {
+    ) -> UUID {
+        infoToast = nil
+        let id = UUID()
         workingContext = WorkingContext(
-            title: title, messages: messages,
-            startedAt: startedAt, expectedSeconds: expectedSeconds
+            id: id, title: title, messages: messages,
+            startedAt: startedAt, expectedSeconds: expectedSeconds,
+            isDismissible: isDismissible,
+            blocksOtherAIFeatures: blocksOtherAIFeatures,
+            cancelHint: cancelHint
         )
         workingCancelHandler = onCancel
+        return id
     }
 
-    func dismissWorkingToast() {
+    func dismissWorkingToast(id expectedID: UUID? = nil) {
+        if let expectedID, workingContext?.id != expectedID { return }
         workingContext = nil
         workingCancelHandler = nil
     }
@@ -399,11 +504,13 @@ final class EntitlementModel {
 
     /// Mag een AI-feature draaien? Zo niet: elevation modal, sign-in of paywall.
     @discardableResult
-    func allowAIFeature(_ feature: AIFeature) -> Bool {
+    func allowAIFeature(_ feature: AIFeature, retry: (() -> Void)? = nil) -> Bool {
+        guard workingContext?.blocksOtherAIFeatures != true else { return false }
         switch PrivacyGate.evaluate(feature, entitlement: self) {
         case .allowed:
             return true
         case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevationRetry = retry
             privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
             return false
         case .needsSignIn:
@@ -415,13 +522,37 @@ final class EntitlementModel {
         }
     }
 
-    func dismissPrivacyElevation() {
-        privacyElevation = nil
+    /// Fill in body has a free server-side no-op when no body edge is cropped.
+    /// Keep privacy and sign-in gates, but let a zero-credit request reach that
+    /// geometry check. If generation is needed the backend still returns 402
+    /// and the normal out-of-credits flow takes over.
+    @discardableResult
+    func allowAIFeatureWithFreeServerPreflight(_ feature: AIFeature, retry: (() -> Void)? = nil) -> Bool {
+        guard workingContext?.blocksOtherAIFeatures != true else { return false }
+        switch PrivacyGate.evaluate(feature, entitlement: self) {
+        case .allowed, .needsCredits:
+            return true
+        case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevationRetry = retry
+            privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
+            return false
+        case .needsSignIn:
+            cloudGate = .signIn
+            return false
+        }
     }
 
-    func openPrivacySettings() {
+    func dismissPrivacyElevation() {
         privacyElevation = nil
-        openSettingsPage = .aiModels
+        privacyElevationRetry = nil
+    }
+
+    func enableCloudFromElevation() {
+        PrivacyPreferences2.shared.tier = .thirdParty
+        let retry = privacyElevationRetry
+        privacyElevation = nil
+        privacyElevationRetry = nil
+        retry?()
     }
 
     func dismissCloudGate() {

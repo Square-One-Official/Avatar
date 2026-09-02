@@ -50,6 +50,7 @@ struct PortraitPickerPanel: View {
                 }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .help(portrait.name.isEmpty ? "Untitled" : portrait.name)
     }
 }

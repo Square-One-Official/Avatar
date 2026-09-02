@@ -229,3 +229,52 @@ Session-sectie met bevestigingsdialoog; na succes `signOutAccount()` + eventueel
 optie de lokale bibliotheek te bewaren of te wissen aanbieden.
 **DoD:** beide targets bouwen; delete-account is bereikbaar en werkt end-to-end tegen
 een test-account; tests groen; Result-regel.
+
+## 15.8 — Billing & Invoices-pagina
+- status: done
+- owner: AI (op directe instructie Thierry 2026-09-02: "I like how this Billing looks. Can we replicate it?" — referentie-screenshot van een derde app)
+- team: FEAT (+ INFRA voor het endpoint, + AvatarKit-model)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen, Result-regel
+- Context: geen Figma-frame. Vorm 1-op-1 naar de referentie, kleuren/maten/typo uit de DS-tokens
+  (15.1-stijl: SettingsSectionCard). Schrijfacties (betaalmethode, opzeggen, btw-id) blijven in
+  de Stripe Customer Portal; de pagina is read-only + deep-links.
+
+Notities (AI, bij oplevering):
+- Sub-nav krijgt een vijfde item ("Billing & Invoices", tussen Account en About). Besluit
+  Thierry (zelfde dag): Account = identiteit (e-mail, sessie, verwijderen); Plan-rij en
+  Credits-sectie zijn van Account naar Billing verhuisd — geen dubbel.
+- Credits bijkopen zit nu direct op Billing (Credits-kaart: saldo + refill-copy, drie
+  bedrag-tegels 50/200/750 met Save-badge t.o.v. het kleinste pack, samenvatting met Total due,
+  "Pay <prijs> now" → bestaande `startTopup()`/Stripe Checkout, checkout-fout inline).
+  Feedback Thierry: géén per-credit-tarieven in de UI — hoeveelheid + Save-badge is genoeg. Packs zijn server-side Pro-only
+  (`/v1/checkout/topup` 403 pro_required) → Starter ziet een Upgrade-chip i.p.v. de ladder.
+  De paywall-top-up-route (credits op) blijft bestaan.
+- Status-badge (Paid/Due/Failed/Void, DS-signaalkleuren) is lokaal in Features/Settings —
+  AvatarUI's DSBadge kent alleen neutral/brand; een Signal-variant is DS-werk zodra een tweede
+  feature 'm nodig heeft.
+- "excl./incl. VAT" komt uit Stripe's `price.tax_behavior`; `unspecified` → geen btw-claim.
+- Korting: eerste geëxpandeerde `subscription.discounts[]` (API 2025-02-24; `discount` is
+  deprecated). Next payment = `invoices.retrieveUpcoming` (stripe-node 17; wordt `createPreview`
+  bij een SDK-bump ≥18) — best-effort, bij 404 verdwijnt alleen de strook.
+- Backend is port-only: `backend/api/v1/billing.ts` staat nog niet op prod. Uitrol via de
+  normale avatars-api-deploy (zie project_vercel_cli_deploy_mechanics); tot die tijd toont de
+  pagina de foutstate met "Try again" (typecheck + unit-tests groen).
+
+**Result:** `GET /v1/billing` (backend/api/v1/billing.ts + pure mapping in lib/billing.ts:
+plan uit de live Stripe-subscription — lijstprijs, interval, tax_behavior, korting incl.
+einddatum, cancel_at_period_end, next payment uit de upcoming-invoice-preview — plus
+factuurhistorie met "Pro · Monthly"/"Top-up · 200 credits"-labels, drafts eruit, nieuwste
+eerst; 9 node:test-tests, `npx tsx --test backend/tests/billing.test.ts`). **AvatarKit:**
+`BillingPayload` (+ `ProTier.formatMinorUnits`, valuta van de wire) en `BackendClient.billing()`;
+3 nieuwe tests. **FEAT:** `SettingsPage.billing` + `SettingsBillingPage` (H1 met Manage
+subscription / Upgrade to Pro / Sign in rechts; Plan-kaart met naam + kortingsbadge, lijstprijs +
+"Per month, excl. VAT", "Next payment €0 on 7 Sep 2026"-strook; Invoices-kaart met inset-rijen:
+icoon, datum + omschrijving, bedrag, status-badge, download → PDF > hosted, scheme-guard),
+Credits-kaart (saldo + pack-tegels + Buy → Stripe Checkout; Starter: Upgrade-chip),
+`BillingCopy` (pure copy incl. de uit Account verhuisde credits-subtitle), EntitlementModel
+`billing/refreshBilling/openInvoice` (fout houdt de vorige payload vast; sign-out wist); states:
+uitgelogd, laden, fout+retry, Starter (Upgrade-chip), Pro-comp zonder Stripe, Pro.
+SettingsAccountPage is teruggebracht tot Email + Session. 13 nieuwe Avatar2Tests + env-gated
+snapshot-dump (`BILLING_DUMP_DIR`). Smoke: `--show-settings billing`.
+

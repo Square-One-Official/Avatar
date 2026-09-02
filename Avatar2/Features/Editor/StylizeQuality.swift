@@ -238,3 +238,33 @@ extension ShellModel {
         return newTopCanvas < -tolerance && oldTopCanvas >= -2
     }
 }
+
+/// Sticker-fix (2026-09-02): hoe ShellModel het canvas kadert ná een effect-
+/// wissel. Een die-cut-sticker is één vrijstaande, rondom gesloten vorm; de
+/// portret-transform (romp tot voorbij de onderrand, centroid-compensatie)
+/// zet 'm te groot en laat de gesloten onderrand als losse snede in het frame
+/// hangen. Omgekeerd is een content-fit-transform betekenisloos zodra het
+/// beeld weer tot de onderrand doorloopt.
+enum EffectFraming: Equatable, Sendable {
+    /// Transform behouden (centroid-compensatie + top-guard) — portret-effecten.
+    case keep
+    /// Vrijstaande vorm: transform resetten, alpha-bbox gecentreerd met marge.
+    case fitContent
+    /// Terug van die-cut naar portret/None: resetten + automatisch kadreren.
+    case autoFrame
+
+    /// Kadrering voor een wissel van `fromDieCut` naar `toDieCut`.
+    static func forSwitch(toDieCut: Bool, fromDieCut: Bool) -> EffectFraming {
+        if toDieCut { return .fitContent }
+        return fromDieCut ? .autoFrame : .keep
+    }
+
+    /// Kadrering van de omgekeerde wissel (undo van deze stap).
+    var inverse: EffectFraming {
+        switch self {
+        case .keep: return .keep
+        case .fitContent: return .autoFrame
+        case .autoFrame: return .fitContent
+        }
+    }
+}

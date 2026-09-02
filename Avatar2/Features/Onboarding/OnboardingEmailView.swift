@@ -61,6 +61,7 @@ struct OnboardingEmailView: View {
                     model.skipOnboarding()
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.subtle)
                 .underline()

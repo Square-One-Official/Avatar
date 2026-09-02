@@ -27,6 +27,7 @@ struct HairNudgeBanner: View {
 
             Button("Download", action: onDownload)
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Action.onAction)
                 .padding(.horizontal, DSSpacing.gap3)
@@ -41,6 +42,7 @@ struct HairNudgeBanner: View {
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .accessibilityLabel("Dismiss")
         }
         .padding(.leading, DSSpacing.gap4)

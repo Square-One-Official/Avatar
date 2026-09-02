@@ -22,6 +22,13 @@ enum AutoFramer {
         var eyeCenter: CGPoint?
         var interEyeDistance: CGFloat?
         var bodyBottomY: CGFloat
+        /// Opaque-pixel bbox in top-left pixel coordinates. Nil when the
+        /// cutout is fully transparent. Used so voluminous effects (Hairy,
+        /// Windy) frame the whole subject instead of the face alone.
+        var contentRect: CGRect?
+        /// Opaque-pixel bbox of the rows above the chin (face.maxY) — hair
+        /// and any halo, never the shoulders. Nil without a face.
+        var headContentRect: CGRect?
     }
 
     struct Transform: Equatable {
@@ -46,9 +53,17 @@ enum AutoFramer {
         interEyeDistance: CGFloat? = nil,
         cutoutSize: CGSize,
         bodyBottomY: CGFloat = 0,
+        contentRect: CGRect? = nil,
+        headContentRect: CGRect? = nil,
         canvas: CGSize = FramingConstants.editCanvas
     ) -> Transform {
         guard let faceRect, faceRect.height > 0 else {
+            // Geen gezicht: centreer het onderwerp (alpha-bbox), niet het PNG.
+            // Hairy/Windy zonder detecteerbaar gezicht zou anders off-center
+            // in een te groot canvas blijven staan.
+            if let contentRect, contentRect.width > 0, contentRect.height > 0 {
+                return fitContent(contentRect, canvas: canvas)
+            }
             return fitTransform(cutoutSize: cutoutSize, canvas: canvas)
         }
 
@@ -82,13 +97,76 @@ enum AutoFramer {
             scale = max(scale, minScale)
         }
 
-        return Transform(
+        let preferred = Transform(
             scale: scale,
             offset: CGSize(
                 width: targetCX - anchorX * scale,
                 height: targetCY - anchorY * scale
             )
         )
+
+        // Volumineus effect (Hairy-halo, Windy-haar omhoog): eye-based
+        // knipt de extra massa af. Alleen dan terugvallen op een padded
+        // content-fit. Gemeten op de hoofdband (rijen boven de kin) zodat
+        // normale schouders/romp nooit meetellen — een gewoon portret houdt
+        // de ooglijn + body-overshoot, ook als de haartop of de schouders
+        // een fractie buiten het canvas vallen (v1-gedrag).
+        if let contentRect,
+           contentRect.width > 0, contentRect.height > 0 {
+            let head = headContentRect ?? contentRect
+            if head.width > 0, head.height > 0,
+               contentShouldLeadFraming(face: faceRect, head: head),
+               contentOverflowsTopOrSides(head, preferred, canvas: canvas) {
+                return fitContent(contentRect, canvas: canvas)
+            }
+        }
+        return preferred
+    }
+
+    /// Padded fit van een onderwerp-bbox (niet het volledige PNG). De
+    /// content-oorsprong wordt in de offset verrekend zodat het onderwerp
+    /// in het canvas midden landt.
+    static func fitContent(_ content: CGRect, canvas: CGSize = FramingConstants.editCanvas) -> Transform {
+        let fitted = fitTransform(cutoutSize: content.size, canvas: canvas)
+        return Transform(
+            scale: fitted.scale,
+            offset: CGSize(
+                width: fitted.offset.width - content.minX * fitted.scale,
+                height: fitted.offset.height - content.minY * fitted.scale
+            )
+        )
+    }
+
+    /// Extra massa rond het hoofd — niet gewoon haar. De Vision-face-box
+    /// loopt van wenkbrauwen tot kin, dus normaal haar steekt er al
+    /// ~0.3–0.6× de boxhoogte boven en ~0.5× de boxbreedte naast uit; lang
+    /// haar tot ~0.7×. Een Hairy-halo zit ruim boven 1×.
+    private static func contentShouldLeadFraming(face: CGRect, head: CGRect) -> Bool {
+        let faceH = max(face.height, 1)
+        let faceW = max(face.width, 1)
+        let above = face.minY - head.minY
+        let extraLeft = face.minX - head.minX
+        let extraRight = head.maxX - face.maxX
+        return above > faceH * 0.9
+            || extraLeft > faceW * 0.9
+            || extraRight > faceW * 0.9
+            || head.width > faceW * 2.8
+    }
+
+    /// Eye-based transform knipt de hoofdband aan de bovenkant of zijkanten
+    /// (onderkant mag: body-overshoot is bewust). Tolerantie 3% van het
+    /// canvas: de alpha-bbox is grof gesampled en een paar px haar buiten
+    /// het frame is geen reden om de ooglijn los te laten.
+    private static func contentOverflowsTopOrSides(
+        _ content: CGRect, _ transform: Transform, canvas: CGSize
+    ) -> Bool {
+        let tolerance = min(canvas.width, canvas.height) * 0.03
+        let top = content.minY * transform.scale + transform.offset.height
+        let left = content.minX * transform.scale + transform.offset.width
+        let right = content.maxX * transform.scale + transform.offset.width
+        return top < -tolerance
+            || left < -tolerance
+            || right > canvas.width + tolerance
     }
 
     /// Eén bron van waarheid voor de "resolved" canvas-transform: de persistente
@@ -192,6 +270,21 @@ enum AutoFramer {
         }
     }
 
+    /// Sticker-fix (2026-09-02): vrijstaande gesloten vorm (die-cut-sticker).
+    /// Geen ooglijn + body-overshoot — die duwt de gesloten onderrand (mét
+    /// witte rand) uit beeld — maar de alpha-bbox gecentreerd met de
+    /// standaard ademruimte. Zonder bbox: het hele PNG passend.
+    static func freestandingTransform(
+        contentRect: CGRect?,
+        cutoutSize: CGSize,
+        canvas: CGSize = FramingConstants.editCanvas
+    ) -> Transform {
+        if let contentRect, contentRect.width > 0, contentRect.height > 0 {
+            return fitContent(contentRect, canvas: canvas)
+        }
+        return fitTransform(cutoutSize: cutoutSize, canvas: canvas)
+    }
+
     /// Geen gezicht: cutout passend met marge, gecentreerd (v1-fallback).
     static func fitTransform(
         cutoutSize: CGSize,
@@ -215,7 +308,7 @@ enum AutoFramer {
     // MARK: - Detectie (Vision, off-main aan te roepen)
 
     static func metrics(for image: CGImage) -> Metrics {
-        var metrics = Metrics(bodyBottomY: 0)
+        var metrics = Metrics(bodyBottomY: 0, contentRect: nil, headContentRect: nil)
 
         // Gezicht + lichaam in één Vision-pass (twee aparte handlers waren ~2× zo traag).
         let faceRequest = VNDetectFaceLandmarksRequest()
@@ -262,9 +355,17 @@ enum AutoFramer {
             }
         }
 
-        // Onderkant lichaam: body-pose (zelfde pass), anders gesamplede alpha-scan.
+        // Onderkant lichaam: body-pose (zelfde pass), anders de alpha-bbox.
+        // Eén alpha-sample voor onderwerp-bbox én hoofdband (rijen boven de kin).
+        let sampler = AlphaSampler(image: image)
+        let content = sampler?.bbox()
+        metrics.contentRect = content
+        if let sampler, let face = metrics.faceRect {
+            let chin = max(0, min(image.height, Int(face.maxY.rounded())))
+            metrics.headContentRect = sampler.bbox(rows: 0..<chin)
+        }
         metrics.bodyBottomY = bodyPoseBottom(from: bodyRequest.results?.first, imageHeight: image.height)
-            ?? contentBottomFromAlpha(of: image)
+            ?? content?.maxY
             ?? 0
         return metrics
     }
@@ -281,28 +382,85 @@ enum AutoFramer {
         return lowestY > 0 ? lowestY : nil
     }
 
-    /// Alpha-scan van onder naar boven (v1-fallback bij mislukte pose).
-    /// Samplet horizontaal (stap ~w/64) — volledige kolom-scan was tot ~64× trager.
-    private static func contentBottomFromAlpha(of image: CGImage) -> CGFloat? {
-        let w = image.width
-        let h = image.height
-        guard w > 0, h > 0 else { return nil }
-        let bpr = w * 4
-        var pixels = [UInt8](repeating: 0, count: h * bpr)
-        guard let ctx = CGContext(
-            data: &pixels, width: w, height: h, bitsPerComponent: 8,
-            bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        let sampleStep = max(1, w / 64)
-        for row in stride(from: h - 1, through: 0, by: -1) {
-            let base = row * bpr
-            for col in stride(from: 0, to: w, by: sampleStep) where pixels[base + col * 4 + 3] > 20 {
-                return CGFloat(row)
+    /// Opaque-pixel bbox (top-left). Samplet een grof raster (~64 stappen per
+    /// as) — genoeg voor framing, niet voor pixel-exacte silhouetten. Zachte
+    /// haarranden (alpha > 8) tellen mee, anders knipt Hairy de halo af.
+    static func contentRectFromAlpha(of image: CGImage, threshold: UInt8 = 8) -> CGRect? {
+        AlphaSampler(image: image)?.bbox(threshold: threshold)
+    }
+
+    /// Hoofdband-bbox: opaque pixels in de rijen boven `chinY` (top-left px).
+    static func headContentRectFromAlpha(of image: CGImage, chinY: CGFloat, threshold: UInt8 = 8) -> CGRect? {
+        let chin = max(0, min(image.height, Int(chinY.rounded())))
+        return AlphaSampler(image: image)?.bbox(threshold: threshold, rows: 0..<chin)
+    }
+
+    /// Eén draw van de cutout naar RGBA, daarna meerdere bbox-queries op een
+    /// grof raster (stap ~w/64, ~h/64).
+    struct AlphaSampler {
+        let width: Int
+        let height: Int
+        let bytesPerRow: Int
+        let stepX: Int
+        let stepY: Int
+        let pixels: [UInt8]
+
+        init?(image: CGImage) {
+            let w = image.width
+            let h = image.height
+            guard w > 0, h > 0 else { return nil }
+            let bpr = w * 4
+            var buffer = [UInt8](repeating: 0, count: h * bpr)
+            let drawn: Bool = buffer.withUnsafeMutableBytes { raw in
+                guard let ctx = CGContext(
+                    data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                    bytesPerRow: bpr, space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                ) else { return false }
+                ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+                return true
             }
+            guard drawn else { return nil }
+            width = w
+            height = h
+            bytesPerRow = bpr
+            stepX = max(1, w / 64)
+            stepY = max(1, h / 64)
+            pixels = buffer
         }
-        return nil
+
+        /// Bbox van de opaque pixels binnen `rows` (top-left, hele beeld als
+        /// nil). Rasterhits worden tot `step-1` px naar buiten verruimd.
+        func bbox(threshold: UInt8 = 8, rows: Range<Int>? = nil) -> CGRect? {
+            let rowRange = (rows ?? 0..<height).clamped(to: 0..<height)
+            guard !rowRange.isEmpty else { return nil }
+            var minX = width, minY = height, maxX = -1, maxY = -1
+            var y = rowRange.lowerBound
+            while y < rowRange.upperBound {
+                var x = 0
+                let base = y * bytesPerRow
+                while x < width {
+                    if pixels[base + x * 4 + 3] > threshold {
+                        if x < minX { minX = x }
+                        if x > maxX { maxX = x }
+                        if y < minY { minY = y }
+                        if y > maxY { maxY = y }
+                    }
+                    x += stepX
+                }
+                y += stepY
+            }
+            guard maxX >= minX, maxY >= minY else { return nil }
+            minX = max(0, minX - (stepX - 1))
+            minY = max(rowRange.lowerBound, minY - (stepY - 1))
+            maxX = min(width - 1, maxX + stepX - 1)
+            maxY = min(rowRange.upperBound - 1, maxY + stepY - 1)
+            return CGRect(
+                x: minX, y: minY,
+                width: maxX - minX + 1,
+                height: maxY - minY + 1
+            )
+        }
     }
 
     /// Berekent (off-main) het auto-frame-transform voor een cutout —
@@ -316,7 +474,9 @@ enum AutoFramer {
             eyeCenter: m.eyeCenter,
             interEyeDistance: m.interEyeDistance,
             cutoutSize: CGSize(width: image.width, height: image.height),
-            bodyBottomY: m.bodyBottomY
+            bodyBottomY: m.bodyBottomY,
+            contentRect: m.contentRect,
+            headContentRect: m.headContentRect
         )
     }
 
@@ -339,23 +499,44 @@ enum AutoFramer {
 
     // MARK: - Actie
 
+    /// `portrait` = gezicht/ooglijn + body-overshoot (default); `freestanding` =
+    /// content-fit van de alpha-bbox (die-cut-sticker, geen Vision nodig).
+    enum Mode: Equatable, Sendable {
+        case portrait
+        case freestanding
+    }
+
     /// Bereken en schrijf het auto-frame-transform voor dit portret; de
     /// geanimeerde overgang komt uit de withAnimation rond de model-writes
     /// (het E06.4-canvas observeert Portrait2).
     @MainActor
-    static func apply(to portrait: Portrait2, image: CGImage, undoManager: UndoManager? = nil) async {
+    static func apply(
+        to portrait: Portrait2, image: CGImage, undoManager: UndoManager? = nil,
+        mode: Mode = .portrait
+    ) async {
         let size = CGSize(width: image.width, height: image.height)
         let before = TransformUndo.snapshot(of: portrait)
-        let metrics = await Task.detached(priority: .userInitiated) {
-            Self.metrics(for: image)
-        }.value
-        let transform = computeTransform(
-            faceRect: metrics.faceRect,
-            eyeCenter: metrics.eyeCenter,
-            interEyeDistance: metrics.interEyeDistance,
-            cutoutSize: size,
-            bodyBottomY: metrics.bodyBottomY
-        )
+        let transform: Transform
+        switch mode {
+        case .freestanding:
+            let content = await Task.detached(priority: .userInitiated) {
+                Self.contentRectFromAlpha(of: image)
+            }.value
+            transform = freestandingTransform(contentRect: content, cutoutSize: size)
+        case .portrait:
+            let metrics = await Task.detached(priority: .userInitiated) {
+                Self.metrics(for: image)
+            }.value
+            transform = computeTransform(
+                faceRect: metrics.faceRect,
+                eyeCenter: metrics.eyeCenter,
+                interEyeDistance: metrics.interEyeDistance,
+                cutoutSize: size,
+                bodyBottomY: metrics.bodyBottomY,
+                contentRect: metrics.contentRect,
+                headContentRect: metrics.headContentRect
+            )
+        }
         DSMotion.animate(DSMotion.springTransform) {
             portrait.offsetX = transform.offset.width
             portrait.offsetY = transform.offset.height

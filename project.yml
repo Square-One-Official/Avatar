@@ -219,7 +219,10 @@ targets:
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SUEnableInstallerLauncherService: true
-        SUEnableDownloaderService: true
+        # Geen SUEnableDownloaderService: Avatar2 heeft network.client, dus de
+        # appcast/downloads lopen in-process. De Downloader-XPC is dan overbodig
+        # én hangt onder Xcode (debugger spawnt 'm suspended, kan niet attachen
+        # → check blijft eeuwig "Checking…"). v1 blijft ongewijzigd.
         SUAllowsAutomaticUpdates: true
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false

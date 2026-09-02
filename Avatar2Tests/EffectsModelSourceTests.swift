@@ -34,7 +34,7 @@ final class EffectsModelSourceTests: XCTestCase {
             portrait: portrait,
             cutoutImage: current,
             coordinator: nil,
-            onApply: { _ in }
+            onApply: { _, _ in }
         )
     }
 

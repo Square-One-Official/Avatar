@@ -178,6 +178,18 @@ Geverifieerd: beide targets bouwen; Avatar2-tests, AvatarKit (89) en AvatarUI (3
 groen; fresh launch van de Debug-build logt de launch-check zonder dat About open was
 (via `/usr/bin/log stream`).
 
+**Bijstelling (2026-09-02, besluit Thierry):** de handmatige
+`checkForUpdatesInBackgroundAtLaunch()` is weer verwijderd. Sparkle plant de
+launch-check zelf zodra `SUEnableAutomaticChecks` aan staat; onze extra call viel
+in Sparkle's eigen start-cyclus (`sessionInProgress == YES` in het log) en werd
+stil genegeerd — dubbel werk zonder effect. Daarnaast: een gevonden update wordt
+niet meer stil gedownload maar aangeboden in een kaart linksonder bij de sidebar
+(`UpdateToastView`: Install Update/Later → voortgang + Cancel → Relaunch/Later;
+"Later" op een gedownloade update laat Sparkle bij afsluiten installeren).
+`SUEnableDownloaderService` is uit Avatar2's Info.plist gehaald (hing onder de
+Xcode-debugger; met `network.client` overbodig). Tests: launch-check-tests
+vervangen door kaart-mapping-tests.
+
 
 ## 13.6 — AuthSessionFileStorage: token-write faalt bij vergrendeld scherm [INFRA]
 - status: done

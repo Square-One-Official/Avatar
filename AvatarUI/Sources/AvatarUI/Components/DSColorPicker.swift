@@ -6,6 +6,8 @@
 // API:
 //   DSColorPicker(color: $color)                  // met alpha
 //   DSColorPicker(color: $color, supportsAlpha: false)
+//   DSColorPicker(color: $color, supportsAlpha: false,
+//                 commitTitle: "Add colour", onCommit: { ... })
 //
 // Figma-TODO: definitieve maatvoering/tints + RGB/HSL-formats (nu Hex actief,
 // RGB/HSL staan als placeholder in de dropdown).
@@ -16,6 +18,8 @@ import SwiftUI
 public struct DSColorPicker: View {
     @Binding private var color: Color
     private let supportsAlpha: Bool
+    private let commitTitle: String?
+    private let onCommit: (() -> Void)?
 
     @State private var hue: Double = 0
     @State private var sat: Double = 1
@@ -27,8 +31,21 @@ public struct DSColorPicker: View {
     @State private var seeded = false
 
     public init(color: Binding<Color>, supportsAlpha: Bool = true) {
+        self.init(color: color, supportsAlpha: supportsAlpha, commitTitle: nil, onCommit: nil)
+    }
+
+    /// `commitTitle` toont een primary-actie onder de hex-rij (bv. "Add colour")
+    /// zodat de picker een expliciete bevestiging heeft i.p.v. alleen dismiss.
+    public init(
+        color: Binding<Color>,
+        supportsAlpha: Bool = true,
+        commitTitle: String?,
+        onCommit: (() -> Void)?
+    ) {
         self._color = color
         self.supportsAlpha = supportsAlpha
+        self.commitTitle = commitTitle
+        self.onCommit = onCommit
     }
 
     enum Format: String, CaseIterable, Identifiable { case hex = "Hex", rgb = "RGB", hsl = "HSL"; var id: String { rawValue } }
@@ -45,6 +62,9 @@ public struct DSColorPicker: View {
                 formatMenu
                 hexField
                 if supportsAlpha { opacityField }
+            }
+            if let commitTitle, let onCommit {
+                DSPrimaryButton(commitTitle, size: .small, fullWidth: true, action: onCommit)
             }
         }
         .padding(DSSpacing.gap5)
@@ -149,6 +169,7 @@ public struct DSColorPicker: View {
                 .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.md))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverHighlight(cornerRadius: DSRadius.md)
         .help("Pick a colour from the screen")
     }

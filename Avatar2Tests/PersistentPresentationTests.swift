@@ -123,6 +123,7 @@ final class PersistentPresentationTests: XCTestCase {
     func testDismissAllEphemeralClearsEveryMenuIncludingMigratedOnes() {
         let store = UIPresentationStore()
         store.editorBackgroundTypeMenuOpen = true
+        store.editorBackgroundColorPickerOpen = true
         store.editorChipMenu = .boost
         store.folderBackgroundPickerOpen = true
         store.selectionBackgroundPickerOpen = true
@@ -137,6 +138,7 @@ final class PersistentPresentationTests: XCTestCase {
         store.dismissAllEphemeral()
 
         XCTAssertFalse(store.editorBackgroundTypeMenuOpen)
+        XCTAssertFalse(store.editorBackgroundColorPickerOpen)
         XCTAssertNil(store.editorChipMenu)
         XCTAssertFalse(store.folderBackgroundPickerOpen)
         XCTAssertFalse(store.selectionBackgroundPickerOpen)
@@ -161,5 +163,86 @@ final class PersistentPresentationTests: XCTestCase {
 
         XCTAssertNil(store.portraitContextMenu)
         XCTAssertEqual(store.editorActiveTool, .background)
+    }
+
+    func testNamePromptAlertCopy() {
+        let create = PresentationAlert.createFolder(draft: "")
+        XCTAssertEqual(create.title, "Create folder")
+        XCTAssertEqual(create.confirmLabel, "Create")
+        XCTAssertEqual(create.fieldPlaceholder, "Folder name")
+        XCTAssertEqual(create.id, "createFolder")
+
+        let forPortraits = PresentationAlert.createFolderForPortraits(targetIDs: [], draft: "")
+        XCTAssertEqual(forPortraits.title, "Create folder")
+        XCTAssertEqual(forPortraits.confirmLabel, "Create")
+    }
+
+    /// Vensterwissel-bug: de concepttekst van het naam-prompt leeft in de
+    /// store, wordt bij een nieuw prompt geseed en blijft staan zolang
+    /// hetzelfde prompt open is.
+    func testNamePromptDraftLivesInStoreAndSurvivesReassign() {
+        let store = UIPresentationStore()
+
+        store.alert = .createFolder(draft: "Original")
+        XCTAssertEqual(store.alertDraft, "Original")
+
+        store.alertDraft = "Awareways"
+        // Zelfde prompt opnieuw toewijzen (view-recreatie) mag niet resetten.
+        store.alert = .createFolder(draft: "Original")
+        XCTAssertEqual(store.alertDraft, "Awareways")
+
+        // Sluiten wist het concept; een nieuw prompt seedt opnieuw.
+        store.alert = nil
+        XCTAssertEqual(store.alertDraft, "")
+        store.alert = .createFolder(draft: "Fresh")
+        XCTAssertEqual(store.alertDraft, "Fresh")
+    }
+
+    func testColoriseAlreadyColourConfirmStoresContinueAction() {
+        let store = UIPresentationStore()
+        var ran = false
+
+        store.presentColoriseAlreadyColour { ran = true }
+
+        XCTAssertEqual(store.confirm, .coloriseAlreadyColour)
+        XCTAssertFalse(ran)
+
+        store.dismissColoriseAlreadyColour()
+        XCTAssertNil(store.confirm)
+        XCTAssertFalse(ran, "cancel mag Colorise niet starten")
+
+        store.presentColoriseAlreadyColour { ran = true }
+        store.confirmColoriseAlreadyColour()
+        XCTAssertTrue(ran)
+        XCTAssertNil(store.confirm)
+        XCTAssertNil(store.pendingColorise)
+    }
+
+    func testDismissColoriseAlreadyColourDoesNotClearOtherConfirms() throws {
+        let store = UIPresentationStore()
+        let id = try makePortraitID()
+        store.confirm = .deletePortraits(ids: [id])
+
+        store.dismissColoriseAlreadyColour()
+
+        XCTAssertEqual(store.confirm, .deletePortraits(ids: [id]))
+    }
+
+    /// Enhance + chip-dropdown overleven een tab-wissel (store), maar
+    /// `endEditorSession` ruimt ze op — library → ander beeld mag ze niet
+    /// opnieuw openen.
+    func testEndEditorSessionClosesEnhancePanelAndChipMenu() {
+        let store = UIPresentationStore()
+        store.editorActiveTool = .edit
+        store.editorChipMenu = .boost
+        store.editorBackgroundTypeMenuOpen = true
+        store.createEffectSheetOpen = true
+
+        store.endEditorSession()
+
+        XCTAssertNil(store.editorActiveTool)
+        XCTAssertNil(store.editorChipMenu)
+        XCTAssertFalse(store.editorBackgroundTypeMenuOpen)
+        XCTAssertTrue(store.createEffectSheetOpen, "een open taak-modal is geen editorsessie-menu")
     }
 }

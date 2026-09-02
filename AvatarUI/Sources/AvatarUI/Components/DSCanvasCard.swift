@@ -56,9 +56,11 @@ public struct DSCanvasCard<Content: View>: View {
         // exportformaat (1:1); de inhoud vult de kaart (aspect-fill door
         // de caller).
         .aspectRatio(1, contentMode: .fit)
-        // Buitenste clip = de kaartvorm zodat overlays (gids/handles) binnen het
-        // canvas blijven; de surface zelf is al naar `surfaceClip` geclipt.
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
+        // Buitenste clip volgt dezelfde frame-vorm als de surface (cirkel of
+        // afgeronde kaart), zodat gids/overlays niet in de hoeken buiten de
+        // vorm uitsteken. Selectie-handles zitten buiten deze kaart
+        // (screen-space overlay in EditorView).
+        .clipShape(surfaceClip)
     }
 }
 

@@ -481,3 +481,58 @@ groen.
 **Openstaand:** de live tab-wissel-check met een échte Image-Playground-generatie
 vergt macOS 15.1+ met Apple Intelligence actief op de dev-Mac; niet gedraaid.
 Het mechanisme (state buiten de view) is met tests geborgd.
+
+## 53.10 — Enhance-tegels: contrast, sprekende previews, hover-animaties, badges
+- status: done
+- owner: FEAT (2026-09-02, worktree Avatars-v2 op `v2/leftnav-restore`; branch-suggestie `v2/e53-10-enhance-tiles`)
+- team: FEAT (+ AvatarKit/Imaging voor de preview-renderer)
+- blockedBy: —
+
+**Wat:** kritiek Thierry 2026-09-02 op het Enhance-raster: (1) tegelvlak
+(`inset`) onzichtbaar op de paneelkaart, (2) Retouch legt niets uit, (3) Studio
+Light = "blob" (bloom + hoek-flare), (4) Portrait toont geen achtergrond bij een
+cutout-import, (5) Fill in body = alleen een fade, (6) Remove background-checker
+(stone/stoneDark) onzichtbaar, (7) slot-icoon op Boost onzichtbaar en overbodig,
+(8) chevron (`chevron.compact.down`, baseline + padding) oogt scheef.
+
+**Besluiten:** Portrait-backdrop = 2–3 **gebundelde** scène-foto's (placeholder-
+set nu, definitief in de asset-batch — ASSETS.md #6); animatie = **on hover, één
+pass**; rust = statisch effect; Reduce Motion = altijd statisch.
+
+**Hoe:**
+- AvatarKit `EnhanceTilePreview.renderLayers` → `Layers { base, reveal, subject
+  (head-crop mét alpha), focus (gezichts-rect 0…1) }`; `render` = `.base`.
+  `zoomTo` vult niet meer met stone (crop dient ook als masker); stone komt er
+  aan het eind bij. Checker stone/**stoneLight** (#4D4745). Studio Light =
+  `improveLighting` + vignette, geen flare. Fill in body = ruimere body-crop,
+  bovenste 55 % solid, daaronder dot-stipple + morphology-contour. Portrait =
+  `blurFraction` rust 0.05 / hover 0.22. Remove background: base = subject over
+  de originele foto (zelfde crop), reveal = checker. Cache `|v8|`.
+- Avatar2 `EnhanceTileMotion` (wipeHorizontal/wipeVertical/shimmer/depthPull/
+  dissolve) + `EnhanceTileLayers`; `EnhanceActionTile` animeert `progress` via
+  `DSMotion.animate` (hover-in: sprong naar start, volgende tick naar 1; hover-
+  out: terug naar rust of sprong voor shimmer/dissolve). Shimmer = lichtband
+  gemaskerd met het subject; wang-glow = twee radial-cirkels op `focus`.
+  Kaart: `neutralStronger` + hairline `divider` (hover `neutralStrongest`);
+  chevron `chevron.down`, gecentreerd, één regel.
+- `EditColorPanel`: lagen i.p.v. één beeld; Portrait krijgt
+  `EnhancePreviewScenes.random()`, Remove background de originele foto. Boost:
+  nooit `.onDevice`; cloud-badge + muted alleen bij Online én Local only.
+
+**Result:** lagen-API `EnhanceTilePreview.renderLayers` (+12 AvatarKit-tests) en
+`EnhanceTileMotion`/`EnhanceTileLayers` in `EnhanceActionTile` (+8 Avatar2-tests);
+kaart `neutralStronger` + hairline, chevron `chevron.down` gecentreerd, Boost zonder
+slot-badge (cloud alleen bij Online én Local only); Portrait op 3 gebundelde
+placeholder-scènes (ASSETS #6, `EnhancePreviewScenes`). Visueel geverifieerd via
+env-gated contactsheet (`EnhanceTileSnapshotDumpTests`, echte cutout): halve kop +
+stippel-silhouet bij Fill in body, checker zichtbaar, wang-glow op het eind van de
+Retouch-wipe, Studio Light zonder flare + shimmer, Portrait scherp→blur. Beide
+targets bouwen; Avatar2 254 tests groen; AvatarUI groen; AvatarKit groen op één
+pre-existing parallel-race na (`BackendClientBaseURLTests.testEmptyOverrideIgnored`,
+slaagt solo; UserDefaults-deling, los van deze story). `check-motion` groen;
+`check-icon-sizes` faalt op twee bestanden uit de eerdere Enhance/Adjust-split
+(`PrivacyTierRadioGroup.swift:41`, `AdjustPanel.swift:379`) — niet in deze story
+aangeraakt, wél te fixen vóór merge (build-v2.sh stopt erop). Open: label "Remove
+background" trunceert op één regel (bestond al); light mode toont de stone-plaat
+donker (bestaand gedrag).
+

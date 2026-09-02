@@ -16,8 +16,6 @@ struct FloatingOverlayHost: View {
     @Query(sort: \Portrait2.updatedAt, order: .reverse) private var portraits: [Portrait2]
     @Query(sort: \BannerDoc.updatedAt, order: .reverse) private var bannerDocs: [BannerDoc]
 
-    @State private var alertDraft = ""
-
     var body: some View {
         ZStack {
             portraitContextLayer
@@ -25,19 +23,25 @@ struct FloatingOverlayHost: View {
             leftNavFolderMenuLayer
             bannerGalleryMenuLayer
         }
+        // Vul de hele overlay: zonder menu's is de ZStack 0×0, waardoor de
+        // modal-overlays hieronder een 0-proposal krijgen — de dim-backdrop
+        // (`Color.black.opacity`) wordt dan door de ZStack-plaatsing op de
+        // dialog-bounds gezet i.p.v. op het venster (hard grijs kader rond de
+        // kaart, geen dimming). Een leeg frame vangt geen clicks.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .focusedSceneValue(\.portraitSet, portraitSetAction)
         .background { escapeBackgroundPicker }
-        .alert(alertTitle, isPresented: Binding(
-            get: { model.presentation.alert != nil },
-            set: { if !$0 { model.presentation.alert = nil; alertDraft = "" } }
-        )) {
-            alertButtons
-        }
+        .overlay { coloriseAlreadyColourDialog }
+        .overlay { namePromptDialog }
+        .dsMotion(DSMotion.fast, value: model.presentation.confirm == .coloriseAlreadyColour)
+        .dsMotion(DSMotion.fast, value: model.presentation.alert)
         .confirmationDialog(
             confirmTitle,
             isPresented: Binding(
-                get: { model.presentation.confirm != nil },
-                set: { if !$0 { model.presentation.confirm = nil } }
+                get: { showsDestructiveConfirm },
+                set: { if !$0 {
+                    if showsDestructiveConfirm { model.presentation.confirm = nil }
+                } }
             ),
             titleVisibility: .visible
         ) {
@@ -59,6 +63,7 @@ struct FloatingOverlayHost: View {
                 PortraitDSContextMenu(
                     portrait: portrait,
                     model: model,
+                    entitlement: entitlement,
                     folders: folders,
                     selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
                     undoManager: undoManager,
@@ -71,7 +76,6 @@ struct FloatingOverlayHost: View {
                     },
                     onRequestNewFolder: { targets in
                         model.presentation.dismissPortraitContextMenu()
-                        alertDraft = ""
                         model.presentation.alert = .createFolderForPortraits(
                             targetIDs: targets.map(\.persistentModelID),
                             draft: ""
@@ -100,7 +104,8 @@ struct FloatingOverlayHost: View {
                     portrait: targets.first,
                     onApply: { background in
                         PortraitSetActions.setBackground(
-                            targets, background, undoManager: undoManager
+                            targets, background, undoManager: undoManager,
+                            reporter: model.setActionReporter
                         )
                     },
                     presentation: model.presentation,
@@ -130,19 +135,24 @@ struct FloatingOverlayHost: View {
             selectedCount: model.selectedPortraitIDs.count,
             matchFraming: {
                 PortraitSetActions.matchFraming(
-                    selectedPortraits, undoManager: undoManager
-                ) { model.setBusyMessage = $0 }
+                    selectedPortraits, undoManager: undoManager, reporter: model.setActionReporter
+                )
             },
             matchLighting: {
-                guard let reference = FolderSetScope.matchLightingReference(selectedPortraits) else { return }
                 PortraitSetActions.matchLighting(
-                    selectedPortraits, reference: reference, undoManager: undoManager
-                ) { model.setBusyMessage = $0 }
+                    selectedPortraits, undoManager: undoManager, reporter: model.setActionReporter
+                )
             },
             setBackground: {
                 let anchor = model.presentation.portraitContextMenu?.anchor
                     ?? model.presentation.selectionBackgroundPickerAnchor
                 model.presentation.openSelectionBackgroundPicker(anchor: anchor)
+            },
+            canResetAdjust: selectedPortraits.contains { !$0.adjust.isNeutral },
+            resetAdjust: {
+                PortraitSetActions.resetAdjust(
+                    selectedPortraits, undoManager: undoManager, reporter: model.setActionReporter
+                )
             }
         )
     }
@@ -165,18 +175,19 @@ struct FloatingOverlayHost: View {
                     }
                     DSMenuRow("Match framing", icon: "square.resize", shortcut: "⌥⌘F", disabled: items.isEmpty) {
                         model.presentation.leftNavFolderMenu = nil
-                        PortraitSetActions.matchFraming(items, undoManager: undoManager) { model.setBusyMessage = $0 }
+                        PortraitSetActions.matchFraming(items, undoManager: undoManager, reporter: model.setActionReporter)
                     }
-                    DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
-                        model.presentation.leftNavFolderMenu = nil
-                        guard let reference = FolderSetScope.matchLightingReference(items) else { return }
-                        PortraitSetActions.matchLighting(
-                            items, reference: reference, undoManager: undoManager
-                        ) { model.setBusyMessage = $0 }
+                    if AppFeatureFlags.matchLightingEnabled {
+                        DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
+                            model.presentation.leftNavFolderMenu = nil
+                            PortraitSetActions.matchLighting(
+                                items, undoManager: undoManager, reporter: model.setActionReporter
+                            )
+                        }
                     }
                     DSMenuRow("Export set", icon: "square.and.arrow.up.on.square", disabled: items.isEmpty) {
                         model.presentation.leftNavFolderMenu = nil
-                        PortraitSetActions.export(items, isPro: model.isPro) { model.setBusyMessage = $0 }
+                        PortraitSetActions.export(items, isPro: model.isPro, reporter: model.setActionReporter)
                     }
                     Divider().padding(.vertical, 2)
                     DSMenuRow("Default background…", icon: "photo.on.rectangle") {
@@ -186,7 +197,6 @@ struct FloatingOverlayHost: View {
                     Divider().padding(.vertical, 2)
                     DSMenuRow("Rename", icon: "pencil") {
                         model.presentation.leftNavFolderMenu = nil
-                        alertDraft = folder.name
                         model.presentation.alert = .renameFolder(folderID: folderID, draft: folder.name)
                     }
                     Divider().padding(.vertical, 2)
@@ -214,7 +224,6 @@ struct FloatingOverlayHost: View {
                     onDismiss: { model.presentation.bannerGalleryMenu = nil },
                     onRename: {
                         model.presentation.bannerGalleryMenu = nil
-                        alertDraft = banner.name
                         model.presentation.alert = .renameBanner(bannerID: bannerID, draft: banner.name)
                     },
                     onDuplicate: {
@@ -245,95 +254,115 @@ struct FloatingOverlayHost: View {
         modelContext.insert(copy)
     }
 
-    // MARK: - Alerts
-
-    private var alertTitle: String {
-        switch model.presentation.alert {
-        case .renameFolder: return "Rename folder"
-        case .createFolder: return "Create folder"
-        case .renameBanner: return "Rename banner"
-        case .createFolderForPortraits: return "Create folder"
-        case nil: return ""
-        }
-    }
+    // MARK: - Name prompt (DSDialog, geen systeem-alert)
 
     @ViewBuilder
-    private var alertButtons: some View {
+    private var namePromptDialog: some View {
         if let alert = model.presentation.alert {
-            switch alert {
-            case .renameFolder(_, let draft):
-                TextField("Folder name", text: Binding(
-                    get: { alertDraft.isEmpty ? draft : alertDraft },
-                    set: { alertDraft = $0 }
-                ))
-                Button("Save") { confirmRenameFolder(alert) }
-                Button("Cancel", role: .cancel) { model.presentation.alert = nil }
-            case .createFolder(let draft):
-                TextField("Folder name", text: Binding(
-                    get: { alertDraft.isEmpty ? draft : alertDraft },
-                    set: { alertDraft = $0 }
-                ))
-                Button("Create") { confirmCreateFolder(alert) }
-                Button("Cancel", role: .cancel) { model.presentation.alert = nil }
-            case .renameBanner(_, let draft):
-                TextField("Banner name", text: Binding(
-                    get: { alertDraft.isEmpty ? draft : alertDraft },
-                    set: { alertDraft = $0 }
-                ))
-                Button("Save") { confirmRenameBanner(alert) }
-                Button("Cancel", role: .cancel) { model.presentation.alert = nil }
-            case .createFolderForPortraits(_, let draft):
-                TextField("Folder name", text: Binding(
-                    get: { alertDraft.isEmpty ? draft : alertDraft },
-                    set: { alertDraft = $0 }
-                ))
-                Button("Create") { confirmCreateFolderForPortraits(alert) }
-                Button("Cancel", role: .cancel) { model.presentation.alert = nil }
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                DSDialog(
+                    title: alert.title,
+                    confirmLabel: alert.confirmLabel,
+                    confirmEnabled: !trimmedAlertDraft.isEmpty,
+                    onConfirm: { confirmNamePrompt(alert) },
+                    onDismiss: { dismissNamePrompt() }
+                ) {
+                    DSTextField(
+                        placeholder: alert.fieldPlaceholder,
+                        autofocus: true,
+                        text: Binding(
+                            get: { model.presentation.alertDraft },
+                            set: { model.presentation.alertDraft = $0 }
+                        )
+                    )
+                    .onSubmit { confirmNamePrompt(alert) }
+                }
+                Button("Cancel") { dismissNamePrompt() }
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
             }
+            .accessibilityAddTraits(.isModal)
         }
     }
 
-    private func confirmRenameFolder(_ alert: PresentationAlert) {
-        defer { model.presentation.alert = nil }
-        guard case .renameFolder(let folderID, _) = alert else { return }
-        let name = alertDraft.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty,
-              let folder = folders.first(where: { $0.persistentModelID == folderID }) else { return }
-        folder.name = name
+    private var trimmedAlertDraft: String {
+        model.presentation.alertDraft.trimmingCharacters(in: .whitespaces)
     }
 
-    private func confirmCreateFolder(_ alert: PresentationAlert) {
-        defer { model.presentation.alert = nil }
-        guard case .createFolder = alert else { return }
-        let name = alertDraft.trimmingCharacters(in: .whitespaces)
+    private func dismissNamePrompt() {
+        model.presentation.alert = nil
+    }
+
+    private func confirmNamePrompt(_ alert: PresentationAlert) {
+        guard model.presentation.alert != nil else { return }
+        let name = trimmedAlertDraft
         guard !name.isEmpty else { return }
-        modelContext.insert(Folder2(name: name))
+        switch alert {
+        case .renameFolder(let folderID, _):
+            guard let folder = folders.first(where: { $0.persistentModelID == folderID }) else {
+                dismissNamePrompt()
+                return
+            }
+            folder.name = name
+        case .createFolder:
+            let folder = Folder2(name: name)
+            modelContext.insert(folder)
+            model.isPortraitsExpanded = true
+            model.showPortraits(folderID: folder.persistentModelID)
+        case .renameBanner(let bannerID, _):
+            guard let banner = bannerDocs.first(where: { $0.persistentModelID == bannerID }) else {
+                dismissNamePrompt()
+                return
+            }
+            banner.name = name
+        case .createFolderForPortraits(let targetIDs, _):
+            let folder = Folder2(name: name)
+            modelContext.insert(folder)
+            for id in targetIDs {
+                if let p = portraits.first(where: { $0.persistentModelID == id }) {
+                    p.folder = folder
+                }
+            }
+            model.isPortraitsExpanded = true
+            model.showPortraits(folderID: folder.persistentModelID)
+        }
+        dismissNamePrompt()
     }
 
-    private func confirmRenameBanner(_ alert: PresentationAlert) {
-        defer { model.presentation.alert = nil }
-        guard case .renameBanner(let bannerID, _) = alert else { return }
-        let name = alertDraft.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty,
-              let banner = bannerDocs.first(where: { $0.persistentModelID == bannerID }) else { return }
-        banner.name = name
-    }
+    // MARK: - Colorise already in colour
 
-    private func confirmCreateFolderForPortraits(_ alert: PresentationAlert) {
-        defer { model.presentation.alert = nil }
-        guard case .createFolderForPortraits(let targetIDs, _) = alert else { return }
-        let name = alertDraft.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { return }
-        let folder = Folder2(name: name)
-        modelContext.insert(folder)
-        for id in targetIDs {
-            if let p = portraits.first(where: { $0.persistentModelID == id }) {
-                p.folder = folder
+    @ViewBuilder
+    private var coloriseAlreadyColourDialog: some View {
+        if model.presentation.confirm == .coloriseAlreadyColour {
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { model.presentation.dismissColoriseAlreadyColour() }
+                DSMessageSheet(
+                    title: ColoriseAlreadyColourCopy.title,
+                    body: ColoriseAlreadyColourCopy.message,
+                    ctaLabel: ColoriseAlreadyColourCopy.confirm,
+                    onCTA: { model.presentation.confirmColoriseAlreadyColour() },
+                    onDismiss: { model.presentation.dismissColoriseAlreadyColour() }
+                )
             }
         }
     }
 
     // MARK: - Confirms
+
+    /// Destructieve confirms (delete) gaan via confirmationDialog; Colorise
+    /// gebruikt `DSMessageSheet` en naam-prompts `DSDialog` (geen systeem-alert).
+    private var showsDestructiveConfirm: Bool {
+        switch model.presentation.confirm {
+        case .deleteAccount, .deletePortraits, .deleteFolder, .deleteBanner: true
+        case .coloriseAlreadyColour, nil: false
+        }
+    }
 
     private var confirmTitle: String {
         switch model.presentation.confirm {
@@ -342,7 +371,7 @@ struct FloatingOverlayHost: View {
             return ids.count >= 2 ? "Delete \(ids.count) portraits?" : "Delete this portrait?"
         case .deleteFolder: return "Delete this folder?"
         case .deleteBanner: return "Delete this banner?"
-        case nil: return ""
+        case .coloriseAlreadyColour, nil: return ""
         }
     }
 
@@ -356,7 +385,7 @@ struct FloatingOverlayHost: View {
             return "Portraits in this folder are kept. This can't be undone."
         case .deleteBanner:
             return "This can't be undone."
-        case nil:
+        case .coloriseAlreadyColour, nil:
             return ""
         }
     }
@@ -397,7 +426,7 @@ struct FloatingOverlayHost: View {
                 model.presentation.confirm = nil
             }
             Button("Cancel", role: .cancel) { model.presentation.confirm = nil }
-        case nil:
+        case .coloriseAlreadyColour, nil:
             EmptyView()
         }
     }

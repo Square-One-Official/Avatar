@@ -15,3 +15,4 @@ Definitieve asset-batch mag later in één keer, niet release-blokkerend.
 | 3 | Background-print-presets (cracked stone, leopard, etc.) | App / Choose Background (4017:1099, "Image"-rij) | tegels 36×36 / canvas 1024² | gradient-presets OK for beta; prints later |
 | 4 | Effects-stijl-previews | App / Effects | thumbnails | CMS/CDN thumbs live for 6/9 styles; sparkles OK for rest |
 | 5 | Frame-lokale zwevende toolbar | **n.v.t.** | zwevende capsule | placeholder-design OK for beta (E31.4) |
+| 6 | Enhance Portrait-tegel scène-foto's (3× Pexels **berg-/natuurlandschap** achter de blur/diepte-preview) | **n.v.t.** (E53.10, besluit Thierry 2026-09-02) | 3× 512×512 JPEG, `Avatar2/Assets.xcassets/EnhanceScenePlaceholder{1,2,3}.imageset` | procedurele bokeh-placeholders (`EnhancePreviewScenes`); Thierry kiest definitieve Pexels-foto's, zelfde namen vervangen |

@@ -1,4 +1,5 @@
-// Onboarding 2.0 — Privacy tier-stap (E04.3). Drie radio-rijen i.p.v. toggle.
+// Onboarding 2.0 — Privacy-stap (E04.3). Twee keuzes: Local only / Cloud
+// (besluit Thierry 2026-09-02; Figma toont nog drie rijen).
 
 import AvatarUI
 import SwiftUI
@@ -6,10 +7,6 @@ import SwiftUI
 struct OnboardingPrivacyView: View {
     @Bindable var model: OnboardingModel
     private let prefs = PrivacyPreferences2.shared
-
-    private var disabledTiers: Set<AIPrivacyTier> {
-        AppleIntelligenceAvailability.supportsApplePrivateCloud ? [] : [.appleCloud]
-    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,8 +27,7 @@ struct OnboardingPrivacyView: View {
                     selection: Binding(
                         get: { prefs.tier },
                         set: { prefs.tier = $0 }
-                    ),
-                    disabledTiers: disabledTiers
+                    )
                 )
                 .padding(.top, DSSpacing.gap12)
 
@@ -45,8 +41,5 @@ struct OnboardingPrivacyView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .refreshAppleIntelligenceAvailability {
-            PrivacyPreferences2.shared.reapplyFingerprintPolicy()
-        }
     }
 }

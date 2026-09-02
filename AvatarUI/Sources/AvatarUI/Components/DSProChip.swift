@@ -66,6 +66,7 @@ public struct DSFeatureIndicator: View {
             }
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .dsFocusEffectDisabled()
         .accessibilityLabel(Text(kind == .pro ? chipLabel : "Online AI models off"))
         .popover(isPresented: $isShowingExplanation, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: DSSpacing.gap2) {
@@ -82,6 +83,7 @@ public struct DSFeatureIndicator: View {
                         .foregroundStyle(DSColor.Action.primaryForeground)
                 }
                 .buttonStyle(DSStateOpacityButtonStyle())
+                .dsFocusEffectDisabled()
             }
             .padding(DSSpacing.gap4)
             .frame(width: 240, alignment: .leading)
@@ -144,6 +146,7 @@ public struct DSGated<Content: View>: View {
                     .allowsHitTesting(false)
             }
             .buttonStyle(DSStateOpacityButtonStyle())
+            .dsFocusEffectDisabled()
             .accessibilityHint(Text(chipLabel))
             .overlay(alignment: .topTrailing) { indicators }
         } else {

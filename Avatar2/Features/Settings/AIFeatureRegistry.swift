@@ -76,9 +76,9 @@ enum AIFeature: String, CaseIterable, Sendable, Equatable {
         case .faceEdit:
             return "To edit your face, your photo is processed securely online. We never use your images for training."
         case .imagePlaygroundGenerate:
-            return "Generate images with Apple Intelligence on Private Cloud Compute. Not used for training."
+            return "To generate this image, it is processed securely. We never use your images for training."
         case .imagePlaygroundEdit:
-            return "Edit with Apple Intelligence on Private Cloud Compute. Not used for training."
+            return "To edit this photo, it is processed securely. We never use your images for training."
         case .backgroundGenerate:
             return "To generate a background from your description, it is processed securely online. We never use your images for training."
         }

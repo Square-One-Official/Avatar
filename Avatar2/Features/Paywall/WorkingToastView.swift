@@ -12,7 +12,7 @@ struct WorkingToastView: View {
     /// E55.9: optionele Cancel-actie (Effects detacht de generatie — resultaat
     /// landt stil in de kaart-cache). nil = geen knop (korte acties).
     var onCancel: (() -> Void)? = nil
-    let onClose: () -> Void
+    var onClose: (() -> Void)? = nil
 
     @State private var index = 0
 
@@ -45,13 +45,15 @@ struct WorkingToastView: View {
                         .dsTextStyle(.labelLarge)
                         .foregroundStyle(DSColor.Foreground.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    DSIconButton(
-                        Image(systemName: "xmark"),
-                        label: "Dismiss",
-                        style: .ghostNeutral,
-                        size: .small,
-                        action: onClose
-                    )
+                    if let onClose {
+                        DSIconButton(
+                            Image(systemName: "xmark"),
+                            label: "Dismiss",
+                            style: .ghostNeutral,
+                            size: .small,
+                            action: onClose
+                        )
+                    }
                 }
 
                 // Cycling description: .id(index) laat SwiftUI de Text als
@@ -89,7 +91,7 @@ struct WorkingToastView: View {
                                 Spacer(minLength: 0)
                                 if let onCancel {
                                     DSGhostButton("Cancel", size: .small, action: onCancel)
-                                        .help("Keep working — the style finishes in the background and lands on its card")
+                                        .help(context.cancelHint ?? "Cancel")
                                 }
                             }
                         }

@@ -13,7 +13,7 @@ import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, currentCredits, ensureCompedCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
-import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE } from "../../lib/stylizePrompts.js";
+import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE, DIE_CUT_COMPOSITION_CLAUSE, isDieCutStyle } from "../../lib/stylizePrompts.js";
 import {
   type AspectPad,
   capLongEdge,
@@ -394,6 +394,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
       }
     }
+    // Die-cut-stijl (sticker): gesloten vorm, gecentreerd met marge — en
+    // hieronder GEEN framing-clausule (zie lib/stylizePrompts.ts). Volgorde
+    // = composeEffectPrompt (bakeoff-driver); hier los uitgeschreven omdat
+    // de refs-fetch async tussen de clausules zit.
+    if (isDieCutStyle(styleKey)) {
+      prompt = `${prompt} ${DIE_CUT_COMPOSITION_CLAUSE}`;
+    }
   } else if (hairPreset) {
     // CMS-first: try Payload, fall back to hardcoded HAIR_PRESETS.
     const cmsPresets = await fetchActiveHairPresets();
@@ -456,7 +463,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.body?.soft_source === true) {
     prompt = `${prompt} ${SHARPNESS_CLAUSE}`;
   }
-  if (req.body?.preserve_framing === true) {
+  // Die-cut-stijlen negeren preserve_framing bewust: de client stuurt 'm
+  // hard aan voor élk effect, maar een sticker moet juist mógen herkadreren.
+  if (req.body?.preserve_framing === true && !isDieCutStyle(styleKey)) {
     prompt = `${prompt} ${FRAMING_CLAUSE}`;
   }
 

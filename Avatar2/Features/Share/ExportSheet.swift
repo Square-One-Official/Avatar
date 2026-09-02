@@ -6,13 +6,14 @@
 //  - Geen inset-kaart meer achter de preview: het beeld zweeft in de gekozen
 //    vorm op de sheet-achtergrond (de kaart leek deel van de export).
 //  - Vorm = de enige echte keuze. Default Square (past op élk platform, dat
-//    croppt zelf), plus Circle en Rounded (Slack/Discord). Onder de preview
-//    een passieve "waar past dit"-regel die meebeweegt met de vorm — platform
-//    is géén configuratie, want álle platforms nemen hetzelfde vierkante beeld.
-//  - Geschatte bestandsgrootte per gekozen maat.
+//    croppt zelf), plus Circle en Rounded (Slack/Discord).
+//  - Geschatte bestandsgrootte per gekozen maat, als DSBadge.
 //  - Share werkt nu écht: de native NSSharingServicePicker wordt verankerd aan
 //    de Share-knop (i.p.v. een nil-anker), en de sheet sluit niet meer meteen
 //    waardoor het venster onder de picker wegviel.
+//
+// Geen SwiftUI `.sheet`: die wordt op macOS bij een vensterwissel afgebroken
+// en opnieuw gepresenteerd. Overlay op ShellView blijft in de view tree.
 
 import AppKit
 import AvatarKit
@@ -23,8 +24,8 @@ import SwiftUI
 struct ExportSheet: View {
     let portraitID: PersistentIdentifier
     var isPro: Bool = false
+    var onClose: () -> Void
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
 
     // E33: standaard Square — dat is wat de meeste platforms nodig hebben (zij
     // croppen zelf naar cirkel/afgerond). Volgt niet langer portrait.frameShape.
@@ -53,7 +54,7 @@ struct ExportSheet: View {
             }
         }
         .onAppear {
-            if portrait == nil { dismiss() }
+            if portrait == nil { onClose() }
         }
     }
 
@@ -63,11 +64,11 @@ struct ExportSheet: View {
             HStack {
                 Text("Export").dsTextStyle(.h3).foregroundStyle(DSColor.Foreground.primary)
                 Spacer()
-                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { dismiss() }
+                DSIconButton(Image(systemName: "xmark"), label: "Close", size: .small) { onClose() }
+                    .keyboardShortcut(.cancelAction)
             }
 
             preview
-            platformHint
 
             field("Shape") {
                 DSSegmentedControl(
@@ -83,9 +84,12 @@ struct ExportSheet: View {
                     segments: PortraitExporter.sizeOptions.map { .init(tag: $0, label: "\($0)px") },
                     equalWidth: true
                 )
-                Text(sizeCaption)
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.muted)
+                HStack(spacing: DSSpacing.gap2) {
+                    Text(sizeQualityCaption)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                    DSBadge(estimatedSizeBadge, type: .neutral)
+                }
             }
 
             if watermark {
@@ -104,7 +108,12 @@ struct ExportSheet: View {
         .padding(DSSpacing.gap8)
         .frame(width: 420)
         .background(DSColor.Background.app)
-        .appliedAppearancePreference()
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DSRadius.xl4, style: .continuous)
+                .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
+        }
+        .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
         // Preview (256px) alléén opnieuw bij een vorm-wissel. De byte-grootte van
         // diezelfde PNG dient als referentie voor de grootteschatting per maat.
         .task(id: shape) {
@@ -135,39 +144,17 @@ struct ExportSheet: View {
         .frame(height: 200)
     }
 
-    @ViewBuilder
-    private var platformHint: some View {
-        HStack(spacing: DSSpacing.gap1_5) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(DSColor.Foreground.muted)
-            Text(Self.platformHintText(for: shape))
-                .dsTextStyle(.bodySmall)
-                .foregroundStyle(DSColor.Foreground.muted)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// Passieve "waar past dit"-regel per export-vorm (unit-getest).
-    static func platformHintText(for shape: ExportShape) -> String {
-        switch shape {
-        case .square:
-            return "Upload this — LinkedIn, Instagram and most apps crop it to a circle."
-        case .circle:
-            return "Already circular — transparent corners. For when the file itself should look round."
-        case .rounded:
-            return "Matches Slack, Discord & Teams."
-        }
-    }
-
-    private var sizeCaption: String {
-        let perfect: String
+    private var sizeQualityCaption: String {
         switch size {
-        case 512: perfect = "Crisp on profiles"
-        case 1024: perfect = "Best for retina displays"
-        default: perfect = "Print & large displays"
+        case 512: return "Crisp on profiles"
+        case 1024: return "Best for retina displays"
+        default: return "Print & large displays"
         }
-        guard let bytes = estimatedBytes else { return "\(perfect) · estimating size…" }
-        return "\(perfect) · ≈ \(formatted(bytes))"
+    }
+
+    private var estimatedSizeBadge: String {
+        guard let bytes = estimatedBytes else { return "Estimating…" }
+        return "≈ \(formatted(bytes))"
     }
 
     /// Goedkope grootteschatting i.p.v. de volle PNG te renderen: schaal de
@@ -231,7 +218,7 @@ struct ExportSheet: View {
         if panel.runModal() == .OK, let url = panel.url {
             try? data.write(to: url)
         }
-        dismiss()
+        onClose()
     }
 }
 

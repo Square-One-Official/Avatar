@@ -120,7 +120,14 @@ final class FaceEffectsModel {
     }
 
     private func generate(presetKey: String, label: String, base: NSImage, portrait: Portrait2?) async {
-        guard entitlement.allowAIFeature(.faceEdit) else { return }
+        guard entitlement.allowAIFeature(.faceEdit, retry: { [weak self] in
+            guard let self else { return }
+            Task {
+                await self.generate(
+                    presetKey: presetKey, label: label, base: base, portrait: portrait
+                )
+            }
+        }) else { return }
 
         let source = StylizeQuality.editStylizeSource(cutout: base)
         _ = await coordinator?.gateBeforeStylize(
@@ -309,7 +316,9 @@ struct FaceActionsPanel: View {
                         }
                     }
                     .buttonStyle(.plain)
+                    .dsFocusEffectDisabled()
                     .disabled(workingTitle != nil)
+                    .cloudFeatureMuted(!isWhiten && CloudFeatureChrome.isLocalOnly)
                     .opacity(workingTitle != nil && !isWorking ? 0.5 : 1)
                     .anchorPreference(key: WhitenAnchorKey.self, value: .bounds) {
                         isWhiten ? $0 : nil
@@ -358,6 +367,7 @@ struct FaceActionsPanel: View {
                     base: baseImage, portrait: portrait
                 )
             }
+            .opacity(CloudFeatureChrome.isLocalOnly ? CloudFeatureChrome.mutedOpacity : 1)
         }
     }
 

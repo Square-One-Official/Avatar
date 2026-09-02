@@ -15,7 +15,7 @@ import SwiftUI
 public struct DSIcon: View {
     public enum Symbol {
         // Bottom-toolbar tools
-        case edit, effects, face, clothing, hair, background, images
+        case edit, adjust, effects, face, clothing, hair, background, images
         // App-bar / chrome
         case share, settings, undo, redo, add, close
         // Canvas-controls
@@ -63,6 +63,7 @@ public struct DSIcon: View {
     private static func systemName(for symbol: Symbol) -> String {
         switch symbol {
         case .edit:        return "paintpalette"        // Ph.palette
+        case .adjust:      return "slider.horizontal.3" // Ph.slidersHorizontal
         case .effects:     return "sparkles"            // Ph.sparkle
         case .face:        return "face.smiling"        // Ph.smiley
         case .clothing:    return "tshirt"              // Ph.tShirt

@@ -19,6 +19,7 @@ struct BannerBreadcrumb: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverHighlight(cornerRadius: DSRadius.md)
             .help("Back")
 
@@ -48,6 +49,7 @@ struct BannerBreadcrumb: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverHighlight(cornerRadius: DSRadius.md)
         .help("Go to \(text)")
     }

@@ -14,18 +14,35 @@
 // nooit een echte updater start.
 
 import Foundation
-import OSLog
 import SwiftUI
 import Combine
 import Sparkle
 
 enum UpdateState: Equatable {
     case idle
+    /// Laatste handmatige check vond geen update; blijft staan tot de
+    /// volgende check zodat "Check now" zichtbaar iets opgeleverd heeft.
+    case upToDate
     case checking
-    case downloading(progress: Double)
-    case extracting
+    /// Update gevonden; wacht op de keuze van de gebruiker (kaart linksonder:
+    /// Install Update / Later). Ook bij achtergrondchecks — een update wordt
+    /// nooit stil gedownload of stil verborgen.
+    case available(version: String)
+    /// `progress` 0…1; nil zolang Sparkle de totale grootte nog niet kent.
+    case downloading(version: String, progress: Double?)
+    case extracting(version: String)
     case readyToRelaunch(version: String)
     case error(String)
+}
+
+/// Wat de update-kaart (linksonder, bij de sidebar) toont. Identiteit zónder
+/// voortgang: de kaart leest de voortgang zelf uit de manager, zodat een
+/// procent-tik de zwevende toast niet steeds opnieuw naar voren haalt.
+enum UpdateToastItem: Equatable {
+    case available(version: String)
+    case downloading(version: String)
+    case extracting(version: String)
+    case ready(version: String)
 }
 
 // MARK: - Engine-seam (E13.5)
@@ -40,7 +57,6 @@ protocol UpdaterEngine: AnyObject {
     var lastUpdateCheckDate: Date? { get }
     func start() throws
     func checkForUpdates()
-    func checkForUpdatesInBackground()
 }
 
 /// Productie-engine: de echte `SPUUpdater` op de main bundle.
@@ -72,7 +88,6 @@ private final class SparkleUpdaterEngine: UpdaterEngine {
 
     func start() throws { try updater.start() }
     func checkForUpdates() { updater.checkForUpdates() }
-    func checkForUpdatesInBackground() { updater.checkForUpdatesInBackground() }
 }
 
 /// No-op-engine voor de unit-test-host: Avatar2Tests draait gehost in
@@ -89,7 +104,6 @@ private final class NoopUpdaterEngine: UpdaterEngine {
     var lastUpdateCheckDate: Date? { nil }
     func start() throws {}
     func checkForUpdates() {}
-    func checkForUpdatesInBackground() {}
 }
 
 // MARK: - UpdateManager
@@ -102,21 +116,24 @@ final class UpdateManager: NSObject {
     /// "Check Now" button is enabled at first paint, before Sparkle's KVO
     /// has had a chance to publish.
     private(set) var canCheckForUpdates = true
-    /// E13.5: observeerbaar bewijs dat de launch-achtergrondcheck is
-    /// aangevraagd (DoD-verificatie zonder echte download).
-    private(set) var lastBackgroundCheckRequest: Date?
-
     private var engine: (any UpdaterEngine)!
     private var userDriver: InAppUserDriver!
-    /// E13.5: de launch-check mag maar één keer per proces vuren — `.task`
-    /// op de WindowGroup-content kan opnieuw draaien (venster her-open).
-    private var hasRequestedLaunchCheck = false
 
     @ObservationIgnored
     private var cancellables = Set<AnyCancellable>()
 
-    @ObservationIgnored
-    private let logger = Logger(subsystem: "nl.squareone.aaavatar2", category: "UpdateManager")
+    /// Kaart linksonder (Avatar2App → `.dsFloatingToast`). nil = geen kaart.
+    /// Fouten blijven bewust buiten de kaart: die staan in Settings → About en
+    /// mogen een achtergrondcheck niet in een nag veranderen.
+    var toastItem: UpdateToastItem? {
+        switch state {
+        case .available(let version): return .available(version: version)
+        case .downloading(let version, _): return .downloading(version: version)
+        case .extracting(let version): return .extracting(version: version)
+        case .readyToRelaunch(let version): return .ready(version: version)
+        case .idle, .upToDate, .checking, .error: return nil
+        }
+    }
 
     var automaticallyChecksForUpdates: Bool {
         get { engine?.automaticallyChecksForUpdates ?? true }
@@ -159,33 +176,42 @@ final class UpdateManager: NSObject {
         engine.checkForUpdates()
     }
 
-    func checkForUpdatesInBackground() {
-        engine.checkForUpdatesInBackground()
+    // Geen handmatige achtergrondcheck bij launch meer (2026-09-02). Sparkle
+    // plant die zelf zodra `automaticallyChecksForUpdates` aan staat
+    // (SUEnableAutomaticChecks + SUScheduledCheckInterval); onze extra call
+    // botste met Sparkle's eigen start-cyclus ("sessionInProgress == YES" in
+    // het log) en werd dan stil genegeerd.
+
+    /// Kaart: "Install Update" — Sparkle gaat downloaden.
+    func installAvailableUpdate() {
+        userDriver.chooseInstall()
     }
 
-    /// E13.5: achtergrond-update-check bij app-launch (audit-C1). Eenmalig
-    /// per proces; respecteert de "Automatic updates"-toggle (staat die uit,
-    /// dan checkt de launch ook niet stilletjes).
-    func checkForUpdatesInBackgroundAtLaunch() {
-        guard !hasRequestedLaunchCheck else { return }
-        hasRequestedLaunchCheck = true
-        guard automaticallyChecksForUpdates else {
-            // .notice (default level) zodat de breadcrumb in `log show`
-            // terug te vinden is — .info wordt niet naar disk gepersisteerd.
-            logger.notice("Launch update check skipped: automatic updates disabled")
-            return
-        }
-        lastBackgroundCheckRequest = Date()
-        logger.notice("Launch background update check requested (E13.5)")
-        engine.checkForUpdatesInBackground()
+    /// Kaart: "Later" — Sparkle sluit deze cyclus; de volgende geplande check
+    /// biedt de update opnieuw aan. Bij een al gedownloade update (ready)
+    /// installeert Sparkle 'm bij het afsluiten van de app.
+    func dismissAvailableUpdate() {
+        userDriver.chooseDismiss()
+    }
+
+    /// Kaart: "Cancel" tijdens de download.
+    func cancelDownload() {
+        userDriver.cancelDownload()
     }
 
     func relaunchAndInstall() {
         userDriver.confirmInstallAndRelaunch()
     }
 
-    fileprivate func updateState(_ newState: UpdateState) {
+    /// Intern (niet fileprivate) zodat de tests de kaart-mapping kunnen toetsen.
+    func updateState(_ newState: UpdateState) {
         state = newState
+    }
+
+    /// Sparkle's `dismissUpdateInstallation` volgt direct op "geen update
+    /// gevonden"; die uitkomst mag daarbij niet meteen weer verdwijnen.
+    fileprivate func settleAfterDismiss() {
+        if state != .upToDate { state = .idle }
     }
 }
 
@@ -193,17 +219,43 @@ final class UpdateManager: NSObject {
 
 private final class InAppUserDriver: NSObject, SPUUserDriver {
     private weak var manager: UpdateManager?
-    private var installReply: ((SPUUserUpdateChoice) -> Void)?
+    /// Reply van `showUpdateFound` (Install/Later) óf van `showReady`
+    /// (Relaunch/Later) — Sparkle wacht erop; precies één keer beantwoorden.
+    private var pendingReply: ((SPUUserUpdateChoice) -> Void)?
+    private var downloadCancellation: (() -> Void)?
     private var cachedNewVersion: String?
+    private var expectedLength: UInt64 = 0
+    private var receivedLength: UInt64 = 0
+    private var lastReportedProgress: Double = -1
 
     init(manager: UpdateManager) {
         self.manager = manager
     }
 
-    func confirmInstallAndRelaunch() {
-        installReply?(.install)
-        installReply = nil
+    private var version: String { cachedNewVersion ?? "" }
+
+    // MARK: keuzes vanuit de kaart
+
+    func chooseInstall() {
+        pendingReply?(.install)
+        pendingReply = nil
     }
+
+    func chooseDismiss() {
+        pendingReply?(.dismiss)
+        pendingReply = nil
+    }
+
+    func cancelDownload() {
+        downloadCancellation?()
+        downloadCancellation = nil
+    }
+
+    func confirmInstallAndRelaunch() {
+        chooseInstall()
+    }
+
+    // MARK: SPUUserDriver
 
     func show(_ request: SPUUpdatePermissionRequest,
               reply: @escaping (SUUpdatePermissionResponse) -> Void) {
@@ -218,7 +270,9 @@ private final class InAppUserDriver: NSObject, SPUUserDriver {
                          state: SPUUserUpdateState,
                          reply: @escaping (SPUUserUpdateChoice) -> Void) {
         cachedNewVersion = appcastItem.displayVersionString
-        reply(.install)
+        pendingReply = reply
+        let version = appcastItem.displayVersionString
+        Task { @MainActor in manager?.updateState(.available(version: version)) }
     }
 
     func showUpdateReleaseNotes(with downloadData: SPUDownloadData) {}
@@ -227,7 +281,7 @@ private final class InAppUserDriver: NSObject, SPUUserDriver {
 
     func showUpdateNotFoundWithError(_ error: Error,
                                      acknowledgement: @escaping () -> Void) {
-        Task { @MainActor in manager?.updateState(.idle) }
+        Task { @MainActor in manager?.updateState(.upToDate) }
         acknowledgement()
     }
 
@@ -237,22 +291,41 @@ private final class InAppUserDriver: NSObject, SPUUserDriver {
     }
 
     func showDownloadInitiated(cancellation: @escaping () -> Void) {
-        Task { @MainActor in manager?.updateState(.downloading(progress: 0)) }
+        downloadCancellation = cancellation
+        expectedLength = 0
+        receivedLength = 0
+        lastReportedProgress = -1
+        let version = version
+        Task { @MainActor in manager?.updateState(.downloading(version: version, progress: nil)) }
     }
 
-    func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {}
+    func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {
+        expectedLength = expectedContentLength
+    }
 
-    func showDownloadDidReceiveData(ofLength length: UInt64) {}
+    func showDownloadDidReceiveData(ofLength length: UInt64) {
+        receivedLength += length
+        guard expectedLength > 0 else { return }
+        let progress = min(1, Double(receivedLength) / Double(expectedLength))
+        // Hele procenten: een state-update per chunk zou de kaart onnodig
+        // vaak laten hertekenen.
+        guard progress - lastReportedProgress >= 0.01 || progress == 1 else { return }
+        lastReportedProgress = progress
+        let version = version
+        Task { @MainActor in manager?.updateState(.downloading(version: version, progress: progress)) }
+    }
 
     func showDownloadDidStartExtractingUpdate() {
-        Task { @MainActor in manager?.updateState(.extracting) }
+        downloadCancellation = nil
+        let version = version
+        Task { @MainActor in manager?.updateState(.extracting(version: version)) }
     }
 
     func showExtractionReceivedProgress(_ progress: Double) {}
 
     func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
-        installReply = reply
-        let version = cachedNewVersion ?? ""
+        pendingReply = reply
+        let version = version
         Task { @MainActor in manager?.updateState(.readyToRelaunch(version: version)) }
     }
 
@@ -268,8 +341,9 @@ private final class InAppUserDriver: NSObject, SPUUserDriver {
     func showUpdateInFocus() {}
 
     func dismissUpdateInstallation() {
-        installReply = nil
+        pendingReply = nil
+        downloadCancellation = nil
         cachedNewVersion = nil
-        Task { @MainActor in manager?.updateState(.idle) }
+        Task { @MainActor in manager?.settleAfterDismiss() }
     }
 }

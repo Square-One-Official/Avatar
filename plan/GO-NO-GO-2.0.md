@@ -70,9 +70,23 @@ deze release; wat rest is gated (signing, live e2e, assets).
 
 ## Kort: wat moet er minimaal gebeuren vóór "go"
 
-1. ~~Backend appcast-v2 + sql/015~~ ✅ gedaan.
-2. `release-v2.sh 2.0.0 101` + Sparkle-update-e2e (**AC_PASSWORD** nodig).
-3. v1→v2 migratie-e2e met echte bibliotheek.
-4. Stripe-mismatch-e2e + webhook-log.
-5. Visuele passes (Home-secties voorop). ~~E32.0~~ ✂ scoped out.
-6. ~~Assets~~ ✅ beta-met-placeholders.
+### Alleen Thierry kan dit (signing, echte data, dashboards)
+
+1. `release-v2.sh 2.0.0 101` + Sparkle-update-e2e (**AC_PASSWORD** nodig) —
+   stappen in [docs/eng/RELEASE-2.0.md](../docs/eng/RELEASE-2.0.md).
+2. v1→v2 migratie-e2e met echte bibliotheek.
+3. Stripe-mismatch-e2e + webhook-log.
+4. Visuele passes (Home-secties voorop). ~~E32.0~~ ✂ scoped out.
+
+### Al groen
+
+- ~~Backend appcast-v2 + sql/015~~ ✅ gedaan.
+- ~~Assets~~ ✅ beta-met-placeholders.
+- Build & tests, flows (code), feature-flags, backend-surface — zie §1, §2, §7, §8.
+
+### Dag-2, niet blokkerend
+
+- Nieuwsbrief double-opt-in (E17.6).
+- Definitieve asset-batch (ASSETS.md).
+- Scripthardening release-v2 (preflight/verify/hervatbaar), CI-lint op
+  `appcast-v2.xml` — zie "Bekende gaten" in het runbook.

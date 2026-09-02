@@ -38,7 +38,9 @@ struct SocialPreviewView: View {
             pickerOverlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: portrait?.updatedAt) { await refresh() }
+        // E50.3: revision (niet updatedAt) + id — twee portretten kunnen dezelfde
+        // revision delen, dus de id hoort in de sleutel.
+        .task(id: portrait.map { "\($0.persistentModelID)-\($0.revision)" }) { await refresh() }
     }
 
     // MARK: Preview — skeleton chrome per platform

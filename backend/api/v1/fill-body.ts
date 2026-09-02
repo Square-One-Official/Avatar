@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { randomUUID } from "node:crypto";
 import { checkRateLimit, requireUser } from "../../lib/auth.js";
 import { MODEL_REGISTRY, resolveModelOverride, UnknownModelOverrideError } from "../../lib/models.js";
 import { proOverrideFor } from "../../lib/proAccess.js";
@@ -6,9 +7,15 @@ import {
   currentCredits,
   ensureCompedCredits,
   ensureUser,
-  logCredit,
+  refundCreditSpend,
+  trySpendCredits,
 } from "../../lib/supabase.js";
-import { padForOutpaint, restoreOriginalSubject } from "../../lib/image.js";
+import {
+  prepareMinimalBodyFill,
+  restoreMinimalBodyFillSubject,
+  type FillBodyEdges,
+  type FillBodyMapping,
+} from "../../lib/image.js";
 import { resolveImageInput } from "../../lib/uploads.js";
 import { magicCutout, outpaintPortrait, ReplicateTimeoutError } from "../../lib/replicate.js";
 
@@ -30,16 +37,15 @@ export const config = {
  *          429 rate_limited
  *
  * Pipeline (real outpainting, not instruction-edit):
- *   1. Build outpaint inputs from the cutout PNG: a padded grey canvas
- *      with the person composited on top, plus a white-on-fill mask.
- *      The original RGBA pixels are preserved bit-for-bit, so identity
- *      can't drift.
- *   2. Check credits (402 if empty).
- *   3. Run FLUX.1 Fill Pro on (image, mask). It only paints into the
+ *   1. Detect which body edges actually touch the source boundary. If none
+ *      touch, return the original cutout without invoking Replicate or charging.
+ *   2. Add a small margin only at those edges and build a white-on-fill mask.
+ *   3. Check credits (402 if empty).
+ *   4. Run FLUX.1 Fill Pro on (image, mask). It only paints into the
  *      masked region.
- *   4. Re-extract alpha via BiRefNet (`magicCutout`) so the client gets
+ *   5. Re-extract alpha via BiRefNet (`magicCutout`) so the client gets
  *      a transparent cutout consistent with `/v1/cutout`'s output shape.
- *   5. Log 1 credit, return the new cutout.
+ *   6. Log the configured credit cost and return the new cutout + mapping.
  *
  * Errors before the credit-deducting Replicate call don't charge.
  */
@@ -97,6 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // bewust op het cutout-default: die stap is interne plumbing, geen
   // bakeoff-onderwerp.
   let modelRef: string | null;
+  let reservedCreditRef: string | null = null;
   try {
     modelRef = resolveModelOverride("fill_body", req.body?.model_override, isDevUser);
   } catch (e) {
@@ -110,20 +117,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureUser(user.id);
 
-    // Step 1: build the outpaint inputs. Pure server-side image work,
-    // no Replicate calls — safe to do before the credit gate.
-    const { padded, mask, personLayer } = await padForOutpaint(inputBytes, { face: faceBox });
+    // Step 1: build an edge-aware outpaint canvas. Pure server-side image
+    // work, no Replicate calls — safe to do before the credit gate.
+    const preparation = await prepareMinimalBodyFill(inputBytes, { face: faceBox });
+    if (!preparation.shouldFill) {
+      const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
+      res.status(200).json({
+        cutout: preparation.cutout.toString("base64"),
+        credits_remaining: creditsRemaining,
+        did_fill: false,
+        mapping: wireMapping(preparation.mapping),
+        filled_edges: wireEdges(preparation.edges),
+      });
+      return;
+    }
+    const { padded, mask, personLayer, mapping, edges } = preparation;
     const paddedDataUrl = `data:image/png;base64,${padded.toString("base64")}`;
     const maskDataUrl = `data:image/png;base64,${mask.toString("base64")}`;
 
-    // Step 2: credit gate. Only checked once we know we're going to do
-    // billable work.
+    // Step 2: atomically reserve credits only after geometry proves this is
+    // billable, but before either paid model runs.
+    let creditsRemaining = 999;
     if (!isDevUser) {
-      const credits = await currentCredits(user.id);
-      if (credits < MODEL_REGISTRY.fill_body.credits) {
+      reservedCreditRef = randomUUID();
+      const remaining = await trySpendCredits({
+        userId: user.id,
+        amount: MODEL_REGISTRY.fill_body.credits,
+        reason: "fill_body",
+        ref: reservedCreditRef,
+      });
+      if (remaining === null) {
+        reservedCreditRef = null;
         res.status(402).json({ error: "insufficient_credits", credits_remaining: 0 });
         return;
       }
+      creditsRemaining = remaining;
     }
 
     // Step 3: FLUX Fill Pro paints into the masked margin only.
@@ -153,23 +181,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // the hair edges (flattened onto grey in step 1) into a light halo. The
     // person should round-trip unchanged — only the newly painted body needs
     // the fresh matte. This composites the clean person back and drops the halo.
-    const finalCutout = await restoreOriginalSubject(cutoutBytes, personLayer);
+    const finalCutout = await restoreMinimalBodyFillSubject(cutoutBytes, personLayer, mapping);
 
-    if (!isDevUser) {
-      await logCredit({
-        userId: user.id,
-        delta: -MODEL_REGISTRY.fill_body.credits,
-        reason: "fill_body",
-        ref: filledUrl,
-      });
-    }
-
-    const creditsRemaining = isDevUser ? 999 : await currentCredits(user.id);
     res.status(200).json({
       cutout: finalCutout.toString("base64"),
       credits_remaining: creditsRemaining,
+      did_fill: true,
+      mapping: wireMapping(mapping),
+      filled_edges: wireEdges(edges),
     });
+    reservedCreditRef = null;
   } catch (err) {
+    if (reservedCreditRef) {
+      try {
+        await refundCreditSpend({
+          userId: user.id,
+          amount: MODEL_REGISTRY.fill_body.credits,
+          reason: "fill_body",
+          ref: reservedCreditRef,
+        });
+      } catch (refundError) {
+        const refundMessage = refundError instanceof Error
+          ? refundError.message
+          : String(refundError);
+        console.error("/v1/fill-body credit refund failed:", refundMessage);
+      }
+      reservedCreditRef = null;
+    }
     // Log the message only — the Replicate SDK embeds the auth header in the
     // full error object, so logging `err` whole leaks REPLICATE_API_TOKEN.
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -193,4 +231,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     res.status(500).json({ error: "fill_body_failed" });
   }
+}
+
+function wireMapping(mapping: FillBodyMapping) {
+  return {
+    canvas_width: mapping.canvasWidth,
+    canvas_height: mapping.canvasHeight,
+    original_x: mapping.originalX,
+    original_y: mapping.originalY,
+    original_width: mapping.originalWidth,
+    original_height: mapping.originalHeight,
+  };
+}
+
+function wireEdges(edges: FillBodyEdges) {
+  return {
+    left: edges.left,
+    right: edges.right,
+    bottom: edges.bottom,
+  };
 }

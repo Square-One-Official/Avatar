@@ -73,6 +73,7 @@ struct BannerImageFloatingToolbar: View {
                 .frame(width: 32, height: 32)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     private var infoMenu: some View {
@@ -95,6 +96,7 @@ struct BannerImageFloatingToolbar: View {
 
             Button("Replace image") { presentation.bannerFloatingMenu = nil; onReplace() }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,6 +106,7 @@ struct BannerImageFloatingToolbar: View {
             // token als de andere destructieve rijen.
             Button("Remove") { presentation.bannerFloatingMenu = nil; onRemove() }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsTextStyle(.labelBase)
                 .foregroundStyle(DSColor.Foreground.destructive)
                 .frame(maxWidth: .infinity, alignment: .leading)

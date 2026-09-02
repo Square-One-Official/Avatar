@@ -63,6 +63,11 @@ struct EditorCanvasView: View {
     /// dus we tekenen ×1/camera).
     private var inverseCameraScale: CGFloat { 1 / max(0.0001, cameraScale) }
 
+    /// Zelfde eenheden als AutoFramer/export (pixels), niet `NSImage.size`
+    /// (punten/DPI). Cloud-boost wijzigt vaak de DPI; layout op `size` zou
+    /// het onderwerp groter plaatsen en Auto-frame buiten het canvas duwen.
+    private var layoutSize: CGSize { image.pixelLayoutSize }
+
     // v1-constanten (EditorView ~57/78/79).
     private let hapticStep: Double = 24
     private let snapEnter: Double = 12
@@ -79,11 +84,11 @@ struct EditorCanvasView: View {
             let side = min(geo.size.width, geo.size.height)
             let transform = resolvedTransform()
             let factor = side / FramingConstants.editCanvas.width
-            let imgW = image.size.width * transform.scale * factor
-            let imgH = image.size.height * transform.scale * factor
+            let imgW = layoutSize.width * transform.scale * factor
+            let imgH = layoutSize.height * transform.scale * factor
             let imgCenter = CGPoint(
-                x: (transform.offsetX + image.size.width * transform.scale / 2) * factor,
-                y: (transform.offsetY + image.size.height * transform.scale / 2) * factor
+                x: (transform.offsetX + layoutSize.width * transform.scale / 2) * factor,
+                y: (transform.offsetY + layoutSize.height * transform.scale / 2) * factor
             )
 
             let clip: AnyShape = frameShape == .circle ? AnyShape(Circle()) : AnyShape(Rectangle())
@@ -198,7 +203,7 @@ struct EditorCanvasView: View {
         // Gedeelde resolver (AutoFramer) zodat de Original-achtergrondlaag in
         // EditorView exact dezelfde plaatsing kan berekenen — geen drift.
         let r = AutoFramer.resolvedTransform(
-            offsetX: c.offsetX, offsetY: c.offsetY, scale: c.scale, cutoutSize: image.size
+            offsetX: c.offsetX, offsetY: c.offsetY, scale: c.scale, cutoutSize: layoutSize
         )
         return CanvasTransform(offsetX: r.offsetX, offsetY: r.offsetY, scale: r.scale)
     }
@@ -242,8 +247,8 @@ struct EditorCanvasView: View {
                 var newSnappedX = snappedX
                 var newSnappedY = snappedY
 
-                let imgW = image.size.width * t.scale
-                let imgH = image.size.height * t.scale
+                let imgW = layoutSize.width * t.scale
+                let imgH = layoutSize.height * t.scale
                 let rawCenterX = rawX + imgW / 2
                 let rawCenterY = rawY + imgH / 2
 

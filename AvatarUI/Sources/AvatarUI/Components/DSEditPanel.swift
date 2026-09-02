@@ -93,6 +93,7 @@ public struct DSEditPanel<Content: View, Accessory: View>: View {
                         }
                     )
             }
+            .scrollClipDisabled()
             .frame(height: scrollHeight, alignment: .top)
             // E18.20: de eerste meting (0 → inhoudshoogte) mag niet meeveren
             // met de open-animatie — dat gaf een snelle "naspring" bij de
@@ -111,9 +112,8 @@ public struct DSEditPanel<Content: View, Accessory: View>: View {
         .padding(DSSpacing.gap5)
         .padding(DSSpacing.gap2)
         .frame(maxWidth: maxWidth)
-        // Solid achtergrond (geen glas): edit-panelen liggen over de foto
-        // en moeten massief zijn zodat de inhoud niet door het portret scheemert.
-        .dsPanelSurface(cornerRadius: DSRadius.xl4, solid: true)
+        // Zelfde massieve 24pt-card als Frame/Background/account-menu's.
+        .dsMenuSurface()
     }
 
     /// nil tot de eerste meting (en in ImageRenderer, dat preferences niet

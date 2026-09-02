@@ -1,7 +1,8 @@
 // Drill-in-breadcrumb voor de editor (alleen zichtbaar in section == .editor).
-// Toont de herkomst-trail: "Home ▸ <Naam>" of "Portraits ▸ <Map|All> ▸ <Naam>".
-// De crumbs zijn klikbaar (terug naar Home / naar de map) en links staat een
-// back-chevron → model.goBack(). De herkomst komt uit ShellModel.openOrigin.
+// Toont de herkomst-trail: "Portraits ▸ <Naam>" of "Portraits ▸ <Map> ▸ <Naam>".
+// De crumbs zijn klikbaar (terug naar Portraits / naar de map) en links staat
+// een back-chevron → model.goBack(). De naam-leaf opent dezelfde rename-modal
+// als de canvas-chip (lege naam → "Add name"). Herkomst: ShellModel.openOrigin.
 
 import AvatarUI
 import SwiftData
@@ -21,6 +22,7 @@ struct LibraryBreadcrumb: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverHighlight(cornerRadius: DSRadius.md)
             .help("Back")
 
@@ -34,14 +36,16 @@ struct LibraryBreadcrumb: View {
     }
 
     @ViewBuilder private var trail: some View {
-        let name = model.selectedPortrait.map { $0.name.isEmpty ? "Untitled" : $0.name } ?? "Untitled"
+        let rawName = model.selectedPortrait?.name ?? ""
+        let hasName = !rawName.isEmpty
+        let name = hasName ? rawName : "Add name"
         switch model.openOrigin {
         case .home:
             // E35.5: het editor-broodkruim wijst naar Portraits (niet Home) — een
             // portret hoort onder Portraits, ook al is het vanaf Home geopend.
             crumb("Portraits") { model.showPortraits(folderID: nil) }
             sep
-            leaf(name)
+            leaf(name, isPlaceholder: !hasName)
         case .portraits(let folderID):
             crumb("Portraits") { model.showPortraits(folderID: nil) }
             if let folder = folders.first(where: { $0.persistentModelID == folderID }) {
@@ -49,7 +53,7 @@ struct LibraryBreadcrumb: View {
                 crumb(folder.name) { model.showPortraits(folderID: folderID) }
             }
             sep
-            leaf(name)
+            leaf(name, isPlaceholder: !hasName)
         }
     }
 
@@ -63,15 +67,25 @@ struct LibraryBreadcrumb: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverHighlight(cornerRadius: DSRadius.md)
         .help("Go to \(text)")
     }
 
-    private func leaf(_ text: String) -> some View {
-        Text(text)
-            .dsTextStyle(.labelBase)
-            .foregroundStyle(DSColor.Foreground.primary)
-            .lineLimit(1)
+    private func leaf(_ text: String, isPlaceholder: Bool) -> some View {
+        Button { model.isShowingRename = true } label: {
+            Text(text)
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(isPlaceholder ? DSColor.Foreground.muted : DSColor.Foreground.primary)
+                .lineLimit(1)
+                .padding(.horizontal, DSSpacing.gap1)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
+        .dsHoverHighlight(cornerRadius: DSRadius.md)
+        .help(isPlaceholder ? "Add name" : "Rename")
+        .accessibilityLabel(isPlaceholder ? "Add name" : "Rename \(text)")
     }
 
     private var sep: some View {

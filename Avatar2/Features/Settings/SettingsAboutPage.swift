@@ -25,15 +25,31 @@ struct SettingsAboutPage: View {
         return "\(version) (\(build))"
     }
 
-    /// Spiegelt de Sparkle-status onder de "Check now"-rij.
+    /// Subtitel onder de "Check now"-rij. Tijdens checking/downloading blijft
+    /// de tekst gelijk aan idle: anders wisselt het aantal regels (smalle
+    /// vensters wikkelen de idle-tekst) en springt de Links-kaart eronder.
+    /// De voortgang zit in het knop-label; alleen echte uitkomsten wisselen.
     private var checkSubtitle: String {
         switch updater.state {
-        case .idle: return "Updates arrive via the Aaavatar update channel"
-        case .checking: return "Checking for updates…"
-        case .downloading: return "Downloading update…"
-        case .extracting: return "Preparing update…"
-        case .readyToRelaunch(let version): return "Version \(version) ready — relaunch to install"
-        case .error: return "Update check failed — try again later"
+        case .idle, .checking, .downloading, .extracting:
+            return "Updates arrive via the Aaavatar update channel"
+        case .upToDate:
+            return "You're up to date"
+        case .available(let version):
+            return "Version \(version) is available"
+        case .readyToRelaunch(let version):
+            return "Version \(version) downloaded — relaunch to install"
+        case .error:
+            return "Update check failed — try again later"
+        }
+    }
+
+    private var checkButtonLabel: String {
+        switch updater.state {
+        case .checking: return "Checking…"
+        case .downloading: return "Downloading…"
+        case .extracting: return "Preparing…"
+        default: return "Check now"
         }
     }
 
@@ -69,10 +85,20 @@ struct SettingsAboutPage: View {
                         ) {
                             // E01.11: live op Sparkle. Disabled zolang een
                             // check loopt (canCheckForUpdates = false).
-                            DSNeutralButton("Check now") {
-                                updater.checkForUpdates()
+                            if case .readyToRelaunch = updater.state {
+                                DSPrimaryButton("Relaunch") {
+                                    updater.relaunchAndInstall()
+                                }
+                            } else if case .available = updater.state {
+                                DSPrimaryButton("Install") {
+                                    updater.installAvailableUpdate()
+                                }
+                            } else {
+                                DSNeutralButton(checkButtonLabel) {
+                                    updater.checkForUpdates()
+                                }
+                                .disabled(!updater.canCheckForUpdates)
                             }
-                            .disabled(!updater.canCheckForUpdates)
                         }
                     }
                 }

@@ -60,6 +60,7 @@ public struct DSToolButton: View {
             .frame(width: 48, height: 48)
         }
         .buttonStyle(ToolSurfaceStyle(isActive: isActive, surface: surface))
+        .dsFocusEffectDisabled()
         .accessibilityLabel(Text(label))
         // Tooltip-hover los van de surface-hover: aparte @State voor de delay-logica.
         .onHover { isHovering = $0 }

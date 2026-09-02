@@ -127,6 +127,16 @@ gehumaniseerd (`-`/`_` → spatie, dubbele separators samengevouwen) — reist m
 stille "Untitled folder N" meer maar vraagt eerst een naam (zelfde alert-prompt als de
 left-nav-flow; lege naam = annuleren). 4 nieuwe naam-tests in `ShellModelTests`. DoD groen.
 
+**Vervolg (2026-09-02, Thierry):** "als de naam van de persoon in de bestandsnaam staat,
+die al vullen" — `defaultPortraitName(from:)` delegeert nu aan `PortraitNameGuess`
+([PortraitNameGuess.swift](Avatar2/Features/Shell/PortraitNameGuess.swift)): tokens met
+cijfers en ruiswoorden (img/dsc/headshot/copy/final/linkedin/team/…) vallen weg,
+tussenvoegsels (van/de/der/von/…) blijven alleen tússen naamdelen, camelCase splitst na
+≥ 3 tekens, all-lower/all-caps wordt gekapitaliseerd. `Thierry_Emmery_headshot_2024.jpg`
+→ "Thierry Emmery"; `IMG_4821.HEIC` → "" (Name-veld toont "Add name" i.p.v. "IMG 4821").
+Gedragswijziging t.o.v. de eerste versie: een bestandsnaam zónder herkenbare naam levert
+geen naam meer op. 4 tests in `ShellModelTests` vervangen (23/23 groen).
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een

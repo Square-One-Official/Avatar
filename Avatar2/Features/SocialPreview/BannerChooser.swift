@@ -62,6 +62,7 @@ struct BannerPickerContent: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     @ViewBuilder private func bannerTile(_ banner: BannerDoc) -> some View {
@@ -83,6 +84,7 @@ struct BannerPickerContent: View {
                     }
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .help(banner.name.isEmpty ? "Untitled banner" : banner.name)
         }
     }

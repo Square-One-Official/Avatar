@@ -90,6 +90,14 @@ final class EffectCutoutTests: XCTestCase {
         )
     }
 
+    func testAdjustedScaleDoublingHalvesScale() {
+        XCTAssertEqual(
+            ShellModel.adjustedScaleForResolutionChange(oldWidth: 1024, newWidth: 2048, currentScale: 0.6),
+            0.3,
+            accuracy: 0.0001
+        )
+    }
+
     func testApplyAlphaMaskKeepsHigherResRGB() {
         let cutout = image(alpha: 255, size: 100)
         let styled = image(alpha: 255, size: 200)
@@ -166,5 +174,16 @@ final class EffectCutoutTests: XCTestCase {
         let img = NSImage(cgImage: ctx.makeImage()!, size: NSSize(width: size, height: size))
         XCTAssertTrue(ShellModel.hasTransparentCorners(img))
         XCTAssertFalse(ShellModel.isLikelyCutout(img))
+    }
+
+    func testFillBodyFaceBoxNormaliseertVisionPixelRect() throws {
+        let box = try XCTUnwrap(EditorView.normalizedFillBodyFaceBox(
+            faceRect: CGRect(x: 200, y: 100, width: 300, height: 250),
+            imageSize: CGSize(width: 1000, height: 1000)
+        ))
+        XCTAssertEqual(box.x, 0.2, accuracy: 0.0001)
+        XCTAssertEqual(box.y, 0.1, accuracy: 0.0001)
+        XCTAssertEqual(box.width, 0.3, accuracy: 0.0001)
+        XCTAssertEqual(box.height, 0.25, accuracy: 0.0001)
     }
 }

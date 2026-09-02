@@ -306,6 +306,7 @@ struct PaywallSheet: View {
             .contentShape(RoundedRectangle(cornerRadius: DSRadius.lg))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     // MARK: - Footer

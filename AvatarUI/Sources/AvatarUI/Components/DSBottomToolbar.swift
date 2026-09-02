@@ -287,6 +287,7 @@ public struct DSCapsuleToolButton<Icon: View>: View {
             .frame(height: size.height)
         }
         .buttonStyle(CapsuleSurfaceStyle(isActive: isActive, surface: surface, pressScale: size.pressScale))
+        .dsFocusEffectDisabled()
         .modifier(CapsuleToolAccessibilityLabel(label: label))
     }
 }
@@ -420,6 +421,7 @@ struct DSToolbarOverflowButton<ID: Hashable>: View {
                 .frame(width: size.height, height: size.height)
         }
         .buttonStyle(DSToolbarOverflowButtonStyle(size: size))
+        .dsFocusEffectDisabled()
         .fixedSize()
         .accessibilityLabel(Text("More tools"))
         // Boven de capsule: eronder zit alleen nog de vensterrand.

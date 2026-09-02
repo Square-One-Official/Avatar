@@ -60,10 +60,14 @@ public enum ProTier: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// EUR-bedrag in de notatie van `locale`. Los testbaar; `locale` is alleen
     /// een parameter zodat tests niet van de machine-instelling afhangen.
-    public static func formatPrice(_ amount: Decimal, locale: Locale = .current) -> String {
+    public static func formatPrice(
+        _ amount: Decimal,
+        currencyCode: String = "EUR",
+        locale: Locale = .current
+    ) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "EUR"
+        formatter.currencyCode = currencyCode.uppercased()
         formatter.locale = locale
         // Hele bedragen tonen we niet als "€50" maar als "€50,00" zou storen bij
         // een prijs die op ,90 eindigt — dus altijd twee decimalen, behalve als
@@ -73,6 +77,21 @@ public enum ProTier: String, Codable, CaseIterable, Identifiable, Sendable {
         formatter.maximumFractionDigits = 2
         return formatter.string(from: amount as NSDecimalNumber)
             ?? "€\(amount)"
+    }
+
+    /// Bedrag in minor units (Stripe: centen) → locale-notatie. `€0` voor een
+    /// 100%-korting-factuur, `€12,99` voor een maandprijs; de valuta komt uit
+    /// de Stripe-payload (altijd EUR vandaag, maar de wire zegt het zelf).
+    public static func formatMinorUnits(
+        _ minorUnits: Int,
+        currencyCode: String = "EUR",
+        locale: Locale = .current
+    ) -> String {
+        formatPrice(
+            Decimal(sign: minorUnits < 0 ? .minus : .plus, exponent: -2, significand: Decimal(abs(minorUnits))),
+            currencyCode: currencyCode,
+            locale: locale
+        )
     }
 }
 
@@ -186,4 +205,133 @@ public struct AccountPayload: Codable, Sendable {
     /// E15.5: true voor dev-allowlisted accounts → toont de Advanced
     /// model-picker. Backend `is_dev_unlimited` (convertFromSnakeCase).
     public let isDevUnlimited: Bool?
+}
+
+// MARK: - Billing & Invoices (Settings)
+
+/// Server payload for `GET /v1/billing` — Settings › Billing & Invoices.
+/// Snake_case keys via `.convertFromSnakeCase`, ISO-8601 dates. Bedragen
+/// zijn minor units (centen) zoals Stripe ze levert; formatteren gebeurt in
+/// de UI via `ProTier.formatMinorUnits`.
+public struct BillingPayload: Codable, Sendable, Equatable {
+    public struct Discount: Codable, Sendable, Equatable {
+        public let percentOff: Double?
+        public let amountOff: Int?
+        public let currency: String?
+        public let endsAt: Date?
+
+        public init(percentOff: Double?, amountOff: Int?, currency: String?, endsAt: Date?) {
+            self.percentOff = percentOff
+            self.amountOff = amountOff
+            self.currency = currency
+            self.endsAt = endsAt
+        }
+    }
+
+    public struct NextPayment: Codable, Sendable, Equatable {
+        public let amount: Int
+        public let currency: String
+        public let at: Date
+
+        public init(amount: Int, currency: String, at: Date) {
+            self.amount = amount
+            self.currency = currency
+            self.at = at
+        }
+    }
+
+    public enum TaxBehavior: String, Codable, Sendable {
+        case inclusive
+        case exclusive
+    }
+
+    public struct Plan: Codable, Sendable, Equatable {
+        public let name: String
+        public let interval: SubscriptionInterval?
+        public let status: String
+        public let cancelAtPeriodEnd: Bool
+        public let currentPeriodEnd: Date?
+        /// Lijstprijs per interval, vóór korting.
+        public let amount: Int
+        public let currency: String
+        public let taxBehavior: TaxBehavior?
+        public let discount: Discount?
+        public let nextPayment: NextPayment?
+
+        public init(
+            name: String,
+            interval: SubscriptionInterval?,
+            status: String,
+            cancelAtPeriodEnd: Bool,
+            currentPeriodEnd: Date?,
+            amount: Int,
+            currency: String,
+            taxBehavior: TaxBehavior?,
+            discount: Discount?,
+            nextPayment: NextPayment?
+        ) {
+            self.name = name
+            self.interval = interval
+            self.status = status
+            self.cancelAtPeriodEnd = cancelAtPeriodEnd
+            self.currentPeriodEnd = currentPeriodEnd
+            self.amount = amount
+            self.currency = currency
+            self.taxBehavior = taxBehavior
+            self.discount = discount
+            self.nextPayment = nextPayment
+        }
+    }
+
+    public enum InvoiceStatus: String, Codable, Sendable {
+        case paid
+        case open
+        case void
+        case uncollectible
+    }
+
+    public struct Invoice: Codable, Sendable, Equatable, Identifiable {
+        public let id: String
+        public let number: String?
+        public let created: Date
+        /// Factuurtotaal (na korting, incl. btw) in minor units.
+        public let amount: Int
+        public let currency: String
+        public let status: InvoiceStatus
+        /// "Pro · Monthly", "Top-up · 200 credits".
+        public let description: String
+        public let hostedUrl: String?
+        public let pdfUrl: String?
+
+        public init(
+            id: String,
+            number: String?,
+            created: Date,
+            amount: Int,
+            currency: String,
+            status: InvoiceStatus,
+            description: String,
+            hostedUrl: String?,
+            pdfUrl: String?
+        ) {
+            self.id = id
+            self.number = number
+            self.created = created
+            self.amount = amount
+            self.currency = currency
+            self.status = status
+            self.description = description
+            self.hostedUrl = hostedUrl
+            self.pdfUrl = pdfUrl
+        }
+    }
+
+    /// nil = geen lopend abonnement (Starter, of Pro-comp zonder Stripe).
+    public let plan: Plan?
+    public let invoices: [Invoice]
+
+    public init(plan: Plan?, invoices: [Invoice]) {
+        self.plan = plan
+        self.invoices = invoices
+    }
 }

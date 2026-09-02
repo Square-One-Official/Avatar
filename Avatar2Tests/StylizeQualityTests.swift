@@ -16,6 +16,20 @@ final class StylizeQualityTests: XCTestCase {
         return NSImage(cgImage: cg, size: NSSize(width: w, height: h))
     }
 
+    // Sticker-fix: kadrering per effect-wissel.
+    func testEffectFramingForSwitch() {
+        XCTAssertEqual(EffectFraming.forSwitch(toDieCut: true, fromDieCut: false), .fitContent)
+        XCTAssertEqual(EffectFraming.forSwitch(toDieCut: true, fromDieCut: true), .fitContent)
+        XCTAssertEqual(EffectFraming.forSwitch(toDieCut: false, fromDieCut: true), .autoFrame)
+        XCTAssertEqual(EffectFraming.forSwitch(toDieCut: false, fromDieCut: false), .keep)
+    }
+
+    func testEffectFramingInverseUndoesTheSwitch() {
+        XCTAssertEqual(EffectFraming.fitContent.inverse, .autoFrame)
+        XCTAssertEqual(EffectFraming.autoFrame.inverse, .fitContent)
+        XCTAssertEqual(EffectFraming.keep.inverse, .keep)
+    }
+
     func testLowResolutionLongEdgeBelow1024() {
         XCTAssertTrue(StylizeQuality.isLowResolution(solidImage(w: 800, h: 600)))
     }

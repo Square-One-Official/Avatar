@@ -1,6 +1,7 @@
 import AppKit
 import AvatarKit
 import AvatarUI
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -21,7 +22,19 @@ struct Avatar2App: App {
     /// smoke-screenshots Thierry's echte portretten niet vervuilen.
     private let modelContainer: ModelContainer
 
+    #if DEBUG
+    /// Meetpunt (2026-09-02): hoe vaak SwiftUI dit `init` per proces draait.
+    /// Elke run maakt een verse AuthService/EntitlementModel/SPUUpdater —
+    /// Sparkle verwacht er precies één per proces.
+    private static var initCount = 0
+    #endif
+
     init() {
+        #if DEBUG
+        Self.initCount += 1
+        Logger(subsystem: "nl.squareone.aaavatar2", category: "Avatar2App")
+            .notice("Avatar2App.init #\(Self.initCount)")
+        #endif
         // Eén venster, geen tabs: zonder dit injecteert AppKit een eigen
         // "View"-menu (Show Tab Bar / Show All Tabs) náást SwiftUI's View-menu →
         // twee "View"-items in de menubalk. Uitzetten laat alleen ons View-menu
@@ -120,10 +133,14 @@ struct Avatar2App: App {
             // bij launch zodat de eerste paneel-open van de sessie instant uit
             // memory/disk schildert. Fire-and-forget, anoniem-vriendelijk.
             .task { EffectsModel.prewarm(entitlement: entitlement) }
-            // E13.5 (audit-C1): achtergrond-update-check bij launch — About
-            // hoeft nooit open. Eenmalig per proces (guard in de manager) en
-            // respecteert de "Automatic updates"-toggle.
-            .task { updates.checkForUpdatesInBackgroundAtLaunch() }
+            // Update-kaart linksonder, bij de sidebar (besluit Thierry
+            // 2026-09-02, Weeve-stijl): Install Update / Later → download met
+            // voortgang + Cancel → Relaunch. Eigen zwevende toast, los van
+            // het fout/credits-slot rechtsonder. De achtergrondcheck bij
+            // launch plant Sparkle zelf (zie UpdateManager).
+            .dsFloatingToast(item: updates.toastItem, alignment: .bottomLeading, padding: DSSpacing.gap5) { _ in
+                UpdateToastView(updater: updates)
+            }
             // E13.5: dezelfde instance voor Settings→About (geen tweede
             // SPUUpdater per proces).
             .environment(updates)
@@ -156,13 +173,15 @@ struct Avatar2App: App {
                 PaywallSheet(model: entitlement)
             }
             // E18.23: toasts rechtsONDERin, met slide-in/out — niet meer
-            // centraal-onder waar ze knoppen overlapten.
-            .overlay(alignment: .bottomTrailing) {
+            // centraal-onder waar ze knoppen overlapten. Zwevend child window
+            // (dsFloatingToast): laatst verschenen staat bovenop, ook t.o.v.
+            // een open DS-contextmenu.
+            .dsFloatingToast(item: entitlement.activeToast, padding: DSSpacing.gap5) { toast in
                 // UXS-2: één slot, dus prioriteit i.p.v. if/else-volgorde —
                 // `activeToast` kiest fout > op-is-op > bezig. Een fout mag de
                 // spinner verdringen: de operatie waar die bij hoorde is mislukt.
                 Group {
-                    switch entitlement.activeToast {
+                    switch toast {
                     case let .error(message):
                         // E18.3: cloud-fout als toast i.p.v. inline tekst.
                         // E44.1: duur uit het model (≥ 8s) — 4s was zo kort
@@ -178,20 +197,24 @@ struct Avatar2App: App {
                     case .outOfCredits:
                         OutOfCreditsToastView(model: entitlement)
                     case let .working(ctx):
-                        WorkingToastView(context: ctx, onCancel: entitlement.workingCancelHandler) {
-                            entitlement.dismissWorkingToast()
-                        }
-                    case .none:
-                        EmptyView()
+                        WorkingToastView(
+                            context: ctx,
+                            onCancel: entitlement.workingCancelHandler,
+                            onClose: ctx.isDismissible
+                                ? { entitlement.dismissWorkingToast() }
+                                : nil
+                        )
+                    case let .info(info):
+                        DSToast(
+                            title: info.title,
+                            description: info.description,
+                            autoDismiss: EntitlementModel.infoToastDuration,
+                            onClose: { entitlement.dismissInfoToast() }
+                        )
                     }
                 }
-                .padding(DSSpacing.gap5)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-            // E53.4: één reduce-motion-bewuste animatie op de gekozen toast i.p.v.
-            // drie losse springs op de onderliggende vlaggen.
-            .dsMotion(DSMotion.springSmall, value: entitlement.activeToast)
-            // Privacy Tier Picker: elevation modal → Settings.
+            // Privacy: elevation modal → Turn on Cloud.
             .overlay {
                 if let request = entitlement.privacyElevation {
                     ZStack {
@@ -200,7 +223,7 @@ struct Avatar2App: App {
                             .onTapGesture { entitlement.dismissPrivacyElevation() }
                         PrivacyElevationSheet(
                             request: request,
-                            onOpenSettings: { entitlement.openPrivacySettings() },
+                            onEnableCloud: { entitlement.enableCloudFromElevation() },
                             onDismiss: { entitlement.dismissPrivacyElevation() }
                         )
                     }
@@ -232,6 +255,9 @@ struct Avatar2App: App {
             CommandGroup(after: .sidebar) {
                 Divider()
                 CanvasZoomCommands()
+            }
+            CommandMenu("Enhance") {
+                EnhanceMenuCommands()
             }
             // E49.2: ⌘U app-breed in het File-menu (werkt ook op board/editor);
             // zelfde focused-scene-value-patroon als SettingsCommands hierboven.

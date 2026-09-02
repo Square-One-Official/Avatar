@@ -19,6 +19,8 @@ enum FolderSetScope {
 
     /// Referentie voor een map-brede Match lighting zonder aangeklikte tegel:
     /// het jongst bewerkte portret (bovenaan in elke lens — voorspelbaar).
+    /// E50.3: niet langer dé referentie — `PortraitSetActions.matchLighting`
+    /// kiest zelf het doel; dit is alleen nog de tie-break bij gelijke stand.
     static func matchLightingReference(_ items: [Portrait2]) -> Portrait2? {
         items.max { $0.updatedAt < $1.updatedAt }
     }

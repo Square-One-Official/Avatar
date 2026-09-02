@@ -13,25 +13,60 @@ struct BannerBackgroundPanel: View {
     @State private var brand = BrandColorKit.shared
     @State private var customImages = BackgroundImageKit.shared
     @State private var pickerColor: Color = .white
+    /// Klik buiten "+"-swatch + picker (waar dan ook) sluit de kleurpicker.
+    @State private var colorPickerClickScope = DSOutsideClickScope()
 
     private let swatch: CGFloat = 30
 
     var body: some View {
         DSEditPanel(title: "Background", subtitle: subtitle) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap4) {
-                section("Color") { colorRow }
-                section("Gradient") { gradientRow }
-                section("Image") { imageRow }
-                if isImageFillActive {
-                    zoomRow
-                }
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                    section("Color") { colorRow }
+                    section("Gradient") { gradientRow }
+                    section("Image") { imageRow }
+                    if isImageFillActive {
+                        zoomRow
+                    }
                     Text("Click the canvas to add a photo — drag to reframe when selected.")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.subtle)
-                    .fixedSize(horizontal: false, vertical: true)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if presentation.colorPicker == .bannerBackground {
+                    colorPickerOverlay
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Picker buiten de scroll-rij: de edge-fade-masker op `scrollRow` kapte
+    /// de overlay op de "+"-swatch af.
+    private var colorPickerOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { presentation.colorPicker = nil }
+            DSColorPicker(
+                color: $pickerColor,
+                supportsAlpha: false,
+                commitTitle: "Add colour",
+                onCommit: {
+                    if let hex = pickerColor.hexRGB { brand.add(hex) }
+                    presentation.colorPicker = nil
+                }
+            )
+                .dsDismissOnOutsideClick(colorPickerClickScope, isActive: true) {
+                    presentation.colorPicker = nil
+                }
+                .appliedAppearancePreference()
+                .padding(.top, 24)
+                .padding(.leading, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
@@ -56,6 +91,10 @@ struct BannerBackgroundPanel: View {
     private var colorRow: some View {
         scrollRow {
             Button {
+                if presentation.colorPicker == .bannerBackground {
+                    presentation.colorPicker = nil
+                    return
+                }
                 if let c = currentSolidColor { pickerColor = c }
                 presentation.colorPicker = .bannerBackground
             } label: {
@@ -67,27 +106,33 @@ struct BannerBackgroundPanel: View {
                             .font(.system(size: DSIconSize.base, weight: .semibold))
                             .foregroundStyle(DSColor.Foreground.subtle)
                     }
+                    .overlay {
+                        Circle().strokeBorder(
+                            presentation.colorPicker == .bannerBackground
+                                ? DSColor.Action.primaryForeground
+                                : DSColor.Foreground.divider,
+                            lineWidth: DSBorderWidth.medium
+                        )
+                    }
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverScale(1.02)
+            .dsOutsideClickInside(colorPickerClickScope)
             .help("Pick a color")
-            .dsDropdownMenu(
-                isPresented: Binding(
-                    get: { presentation.colorPicker == .bannerBackground },
-                    set: { presentation.colorPicker = $0 ? .bannerBackground : nil }
-                ),
-                anchorHeight: swatch
-            ) {
-                DSColorPicker(color: $pickerColor, supportsAlpha: false)
-                    .appliedAppearancePreference()
-            }
 
-            ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
-                swatchButton(color) { applySolid(color) }
-            }
-            ForEach(brand.hexColors, id: \.self) { hex in
+            ForEach(brand.hexColors.reversed(), id: \.self) { hex in
                 if let color = Color(hexRGB: hex) {
-                    swatchButton(color) { applySolid(color) }
+                    swatchButton(color) {
+                        presentation.colorPicker = nil
+                        applySolid(color)
+                    }
+                }
+            }
+            ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
+                swatchButton(color) {
+                    presentation.colorPicker = nil
+                    applySolid(color)
                 }
             }
         }
@@ -105,21 +150,28 @@ struct BannerBackgroundPanel: View {
 
     private var gradientRow: some View {
         scrollRow {
-            ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
-                Button { applyGradient(colors) } label: {
+            ForEach(BackgroundKit.gradientPresets) { preset in
+                Button {
+                    presentation.colorPicker = nil
+                    applyGradient(preset)
+                } label: {
                     RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                        .fill(BackgroundKit.gradient(colors))
+                        .fill(DSColor.Background.neutral)
                         .frame(width: 96, height: swatch)
+                        .overlay { BackgroundKit.meshFill(preset) }
+                        .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
                                 .strokeBorder(
-                                    isSelectedGradient(colors) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
-                                    lineWidth: isSelectedGradient(colors) ? DSBorderWidth.medium : DSBorderWidth.thin
+                                    isSelectedGradient(preset) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
+                                    lineWidth: isSelectedGradient(preset) ? DSBorderWidth.medium : DSBorderWidth.thin
                                 )
                         )
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
                 .dsHoverScale(1.02)
+                .help(preset.name)
             }
         }
     }
@@ -139,6 +191,7 @@ struct BannerBackgroundPanel: View {
                     }
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverScale(1.02)
             .help("Upload image")
 
@@ -215,6 +268,7 @@ struct BannerBackgroundPanel: View {
                 )
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
     }
 
@@ -233,6 +287,7 @@ struct BannerBackgroundPanel: View {
                 )
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsHoverScale(1.02)
     }
 
@@ -258,12 +313,13 @@ struct BannerBackgroundPanel: View {
         return color.hexRGB?.caseInsensitiveCompare(hex) == .orderedSame
     }
 
-    private func isSelectedGradient(_ colors: [Color]) -> Bool {
+    private func isSelectedGradient(_ preset: BackgroundGradientPreset) -> Bool {
         guard case let .meshGradient(stops) = doc.layers.fill else { return false }
-        let hexes = colors.compactMap { $0.hexRGB }
-        guard hexes.count >= 2, stops.count >= 2 else { return false }
-        return stops.first?.hex.caseInsensitiveCompare(hexes[0]) == .orderedSame
-            && stops.last?.hex.caseInsensitiveCompare(hexes[hexes.count - 1]) == .orderedSame
+        let hexes = preset.blobs.map(\.hex)
+        guard stops.count == hexes.count else { return false }
+        return zip(stops, hexes).allSatisfy {
+            $0.hex.caseInsensitiveCompare($1) == .orderedSame
+        }
     }
 
     private func applySolid(_ color: Color, remember: Bool = false) {
@@ -274,13 +330,11 @@ struct BannerBackgroundPanel: View {
         if remember { brand.add(hex) }
     }
 
-    private func applyGradient(_ colors: [Color]) {
-        let hexes = colors.compactMap { $0.hexRGB }
-        guard hexes.count >= 2 else { return }
-        let stops = [
-            MeshStop(hex: hexes[0], x: 0, y: 0),
-            MeshStop(hex: hexes[hexes.count - 1], x: 1, y: 1),
-        ]
+    private func applyGradient(_ preset: BackgroundGradientPreset) {
+        let stops = preset.blobs.map {
+            MeshStop(hex: $0.hex, x: Double($0.x), y: Double($0.y))
+        }
+        guard stops.count >= 2 else { return }
         var layers = doc.layers
         layers.fill = .meshGradient(stops: stops)
         doc.layers = layers

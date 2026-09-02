@@ -16,7 +16,9 @@ enum PrivacyGate {
         let current = PrivacyPreferences2.shared.effectiveTier
         let required = AIFeatureRegistry.requiredTier(for: feature)
         guard AIFeatureRegistry.tierSufficient(current: current, required: required) else {
-            return .needsElevation(requiredTier: required, feature: feature)
+            // UI only offers Cloud (thirdParty), even when the feature
+            // internally needs Apple Private Cloud.
+            return .needsElevation(requiredTier: .thirdParty, feature: feature)
         }
         // Apple Private Cloud features (Image Playground): tier suffices, no account/credits.
         if feature.requiredTier == .appleCloud, feature.creditCost == nil {

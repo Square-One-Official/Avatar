@@ -33,6 +33,14 @@ enum AppFeatureFlags {
     /// DEBUG: `--enable-clothes` of `--open-panel clothing`.
     static let clothesEnabled: Bool = enabledInDebug(flag: "clothes", openPanel: "clothing")
 
+    /// E50.3 — "Match lighting" over een selectie. Besluit Thierry 2026-09-02:
+    /// GESCHRAPT voor nu — een globale slider-match (belichting/warmte/contrast)
+    /// kan lichtrichting en clippende highlights niet matchen, dus het resultaat
+    /// oogt niet als "dezelfde studio"; later mogelijk AI-relighting (E50.4).
+    /// De code + tests blijven; alleen de entry points (tegel-/Edit-/map-menu,
+    /// board-toolbar) zijn verborgen. DEBUG: `--enable-match-lighting`.
+    static let matchLightingEnabled: Bool = enabledInDebug(flag: "match-lighting")
+
     /// DEBUG-only: `--enable-<flag>`, of `--open-panel <value>` zodat bestaande
     /// smoke-runs het paneel nog kunnen openen zonder extra args.
     private static func enabledInDebug(flag: String, openPanel: String? = nil) -> Bool {

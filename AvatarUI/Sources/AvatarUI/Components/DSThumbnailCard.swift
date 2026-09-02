@@ -22,7 +22,7 @@ public struct DSThumbnailCard<Icon: View>: View {
 
     /// `tileHeight` defaults to `tileSize` (square). Pass an explicit height
     /// for portrait-shaped cards (e.g. Face: 112 × 152). Effects is 1:1
-    /// (96 × 96).
+    /// (144 × 144), in de buurt van de Enhance-kaart (~147 × 128).
     public init(
         label: String,
         isPro: Bool = false,
@@ -93,7 +93,7 @@ public struct DSThumbnailCard<Icon: View>: View {
                         .padding(DSSpacing.gap1)
                 }
             }
-            // Selectie-/active-ring + check-badge.
+            // Selectie-ring. Geen check-badge: de groene border is genoeg.
             .overlay {
                 RoundedRectangle(cornerRadius: DSRadius.lg)
                     .strokeBorder(DSColor.Action.primary, lineWidth: 2)
@@ -109,14 +109,9 @@ public struct DSThumbnailCard<Icon: View>: View {
                             .background(Circle().fill(.black.opacity(0.55)))
                     }
                     .buttonStyle(.plain)
+                    .dsFocusEffectDisabled()
                     .padding(DSSpacing.gap1)
                     .help("Regenerate")
-                } else if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(DSColor.Action.primary)
-                        .background(Circle().fill(.black.opacity(0.4)))
-                        .padding(DSSpacing.gap1)
                 }
             }
     }

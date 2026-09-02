@@ -1,16 +1,113 @@
-# Avatar
+# Aaavatar
+
+Native macOS-app die portretfoto's consistent verwerkt: achtergrond
+verwijderen, automatisch uitlijnen op het gezicht, verbeteren, stijlen en met
+één klik exporteren naar LinkedIn / Slack / e-mail / banners.
+
+Deze repo bevat **twee apps**. **Aaavatar 2** (`Avatar2/`) is het actieve
+project; **Aaavatar 1** (`Avatar/`) is sinds 2026-06-15 bevroren en moet
+alleen blijven bouwen. Werk je met een agent: lees eerst
+[`CLAUDE.md`](CLAUDE.md) en [`plan/BOARD.md`](plan/BOARD.md).
+
+## Mentaal model
+
+| Map | Wat | Eigenaar (zie CLAUDE.md) |
+|---|---|---|
+| `Avatar2/` | De 2.0-app. Compositie-root `Avatar2App.swift`; alles per feature in `Features/<naam>/` | INFRA (root) · FEAT (features) |
+| `AvatarKit/` | Swift-package met services en engines: backend-client, auth (e-mail + OTP), cutout/imaging-engines, TLS-pinning | INFRA · AI (`Engines/`) |
+| `AvatarUI/` | Swift-package met het design system: tokens (`DSColor`, `DSSpacing`, `DSMotion`, …) en DS-componenten, 1-op-1 uit Figma | DS |
+| `backend/` | `avatars-api` op Vercel + Supabase: credits, Stripe, effects, appcast-feeds | INFRA |
+| `admin/` | `avatar-admin`, Payload-CMS voor effects/berichten | INFRA |
+| `plan/` | Bord, epics, beslissingen, go/no-go — de werkwijze en de bron van waarheid voor wat er gebouwd wordt | — |
+| `docs/` | Engineering-, security- en legal-documentatie; o.a. het release-runbook | — |
+| `scripts/` | DoD-gate, guards, release, model-conversie (zie `scripts/README.md`) | — |
+| `Avatar/` | Aaavatar 1 — bevroren, niet aanraken buiten SHARED-stories | — |
+
+### `Avatar2/Features/`
+
+| Map | Inhoud |
+|---|---|
+| `Shell/` | Venster-shell: `ShellView`/`ShellModel`, home, left-nav, floating overlays, gedeelde presentatiestate |
+| `Sidebar/` | SwiftData-modellen `Portrait2`, `Folder2` en het drag-item |
+| `Portraits/` | Bibliotheek: mappen, breadcrumb, import-support |
+| `Board/` | Grid-weergave met multi-select en batch-acties |
+| `Editor/` | Canvas, transform/adjust/enhance-panelen, achtergrond, effects, undo-facades |
+| `Background/` | Achtergrond genereren (Image Playground / cloud) |
+| `Banners/` | Banner Studio (achter `AppFeatureFlags.bannersEnabled`, default uit) |
+| `SocialPreview/` | Preview per platform + banner-export |
+| `Share/` | Export- en rename-sheets |
+| `Onboarding/` | Splash, privacy, modeldownload, e-mail + OTP |
+| `Paywall/` | `EntitlementModel` (Pro, credits, checkout), paywall en toasts |
+| `Settings/` | Preferences, AI-modellen/privacy-tiers, account, About + Sparkle-`UpdateManager` |
+| `Shared/` | Thumbnails, links, kleine gedeelde helpers |
+
+## Vereisten
+
+- macOS 14 (Sonoma) of nieuwer
+- Xcode 16 of nieuwer
+- [xcodegen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) — het `.xcodeproj` wordt uit `project.yml` gegenereerd
+
+## Bouwen & testen
+
+```bash
+xcodegen generate          # eerste keer of na nieuwe bestanden
+open Avatar.xcodeproj      # scheme "Avatar2" (⌘R)
+```
+
+De Definition-of-Done-gate bouwt beide targets en draait alle suites:
+
+```bash
+scripts/build-v2.sh
+```
+
+Losse onderdelen:
+
+```bash
+xcodebuild -project Avatar.xcodeproj -scheme Avatar2 -configuration Debug build
+xcodebuild -project Avatar.xcodeproj -scheme Avatar2 -configuration Debug test   # Avatar2Tests, gehost in de app
+swift test --package-path AvatarKit --parallel
+swift test --package-path AvatarUI --parallel
+```
+
+Twee guards draaien mee in de gate: `scripts/check-motion.sh` (alle animatie
+via `DSMotion`, reduce-motion-bewust) en `scripts/check-icon-sizes.sh`
+(icoongroottes via `DSIconSize`).
+
+## Releasen
+
+Zie [`docs/eng/RELEASE-2.0.md`](docs/eng/RELEASE-2.0.md): artefacten,
+pipeline, waarom het kanaal zo in elkaar zit (eigen appcast, verplichte
+prerelease), eenmalige setup, stappen per release, rollback en sleutels.
+Script: `scripts/release-v2.sh <versie> <build>`. Status van de eerste
+beta: [`plan/GO-NO-GO-2.0.md`](plan/GO-NO-GO-2.0.md).
+
+## Verder lezen
+
+- [`CLAUDE.md`](CLAUDE.md) — werkafspraken, ownership, Figma-bron
+- [`plan/BOARD.md`](plan/BOARD.md) — het bord: epics, status, beslissingen
+- [`plan/DECISIONS-PENDING.md`](plan/DECISIONS-PENDING.md) — open besluiten
+- [`plan/ASSETS.md`](plan/ASSETS.md) — placeholder-register
+- [`docs/security/`](docs/security/) — beleid, deploy-checklist, incident-response
+
+---
+
+# Aaavatar 1 (bevroren)
+
+Onderstaande beschrijft de v1-app in `Avatar/`. Sinds 2026-06-15 gaat al het
+nieuwe werk naar Aaavatar 2; v1 moet alleen blijven bouwen (de DoD-gate bouwt
+'m mee) en het v1→v2-importpad blijft ondersteund.
 
 Native macOS app voor HR die portretfoto's van medewerkers consistent verwerkt: AI achtergrond-verwijdering, automatische uitlijning op het gezicht, vaste achtergrond, en één-klik export naar LinkedIn / Slack / Email / generieke formaten.
 
 Vervangt de Figma-workflow.
 
-## Vereisten
+## Vereisten (v1)
 
 - macOS 14 (Sonoma) of nieuwer — vereist voor Apple's `VNGenerateForegroundInstanceMaskRequest` (subject lift)
 - Xcode 15 of nieuwer
 - [xcodegen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) — alleen nodig om `.xcodeproj` te (her)genereren
 
-## Bouwen & draaien
+## Bouwen & draaien (v1)
 
 ```bash
 # Eerste keer (of na het toevoegen van bestanden):
@@ -30,7 +127,7 @@ xcodebuild -project Avatar.xcodeproj -scheme Avatar \
 
 De `.app` komt in `~/Library/Developer/Xcode/DerivedData/Avatar-*/Build/Products/Debug/Avatar.app`.
 
-## Hoe het werkt
+## Hoe het werkt (v1)
 
 1. **Importeer** een portretfoto (sleep op het venster, of `+` knop)
 2. App roept `Vision.VNGenerateForegroundInstanceMaskRequest` aan → vrijstaande cutout
@@ -41,7 +138,7 @@ De `.app` komt in `~/Library/Developer/Xcode/DerivedData/Avatar-*/Build/Products
 5. Lila kan handmatig nog slepen / schalen / van achtergrond wisselen
 6. **Exporteer** met een of meer presets in één klik → PNG's in haar gekozen map
 
-## Bestandsstructuur
+## Bestandsstructuur (v1)
 
 ```
 Avatar/
@@ -67,7 +164,7 @@ Avatar/
     └── SettingsView.swift         Backgrounds & export-preset management
 ```
 
-## Built-in export presets
+## Built-in export presets (v1)
 
 | Naam        | Afmetingen | Vorm    |
 |-------------|-----------|---------|
@@ -80,7 +177,7 @@ Avatar/
 
 Lila kan extra presets toevoegen via **Avatar → Settings… → Export presets**.
 
-## Auto-alignment afstemmen
+## Auto-alignment afstemmen (v1)
 
 De drie magische getallen staan in [`Avatar/Services/AutoAligner.swift`](Avatar/Services/AutoAligner.swift):
 
@@ -97,7 +194,7 @@ Pas deze aan om de huisstijl te matchen (kleinere koppen, meer ruimte boven, etc
 - Geen batch-import van meerdere foto's tegelijk
 - Geen undo/redo voor canvas-aanpassingen (auto-save bij elke wijziging)
 
-## Distributie
+## Distributie (v1)
 
 Twee kanalen, beide vanuit dezelfde codebase:
 

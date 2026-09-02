@@ -63,9 +63,40 @@ enum PresentationAlert: Equatable, Identifiable {
     var id: String {
         switch self {
         case .renameFolder(let id, _): "renameFolder-\(id)"
-        case .createFolder(let draft): "createFolder-\(draft)"
+        case .createFolder: "createFolder"
         case .renameBanner(let id, _): "renameBanner-\(id)"
         case .createFolderForPortraits(let ids, _): "newFolder-\(ids.map(\.hashValue).description)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .renameFolder: "Rename folder"
+        case .createFolder, .createFolderForPortraits: "Create folder"
+        case .renameBanner: "Rename banner"
+        }
+    }
+
+    var confirmLabel: String {
+        switch self {
+        case .createFolder, .createFolderForPortraits: "Create"
+        case .renameFolder, .renameBanner: "Save"
+        }
+    }
+
+    var fieldPlaceholder: String {
+        switch self {
+        case .renameFolder, .createFolder, .createFolderForPortraits: "Folder name"
+        case .renameBanner: "Banner name"
+        }
+    }
+
+    var initialDraft: String {
+        switch self {
+        case .renameFolder(_, let draft): draft
+        case .createFolder(let draft): draft
+        case .renameBanner(_, let draft): draft
+        case .createFolderForPortraits(_, let draft): draft
         }
     }
 }
@@ -75,6 +106,10 @@ enum PresentationConfirm: Equatable, Identifiable {
     case deletePortraits(ids: [PersistentIdentifier])
     case deleteFolder(folderID: PersistentIdentifier)
     case deleteBanner(bannerID: PersistentIdentifier)
+    /// Colorise op een foto die al in kleur lijkt — bevestig vóór de credit
+    /// eraf gaat. De continue-actie leeft op `pendingColorise` zodat de
+    /// dialog een tab-wissel overleeft (E53.7).
+    case coloriseAlreadyColour
 
     var id: String {
         switch self {
@@ -82,6 +117,7 @@ enum PresentationConfirm: Equatable, Identifiable {
         case .deletePortraits(let ids): "deletePortraits-\(ids.map(\.hashValue).description)"
         case .deleteFolder(let id): "deleteFolder-\(id)"
         case .deleteBanner(let id): "deleteBanner-\(id)"
+        case .coloriseAlreadyColour: "coloriseAlreadyColour"
         }
     }
 }
@@ -149,10 +185,41 @@ final class UIPresentationStore {
     var effectsContextMenu: AnchoredMenuRequest?
 
     // MARK: Alerts & confirms
-    var alert: PresentationAlert?
+    /// Een nieuw (ander) prompt seedt het concept; dezelfde alert opnieuw
+    /// toewijzen laat de getypte tekst met rust.
+    var alert: PresentationAlert? {
+        didSet {
+            if alert?.id != oldValue?.id { alertDraft = alert?.initialDraft ?? "" }
+        }
+    }
+    /// Concepttekst van het open naam-prompt (rename/create folder, rename
+    /// banner). Leeft hier — niet als @State op `FloatingOverlayHost` — zodat
+    /// een vensterwissel (Cmd-Tab en terug) de getypte naam niet terugzet
+    /// naar de originele.
+    var alertDraft = ""
     var confirm: PresentationConfirm?
+    /// Continue-actie voor `.coloriseAlreadyColour`. Wordt nil bij cancel/
+    /// dismiss, zodat een hintergebleven closure niet later alsnog vuurt.
+    var pendingColorise: (() -> Void)?
 
     // MARK: - Helpers
+
+    func presentColoriseAlreadyColour(onConfirm: @escaping () -> Void) {
+        pendingColorise = onConfirm
+        confirm = .coloriseAlreadyColour
+    }
+
+    func dismissColoriseAlreadyColour() {
+        pendingColorise = nil
+        if confirm == .coloriseAlreadyColour { confirm = nil }
+    }
+
+    func confirmColoriseAlreadyColour() {
+        let action = pendingColorise
+        pendingColorise = nil
+        if confirm == .coloriseAlreadyColour { confirm = nil }
+        action?()
+    }
 
     func dismissPortraitContextMenu() {
         portraitContextMenu = nil
@@ -191,6 +258,7 @@ final class UIPresentationStore {
     func dismissAllEphemeral() {
         editorCanvasMenu = nil
         editorBackgroundTypeMenuOpen = false
+        editorBackgroundColorPickerOpen = false
         editorChipMenu = nil
         boardCanvasMenu = nil
         boardBatchMenu = nil
@@ -206,5 +274,14 @@ final class UIPresentationStore {
         folderBackgroundPickerOpen = false
         selectionBackgroundPickerOpen = false
         colorPicker = nil
+    }
+
+    /// Einde van de editorsessie: library/home, of een ander beeld openen
+    /// vanuit de gallery. Enhance (en chip-dropdowns) horen niet mee te
+    /// reizen naar een nieuw portret. Tab-/vensterwissel raakt dit niet —
+    /// `section` blijft dan `.editor`.
+    func endEditorSession() {
+        dismissAllEphemeral()
+        editorActiveTool = nil
     }
 }

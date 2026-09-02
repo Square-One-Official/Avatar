@@ -58,6 +58,7 @@ struct ManageBackgroundsSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
         }
         .padding(.horizontal, DSSpacing.gap5)
         .padding(.top, DSSpacing.gap5)
@@ -86,6 +87,7 @@ struct ManageBackgroundsSheet: View {
                         DSNeutralButton("Generate", icon: Image(systemName: "sparkles")) {
                             openGenerate()
                         }
+                        .cloudFeatureMuted()
                     }
                     DSNeutralButton("Upload", icon: Image(systemName: "arrow.up.doc")) { upload() }
                 }
@@ -194,22 +196,14 @@ struct ManageBackgroundsSheet: View {
                         .padding(4)
                 }
                 .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
             }
     }
 
     private func openGenerate() {
-        let tier = PrivacyPreferences2.shared.effectiveTier
-        if tier == .onDevice {
-            if let entitlement {
-                _ = entitlement.allowAIFeature(.backgroundGenerate)
-            }
-            return
-        }
-        if tier == .appleCloud, let entitlement {
-            guard entitlement.allowAIFeature(.imagePlaygroundGenerate) else { return }
-        }
-        GenerateBackgroundPresenter.shared.present(
+        presentGenerateBackground(
             context: .portrait,
+            entitlement: entitlement,
             applyAfterSave: false,
             onSaved: { _ in }
         )

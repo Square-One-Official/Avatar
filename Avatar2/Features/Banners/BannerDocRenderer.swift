@@ -166,9 +166,21 @@ enum BannerDocRenderer {
         }
     }
 
-    /// Vereenvoudigde mesh-gradient (37.1): een diagonale lineaire blend over de
-    /// stop-kleuren. De échte N-punts mesh komt als shader in E38.
+    /// 2 stops blijven een diagonale blend (bestaande banners). 3+ stops zijn
+    /// overlapping radials (CSS-mesh), zelfde pad als `BackgroundKit`.
     private static func renderMesh(_ stops: [MeshStop], size: CGSize) -> CGImage? {
+        if stops.count >= 3 {
+            let blobs = stops.map {
+                BackgroundGradientPreset.Blob(
+                    hex: $0.hex,
+                    x: CGFloat($0.x),
+                    y: CGFloat($0.y),
+                    radius: 0.62
+                )
+            }
+            return BackgroundKit.renderMeshImage(blobs: blobs, size: size)
+        }
+
         let w = max(1, Int(size.width)); let h = max(1, Int(size.height))
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
         guard let ctx = CGContext(

@@ -48,3 +48,28 @@ enum ImageEnhanceUndo {
         }
     }
 }
+
+/// Fill in body changes both the cutout bytes and the subject transform.
+/// Register them as one native undo item so Cmd-Z restores the exact previous
+/// composition rather than only swapping the image.
+enum FillBodyUndo {
+    @MainActor
+    static func register(
+        _ undoManager: UndoManager?,
+        model: ShellModel,
+        portrait: Portrait2,
+        undoTo before: ShellModel.FillBodyState,
+        redoTo after: ShellModel.FillBodyState
+    ) {
+        guard before != after else { return }
+        ReversibleChange.register(
+            undoManager,
+            target: portrait,
+            from: before,
+            to: after,
+            actionName: "Fill in body"
+        ) { target, state in
+            model.applyFillBodyState(state, to: target)
+        }
+    }
+}

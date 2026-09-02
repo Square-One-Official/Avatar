@@ -12,8 +12,10 @@ public enum DSDropdownPlacement: Sendable {
 
 public extension View {
     /// Toont `menu` als caret-loze, zwevende kaart direct onder deze view.
-    /// Sluit bij een tik buiten het anker+menu (via `dismissOverlay` op een
-    /// voorouder) of wanneer `isPresented` false wordt gezet.
+    /// Sluit bij élke muisklik buiten anker+menu (waar dan ook in het venster,
+    /// via `DSOutsideClickScope`), bij Esc, of wanneer `isPresented` false
+    /// wordt gezet. `dsDropdownDismissOverlay` is daarmee optioneel; 'ie
+    /// slikt de klik binnen z'n container nog wel in.
     func dsDropdownMenu<Menu: View>(
         isPresented: Binding<Bool>,
         anchorHeight: CGFloat = 32,
@@ -44,25 +46,29 @@ private struct DSDropdownMenuModifier<Menu: View>: ViewModifier {
     let placement: DSDropdownPlacement
     @ViewBuilder let menu: () -> Menu
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var clickScope = DSOutsideClickScope()
 
     func body(content: Content) -> some View {
         content
+            .dsOutsideClickInside(clickScope)
             .overlay(alignment: .top) {
                 if isPresented {
                     menu()
+                        .dsDismissOnOutsideClick(clickScope, isPresented: $isPresented)
                         .fixedSize()
                         .offset(y: placement == .below ? anchorHeight + gap : 0)
                         .alignmentGuide(.top) { d in
                             placement == .above ? d[.bottom] + gap : d[.top]
                         }
-                        .zIndex(10)
+                        .zIndex(1000)
+                        .compositingGroup()
                         .transition(.dsScaleFade(
                             anchor: placement == .below ? .top : .bottom,
                             reduceMotion: reduceMotion
                         ))
                 }
             }
-            .zIndex(isPresented ? 10 : 0)
+            .zIndex(isPresented ? 1000 : 0)
             .dsMotion(DSMotion.fast, value: isPresented)
     }
 }
@@ -112,6 +118,7 @@ public struct DSDropdownButton<Label: View, Menu: View>: View {
             label
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsDropdownMenu(
             isPresented: $isPresented,
             anchorHeight: anchorHeight,

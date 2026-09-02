@@ -36,6 +36,7 @@ public struct DSGhostButton: View {
                 .padding(.vertical, size.verticalPadding)
         }
         .buttonStyle(GhostSurfaceStyle(size: size))
+        .dsFocusEffectDisabled()
     }
 
     private struct GhostSurfaceStyle: ButtonStyle {

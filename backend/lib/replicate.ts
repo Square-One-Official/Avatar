@@ -161,8 +161,10 @@ export async function outpaintPortrait(input: {
   // black = preserve), but stating the rule in the prompt is a second
   // safety net for any feathered seam pixels near the face.
   const prompt =
-    "A studio portrait of one person, head and upper chest only, " +
-    "centered. Plain empty neutral grey background, completely empty, " +
+    "Minimally complete only the cropped body or clothing that continues into " +
+    "the small white masked edge. Preserve the current pose, scale, framing, " +
+    "and composition. Do not invent a full body or extend farther than the mask. " +
+    "Plain empty neutral grey background, completely empty, " +
     "no objects, no props, no microphone, no instruments, no hands raised, " +
     "no accessories, no other people, no text. Keep the face, hair, skin, " +
     "and clothing untouched. Do not modify the face under any circumstances; " +

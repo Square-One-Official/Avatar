@@ -82,6 +82,61 @@ final class BackendClientDecodeTests: XCTestCase {
         XCTAssertEqual(account.monthlyResetAt, expected)
     }
 
+    // MARK: - GET /v1/billing
+
+    func testBillingDecodesBackendShape() async throws {
+        // Vorm uit backend/lib/billing.ts (mapSubscription + mapInvoices).
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "plan": {
+                "name": "Pro",
+                "interval": "month",
+                "status": "active",
+                "cancel_at_period_end": false,
+                "current_period_end": "2026-09-07T00:00:00Z",
+                "amount": 1299,
+                "currency": "eur",
+                "tax_behavior": "exclusive",
+                "discount": { "percent_off": 100, "amount_off": null, "currency": null, "ends_at": "2027-08-07T00:00:00Z" },
+                "next_payment": { "amount": 0, "currency": "eur", "at": "2026-09-07T00:00:00Z" }
+              },
+              "invoices": [
+                {
+                  "id": "in_1", "number": "A-0001", "created": "2026-08-07T00:00:00Z",
+                  "amount": 0, "currency": "eur", "status": "paid",
+                  "description": "Pro · Monthly",
+                  "hosted_url": "https://invoice.stripe.com/i/in_1",
+                  "pdf_url": null
+                }
+              ]
+            }
+            """), forPath: "/v1/billing")
+
+        let billing = try await client.billing()
+        let plan = try XCTUnwrap(billing.plan)
+        XCTAssertEqual(plan.name, "Pro")
+        XCTAssertEqual(plan.interval, .month)
+        XCTAssertEqual(plan.amount, 1299)
+        XCTAssertEqual(plan.taxBehavior, .exclusive)
+        XCTAssertEqual(plan.discount?.percentOff, 100)
+        XCTAssertEqual(plan.discount?.endsAt, ISO8601DateFormatter().date(from: "2027-08-07T00:00:00Z"))
+        XCTAssertEqual(plan.nextPayment?.amount, 0)
+        XCTAssertEqual(billing.invoices.count, 1)
+        XCTAssertEqual(billing.invoices[0].status, .paid)
+        XCTAssertEqual(billing.invoices[0].description, "Pro · Monthly")
+        XCTAssertNil(billing.invoices[0].pdfUrl)
+    }
+
+    /// Starter zonder Stripe-customer: `plan: null, invoices: []`.
+    func testBillingDecodesEmptyShape() async throws {
+        BackendStubURLProtocol.setStub(.json(200, """
+            { "plan": null, "invoices": [] }
+            """), forPath: "/v1/billing")
+        let billing = try await client.billing()
+        XCTAssertNil(billing.plan)
+        XCTAssertTrue(billing.invoices.isEmpty)
+    }
+
     func testAccountDevUnlimitedDecodes() async throws {
         // Dev-allowlist-pad uit account.ts: sentinel-quota + is_dev_unlimited.
         BackendStubURLProtocol.setStub(.json(200, """
@@ -265,6 +320,77 @@ final class BackendClientDecodeTests: XCTestCase {
         let (data, credits) = try await client.colorize(imagePNG: Data("input-png".utf8))
         XCTAssertEqual(String(decoding: data, as: UTF8.self), "colorized-png")
         XCTAssertEqual(credits, 38)
+    }
+
+    // MARK: - POST /v1/fill-body
+
+    func testFillBodyDetailedDecodesMappingAndSendsFaceBox() async throws {
+        stubUploadLeg()
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "cutout": "\(base64("filled-png"))",
+              "credits_remaining": 36,
+              "did_fill": true,
+              "mapping": {
+                "canvas_width": 896,
+                "canvas_height": 1024,
+                "original_x": 96,
+                "original_y": 0,
+                "original_width": 800,
+                "original_height": 1024
+              },
+              "filled_edges": { "left": true, "right": false, "bottom": false }
+            }
+            """), forPath: "/v1/fill-body")
+
+        let result = try await client.fillBodyDetailed(
+            imagePNG: Data("input-png".utf8),
+            faceBox: BackendClient.FaceBox(x: 0.25, y: 0.1, width: 0.3, height: 0.25)
+        )
+
+        XCTAssertTrue(result.didFill)
+        XCTAssertEqual(String(decoding: result.data, as: UTF8.self), "filled-png")
+        XCTAssertEqual(result.creditsRemaining, 36)
+        XCTAssertEqual(result.mapping.originalX, 96)
+        XCTAssertEqual(result.mapping.originalWidth, 800)
+        XCTAssertEqual(result.filledEdges, .init(left: true, right: false, bottom: false))
+
+        let request = try XCTUnwrap(
+            BackendStubURLProtocol.requestLog.last(where: { $0.url?.path == "/v1/fill-body" })
+        )
+        let body = try XCTUnwrap(bodyData(of: request))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let face = try XCTUnwrap(json["face"] as? [String: Any])
+        XCTAssertEqual(face["x"] as? Double, 0.25)
+        XCTAssertEqual(face["y"] as? Double, 0.1)
+        XCTAssertEqual(face["width"] as? Double, 0.3)
+        XCTAssertEqual(face["height"] as? Double, 0.25)
+    }
+
+    func testFillBodyNoOpDecodesWithoutChargingSignal() async throws {
+        stubUploadLeg()
+        BackendStubURLProtocol.setStub(.json(200, """
+            {
+              "cutout": "\(base64("original-png"))",
+              "credits_remaining": 38,
+              "did_fill": false,
+              "mapping": {
+                "canvas_width": 800,
+                "canvas_height": 1000,
+                "original_x": 0,
+                "original_y": 0,
+                "original_width": 800,
+                "original_height": 1000
+              },
+              "filled_edges": { "left": false, "right": false, "bottom": false }
+            }
+            """), forPath: "/v1/fill-body")
+
+        let result = try await client.fillBodyDetailed(imagePNG: Data("input-png".utf8))
+
+        XCTAssertFalse(result.didFill)
+        XCTAssertEqual(result.creditsRemaining, 38)
+        XCTAssertEqual(result.mapping.canvasWidth, 800)
     }
 
     // MARK: - POST /v1/generate-background

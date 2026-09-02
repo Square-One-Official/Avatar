@@ -75,6 +75,36 @@ public struct DSChip: View {
             DSBadge(label, icon: icon, type: type)
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .dsFocusEffectDisabled()
+    }
+}
+
+/// Credit-prijs op een actie-tegel/-kaart ("⚡ 2"). Bewust stiller dan
+/// `DSBadge`: de prijs is bijzaak naast de titel, dus muted glyph en subtle
+/// cijfer i.p.v. primary op een 16pt-icoon. Bolt = credit; sparkles blijft
+/// AI/Effects.
+public struct DSCreditBadge: View {
+    private let amount: String
+
+    public init(_ amount: String) {
+        self.amount = amount
+    }
+
+    public var body: some View {
+        HStack(spacing: DSSpacing.gap1) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: DSIconSize.xs, weight: .semibold))
+                .foregroundStyle(DSColor.Foreground.muted)
+            Text(amount)
+                .dsTextStyle(.labelSmall)
+                .lineLimit(1)
+                .foregroundStyle(DSColor.Foreground.subtle)
+        }
+        .padding(.horizontal, DSSpacing.gap2)
+        .padding(.vertical, DSSpacing.gap1)
+        .background(DSColor.Background.neutral, in: RoundedRectangle(cornerRadius: DSRadius.md))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(amount) credits")
     }
 }
 

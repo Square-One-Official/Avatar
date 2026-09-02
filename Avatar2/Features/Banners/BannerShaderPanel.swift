@@ -27,6 +27,7 @@ struct BannerShaderPanel: View {
                         ForEach(ShaderCatalog.all) { effect in
                             Button { add(effect) } label: { effectChip(effect) }
                                 .buttonStyle(.plain)
+                                .dsFocusEffectDisabled()
                                 .dsHoverScale(1.02)
                                 .help("Add \(effect.displayName)")
                         }
@@ -113,16 +114,19 @@ struct BannerShaderPanel: View {
 
                 Button { move(index, by: -1) } label: { Image(systemName: "arrow.up") }
                     .buttonStyle(.plain).disabled(index == 0)
+                    .dsFocusEffectDisabled()
                     .foregroundStyle(index == 0 ? DSColor.Foreground.divider : DSColor.Foreground.muted)
                     .help("Move up")
                 Button { move(index, by: 1) } label: { Image(systemName: "arrow.down") }
                     .buttonStyle(.plain).disabled(index >= layers.count - 1)
+                    .dsFocusEffectDisabled()
                     .foregroundStyle(index >= layers.count - 1 ? DSColor.Foreground.divider : DSColor.Foreground.muted)
                     .help("Move down")
                 Button { delete(value.id) } label: {
                     Image(systemName: "trash").foregroundStyle(DSColor.Foreground.muted)
                 }
                 .buttonStyle(.plain).help("Remove")
+                .dsFocusEffectDisabled()
             }
             .font(.system(size: DSIconSize.sm))
 

@@ -99,6 +99,31 @@ extension DSEditPanelTests {
             XCTAssertNotNil(ImageRenderer(content: view).cgImage)
         }
     }
+
+    /// Cirkel-clip moet ook de CONTENT knippen: een punt in de vierkante hoek
+    /// (binnen xl4-rounded-rect, buiten de ingeschreven cirkel) mag niet wit zijn.
+    @MainActor
+    func testCanvasCardCircleClipHeeftGeenVierkanteHoeken() {
+        let view = DSCanvasCard(
+            showsDotGrid: false,
+            backgroundColor: .white,
+            surfaceClip: AnyShape(Circle())
+        ) {
+            Color.white
+        }
+        .frame(width: 100, height: 100)
+        .background(Color.black)
+
+        guard let cg = ImageRenderer(content: view).cgImage else {
+            return XCTFail("render mislukt")
+        }
+        let center = pixel(cg, x: 50, y: 50)
+        XCTAssertGreaterThan(center.r, 180, "centrum hoort wit te zijn: \(center)")
+        for (x, y) in [(12, 12), (87, 12), (12, 87), (87, 87)] {
+            let p = pixel(cg, x: x, y: y)
+            XCTAssertLessThan(p.r, 40, "hoek (\(x),\(y)) hoort buiten de cirkel te vallen: \(p)")
+        }
+    }
 }
 
 // E03.16 — layoutgarantie (bevinding 19): op de minimummaat 800×600 met
@@ -177,5 +202,36 @@ extension DSEditPanelTests {
             onderband.contains { $0.r < 150 || $0.g > 120 },
             "solid-paneel hoort de onderkant van de foto te dempen: \(onderband.map(\.r))"
         )
+    }
+
+    /// `dsPanelSurface` mag child-overlays niet clippen: Enhance-dropdowns
+    /// zijn breder dan hun tegel en moeten over de kaart-rand vallen.
+    @MainActor
+    func testPanelSurfaceLaatOverflowingOverlayOngeclipt() {
+        let card: CGFloat = 80
+        let canvas: CGFloat = 200
+        let overflow: CGFloat = 24
+        let view = ZStack {
+            Color.red
+            Color.clear
+                .frame(width: card, height: card)
+                .overlay(alignment: .topLeading) {
+                    Color.blue
+                        .frame(width: overflow, height: overflow)
+                        .offset(x: -overflow)
+                }
+                .dsPanelSurface(cornerRadius: 8, solid: true)
+        }
+        .frame(width: canvas, height: canvas)
+
+        guard let cg = ImageRenderer(content: view).cgImage else {
+            return XCTFail("render mislukt")
+        }
+
+        // Kaart gecentreerd: linker rand op (200-80)/2 = 60. Overlay steekt
+        // 24pt uit → blauw van x=36 tot x=60, y=60 tot y=84.
+        let p = pixel(cg, x: 48, y: 72)
+        XCTAssertGreaterThan(p.b, 180, "dropdown-overlay hoort over de kaart-rand te vallen, niet geclipt: \(p)")
+        XCTAssertLessThan(p.r, 80, "geclipt overlay zou het rode canvas tonen: \(p)")
     }
 }

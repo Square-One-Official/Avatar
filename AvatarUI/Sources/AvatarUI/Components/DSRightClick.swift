@@ -35,6 +35,11 @@ private struct RightClickCatcher: NSViewRepresentable {
     final class CatcherView: NSView {
         var action: ((CGPoint) -> Void)?
 
+        /// SwiftUI is top-down; AppKit's default origin is bottom-left. Without
+        /// this, `convert(_:from:)` reports a flipped Y and the DS-menu opens
+        /// at the opposite edge of the clicked view.
+        override var isFlipped: Bool { true }
+
         override func rightMouseDown(with event: NSEvent) {
             let point = convert(event.locationInWindow, from: nil)
             action?(point)

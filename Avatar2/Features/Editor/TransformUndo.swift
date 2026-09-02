@@ -17,11 +17,13 @@ enum TransformUndo {
         Snapshot(offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale)
     }
 
+    /// E50.3: undo/redo bumpt alléén `revision` (canvas/thumbs verversen) en
+    /// niet `updatedAt` — terugdraaien mag de rasterorde niet herschudden.
     private static func apply(_ s: Snapshot, to portrait: Portrait2) {
         portrait.offsetX = s.offsetX
         portrait.offsetY = s.offsetY
         portrait.scale = s.scale
-        portrait.touch()
+        portrait.bumpRevision()
     }
 
     /// Registreert een undo die naar `before` terugzet en een redo naar

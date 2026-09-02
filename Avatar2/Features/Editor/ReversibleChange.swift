@@ -1,9 +1,9 @@
 // Gedeelde undo/redo-motor (audit-cleanup). Alle before→after-undo's in v2
-// (transform, adjust, beeld-vervanging, cutout-bytes, board-positie) deelden
+// (transform, adjust, beeld-vervanging, board-positie) deelden
 // hetzelfde recursieve `registerUndo(withTarget:)`-patroon: undo zet `before`
 // terug en registreert meteen de inverse zodat redo werkt. Dat patroon staat
 // nu één keer hier; de domein-specifieke facades (TransformUndo, AdjustUndo,
-// ImageEnhanceUndo, CutoutDataUndo, BoardMoveUndo) blijven bestaan als
+// ImageEnhanceUndo, BoardMoveUndo) blijven bestaan als
 // intentie-onthullende ingangen en delegeren hiernaartoe.
 
 import Foundation

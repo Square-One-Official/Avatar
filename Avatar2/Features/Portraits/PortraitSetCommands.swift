@@ -7,8 +7,13 @@ import SwiftUI
 struct PortraitSetAction {
     var selectedCount: Int
     var matchFraming: () -> Void
+    /// E50.3: automatische doelkeuze (patroon van de set / best belicht).
     var matchLighting: () -> Void
     var setBackground: () -> Void
+    /// E50.3: Adjust-laag van de selectie neutraal — de terugweg voor Match
+    /// lighting; verborgen zolang die feature geschrapt is (zelfde flag).
+    var canResetAdjust: Bool
+    var resetAdjust: () -> Void
 }
 
 private struct PortraitSetKey: FocusedValueKey {
@@ -30,11 +35,17 @@ struct PortraitSetCommands: View {
         Button("Match Framing") { portraitSet?.matchFraming() }
             .keyboardShortcut("f", modifiers: [.command, .option])
             .disabled(portraitSet == nil || count < 2)
-        Button("Match Lighting") { portraitSet?.matchLighting() }
-            .keyboardShortcut("l", modifiers: [.command, .option])
-            .disabled(portraitSet == nil || count < 2)
+        if AppFeatureFlags.matchLightingEnabled {
+            Button("Match Lighting") { portraitSet?.matchLighting() }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+                .disabled(portraitSet == nil || count < 2)
+        }
         Button("Set Background…") { portraitSet?.setBackground() }
             .keyboardShortcut("b", modifiers: [.command, .shift])
             .disabled(portraitSet == nil || count < 1)
+        if AppFeatureFlags.matchLightingEnabled {
+            Button("Reset Adjustments on Selection") { portraitSet?.resetAdjust() }
+                .disabled(portraitSet?.canResetAdjust != true)
+        }
     }
 }

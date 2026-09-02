@@ -71,6 +71,7 @@ struct ShellTopBar: View {
 
 /// Gelabelde segmented control — icoon + tekst per segment (pencil · eye).
 private struct EditorViewModeToggle: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var selectionNamespace
     let isPreview: Bool
     let height: CGFloat
@@ -79,14 +80,18 @@ private struct EditorViewModeToggle: View {
     var body: some View {
         HStack(spacing: 0) {
             segment(icon: "pencil", label: "Edit", selected: !isPreview) {
-                DSMotion.animate(DSMotion.springSmall) { onChange(false) }
+                onChange(false)
             }
             segment(icon: "eye", label: "Preview", selected: isPreview) {
-                DSMotion.animate(DSMotion.springSmall) { onChange(true) }
+                onChange(true)
             }
         }
         .padding(DSSpacing.gap0_5)
         .background(DSColor.Background.neutral, in: Capsule())
+        // Wint van de shell-transactie die Edit↔Preview-layout stilzet.
+        .transaction(value: isPreview) {
+            $0.animation = reduceMotion ? nil : DSMotion.springSmall
+        }
         .dsMotion(DSMotion.springSmall, value: isPreview)
     }
 
@@ -111,6 +116,7 @@ private struct EditorViewModeToggle: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .accessibilityLabel(label)
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
@@ -141,6 +147,7 @@ private struct SharePillButton: View {
             .scaleEffect(pressed ? 0.97 : 1)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
         .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
         .dsMotion(DSMotion.micro, value: hovering)
@@ -179,6 +186,7 @@ private struct DSCompactTopBarButton: View {
                 .scaleEffect(pressed ? 0.97 : 1)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
         .pressEvents(onPress: { pressed = true }, onRelease: { pressed = false })
         .dsMotion(DSMotion.micro, value: hovering)

@@ -127,6 +127,7 @@ struct CreateEffectSheet: View {
                 }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onDrop(of: [.fileURL, .image], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }

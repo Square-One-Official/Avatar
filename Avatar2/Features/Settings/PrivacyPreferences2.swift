@@ -2,8 +2,8 @@
 // als v1 (aiPrivacyMode, localCutoutEngine, shareAnonymousDiagnostics) in
 // het eigen defaults-domein van Avatar2, conform de E04.3-notities.
 //
-// Privacy Tier Picker: `tier` (onDevice / appleCloud / thirdParty) vervangt
-// de binaire mode; legacy `mode` blijft als computed bridge naar v1-keys.
+// UI is Local only / Cloud. Intern blijft `appleCloud` leesbaar en migreert
+// naar `thirdParty`. Legacy `mode` blijft als computed bridge naar v1-keys.
 
 import AvatarKit
 import Foundation
@@ -30,22 +30,20 @@ final class PrivacyPreferences2 {
     static let engineKey = "localCutoutEngine"
     static let shareDiagnosticsKey = "shareAnonymousDiagnostics"
 
-    /// Opgeslagen voorkeur (UI-selectie).
+    /// Opgeslagen voorkeur (UI-selectie). Apple Private Cloud migreert naar Cloud.
     var tier: AIPrivacyTier = .onDevice {
         didSet {
+            if tier == .appleCloud {
+                tier = .thirdParty
+                return
+            }
             persistTier(tier)
             applyFingerprintPolicy(for: effectiveTier)
         }
     }
 
-    /// Tier die gates en features daadwerkelijk gebruiken. Apple Private Cloud
-    /// telt alleen als Image Playground op dit Mac beschikbaar is.
-    var effectiveTier: AIPrivacyTier {
-        if tier == .appleCloud, !AppleIntelligenceAvailability.supportsApplePrivateCloud {
-            return .onDevice
-        }
-        return tier
-    }
+    /// Tier die gates en features daadwerkelijk gebruiken.
+    var effectiveTier: AIPrivacyTier { tier.userFacing }
 
     /// Legacy bridge — leest/schrijft via `tier`.
     var mode: AIPrivacyMode2 {
@@ -80,7 +78,7 @@ final class PrivacyPreferences2 {
         let defaults = UserDefaults.standard
         if let raw = defaults.string(forKey: Self.tierKey),
            let stored = AIPrivacyTier(storageKey: raw) {
-            tier = stored
+            tier = stored.userFacing
         } else if let raw = defaults.string(forKey: Self.modeKey),
                   let legacy = AIPrivacyMode2(rawValue: raw) {
             tier = legacy == .localOnly ? .onDevice : .thirdParty

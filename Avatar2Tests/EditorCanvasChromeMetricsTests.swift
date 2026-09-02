@@ -16,4 +16,24 @@ import Testing
         #expect(layout.cardSide == 800)
         #expect(layout.origin == CGPoint(x: -100, y: 0))
     }
+
+    @Test func selectionRingIsCircleWhenFrameIsCircle() {
+        #expect(
+            EditorCanvasChromeMetrics.selectionRingCornerRadius(
+                isCircle: true,
+                cameraScale: 1.5,
+                cardCornerRadius: 24
+            ) == nil
+        )
+    }
+
+    @Test func selectionRingScalesRoundedRectWithCamera() {
+        #expect(
+            EditorCanvasChromeMetrics.selectionRingCornerRadius(
+                isCircle: false,
+                cameraScale: 2,
+                cardCornerRadius: 24
+            ) == 50
+        )
+    }
 }

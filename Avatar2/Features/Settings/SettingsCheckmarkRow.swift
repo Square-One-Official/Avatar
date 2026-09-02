@@ -73,6 +73,7 @@ struct SettingsCheckmarkRow<Leading: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(isDisabled)
         .onHover { isHovering = $0 && !isDisabled }
         .dsMotion(DSMotion.micro, value: isHovering)

@@ -162,6 +162,7 @@ struct BannerTextFloatingToolbar: View {
                 .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         // Kleur-paneel zit in de VStack boven de pil (Freeform-stijl).
     }
 
@@ -176,6 +177,7 @@ struct BannerTextFloatingToolbar: View {
                 .frame(minWidth: 28)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .simultaneousGesture(TapGesture(count: 2).onEnded { openFontPanel() })
         // Format-paneel zit in de VStack boven de pil (Freeform-stijl).
     }
@@ -204,6 +206,7 @@ struct BannerTextFloatingToolbar: View {
             .foregroundStyle(DSColor.Foreground.primary)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .dsDropdownMenu(isPresented: menuBinding(sizeMenuKind), anchorHeight: 28, placement: .below) {
             sizeMenu
         }
@@ -404,6 +407,7 @@ struct BannerTextFloatingToolbar: View {
                 }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     private func alignChip(_ align: Int, icon: String) -> some View {
@@ -480,6 +484,7 @@ private struct HoverFill<Label: View>: View {
                 .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
     }
 }
@@ -501,6 +506,7 @@ private struct HoverRow<Label: View>: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hovering = $0 }
     }
 }

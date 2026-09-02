@@ -2,10 +2,9 @@ import Foundation
 import XCTest
 @testable import AvatarKit
 
-/// E15.6 + E55.2: de gebruikersgerichte generatie-modelkeuze. Sinds E55.2 is
-/// OpenAI de weergave-default en gaat alléén een expliciete keuze
-/// (`explicit`) als `generation_model` de deur uit — zonder keuze regeert de
-/// server-default (vloot-rollback via STYLIZE_DEFAULT_MODEL zonder app-update).
+/// Persistente GenerationModelStore (niet meer user-facing). Encoding-tests
+/// blijven: `generation_model` verdwijnt uit de JSON als de client `nil` stuurt
+/// — BackendClient laat het veld nu altijd weg tenzij een caller hem zet.
 @MainActor
 final class GenerationModelStoreTests: XCTestCase {
     private var defaults: UserDefaults!

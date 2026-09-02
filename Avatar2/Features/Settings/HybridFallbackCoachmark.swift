@@ -14,5 +14,5 @@ enum HybridFallbackCoachmark {
     }
 
     static let message =
-        "Processed on your Mac. Advanced privacy unlocks sharper edges."
+        "Processed on your Mac. Cloud unlocks sharper edges."
 }

@@ -13,5 +13,14 @@ extension AvatarUITests {
     func testConcentrischeRadius() {
         XCTAssertEqual(DSRadius.concentric(inset: 4), DSRadius.window - 4)
         XCTAssertEqual(DSRadius.concentric(inset: DSRadius.window + 10), 0)
+        XCTAssertEqual(DSRadius.concentric(inset: 8, outer: 24), 16)
+    }
+
+    func testMenuRowRadiusIsConcentricWithPanel() {
+        XCTAssertEqual(
+            DSMenuLayout.rowRadius,
+            DSMenuLayout.cornerRadius - DSMenuLayout.listInset
+        )
+        XCTAssertEqual(DSMenuLayout.rowRadius, DSRadius.xl2)
     }
 }

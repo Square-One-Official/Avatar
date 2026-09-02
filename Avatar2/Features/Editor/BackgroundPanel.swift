@@ -2,9 +2,9 @@
 // 2026-07-03, aangescherpt met audit-ronde 2):
 //   - Tab-header: Gallery · Unsplash · Upload · Generate; rechts twee
 //     modus-pills "Original" / "None" (de vage "Remove" is vervallen).
-//   - Gallery: verticaal scrollend 4-koloms grid met sectiekoppen — Color &
-//     Gradient (picker-"+", DS-kleuren, brand colors met hover-verwijderen,
-//     gradients) en de CMS-categorieën mét tegel-labels (Notion-stijl).
+//   - Gallery: verticaal scrollend 4-koloms grid met sectiekoppen — Color
+//     (picker-"+", DS-kleuren, brand colors met hover-verwijderen), Gradient
+//     (10 mesh-presets) en de CMS-categorieën mét tegel-labels (Notion-stijl).
 //   - Unsplash: zoekveld + editorial/zoek-grid via de /v1/unsplash-proxy
 //     (attributie onder elke tegel, download-registratie bij apply).
 //   - Upload: "+"-tegel + de persistente eigen uploads (E24.24).
@@ -44,18 +44,21 @@ struct BackgroundPanel: View {
 
     private enum PickerTab: Hashable { case gallery, unsplash, generate }
     @State private var tab: PickerTab = .gallery
+    /// Klik buiten "+"-tegel + picker (waar dan ook) sluit de kleurpicker.
+    @State private var colorPickerClickScope = DSOutsideClickScope()
 
     @State private var brand = BrandColorKit.shared
     // E24.24: persistente custom-achtergrond-uploads (herbruikbare tegels).
     @State private var customImages = BackgroundImageKit.shared
-    // E25.2: DSColorPicker vanuit de "+"-tegel in Color & Gradient.
+    // E25.2: DSColorPicker vanuit de "+"-tegel in de Color-rij.
     @State private var pickerColor: Color = .white
     // Hover-state voor het verwijder-kruisje op brand-kleuren (audit #1).
     @State private var hoveredBrandHex: String?
     // CMS-achtergronden (E33+). Sessie-cache zodat herhaalbaar openen
     // geen flits geeft; leeg = nog niet geladen (geen fallback nodig).
     @State private var cmsBackgrounds: [RemoteBackground] = BackgroundPanel.sessionCache
-    // CMS-gradient-presets (E33+). Leeg = fallback op BackgroundKit.gradientPresets.
+    // CMS-gradient-presets (E33+). Worden achter de 10 lokale mesh-presets
+    // geplakt; leeg = alleen de kit.
     @State private var cmsGradients: [RemoteGradientPreset] = BackgroundPanel.gradientCache
     // Unsplash (audit #5). Editorial feed sessie-gecachet; zoeken is live.
     @State private var unsplashQuery = ""
@@ -139,6 +142,9 @@ struct BackgroundPanel: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await loadCMSBackgrounds() }
+        .onChange(of: tab) { _, _ in
+            presentation.editorBackgroundColorPickerOpen = false
+        }
         // Ronde 4: opent het paneel terwijl er nog gegenereerd wordt, toon
         // dan direct de Generate-tab met de lopende status i.p.v. Gallery.
         .onAppear { if generateSession.isGenerating { tab = .generate } }
@@ -190,6 +196,7 @@ struct BackgroundPanel: View {
             }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
     }
 
     /// De achtergrond-modus als expliciete, gelabelde toggle: Original (foto
@@ -227,27 +234,71 @@ struct BackgroundPanel: View {
                 }
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .help(help)
     }
 
-    // MARK: Gallery-tab — Color & Gradient · Uploaded · (Banners) · CMS
+    // MARK: Gallery-tab — Color · Gradient · Uploaded · (Banners) · CMS
 
     /// Secties stapelen verticaal; elke sectie is een horizontaal scrollende
     /// rij (besluit Thierry: opzij-scrollen behouden, nieuwste uploads links).
     private var galleryTab: some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-                rowSection("Color & Gradient") { colorAndGradientTiles }
-                rowSection("Uploaded") { uploadedTiles }
-                if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
-                    rowSection("Banners") { bannerTiles }
+        ZStack(alignment: .topLeading) {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                    rowSection("Color") { colorTiles }
+                    rowSection("Gradient") { gradientTiles }
+                    rowSection("Uploaded") { uploadedTiles }
+                    if showsBanners, AppFeatureFlags.bannersEnabled, !savedBanners.isEmpty {
+                        rowSection("Banners") { bannerTiles }
+                    }
+                    ForEach(cmsCategories, id: \.self) { cat in
+                        rowSection(cat) { cmsTiles(for: cat) }
+                    }
                 }
-                ForEach(cmsCategories, id: \.self) { cat in
-                    rowSection(cat) { cmsTiles(for: cat) }
-                }
+            }
+            .scrollClipDisabled()
+            .frame(height: contentHeight)
+
+            if presentation.editorBackgroundColorPickerOpen {
+                colorPickerOverlay
             }
         }
         .frame(height: contentHeight)
+        .onChange(of: pickerColor) { _, c in
+            guard presentation.editorBackgroundColorPickerOpen, let hex = c.hexRGB else { return }
+            selectColor(hex)
+        }
+        .onChange(of: presentation.editorBackgroundColorPickerOpen) { _, open in
+            guard !open, let hex = pickerColor.hexRGB,
+                  activeColorHex == hex else { return }
+            brand.add(hex)
+        }
+    }
+
+    /// Picker hangt op het Gallery-vlak, niet in de scroll-rij: de
+    /// edge-fade-masker + verticale clip kapten de overlay op de "+"-tegel af
+    /// (de knop zette de flag, maar de picker was onzichtbaar).
+    private var colorPickerOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { presentation.editorBackgroundColorPickerOpen = false }
+            DSColorPicker(
+                color: $pickerColor,
+                supportsAlpha: false,
+                commitTitle: "Add colour",
+                onCommit: commitPickedColor
+            )
+                .dsDismissOnOutsideClick(colorPickerClickScope, isActive: true) {
+                    presentation.editorBackgroundColorPickerOpen = false
+                }
+                .appliedAppearancePreference()
+                .padding(.top, 24)
+                .padding(.leading, 108)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// Uploads als Gallery-sectie (Upload-tab vervallen): "+"-tegel als
@@ -275,49 +326,24 @@ struct BackgroundPanel: View {
     }
 
     @ViewBuilder
-    private var colorAndGradientTiles: some View {
+    private var colorTiles: some View {
         // E25.2: "+"-tegel opent de DSColorPicker (met eigen eyedropper); live
-        // bijwerken terwijl de picker open is.
-        tile(isSelected: false, width: rowTileWidth) {
+        // bijwerken terwijl de picker open is. Overlay hangt op `galleryTab`.
+        tile(
+            isSelected: presentation.editorBackgroundColorPickerOpen,
+            width: rowTileWidth,
+            hoverScale: 1
+        ) {
             Image(systemName: "plus")
                 .font(.system(size: DSIconSize.base, weight: .semibold))
                 .foregroundStyle(DSColor.Foreground.subtle)
-        } action: {
-            if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
-            presentation.editorBackgroundColorPickerOpen = true
-        }
+        } action: { toggleColorPicker() }
+        .dsOutsideClickInside(colorPickerClickScope)
         .help("Pick a color")
-        .dsDropdownMenu(
-            isPresented: Binding(
-                get: { presentation.editorBackgroundColorPickerOpen },
-                set: { presentation.editorBackgroundColorPickerOpen = $0 }
-            ),
-            anchorHeight: rowTileWidth * (10.0 / 16.0)
-        ) {
-            DSColorPicker(color: $pickerColor, supportsAlpha: false)
-                .appliedAppearancePreference()
-        }
-        .onChange(of: pickerColor) { _, c in
-            guard presentation.editorBackgroundColorPickerOpen, let hex = c.hexRGB else { return }
-            selectColor(hex)
-        }
-        // Audit #1 (random shades): bewaar bij sluiten alléén de kleur die
-        // daadwerkelijk als achtergrond is toegepast — voorheen groeide de
-        // brand-rij met élke picker-sessie een willekeurige tussenstand.
-        .onChange(of: presentation.editorBackgroundColorPickerOpen) { _, open in
-            guard !open, let hex = pickerColor.hexRGB,
-                  activeColorHex == hex else { return }
-            brand.add(hex)
-        }
 
-        ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
-            colorTile(color)
-        }
-
-        // Audit #1: de kit saneert en capt zelf (near-duplicates samengevouwen,
-        // max 12) — toon alles zodat het hover-kruisje zichtbaar effect heeft
-        // (geen verborgen voorraad die een verwijderde tint stilletjes vervangt).
-        ForEach(brand.hexColors, id: \.self) { hex in
+        // Nieuwste brand-kleur direct ná de plus (horizontale rij scrollt
+        // anders de nieuwe swatch uit beeld, achter de DS-presets).
+        ForEach(brand.hexColors.reversed(), id: \.self) { hex in
             if let color = Color(hexRGB: hex) {
                 colorTile(color, hex: hex)
                     .overlay(alignment: .topTrailing) {
@@ -330,18 +356,40 @@ struct BackgroundPanel: View {
             }
         }
 
-        // Gradient-presets: CMS-gestuurd als aanwezig, anders hardgecodeerde fallback.
-        if cmsGradients.isEmpty {
-            ForEach(Array(BackgroundKit.gradientPresets.enumerated()), id: \.offset) { _, colors in
-                gradientTile(colors)
-            }
-        } else {
-            ForEach(cmsGradients, id: \.label) { g in
-                if let from = Color(hexRGB: g.fromHex), let to = Color(hexRGB: g.toHex) {
-                    gradientTile([from, to])
-                }
+        ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
+            colorTile(color)
+        }
+    }
+
+    @ViewBuilder
+    private var gradientTiles: some View {
+        ForEach(BackgroundKit.gradientPresets) { preset in
+            gradientTile(preset)
+        }
+        ForEach(cmsGradients, id: \.label) { g in
+            if let from = Color(hexRGB: g.fromHex), let to = Color(hexRGB: g.toHex) {
+                cmsGradientTile(from: from, to: to, label: g.label)
             }
         }
+    }
+
+    private func toggleColorPicker() {
+        if presentation.editorBackgroundColorPickerOpen {
+            presentation.editorBackgroundColorPickerOpen = false
+            return
+        }
+        if let hex = activeColorHex, let c = Color(hexRGB: hex) { pickerColor = c }
+        presentation.editorBackgroundColorPickerOpen = true
+    }
+
+    private func commitPickedColor() {
+        guard let hex = pickerColor.hexRGB else {
+            presentation.editorBackgroundColorPickerOpen = false
+            return
+        }
+        selectColor(hex)
+        brand.add(hex)
+        presentation.editorBackgroundColorPickerOpen = false
     }
 
     private func brandRemoveBadge(_ hex: String) -> some View {
@@ -360,6 +408,7 @@ struct BackgroundPanel: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .padding(DSSpacing.gap1)
         .help("Remove this brand colour")
     }
@@ -369,13 +418,25 @@ struct BackgroundPanel: View {
         let isSelected = hex != nil && activeColorHex == hex
         return tile(isSelected: isSelected, width: rowTileWidth) {
             Rectangle().fill(color)
-        } action: { if let hex { selectColor(hex) } }
+        } action: {
+            presentation.editorBackgroundColorPickerOpen = false
+            if let hex { selectColor(hex) }
+        }
     }
 
-    private func gradientTile(_ colors: [Color]) -> some View {
-        tile(isSelected: isAppliedSource(gradientKey(colors)), width: rowTileWidth) {
+    private func gradientTile(_ preset: BackgroundGradientPreset) -> some View {
+        tile(isSelected: isAppliedSource(gradientKey(preset.id)), width: rowTileWidth) {
+            BackgroundKit.meshFill(preset)
+        } action: { selectGradient(preset) }
+        .help(preset.name)
+    }
+
+    private func cmsGradientTile(from: Color, to: Color, label: String) -> some View {
+        let colors = [from, to]
+        return tile(isSelected: isAppliedSource(gradientKey(colors)), width: rowTileWidth) {
             Rectangle().fill(BackgroundKit.gradient(colors))
-        } action: { selectGradient(colors) }
+        } action: { selectLinearGradient(colors) }
+        .help(label)
     }
 
     @ViewBuilder
@@ -566,6 +627,7 @@ struct BackgroundPanel: View {
             .background(DSColor.Background.neutral, in: Capsule())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(generateSession.isGenerating)
         .help("Choose what to generate")
         // Caret-loos DS-dropdown (geen systeem-popover), boven de chip zoals
@@ -609,6 +671,7 @@ struct BackgroundPanel: View {
             .frame(width: 28, height: 28)
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .disabled(promptEmpty && !isGenerating)
         .opacity(promptEmpty && !isGenerating ? 0.4 : 1)
         .help(isGenerating ? "Stop generating" : "Generate")
@@ -697,24 +760,33 @@ struct BackgroundPanel: View {
     /// 2pt selected-rand voor alle bronnen (kleur, gradient, CMS, upload).
     /// `width` gezet = vaste rij-tegel (horizontale Gallery-rijen);
     /// nil = flexibel in een grid (Unsplash).
+    ///
+    /// De ring ligt in een vaste 2pt-gutter buiten de fill — selected/unselected
+    /// houden dezelfde tegelmaat (een inset `strokeBorder` 0→2 kromp de plus).
     private func tile(
-        isSelected: Bool, width: CGFloat? = nil,
+        isSelected: Bool, width: CGFloat? = nil, hoverScale: CGFloat = 1.10,
         @ViewBuilder content: () -> some View, action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            RoundedRectangle(cornerRadius: DSRadius.lg)
+        let shape = RoundedRectangle(cornerRadius: DSRadius.lg)
+        return Button(action: action) {
+            shape
                 .fill(DSColor.Background.neutral)
                 .aspectRatio(tileAspect, contentMode: .fit)
                 .frame(width: width)
                 .overlay { content() }
-                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                .clipShape(shape)
+                .padding(2)
                 .overlay {
-                    RoundedRectangle(cornerRadius: DSRadius.lg)
-                        .strokeBorder(DSColor.Foreground.primary, lineWidth: isSelected ? 2 : 0)
+                    RoundedRectangle(cornerRadius: DSRadius.lg + 2)
+                        .strokeBorder(
+                            isSelected ? DSColor.Foreground.primary : Color.clear,
+                            lineWidth: 2
+                        )
                 }
         }
         .buttonStyle(.plain)
-        .dsHoverScale()
+        .dsFocusEffectDisabled()
+        .dsHoverScale(isSelected ? 1 : hoverScale)
     }
 
     // MARK: Selectie-state
@@ -748,6 +820,10 @@ struct BackgroundPanel: View {
 
     private func gradientKey(_ colors: [Color]) -> String {
         "gradient:" + colors.compactMap(\.hexRGB).joined(separator: "-")
+    }
+
+    private func gradientKey(_ presetID: String) -> String {
+        "gradient:" + presetID
     }
 
     private func cmsKey(_ bg: RemoteBackground) -> String {
@@ -863,7 +939,9 @@ struct BackgroundPanel: View {
     // MARK: Acties
 
     /// E31.7: één apply-punt — naar de injected closure (batch) of het portret.
-    private func apply(_ background: PortraitBackground) {
+    /// `closePicker` blijft false tijdens live-drag in de color picker.
+    private func apply(_ background: PortraitBackground, closePicker: Bool = true) {
+        if closePicker { presentation.editorBackgroundColorPickerOpen = false }
         if let onApply { onApply(background) }
         else if let folder { folder.setDefaultBackground(background) }
         else { portrait?.setBackground(background) }
@@ -881,10 +959,16 @@ struct BackgroundPanel: View {
     }
 
     private func selectColor(_ hex: String) {
-        apply(.color(hex))
+        apply(.color(hex), closePicker: false)
     }
 
-    private func selectGradient(_ colors: [Color]) {
+    private func selectGradient(_ preset: BackgroundGradientPreset) {
+        guard let png = BackgroundKit.renderGradientPNG(preset) else { return }
+        recordAppliedSource(gradientKey(preset.id), data: png)
+        apply(.image(png))
+    }
+
+    private func selectLinearGradient(_ colors: [Color]) {
         guard let png = BackgroundKit.renderGradientPNG(colors) else { return }
         recordAppliedSource(gradientKey(colors), data: png)
         apply(.image(png))

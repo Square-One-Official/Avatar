@@ -77,6 +77,16 @@ enum ShellMetrics {
     /// Totale hoogte van de editor-top-chrome (gelijk aan traffic-light-rij).
     static var topBarBandHeight: CGFloat { windowControlsRowHeight }
 
+    // MARK: - Paginakop (Home / Portraits)
+
+    /// Top-inset van de paginatitel ("Home", "All portraits", mapnaam). Home
+    /// had gap6 ín de scroll, de gallery gap8 in een vaste header — de titel
+    /// versprong bij tabwissel. Beide schermen bouwen nu dezelfde vaste kop.
+    static let pageTitleTopInset: CGFloat = DSSpacing.gap8
+
+    /// Ruimte tussen de paginakop en de content eronder.
+    static let pageTitleBottomInset: CGFloat = DSSpacing.gap6
+
     // MARK: - Portret-grid (UXS-9 / UX8)
 
     /// Kolommen in het portret-rooster. Home en de Portraits-gallery hadden

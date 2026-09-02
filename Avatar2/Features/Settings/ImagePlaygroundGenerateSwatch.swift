@@ -34,14 +34,16 @@ struct ImagePlaygroundGenerateSwatch: View {
                     }
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverScale()
             .help(resolvedHelp)
             .accessibilityLabel(resolvedHelp)
+            .cloudFeatureMuted()
         }
     }
 
     private func request() {
-        guard let entitlement, entitlement.allowAIFeature(feature) else { return }
+        guard let entitlement, entitlement.allowAIFeature(feature, retry: request) else { return }
         ImagePlaygroundPresenter.shared.present(sourceImage: sourceImage, onCompleted: onGenerated)
     }
 }
@@ -58,7 +60,7 @@ struct ImagePlaygroundEditChip: View {
                 HStack(spacing: DSSpacing.gap1) {
                     DSIcon(.privacyAppleCloud, size: DSIconSize.sm, weight: .bold)
                     Text("Edit with Apple Intelligence").dsTextStyle(.labelSmall)
-                    DSPrivacyBadge(tier: .appleCloud)
+                    DSPrivacyBadge(tier: .thirdParty)
                 }
                 .foregroundStyle(DSColor.Foreground.primary)
                 .padding(.horizontal, DSSpacing.gap2)
@@ -66,13 +68,18 @@ struct ImagePlaygroundEditChip: View {
                 .background(DSColor.Background.neutral, in: Capsule())
             }
             .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
             .dsHoverScale()
+            .cloudFeatureMuted()
             .accessibilityLabel("Edit with Apple Intelligence")
         }
     }
 
     private func request() {
-        guard let entitlement, entitlement.allowAIFeature(.imagePlaygroundEdit) else { return }
+        guard let entitlement, entitlement.allowAIFeature(
+            .imagePlaygroundEdit,
+            retry: request
+        ) else { return }
         ImagePlaygroundPresenter.shared.present(sourceImage: sourceImage, onCompleted: onEdited)
     }
 }

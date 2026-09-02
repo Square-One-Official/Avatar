@@ -57,6 +57,7 @@ public struct DSIconButton: View {
                 .frame(width: size.iconSize, height: size.iconSize)
         }
         .buttonStyle(SurfaceStyle(style: style, size: size, isActive: isActive))
+        .dsFocusEffectDisabled()
         .accessibilityLabel(label)
         .help(label)
     }

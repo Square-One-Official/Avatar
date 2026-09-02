@@ -37,6 +37,7 @@ public struct DSNeutralButton: View {
                 .background(DSColor.Background.neutral, in: Capsule())
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .dsFocusEffectDisabled()
     }
 }
 

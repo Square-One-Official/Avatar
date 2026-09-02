@@ -12,6 +12,7 @@ struct EnhanceCommands {
     var portrait: () -> Void = {}
     var portraitOn = false
     var colorise: () -> Void = {}
+    var alreadyInColour = false
     var fillBody: () -> Void = {}
     var resetAdjustments: () -> Void = {}
     var canResetAdjustments = false
@@ -57,6 +58,9 @@ struct EnhanceMenuCommands: View {
 
         Button("Colorise") { enhance?.colorise() }
             .keyboardShortcut("k", modifiers: [.command, .shift])
+            .help(enhance?.alreadyInColour == true
+                  ? ColoriseAlreadyColourCopy.help
+                  : ColoriseAlreadyColourCopy.defaultHelp)
             .disabled(enhance == nil)
 
         Button("Fill in body") { enhance?.fillBody() }

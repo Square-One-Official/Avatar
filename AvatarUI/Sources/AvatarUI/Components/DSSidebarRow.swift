@@ -78,6 +78,7 @@ public struct DSSidebarRow<Avatar: View>: View {
             }
         }
         .buttonStyle(DSStateOpacityButtonStyle())
+        .dsFocusEffectDisabled()
         .onHover { isHovering = $0 }
         .dsMotion(DSMotion.micro, value: isHovering)
         .accessibilityLabel(Text(role.map { "\(name), \($0)" } ?? name))

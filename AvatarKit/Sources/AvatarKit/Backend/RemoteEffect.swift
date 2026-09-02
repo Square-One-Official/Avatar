@@ -21,21 +21,39 @@ public struct RemoteEffect: Identifiable, Equatable, Sendable {
     public let thumbnailUrl: URL?
     /// Sorteervolgorde in het paneel (lager = eerder).
     public let order: Int
+    /// Sticker-fix (2026-09-02): wat voor beeld het effect oplevert. De server
+    /// (`/v1/effects`, DIE_CUT_STYLE_KEYS) is de bron; ontbreekt het veld
+    /// (oude lijst-snapshot) dan `.portrait` = het bestaande gedrag.
+    public let composition: Composition
+
+    /// `portrait`: het onderwerp loopt tot de onderrand door (romp uit beeld) —
+    /// de canvas-transform blijft behouden. `dieCut`: één vrijstaande, rondom
+    /// gesloten vorm (sticker) — de client kadert 'm als content-fit.
+    public enum Composition: String, Sendable, Equatable {
+        case portrait
+        case dieCut = "die_cut"
+    }
+
+    public var isDieCut: Bool { composition == .dieCut }
 
     public var id: String { key }
 
-    public init(key: String, label: String, thumbnailUrl: URL?, order: Int) {
+    public init(
+        key: String, label: String, thumbnailUrl: URL?, order: Int,
+        composition: Composition = .portrait
+    ) {
         self.key = key
         self.label = label
         self.thumbnailUrl = thumbnailUrl
         self.order = order
+        self.composition = composition
     }
 }
 
 extension RemoteEffect: Decodable {
     // Custom init in een extension behoudt de memberwise `init` (voor `fallback`).
     enum CodingKeys: String, CodingKey {
-        case key, label, order
+        case key, label, order, composition
         case thumbnailUrl
     }
 
@@ -50,6 +68,9 @@ extension RemoteEffect: Decodable {
             thumbnailUrl = nil
         }
         order = try c.decodeIfPresent(Int.self, forKey: .order) ?? 0
+        // Onbekende waarde (nieuwere server) → portrait: nooit de lijst laten falen.
+        composition = (try c.decodeIfPresent(String.self, forKey: .composition))
+            .flatMap(Composition.init(rawValue:)) ?? .portrait
     }
 }
 
@@ -63,6 +84,7 @@ extension RemoteEffect: Encodable {
         try c.encode(label, forKey: .label)
         try c.encodeIfPresent(thumbnailUrl?.absoluteString, forKey: .thumbnailUrl)
         try c.encode(order, forKey: .order)
+        try c.encode(composition.rawValue, forKey: .composition)
     }
 }
 
@@ -75,7 +97,7 @@ extension RemoteEffect {
     public static let fallback: [RemoteEffect] = [
         RemoteEffect(key: "balloon", label: "Balloon", thumbnailUrl: nil, order: 10),
         RemoteEffect(key: "windy", label: "Windy", thumbnailUrl: nil, order: 11),
-        RemoteEffect(key: "sticker", label: "Sticker", thumbnailUrl: nil, order: 12),
+        RemoteEffect(key: "sticker", label: "Sticker", thumbnailUrl: nil, order: 12, composition: .dieCut),
         RemoteEffect(key: "flowers", label: "Flowers", thumbnailUrl: nil, order: 13),
         RemoteEffect(key: "3d-head", label: "3D Head", thumbnailUrl: nil, order: 14),
         RemoteEffect(key: "hairy", label: "Hairy", thumbnailUrl: nil, order: 15),

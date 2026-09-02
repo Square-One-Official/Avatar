@@ -23,3 +23,4 @@ Kernregels (samenvatting, details in BOARD.md):
 - Plandocumenten: `~/Documents/Claude/Projects/Aaavatar/` (redesign-audit-en-plan.md, aaavatar-2.0-bouwplan.md, pipeline-audit-2.0.md, figma-design-review.md).
 - Auth 2.0 = e-mail + OTP, geen Google-UI (Google-infra bewaren). Stripe hangt aan Supabase user-id + e-mail; zie E01.7 voor de identiteitstest.
 - Builds: `xcodegen` voor projectgeneratie waar een project.yml ligt; test op beide targets.
+- Release 2.0: runbook in `docs/eng/RELEASE-2.0.md` (artefacten, pipeline, waarom eigen feed + verplichte prerelease, sleutels, rollback); script `scripts/release-v2.sh`. `README.md` beschrijft de repo-indeling (Avatar2/AvatarKit/AvatarUI/backend/admin) — v1-sectie staat eronder als bevroren.

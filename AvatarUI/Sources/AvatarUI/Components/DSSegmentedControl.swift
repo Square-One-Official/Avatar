@@ -45,7 +45,9 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
         .background(DSColor.Background.neutral, in: Capsule())
         .dsMotion(DSMotion.springSmall, value: selection)
         // UXS-25: ←/→ lopen door de segmenten zodra de control focus heeft.
-        .focusable()
+        // Systeemring uit: een muisklik zou anders het lichtblauwe rechthoekje
+        // rond de capsule zetten (Figma heeft die staat niet).
+        .dsKeyboardFocusable()
         .onMoveCommand { direction in
             switch direction {
             case .left:  moveSelection(by: -1)
@@ -95,6 +97,7 @@ public struct DSSegmentedControl<Tag: Hashable>: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
         .onHover { hoveredTag = $0 ? segment.tag : (hoveredTag == segment.tag ? nil : hoveredTag) }
         .dsMotion(DSMotion.micro, value: isHovered)
         .accessibilityLabel(segment.label)

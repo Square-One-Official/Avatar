@@ -3,6 +3,7 @@
 // onaangeraakt. Cutout als externe blob; thumbnails rendert de sidebar
 // uit dezelfde data.
 
+import AvatarKit
 import Foundation
 import SwiftData
 
@@ -18,6 +19,20 @@ final class Portrait2 {
     /// zet bestaande rijen eenmalig op `createdAt` (de bedoelde default —
     /// SwiftData kan niet naar een ander veld defaulten).
     var updatedAt: Date = Date.distantPast
+    /// E50.3: wijzigings-token voor thumbnail-caches en canvas-refresh — GEEN
+    /// sorteersleutel. Elke visuele mutatie moet 'm bumpen: `touch()` doet dat
+    /// (én zet `updatedAt`); `bumpRevision()` bumpt alléén dit token, voor
+    /// set-brede acties en undo/redo die de rasterorde NIET mogen herschudden.
+    /// Wie later een visueel veld schrijft zonder een van beide, krijgt een
+    /// stale thumbnail. Gepersisteerd (lichtgewicht migratie, default 0) zodat
+    /// een opnieuw opgehaalde instance niet op een oude cache-key botst.
+    var revision: Int = 0
+    /// Laatst geopend in de editor (Home toont dit portret als hero). Alléén
+    /// gezet door `ShellModel.openPortrait` — niet door `select(_:)`, want dat
+    /// vuurt ook bij launch/board/undo. Geen sorteersleutel. Lichtgewicht
+    /// migratie via de nil-default; zonder open-historie valt Home terug op
+    /// het nieuwste portret.
+    var lastOpenedAt: Date?
     @Attribute(.externalStorage) var cutoutData: Data
     /// Originele importfoto (E06.2 hold-to-compare): ingedrukt houden toont
     /// dit i.p.v. de cutout. Optioneel + externalStorage; bestaande rijen
@@ -39,8 +54,8 @@ final class Portrait2 {
     @Attribute(.externalStorage) var editSourceData: Data?
     /// Stabiele signature (`Portrait2.cutoutSignature`) van de `cutoutData` waarvan
     /// `editSourceData` de bron is. Stempel om staleness te detecteren: wijkt de
-    /// signature van de huidige `cutoutData` hiervan af (bv. na een undo/redo of een
-    /// Match Lighting die de cutout terugzette/verving), dan hoort `editSourceData`
+    /// signature van de huidige `cutoutData` hiervan af (bv. na een undo/redo van een
+    /// beeld-vervangende edit), dan hoort `editSourceData`
     /// niet meer bij dit beeld → "Remove background" negeert het (geen edit-resurrectie).
     /// Een content-signature i.p.v. alleen `count` zodat twee verschillende cutouts met
     /// toevallig gelijke grootte niet vals matchen.
@@ -221,9 +236,16 @@ final class Portrait2 {
     /// v2 zelf is gemaakt. Lichtgewicht migratie via de nil-default.
     var v1ImportID: String?
 
-    /// Markeer als zojuist bewerkt.
+    /// Markeer als zojuist bewerkt: sorteert naar boven én ververst caches.
     func touch() {
         updatedAt = .now
+        revision += 1
+    }
+
+    /// E50.3: alléén caches/canvas verversen; `updatedAt` (en dus de rasterorde
+    /// en Home "Recent") blijft staan. Voor set-brede acties en undo/redo.
+    func bumpRevision() {
+        revision += 1
     }
 
     /// E24.14: de Adjust-laag als waarde-object (lezen/schrijven van de vier
@@ -264,8 +286,9 @@ final class Portrait2 {
     /// Zet de achtergrond-modus (wist de andere twee velden) + `touch()`. Wist
     /// ook de E40.2-bannerkoppeling; de banner-bron zet 'm daarna expliciet
     /// terug zodat alleen een uit-een-banner overgenomen achtergrond gekoppeld
-    /// blijft.
-    func setBackground(_ background: PortraitBackground) {
+    /// blijft. E50.3: `recordsEdit: false` (set-brede actie + z'n undo) bumpt
+    /// alléén `revision` zodat de rasterorde niet herschudt.
+    func setBackground(_ background: PortraitBackground, recordsEdit: Bool = true) {
         backgroundBannerID = nil
         switch background {
         case .transparent:
@@ -277,7 +300,7 @@ final class Portrait2 {
         case .image(let data):
             useOriginalBackground = false; backgroundColorHex = nil; backgroundImageData = data
         }
-        touch()
+        if recordsEdit { touch() } else { bumpRevision() }
     }
 
     /// E34: de banner-keuze als ÉÉN waarde-object (spiegelt `background`).
@@ -356,4 +379,20 @@ struct PortraitAdjust: Equatable, Sendable {
 
     static let neutral = PortraitAdjust()
     var isNeutral: Bool { self == .neutral }
+}
+
+extension PortraitAdjust {
+    /// E50.3: een belichtings-match (`SetLightingNormalizer.AdjustSuggestion`)
+    /// als Adjust-stand. Brightness/contrast/temperature VERVANGEN de huidige
+    /// waarden (herhaald matchen stapelt niet); saturation is het handmatige
+    /// spoor van de gebruiker en blijft staan. In een extension zodat de
+    /// memberwise/default init van de struct blijven bestaan.
+    init(applying suggestion: SetLightingNormalizer.AdjustSuggestion, keepingSaturationOf current: PortraitAdjust) {
+        self.init(
+            brightness: suggestion.brightness,
+            contrast: suggestion.contrast,
+            saturation: current.saturation,
+            temperature: suggestion.temperature
+        )
+    }
 }
