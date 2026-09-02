@@ -22,7 +22,7 @@ final class EntitlementModelTests: XCTestCase {
     }
 
     private func makeModel() -> EntitlementModel {
-        EntitlementModel(auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession())
+        EntitlementModel(auth: AuthService.isolated(), backendSession: EntitlementStubURLProtocol.makeSession())
     }
 
     /// Vorm uit backend/api/v1/account.ts; alleen de velden die per test
@@ -428,7 +428,7 @@ final class EntitlementModelTests: XCTestCase {
 
     /// De reducer hangt aan het model, niet alleen aan losse argumenten.
     func testActiveToastFollowsModelState() {
-        let model = EntitlementModel(auth: AuthService())
+        let model = EntitlementModel(auth: AuthService.isolated())
         XCTAssertNil(model.activeToast)
 
         model.presentWorking(title: "Applying style", messages: ["…"])
@@ -455,7 +455,7 @@ final class EntitlementModelTests: XCTestCase {
     }
 
     func testInfoToastAppearsAfterWorkingStateEnds() {
-        let model = EntitlementModel(auth: AuthService())
+        let model = EntitlementModel(auth: AuthService.isolated())
         model.presentWorking(title: "Filling in body", messages: ["…"])
         model.presentInfo(title: "Body completed", description: "Press ⌘Z to undo.")
         XCTAssertEqual(
@@ -475,7 +475,7 @@ final class EntitlementModelTests: XCTestCase {
     }
 
     func testWorkingTokenKanGeenNieuwereOperatieDismisssen() {
-        let model = EntitlementModel(auth: AuthService())
+        let model = EntitlementModel(auth: AuthService.isolated())
         let first = model.presentWorking(title: "First", messages: ["…"])
         let second = model.presentWorking(title: "Second", messages: ["…"])
 
@@ -487,7 +487,7 @@ final class EntitlementModelTests: XCTestCase {
     }
 
     func testExclusieveFillBodyStatusBlokkeertAndereAIFeatures() {
-        let model = EntitlementModel(auth: AuthService())
+        let model = EntitlementModel(auth: AuthService.isolated())
         model.presentWorking(
             title: "Filling in body",
             messages: ["…"],
@@ -503,7 +503,7 @@ final class EntitlementModelTests: XCTestCase {
     /// WorkingToastView door) en wordt bij dismiss opgeruimd, zodat een
     /// volgende toast niet met een oude cancel-actie start.
     func testWorkingToastCancelHandlerWordtDoorgegevenEnOpgeruimd() {
-        let model = EntitlementModel(auth: AuthService())
+        let model = EntitlementModel(auth: AuthService.isolated())
         var cancelled = 0
         let id = model.presentWorking(
             title: "Filling in body",

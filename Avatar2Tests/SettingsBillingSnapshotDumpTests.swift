@@ -47,14 +47,14 @@ final class SettingsBillingSnapshotDumpTests: XCTestCase {
     /// initial-session en zou een eerder gezette debug-sessie overschrijven;
     /// eerst laten settelen, dán de sessie zetten.
     private func signedInAuth() async -> AuthService {
-        let auth = AuthService()
+        let auth = AuthService.isolated()
         try? await Task.sleep(for: .milliseconds(250))
         auth.debugSetSession(accessToken: "test-token", email: "t@example.test")
         return auth
     }
 
     private func model(signedIn: Bool, pro: Bool) async -> EntitlementModel {
-        let auth = signedIn ? await signedInAuth() : AuthService()
+        let auth = signedIn ? await signedInAuth() : AuthService.isolated()
         let model = EntitlementModel(auth: auth, backendSession: EntitlementStubURLProtocol.makeSession())
         if signedIn {
             EntitlementStubURLProtocol.setStub(

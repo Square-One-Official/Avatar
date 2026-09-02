@@ -294,7 +294,7 @@ final class PortraitSetActionsTests: XCTestCase {
     // MARK: - Reporter (ShellModel)
 
     func testReporterBusyNilKeepsDoneReceipt() {
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         let reporter = model.setActionReporter
 
         reporter.busy("Matching lighting…")

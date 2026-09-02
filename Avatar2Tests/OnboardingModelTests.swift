@@ -17,7 +17,7 @@ final class OnboardingModelTests: XCTestCase {
         let name = "nl.squareone.aaavatar2.tests.\(suite)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
-        return (OnboardingModel(auth: AuthService(), defaults: defaults), defaults)
+        return (OnboardingModel(auth: AuthService.isolated(), defaults: defaults), defaults)
     }
 
     // MARK: stap-overgangen
@@ -100,7 +100,7 @@ final class OnboardingModelTests: XCTestCase {
         model.skipOnboarding()
         model.finishFromPrivacy()
         model.finishFromDownload()
-        let revived = OnboardingModel(auth: AuthService(), defaults: defaults)
+        let revived = OnboardingModel(auth: AuthService.isolated(), defaults: defaults)
         XCTAssertTrue(revived.hasCompleted)
     }
 

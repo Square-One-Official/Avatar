@@ -11,7 +11,7 @@ final class PrivacyGateTests: XCTestCase {
         defer { prefs.tier = previous }
 
         prefs.tier = .thirdParty
-        let entitlement = EntitlementModel(auth: AuthService())
+        let entitlement = EntitlementModel(auth: AuthService.isolated())
 
         let result = PrivacyGate.evaluate(.imagePlaygroundGenerate, entitlement: entitlement)
         XCTAssertEqual(result, PrivacyGateResult.allowed)
@@ -24,7 +24,7 @@ final class PrivacyGateTests: XCTestCase {
         defer { prefs.tier = previous }
 
         prefs.tier = .onDevice
-        let entitlement = EntitlementModel(auth: AuthService())
+        let entitlement = EntitlementModel(auth: AuthService.isolated())
 
         let result = PrivacyGate.evaluate(.imagePlaygroundGenerate, entitlement: entitlement)
         XCTAssertEqual(
@@ -40,7 +40,7 @@ final class PrivacyGateTests: XCTestCase {
         defer { prefs.tier = previous }
 
         prefs.tier = .onDevice
-        let entitlement = EntitlementModel(auth: AuthService())
+        let entitlement = EntitlementModel(auth: AuthService.isolated())
         var retried = false
         XCTAssertFalse(entitlement.allowAIFeature(.colorise, retry: { retried = true }))
         XCTAssertNotNil(entitlement.privacyElevation)

@@ -20,7 +20,7 @@ final class PersistentPresentationTests: XCTestCase {
     // MARK: - Sign-in flow
 
     func testSignInFlowSurvivesDismissCloudGateWithoutReset() {
-        let entitlement = EntitlementModel(auth: AuthService())
+        let entitlement = EntitlementModel(auth: AuthService.isolated())
         entitlement.presentSignIn()
         entitlement.signInFlow.email = "user@example.com"
         entitlement.signInFlow.phase = .otp
@@ -35,7 +35,7 @@ final class PersistentPresentationTests: XCTestCase {
     }
 
     func testCloseSignInResetsFlow() {
-        let entitlement = EntitlementModel(auth: AuthService())
+        let entitlement = EntitlementModel(auth: AuthService.isolated())
         entitlement.presentSignIn()
         entitlement.signInFlow.email = "user@example.com"
         entitlement.signInFlow.phase = .otp

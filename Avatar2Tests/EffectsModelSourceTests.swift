@@ -29,7 +29,7 @@ final class EffectsModelSourceTests: XCTestCase {
 
     private func makeModel(portrait: Portrait2?, current: NSImage) -> EffectsModel {
         EffectsModel(
-            entitlement: EntitlementModel(auth: AuthService()),
+            entitlement: EntitlementModel(auth: AuthService.isolated()),
             baseImage: current,
             portrait: portrait,
             cutoutImage: current,

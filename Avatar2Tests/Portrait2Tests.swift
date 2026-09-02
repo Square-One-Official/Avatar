@@ -28,7 +28,7 @@ final class Portrait2Tests: XCTestCase {
         let portrait = Portrait2(cutoutData: Data([1]))
         context.insert(portrait)
 
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         model.modelContext = context
         model.select(portrait)
         model.portraitName = "Jan van den Berg"

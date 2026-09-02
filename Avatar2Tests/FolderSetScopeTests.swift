@@ -77,7 +77,7 @@ final class FolderSetScopeTests: XCTestCase {
         let ordered = FolderSetScope.items(in: all, folderID: s.folder.persistentModelID)
             .map(\.persistentModelID)
 
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         // Bestaande selectie buiten de map wordt VERVANGEN (⌘A = scope, geen union).
         model.selectedPortraitIDs = [s.unfiled.persistentModelID]
         model.selectAllPortraits(ordered)
@@ -94,7 +94,7 @@ final class FolderSetScopeTests: XCTestCase {
         let context = try makeContext()
         let s = seed(context)
 
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         model.selectedPortraitIDs = [s.inA.persistentModelID]
         model.selectAllPortraits([])
 

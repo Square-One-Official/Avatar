@@ -15,14 +15,14 @@ import XCTest
 final class ShellModelTests: XCTestCase {
 
     func testStartLeeg() {
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         if case .empty = model.canvas {} else {
             XCTFail("verwacht .empty als startstaat")
         }
     }
 
     func testOnleesbareDataGaatNaarFailed() async {
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         await model.importImage(data: Data([0x00, 0x01, 0x02]))
         if case .failed = model.canvas {} else {
             XCTFail("verwacht .failed bij onleesbare data")
@@ -136,7 +136,7 @@ final class ShellModelTests: XCTestCase {
         let context = try makeContext()
         let portrait = Portrait2(name: "Test", cutoutData: try png(cutout))
         context.insert(portrait)
-        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService()))
+        let model = ShellModel(entitlement: EntitlementModel(auth: AuthService.isolated()))
         model.modelContext = context
         model.select(portrait)
         return (model, portrait, context)
@@ -168,7 +168,7 @@ final class ShellModelTests: XCTestCase {
             { "allowed": false, "imports_used": 3, "imports_remaining": 0 }
             """), forPath: "/v1/import-claim")
         let entitlement = EntitlementModel(
-            auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession()
+            auth: AuthService.isolated(), backendSession: EntitlementStubURLProtocol.makeSession()
         )
         let model = ShellModel(entitlement: entitlement)
         let context = try makeContext()
@@ -197,7 +197,7 @@ final class ShellModelTests: XCTestCase {
             { "allowed": true, "imports_used": 1, "imports_remaining": 2 }
             """), forPath: "/v1/import-claim")
         return EntitlementModel(
-            auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession()
+            auth: AuthService.isolated(), backendSession: EntitlementStubURLProtocol.makeSession()
         )
     }
 
@@ -324,7 +324,7 @@ final class ShellModelTests: XCTestCase {
     }
 
     private func makeStubbedEntitlement() -> EntitlementModel {
-        EntitlementModel(auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession())
+        EntitlementModel(auth: AuthService.isolated(), backendSession: EntitlementStubURLProtocol.makeSession())
     }
 
     private func threeSources() throws -> [ShellModel.ImportSource] {

@@ -41,7 +41,13 @@ public final class AuthService {
     @ObservationIgnored
     private var authStateTask: Task<Void, Never>?
 
-    public init() {
+    /// - Parameter storage: waar de Supabase-sessie leeft. Default is het
+    ///   versleutelde bestand in de app-container. Tests en smokes geven
+    ///   `AuthSessionMemoryStorage()` mee: de unit-test-host draait in
+    ///   dezelfde container als de echte app, en een `signOut()` op de
+    ///   file-storage wist dan het echte sessiebestand én trekt via
+    ///   `/logout?scope=global` alle refresh-tokens van de user in.
+    public init(storage: any AuthLocalStorage = AuthSessionFileStorage()) {
         // flowType .implicit: OTP-verify heeft geen PKCE-verifier nodig en
         // dit houdt de client compatibel met server-geïnitieerde links
         // (zelfde overweging als v1's AuthManager).
@@ -50,7 +56,7 @@ public final class AuthService {
             supabaseKey: SupabaseConfiguration.publishableKey,
             options: SupabaseClientOptions(
                 auth: SupabaseClientOptions.AuthOptions(
-                    storage: AuthSessionFileStorage(),
+                    storage: storage,
                     flowType: .implicit
                 )
             )
