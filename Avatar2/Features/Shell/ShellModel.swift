@@ -231,6 +231,12 @@ final class ShellModel {
     var selectedPortraitIDs: Set<PersistentIdentifier> = []
     @ObservationIgnored private var selectionAnchorID: PersistentIdentifier?
 
+    /// Selectiemodus ("Select images" in de Portraits-header): een plain klik
+    /// op een tegel togglet de selectie i.p.v. het portret te openen — zodat
+    /// je zonder ⌘ een set kunt samenstellen. Eindigt met Done/Esc of bij
+    /// navigatie (samen met de selectie zelf).
+    var isSelectingPortraits = false
+
     func isPortraitSelected(_ portrait: Portrait2) -> Bool {
         selectedPortraitIDs.contains(portrait.persistentModelID)
     }
@@ -238,6 +244,17 @@ final class ShellModel {
     func clearPortraitSelection() {
         selectedPortraitIDs.removeAll()
         selectionAnchorID = nil
+        isSelectingPortraits = false
+    }
+
+    /// Select images ⇄ Done. Done wist ook de selectie: de modus is de
+    /// enige manier waarop die set is opgebouwd, dus 'klaar' = schone lei.
+    func togglePortraitSelectionMode() {
+        if isSelectingPortraits {
+            clearPortraitSelection()
+        } else {
+            isSelectingPortraits = true
+        }
     }
 
     /// Rechtsklik op een portret: selecteer het als het nog niet in de set zit
@@ -269,6 +286,10 @@ final class ShellModel {
         } else if mods.contains(.shift), let anchor = selectionAnchorID,
                   let from = ordered.firstIndex(of: anchor), let to = ordered.firstIndex(of: id) {
             for pid in ordered[min(from, to)...max(from, to)] { selectedPortraitIDs.insert(pid) }
+        } else if isSelectingPortraits {
+            // Selectiemodus: plain klik gedraagt zich als ⌘-klik.
+            if selectedPortraitIDs.contains(id) { selectedPortraitIDs.remove(id) } else { selectedPortraitIDs.insert(id) }
+            selectionAnchorID = id
         } else {
             openPortrait(portrait)
         }

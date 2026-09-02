@@ -120,13 +120,17 @@ struct PortraitsGalleryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap5) {
-            VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                Text(selectedFolder?.name ?? "All portraits")
-                    .dsTextStyle(.h3)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                Text("\(items.count) \(items.count == 1 ? "portrait" : "portraits")")
-                    .dsTextStyle(.bodySmall)
-                    .foregroundStyle(DSColor.Foreground.subtle)
+            HStack(alignment: .center, spacing: DSSpacing.gap4) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap1) {
+                    Text(selectedFolder?.name ?? "All portraits")
+                        .dsTextStyle(.h3)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    Text(subtitle)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                }
+                Spacer(minLength: DSSpacing.gap4)
+                headerActions
             }
             if let folder = selectedFolder {
                 FolderDefaultBackgroundControl(
@@ -146,6 +150,89 @@ struct PortraitsGalleryView: View {
         // Zonder deze z-index winnen de portret-Images de AppKit-laagstrijd
         // (menu onder de foto's) én vangt de dismiss-scrim de tegel-klikken.
         .zIndex(folderBackgroundPickerOpen.wrappedValue ? 1000 : 0)
+    }
+
+    /// "65 portraits" — in selectiemodus met de selectie erbij ("3 of 65 selected").
+    private var subtitle: String {
+        let n = items.count
+        let count = "\(n) \(n == 1 ? "portrait" : "portraits")"
+        guard model.isSelectingPortraits || selectedCount > 0 else { return count }
+        return "\(selectedCount) of \(n) selected"
+    }
+
+    /// Aantal geselecteerde portretten binnen deze lens (ook via ⌘A/⌘-klik).
+    private var selectedCount: Int {
+        items.filter { model.isPortraitSelected($0) }.count
+    }
+
+    private var allSelected: Bool {
+        !items.isEmpty && selectedCount == items.count
+    }
+
+    /// Rechts van de titel (Weeve-stijl neutrale pillen): Select images ⇄ Done
+    /// en Export. Staat álles geselecteerd (⌘A of handmatig), dan wordt de
+    /// eerste knop "Deselect" en wist een klik de selectie + de modus.
+    /// Export werkt op de selectie; zonder selectie op de hele lens.
+    private var headerActions: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            DSNeutralButton(selectButtonTitle) {
+                if allSelected {
+                    model.clearPortraitSelection()
+                } else {
+                    model.togglePortraitSelectionMode()
+                }
+            }
+            .help(selectButtonHelp)
+            DSNeutralButton("Export") { exportFromHeader() }
+                .disabled(items.isEmpty)
+                .help(exportHelp)
+        }
+        // Esc verlaat de selectiemodus (zelfde als Done).
+        .background {
+            if model.isSelectingPortraits {
+                Button("") { model.togglePortraitSelectionMode() }
+                    .keyboardShortcut(.escape, modifiers: [])
+                    .opacity(0)
+            }
+        }
+        .dsMotion(DSMotion.micro, value: model.isSelectingPortraits)
+        .dsMotion(DSMotion.micro, value: allSelected)
+    }
+
+    private var selectButtonTitle: String {
+        if allSelected { return "Deselect" }
+        return model.isSelectingPortraits ? "Done" : "Select images"
+    }
+
+    private var selectButtonHelp: String {
+        if allSelected { return "Deselect all portraits" }
+        return model.isSelectingPortraits ? "Leave selection mode" : "Click portraits to select them"
+    }
+
+    /// Doel van Export: de selectie binnen deze lens, anders alle zichtbare portretten.
+    private var exportTargets: [Portrait2] {
+        let selected = items.filter { model.isPortraitSelected($0) }
+        return selected.isEmpty ? items : selected
+    }
+
+    private var exportHelp: String {
+        let n = exportTargets.count
+        let selected = items.contains { model.isPortraitSelected($0) }
+        if n == 1 { return "Export this portrait" }
+        return selected ? "Export \(n) selected portraits" : "Export all \(n) portraits"
+    }
+
+    /// Eén portret → de DS-export-popup (vorm/maat + Save/Share); meerdere →
+    /// mapkeuze + batch-PNG's (zelfde pad als "Export N portraits…" in het menu).
+    private func exportFromHeader() {
+        let targets = exportTargets
+        guard !targets.isEmpty else { return }
+        if targets.count == 1, let only = targets.first {
+            model.select(only)
+            model.exportCurrentPortrait()
+        } else {
+            PortraitSetActions.export(targets, isPro: model.isPro, reporter: model.setActionReporter)
+        }
     }
 
     private var emptyState: some View {
@@ -232,7 +319,7 @@ struct PortraitGridTile: View {
             .onTapGesture {
                 model.handlePortraitClick(portrait, ordered: ordered(), mods: NSApp.currentEvent?.modifierFlags ?? [])
             }
-            .help("Click to open · ⌘-click to select")
+            .help(model.isSelectingPortraits ? "Click to select" : "Click to open · ⌘-click to select")
             // Sleep een portret naar een map in de left-nav (zie LeftNavView).
             // Een klik zonder beweging blijft 'open'; pas bij verslepen start de drag.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))
