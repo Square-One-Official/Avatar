@@ -137,6 +137,18 @@ tussenvoegsels (van/de/der/von/…) blijven alleen tússen naamdelen, camelCase 
 Gedragswijziging t.o.v. de eerste versie: een bestandsnaam zónder herkenbare naam levert
 geen naam meer op. 4 tests in `ShellModelTests` vervangen (23/23 groen).
 
+**Vervolg 2 (2026-09-02, Thierry: "kunnen we slimmer naam herkennen?"):**
+[PortraitNameResolver.swift](Avatar2/Features/Shell/PortraitNameResolver.swift) — drie lagen:
+(1) beeld-metadata (IPTC ObjectName/Caption/Keywords, TIFF ImageDescription, PNG Title,
+Exif UserComment); (2) on-device model via Foundation Models (macOS 26 + Apple Intelligence
+aan, weak-linked; guided generation, antwoord gevalideerd tegen de input — geen verzonnen
+namen; 4s-timeout); (3) heuristiek `PortraitNameGuess` (bestandsnaam + titel-velden) als
+fallback. De resolutie loopt parallel aan de cutout en wordt pas bij `persist` afgewacht;
+batch-tegels tonen de heuristiek-naam als placeholder. Data-drops (Photos/browser) krijgen
+nu ook een naam als de metadata er een bevat. 8 tests in `PortraitNameResolverTests`
+(model uit; deterministisch). Laag 2 is nog niet live gevalideerd — Apple Intelligence staat
+op de dev-Mac uit; NLTagger afgewezen als fallback (NL geen name-model, EN te wisselvallig).
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een

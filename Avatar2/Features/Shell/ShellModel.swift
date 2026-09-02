@@ -420,10 +420,11 @@ final class ShellModel {
             setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
-        // E36.5 (audit-B5): de bron-bestandsnaam reist mee tot in `persist` als
-        // default-portretnaam — anders heet álles "Untitled" (Home, lenzen,
-        // breadcrumb, Name-veld).
-        await runCutout(on: cgImage, defaultName: Self.defaultPortraitName(from: url))
+        // E36.5 (audit-B5): de naam reist mee tot in `persist` — anders heet
+        // álles "Untitled". De resolutie (metadata → on-device model →
+        // heuristiek, PortraitNameResolver) loopt parallel aan de cutout.
+        let nameTask = Task.detached(priority: .userInitiated) { await PortraitNameResolver.resolve(url: url) }
+        await runCutout(on: cgImage, name: nameTask)
     }
 
     func importImage(data: Data) async {
@@ -432,20 +433,23 @@ final class ShellModel {
             setCanvas(.failed("That file doesn't look like an image we can read."))
             return
         }
-        // Dropped Data zonder bron-URL: geen zinvolle naam beschikbaar → leeg
-        // (UI toont "Untitled" tot de gebruiker een naam invult).
-        await runCutout(on: cgImage)
+        // Dropped Data zonder bron-URL: alleen beeld-metadata kan nog een naam
+        // opleveren (PortraitNameResolver); anders leeg → "Add name".
+        let nameTask = Task.detached(priority: .userInitiated) { await PortraitNameResolver.resolve(data: data) }
+        await runCutout(on: cgImage, name: nameTask)
     }
 
-    /// E36.5 (audit-B5) + naam-extractie: default-portretnaam = de
-    /// persoonsnaam uit de bestandsnaam (`Thierry_Emmery_headshot_2024.jpg` →
-    /// "Thierry Emmery"); camera-ruis als `IMG_4821.HEIC` levert "" op zodat
-    /// het Name-veld "Add name" toont i.p.v. "IMG 4821". Zie PortraitNameGuess.
+    /// E36.5 (audit-B5) + naam-extractie: synchrone heuristiek-naam uit de
+    /// bestandsnaam (`Thierry_Emmery_headshot_2024.jpg` → "Thierry Emmery",
+    /// `IMG_4821.HEIC` → ""). Dient als directe placeholder (batch-tegel);
+    /// de volledige resolutie incl. on-device model zit in PortraitNameResolver.
     static func defaultPortraitName(from url: URL) -> String {
         PortraitNameGuess.name(from: url)
     }
 
-    private func runCutout(on importedImage: CGImage, defaultName: String = "") async {
+    /// `name`: de asynchrone naamresolutie; wordt pas bij `persist` afgewacht
+    /// (begrensd door PortraitNameResolver.modelTimeout).
+    private func runCutout(on importedImage: CGImage, name nameTask: Task<String, Never>? = nil) async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport(
@@ -490,7 +494,7 @@ final class ShellModel {
             setCanvas(.result(cutout))
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
-            persist(cutout: cutout, original: original, name: defaultName)
+            persist(cutout: cutout, original: original, name: await nameTask?.value ?? "")
             // E05.6: eenmalige nudge als de Vision-rand rafelig oogt en het
             // hifi-model nog niet binnen is.
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
@@ -556,7 +560,11 @@ final class ShellModel {
         let cgImage: CGImage
         /// Hetzelfde beeld als NSImage voor de tegel.
         let original: NSImage
-        let name: String
+        /// Direct beschikbare (heuristiek-)naam voor de tegel; wordt vervangen
+        /// door de uitkomst van `nameTask` zodra die er is.
+        var name: String
+        /// Volledige naamresolutie (PortraitNameResolver), afgewacht vóór persist.
+        var nameTask: Task<String, Never>? = nil
         /// Bestemming: de map waarin gedropt is; nil (Home / All portraits) =
         /// unfiled, zonder map-default-achtergrond — net als het single-pad.
         let folderID: PersistentIdentifier?
@@ -667,10 +675,18 @@ final class ShellModel {
             // main zouden de drop-animatie laten haperen.
             guard let decoded = await Self.decodeImport(source) else { continue }
             let name: String
-            if case .file(let url) = source { name = Self.defaultPortraitName(from: url) } else { name = "" }
+            let nameTask: Task<String, Never>
+            switch source {
+            case .file(let url):
+                name = Self.defaultPortraitName(from: url)
+                nameTask = Task.detached(priority: .utility) { await PortraitNameResolver.resolve(url: url) }
+            case .data(let data):
+                name = ""
+                nameTask = Task.detached(priority: .utility) { await PortraitNameResolver.resolve(data: data) }
+            }
             jobs.append(LibraryImportJob(
                 source: source, cgImage: decoded.cgImage, original: nsImage(from: decoded.cgImage),
-                name: name, folderID: folderID
+                name: name, nameTask: nameTask, folderID: folderID
             ))
         }
         guard !jobs.isEmpty else {
@@ -784,8 +800,10 @@ final class ShellModel {
             )
             entitlement.markFirstCutoutCompleted()
             if let modelContext {
+                let resolvedName = await job.nameTask?.value ?? job.name
+                updateLibraryImport(job.id) { $0.name = resolvedName }
                 let portrait = Portrait2(
-                    name: job.name, cutoutData: encoded.cutoutPNG, originalData: encoded.originalPNG
+                    name: resolvedName, cutoutData: encoded.cutoutPNG, originalData: encoded.originalPNG
                 )
                 modelContext.insert(portrait)
                 FolderImportSupport.attachImport(

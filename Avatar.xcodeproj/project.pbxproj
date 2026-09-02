@@ -201,6 +201,7 @@
 		8C5115841322D419BE3EBA80 /* ImagePlaygroundBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60BA406576409CD3BF16452F /* ImagePlaygroundBridge.swift */; };
 		8C7C95E585BA1BC0A626DB7E /* BannerBreadcrumb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B6546E0BE313C07BC46399 /* BannerBreadcrumb.swift */; };
 		8CDD7051F91B18FE99FE8F7E /* BannerPresetsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6D408B55E150C56551DE482 /* BannerPresetsModel.swift */; };
+		8CEF411072AB70A2BEA6981B /* PortraitNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641F9785D37AF1C0411AB33F /* PortraitNameResolver.swift */; };
 		8DB7E689C27640A50DDAB6BB /* SettingsAboutPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA739B3C3E6F3105E436741 /* SettingsAboutPage.swift */; };
 		8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */; };
 		8F3C474B398803948710AE4F /* RemoteThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104DC6671647D23FFB03532A /* RemoteThumbnail.swift */; };
@@ -301,6 +302,7 @@
 		D4817F27762F9D7C51324091 /* PortraitsGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */; };
 		D481897535E17F0376EA1C21 /* ProUpsellToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80857857F8C364DD00524644 /* ProUpsellToastView.swift */; };
 		D4851113A8AB34D81F2CE4EE /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1FE0D21D63DDB8E786DDDF /* SeedData.swift */; };
+		D4B464031D68FA1D50D1A4E6 /* PortraitNameResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B66FE220FAF07BA0E3EACD /* PortraitNameResolverTests.swift */; };
 		D4B598B61B0C0A9912859FDF /* EntitlementModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42425F916AF8200C81E49949 /* EntitlementModel.swift */; };
 		D4B599DCB231023448071EA0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = D94FA301098580AC25AAEE33 /* ZIPFoundation */; };
 		D5239F6F44EDD048CCD08D5F /* Mesh 03.png in Resources */ = {isa = PBXBuildFile; fileRef = 947924202C732493D553BD14 /* Mesh 03.png */; };
@@ -484,6 +486,7 @@
 		6301BF9A9CDE67096FEA91BC /* LocalUpscaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUpscaleTests.swift; sourceTree = "<group>"; };
 		63AE0AD6B2985DE8E51E2498 /* SidebarProQuotaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarProQuotaCard.swift; sourceTree = "<group>"; };
 		63EB8AB21396622AB916B788 /* SettingsAccountPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAccountPage.swift; sourceTree = "<group>"; };
+		641F9785D37AF1C0411AB33F /* PortraitNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitNameResolver.swift; sourceTree = "<group>"; };
 		64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundKit.swift; sourceTree = "<group>"; };
 		654967493F525682771975A5 /* Portrait2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Portrait2.swift; sourceTree = "<group>"; };
 		655F0CB176808F917B442483 /* LibraryImportTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryImportTile.swift; sourceTree = "<group>"; };
@@ -632,6 +635,7 @@
 		E3C2171D215A2F30889765B7 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		E40322E62F6D1D138B1D5E36 /* EditColorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditColorPanel.swift; sourceTree = "<group>"; };
 		E550B398D542F0234C2B9396 /* GoogleGMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleGMark.swift; sourceTree = "<group>"; };
+		E6B66FE220FAF07BA0E3EACD /* PortraitNameResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitNameResolverTests.swift; sourceTree = "<group>"; };
 		E7FCF40ADE1A014274997158 /* BackgroundGenerationCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundGenerationCatalogTests.swift; sourceTree = "<group>"; };
 		EA293E7F1CF952594B0EB25E /* UpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateManager.swift; sourceTree = "<group>"; };
 		EA958F91864FE80D5ACCD898 /* ImageEnhanceUndo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEnhanceUndo.swift; sourceTree = "<group>"; };
@@ -1008,6 +1012,7 @@
 				D31E0E59411AFDA6E80712D5 /* OnboardingModelTests.swift */,
 				BFE12F510A9E1E7C5FD82723 /* PersistentPresentationTests.swift */,
 				6F4C6433C0A7DD0C9E89C753 /* Portrait2Tests.swift */,
+				E6B66FE220FAF07BA0E3EACD /* PortraitNameResolverTests.swift */,
 				088330F9E14CE44B3E6186C8 /* PortraitSetActionsTests.swift */,
 				A7F4BBC106F461A04908F03F /* PrivacyGateTests.swift */,
 				EF790EA6BAB731966821123B /* SettingsBillingSnapshotDumpTests.swift */,
@@ -1119,6 +1124,7 @@
 				C504E7ED42D59197C3971A3A /* LeftNavView.swift */,
 				655F0CB176808F917B442483 /* LibraryImportTile.swift */,
 				1F6D9DAEA422C7F3B7EA595E /* PortraitNameGuess.swift */,
+				641F9785D37AF1C0411AB33F /* PortraitNameResolver.swift */,
 				54369F389DBFE190082A8235 /* PortraitsGalleryView.swift */,
 				E2ABE06E1265C5E505A34429 /* ShellMetrics.swift */,
 				9E2F90C51F873C306E8E73DF /* ShellModel.swift */,
@@ -1566,6 +1572,7 @@
 				9842DF7250CB0EA5FBCE4A53 /* PortraitDragItem.swift in Sources */,
 				694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */,
 				526698446F1F3AF3A17F7E61 /* PortraitNameGuess.swift in Sources */,
+				8CEF411072AB70A2BEA6981B /* PortraitNameResolver.swift in Sources */,
 				A467B165881557A4E0CD4FA1 /* PortraitPickerPanel.swift in Sources */,
 				4EEF7EBE6FC696C28CCC83EB /* PortraitSetActions.swift in Sources */,
 				DE0DCC1271B7B738E33E1F4B /* PortraitSetCommands.swift in Sources */,
@@ -1653,6 +1660,7 @@
 				8DC5BE0C688432689A98EF3E /* OnboardingModelTests.swift in Sources */,
 				B8206C2F61CE578216A90494 /* PersistentPresentationTests.swift in Sources */,
 				B75EB071FBBE2203B62354C2 /* Portrait2Tests.swift in Sources */,
+				D4B464031D68FA1D50D1A4E6 /* PortraitNameResolverTests.swift in Sources */,
 				8ABF0C659D081D6AF2BAA68D /* PortraitSetActionsTests.swift in Sources */,
 				71F32905E25A2A0995ADAC68 /* PrivacyGateTests.swift in Sources */,
 				0398057439A020190662F016 /* SettingsBillingSnapshotDumpTests.swift in Sources */,
@@ -1757,7 +1765,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.0.0;
-				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground";
+				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;
 				PRODUCT_NAME = "Aaavatar 2";
@@ -1923,7 +1931,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 2.0.0;
-				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground";
+				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;
 				PRODUCT_NAME = "Aaavatar 2";

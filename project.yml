@@ -265,7 +265,7 @@ targets:
         ENABLE_PREVIEWS: YES
         COMBINE_HIDPI_IMAGES: YES
         CODE_SIGN_ENTITLEMENTS: Avatar2/Avatar2.entitlements
-        OTHER_LDFLAGS: "$(inherited) -weak_framework ImagePlayground"
+        OTHER_LDFLAGS: "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels"
     scheme:
       testTargets:
         - Avatar2Tests
