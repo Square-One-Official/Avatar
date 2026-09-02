@@ -21,10 +21,20 @@ import SwiftUI
 
 // MARK: - Plaatsing (SwiftUI-space; de host rekent om naar scherm)
 
+/// Waarbinnen een verankerd menu geklemd wordt.
+public enum DSFloatingBounds: Equatable {
+    /// Contextmenu: mag over de vensterrand heen, klemt op het scherm.
+    case screen
+    /// Popover-achtig paneel (bv. de achtergrond-kiezer): blijft binnen het
+    /// hostvenster — een groot paneel dat half buiten het venster hangt oogt
+    /// als een bug, niet als een menu.
+    case window
+}
+
 public enum DSFloatingPlacement: Equatable {
     /// Menu: linksboven van de inhoud op dit punt in SwiftUI `.global`;
-    /// geklemd binnen het zichtbare scherm.
-    case anchoredTopLeft(CGPoint)
+    /// geklemd binnen `bounds` (scherm of hostvenster).
+    case anchoredTopLeft(CGPoint, bounds: DSFloatingBounds = .screen)
     /// Toast: in een hoek van het hostvenster, `padding` van de rand.
     case corner(Alignment, padding: CGFloat)
 }
@@ -33,7 +43,7 @@ public enum DSFloatingPlacement: Equatable {
 
 enum DSFloatingLayout {
     enum Placement: Equatable {
-        case anchoredTopLeft(CGPoint)
+        case anchoredTopLeft(CGPoint, bounds: DSFloatingBounds)
         case corner(Alignment, padding: CGFloat)
     }
 
@@ -46,7 +56,8 @@ enum DSFloatingLayout {
     }
 
     /// Waar de inhoud (zónder schaduwmarge) op het scherm komt.
-    /// - anchoredTopLeft: op het anker; klemt binnen `screen` met `padding`.
+    /// - anchoredTopLeft: op het anker; klemt met `padding` binnen `screen`
+    ///   (`.screen`) of binnen het zichtbare deel van `parent` (`.window`).
     ///   Past het niet, dan blijft de linker-/bovenrand zichtbaar.
     /// - corner: hoek van `parent` (content-rect van het hostvenster).
     static func contentFrame(
@@ -57,13 +68,24 @@ enum DSFloatingLayout {
         padding: CGFloat = DSSpacing.gap2
     ) -> CGRect {
         switch placement {
-        case .anchoredTopLeft(let topLeft):
+        case .anchoredTopLeft(let topLeft, let bounds):
+            // `.window`: klem op het zichtbare deel van het hostvenster; past
+            // de inhoud daar (per as) niet in, dan op het scherm — een paneel
+            // dat over de vensterrand valt is beter dan één die van het
+            // scherm af valt.
+            var hBox = screen
+            var vBox = screen
+            if bounds == .window {
+                let visible = parent.intersection(screen)
+                if !visible.isNull, visible.width - 2 * padding >= size.width { hBox = visible }
+                if !visible.isNull, visible.height - 2 * padding >= size.height { vBox = visible }
+            }
             let x = min(
-                max(topLeft.x, screen.minX + padding),
-                max(screen.minX + padding, screen.maxX - size.width - padding)
+                max(topLeft.x, hBox.minX + padding),
+                max(hBox.minX + padding, hBox.maxX - size.width - padding)
             )
-            let upper = screen.maxY - padding
-            let lower = screen.minY + padding + size.height
+            let upper = vBox.maxY - padding
+            let lower = vBox.minY + padding + size.height
             let top = max(min(topLeft.y, upper), min(lower, upper))
             return CGRect(x: x, y: top - size.height, width: size.width, height: size.height)
         case .corner(let alignment, let inset):
@@ -83,8 +105,10 @@ enum DSFloatingLayout {
         }
     }
 
-    /// Menu's mogen over de vensterrand heen (clip = scherm); toasts blijven
-    /// binnen het hostvenster (clip = parent), net als de oude overlay.
+    /// Menu's mogen over de vensterrand heen (clip = scherm) — ook een
+    /// venster-geklemd paneel: z'n schaduw mag als bij een popover over de
+    /// vensterrand vallen. Toasts blijven binnen het hostvenster (clip =
+    /// parent), net als de oude overlay.
     static func clipRect(placement: Placement, parent: CGRect, screen: CGRect) -> CGRect {
         switch placement {
         case .anchoredTopLeft: return screen
@@ -122,13 +146,34 @@ public enum DSFloatingMode {
     /// `.dsSlide(.trailing)` (reduce motion → alleen fade).
     case toast
 
-    /// Schaduwmarge rond de inhoud. Menu: `dsMenuSurface` (radius 12, y 12).
-    /// Toast: DSToast (radius 40, y 40 — de gehalveerde Shadows/Default).
+    /// Schaduwmarge rond de inhoud: de panel is de clip-regio, dus de marge
+    /// moet de héle blur bevatten. Een SwiftUI-`shadow(radius:)` loopt ~3×
+    /// de radius door; een krappere marge knipt de schaduw hard af tot een
+    /// rechthoek rond de kaart. Menu: `dsMenuSurface` (`DSPanelShadow`);
+    /// toast: DSToast (de gehalveerde Shadows/Default).
     var margin: NSEdgeInsets {
         switch self {
-        case .menu: return NSEdgeInsets(top: 12, left: 24, bottom: 36, right: 24)
-        case .toast: return NSEdgeInsets(top: 40, left: 80, bottom: 120, right: 80)
+        case .menu:
+            return Self.shadowMargin(radius: DSPanelShadow.radius, yOffset: DSPanelShadow.yOffset)
+        case .toast:
+            return Self.shadowMargin(
+                radius: DSShadow.default.radius / 2,
+                yOffset: DSShadow.default.offset.height / 2
+            )
         }
+    }
+
+    /// Hoeveel een `shadow(radius:y:)` buiten de inhoud kan tekenen.
+    static let shadowBlurExtent: CGFloat = 3
+
+    static func shadowMargin(radius: CGFloat, yOffset: CGFloat) -> NSEdgeInsets {
+        let blur = radius * shadowBlurExtent
+        return NSEdgeInsets(
+            top: max(0, blur - yOffset),
+            left: blur,
+            bottom: blur + yOffset,
+            right: blur
+        )
     }
 
     var isMenu: Bool {
@@ -489,11 +534,11 @@ struct DSFloatingWindowHost<Identity: Equatable>: NSViewRepresentable {
         switch placement {
         case .corner(let alignment, let padding):
             return .corner(alignment, padding: padding)
-        case .anchoredTopLeft(let global):
+        case .anchoredTopLeft(let global, let bounds):
             let local = CGPoint(x: global.x - hostGlobalFrame.minX, y: global.y - hostGlobalFrame.minY)
-            guard let window = view.window else { return .anchoredTopLeft(local) }
+            guard let window = view.window else { return .anchoredTopLeft(local, bounds: bounds) }
             let inWindow = view.convert(local, to: nil)
-            return .anchoredTopLeft(window.convertPoint(toScreen: inWindow))
+            return .anchoredTopLeft(window.convertPoint(toScreen: inWindow), bounds: bounds)
         }
     }
 }

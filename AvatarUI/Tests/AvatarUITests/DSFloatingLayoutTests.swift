@@ -14,7 +14,7 @@ final class DSFloatingLayoutTests: XCTestCase {
 
     func testMenuOpensAtAnchorTopLeft() {
         let frame = DSFloatingLayout.contentFrame(
-            placement: .anchoredTopLeft(CGPoint(x: 500, y: 400)),
+            placement: .anchoredTopLeft(CGPoint(x: 500, y: 400), bounds: .screen),
             size: CGSize(width: 220, height: 300),
             parent: parent, screen: screen
         )
@@ -27,7 +27,7 @@ final class DSFloatingLayoutTests: XCTestCase {
         // Anker onderin het venster: het menu steekt onder de vensterrand uit
         // (parent.minY = 100) maar blijft binnen het scherm.
         let frame = DSFloatingLayout.contentFrame(
-            placement: .anchoredTopLeft(CGPoint(x: 1300, y: 150)),
+            placement: .anchoredTopLeft(CGPoint(x: 1300, y: 150), bounds: .screen),
             size: CGSize(width: 220, height: 300),
             parent: parent, screen: screen
         )
@@ -35,14 +35,66 @@ final class DSFloatingLayoutTests: XCTestCase {
         XCTAssertEqual(frame.minY, screen.minY + DSSpacing.gap2)
         XCTAssertEqual(frame.maxX, screen.maxX - DSSpacing.gap2)
         XCTAssertEqual(
-            DSFloatingLayout.clipRect(placement: .anchoredTopLeft(.zero), parent: parent, screen: screen),
+            DSFloatingLayout.clipRect(placement: .anchoredTopLeft(.zero, bounds: .screen), parent: parent, screen: screen),
             screen
         )
     }
 
+    func testWindowBoundedPanelStaysInsideParent() {
+        // Achtergrond-kiezer (440 breed) geopend op een klik rechtsonder in
+        // het venster: schuift naar binnen i.p.v. over de vensterrand.
+        let placement = DSFloatingLayout.Placement.anchoredTopLeft(CGPoint(x: 1100, y: 250), bounds: .window)
+        let frame = DSFloatingLayout.contentFrame(
+            placement: placement,
+            size: CGSize(width: 472, height: 560),
+            parent: parent, screen: screen
+        )
+        XCTAssertEqual(frame.maxX, parent.maxX - DSSpacing.gap2)
+        XCTAssertEqual(frame.minY, parent.minY + DSSpacing.gap2)
+        XCTAssertGreaterThanOrEqual(frame.minX, parent.minX)
+        XCTAssertLessThanOrEqual(frame.maxY, parent.maxY)
+        // De schaduw mag wél over de vensterrand (clip = scherm, als een popover).
+        XCTAssertEqual(DSFloatingLayout.clipRect(placement: placement, parent: parent, screen: screen), screen)
+    }
+
+    func testWindowBoundedPanelFallsBackToScreenWhenParentIsTooSmall() {
+        // Venster grotendeels van het scherm af (zichtbaar deel 240 breed):
+        // het paneel past daar niet in → klemmen op het scherm, per as.
+        let offscreenParent = CGRect(x: 1200, y: 100, width: 1000, height: 600)
+        let frame = DSFloatingLayout.contentFrame(
+            placement: .anchoredTopLeft(CGPoint(x: 2000, y: 600), bounds: .window),
+            size: CGSize(width: 472, height: 400),
+            parent: offscreenParent, screen: screen
+        )
+        XCTAssertEqual(frame.maxX, screen.maxX - DSSpacing.gap2)
+        XCTAssertEqual(frame.maxY, 600, "verticaal past het wél in het venster → op het anker")
+        // Paneel hoger dan het venster: verticaal op het scherm, horizontaal in het venster.
+        let tall = DSFloatingLayout.contentFrame(
+            placement: .anchoredTopLeft(CGPoint(x: 900, y: 150), bounds: .window),
+            size: CGSize(width: 472, height: 700),
+            parent: parent, screen: screen
+        )
+        XCTAssertEqual(tall.maxX, parent.maxX - DSSpacing.gap2)
+        XCTAssertEqual(tall.minY, screen.minY + DSSpacing.gap2)
+    }
+
+    func testMarginsContainTheFullShadowBlur() {
+        // Menu: dsMenuSurface-schaduw (radius 12, y 12) → 36 opzij, 24 boven, 48 onder.
+        let menu = DSFloatingMode.menu(onDismiss: {}).margin
+        XCTAssertEqual(menu.left, DSPanelShadow.radius * DSFloatingMode.shadowBlurExtent)
+        XCTAssertEqual(menu.right, menu.left)
+        XCTAssertEqual(menu.top, menu.left - DSPanelShadow.yOffset)
+        XCTAssertEqual(menu.bottom, menu.left + DSPanelShadow.yOffset)
+        // Toast: gehalveerde Shadows/Default.
+        let toast = DSFloatingMode.toast.margin
+        let toastRadius = DSShadow.default.radius / 2
+        XCTAssertEqual(toast.left, toastRadius * DSFloatingMode.shadowBlurExtent)
+        XCTAssertEqual(toast.bottom, toast.left + DSShadow.default.offset.height / 2)
+    }
+
     func testOversizedMenuKeepsTopAndLeadingEdgeVisible() {
         let frame = DSFloatingLayout.contentFrame(
-            placement: .anchoredTopLeft(CGPoint(x: 700, y: 500)),
+            placement: .anchoredTopLeft(CGPoint(x: 700, y: 500), bounds: .screen),
             size: CGSize(width: 2000, height: 2000),
             parent: parent, screen: screen
         )

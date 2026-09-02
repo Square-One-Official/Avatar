@@ -229,22 +229,27 @@ enum DSContextMenuPlacement {
 // MARK: - Overlay + scrim
 
 /// Scrim in-window (klik-buiten binnen het hostvenster) + het menu in een
-/// child window op het anker. Het menu wordt op z'n échte maat gemeten en op
-/// het scherm geklemd; `menuWidth`/`menuHeight` blijven in de signature voor
-/// bestaande call sites maar sturen de plaatsing niet meer.
+/// child window op het anker. Het menu wordt op z'n échte maat gemeten en
+/// geklemd binnen `bounds` (default: het scherm, zoals een native NSMenu;
+/// `.window` voor grote popover-achtige panelen). `menuWidth`/`menuHeight`
+/// blijven in de signature voor bestaande call sites maar sturen de
+/// plaatsing niet meer.
 public struct DSContextMenuOverlay<Menu: View>: View {
     private let anchor: CGRect
+    private let bounds: DSFloatingBounds
     private let onDismiss: () -> Void
     private let menu: Menu
 
     public init(
         anchor: CGRect,
+        bounds: DSFloatingBounds = .screen,
         onDismiss: @escaping () -> Void,
         menuWidth _: CGFloat = 220,
         menuHeight _: CGFloat = 260,
         @ViewBuilder menu: () -> Menu
     ) {
         self.anchor = anchor
+        self.bounds = bounds
         self.onDismiss = onDismiss
         self.menu = menu()
     }
@@ -255,7 +260,10 @@ public struct DSContextMenuOverlay<Menu: View>: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onDismiss)
             DSFloatingWindowAnchor(
-                placement: .anchoredTopLeft(DSContextMenuPlacement.preferredTopLeft(anchor: anchor)),
+                placement: .anchoredTopLeft(
+                    DSContextMenuPlacement.preferredTopLeft(anchor: anchor),
+                    bounds: bounds
+                ),
                 mode: .menu(onDismiss: onDismiss),
                 identity: anchor
             ) {
