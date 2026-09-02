@@ -45,6 +45,9 @@ final class ShellModelTests: XCTestCase {
         XCTAssertEqual(naam("ThierryEmmery.png"), "Thierry Emmery")
         XCTAssertEqual(naam("EMMERY_THIERRY.png"), "Emmery Thierry")
         XCTAssertEqual(naam("Anne-Marie O'Neill.png"), "Anne Marie O'Neill")
+        XCTAssertEqual(naam("thierry2.jpg"), "Thierry", "aangeplakte cijfers vallen af")
+        XCTAssertEqual(naam("JanJansen2.png"), "Jan Jansen")
+        XCTAssertEqual(naam("2024_anna01.HEIC"), "Anna")
     }
 
     func testDefaultNaamIsLeegZonderPersoonsnaam() {

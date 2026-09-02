@@ -78,9 +78,11 @@ enum PortraitNameGuess {
     }
 
     /// Token → naamdeel, tussenvoegsel of ruis (nil).
-    private static func classify(_ raw: String) -> Token? {
-        // Apostrofs/accenten mogen; cijfers of andere tekens = ruis
-        // (IMG_4821, 2024, 20240902, v2, 1x, 400px, p1).
+    private static func classify(_ token: String) -> Token? {
+        // Cijfers aan de randen vallen af ("thierry2", "anna01", "2024anna" →
+        // naam; "img4821" → "img" → ruis; "p1"/"v2"/"1x" → één letter → ruis;
+        // "400px" → "px" → ruis). Cijfers middenin (h2o) of andere tekens = ruis.
+        let raw = String(token.drop(while: \.isNumber).reversed().drop(while: \.isNumber).reversed())
         guard !raw.isEmpty, raw.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "’" }) else { return nil }
         let lower = raw.lowercased()
         if particles.contains(lower) { return .particle(lower) }
