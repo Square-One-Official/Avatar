@@ -37,7 +37,8 @@ struct OnboardingStepPrivacy: View {
                     title: Loc.onboardingPrivacyLocalTitle,
                     badge: Loc.onboardingPrivacyLocalRecommended,
                     detail: Loc.onboardingPrivacyLocalBody,
-                    icon: "lock.shield"
+                    icon: "lock.shield",
+                    position: (1, 2)
                 ) {
                     prefs.mode = .localOnly
                 }
@@ -46,12 +47,23 @@ struct OnboardingStepPrivacy: View {
                     title: Loc.onboardingPrivacyCloudTitle,
                     badge: nil,
                     detail: Loc.onboardingPrivacyCloudBody,
-                    icon: "cloud"
+                    icon: "cloud",
+                    position: (2, 2)
                 ) {
                     prefs.mode = .cloudAllowed
                 }
             }
             .padding(.horizontal, 28)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Loc.onboardingPrivacyTitle)
+            .focusable()
+            .onMoveCommand { direction in
+                switch direction {
+                case .up: prefs.mode = .localOnly
+                case .down: prefs.mode = .cloudAllowed
+                default: break
+                }
+            }
 
             Button(action: onContinue) {
                 Text(Loc.onboardingContinue)
@@ -60,7 +72,7 @@ struct OnboardingStepPrivacy: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.appBrand)
+                            .fill(Color.appBrandSolid)
                     )
                     .foregroundStyle(.white)
             }

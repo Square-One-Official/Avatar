@@ -22,7 +22,7 @@ struct ImportDropZone: View {
                 Button(action: pickFiles) {
                     Text(Loc.orBrowseFiles)
                         .font(.body.weight(.medium))
-                        .foregroundStyle(dropZoneBlue)
+                        .foregroundStyle(Color.appBrandInk)
                         .underline()
                 }
                 .buttonStyle(.plain)
@@ -51,9 +51,12 @@ struct ImportDropZone: View {
             if let banner = appState.errorBanner {
                 VStack {
                     Spacer()
-                    StatusChip(severity: banner.severity,
-                               message: banner.message,
-                               onDismiss: { appState.dismissBanner() })
+                    StatusChip(
+                        severity: banner.severity,
+                        message: banner.message,
+                        onDismiss: { appState.dismissBanner() },
+                        action: banner.statusChipAction(appState: appState)
+                    )
                         .padding(.bottom, 24)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }

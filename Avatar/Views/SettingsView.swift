@@ -41,6 +41,7 @@ struct SettingsView: View {
         .sheet(isPresented: $appState.showProUpgradeSheetInSettings) {
             ProUpgradeSheet()
                 .environment(appState)
+                .environment(appState.privacyPrefs)
         }
     }
 }
@@ -617,6 +618,8 @@ private struct BackgroundSettingsCard: View {
 
 struct AccountSettings: View {
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyPreferences.self) private var privacyPrefs
+    @State private var showRecoverProSheet = false
 
     var body: some View {
         ScrollView {
@@ -756,7 +759,9 @@ struct AccountSettings: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(Loc.proSectionTitle)
                         .font(.headline)
-                    Text(Loc.proSectionSubtitle)
+                    Text(privacyPrefs.cloudAllowed
+                         ? Loc.proSectionSubtitle
+                         : Loc.proSectionSubtitleLocalOnly)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -803,8 +808,20 @@ struct AccountSettings: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
+            Button {
+                showRecoverProSheet = true
+            } label: {
+                Text(Loc.recoverProLink)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
         }
         .padding(8)
+        .sheet(isPresented: $showRecoverProSheet) {
+            RecoverProSheet()
+                .environment(appState)
+        }
     }
 
     @MainActor

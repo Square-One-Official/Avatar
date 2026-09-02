@@ -12,6 +12,8 @@ struct OnboardingStepAuth: View {
     /// Host advances to the privacy step.
     let advance: () -> Void
 
+    @State private var showRecoverProSheet = false
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
@@ -57,11 +59,29 @@ struct OnboardingStepAuth: View {
                         .padding(.vertical, 8)
                 }
                 .buttonStyle(PressableButtonStyle())
+
+                // Restore Pro for users who paid before signing in on
+                // another Mac / install. Secondary (not tertiary) so the
+                // link clears contrast while staying quieter than Google.
+                Button {
+                    showRecoverProSheet = true
+                } label: {
+                    Text(Loc.recoverProLink)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 22)
         }
         .motionAwareAnimation(.easeOut(duration: 0.18), value: appState.auth.lastSignInError)
+        .sheet(isPresented: $showRecoverProSheet) {
+            RecoverProSheet()
+                .environment(appState)
+        }
         .onChange(of: appState.auth.isSignedIn) { _, signedIn in
             // Auto-advance on sign-in — the user expressed clear intent,
             // they shouldn't have to come back and click "Continue".

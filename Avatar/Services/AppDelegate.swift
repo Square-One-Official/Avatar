@@ -17,6 +17,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.modelContainer = container
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Clears a stuck Google OAuth spinner when the user returns from
+        // the browser without completing sign-in.
+        appState?.auth.handleAppBecameActive()
+    }
+
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
 

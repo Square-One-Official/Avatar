@@ -57,11 +57,20 @@ struct LibraryView: View {
     // MARK: - Subviews
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            portraits.isEmpty ? Loc.noPortraitsYet : Loc.noResults,
-            systemImage: "person.crop.rectangle",
-            description: Text(portraits.isEmpty ? Loc.importToStart : Loc.adjustSearch)
-        )
+        VStack(spacing: 16) {
+            ContentUnavailableView(
+                portraits.isEmpty ? Loc.noPortraitsYet : Loc.noResults,
+                systemImage: "person.crop.rectangle",
+                description: Text(portraits.isEmpty ? Loc.importToStart : Loc.adjustSearch)
+            )
+            if portraits.isEmpty {
+                Button(Loc.importPhoto) {
+                    PortraitLibrary.importFromOpenPanel(context: context, appState: appState)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+            }
+        }
         .frame(maxHeight: .infinity)
     }
 

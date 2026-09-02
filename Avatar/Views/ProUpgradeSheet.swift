@@ -17,6 +17,7 @@ import AppKit
 struct ProUpgradeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(PrivacyPreferences.self) private var privacyPrefs
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -244,9 +245,13 @@ struct ProUpgradeSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 featureRow(Loc.proPlanFeatureUnlimited)
                 featureRow(Loc.proPlanFeatureBatch(ProLimits.maxBatchImport))
-                featureRow(Loc.proPlanFeatureCutout)
-                featureRow(Loc.proPlanFeatureHair)
-                featureRow(Loc.proPlanFeatureCredits)
+                if privacyPrefs.cloudAllowed {
+                    featureRow(Loc.proPlanFeatureCutout)
+                    featureRow(Loc.proPlanFeatureHair)
+                    featureRow(Loc.proPlanFeatureCredits)
+                } else {
+                    featureRow(Loc.proPlanFeatureCloudWhenAllowed)
+                }
             }
 
             // Pre-auth checkout: tap Subscribe → straight to Stripe. Stripe

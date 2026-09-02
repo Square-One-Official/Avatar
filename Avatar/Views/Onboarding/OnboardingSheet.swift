@@ -10,6 +10,7 @@ import SwiftUI
 struct OnboardingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var appState
     @Environment(PrivacyPreferences.self) private var prefs
 
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
@@ -51,10 +52,11 @@ struct OnboardingSheet: View {
             .transition(.opacity)
             .id(step)
 
-            // Back row hidden on step 1. ⎋ jumps back when visible — the
-            // default cancel binding goes here rather than dismissing the
-            // sheet so users can't accidentally bail mid-flow.
-            if step > .auth {
+            // Back row: hidden on auth, and on privacy when already signed in
+            // (going back would re-show a Google CTA that no longer applies).
+            // ⎋ jumps back when visible — cancel binding stays here rather
+            // than dismissing the sheet mid-flow.
+            if showsBackButton {
                 HStack {
                     Button {
                         goBack()
@@ -77,10 +79,32 @@ struct OnboardingSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.appCanvas)
         .background(WindowBackgroundPainter(colorScheme: colorScheme).frame(width: 0, height: 0))
+        // Privacy consent is required — Esc / click-outside must not skip it.
+        .interactiveDismissDisabled(true)
         .motionAwareAnimation(.easeOut(duration: 0.22), value: step)
+        .onAppear { skipAuthIfSignedIn() }
+        .onChange(of: appState.auth.isSignedIn) { _, signedIn in
+            if signedIn { skipAuthIfSignedIn() }
+        }
+    }
+
+    /// Back is available after auth, except on privacy when the user is
+    /// already signed in — that step was the entry point for them.
+    private var showsBackButton: Bool {
+        switch step {
+        case .auth: return false
+        case .privacy: return !appState.auth.isSignedIn
+        case .engine: return true
+        }
     }
 
     // MARK: - Step transitions
+
+    private func skipAuthIfSignedIn() {
+        if appState.auth.isSignedIn, step == .auth {
+            step = .privacy
+        }
+    }
 
     private func advanceFromAuth() {
         step = .privacy
@@ -99,9 +123,15 @@ struct OnboardingSheet: View {
 
     private func goBack() {
         switch step {
-        case .auth: break
-        case .privacy: step = .auth
-        case .engine: step = .privacy
+        case .auth:
+            break
+        case .privacy:
+            // Signed-in users never land on auth; don't send them there.
+            if !appState.auth.isSignedIn {
+                step = .auth
+            }
+        case .engine:
+            step = .privacy
         }
     }
 

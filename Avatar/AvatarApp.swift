@@ -14,9 +14,18 @@ extension Color {
     /// Slightly elevated surface for cards, search bars, preset tiles.
     static let appSurface = Color(nsColor: .appSurface)
 
-    /// Brand periwinkle blue. Primary action color — CTAs, links, drop-zone
-    /// accents, Pro upsell surfaces. Same value in light and dark mode.
+    /// Brand periwinkle blue. Accents, selection rings, icons on dark canvas.
+    /// Too light for white label text — use `appBrandSolid` for filled CTAs
+    /// and `appBrandInk` for text links on light surfaces.
     static let appBrand = Color(red: 0x5E / 255.0, green: 0x99 / 255.0, blue: 1.0)
+
+    /// Darker brand fill for primary buttons so white labels clear WCAG AA
+    /// (white on `#1E5FCC` ≈ 5.9:1). Same value in light and dark mode.
+    static let appBrandSolid = Color(red: 0x1E / 255.0, green: 0x5F / 255.0, blue: 0xCC / 255.0)
+
+    /// Brand text/link color that adapts per appearance. Light mode uses a
+    /// deep blue (≥4.5:1 on window canvas); dark mode keeps the periwinkle.
+    static let appBrandInk = Color(nsColor: .appBrandInk)
 
     // MARK: Status palette
     //
@@ -55,6 +64,15 @@ extension NSColor {
             return NSColor(srgbRed: 0x16/255, green: 0x16/255, blue: 0x18/255, alpha: 1)
         }
         return .controlBackgroundColor
+    }
+
+    /// Text/link brand ink. Light: deep blue for AA on window canvas.
+    /// Dark: same periwinkle as `Color.appBrand` (≈7:1 on near-black).
+    static let appBrandInk = NSColor(name: NSColor.Name("appBrandInk")) { appearance in
+        if appearance.isDarkMode {
+            return NSColor(srgbRed: 0x5E/255, green: 0x99/255, blue: 1, alpha: 1)
+        }
+        return NSColor(srgbRed: 0x1A/255, green: 0x4F/255, blue: 0xA8/255, alpha: 1)
     }
 
     // MARK: - Status palette implementations

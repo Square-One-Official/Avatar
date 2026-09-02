@@ -14,9 +14,41 @@ extension FocusedValues {
     }
 }
 
+/// Editor enhance actions published by `EnhancePanel` so the menu bar can
+/// drive the same apply/undo/reset paths as the inspector tiles.
+struct EnhanceCommands {
+    var autoAlign: () -> Void = {}
+    var canAutoAlign = false
+    var toggleMagicRetouch: () -> Void = {}
+    var canMagicRetouch = false
+    var isMagicRetouched = false
+    var toggleFillBody: () -> Void = {}
+    var canFillBody = false
+    var isFillBodyApplied = false
+    var showFillBody = false
+    var toggleColorize: () -> Void = {}
+    var canColorize = false
+    var isColorized = false
+    var showColorize = false
+    var resetAdjustments: () -> Void = {}
+    var canResetAdjustments = false
+}
+
+private struct EnhanceCommandsKey: FocusedValueKey {
+    typealias Value = EnhanceCommands
+}
+
+extension FocusedValues {
+    var enhanceCommands: EnhanceCommands? {
+        get { self[EnhanceCommandsKey.self] }
+        set { self[EnhanceCommandsKey.self] = newValue }
+    }
+}
+
 /// File / Edit / View / Find commands. Debug stays in `AvatarApp`.
 struct AvatarCommands: Commands {
     @FocusedValue(\.appState) private var appState
+    @FocusedValue(\.enhanceCommands) private var enhance
     @AppStorage("showAlignmentGuide") private var showAlignmentGuide = false
 
     private var canExport: Bool { !(appState?.selectedPortraitIDs.isEmpty ?? true) }
@@ -81,6 +113,49 @@ struct AvatarCommands: Commands {
             Divider()
 
             Toggle(Loc.alignmentShowGuide, isOn: $showAlignmentGuide)
+        }
+
+        CommandMenu(Loc.enhanceMenu) {
+            Button(Loc.autoAlignFace) {
+                enhance?.autoAlign()
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
+            .disabled(!(enhance?.canAutoAlign ?? false))
+
+            Divider()
+
+            Toggle(Loc.magicRetouch, isOn: Binding(
+                get: { enhance?.isMagicRetouched ?? false },
+                set: { _ in enhance?.toggleMagicRetouch() }
+            ))
+            .keyboardShortcut("r")
+            .disabled(!(enhance?.canMagicRetouch ?? false))
+
+            if enhance?.showFillBody ?? false {
+                Toggle(Loc.fillBody, isOn: Binding(
+                    get: { enhance?.isFillBodyApplied ?? false },
+                    set: { _ in enhance?.toggleFillBody() }
+                ))
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!(enhance?.canFillBody ?? false))
+            }
+
+            if enhance?.showColorize ?? false {
+                Toggle(Loc.colorize, isOn: Binding(
+                    get: { enhance?.isColorized ?? false },
+                    set: { _ in enhance?.toggleColorize() }
+                ))
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                .disabled(!(enhance?.canColorize ?? false))
+            }
+
+            Divider()
+
+            Button(Loc.resetAdjustments) {
+                enhance?.resetAdjustments()
+            }
+            .keyboardShortcut("r", modifiers: [.command, .option])
+            .disabled(!(enhance?.canResetAdjustments ?? false))
         }
     }
 

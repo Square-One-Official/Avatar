@@ -332,7 +332,7 @@ enum ImportFlow {
         // signed PUT URL request that the privacy mode is supposed to
         // block. The CTA points at the only place to flip the switch.
         guard appState.privacyPrefs.cloudAllowed else {
-            appState.note(Loc.reprocessRequiresCloudAI)
+            appState.noteCloudAIRequired(Loc.reprocessRequiresCloudAI)
             return
         }
         guard appState.proEntitlement.canUseProCutout else {
@@ -497,7 +497,7 @@ enum ImportFlow {
         // Defense in depth: UI hides apply in local-only, but any future
         // call site must still fail closed before a signed upload.
         guard appState.privacyPrefs.cloudAllowed else {
-            appState.note(Loc.cloudFeatureRequiresCloudAI)
+            appState.noteCloudAIRequired()
             return
         }
         guard appState.proEntitlement.isPro else {
@@ -699,7 +699,7 @@ enum ImportFlow {
     ) {
         guard !appState.isProcessing else { return }
         guard appState.privacyPrefs.cloudAllowed else {
-            appState.note(Loc.cloudFeatureRequiresCloudAI)
+            appState.noteCloudAIRequired()
             return
         }
         guard appState.proEntitlement.isPro else {
@@ -910,6 +910,10 @@ enum ImportFlow {
                     // ever reach the cloud call. If we still get here
                     // something is out of sync, so escalate.
                     appState.fail(err.errorDescription ?? Loc.somethingWentWrong)
+                case .cloudAIDisabled:
+                    // Local-only posture — fall through to on-device cutout
+                    // without a scary failure toast; Settings copy covers it.
+                    break
                 }
             }
             // Fallback runs sync off main. Apple Subject Lift / downloaded

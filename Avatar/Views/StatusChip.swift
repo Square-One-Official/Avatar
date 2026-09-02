@@ -131,3 +131,18 @@ struct StatusChip: View {
         }
     }
 }
+
+extension ErrorBanner {
+    /// Maps the optional banner action enum onto a `StatusChip` CTA.
+    @MainActor
+    func statusChipAction(appState: AppState) -> StatusChipAction? {
+        switch action {
+        case .openPrivacySettings:
+            return StatusChipAction(label: Loc.openPrivacySettingsCTA) {
+                appState.openPrivacySettings()
+            }
+        case nil:
+            return nil
+        }
+    }
+}

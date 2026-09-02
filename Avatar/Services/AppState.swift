@@ -1,9 +1,17 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import AppKit
 
 enum SettingsTab: String {
     case general, backgrounds, account
+}
+
+/// Optional CTA on an `ErrorBanner`. Stored as an enum (not a closure) so
+/// the banner stays `Equatable` for SwiftUI animations.
+enum ErrorBannerAction: Equatable {
+    /// Opens Settings on General (Privacy & AI lives there).
+    case openPrivacySettings
 }
 
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -49,6 +57,7 @@ struct ProToast: Equatable {
 struct ErrorBanner: Equatable {
     let message: String
     let severity: StatusSeverity
+    var action: ErrorBannerAction? = nil
 }
 
 /// A pending batch-import confirmation surfaced when a Pro user drops more
@@ -204,23 +213,35 @@ final class AppState {
     var errorBanner: ErrorBanner?
 
     /// Soft error: recoverable. User can usually retry. Renders as amber.
-    func warn(_ message: String) {
-        errorBanner = ErrorBanner(message: message, severity: .warning)
+    func warn(_ message: String, action: ErrorBannerAction? = nil) {
+        errorBanner = ErrorBanner(message: message, severity: .warning, action: action)
     }
 
     /// Hard error: action probably won't succeed by retry alone. Renders as
     /// muted brick. Use for server faults, decode failures, auth problems.
-    func fail(_ message: String) {
-        errorBanner = ErrorBanner(message: message, severity: .danger)
+    func fail(_ message: String, action: ErrorBannerAction? = nil) {
+        errorBanner = ErrorBanner(message: message, severity: .danger, action: action)
     }
 
     /// Neutral notice. Renders as periwinkle. Use for "nothing to do here"
     /// messages that aren't really errors but need a visible acknowledgement.
-    func note(_ message: String) {
-        errorBanner = ErrorBanner(message: message, severity: .info)
+    func note(_ message: String, action: ErrorBannerAction? = nil) {
+        errorBanner = ErrorBanner(message: message, severity: .info, action: action)
+    }
+
+    /// Local-only hit a cloud feature — short copy + CTA into Privacy & AI.
+    func noteCloudAIRequired(_ message: String = Loc.cloudFeatureRequiresCloudAI) {
+        note(message, action: .openPrivacySettings)
     }
 
     func dismissBanner() { errorBanner = nil }
+
+    /// Opens the Settings window on General so Privacy & AI is visible.
+    func openPrivacySettings() {
+        selectedSettingsTab = .general
+        dismissBanner()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
 
     /// Single source of truth for "what should the UI do when a backend
     /// call fails?". Centralized here so a new feature touching the
@@ -262,6 +283,9 @@ final class AppState {
             // surface the same too-large copy so the user gets a clear
             // explanation rather than a generic "server error".
             warn(error.errorDescription ?? Loc.somethingWentWrong)
+            return true
+        case .cloudAIDisabled:
+            noteCloudAIRequired()
             return true
         }
     }
@@ -356,7 +380,10 @@ final class AppState {
     /// Backend REST client. Bound to the shared `AuthManager` so calls and
     /// sign-in flow see the same token storage.
     @ObservationIgnored
-    private(set) lazy var backend: BackendClient = BackendClient(auth: auth)
+    private(set) lazy var backend: BackendClient = BackendClient(
+        auth: auth,
+        privacyPrefs: privacyPrefs
+    )
 
     /// Feature-announcement + NEW-badge pipeline. Owns the in-memory
     /// model of "what announcement should the modal show" and "which

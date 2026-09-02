@@ -37,6 +37,15 @@ final class AuthManager {
     @ObservationIgnored
     private var authStateTask: Task<Void, Never>?
 
+    /// Cleared when a callback URL arrives or the user abandons the browser
+    /// flow. Lets `handleAppBecameActive` distinguish "still waiting" from
+    /// "callback already being processed".
+    @ObservationIgnored
+    private var awaitingOAuthCallback = false
+
+    @ObservationIgnored
+    private var abandonSignInTask: Task<Void, Never>?
+
     init() {
         // flowType: .implicit — Supabase magic-links generated server-side
         // by `signInWithOtp` produce `#access_token=...` callback URLs.
@@ -60,12 +69,15 @@ final class AuthManager {
 
     deinit {
         authStateTask?.cancel()
+        abandonSignInTask?.cancel()
     }
 
     /// Opens Google OAuth in the user's default browser. The browser will
     /// redirect back to `aaavatar://auth-callback?...` which the URL scheme
     /// handler forwards to `completeSignIn(from:)`.
     func startSignIn() {
+        abandonSignInTask?.cancel()
+        awaitingOAuthCallback = true
         isSigningIn = true
         lastSignInError = nil
         do {
@@ -76,7 +88,8 @@ final class AuthManager {
             NSWorkspace.shared.open(url)
         } catch {
             dlog("[Auth] getOAuthSignInURL failed: \(error)")
-            lastSignInError = error.localizedDescription
+            awaitingOAuthCallback = false
+            lastSignInError = Loc.signInDidNotFinish
             isSigningIn = false
         }
     }
@@ -88,6 +101,8 @@ final class AuthManager {
     /// async stream, and races there left users stuck on the signed-out card
     /// after clicking "Open Avatar" from the browser.
     func completeSignIn(from url: URL) async {
+        abandonSignInTask?.cancel()
+        awaitingOAuthCallback = false
         defer { isSigningIn = false }
         dlog("[Auth] completeSignIn from \(url.absoluteString)")
         do {
@@ -98,14 +113,30 @@ final class AuthManager {
             dlog("[Auth] sign-in succeeded for \(session.user.email ?? "<no email>")")
         } catch {
             dlog("[Auth] session(from:) failed: \(error)")
-            lastSignInError = (error as? LocalizedError)?.errorDescription
-                ?? error.localizedDescription
+            lastSignInError = Loc.signInDidNotFinish
         }
     }
 
     func signOut() {
         Task {
             try? await supabase.auth.signOut()
+        }
+    }
+
+    /// Called from `AppDelegate.applicationDidBecomeActive`. If the user
+    /// returned from the browser without completing OAuth, clear the
+    /// loading state after a short debounce so a real callback that lands
+    /// in the same activation still wins.
+    func handleAppBecameActive() {
+        guard awaitingOAuthCallback, isSigningIn, !isSignedIn else { return }
+        abandonSignInTask?.cancel()
+        abandonSignInTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard let self, !Task.isCancelled else { return }
+            guard self.awaitingOAuthCallback, self.isSigningIn, !self.isSignedIn else { return }
+            self.awaitingOAuthCallback = false
+            self.isSigningIn = false
+            self.lastSignInError = Loc.signInDidNotFinish
         }
     }
 

@@ -15,6 +15,9 @@ enum BackendError: LocalizedError {
     /// limit. Surfaces a dedicated "image too large" toast instead of the
     /// generic server-error copy — the request never reaches the wire.
     case payloadTooLarge(bytes: Int, limit: Int)
+    /// Privacy mode is Local-only — no photo bytes may leave the Mac.
+    /// Raised by cloud image endpoints before any upload starts.
+    case cloudAIDisabled
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +31,8 @@ enum BackendError: LocalizedError {
         case .transport(let e): return e.localizedDescription
         case .payloadTooLarge(_, let limit):
             return "Image is over \(limit / (1024 * 1024)) MB."
+        case .cloudAIDisabled:
+            return Loc.cloudFeatureRequiresCloudAI
         }
     }
 }
@@ -55,11 +60,24 @@ final class BackendClient {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
 
     private unowned let auth: AuthManager
+    private unowned let privacyPrefs: PrivacyPreferences
     private let session: URLSession
 
-    init(auth: AuthManager, session: URLSession = TLSPinning.pinnedShared) {
+    init(
+        auth: AuthManager,
+        privacyPrefs: PrivacyPreferences,
+        session: URLSession = TLSPinning.pinnedShared
+    ) {
         self.auth = auth
+        self.privacyPrefs = privacyPrefs
         self.session = session
+    }
+
+    /// Fail closed before any photo upload when Privacy mode is Local-only.
+    private func requireCloudAI() throws {
+        guard privacyPrefs.cloudAllowed else {
+            throw BackendError.cloudAIDisabled
+        }
     }
 
     // MARK: GET /v1/account
@@ -118,6 +136,7 @@ final class BackendClient {
     }
 
     func cutout(imagePNG: Data) async throws -> (Data, Int) {
+        try requireCloudAI()
         guard imagePNG.count <= Self.cutoutInputLimitBytes else {
             throw BackendError.payloadTooLarge(
                 bytes: imagePNG.count,
@@ -197,6 +216,7 @@ final class BackendClient {
         let height: Double
     }
     func fillBody(imagePNG: Data, faceBox: FaceBox? = nil) async throws -> (Data, Int) {
+        try requireCloudAI()
         struct Body: Encodable {
             let image: String
             let face: FaceBox?
@@ -225,6 +245,7 @@ final class BackendClient {
         let creditsRemaining: Int
     }
     func colorize(imagePNG: Data) async throws -> (Data, Int) {
+        try requireCloudAI()
         struct Body: Encodable { let image: String }
         let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
         let resp: ColorizeResponse = try await request("/v1/colorize", method: "POST", body: body)
@@ -314,6 +335,7 @@ final class BackendClient {
         intent: StylizeIntent,
         generationModel: StylizeModel? = nil
     ) async throws -> (Data, Int) {
+        try requireCloudAI()
         struct Body: Encodable {
             let image: String
             var style: String?
@@ -361,6 +383,7 @@ final class BackendClient {
         let creditsRemaining: Int
     }
     func upscale(imagePNG: Data) async throws -> (Data, Int) {
+        try requireCloudAI()
         struct Body: Encodable { let image: String }
         let body = try JSONEncoder().encode(Body(image: imagePNG.base64EncodedString()))
         let resp: UpscaleResponse = try await request("/v1/upscale", method: "POST", body: body)

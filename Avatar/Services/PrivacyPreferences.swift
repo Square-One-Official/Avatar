@@ -49,13 +49,12 @@ final class PrivacyPreferences {
     static let engineKey             = "localCutoutEngine"
     static let shareDiagnosticsKey   = "shareAnonymousDiagnostics"
 
-    /// Default for new users coming through onboarding is whatever they
-    /// pick. Default for migrated existing users is `cloudAllowed`,
-    /// preserving today's behaviour. Default for anyone reaching this
-    /// without onboarding (e.g., a unit test) is also `cloudAllowed`
-    /// so we never silently block a feature without explicit user
-    /// consent to the privacy posture.
-    var mode: AIPrivacyMode = .cloudAllowed {
+    /// Default for new installs / onboarding is `localOnly` — matches the
+    /// "Recommended for privacy" card so Continue without an extra tap
+    /// does not silently enable cloud AI. Migrated users who already saw
+    /// the legacy welcome sheet are explicitly set to `cloudAllowed` in
+    /// `MainWindow.task` so behaviour is preserved.
+    var mode: AIPrivacyMode = .localOnly {
         didSet {
             UserDefaults.standard.set(mode.rawValue, forKey: Self.modeKey)
             // Audit MEDIUM #26: localOnly users get an ephemeral device

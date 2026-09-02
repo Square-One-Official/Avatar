@@ -80,11 +80,18 @@ enum Loc {
 
     // MARK: Editor – Alignment
     static var autoAlignFace: String   { en ? "Auto-align to face" : "Auto-uitlijnen op gezicht" }
+    static var autoAlignDisabledHelp: String {
+        en ? "No face detected in this portrait."
+           : "Geen gezicht gevonden in dit portret."
+    }
     /// Undo action name for handle-based scale changes on the canvas.
     static var scale: String           { en ? "Scale" : "Schaal" }
 
     // MARK: Editor – Edit section
     static var edit: String            { en ? "Edit" : "Bewerken" }
+    static var enhanceMenu: String     { en ? "Enhance" : "Verbeteren" }
+    static var statusOn: String        { en ? "On" : "Aan" }
+    static var statusOff: String       { en ? "Off" : "Uit" }
     static var redoWithMagicCutout: String {
         en ? "Redo with Magic Cutout" : "Opnieuw met Magic Cutout"
     }
@@ -120,6 +127,10 @@ enum Loc {
     static var fillBodyHelp: String {
         en ? "Reconstruct shoulders and torso when the photo is cropped."
            : "Reconstrueer schouders en bovenlichaam als de foto is bijgesneden."
+    }
+    static var fillBodyUndoHelp: String {
+        en ? "Revert to the original cutout without the filled-in body."
+           : "Herstel de originele uitknip zonder aangevuld lichaam."
     }
     static var fillBodyAlready: String {
         en ? "Body fill is already applied to this portrait."
@@ -298,6 +309,12 @@ enum Loc {
     static var signInWithGoogle: String {
         en ? "Sign in with Google" : "Aanmelden met Google"
     }
+    /// Recoverable OAuth failure / abandoned browser flow. Actionable,
+    /// no raw SDK text.
+    static var signInDidNotFinish: String {
+        en ? "Sign-in didn’t finish. Check the browser window and try again."
+           : "Aanmelden is niet gelukt. Controleer het browservenster en probeer opnieuw."
+    }
 
     // MARK: Pro recovery sheet (fresh install, paid before signing in)
     static var recoverProLink: String {
@@ -372,8 +389,8 @@ enum Loc {
         en ? "Download enhanced model" : "Verbeterd model downloaden"
     }
     static var onboardingEngineDownloadedBody: String {
-        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Choosing this starts the download now — you can cancel or remove it later in Settings."
-           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Als je dit kiest, start de download meteen — je kunt later annuleren of verwijderen in Instellingen."
+        en ? "78 MB download. Cleaner cutout edges than the built-in pipeline, especially on hair. Runs entirely on this Mac. Choosing this starts the download now — it continues in Settings if you leave, and you can remove it there anytime."
+           : "78 MB download. Strakkere uitsnede dan de standaard pipeline, met name op haar. Draait volledig op deze Mac. Als je dit kiest, start de download meteen — die loopt door in Instellingen als je weggaat, en je kunt het daar altijd verwijderen."
     }
 
     // MARK: Onboarding — Generic
@@ -387,6 +404,16 @@ enum Loc {
     static var onboardingDoneWithoutEnhanced: String {
         en ? "Continue without enhanced model"
            : "Doorgaan zonder verbeterd model"
+    }
+    static var onboardingChoiceSelected: String {
+        en ? "Selected" : "Geselecteerd"
+    }
+    static var onboardingChoiceNotSelected: String {
+        en ? "Not selected" : "Niet geselecteerd"
+    }
+    static func onboardingChoiceHint(_ index: Int, of count: Int) -> String {
+        en ? "Choice \(index) of \(count)"
+           : "Keuze \(index) van \(count)"
     }
 
     // MARK: Settings — Privacy & AI section
@@ -412,8 +439,12 @@ enum Loc {
            : "Cloud-AI toestaan"
     }
     static var cloudFeatureRequiresCloudAI: String {
-        en ? "This feature uses cloud AI. Switch to Allow cloud AI in Settings → Privacy & AI."
-           : "Deze functie gebruikt cloud-AI. Kies Cloud-AI toestaan in Instellingen → Privacy & AI."
+        en ? "This feature uses cloud AI."
+           : "Deze functie gebruikt cloud-AI."
+    }
+    static var openPrivacySettingsCTA: String {
+        en ? "Privacy & AI"
+           : "Privacy & AI"
     }
     // Audit MEDIUM #27. Toggle copy kept for a future telemetry surface;
     // the Settings UI hides the control until something reads the flag.
@@ -445,6 +476,24 @@ enum Loc {
     static var modelDownloadRetryButton: String {
         en ? "Try again" : "Opnieuw proberen"
     }
+    /// User-facing download / install failures — recovery-first, no HTTP
+    /// codes or hash prefixes (those stay in the log).
+    static var modelDownloadFailed: String {
+        en ? "Couldn't download the model. Check your connection and try again."
+           : "Model downloaden mislukt. Controleer je verbinding en probeer opnieuw."
+    }
+    static var modelVerificationFailed: String {
+        en ? "The download didn’t pass the integrity check. Try again."
+           : "De download doorstond de integriteitscheck niet. Probeer opnieuw."
+    }
+    static var modelUnzipFailed: String {
+        en ? "Couldn't extract the model. Try again."
+           : "Model uitpakken mislukt. Probeer opnieuw."
+    }
+    static var modelInstallFailed: String {
+        en ? "Couldn't install the model. Try again."
+           : "Model installeren mislukt. Probeer opnieuw."
+    }
     static var modelMissingFallbackToast: String {
         en ? "Enhanced model isn't downloaded yet. Used Apple Vision for this import. Download in Settings → Privacy & AI."
            : "Het verbeterde model is nog niet gedownload. Apple Vision werd gebruikt voor deze import. Downloaden in Instellingen → Privacy & AI."
@@ -452,8 +501,8 @@ enum Loc {
 
     // MARK: Cloud-feature gating toasts (local-only)
     static var reprocessRequiresCloudAI: String {
-        en ? "Re-cutout uses cloud AI. Switch to Allow cloud AI in Settings → Privacy & AI."
-           : "Opnieuw uitsnijden gebruikt cloud-AI. Kies Cloud-AI toestaan in Instellingen → Privacy & AI."
+        en ? "Re-cutout uses cloud AI."
+           : "Opnieuw uitsnijden gebruikt cloud-AI."
     }
 
     // MARK: Account / Pro settings section
@@ -472,6 +521,12 @@ enum Loc {
     static var proSectionSubtitle: String {
         en ? "Magic Cutout, monthly credits included"
            : "Magic Cutout, met maandelijkse credits"
+    }
+    /// Account upgrade blurb when Privacy mode is Local-only — don't pitch
+    /// cloud cutout while uploads are off.
+    static var proSectionSubtitleLocalOnly: String {
+        en ? "Unlimited portraits on this Mac"
+           : "Onbeperkt portretten op deze Mac"
     }
     static var proSignInWithGoogle: String  { en ? "Sign in with Google" : "Aanmelden met Google" }
     static var proSignOut: String           { en ? "Sign out" : "Afmelden" }
@@ -604,6 +659,12 @@ enum Loc {
     }
     static var proPlanFeatureCredits: String {
         en ? "200 credits per month" : "200 credits per maand"
+    }
+    /// Paywall bullet when Privacy mode is Local-only — cloud extras stay
+    /// available after the user allows cloud AI.
+    static var proPlanFeatureCloudWhenAllowed: String {
+        en ? "Cloud AI extras when you allow them in Privacy & AI"
+           : "Cloud-AI-extra's zodra je die toestaat in Privacy & AI"
     }
     static var proUpgradeFinePrint: String {
         en ? "Cancel anytime. Credits reset at the start of each billing period. Top-up credits never expire."
@@ -750,6 +811,10 @@ enum Loc {
     static var shadows: String         { en ? "Shadows" : "Schaduwen" }
     static var resetAdjustments: String { en ? "Reset Adjustments" : "Herstel aanpassingen" }
     static var adjustment: String      { en ? "Adjustment" : "Aanpassing" }
+    static var adjustmentTileHint: String {
+        en ? "Shows the slider for this adjustment."
+           : "Toont de schuifregelaar voor deze aanpassing."
+    }
 
     // MARK: Editor – Sidebar tabs
     static var tabPortrait: String     { en ? "Portrait" : "Portret" }

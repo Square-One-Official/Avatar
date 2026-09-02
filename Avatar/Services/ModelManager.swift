@@ -427,17 +427,23 @@ final class ModelManager {
     // MARK: - Helpers
 
     private nonisolated func localizedMessage(for error: Error) -> String {
+        // Log technical detail; surface recovery-first Loc copy to the UI.
         switch error {
         case let ModelManagerError.downloadFailed(msg):
-            return "Couldn't download (\(msg))"
+            dlog("[ModelManager] downloadFailed detail: \(msg)")
+            return Loc.modelDownloadFailed
         case let ModelManagerError.verificationFailed(expected, got):
-            return "Integrity check failed. Expected \(String(expected.prefix(8)))…, got \(String(got.prefix(8)))…"
+            dlog("[ModelManager] verificationFailed expected=\(expected.prefix(12)) got=\(got.prefix(12))")
+            return Loc.modelVerificationFailed
         case let ModelManagerError.unzipFailed(msg):
-            return "Couldn't extract model (\(msg))"
+            dlog("[ModelManager] unzipFailed detail: \(msg)")
+            return Loc.modelUnzipFailed
         case let ModelManagerError.installFailed(msg):
-            return "Couldn't install model (\(msg))"
+            dlog("[ModelManager] installFailed detail: \(msg)")
+            return Loc.modelInstallFailed
         default:
-            return error.localizedDescription
+            dlog("[ModelManager] unknown failure: \(error)")
+            return Loc.modelDownloadFailed
         }
     }
 }

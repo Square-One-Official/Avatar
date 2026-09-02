@@ -8,7 +8,6 @@ struct EditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.undoManager) private var undoManager
     @Environment(AppState.self) private var appState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \BackgroundPreset.createdAt) private var backgrounds: [BackgroundPreset]
     @Query private var allPortraits: [Portrait]
 
@@ -20,26 +19,6 @@ struct EditorView: View {
     @State private var sliderActionName: String? = nil
     @State private var showBulkAlignConfirm = false
     @State private var bulkSkippedCount: Int? = nil
-
-    /// Which pane the right-hand inspector is showing. Persisted across launches.
-    @AppStorage("editorTab") private var editorTab: EditorTab = .portrait
-
-    enum EditorTab: String, CaseIterable, Identifiable {
-        case portrait, adjust
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .portrait: return Loc.tabPortrait
-            case .adjust:   return Loc.tabAdjust
-            }
-        }
-        var symbol: String {
-            switch self {
-            case .portrait: return "person.crop.square"
-            case .adjust:   return "slider.horizontal.3"
-            }
-        }
-    }
 
     /// Shows a semi-transparent alignment guide (eye markers + head oval)
     /// on the canvas so you can visually verify that all portraits share the
@@ -176,9 +155,12 @@ struct EditorView: View {
             // Fill in Body's "already complete" no-op) flipped silently.
             .overlay(alignment: .bottom) {
                 if let banner = appState.errorBanner {
-                    StatusChip(severity: banner.severity,
-                               message: banner.message,
-                               onDismiss: { appState.dismissBanner() })
+                    StatusChip(
+                        severity: banner.severity,
+                        message: banner.message,
+                        onDismiss: { appState.dismissBanner() },
+                        action: banner.statusChipAction(appState: appState)
+                    )
                         .padding(.bottom, 24)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
@@ -380,27 +362,36 @@ struct EditorView: View {
     // MARK: - Controls
 
     private var controlsPanel: some View {
-        VStack(spacing: 0) {
-            PillSegmentedControl(
-                selection: $editorTab,
-                segments: EditorTab.allCases.map {
-                    .init(tag: $0, label: $0.label, symbol: $0.symbol)
+        ScrollView {
+            VStack(spacing: 18) {
+                inspectorSection(title: Loc.info) {
+                    VStack(spacing: 0) {
+                        infoRow(symbol: "person.crop.circle",
+                                placeholder: Loc.employeeName,
+                                text: $portrait.name)
+                        Divider()
+                            .padding(.vertical, 10)
+                        infoRow(symbol: "tag",
+                                placeholder: Loc.role,
+                                text: $portrait.tags)
+                    }
                 }
-            )
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
 
-            Group {
-                switch editorTab {
-                case .portrait: portraitTab
-                case .adjust:   adjustTabContainer
+                inspectorSection(title: Loc.background) {
+                    BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
+                }
+
+                inspectorSection(title: Loc.edit) {
+                    EnhancePanel(
+                        portrait: portrait,
+                        trackSliderUndo: trackSliderUndo,
+                        commitSliderUndo: commitSliderUndo
+                    )
                 }
             }
-            .id(editorTab)
-            .transition(
-                .opacity
-            )
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
         .background(Color.appCanvas)
         .confirmationDialog(
@@ -425,44 +416,6 @@ struct EditorView: View {
         }
     }
 
-    // MARK: Portrait tab
-
-    @ViewBuilder private var portraitTab: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                inspectorSection(title: Loc.info) {
-                    VStack(spacing: 0) {
-                        infoRow(symbol: "person.crop.circle",
-                                placeholder: Loc.employeeName,
-                                text: $portrait.name)
-                        Divider()
-                            .padding(.vertical, 10)
-                        infoRow(symbol: "tag",
-                                placeholder: Loc.role,
-                                text: $portrait.tags)
-                    }
-                }
-
-                inspectorSection(title: Loc.background) {
-                    BackgroundPicker(portrait: portrait, backgrounds: backgrounds)
-                }
-
-                inspectorSection(title: Loc.edit) {
-                    enhanceSectionBody
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
-        }
-    }
-
-    private var adjustTabContainer: some View {
-        Form { adjustTab }
-            .formStyle(.grouped)
-            .scrollContentBackground(.hidden)
-    }
-
     @ViewBuilder
     private func infoRow(symbol: String, placeholder: String, text: Binding<String>) -> some View {
         HStack(spacing: 10) {
@@ -479,8 +432,7 @@ struct EditorView: View {
     }
 
     /// Section card chrome: a subtle elevated surface (`appSurface`) above the
-    /// sidebar's `appCanvas`, with a small uppercase header. Mirrors the layered
-    /// look of `PillSegmentedControl` so the inspector reads as one family.
+    /// inspector's `appCanvas`, with a small uppercase header.
     @ViewBuilder
     private func inspectorSection<Content: View>(
         title: String,
@@ -504,316 +456,6 @@ struct EditorView: View {
                         )
                 )
         }
-    }
-
-    // MARK: Enhance section (lives inside the Portrait tab)
-
-    /// True whenever this portrait still carries a free Apple-pipeline cutout.
-    /// The card is a one-shot offer to re-cut via cloud Magic Cutout —
-    /// independent of the persistent "Magic Cutout" import toggle. Clicking
-    /// runs cloud regardless of the toggle, and surfaces the paywall if the
-    /// user has neither Pro nor free-trial credit left.
-    private var showMagicCutoutUpgradeCard: Bool {
-        portrait.originalImageData != nil
-            && !portrait.cutoutUsedMagic
-    }
-
-    @ViewBuilder private var enhanceSectionBody: some View {
-        VStack(spacing: 10) {
-            enhanceCard(
-                title: Loc.autoAlignFace,
-                systemImage: "face.smiling",
-                disabled: portrait.faceRect == .zero,
-                help: Loc.autoAlignFace
-            ) {
-                autoAlign()
-            }
-
-            enhanceCard(
-                title: portrait.isMagicRetouched ? Loc.magicRetouchUndo : Loc.magicRetouch,
-                systemImage: portrait.isMagicRetouched ? "arrow.uturn.backward" : "wand.and.sparkles",
-                disabled: portrait.cutoutPNG == nil || appState.isProcessing,
-                help: portrait.isMagicRetouched ? Loc.magicRetouchUndoHelp : Loc.magicRetouchHelp,
-                active: portrait.isMagicRetouched
-            ) {
-                if portrait.isMagicRetouched {
-                    ImportFlow.undoMagicRetouch(portrait: portrait, context: context, appState: appState)
-                } else {
-                    ImportFlow.magicRetouch(portrait: portrait, context: context, appState: appState)
-                }
-            }
-
-            // Re-cutout is intentionally hidden by default — we promise the
-            // initial cutout is right the first time. The single exception:
-            // an existing cutout produced by the free Apple pipeline while the
-            // user is now Pro with Magic Cutout enabled. In that case we
-            // surface a one-shot "redo with Magic Cutout" affordance, which
-            // disappears again once the upgraded cutout lands.
-            //
-            // Local-only mode hides this card entirely: redo IS a cloud
-            // call, and the privacy promise is that no cloud call leaves
-            // the Mac. Showing a disabled-with-upsell button would be
-            // dishonest about the posture; better to make the affordance
-            // simply disappear and surface the choice in Settings instead.
-            if showMagicCutoutUpgradeCard && appState.privacyPrefs.cloudAllowed {
-                enhanceCard(
-                    title: Loc.redoWithMagicCutout,
-                    systemImage: "wand.and.stars",
-                    disabled: appState.isProcessing,
-                    help: Loc.redoWithMagicCutoutHelp
-                ) {
-                    ImportFlow.reprocess(portrait: portrait, context: context, appState: appState)
-                }
-            }
-
-            // Fill in Body / Colorize apply are cloud-only. Hide apply
-            // when local-only so we don't tease a paywall for a privacy
-            // opt-out. Undo of an already-applied cloud result stays
-            // available — that only restores local pixels, no upload.
-            if appState.privacyPrefs.cloudAllowed || portrait.isFillBodyApplied {
-                enhanceCard(
-                    title: portrait.isFillBodyApplied ? Loc.fillBodyUndo : Loc.fillBody,
-                    systemImage: portrait.isFillBodyApplied ? "arrow.uturn.backward" : "bandage.fill",
-                    disabled: portrait.cutoutPNG == nil || appState.isProcessing,
-                    help: Loc.fillBodyHelp,
-                    active: portrait.isFillBodyApplied,
-                    showProBadge: appState.privacyPrefs.cloudAllowed
-                        && !appState.proEntitlement.isPro
-                        && !portrait.isFillBodyApplied
-                ) {
-                    if portrait.isFillBodyApplied {
-                        ImportFlow.undoFillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                    } else {
-                        ImportFlow.fillBody(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                    }
-                }
-            }
-
-            if appState.privacyPrefs.cloudAllowed || portrait.isColorized {
-                enhanceCard(
-                    title: portrait.isColorized ? Loc.colorizeUndo : Loc.colorize,
-                    systemImage: portrait.isColorized ? "arrow.uturn.backward" : "paintpalette",
-                    disabled: portrait.cutoutPNG == nil || appState.isProcessing,
-                    help: portrait.isColorized ? Loc.colorizeUndoHelp : Loc.colorizeHelp,
-                    active: portrait.isColorized,
-                    showProBadge: appState.privacyPrefs.cloudAllowed
-                        && !appState.proEntitlement.isPro
-                        && !portrait.isColorized
-                ) {
-                    if portrait.isColorized {
-                        ImportFlow.undoColorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                    } else {
-                        ImportFlow.colorize(portrait: portrait, context: context, appState: appState, undoManager: undoManager)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func enhanceCard(
-        title: String,
-        systemImage: String,
-        disabled: Bool,
-        help: String,
-        active: Bool = false,
-        showProBadge: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            enhanceCardLabel(
-                title: title,
-                systemImage: systemImage,
-                active: active,
-                showProBadge: showProBadge
-            )
-        }
-        .buttonStyle(PressableButtonStyle())
-        .disabled(disabled)
-        .opacity(disabled ? 0.45 : 1)
-        .help(help)
-    }
-
-    /// The elevated-card visual chrome shared by `enhanceCard` (Button) and
-    /// the "More magic edits" Menu so both sit identically in the section.
-    /// `trailingSystemImage` adds an indicator (e.g. chevron) when the
-    /// label is acting as a Menu opener.
-    @ViewBuilder
-    private func enhanceCardLabel(
-        title: String,
-        systemImage: String,
-        active: Bool = false,
-        trailingSystemImage: String? = nil,
-        showProBadge: Bool = false
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(active ? Color.accentColor : Color.primary)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(active ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.12))
-                )
-                .symbolEffect(.bounce, value: active)
-            Text(title)
-                .fontWeight(.medium)
-                .foregroundStyle(Color.primary)
-            Spacer(minLength: 0)
-            if showProBadge {
-                ProBadge()
-            }
-            if let trailing = trailingSystemImage {
-                Image(systemName: trailing)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-                )
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
-    // MARK: Adjust tab
-
-    @ViewBuilder private var adjustTab: some View {
-        Section {
-            adjustmentSlider(Loc.exposure,    icon: "sun.max",            value: $portrait.adjExposure,    range: -2...2,       neutral: 0,   displayScale: 50)
-            adjustmentSlider(Loc.contrast,    icon: "circle.lefthalf.filled", value: $portrait.adjContrast,    range: 0.5...1.5,    neutral: 1,   displayScale: 200)
-            adjustmentSlider(Loc.tint,        icon: "drop",               value: $portrait.adjTint,        range: -100...100,   neutral: 0,   displayScale: 1)
-            adjustmentSlider(Loc.saturation,  icon: "paintpalette",       value: $portrait.adjSaturation,  range: 0...2,        neutral: 1,   displayScale: 100)
-            adjustmentSlider(Loc.temperature, icon: "thermometer.medium", value: $portrait.adjTemperature, range: -2000...2000, neutral: 0,   displayScale: 0.05)
-            adjustmentSlider(Loc.highlights,  icon: "sun.horizon",        value: $portrait.adjHighlights,  range: 0...2,        neutral: 1,   displayScale: 100)
-            adjustmentSlider(Loc.shadows,     icon: "moon",               value: $portrait.adjShadows,     range: -1...1,       neutral: 0,   displayScale: 100)
-
-            if isAdjustmentsDirty {
-                Button {
-                    Motion.run(reduceMotion, .easeOut(duration: 0.18)) { resetAdjustments() }
-                } label: {
-                    Label(Loc.resetAdjustments, systemImage: "arrow.counterclockwise")
-                }
-                .foregroundStyle(.secondary)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        } header: {
-            Text(Loc.colorAdjustments)
-        }
-    }
-
-    private var isAdjustmentsDirty: Bool {
-        portrait.adjExposure != 0 ||
-        portrait.adjContrast != 1 ||
-        portrait.adjTint != 0 ||
-        portrait.adjSaturation != 1 ||
-        portrait.adjTemperature != 0 ||
-        portrait.adjHighlights != 1 ||
-        portrait.adjShadows != 0
-    }
-
-    private func adjustmentSlider(
-        _ label: String,
-        icon: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>,
-        neutral: Double,
-        displayScale: Double
-    ) -> some View {
-        let isDirty = value.wrappedValue != neutral
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 14)
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 6, height: 6)
-                    .opacity(isDirty ? 1 : 0)
-                    .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
-                Spacer()
-                Text(String(format: "%+.0f", (value.wrappedValue - neutral) * displayScale))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .opacity(isDirty ? 1 : 0)
-                    .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
-            }
-            ZStack {
-                Slider(
-                    value: Binding(
-                        get: { value.wrappedValue },
-                        set: { newValue in
-                            trackSliderUndo(actionName: label)
-                            let snapThreshold = (range.upperBound - range.lowerBound) * 0.02
-                            let wasOff = value.wrappedValue != neutral
-                            let snapped = abs(newValue - neutral) < snapThreshold ? neutral : newValue
-                            if snapped == neutral && wasOff {
-                                #if os(macOS)
-                                haptics.perform(.alignment, performanceTime: .now)
-                                #endif
-                            }
-                            // Live preview only mutates the model in memory; the
-                            // SwiftData save and updatedAt bump are deferred to
-                            // drag-end via onEditingChanged. The adjustedCutout
-                            // cache self-invalidates on key mismatch so we don't
-                            // need to clear it per tick.
-                            value.wrappedValue = snapped
-                        }
-                    ),
-                    in: range,
-                    onEditingChanged: { editing in
-                        if !editing {
-                            portrait.updatedAt = Date()
-                            try? context.save()
-                        }
-                    }
-                )
-                // Subtle tick mark on the track at the neutral position.
-                GeometryReader { geo in
-                    let fraction = (neutral - range.lowerBound) / (range.upperBound - range.lowerBound)
-                    Rectangle()
-                        .fill(Color.secondary.opacity(isDirty ? 0 : 0.55))
-                        .frame(width: 1.5, height: 6)
-                        .position(x: geo.size.width * fraction, y: geo.size.height / 2)
-                        .motionAwareAnimation(.easeOut(duration: 0.12), value: isDirty)
-                }
-                .allowsHitTesting(false)
-            }
-        }
-    }
-
-    private func resetAdjustments() {
-        commitSliderUndo()
-        let before = PortraitUndoManager.snapshot(of: portrait)
-        portrait.adjExposure = 0
-        portrait.adjContrast = 1
-        portrait.adjSaturation = 1
-        portrait.adjTemperature = 0
-        portrait.adjTint = 0
-        portrait.adjHighlights = 1
-        portrait.adjShadows = 0
-        portrait.updatedAt = Date()
-        appState.invalidateAdjusted(for: portrait)
-        try? context.save()
-        PortraitUndoManager.registerFromSnapshots(
-            before: before,
-            after: PortraitUndoManager.snapshot(of: portrait),
-            context: context,
-            undoManager: undoManager,
-            appState: appState,
-            actionName: Loc.resetAdjustments
-        )
     }
 
     /// Captures a "before" snapshot on the first slider tick. The snapshot
@@ -842,32 +484,6 @@ struct EditorView: View {
         )
         sliderUndoSnapshot = nil
         sliderActionName = nil
-    }
-
-    private func autoAlign() {
-        guard let cutout = appState.cutout(for: portrait) else { return }
-        commitSliderUndo()
-        let before = PortraitUndoManager.snapshot(of: portrait)
-        let size = CGSize(width: cutout.width, height: cutout.height)
-        let t = AutoAligner.computeTransform(
-            faceRect: portrait.faceRect,
-            eyeCenter: portrait.eyeCenter,
-            interEyeDistance: CGFloat(portrait.interEyeDistance),
-            cutoutSize: size,
-            bodyBottomY: CGFloat(portrait.bodyBottomY))
-        portrait.scale = Double(t.scale)
-        portrait.offsetX = Double(t.offset.width)
-        portrait.offsetY = Double(t.offset.height)
-        portrait.updatedAt = Date()
-        try? context.save()
-        PortraitUndoManager.registerFromSnapshots(
-            before: before,
-            after: PortraitUndoManager.snapshot(of: portrait),
-            context: context,
-            undoManager: undoManager,
-            appState: appState,
-            actionName: Loc.autoAlignAction
-        )
     }
 
     // MARK: - Bulk align

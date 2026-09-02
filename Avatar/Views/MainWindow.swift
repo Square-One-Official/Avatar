@@ -109,6 +109,7 @@ struct MainWindow: View {
         .sheet(isPresented: $state.showProUpgradeSheet) {
             ProUpgradeSheet()
                 .environment(appState)
+                .environment(appState.privacyPrefs)
         }
         .sheet(isPresented: $showOnboardingSheet) {
             OnboardingSheet()
@@ -193,21 +194,22 @@ struct MainWindow: View {
             // saw the legacy single-step welcome sheet to the new flag
             // with `cloudAllowed + appleVision` defaults. That preserves
             // exactly today's behaviour (Magic Cutout still works, photos
-            // still upload, etc.) without re-onboarding them. The
-            // `PrivacyPreferences` defaults registration already provides
-            // those values, so we only need to flip `hasSeenOnboarding`.
+            // still upload, etc.) without re-onboarding them.
             if !hasRunOnboardingMigration {
                 hasRunOnboardingMigration = true
                 if hasSeenWelcomeSignIn {
                     hasSeenOnboarding = true
+                    // New installs default to localOnly; legacy users who
+                    // never wrote aiPrivacyMode must stay on cloudAllowed.
+                    if UserDefaults.standard.string(forKey: PrivacyPreferences.modeKey) == nil {
+                        appState.privacyPrefs.mode = .cloudAllowed
+                    }
                 }
             }
 
             // First-launch onboarding. Present when the user hasn't
-            // completed it AND isn't already signed in (a returning user
-            // whose session restored shouldn't be asked to sign in again,
-            // but we still want to capture the privacy posture — for
-            // those, jump them straight to the privacy step instead).
+            // completed it. A returning signed-in session skips the auth
+            // step inside OnboardingSheet.onAppear.
             if !hasSeenOnboarding {
                 showOnboardingSheet = true
             }
@@ -215,10 +217,11 @@ struct MainWindow: View {
             // Announcements + NEW badges. Badges fetch anonymously so a
             // signed-out user still sees the pill; the pending-pop-up
             // path only runs once we have a session, since the seen-
-            // state filter requires a user id. Skip the modal in
-            // local-only — CMS campaigns mostly pitch cloud features.
+            // state filter requires a user id. Skip the modal while
+            // onboarding is up — macOS won't stack a second sheet.
             await appState.announcements.refreshBadges()
-            if appState.auth.isSignedIn,
+            if !showOnboardingSheet,
+               appState.auth.isSignedIn,
                appState.privacyPrefs.cloudAllowed {
                 await appState.announcements.fetchPending()
             }
@@ -227,16 +230,23 @@ struct MainWindow: View {
             if signedIn {
                 appState.refreshEntitlement()
                 Task {
-                    // Brief stagger lets the WelcomeSignInSheet finish its
-                    // dismiss animation before the announcement sheet
-                    // tries to present — macOS won't show two sheets at
-                    // once and would silently swallow the second.
                     try? await Task.sleep(for: .milliseconds(450))
                     await appState.announcements.refreshBadges()
-                    if appState.privacyPrefs.cloudAllowed {
+                    if !showOnboardingSheet,
+                       appState.privacyPrefs.cloudAllowed {
                         await appState.announcements.fetchPending()
                     }
                 }
+            }
+        }
+        .onChange(of: showOnboardingSheet) { _, showing in
+            // After onboarding dismisses, surface any pending announcement
+            // that was deferred while the sheet was up.
+            guard !showing, hasSeenOnboarding else { return }
+            guard appState.auth.isSignedIn, appState.privacyPrefs.cloudAllowed else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(300))
+                await appState.announcements.fetchPending()
             }
         }
         .onChange(of: appState.privacyPrefs.mode) { _, mode in
@@ -244,7 +254,7 @@ struct MainWindow: View {
                 // Drop an in-flight cloud pitch without marking it seen,
                 // so allowing cloud AI later can still surface it.
                 appState.announcements.current = nil
-            } else if appState.auth.isSignedIn {
+            } else if appState.auth.isSignedIn, !showOnboardingSheet {
                 Task { await appState.announcements.fetchPending() }
             }
         }

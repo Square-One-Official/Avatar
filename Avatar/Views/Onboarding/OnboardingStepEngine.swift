@@ -52,7 +52,8 @@ struct OnboardingStepEngine: View {
                     title: Loc.onboardingEngineAppleVisionTitle,
                     badge: Loc.onboardingEngineAppleVisionDefault,
                     detail: Loc.onboardingEngineAppleVisionBody,
-                    icon: "applelogo"
+                    icon: "applelogo",
+                    position: (1, 2)
                 ) {
                     prefs.engine = .appleVision
                 }
@@ -61,7 +62,8 @@ struct OnboardingStepEngine: View {
                     title: Loc.onboardingEngineDownloadedTitle,
                     badge: nil,
                     detail: Loc.onboardingEngineDownloadedBody,
-                    icon: "arrow.down.circle"
+                    icon: "arrow.down.circle",
+                    position: (2, 2)
                 ) {
                     prefs.engine = .downloadedModel
                     // Auto-trigger the download on first selection. No-op
@@ -71,6 +73,20 @@ struct OnboardingStepEngine: View {
                 }
             }
             .padding(.horizontal, 28)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Loc.onboardingEngineTitle)
+            .focusable()
+            .onMoveCommand { direction in
+                switch direction {
+                case .up:
+                    prefs.engine = .appleVision
+                case .down:
+                    prefs.engine = .downloadedModel
+                    manager.download()
+                default:
+                    break
+                }
+            }
 
             // Inline download status. Hidden when the user is on Apple
             // Vision (state is irrelevant) AND when the engine is
@@ -92,7 +108,7 @@ struct OnboardingStepEngine: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(doneButtonEnabled ? Color.appBrand : Color.appBrand.opacity(0.45))
+                            .fill(doneButtonEnabled ? Color.appBrandSolid : Color.appBrandSolid.opacity(0.45))
                     )
                     .foregroundStyle(.white)
             }
@@ -164,15 +180,17 @@ struct OnboardingStepEngine: View {
     /// True when the Done button should be tappable. Apple Vision is
     /// always allowed; downloaded-model path waits for the download to
     /// either finish or fail (failure path falls back to Apple Vision).
+    /// `.notDownloaded` keeps Done disabled so a click in the gap
+    /// between card-tap and download-start cannot exit with a missing model.
     private var doneButtonEnabled: Bool {
         switch (prefs.engine, manager.state) {
         case (.appleVision, _):
             return true
         case (.downloadedModel, .ready),
-             (.downloadedModel, .failed),
-             (.downloadedModel, .notDownloaded):
+             (.downloadedModel, .failed):
             return true
-        case (.downloadedModel, .downloading):
+        case (.downloadedModel, .notDownloaded),
+             (.downloadedModel, .downloading):
             return false
         }
     }
@@ -183,9 +201,10 @@ struct OnboardingStepEngine: View {
     private var doneButtonLabel: String {
         switch (prefs.engine, manager.state) {
         case (.appleVision, _),
-             (.downloadedModel, .ready),
-             (.downloadedModel, .notDownloaded):
+             (.downloadedModel, .ready):
             return Loc.onboardingDone
+        case (.downloadedModel, .notDownloaded):
+            return Loc.modelDownloadingLabel(percent: 0)
         case (.downloadedModel, .downloading(let progress)):
             return Loc.modelDownloadingLabel(percent: Int(progress * 100))
         case (.downloadedModel, .failed):
@@ -235,6 +254,8 @@ struct ChoiceCard: View {
     let badge: String?
     let detail: String
     let icon: String
+    /// 1-based index and group size for VoiceOver ("1 of 2").
+    let position: (index: Int, count: Int)
     let action: () -> Void
 
     var body: some View {
@@ -244,6 +265,7 @@ struct ChoiceCard: View {
                     .font(.headline)
                     .foregroundStyle(isSelected ? Color.appBrand : .secondary)
                     .frame(width: 24)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
@@ -258,6 +280,7 @@ struct ChoiceCard: View {
                                 .background(
                                     Capsule().fill(Color.secondary.opacity(0.15))
                                 )
+                                .accessibilityHidden(true)
                         }
                     }
                     Text(detail)
@@ -280,6 +303,7 @@ struct ChoiceCard: View {
                             .padding(4)
                     )
                     .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
             }
             .padding(14)
             .background(
@@ -293,5 +317,16 @@ struct ChoiceCard: View {
             )
         }
         .buttonStyle(PressableButtonStyle())
+        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityLabel(accessibilityName)
+        .accessibilityValue(isSelected ? Loc.onboardingChoiceSelected : Loc.onboardingChoiceNotSelected)
+        .accessibilityHint(Loc.onboardingChoiceHint(position.index, of: position.count))
+    }
+
+    private var accessibilityName: String {
+        if let badge {
+            return "\(title), \(badge). \(detail)"
+        }
+        return "\(title). \(detail)"
     }
 }
