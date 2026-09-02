@@ -820,6 +820,21 @@ extension ShellView {
             // en heeft geen annuleer-pad. Een knop die niets doet is erger
             // dan geen knop.
             DSToast(title: message, isLoading: true)
+        case .done(let receipt) where receipt.compact:
+            // Set background: zelfde formaat als de "Removing background…"-pill,
+            // geen kaart. Undo blijft inline; ⌘Z werkt sowieso. `.id` hertelt de
+            // timer bij een vervangende bon met dezelfde titel.
+            ConfirmationStatusPill(
+                label: receipt.title,
+                onUndo: receipt.canUndo
+                    ? {
+                        receipt.performUndo()
+                        model.dismissSetActionToast()
+                    }
+                    : nil,
+                onDismiss: { model.dismissSetActionToast() }
+            )
+            .id(receipt.id)
         case .done(let receipt):
             DSToast(
                 title: receipt.title,

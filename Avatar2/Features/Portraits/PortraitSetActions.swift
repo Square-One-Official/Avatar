@@ -327,6 +327,7 @@ enum PortraitSetActions {
         reporter.done(SetActionReceipt(
             title: changed > 0 ? "Set background on \(plural(changed))" : "Background already set",
             actionName: changed > 0 ? "Background" : nil,
+            compact: true,
             undoManager: undoManager
         ))
     }
@@ -350,6 +351,7 @@ enum PortraitSetActions {
         reporter.done(SetActionReceipt(
             title: changed > 0 ? "Set folder background on \(plural(changed))" : "Folder background already set",
             actionName: changed > 0 ? "Background" : nil,
+            compact: true,
             undoManager: undoManager
         ))
     }

@@ -28,12 +28,18 @@ struct SetActionReceipt: Identifiable, Equatable {
     /// Optionele tweede regel in de toast (bv. waar het resultaat te zien is).
     let detail: String?
     let actionName: String?
+    /// Compacte bevestiging (status-pill rechtsonder, zoals "Removing
+    /// background…") i.p.v. de 360pt-toastkaart — voor korte, synchrone acties
+    /// (Set background) waar een kaart met omschrijving te zwaar is. De pill
+    /// toont alleen titel + inline Undo; `detail` wordt dan niet getoond.
+    let compact: Bool
     weak var undoManager: UndoManager?
 
-    init(title: String, detail: String? = nil, actionName: String?, undoManager: UndoManager?) {
+    init(title: String, detail: String? = nil, actionName: String?, compact: Bool = false, undoManager: UndoManager?) {
         self.title = title
         self.detail = detail
         self.actionName = actionName
+        self.compact = compact
         self.undoManager = undoManager
     }
 

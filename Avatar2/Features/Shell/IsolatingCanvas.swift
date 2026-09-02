@@ -108,3 +108,53 @@ struct IsolatingStatusPill: View {
         .background(DSColor.Background.card, in: Capsule())
     }
 }
+
+/// Compacte "klaar"-bevestiging in hetzelfde formaat als `IsolatingStatusPill`:
+/// de 32-container krijgt een vinkje i.p.v. de activity-indicator, daarnaast
+/// het label en (optioneel) een inline Undo. Voor korte set-acties (Set
+/// background) waar de 360pt-toastkaart te groot is (Thierry, 2026-09-02).
+/// Telt zelf af; hover bevriest de timer (zelfde UXS-2-gedrag als DSToast).
+/// Geen sluitknop: de pill verdwijnt vanzelf, en Undo is de enige actie.
+struct ConfirmationStatusPill: View {
+    let label: String
+    var onUndo: (() -> Void)? = nil
+    var autoDismiss: Duration = .seconds(4)
+    let onDismiss: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: DSSpacing.gap3) {
+            ZStack {
+                Circle()
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: 32, height: 32)
+                Image(systemName: "checkmark")
+                    .font(.system(size: DSIconSize.base, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.primary)
+            }
+            Text(label)
+                .dsTextStyle(.labelSmall)
+                .foregroundStyle(DSColor.Foreground.subtle)
+                .padding(.trailing, onUndo == nil ? DSSpacing.gap2 : 0)
+            if let onUndo {
+                DSGhostButton("Undo", size: .small, action: onUndo)
+                    .padding(.trailing, DSSpacing.gap1)
+            }
+        }
+        .padding(DSSpacing.gap2)
+        .background(DSColor.Background.card, in: Capsule())
+        .onHover { isHovering = $0 }
+        .task {
+            let step = Duration.milliseconds(50)
+            var remaining = autoDismiss
+            while remaining > .zero {
+                try? await Task.sleep(for: step)
+                if Task.isCancelled { return }
+                guard !isHovering else { continue }
+                remaining -= step
+            }
+            onDismiss()
+        }
+    }
+}
