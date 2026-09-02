@@ -76,7 +76,8 @@ gefaalde cloud-actie.
 - Result: alle vier gebieden ≥3 tests, op pure/statische paden of de
   47.1/47.2-stub-sessie (geen UI-tests). **ShellModel** (+6 in
   `ShellModelTests`): cutoutSignature deterministisch/content-gevoelig,
-  import-gate op de cap (402-stub → paywall, canvas+store ongemoeid), select
+  import-gate op de cap (402-stub → paywall, canvas+store ongemoeid; batch-contract
+  sinds E14.10: geen tegel vóór de gate, rest bewaard als pending set), select
   (directe selectie-state + async canvas-decode), effect-apply met
   cutout-resultaat (edit-bron gewist), vol resultaat (edit-bron + verse
   stempel → stale na cutout-terugdraai), applyIsolatedResult (geen tweede

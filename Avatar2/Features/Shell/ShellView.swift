@@ -5,6 +5,7 @@
 // Name/Role-header staat in de flow bóven de canvas-kaart — nooit over
 // de foto.
 
+import AppKit
 import AvatarUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -194,6 +195,10 @@ struct ShellView: View {
                 entitlement.openSettingsPage = nil
             }
         }
+        // E14.10: wachtende drop-import hervatten/laten vervallen (eigen
+        // modifier: drie extra modifiers in deze body-keten lieten de
+        // type-checker vastlopen).
+        .modifier(GatedImportHooks(model: model, entitlement: entitlement))
         .task {
             model.modelContext = modelContext
             // Punt 13: niet-lege store → laatst bewerkte/geselecteerde
@@ -727,6 +732,33 @@ private enum DroppedImageSources {
                 continuation.resume(returning: data)
             }
         }
+    }
+}
+
+// MARK: - E14.10: wachtende drop-import
+
+/// Een drop die niet in de Starter-cap paste wacht op een upgrade. Pro
+/// geworden → alsnog importeren; paywall gesloten zonder upgrade (en niet
+/// voor Stripe Checkout) → de set vervalt met uitleg. Terug uit de browser na
+/// Stripe Checkout lezen we het account na zodat `isProActive` kan flippen —
+/// alleen zolang er iets wacht, geen extra account-calls op elke activatie.
+private struct GatedImportHooks: ViewModifier {
+    let model: ShellModel
+    let entitlement: EntitlementModel
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: entitlement.isProActive) { _, isPro in
+                if isPro { model.resumePendingGatedImport() }
+            }
+            .onChange(of: entitlement.isPaywallPresented) { _, isPresented in
+                guard !isPresented, !entitlement.isProActive, !entitlement.paywallClosedForCheckout else { return }
+                model.discardPendingGatedImport()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                guard model.pendingGatedImport != nil, !entitlement.isProActive else { return }
+                Task { await entitlement.refresh() }
+            }
     }
 }
 

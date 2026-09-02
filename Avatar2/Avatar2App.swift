@@ -205,11 +205,14 @@ struct Avatar2App: App {
                                 : nil
                         )
                     case let .info(info):
+                        // E14.10: optionele actie ("Upgrade to Pro" na een
+                        // deels geïmporteerde drop) via de E50.3-actie-rij.
                         DSToast(
                             title: info.title,
                             description: info.description,
                             autoDismiss: EntitlementModel.infoToastDuration,
-                            onClose: { entitlement.dismissInfoToast() }
+                            onClose: { entitlement.dismissInfoToast() },
+                            action: info.action.map { DSToastAction($0.label, handler: $0.handler) }
                         )
                     }
                 }

@@ -112,6 +112,85 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertFalse(model.isShowingOutOfCreditsToast)
     }
 
+    /// E14.10: de batch-import beslist zelf over paywall vs. toast — met
+    /// `presentPaywall: false` blijft een weigering bij de caller.
+    func testClaimImportDeniedWithoutPaywallStaysClosed() async {
+        EntitlementStubURLProtocol.setStub(.json(402, """
+            { "allowed": false, "imports_used": 3, "imports_remaining": 0 }
+            """), forPath: "/v1/import-claim")
+        let model = makeModel()
+
+        let allowed = await model.claimImport(presentPaywall: false)
+
+        XCTAssertFalse(allowed)
+        XCTAssertFalse(model.isPaywallPresented)
+        XCTAssertNil(model.upgradeReason)
+    }
+
+    /// E14.10: de reden reist mee naar de contextregel en hoort bij één
+    /// presentatie — sluiten wist 'm, een latere Upgrade-chip is schoon.
+    func testRequestUpgradeReasonDrivesCopyAndClearsOnDismiss() {
+        let model = makeModel()
+
+        model.requestUpgrade(reason: .importCapReached(dropped: 14, capacity: 3))
+        XCTAssertTrue(model.isPaywallPresented)
+        XCTAssertEqual(model.upgradeReasonCopy,
+                       "You dropped 14 images, but your 3 free images are used up. Upgrade to Pro to import them.")
+
+        model.isPaywallPresented = false
+        XCTAssertNil(model.upgradeReason)
+        XCTAssertNil(model.upgradeReasonCopy)
+
+        model.requestUpgrade()
+        XCTAssertNil(model.upgradeReasonCopy, "generieke opening: geen contextregel")
+
+        model.requestUpgrade(reason: .importCapReached(dropped: 1, capacity: 3))
+        XCTAssertEqual(model.upgradeReasonCopy, "Your 3 free images are used up. Upgrade to Pro to keep importing.")
+    }
+
+    /// E14.10: pre-flight voor de batch — free-teller uit het account, Pro en
+    /// onbereikbaar account = nil (server blijft per beeld de autoriteit).
+    func testRemainingImportCapacityFollowsAccount() async {
+        EntitlementStubURLProtocol.setStub(.json(200, accountJSON(freeImportsRemaining: 2)), forPath: "/v1/account")
+        let free = makeModel()
+        let capacity = await free.remainingImportCapacity()
+        XCTAssertEqual(capacity, 2, "laadt het account na als het er nog niet is")
+
+        EntitlementStubURLProtocol.setStub(.json(200, accountJSON(tier: "pro", credits: 50)), forPath: "/v1/account")
+        let pro = makeModel()
+        let proCapacity = await pro.remainingImportCapacity()
+        XCTAssertNil(proCapacity, "Pro: onbeperkt")
+
+        EntitlementStubURLProtocol.setStub(.failure(URLError(.notConnectedToInternet)), forPath: "/v1/account")
+        let offline = makeModel()
+        let unknown = await offline.remainingImportCapacity()
+        XCTAssertNil(unknown, "onbekend → niet blokkeren, de claim per beeld beslist")
+    }
+
+    /// E14.10: de actie in een info-toast sluit de toast zelf voordat ze
+    /// haar werk doet (anders staat "Upgrade to Pro" naast de open paywall).
+    func testInfoToastActionDismissesToastFirst() {
+        let model = makeModel()
+        var fired = false
+        model.presentInfo(title: "1 of 3 images imported", action: .init(label: "Upgrade to Pro") { fired = true })
+        XCTAssertEqual(model.infoToast?.action?.label, "Upgrade to Pro")
+        XCTAssertEqual(
+            model.activeToast,
+            .info(.init(title: "1 of 3 images imported", description: nil, action: .init(label: "Upgrade to Pro") {})),
+            "gelijkheid op titel/omschrijving/actielabel — niet op de closure"
+        )
+        XCTAssertNotEqual(
+            model.activeToast,
+            .info(.init(title: "1 of 3 images imported", description: nil)),
+            "ander actielabel (of geen) = andere toast"
+        )
+
+        model.infoToast?.action?.handler()
+
+        XCTAssertTrue(fired)
+        XCTAssertNil(model.infoToast)
+    }
+
     /// Toegestane claim ververst meteen account + teller (QuotaBadge).
     func testClaimImportAllowedRefreshesAccount() async {
         EntitlementStubURLProtocol.setStub(.json(200, """

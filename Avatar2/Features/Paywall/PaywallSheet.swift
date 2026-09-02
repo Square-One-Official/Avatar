@@ -137,6 +137,17 @@ struct PaywallSheet: View {
                 }
             }
 
+            // E14.10: waarom je hier bent, als de paywall door een geweigerde
+            // drop opende ("You dropped 14 images, but …"). Bewuste afwijking
+            // van frame 4019:953 (besluit Thierry 2026-09-02).
+            if let context = model.upgradeReasonCopy {
+                Text(context)
+                    .dsTextStyle(.bodySmall)
+                    .foregroundStyle(DSColor.Foreground.subtle)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+            }
+
             intervalToggle
 
             HStack(alignment: .top, spacing: DSSpacing.gap4) {

@@ -278,3 +278,84 @@ comp-grant; `isDevUnlimitedUser` uit drie plaatsen geconsolideerd naar
 `proOverrideFor`; `tsc --noEmit` schoon op backend, admin `next build` groen
 (4 pre-existing tsc-errors ongewijzigd), Avatar2-target bouwt (geen Swift
 geraakt). Niet gedaan: prod-uitrol — wacht op de SQL-migratie van Thierry.
+
+## 14.10 — Drop-import boven de Starter-cap: uitleggen, deels importeren, hervatten
+- status: done
+- owner: FEAT (AI-agent)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- branch: `v2/e14-14.10`
+
+Melding Thierry 2026-09-02: uitgelogd 14 beelden in een map gedropt → de tegels
+flitsten kort, de "Choose your plan"-paywall opende, en na het wegklikken waren
+alle beelden weg — zonder één woord uitleg. Sidebar zei ondertussen "3 left of 3".
+
+**Oorzaak:** de batch-import (`ShellModel.importImages`) zette alle tegels
+optimistisch neer en deed daarna pas per beeld de server-claim; de eerste 402
+veegde alle wachtende tegels in één frame weg (`processLibraryImport`). Het
+single-pad (`runCutout`) claimt wél vóór het canvas aanraakt — E14.2 heeft
+alleen dat pad gewired. De paywall kende geen reden; er was geen toast en geen
+deel-import.
+
+**Besluiten Thierry (2026-09-02):** deels passend → importeer wat past + toast
+met Upgrade-knop (geen gedwongen paywall); paywall door geweigerde drop krijgt
+een contextregel (**bewuste afwijking van Figma-frame 4019:953**, dat kent geen
+contextregel); gedropte set bewaren en hervatten na een geslaagde upgrade,
+sluiten zonder upgrade → korte toast.
+
+**Plan:**
+1. `EntitlementModel.remainingImportCapacity()` — pre-flight (Pro/onbekend = nil,
+   anders `freeImportsRemaining`, laadt het account één keer na). `claimImport(presentPaywall:reason:)`,
+   `requestUpgrade(reason:)` + `UpgradeReason.importCapReached(dropped:capacity)` →
+   `upgradeReasonCopy`; reden wist zichzelf bij sluiten. `InfoToast.action` (DSToast had de
+   actie-rij al, E50.3). `paywallClosedForCheckout` zodat sluiten-voor-Stripe ≠ afzien.
+2. `ShellModel.importImages(_:into:)`: niets past → geen tegel, set wacht (`pendingGatedImport`),
+   paywall met reden; deel past → alleen dat deel krijgt tegels, rest wacht, aan het eind
+   "X of N images imported"-toast met Upgrade; server weigert toch (stale teller) → wachtrij
+   naar de pending set, niets geland → paywall. `resumePendingGatedImport()` (Pro geworden →
+   import in de oorspronkelijke map), `discardPendingGatedImport()` (paywall afgewezen →
+   "N images weren't imported"). Single-pad geeft `dropped: 1` mee voor de contextregel.
+3. `PaywallSheet.planChooser`: contextregel onder de titel als `upgradeReasonCopy != nil`.
+4. `ShellView` `GatedImportHooks` (ViewModifier): Pro → hervatten; paywall dicht zonder Pro en
+   niet voor checkout → vervallen; `didBecomeActive` → account nalezen zolang er iets wacht.
+5. Tests: `testBatchImportStoptOpDeCapZonderRestanten` vervangen door vijf E14.10-tests
+   (geen tegel + wacht, deels + toast + actie, stale teller, hervatten in de map, vervallen met
+   toast) en vier `EntitlementModelTests` (presentPaywall:false, reden/copy/wissen, capaciteit,
+   toast-actie).
+
+**Afhankelijkheid:** 14.11. Zolang `/v1/account` uitgelogd "3 over" zegt terwijl de claim
+weigert, loopt een uitgelogde drop via het stale-pad: max. 3 tegels flitsen alsnog, daarna
+paywall met uitleg en de set wacht. Correct en uitgelegd, maar pas zonder flits met 14.11.
+
+**Result (2026-09-02):** Batch-import peilt eerst de Starter-cap (`EntitlementModel.remainingImportCapacity`)
+en zet alleen tegels neer voor wat past; niets past → geen tegel, paywall met contextregel
+("You dropped 14 images, but your 3 free images are used up…"), set wacht; deel past → dat deel
+landt, daarna toast "X of N images imported" met Upgrade-knop; server weigert toch → wachtrij
+naar de pending set, paywall met reden. Pro geworden → hervatten in de oorspronkelijke map
+(`didBecomeActive` leest het account na zolang er iets wacht); paywall afgewezen → "N images
+weren't imported"-toast; sluiten-voor-Stripe telt niet als afwijzen. Single-pad geeft de reden
+óók mee. Contextregel = gedocumenteerde Figma-afwijking. Tests: 5 nieuwe ShellModel-tests
+(vervangen `testBatchImportStoptOpDeCapZonderRestanten`), 4 nieuwe EntitlementModel-tests;
+`testBatchImportTegelsVolgenDeLens` gehard met `context.save()` (eenmalige SwiftData-fatal op
+een temporary folder-identifier, pre-existing pad). Avatar én Avatar2 bouwen groen, volledige
+Avatar2-suite groen; AvatarKit/AvatarUI ongewijzigd (geen `swift test` nodig). Handmatige
+smoke op een device met opgebruikte teller: Thierry. Open: 14.11 (INFRA).
+
+## 14.11 — `/v1/account` spiegelt de device-teller [INFRA]
+- status: ready
+- team: INFRA
+- blockedBy: —
+- DoD: `tsc --noEmit` schoon, backend-test, prod-deploy via E43-pad
+
+**Wat:** `backend/api/v1/account.ts` stuurt op het pure-anonieme pad hardcoded
+`free_imports_remaining: FREE_IMPORTS_ALLOWANCE` en op het ingelogde free-pad alleen
+`users.free_imports_used`. `/v1/import-claim` weigert op `max(user, device)`
+(`tryConsumeFreeImport`). Gevolg: sidebar "3 left of 3 images" naast een 402, en de
+E14.10-pre-flight denkt dat er ruimte is (stale-pad, flits van max. 3 tegels).
+**Voorstel:** read-only helper `freeImportsUsedForDevice(fingerprint)` in `backend/lib/supabase.ts`
+(naast `freeImportsUsedForUser`, `device_imports.free_imports_used`), en op beide free-paden
+`free_imports_used = max(userUsed, deviceUsed)`. Zelfde semantiek als de claim; geen
+schema-wijziging. Anonieme pad: fingerprint komt al uit `readDeviceFingerprint`.
+**DoD:** een device op de cap ziet uitgelogd én ingelogd "0 left of 3"; backend-test op
+beide paden; Result-regel.
+

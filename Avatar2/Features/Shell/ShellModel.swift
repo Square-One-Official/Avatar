@@ -448,7 +448,9 @@ final class ShellModel {
     private func runCutout(on importedImage: CGImage, defaultName: String = "") async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
-        guard await entitlement.claimImport() else { return }
+        guard await entitlement.claimImport(
+            reason: .importCapReached(dropped: 1, capacity: FreeTier.maxPortraits)
+        ) else { return }
         // Drop/upload vanuit de library: open de editor METEEN met de nieuwe
         // foto — niet pas ná de cutout (de library bleef ~2s staan en de editor
         // popte laat in beeld). De vorige selectie gaat weg zodat niet eerst de
@@ -547,6 +549,9 @@ final class ShellModel {
         }
 
         let id = UUID()
+        /// E14.10: de bron blijft bij de job zodat een door de server
+        /// geweigerd beeld als wachtende import bewaard kan worden.
+        let source: ImportSource
         /// Genormaliseerd (sRGB) bronbeeld voor de engine.
         let cgImage: CGImage
         /// Hetzelfde beeld als NSImage voor de tegel.
@@ -563,6 +568,26 @@ final class ShellModel {
     /// Voortgang van de lopende batch voor de status-pill; nil = geen batch.
     private(set) var libraryImportProgress: (done: Int, total: Int)?
     @ObservationIgnored private var isLibraryImportRunning = false
+
+    /// E14.10: beelden uit een drop die (nog) niet in de Starter-cap passen.
+    /// Bewaard als bron (URL/bytes, niet gedecodeerd) zolang de gebruiker kan
+    /// upgraden: wordt het account Pro terwijl de app draait, dan gaat de
+    /// import alsnog door (`resumePendingGatedImport`). Een nieuwe drop
+    /// vervangt de wachtende set.
+    struct PendingGatedImport {
+        var sources: [ImportSource]
+        /// Bestemming van de oorspronkelijke drop.
+        let folderID: PersistentIdentifier?
+        /// De paywall is vóór deze set geopend: sluit de gebruiker 'm zonder
+        /// upgrade, dan vervalt de set (met een toast die dat zegt).
+        var awaitsPaywall = false
+    }
+    private(set) var pendingGatedImport: PendingGatedImport?
+
+    /// Telling over de lopende batch-run (meerdere drops die achter elkaar
+    /// aansluiten tellen mee) voor de "X of N imported"-samenvatting.
+    @ObservationIgnored private var batchTally = (dropped: 0, imported: 0)
+
     /// Zijde (px) van de tegel-compositie die tijdens de reveal en als
     /// placeholder van de verse tegel dient. Retina-tegel op de 3-koloms-grid.
     private static let libraryImportPreviewSide = 640
@@ -608,20 +633,48 @@ final class ShellModel {
         if section == .editor { goBack() }
         if section == .banners { showHome() }
         let folderID: PersistentIdentifier? = section == .portraits ? selectedFolderID : nil
+        await importImages(sources, into: folderID)
+    }
+
+    /// Batch-import naar een vaste bestemming (drop én hervatting).
+    ///
+    /// E14.10: éérst de Starter-cap peilen, dán pas tegels neerzetten. Voorheen
+    /// verschenen alle 14 tegels optimistisch en veegde de eerste geweigerde
+    /// server-claim ze in één frame weer weg — zonder uitleg. Nu:
+    /// - past er niets → geen tegel, paywall met contextregel, de set wacht;
+    /// - past een deel → alleen dat deel krijgt tegels, de rest wacht en de
+    ///   batch eindigt met een "X of N imported"-toast met Upgrade-knop;
+    /// - blijkt de teller stale (server weigert toch) → zelfde afhandeling,
+    ///   nooit meer een stille wipe.
+    private func importImages(_ sources: [ImportSource], into folderID: PersistentIdentifier?) async {
+        guard !sources.isEmpty else { return }
+        let capacity = await entitlement.remainingImportCapacity()
+        if let capacity, capacity == 0 {
+            pendingGatedImport = PendingGatedImport(sources: sources, folderID: folderID, awaitsPaywall: true)
+            entitlement.requestUpgrade(
+                reason: .importCapReached(dropped: sources.count, capacity: FreeTier.maxPortraits)
+            )
+            return
+        }
+        let fitting = capacity.map { Array(sources.prefix($0)) } ?? sources
+        let overflow = Array(sources.dropFirst(fitting.count))
+        pendingGatedImport = overflow.isEmpty ? nil : PendingGatedImport(sources: overflow, folderID: folderID)
+        batchTally.dropped += sources.count
 
         var jobs: [LibraryImportJob] = []
-        for source in sources {
+        for source in fitting {
             // Decode + sRGB-normalisatie (E02.5) off-main; 14 grote JPEG's op
             // main zouden de drop-animatie laten haperen.
             guard let decoded = await Self.decodeImport(source) else { continue }
             let name: String
             if case .file(let url) = source { name = Self.defaultPortraitName(from: url) } else { name = "" }
             jobs.append(LibraryImportJob(
-                cgImage: decoded.cgImage, original: nsImage(from: decoded.cgImage),
+                source: source, cgImage: decoded.cgImage, original: nsImage(from: decoded.cgImage),
                 name: name, folderID: folderID
             ))
         }
         guard !jobs.isEmpty else {
+            if !isLibraryImportRunning { batchTally = (dropped: 0, imported: 0) }
             setActionToast = .done(SetActionReceipt(
                 title: "Those files don't look like images we can read.",
                 actionName: nil, undoManager: nil
@@ -639,13 +692,78 @@ final class ShellModel {
         }
         isLibraryImportRunning = false
         libraryImportProgress = nil
+        finishGatedBatch()
+    }
+
+    /// Einde van een batch-run: leg uit wat er met de niet-geïmporteerde
+    /// beelden is gebeurd. Deel geland → toast met Upgrade-knop (geen
+    /// gedwongen paywall, besluit Thierry 2026-09-02); niets geland (stale
+    /// teller: de client dacht dat er ruimte was) → paywall met contextregel.
+    private func finishGatedBatch() {
+        let tally = batchTally
+        batchTally = (dropped: 0, imported: 0)
+        guard let pending = pendingGatedImport, !pending.sources.isEmpty else { return }
+        let heldBack = pending.sources.count
+        let reason = EntitlementModel.UpgradeReason.importCapReached(
+            dropped: tally.dropped, capacity: FreeTier.maxPortraits
+        )
+        guard tally.imported > 0 else {
+            pendingGatedImport?.awaitsPaywall = true
+            entitlement.requestUpgrade(reason: reason)
+            return
+        }
+        entitlement.presentInfo(
+            title: "\(tally.imported) of \(tally.dropped) images imported",
+            description: "Starter includes \(FreeTier.maxPortraits) images. Upgrade to Pro to add the other \(heldBack).",
+            action: .init(label: "Upgrade to Pro") { [weak self] in
+                guard let self else { return }
+                self.pendingGatedImport?.awaitsPaywall = true
+                self.entitlement.requestUpgrade(reason: reason)
+            }
+        )
+    }
+
+    /// E14.10: het account is Pro geworden terwijl er een set wachtte → de
+    /// import gaat alsnog door, in de map van de oorspronkelijke drop.
+    func resumePendingGatedImport() {
+        guard entitlement.isProActive, let pending = pendingGatedImport else { return }
+        pendingGatedImport = nil
+        Task { await importImages(pending.sources, into: pending.folderID) }
+    }
+
+    /// E14.10: de paywall die voor de wachtende set open stond is gesloten
+    /// zonder upgrade → de set vervalt, met een toast die dat zegt (voorheen
+    /// verdwenen de beelden zonder één woord). Een set die alleen via de
+    /// deel-toast hangt (paywall nooit geopend) blijft staan tot een volgende
+    /// drop of een upgrade.
+    func discardPendingGatedImport() {
+        guard let pending = pendingGatedImport, pending.awaitsPaywall else { return }
+        pendingGatedImport = nil
+        let count = pending.sources.count
+        entitlement.presentInfo(
+            title: count == 1 ? "1 image wasn't imported" : "\(count) images weren't imported",
+            description: "Upgrade to Pro any time to import them."
+        )
+    }
+
+    /// Door de server geweigerde beelden (stale teller) achter de wachtende set.
+    private func holdBack(_ sources: [ImportSource], folderID: PersistentIdentifier?) {
+        guard !sources.isEmpty else { return }
+        if pendingGatedImport != nil {
+            pendingGatedImport?.sources.append(contentsOf: sources)
+        } else {
+            pendingGatedImport = PendingGatedImport(sources: sources, folderID: folderID)
+        }
     }
 
     private func processLibraryImport(_ job: LibraryImportJob) async {
-        // E14.2: dezelfde importgate als het single-pad, per beeld. Cap bereikt →
-        // de paywall staat open; de rest van de batch vervalt (geen 11× paywall).
-        guard await entitlement.claimImport() else {
+        // E14.2: dezelfde importgate als het single-pad, per beeld. Cap bereikt
+        // (pre-flight was stale) → de rest van de batch wacht als pending set;
+        // `finishGatedBatch` beslist over paywall of toast (geen 11× paywall).
+        guard await entitlement.claimImport(presentPaywall: false) else {
+            let queued = libraryImportJobs.filter { if case .queued = $0.phase { return true } else { return false } }
             libraryImportJobs.removeAll { if case .queued = $0.phase { return true } else { return false } }
+            holdBack(queued.map(\.source), folderID: job.folderID)
             return
         }
         updateLibraryImport(job.id) { $0.phase = .isolating }
@@ -678,6 +796,7 @@ final class ShellModel {
             }
             // Tegel weg + portret erin in dezelfde main-actor-beurt → één layout-pass.
             libraryImportJobs.removeAll { $0.id == job.id }
+            batchTally.imported += 1
             advanceLibraryImportProgress()
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
         } catch {

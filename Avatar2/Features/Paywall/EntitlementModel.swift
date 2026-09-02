@@ -40,16 +40,62 @@ final class EntitlementModel {
     /// kapot gaat als de CMS onbereikbaar is bij startup.
     private(set) var featureFlags: RemoteFeatureFlags = .allEnabled
 
-    var isPaywallPresented = false
+    var isPaywallPresented = false {
+        didSet {
+            // E14.10: de reden hoort bij één presentatie — een latere "Upgrade"-
+            // chip toont weer de schone plan-kiezer.
+            if !isPaywallPresented { upgradeReason = nil }
+        }
+    }
+
+    /// E14.10: waarom de paywall open ging, voor een contextregel in de
+    /// plan-kiezer. nil = generieke opening (Upgrade-chip, Settings, gates).
+    enum UpgradeReason: Equatable {
+        /// Een drop van `dropped` beelden paste niet (meer) in de Starter-cap
+        /// van `capacity` afbeeldingen.
+        case importCapReached(dropped: Int, capacity: Int)
+    }
+    private(set) var upgradeReason: UpgradeReason?
+
+    /// Copy voor de contextregel onder "Choose your plan" (bewuste afwijking
+    /// van Figma-frame 4019:953, besluit Thierry 2026-09-02 — zie E14.10).
+    var upgradeReasonCopy: String? {
+        switch upgradeReason {
+        case nil:
+            return nil
+        case .importCapReached(let dropped, let capacity) where dropped >= 2:
+            return "You dropped \(dropped) images, but your \(capacity) free images are used up. Upgrade to Pro to import them."
+        case .importCapReached(_, let capacity):
+            return "Your \(capacity) free images are used up. Upgrade to Pro to keep importing."
+        }
+    }
+
+    /// E14.10: de paywall sloot omdat Stripe Checkout in de browser opende —
+    /// niet omdat de gebruiker afzag van upgraden. De shell laat een
+    /// wachtende drop-import dan staan tot het account Pro wordt.
+    private(set) var paywallClosedForCheckout = false
+
     /// Op=op-toast (HTTP 402 / credits op): toast eerst, paywall op tik.
     private(set) var isShowingOutOfCreditsToast = false
 
     /// E18.3: generieke fout-toast voor cloud-acties (Effects/Hair/Clothing/
     /// Boost) i.p.v. inline tekst onder de menutitel.
     private(set) var errorToast: String?
+    /// E14.10: optionele actie in een info-toast ("Upgrade to Pro"). De
+    /// handler sluit de toast niet zelf; `presentInfo` regelt dat.
+    struct InfoToastAction {
+        let label: String
+        let handler: () -> Void
+    }
     struct InfoToast: Equatable {
         let title: String
         let description: String?
+        var action: InfoToastAction? = nil
+
+        static func == (lhs: InfoToast, rhs: InfoToast) -> Bool {
+            lhs.title == rhs.title && lhs.description == rhs.description
+                && lhs.action?.label == rhs.action?.label
+        }
     }
     private(set) var infoToast: InfoToast?
 
@@ -382,9 +428,12 @@ final class EntitlementModel {
     }
 
     /// Eén opstap voor alle gating: DSGated.onUpgradeRequested en 402-paden.
-    func requestUpgrade() {
+    /// E14.10: optioneel mét reden → contextregel in de plan-kiezer.
+    func requestUpgrade(reason: UpgradeReason? = nil) {
         checkoutError = nil
         isShowingOutOfCreditsToast = false
+        paywallClosedForCheckout = false
+        upgradeReason = reason
         isPaywallPresented = true
     }
 
@@ -450,8 +499,16 @@ final class EntitlementModel {
         errorToast = nil
     }
 
-    func presentInfo(title: String, description: String? = nil) {
-        infoToast = InfoToast(title: title, description: description)
+    func presentInfo(title: String, description: String? = nil, action: InfoToastAction? = nil) {
+        // De actie sluit de toast vanzelf — een "Upgrade"-knop die blijft
+        // staan naast de paywall zou dubbelop zijn.
+        let wrapped = action.map { action in
+            InfoToastAction(label: action.label) { [weak self] in
+                self?.infoToast = nil
+                action.handler()
+            }
+        }
+        infoToast = InfoToast(title: title, description: description, action: wrapped)
     }
 
     func dismissInfoToast() {
@@ -575,30 +632,53 @@ final class EntitlementModel {
     /// `allowed`. Niet toegestaan (cap bereikt / 402) → paywall + false.
     /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
     /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
-    func claimImport() async -> Bool {
+    ///
+    /// E14.10: `presentPaywall: false` laat de weigering aan de caller (de
+    /// batch-import beslist zelf tussen paywall en "X of N imported"-toast);
+    /// `reason` reist mee naar de contextregel in de plan-kiezer.
+    func claimImport(presentPaywall: Bool = true, reason: UpgradeReason? = nil) async -> Bool {
         #if DEBUG
         // Smoke-runs (`--smoke-store` e.d.) draaien op een geïsoleerde store maar
         // delen het echte account; deze bypass houdt de gate uit de flow-smokes
         // zonder server-claims te verbruiken.
-        if ProcessInfo.processInfo.arguments.contains("--bypass-import-gate") {
-            return true
-        }
+        if Self.bypassesImportGate { return true }
         #endif
         do {
             let resp = try await backend.claimImport()
             if !resp.allowed {
-                requestUpgrade()
+                if presentPaywall { requestUpgrade(reason: reason) }
                 return false
             }
             // Bijgewerkte teller meteen zichtbaar in de QuotaBadge.
             await refresh()
             return true
         } catch BackendError.noCredits {
-            requestUpgrade()
+            if presentPaywall { requestUpgrade(reason: reason) }
             return false
         } catch {
             return true
         }
+    }
+
+    #if DEBUG
+    private static var bypassesImportGate: Bool {
+        ProcessInfo.processInfo.arguments.contains("--bypass-import-gate")
+    }
+    #endif
+
+    /// E14.10: pre-flight vóór een batch-import — hoeveel beelden passen er
+    /// nog in de Starter-cap? `nil` = onbeperkt óf onbekend (Pro, account niet
+    /// te laden): de server blijft per beeld de autoriteit via `claimImport`.
+    /// Laadt het account één keer na als het er nog niet is, zodat een drop
+    /// direct na launch niet blind 14 tegels neerzet.
+    func remainingImportCapacity() async -> Int? {
+        #if DEBUG
+        if Self.bypassesImportGate { return nil }
+        #endif
+        if isProActive { return nil }
+        if account == nil { await refresh() }
+        if isProActive { return nil }
+        return freeImportsRemaining.map { max(0, $0) }
     }
 
     func dismissOutOfCreditsToast() {
@@ -661,6 +741,10 @@ final class EntitlementModel {
             // het scheme zodat alleen web-/eigen-scheme-URL's geopend worden.
             guard url.isAllowedExternalScheme else { throw BackendError.decode }
             NSWorkspace.shared.open(url)
+            // E14.10: sluiten-voor-checkout ≠ afzien van upgraden (zie
+            // `paywallClosedForCheckout`); de vlag vóór de toewijzing zodat
+            // een `onChange(of: isPaywallPresented)` 'm al ziet.
+            paywallClosedForCheckout = true
             isPaywallPresented = false
         case .storeKit:
             // DMG-pad. Het StoreKit-pad hoort bij een latere MAS-story.

@@ -252,6 +252,11 @@ final class ShellModelTests: XCTestCase {
         let other = Folder2(name: "Other")
         context.insert(folder)
         context.insert(other)
+        // Permanente identifiers: `folderDefaultBackground` lost de map op via
+        // `model(for:)`, en een temporary identifier is niet altijd resolvable
+        // (eenmalige SwiftData-fatal "cannot fulfill model without a store
+        // identifier" in deze test, 2026-09-02).
+        try context.save()
         model.showPortraits(folderID: folder.persistentModelID)
         var observedJobs: [ShellModel.LibraryImportJob] = []
         model.debugCutoutOverride = { image in
@@ -277,33 +282,218 @@ final class ShellModelTests: XCTestCase {
                        "omgekeerde drop-volgorde: de kop van de wachtrij grenst aan het grid")
     }
 
-    /// Cap bereikt (402) bij het eerste beeld: paywall open, de hele rest van
-    /// de batch vervalt (geen paywall per beeld) en er wordt niets gepersisteerd.
-    func testBatchImportStoptOpDeCapZonderRestanten() async throws {
+    // MARK: - E14.10: drop boven de Starter-cap (pre-flight, pending set, hervatten)
+
+    /// Vorm uit backend/api/v1/account.ts (free-tier: `tier: null`).
+    private func accountJSON(freeImportsRemaining: Int, tier: String = "free") -> String {
+        """
+        {
+          "tier": \(tier == "pro" ? "\"pro\"" : "null"),
+          "credits_remaining": \(tier == "pro" ? 200 : 0),
+          "monthly_quota": \(tier == "pro" ? 200 : 0),
+          "monthly_reset_at": null,
+          "subscription_status": "\(tier == "pro" ? "active" : "none")",
+          "subscription_renews_at": null,
+          "free_cutouts_used": 0,
+          "free_cutouts_remaining": 3,
+          "free_imports_used": \(3 - freeImportsRemaining),
+          "free_imports_remaining": \(freeImportsRemaining),
+          "needs_account_link": false
+        }
+        """
+    }
+
+    private func stubAccount(freeImportsRemaining: Int, tier: String = "free") {
+        EntitlementStubURLProtocol.setStub(
+            .json(200, accountJSON(freeImportsRemaining: freeImportsRemaining, tier: tier)),
+            forPath: "/v1/account"
+        )
+    }
+
+    private func stubClaim(allowed: Bool) {
+        EntitlementStubURLProtocol.setStub(
+            allowed
+                ? .json(200, """
+                    { "allowed": true, "imports_used": 1, "imports_remaining": 2 }
+                    """)
+                : .json(402, """
+                    { "allowed": false, "imports_used": 3, "imports_remaining": 0 }
+                    """),
+            forPath: "/v1/import-claim"
+        )
+    }
+
+    private func makeStubbedEntitlement() -> EntitlementModel {
+        EntitlementModel(auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession())
+    }
+
+    private func threeSources() throws -> [ShellModel.ImportSource] {
+        [
+            .data(try png(opaqueImage(shade: 90))),
+            .data(try png(opaqueImage(shade: 120))),
+            .data(try png(opaqueImage(shade: 200))),
+        ]
+    }
+
+    private func waitForStoredCount(_ expected: Int, in context: ModelContext, timeout: TimeInterval = 5) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if try context.fetch(FetchDescriptor<Portrait2>()).count >= expected { return }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    /// Cap al vol vóór de drop: er komt géén tegel (voorheen flitsten alle
+    /// tegels en veegde de eerste 402 ze stil weg), de paywall opent mét de
+    /// reden, en de hele set wacht op een upgrade. Niets gepersisteerd.
+    func testBatchImportBovenDeCapZetGeenTegelNeerEnWacht() async throws {
         EntitlementStubURLProtocol.reset()
         defer { EntitlementStubURLProtocol.reset() }
-        EntitlementStubURLProtocol.setStub(.json(402, """
-            { "allowed": false, "imports_used": 3, "imports_remaining": 0 }
-            """), forPath: "/v1/import-claim")
-        let entitlement = EntitlementModel(
-            auth: AuthService(), backendSession: EntitlementStubURLProtocol.makeSession()
-        )
+        stubAccount(freeImportsRemaining: 0)
+        stubClaim(allowed: false)
+        let entitlement = makeStubbedEntitlement()
+        let model = ShellModel(entitlement: entitlement)
+        let context = try makeLibraryContext()
+        model.modelContext = context
+        model.debugCutoutOverride = { _ in XCTFail("geen cutout als er niets past"); throw CancellationError() }
+
+        await model.importImages(try threeSources())
+
+        XCTAssertTrue(entitlement.isPaywallPresented, "cap → paywall")
+        XCTAssertEqual(entitlement.upgradeReason, .importCapReached(dropped: 3, capacity: FreeTier.maxPortraits))
+        XCTAssertEqual(entitlement.upgradeReasonCopy,
+                       "You dropped 3 images, but your 3 free images are used up. Upgrade to Pro to import them.")
+        XCTAssertTrue(model.libraryImportJobs.isEmpty, "geen tegel vóór de gate")
+        XCTAssertNil(model.libraryImportProgress)
+        XCTAssertEqual(model.pendingGatedImport?.sources.count, 3, "de hele drop wacht op een upgrade")
+        XCTAssertEqual(model.pendingGatedImport?.awaitsPaywall, true)
+        XCTAssertNil(entitlement.infoToast, "niets geland → paywall, geen deel-toast")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 0)
+    }
+
+    /// Eén plek over, drie gedropt: het eerste beeld landt, de andere twee
+    /// wachten, en de batch eindigt met een toast mét Upgrade-knop — géén
+    /// gedwongen paywall (besluit Thierry 2026-09-02). De knop opent de
+    /// paywall met de reden en sluit de toast.
+    func testBatchImportDeelsPassendLandtDeelEnToontToastMetUpgrade() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        stubAccount(freeImportsRemaining: 1)
+        stubClaim(allowed: true)
+        let entitlement = makeStubbedEntitlement()
+        let model = ShellModel(entitlement: entitlement)
+        let context = try makeLibraryContext()
+        model.modelContext = context
+        model.debugCutoutOverride = { $0 }
+
+        await model.importImages(try threeSources())
+
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 1, "alleen wat past landt")
+        XCTAssertFalse(entitlement.isPaywallPresented, "deels geland → geen gedwongen paywall")
+        XCTAssertEqual(entitlement.infoToast?.title, "1 of 3 images imported")
+        XCTAssertEqual(entitlement.infoToast?.description,
+                       "Starter includes 3 images. Upgrade to Pro to add the other 2.")
+        XCTAssertEqual(entitlement.infoToast?.action?.label, "Upgrade to Pro")
+        XCTAssertEqual(model.pendingGatedImport?.sources.count, 2)
+        XCTAssertEqual(model.pendingGatedImport?.awaitsPaywall, false)
+        XCTAssertTrue(model.libraryImportJobs.isEmpty)
+
+        // Zonder geopende paywall vervalt er niets stilletjes.
+        model.discardPendingGatedImport()
+        XCTAssertEqual(model.pendingGatedImport?.sources.count, 2, "set blijft staan zolang de paywall niet is afgewezen")
+
+        entitlement.infoToast?.action?.handler()
+        XCTAssertNil(entitlement.infoToast, "de actie sluit de toast")
+        XCTAssertTrue(entitlement.isPaywallPresented)
+        XCTAssertEqual(entitlement.upgradeReason, .importCapReached(dropped: 3, capacity: FreeTier.maxPortraits))
+        XCTAssertEqual(model.pendingGatedImport?.awaitsPaywall, true)
+    }
+
+    /// Stale teller: het account zegt "2 over", de server weigert toch (ander
+    /// apparaat / uitgelogd device-teller). Er is dan wél even een tegel, maar
+    /// niets landt → paywall met reden, alle drie de beelden wachten, geen
+    /// stille wipe.
+    func testBatchImportStaleTellerWeigertAllesEnWacht() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        stubAccount(freeImportsRemaining: 2)
+        stubClaim(allowed: false)
+        let entitlement = makeStubbedEntitlement()
         let model = ShellModel(entitlement: entitlement)
         let context = try makeLibraryContext()
         model.modelContext = context
         model.debugCutoutOverride = { _ in XCTFail("geen cutout na een geweigerde claim"); throw CancellationError() }
 
-        await model.importImages([
-            .data(try png(opaqueImage(shade: 90))),
-            .data(try png(opaqueImage(shade: 120))),
-            .data(try png(opaqueImage(shade: 200))),
-        ])
+        await model.importImages(try threeSources())
 
-        XCTAssertTrue(entitlement.isPaywallPresented, "cap → paywall")
-        XCTAssertEqual(model.section, .home)
-        XCTAssertTrue(model.libraryImportJobs.isEmpty, "de rest van de batch vervalt")
+        XCTAssertTrue(entitlement.isPaywallPresented)
+        XCTAssertEqual(entitlement.upgradeReason, .importCapReached(dropped: 3, capacity: FreeTier.maxPortraits))
+        XCTAssertNil(entitlement.infoToast)
+        XCTAssertTrue(model.libraryImportJobs.isEmpty)
         XCTAssertNil(model.libraryImportProgress)
+        XCTAssertEqual(model.pendingGatedImport?.sources.count, 3, "2 uit de wachtrij + 1 overschot")
+        XCTAssertEqual(model.pendingGatedImport?.awaitsPaywall, true)
         XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 0)
+    }
+
+    /// Het account wordt Pro terwijl de set wacht → de import gaat alsnog door,
+    /// in de map van de oorspronkelijke drop.
+    func testPendingGatedImportHervatNaUpgradeInDeOorspronkelijkeMap() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        stubAccount(freeImportsRemaining: 0)
+        stubClaim(allowed: false)
+        let entitlement = makeStubbedEntitlement()
+        let model = ShellModel(entitlement: entitlement)
+        let context = try makeLibraryContext()
+        model.modelContext = context
+        let folder = Folder2(name: "Team")
+        context.insert(folder)
+        try context.save()
+        model.showPortraits(folderID: folder.persistentModelID)
+        model.debugCutoutOverride = { $0 }
+
+        await model.importImages(try threeSources())
+        XCTAssertEqual(model.pendingGatedImport?.sources.count, 3)
+
+        // Upgrade: account Pro, claim short-circuit. De gebruiker staat
+        // inmiddels op Home — de set moet tóch in "Team" landen.
+        stubAccount(freeImportsRemaining: 0, tier: "pro")
+        stubClaim(allowed: true)
+        await entitlement.refresh()
+        XCTAssertTrue(entitlement.isProActive)
+        model.showHome()
+        model.resumePendingGatedImport()
+
+        try await waitForStoredCount(3, in: context)
+        let stored = try context.fetch(FetchDescriptor<Portrait2>())
+        XCTAssertEqual(stored.count, 3, "de wachtende set landt volledig")
+        XCTAssertTrue(stored.allSatisfy { $0.folder?.persistentModelID == folder.persistentModelID },
+                      "in de map van de oorspronkelijke drop")
+        XCTAssertNil(model.pendingGatedImport)
+    }
+
+    /// Paywall gesloten zonder upgrade → de set vervalt met een toast die dat
+    /// zegt (voorheen: beelden weg zonder één woord).
+    func testPendingGatedImportVervaltMetToastNaAfgewezenPaywall() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        stubAccount(freeImportsRemaining: 0)
+        stubClaim(allowed: false)
+        let entitlement = makeStubbedEntitlement()
+        let model = ShellModel(entitlement: entitlement)
+        model.modelContext = try makeLibraryContext()
+
+        await model.importImages(try threeSources())
+        XCTAssertEqual(model.pendingGatedImport?.awaitsPaywall, true)
+
+        entitlement.isPaywallPresented = false
+        model.discardPendingGatedImport()
+
+        XCTAssertNil(model.pendingGatedImport)
+        XCTAssertEqual(entitlement.infoToast?.title, "3 images weren't imported")
+        XCTAssertEqual(entitlement.infoToast?.description, "Upgrade to Pro any time to import them.")
+        XCTAssertNil(entitlement.upgradeReason, "reden hoort bij één presentatie")
     }
 
     /// Geen persoon gevonden: het beeld wordt niet gepersisteerd, de tegel
