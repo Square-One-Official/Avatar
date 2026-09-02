@@ -19,10 +19,13 @@ enum PortraitNameGuess {
     /// `fileName` (met of zonder extensie) → persoonsnaam of "".
     static func name(fromFileName fileName: String) -> String {
         let stem = stripExtension(fileName)
-        // Eerst het hele token tegen de ruislijst ("LinkedIn"), pas daarna
-        // camelCase-splitsen ("ThierryEmmery") — anders wordt "Linked" een naam.
+        // Eerst het hele token tegen de ruislijst ("LinkedIn") en de
+        // cijfer-check (CDN-hash "74ZFkSVk" valt als geheel af), pas daarna
+        // camelCase-splitsen ("ThierryEmmery") — anders wordt "Linked" of
+        // "ZFk" een naam.
         let tokens = tokenize(stem)
             .filter { !noiseWords.contains($0.lowercased()) }
+            .compactMap(lettersOnly)
             .flatMap(splitCamelCase)
         let kept = tokens.compactMap(classify)
         let trimmed = trimParticles(kept)
@@ -77,13 +80,22 @@ enum PortraitNameGuess {
         return out
     }
 
-    /// Token → naamdeel, tussenvoegsel of ruis (nil).
-    private static func classify(_ token: String) -> Token? {
-        // Cijfers aan de randen vallen af ("thierry2", "anna01", "2024anna" →
-        // naam; "img4821" → "img" → ruis; "p1"/"v2"/"1x" → één letter → ruis;
-        // "400px" → "px" → ruis). Cijfers middenin (h2o) of andere tekens = ruis.
+    /// Cijfers aan de randen vallen af ("thierry2", "anna01", "2024anna" →
+    /// naam; "img4821" → "img" → ruis; "p1"/"v2"/"1x" → één letter → ruis;
+    /// "400px" → "px" → ruis). Cijfers middenin ("74ZFkSVk", "Z1GiMhz") of
+    /// andere tekens → nil (het hele token is ruis).
+    private static func lettersOnly(_ token: String) -> String? {
         let raw = String(token.drop(while: \.isNumber).reversed().drop(while: \.isNumber).reversed())
         guard !raw.isEmpty, raw.allSatisfy({ $0.isLetter || $0 == "'" || $0 == "’" }) else { return nil }
+        // Hash-achtig ("ZFkSVk" uit `74ZFkSVk`): gemengd hoofdletterig mét twee
+        // hoofdletters op rij komt in namen niet voor (McDonald/DeVries/JP wel).
+        let mixed = raw != raw.lowercased() && raw != raw.uppercased()
+        if mixed, zip(raw, raw.dropFirst()).contains(where: { $0.isUppercase && $1.isUppercase }) { return nil }
+        return raw
+    }
+
+    /// Token → naamdeel, tussenvoegsel of ruis (nil).
+    private static func classify(_ raw: String) -> Token? {
         let lower = raw.lowercased()
         if particles.contains(lower) { return .particle(lower) }
         if noiseWords.contains(lower) { return nil }

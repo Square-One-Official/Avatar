@@ -48,6 +48,7 @@ final class ShellModelTests: XCTestCase {
         XCTAssertEqual(naam("thierry2.jpg"), "Thierry", "aangeplakte cijfers vallen af")
         XCTAssertEqual(naam("JanJansen2.png"), "Jan Jansen")
         XCTAssertEqual(naam("2024_anna01.HEIC"), "Anna")
+        XCTAssertEqual(naam("jelle-looijen.74ZFkSVk_Z1GiMhz.webp"), "Jelle Looijen", "CDN-hash valt als geheel af")
     }
 
     func testDefaultNaamIsLeegZonderPersoonsnaam() {
