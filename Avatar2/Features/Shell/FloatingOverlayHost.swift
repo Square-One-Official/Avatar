@@ -91,11 +91,16 @@ struct FloatingOverlayHost: View {
 
     // MARK: - Selection background picker
 
+    /// Groot paneel op een klik-anker: blijft binnen het venster (`.window`),
+    /// anders hangt 'ie bij een klik rechtsonder half buiten de app. Kiezen
+    /// sluit 'm — de "klaar"-toast (met Undo) landt rechtsonder, precies waar
+    /// het paneel anders staat.
     @ViewBuilder private var selectionBackgroundPickerLayer: some View {
         if model.presentation.selectionBackgroundPickerOpen {
             let targets = portraits.filter { model.isPortraitSelected($0) }
             DSContextMenuOverlay(
                 anchor: model.presentation.selectionBackgroundPickerAnchor,
+                bounds: .window,
                 onDismiss: { model.presentation.selectionBackgroundPickerOpen = false },
                 menuWidth: 460,
                 menuHeight: 480
@@ -103,6 +108,7 @@ struct FloatingOverlayHost: View {
                 BackgroundPanel(
                     portrait: targets.first,
                     onApply: { background in
+                        model.presentation.selectionBackgroundPickerOpen = false
                         PortraitSetActions.setBackground(
                             targets, background, undoManager: undoManager,
                             reporter: model.setActionReporter

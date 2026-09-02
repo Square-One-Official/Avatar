@@ -7,6 +7,15 @@
 
 import SwiftUI
 
+/// Schaduw van `dsPanelSurface`/`dsMenuSurface`. Eén plek, zodat de
+/// child-window-marge (`DSFloatingMode.menu`) 'm volledig kan omvatten —
+/// een te krappe marge knipt de blur hard af tot een rechthoek.
+public enum DSPanelShadow {
+    public static let radius: CGFloat = 12
+    public static let yOffset: CGFloat = 12
+    public static let opacity: Double = 0.25
+}
+
 public enum DSMenuLayout {
     public static let cornerRadius = DSRadius.xl4
     public static let contentInset = DSSpacing.gap5 + DSSpacing.gap2
@@ -61,7 +70,12 @@ private struct DSPanelSurface: ViewModifier {
                 .overlay {
                     shape.strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
                 }
-                .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
+                .shadow(
+                    color: .black.opacity(DSPanelShadow.opacity),
+                    radius: DSPanelShadow.radius,
+                    x: 0,
+                    y: DSPanelShadow.yOffset
+                )
             }
     }
 }
