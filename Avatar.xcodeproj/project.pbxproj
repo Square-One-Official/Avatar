@@ -240,6 +240,7 @@
 		A467B165881557A4E0CD4FA1 /* PortraitPickerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9089B7FDAD2E88C8C2B1D0EA /* PortraitPickerPanel.swift */; };
 		A4D8BAE9F6A6CCE3F1DDB9FE /* OnboardingStepAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12061CD6212BEF64459A8305 /* OnboardingStepAuth.swift */; };
 		A6AB056EC5348AFDA387F49E /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48EF633AE84A1D2EF9412998 /* LibraryView.swift */; };
+		A823741DA73E101FDBE7E2C0 /* FirstNameLexicon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942237660EAD76755283E910 /* FirstNameLexicon.swift */; };
 		A9D2A5FF7F46FFDDE4D8FE4C /* AppFeatureFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = D689B89995FD3E13AC8C9B95 /* AppFeatureFlags.swift */; };
 		AB116BF57A42F4C1EC0CA933 /* SettingsAIModelsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE4A6E054F04E9AF5422E8D /* SettingsAIModelsPage.swift */; };
 		AD81DDF070642AAF46E77DA6 /* BoardSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DDA9AA35FF6DB61BD3C30C /* BoardSelectionTests.swift */; };
@@ -543,6 +544,7 @@
 		9370E919EA3BBA42F850AF34 /* ShellTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellTopBar.swift; sourceTree = "<group>"; };
 		93B33095D2BD0E9A83923DCC /* PortraitSetCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitSetCommands.swift; sourceTree = "<group>"; };
 		93C81DA0EFDBF0B32E86E04F /* BillingCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillingCopy.swift; sourceTree = "<group>"; };
+		942237660EAD76755283E910 /* FirstNameLexicon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstNameLexicon.swift; sourceTree = "<group>"; };
 		943E8CCEC9CCEFB639805EF6 /* CanvasFrameChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFrameChip.swift; sourceTree = "<group>"; };
 		944A04C42B02792DA0CA60F7 /* BackgroundBlur.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundBlur.swift; sourceTree = "<group>"; };
 		947924202C732493D553BD14 /* Mesh 03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Mesh 03.png"; sourceTree = "<group>"; };
@@ -1116,6 +1118,7 @@
 		D3C947F3B98104547D348526 /* Shell */ = {
 			isa = PBXGroup;
 			children = (
+				942237660EAD76755283E910 /* FirstNameLexicon.swift */,
 				155C2CC018673A6DC2943083 /* FirstUseEmptyState.swift */,
 				1CBD8A1973A183DF41E9F58A /* FloatingOverlayHost.swift */,
 				FFCC71547FA68BD97E340BCB /* HairNudgeBanner.swift */,
@@ -1531,6 +1534,7 @@
 				D4B598B61B0C0A9912859FDF /* EntitlementModel.swift in Sources */,
 				C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */,
 				CF9E235E79249DE1E406C52B /* FaceActionsPanel.swift in Sources */,
+				A823741DA73E101FDBE7E2C0 /* FirstNameLexicon.swift in Sources */,
 				F0763A380C72AF645E13B60C /* FirstUseEmptyState.swift in Sources */,
 				BCF0B97BA2069984413BCB67 /* FloatingOverlayHost.swift in Sources */,
 				EC2D91A5AFAD922F5CD0C442 /* Folder2.swift in Sources */,

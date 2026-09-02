@@ -149,6 +149,16 @@ nu ook een naam als de metadata er een bevat. 8 tests in `PortraitNameResolverTe
 (model uit; deterministisch). Laag 2 is nog niet live gevalideerd — Apple Intelligence staat
 op de dev-Mac uit; NLTagger afgewezen als fallback (NL geen name-model, EN te wisselvallig).
 
+**Vervolg 3 (2026-09-02, Thierry: "B, volledig offline" — geen Apple Intelligence):**
+[FirstNameLexicon.swift](Avatar2/Features/Shell/FirstNameLexicon.swift) — gebundeld lexicon van
+2200 voornamen (NL/Fries/EN/DE/FR/ES/IT/PT/PL/Scandinavisch/TR/Arabisch/Hindoestaans/Oost-Aziatisch,
+accent-gevouwen). `PortraitNameGuess.refine`: mét voornaam is die het anker (alles ervóór valt af,
+behalve het "Achternaam Voornaam"-patroon met precies twee delen; ná de achternaam stopt de naam bij
+het eerste gewone woord); zónder voornaam beslist een NLTagger-woordenboekcheck (EN, `.otherWord`)
+— alleen gewone woorden ("man beard", "square one") → geen naam, een onbekend woord ("looijen") blijft
+achternaam. Telwoorden zijn ruis. Gedragswijziging: `p1-man-beard.png` → "" (was "Man Beard").
+Laag 2 (on-device model) blijft bestaan voor Macs mét Apple Intelligence. 33/33 + 8/8 tests groen.
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een

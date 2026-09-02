@@ -4,10 +4,17 @@
 // bestandsnaam met camera-ruis. Heuristiek, geen NLP: tokens met cijfers en
 // bekende ruiswoorden (img, headshot, copy, …) vallen weg, tussenvoegsels
 // (van, de, der, …) blijven alleen tússen naamdelen staan, en de rest wordt
-// als naam gekapitaliseerd. Zonder overgebleven naamdelen → "" (het veld
-// toont dan "Add name", zoals bij naamloze Data-drops).
+// als naam gekapitaliseerd. Daarbovenop twee offline signalen (Thierry,
+// 2026-09-02: "volledig offline"): een gebundeld voornamen-lexicon
+// (FirstNameLexicon) als anker — wat vóór de voornaam staat is geen naam, wat
+// erna komt is de achternaam — en, als er géén voornaam in zit, een
+// woordenboek-check via NLTagger: bestaan alle overgebleven woorden gewoon
+// ("man beard", "square one"), dan is het geen naam; een onbekend woord
+// ("looijen") blijft als achternaam staan. Zonder overgebleven naamdelen → ""
+// (het veld toont dan "Add name", zoals bij naamloze Data-drops).
 
 import Foundation
+import NaturalLanguage
 
 enum PortraitNameGuess {
 
@@ -28,11 +35,9 @@ enum PortraitNameGuess {
             .compactMap(lettersOnly)
             .flatMap(splitCamelCase)
         let kept = tokens.compactMap(classify)
-        let trimmed = trimParticles(kept)
-        guard trimmed.contains(where: { if case .name = $0 { return true } else { return false } }) else {
-            return ""
-        }
-        return trimmed.map(\.rendered).joined(separator: " ")
+        let refined = refine(trimParticles(kept))
+        guard refined.contains(where: \.isName) else { return "" }
+        return refined.map(\.rendered).joined(separator: " ")
     }
 
     // MARK: - Stappen
@@ -47,6 +52,48 @@ enum PortraitNameGuess {
             case .particle(let s): return s
             }
         }
+
+        var isName: Bool { if case .name = self { return true } else { return false } }
+        var isFirstName: Bool { if case .name(let s) = self { return FirstNameLexicon.contains(s) } else { return false } }
+    }
+
+    // MARK: - Voornaam-anker + woordenboek-check
+
+    /// Mét voornaam (lexicon): alles vóór de voornaam valt af — behalve het
+    /// "Achternaam Voornaam"-patroon (precies twee naamdelen, `EMMERY_THIERRY`)
+    /// — en ná de achternaam stopt de naam bij het eerste gewone woord
+    /// (`sanne-jansen-presentation` → "Sanne Jansen"). Zónder voornaam: alleen
+    /// een naam als minstens één woord géén woordenboekwoord is.
+    private static func refine(_ tokens: [Token]) -> [Token] {
+        let names = tokens.filter(\.isName)
+        guard !names.isEmpty else { return [] }
+        guard let anchor = tokens.firstIndex(where: \.isFirstName) else {
+            let words = names.map(\.rendered)
+            return words.allSatisfy(isDictionaryWord) ? [] : tokens
+        }
+        let surnameFirst = names.count == 2 && tokens.firstIndex(where: \.isName) != anchor
+            && tokens.lastIndex(where: \.isName) == anchor
+        if surnameFirst { return tokens }
+        var result: [Token] = []
+        var surnameParts = 0
+        for token in tokens[anchor...] {
+            if token.isName, result.count > 0 {
+                if surnameParts >= 1, !token.isFirstName, isDictionaryWord(token.rendered) { break }
+                surnameParts += 1
+            }
+            result.append(token)
+        }
+        return trimParticles(result)
+    }
+
+    /// Engels NLTagger-woordenboek: `.otherWord` = bekend gewoon woord ("beard",
+    /// "square"); namen en onbekende woorden ("looijen") krijgen een andere tag.
+    private static func isDictionaryWord(_ word: String) -> Bool {
+        let tagger = NLTagger(tagSchemes: [.nameType])
+        tagger.string = word
+        tagger.setLanguage(.english, range: word.startIndex..<word.endIndex)
+        let (tag, _) = tagger.tag(at: word.startIndex, unit: .word, scheme: .nameType)
+        return tag == .otherWord
     }
 
     /// Alleen de laatste extensie (`team.profile.jpeg` → `team.profile`); een
@@ -175,6 +222,9 @@ enum PortraitNameGuess {
         // bijwoorden/lidwoorden die als bestandsnaamvulling voorkomen
         "the", "a", "an", "and", "of", "for", "with", "met", "en", "een", "voor", "bij", "zonder", "without",
         "at", "om", "on", "am", "pm", "uur",
+        // telwoorden als bestandsnaamvulling ("Square One", "photo two")
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "een", "twee", "drie", "vier", "vijf", "zes", "zeven", "acht", "negen", "tien",
         // bekende afbeeldingsextensies als token (bv. "anna.png.jpg")
         "jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "gif", "bmp", "webp", "avif", "psd",
     ]

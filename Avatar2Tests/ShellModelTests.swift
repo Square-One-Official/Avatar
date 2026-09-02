@@ -57,7 +57,18 @@ final class ShellModelTests: XCTestCase {
         XCTAssertEqual(naam("Screenshot 2026-09-02 at 10.12.33.png"), "")
         XCTAssertEqual(naam("headshot-final-v2.png"), "")
         XCTAssertEqual(naam("team.profile.jpeg"), "")
-        XCTAssertEqual(naam("p1-man_beard.png"), "Man Beard", "onbekende woorden gelden als naam")
+        XCTAssertEqual(naam("p1-man_beard.png"), "", "geen voornaam + alleen gewone woorden → geen naam")
+    }
+
+    func testDefaultNaamGebruiktVoornamenlexicon() {
+        XCTAssertEqual(naam("Thierry Emmery - Square One.png"), "Thierry Emmery", "na de achternaam stopt de naam bij ruis")
+        XCTAssertEqual(naam("sanne-jansen-presentation.png"), "Sanne Jansen", "gewoon woord na de achternaam valt af")
+        XCTAssertEqual(naam("avond-roos-jansen.png"), "Roos Jansen", "wat vóór de voornaam staat is geen naam")
+        XCTAssertEqual(naam("EMMERY_THIERRY.png"), "Emmery Thierry", "achternaam-eerst met precies twee delen blijft")
+        XCTAssertEqual(naam("looijen.png"), "Looijen", "onbekend woord zonder voornaam blijft achternaam")
+        XCTAssertEqual(naam("man-beard.png"), "", "alleen woordenboekwoorden zonder voornaam → geen naam")
+        XCTAssertEqual(naam("Zoë_Müller.jpg"), "Zoë Müller", "accenten: lexicon-match gevouwen, weergave intact")
+        XCTAssertGreaterThan(FirstNameLexicon.count, 2000)
     }
 
     func testDefaultNaamStriptAlleenBekendeBeeldextensies() {
