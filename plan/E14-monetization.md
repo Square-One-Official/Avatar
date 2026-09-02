@@ -342,10 +342,11 @@ Avatar2-suite groen; AvatarKit/AvatarUI ongewijzigd (geen `swift test` nodig). H
 smoke op een device met opgebruikte teller: Thierry. Open: 14.11 (INFRA).
 
 ## 14.11 — `/v1/account` spiegelt de device-teller [INFRA]
-- status: ready
-- team: INFRA
+- status: done
+- owner: INFRA (AI-agent, op verzoek Thierry 2026-09-02)
 - blockedBy: —
 - DoD: `tsc --noEmit` schoon, backend-test, prod-deploy via E43-pad
+- branch: `v2/e14-14.10` (samen met 14.10)
 
 **Wat:** `backend/api/v1/account.ts` stuurt op het pure-anonieme pad hardcoded
 `free_imports_remaining: FREE_IMPORTS_ALLOWANCE` en op het ingelogde free-pad alleen
@@ -358,4 +359,16 @@ E14.10-pre-flight denkt dat er ruimte is (stale-pad, flits van max. 3 tegels).
 schema-wijziging. Anonieme pad: fingerprint komt al uit `readDeviceFingerprint`.
 **DoD:** een device op de cap ziet uitgelogd én ingelogd "0 left of 3"; backend-test op
 beide paden; Result-regel.
+
+**Result (2026-09-02):** `freeImportsUsedForDevice(fingerprint)` toegevoegd in
+`backend/lib/supabase.ts` (read-only op `device_imports`, null-fingerprint → 0) en pure
+helper `freeImportCounters(user, device, allowance)` in nieuw `backend/lib/freeImports.ts`
+(max(user, device), geklemd op 0..allowance). `api/v1/account.ts` gebruikt die op het
+ingelogde free-pad (incl. comped-Pro-payload) én op het pure-anonieme pad, dat voorheen
+hardcoded `free_imports_remaining: 3` stuurde; fingerprint wordt nu éénmaal bovenin gelezen
+(`readDeviceFingerprint`, soft). Responseshape ongewijzigd → geen app-wijziging. 5 node:test-
+tests (`npx tsx --test backend/tests/free-imports.test.ts`), `tsc --noEmit` schoon,
+billing-tests ongewijzigd groen. **Niet gedaan: prod-deploy** — avatars-api uitrollen via het
+E43-pad (Thierry); tot dan blijft de sidebar uitgelogd "3 left" zeggen en loopt E14.10 via het
+stale-pad.
 

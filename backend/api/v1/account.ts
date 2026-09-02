@@ -13,11 +13,13 @@ import {
   ensureCompedCredits,
   ensureUser,
   freeCutoutsUsed,
+  freeImportsUsedForDevice,
   freeImportsUsedForUser,
   FREE_CUTOUTS_ALLOWANCE,
   FREE_IMPORTS_ALLOWANCE,
   supabase,
 } from "../../lib/supabase.js";
+import { freeImportCounters } from "../../lib/freeImports.js";
 import { creditsForTier, type Tier } from "../../lib/stripe.js";
 
 /**
@@ -39,6 +41,11 @@ import { creditsForTier, type Tier } from "../../lib/stripe.js";
  *   free_imports_used: int,                  // Lifetime imports spent (0..FREE_IMPORTS_ALLOWANCE)
  *   free_imports_remaining: int              // FREE_IMPORTS_ALLOWANCE - used, clamped at 0
  * }
+ *
+ * E14.11: the free-import pair is the EFFECTIVE counter, max(account, device
+ * via X-Device-Fingerprint) — the same rule `/v1/import-claim` denies on.
+ * Signed-out callers previously got a hardcoded "3 remaining" while the
+ * claim said no; the app rendered "3 left of 3 images" next to the paywall.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -58,6 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // makes it possible to be Pro without a Supabase session yet.
   const userResult = await optionalUser(req, res);
   if (userResult === "rejected") return; // optionalUser already wrote 401
+
+  // Soft read: a missing/malformed fingerprint just means "no device
+  // counter to merge in" (readDeviceFingerprint never writes a 400).
+  const fingerprint = readDeviceFingerprint(req);
 
   try {
     if (userResult) {
@@ -98,12 +109,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await ensureCompedCredits(user.id, override.monthlyCredits);
       }
 
-      const [sub, credits, freeCutouts, freeImports] = await Promise.all([
+      const [sub, credits, freeCutouts, freeImportsUser, freeImportsDevice] = await Promise.all([
         activeSubscription(user.id),
         currentCredits(user.id),
         freeCutoutsUsed(user.id),
         freeImportsUsedForUser(user.id),
+        freeImportsUsedForDevice(fingerprint),
       ]);
+      // E14.11: effective counter = max(account, device), like the claim.
+      const freeImports = freeImportCounters(freeImportsUser, freeImportsDevice, FREE_IMPORTS_ALLOWANCE);
 
       // A comp doesn't overwrite a real subscription — if the account also
       // pays, the Stripe numbers win (they're the ones with a renewal date and
@@ -118,8 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscription_renews_at: nextMonthlyResetAt(),
           free_cutouts_used: freeCutouts,
           free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
-          free_imports_used: freeImports,
-          free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+          ...freeImports,
           needs_account_link: false,
         });
         return;
@@ -139,8 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         subscription_renews_at: periodEnd,
         free_cutouts_used: freeCutouts,
         free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
-        free_imports_used: freeImports,
-        free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+        ...freeImports,
         needs_account_link: false,
       });
       return;
@@ -164,7 +176,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // is a low-entropy secret (UserDefaults plist, recoverable by anyone
     // with disk access), so the response must not turn into a fingerprint
     // → email oracle.
-    const fingerprint = readDeviceFingerprint(req);
     if (fingerprint) {
       const ipAllowed = await checkAnonAccountRateLimit(clientIp(req));
       if (!ipAllowed) {
@@ -212,6 +223,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Pure anonymous: no signed-in user and no device grant. Free tier.
+    // E14.11: the device counter is the only counter the claim consults for
+    // this caller — report it instead of a hardcoded full allowance.
+    const anonymousDeviceUsed = await freeImportsUsedForDevice(fingerprint);
     res.status(200).json({
       tier: null,
       credits_remaining: 0,
@@ -221,8 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subscription_renews_at: null,
       free_cutouts_used: 0,
       free_cutouts_remaining: FREE_CUTOUTS_ALLOWANCE,
-      free_imports_used: 0,
-      free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
+      ...freeImportCounters(0, anonymousDeviceUsed, FREE_IMPORTS_ALLOWANCE),
       needs_account_link: false,
     });
   } catch (err) {

@@ -316,6 +316,25 @@ export async function tryConsumeFreeImport(
   };
 }
 
+/**
+ * Read-only: how many lifetime free imports this device has consumed
+ * (`device_imports.free_imports_used`, keyed on the Keychain fingerprint).
+ * E14.11: `/v1/account` must report the same truth as `/v1/import-claim`,
+ * which denies on max(user, device) — without this the sidebar said
+ * "3 left of 3" next to a 402. `null` fingerprint → 0 (nothing to look up).
+ */
+export async function freeImportsUsedForDevice(fingerprint: string | null): Promise<number> {
+  if (!fingerprint) return 0;
+  const { data, error } = await supabase
+    .from("device_imports")
+    .select("free_imports_used")
+    .eq("fingerprint_id", fingerprint)
+    .maybeSingle();
+  if (error) throw error;
+  const used = (data as { free_imports_used: number } | null)?.free_imports_used;
+  return typeof used === "number" ? used : 0;
+}
+
 /** Read-only: how many lifetime free imports this user has consumed. */
 export async function freeImportsUsedForUser(userId: string): Promise<number> {
   const { data, error } = await supabase
