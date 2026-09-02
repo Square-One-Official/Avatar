@@ -85,11 +85,25 @@ final class DSFloatingLayoutTests: XCTestCase {
         XCTAssertEqual(menu.right, menu.left)
         XCTAssertEqual(menu.top, menu.left - DSPanelShadow.yOffset)
         XCTAssertEqual(menu.bottom, menu.left + DSPanelShadow.yOffset)
+        // Paneel: zelfde kaart-schaduw als een menu.
+        let panel = DSFloatingMode.panel(onDismiss: {}).margin
+        XCTAssertEqual(panel.left, menu.left)
+        XCTAssertEqual(panel.top, menu.top)
+        XCTAssertEqual(panel.bottom, menu.bottom)
         // Toast: gehalveerde Shadows/Default.
         let toast = DSFloatingMode.toast.margin
         let toastRadius = DSShadow.default.radius / 2
         XCTAssertEqual(toast.left, toastRadius * DSFloatingMode.shadowBlurExtent)
         XCTAssertEqual(toast.bottom, toast.left + DSShadow.default.offset.height / 2)
+    }
+
+    func testModeKindMapsToMenuOrPanel() {
+        XCTAssertFalse(DSFloatingMode(kind: .menu, onDismiss: {}).isPanel)
+        XCTAssertTrue(DSFloatingMode(kind: .menu, onDismiss: {}).isMenu)
+        XCTAssertTrue(DSFloatingMode(kind: .panel, onDismiss: {}).isPanel)
+        XCTAssertTrue(DSFloatingMode(kind: .panel, onDismiss: {}).isMenu, "een paneel is menu-achtig (geen toast)")
+        XCTAssertFalse(DSFloatingMode.toast.isMenu)
+        XCTAssertNil(DSFloatingMode.toast.onDismiss)
     }
 
     func testOversizedMenuKeepsTopAndLeadingEdgeVisible() {

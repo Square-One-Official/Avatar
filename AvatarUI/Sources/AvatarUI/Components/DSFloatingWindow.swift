@@ -138,10 +138,27 @@ enum DSFloatingLayout {
 
 // MARK: - Modus
 
+/// Gedrag van een verankerd zwevend menu/paneel (`DSContextMenuOverlay`).
+public enum DSFloatingKind: Equatable {
+    /// Contextmenu: transient, zoals een native NSMenu.
+    case menu
+    /// Popover-achtig paneel (bv. de achtergrond-kiezer op een selectie).
+    case panel
+}
+
 public enum DSFloatingMode {
     /// Contextmenu: sluit op klik buiten het menu (ook buiten de app), Esc,
-    /// app-deactivatie en verplaatsen/resizen van het hostvenster.
+    /// app-deactivatie en verplaatsen/resizen van het hostvenster. Wordt
+    /// nooit key: het hostvenster houdt de focus.
     case menu(onDismiss: () -> Void)
+    /// Popover-achtig paneel: sluit op klik buiten het paneel (binnen de app),
+    /// Esc en verplaatsen/resizen van het hostvenster — maar overleeft een
+    /// app-/vensterwissel (Cmd-Tab, klik in een andere app en terug), zoals
+    /// de andere overlays van de shell-host. Kan key worden, zodat
+    /// tekstvelden erin (hex-invoer, zoekveld, prompt) toetsen en plakken
+    /// ontvangen; een menu-panel dat nooit key wordt laat een TextField
+    /// stil vallen.
+    case panel(onDismiss: () -> Void)
     /// Toast: blijft staan; volgt het hostvenster; slide-in/out zoals
     /// `.dsSlide(.trailing)` (reduce motion → alleen fade).
     case toast
@@ -153,7 +170,7 @@ public enum DSFloatingMode {
     /// toast: DSToast (de gehalveerde Shadows/Default).
     var margin: NSEdgeInsets {
         switch self {
-        case .menu:
+        case .menu, .panel:
             return Self.shadowMargin(radius: DSPanelShadow.radius, yOffset: DSPanelShadow.yOffset)
         case .toast:
             return Self.shadowMargin(
@@ -176,9 +193,28 @@ public enum DSFloatingMode {
         )
     }
 
+    /// Menu-achtig (geen toast): verankerd, sluit via `onDismiss`.
     var isMenu: Bool {
-        if case .menu = self { return true }
+        onDismiss != nil
+    }
+
+    var isPanel: Bool {
+        if case .panel = self { return true }
         return false
+    }
+
+    var onDismiss: (() -> Void)? {
+        switch self {
+        case .menu(let onDismiss), .panel(let onDismiss): return onDismiss
+        case .toast: return nil
+        }
+    }
+
+    public init(kind: DSFloatingKind, onDismiss: @escaping () -> Void) {
+        switch kind {
+        case .menu: self = .menu(onDismiss: onDismiss)
+        case .panel: self = .panel(onDismiss: onDismiss)
+        }
     }
 }
 
@@ -187,6 +223,8 @@ public enum DSFloatingMode {
 final class DSFloatingPanel: NSPanel {
     /// Voor debugging/tests: welke modus deze panel host.
     fileprivate(set) var isToast = false
+    /// `.panel`-modus: mag key worden (tekstvelden). Menu's en toasts nooit.
+    fileprivate(set) var allowsKeyboardFocus = false
 
     init() {
         super.init(
@@ -208,10 +246,13 @@ final class DSFloatingPanel: NSPanel {
         collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
     }
 
-    // Nooit key/main: het hostvenster houdt focus; Esc loopt via een
-    // event-monitor. SwiftUI-hover en -clicks werken zonder key-status
-    // (acceptsFirstMouse op de hosting view).
-    override var canBecomeKey: Bool { false }
+    // Menu/toast nooit key, nooit main: het hostvenster houdt focus; Esc
+    // loopt via een event-monitor. SwiftUI-hover en -clicks werken zonder
+    // key-status (acceptsFirstMouse op de hosting view). Een `.panel` wordt
+    // key bij een klik erin (`becomesKeyOnlyIfNeeded = false`: ook een klik
+    // op een tegel, niet alleen op een tekstveld — een SwiftUI-TextField in
+    // een NSHostingView meldt zich niet betrouwbaar als `needsPanelToBecomeKey`).
+    override var canBecomeKey: Bool { allowsKeyboardFocus }
     override var canBecomeMain: Bool { false }
 }
 
@@ -250,6 +291,8 @@ final class DSFloatingPanelController {
         self.placement = placement
         hosting = DSFloatingHostingView(rootView: rootView)
         panel.isToast = !mode.isMenu
+        panel.allowsKeyboardFocus = mode.isPanel
+        panel.becomesKeyOnlyIfNeeded = !mode.isPanel
         container.wantsLayer = true
         hosting.wantsLayer = true
         container.addSubview(hosting)
@@ -301,8 +344,12 @@ final class DSFloatingPanelController {
         isClosing = true
         removeObservers()
         let finish = { [self] in
+            // Een key `.panel` geeft de focus expliciet terug aan het
+            // hostvenster (anders kiest AppKit zelf een venster).
+            let wasKey = panel.isKeyWindow
             parent?.removeChildWindow(panel)
             panel.orderOut(nil)
+            if wasKey { parent?.makeKey() }
         }
         if animated, isAttached { animateExit(completion: finish) } else { finish() }
     }
@@ -391,30 +438,32 @@ final class DSFloatingPanelController {
             observers.append(center.addObserver(forName: name, object: parent, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    switch self.mode {
-                    case .menu(let onDismiss): onDismiss()
-                    case .toast: self.relayout(animated: false)
-                    }
+                    if let onDismiss = self.mode.onDismiss { onDismiss() }
+                    else { self.relayout(animated: false) }
                 }
             })
         }
 
-        guard case .menu(let onDismiss) = mode else { return }
-        observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { onDismiss() }
-        })
-        // Klik buiten het menu — in een ander venster van de app (het
-        // hostvenster zelf heeft óók de in-window scrim) of buiten de app.
-        let mouseDown: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        guard let onDismiss = mode.onDismiss else { return }
+        // Alleen een menu is transient: app-deactivatie en een klik buiten de
+        // app sluiten het. Een `.panel` blijft staan bij een venster-/app-
+        // wissel (de gebruiker klikt óók op een ander venster om te wisselen).
+        if case .menu = mode {
+            observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { onDismiss() }
+            })
+            if let monitor = NSEvent.addGlobalMonitorForEvents(matching: Self.mouseDown, handler: { _ in
+                MainActor.assumeIsolated { onDismiss() }
+            }) { monitors.append(monitor) }
+        }
+        // Klik buiten het menu/paneel, binnen de app — in een ander venster
+        // (het hostvenster zelf heeft óók de in-window scrim).
         let panel = self.panel
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: mouseDown, handler: { event in
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDown, handler: { event in
             if event.window !== panel {
                 MainActor.assumeIsolated { onDismiss() }
             }
             return event
-        }) { monitors.append(monitor) }
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mouseDown, handler: { _ in
-            MainActor.assumeIsolated { onDismiss() }
         }) { monitors.append(monitor) }
         // Esc sluit het menu; de panel is nooit key, dus via een monitor.
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
@@ -423,6 +472,8 @@ final class DSFloatingPanelController {
             return nil
         }) { monitors.append(monitor) }
     }
+
+    private static let mouseDown: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
 
     private func removeObservers() {
         observers.forEach(NotificationCenter.default.removeObserver)

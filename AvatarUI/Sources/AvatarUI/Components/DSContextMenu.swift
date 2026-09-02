@@ -237,12 +237,16 @@ enum DSContextMenuPlacement {
 public struct DSContextMenuOverlay<Menu: View>: View {
     private let anchor: CGRect
     private let bounds: DSFloatingBounds
+    private let kind: DSFloatingKind
     private let onDismiss: () -> Void
     private let menu: Menu
 
+    /// `kind: .panel` voor een popover-achtig paneel dat een app-/venster-
+    /// wissel overleeft en waarin tekstvelden werken (zie `DSFloatingMode`).
     public init(
         anchor: CGRect,
         bounds: DSFloatingBounds = .screen,
+        kind: DSFloatingKind = .menu,
         onDismiss: @escaping () -> Void,
         menuWidth _: CGFloat = 220,
         menuHeight _: CGFloat = 260,
@@ -250,6 +254,7 @@ public struct DSContextMenuOverlay<Menu: View>: View {
     ) {
         self.anchor = anchor
         self.bounds = bounds
+        self.kind = kind
         self.onDismiss = onDismiss
         self.menu = menu()
     }
@@ -264,7 +269,7 @@ public struct DSContextMenuOverlay<Menu: View>: View {
                     DSContextMenuPlacement.preferredTopLeft(anchor: anchor),
                     bounds: bounds
                 ),
-                mode: .menu(onDismiss: onDismiss),
+                mode: DSFloatingMode(kind: kind, onDismiss: onDismiss),
                 identity: anchor
             ) {
                 menu

@@ -94,26 +94,31 @@ struct FloatingOverlayHost: View {
     /// Groot paneel op een klik-anker: blijft binnen het venster (`.window`),
     /// anders hangt 'ie bij een klik rechtsonder half buiten de app. Kiezen
     /// sluit 'm — de "klaar"-toast (met Undo) landt rechtsonder, precies waar
-    /// het paneel anders staat.
+    /// het paneel anders staat. `.panel`: overleeft een vensterwissel en kan
+    /// key worden (hex-/zoek-/promptveld). Een eigen kleur gaat pas bij
+    /// "Add colour" naar de selectie — live meebewegen zou elke drag-stap als
+    /// een aparte set-actie (toast + undo-groep) afvuren én het paneel sluiten.
     @ViewBuilder private var selectionBackgroundPickerLayer: some View {
         if model.presentation.selectionBackgroundPickerOpen {
             let targets = portraits.filter { model.isPortraitSelected($0) }
             DSContextMenuOverlay(
                 anchor: model.presentation.selectionBackgroundPickerAnchor,
                 bounds: .window,
-                onDismiss: { model.presentation.selectionBackgroundPickerOpen = false },
+                kind: .panel,
+                onDismiss: { model.presentation.closeSelectionBackgroundPicker() },
                 menuWidth: 460,
                 menuHeight: 480
             ) {
                 BackgroundPanel(
                     portrait: targets.first,
                     onApply: { background in
-                        model.presentation.selectionBackgroundPickerOpen = false
+                        model.presentation.closeSelectionBackgroundPicker()
                         PortraitSetActions.setBackground(
                             targets, background, undoManager: undoManager,
                             reporter: model.setActionReporter
                         )
                     },
+                    appliesColorLive: false,
                     presentation: model.presentation,
                     entitlement: entitlement
                 )
@@ -126,7 +131,7 @@ struct FloatingOverlayHost: View {
     }
 
     private var escapeBackgroundPicker: some View {
-        Button("") { model.presentation.selectionBackgroundPickerOpen = false }
+        Button("") { model.presentation.closeSelectionBackgroundPicker() }
             .keyboardShortcut(.escape, modifiers: [])
             .opacity(0)
             .disabled(!model.presentation.selectionBackgroundPickerOpen)

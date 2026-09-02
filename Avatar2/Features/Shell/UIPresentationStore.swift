@@ -225,10 +225,21 @@ final class UIPresentationStore {
         portraitContextMenu = nil
     }
 
+    /// Het BackgroundPanel deelt z'n kleurpicker-/type-dropdown-flags met de
+    /// editor; een vers geopende selectie-picker begint zonder open
+    /// subpaneel (een blijven-hangen flag toonde de kleurpicker meteen).
     func openSelectionBackgroundPicker(anchor: CGRect) {
         portraitContextMenu = nil
+        editorBackgroundColorPickerOpen = false
+        editorBackgroundTypeMenuOpen = false
         selectionBackgroundPickerAnchor = anchor
         selectionBackgroundPickerOpen = true
+    }
+
+    func closeSelectionBackgroundPicker() {
+        selectionBackgroundPickerOpen = false
+        editorBackgroundColorPickerOpen = false
+        editorBackgroundTypeMenuOpen = false
     }
 
     func openPortraitContextMenu(

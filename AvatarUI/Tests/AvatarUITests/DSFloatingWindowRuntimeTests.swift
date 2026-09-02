@@ -41,6 +41,7 @@ final class DSFloatingWindowRuntimeTests: XCTestCase {
     private final class Stage: ObservableObject {
         @Published var toast: String?
         @Published var menuAnchor: CGRect?
+        @Published var panelAnchor: CGRect?
     }
 
     private struct Harness: View {
@@ -66,6 +67,19 @@ final class DSFloatingWindowRuntimeTests: XCTestCase {
                                     DSMenuRow("Row \(i)", icon: "circle") {}
                                 }
                             }
+                        }
+                    }
+                }
+                .overlay {
+                    if let anchor = stage.panelAnchor {
+                        DSContextMenuOverlay(
+                            anchor: anchor, bounds: .window, kind: .panel,
+                            onDismiss: { stage.panelAnchor = nil }
+                        ) {
+                            DSTextField(label: nil, placeholder: "RRGGBB", text: .constant(""))
+                                .frame(width: 200)
+                                .padding()
+                                .dsPanelSurface()
                         }
                     }
                 }
@@ -106,6 +120,39 @@ final class DSFloatingWindowRuntimeTests: XCTestCase {
         stage.menuAnchor = nil
         pump()
         XCTAssertTrue(panels.isEmpty, "sluiten haalt het child window weg")
+    }
+
+    /// De selectie-achtergrondkiezer (`.panel`) moet een venster-/appwissel
+    /// overleven en toetsen kunnen ontvangen; een contextmenu (`.menu`) blijft
+    /// transient en nooit key.
+    func testPanelSurvivesAppDeactivationWhereMenuDoesNot() {
+        let stage = Stage()
+        window.contentView = NSHostingView(rootView: Harness(stage: stage))
+        pump()
+
+        stage.menuAnchor = CGRect(x: 100, y: 100, width: 0, height: 0)
+        stage.panelAnchor = CGRect(x: 300, y: 100, width: 0, height: 0)
+        pump()
+        XCTAssertEqual(panels.count, 2)
+        guard let menuPanel = panels.first(where: { !$0.allowsKeyboardFocus }),
+              let floatingPanel = panels.first(where: { $0.allowsKeyboardFocus }) else {
+            return XCTFail("verwacht een menu- én een paneel-child window: \(panels.map(\.allowsKeyboardFocus))")
+        }
+        XCTAssertFalse(menuPanel.canBecomeKey, "menu wordt nooit key")
+        XCTAssertTrue(floatingPanel.canBecomeKey, "paneel kan key worden (tekstvelden)")
+        XCTAssertFalse(floatingPanel.becomesKeyOnlyIfNeeded)
+
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        pump()
+        XCTAssertNil(stage.menuAnchor, "menu sluit bij app-deactivatie")
+        XCTAssertNotNil(stage.panelAnchor, "paneel blijft staan bij app-deactivatie")
+        XCTAssertEqual(panels.count, 1)
+
+        // Verplaatsen van het hostvenster sluit ook het paneel (anker is stale).
+        window.setFrameOrigin(NSPoint(x: window.frame.origin.x + 40, y: window.frame.origin.y))
+        pump()
+        XCTAssertNil(stage.panelAnchor, "paneel sluit bij verplaatsen van het hostvenster")
+        XCTAssertTrue(panels.isEmpty)
     }
 
     func testLastShownIsOnTop() {

@@ -31,6 +31,13 @@ struct BackgroundPanel: View {
     /// de keuze op ALLE geselecteerde portretten toepast. De UI is identiek;
     /// `portrait` blijft de bron voor display/selectie-state (Original/custom).
     var onApply: ((PortraitBackground) -> Void)? = nil
+    /// Of een kleur uit de DSColorPicker líve (bij elke wijziging) wordt
+    /// toegepast, of pas bij "Add colour". Default live: editor en board tonen
+    /// de kleur meteen op het canvas. De selectie-picker (shell-host) zet 'm
+    /// uit: daar is elke apply een afgeronde set-actie (toast + undo) die het
+    /// paneel sluit — live meebewegen sloot het paneel al bij het openen van
+    /// de picker (de start-kleur telde als wijziging).
+    var appliesColorLive: Bool = true
     /// E53.7: presentatiestate voor caret-loze color picker (geen systeem-popover).
     var presentation: UIPresentationStore
     /// Benodigd voor de CMS/Unsplash-fetches en de generatie; optioneel zodat
@@ -267,7 +274,7 @@ struct BackgroundPanel: View {
         .frame(height: contentHeight)
         .onChange(of: pickerColor) { _, c in
             guard presentation.editorBackgroundColorPickerOpen, let hex = c.hexRGB else { return }
-            selectColor(hex)
+            selectColor(hex, live: true)
         }
         .onChange(of: presentation.editorBackgroundColorPickerOpen) { _, open in
             guard !open, let hex = pickerColor.hexRGB,
@@ -958,7 +965,10 @@ struct BackgroundPanel: View {
         apply(.transparent)
     }
 
-    private func selectColor(_ hex: String) {
+    /// `live`: tussenstand uit de open kleurpicker (drag/typen); wordt
+    /// overgeslagen als de aanroeper alleen de bevestigde kleur wil.
+    private func selectColor(_ hex: String, live: Bool = false) {
+        if live, !appliesColorLive { return }
         apply(.color(hex), closePicker: false)
     }
 
