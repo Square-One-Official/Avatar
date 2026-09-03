@@ -384,6 +384,224 @@ enum PortraitSetActions {
         return changes.count
     }
 
+    // MARK: - Fill in body (E57.3)
+
+    /// Wat Fill in body aan een portret verandert: pixels én transform in één
+    /// snapshot (alleen de PNG terugzetten zou de kadrering-sprong terughalen
+    /// die E56 juist voorkomt), plus de "schone isolatie"-vlag.
+    struct FillBodySnapshot: Equatable {
+        let cutoutData: Data
+        let transform: TransformUndo.Snapshot
+        let derivesFromOriginal: Bool
+
+        init(cutoutData: Data, transform: TransformUndo.Snapshot, derivesFromOriginal: Bool) {
+            self.cutoutData = cutoutData
+            self.transform = transform
+            self.derivesFromOriginal = derivesFromOriginal
+        }
+
+        init(of portrait: Portrait2) {
+            self.init(
+                cutoutData: portrait.cutoutData,
+                transform: TransformUndo.snapshot(of: portrait),
+                derivesFromOriginal: portrait.cutoutDerivesFromOriginal
+            )
+        }
+    }
+
+    /// Pure stap (testbaar): backend-resultaat + mapping → before/after voor
+    /// dit portret, of nil als de cutout ondertussen wijzigde of de mapping
+    /// niet op het resultaat past (dan liever niets dan een verschoven kader).
+    /// Zelfde geometrie als de editor (`ShellModel.compensatedFillBodyTransform`):
+    /// elke bestaande pixel blijft op dezelfde plek, de nieuwe rand komt erbij.
+    static func fillBodySnapshots(
+        applying image: NSImage,
+        mapping: BackendClient.FillBodyResult.Mapping,
+        to portrait: Portrait2,
+        expectedCutoutSignature: Int
+    ) -> (before: FillBodySnapshot, after: FillBodySnapshot)? {
+        guard Portrait2.cutoutSignature(portrait.cutoutData) == expectedCutoutSignature,
+              let oldCG = NSImage(data: portrait.cutoutData)?
+                .cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let newCG = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let transform = ShellModel.compensatedFillBodyTransform(
+                oldSize: CGSize(width: oldCG.width, height: oldCG.height),
+                newSize: CGSize(width: newCG.width, height: newCG.height),
+                mapping: mapping,
+                current: TransformUndo.snapshot(of: portrait)
+              ),
+              let png = image.pngData()
+        else { return nil }
+        let before = FillBodySnapshot(of: portrait)
+        let after = FillBodySnapshot(cutoutData: png, transform: transform, derivesFromOriginal: false)
+        return (before, after)
+    }
+
+    private struct FillBodyOutcome {
+        var results: [(Portrait2, FillBodySnapshot, FillBodySnapshot)] = []
+        var nothingToFill = 0
+        var failed = 0
+        var outOfCredits = false
+        var proRequired = false
+    }
+
+    /// "Fill in body" op de selectie (E57.3, Edit ▸ in het tegelmenu). Zelfde
+    /// contract als de editor-tegel (E56): alleen echt afgesneden randen worden
+    /// aangevuld, de gezichtsbox gaat mee als never-paint, zonder afgesneden
+    /// rand is de call een gratis server-no-op — vandaar de gate mét gratis
+    /// preflight. Sequentieel (geheugen + rate limits), daarna één undo-groep
+    /// zodat ⌘Z de hele batch terugdraait. Op is op (402) stopt de batch; wat
+    /// al klaar was blijft.
+    static func fillBody(
+        _ targets: [Portrait2],
+        entitlement: EntitlementModel,
+        undoManager: UndoManager?,
+        reporter: SetActionReporter
+    ) {
+        guard !targets.isEmpty else { return }
+        guard entitlement.allowAIFeatureWithFreeServerPreflight(.restoreBody, retry: {
+            fillBody(targets, entitlement: entitlement, undoManager: undoManager, reporter: reporter)
+        }) else { return }
+        let total = targets.count
+        reporter.busy("Filling in body…")
+        Task {
+            defer { reporter.busy(nil) }
+            var outcome = FillBodyOutcome()
+            for (index, portrait) in targets.enumerated() {
+                if total > 1 { reporter.busy("Filling in body \(index + 1) of \(total)…") }
+                let source = portrait.cutoutData
+                let signature = Portrait2.cutoutSignature(source)
+                do {
+                    let faceBox = await fillBodyFaceBox(pngData: source)
+                    let result = try await entitlement.backend.fillBodyDetailed(imagePNG: source, faceBox: faceBox)
+                    guard result.didFill else {
+                        outcome.nothingToFill += 1
+                        continue
+                    }
+                    // Onleesbare bytes of een mapping die niet past (of een
+                    // tussentijds bewerkt portret): overslaan, niet gokken.
+                    guard let image = NSImage(data: result.data),
+                          let snapshots = fillBodySnapshots(
+                            applying: image, mapping: result.mapping,
+                            to: portrait, expectedCutoutSignature: signature
+                          )
+                    else {
+                        outcome.failed += 1
+                        continue
+                    }
+                    outcome.results.append((portrait, snapshots.before, snapshots.after))
+                } catch BackendError.noCredits {
+                    outcome.outOfCredits = true
+                    break
+                } catch BackendError.proRequired {
+                    outcome.proRequired = true
+                    break
+                } catch {
+                    outcome.failed += 1
+                }
+            }
+            let n = applyFilledBodies(outcome.results, undoManager: undoManager, reporter: reporter)
+            // Ook bij no-ops verversen: de server kan credits hebben afgeschreven.
+            await entitlement.refresh()
+            if outcome.outOfCredits { entitlement.handleOutOfCredits() }
+            if outcome.proRequired { entitlement.requestUpgrade() }
+            reporter.done(fillBodyReceipt(
+                applied: n, total: total, nothingToFill: outcome.nothingToFill,
+                failed: outcome.failed, outOfCredits: outcome.outOfCredits, undoManager: undoManager
+            ))
+        }
+    }
+
+    /// Vision-gezichtsbox (genormaliseerd) zoals de editor 'm meestuurt: het
+    /// gezicht is never-paint in het outpaint-masker. Decode + Vision off-main.
+    private static func fillBodyFaceBox(pngData: Data) async -> BackendClient.FaceBox? {
+        await Task.detached(priority: .userInitiated) { () -> BackendClient.FaceBox? in
+            guard let cg = NSImage(data: pngData)?.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                return nil
+            }
+            let rect = AutoFramer.metrics(for: cg).faceRect
+            return EditorView.normalizedFillBodyFaceBox(
+                faceRect: rect, imageSize: CGSize(width: cg.width, height: cg.height)
+            )
+        }.value
+    }
+
+    /// Bon voor de Fill in body-batch (testbaar). Eén portret krijgt dezelfde
+    /// copy als de editor ("Body completed" / "Nothing to fill").
+    static func fillBodyReceipt(
+        applied: Int, total: Int, nothingToFill: Int, failed: Int, outOfCredits: Bool, undoManager: UndoManager?
+    ) -> SetActionReceipt {
+        let title: String
+        var detail: String?
+        if applied == 0 {
+            if outOfCredits {
+                title = "Out of credits — nothing filled in"
+            } else if nothingToFill == total {
+                title = total == 1 ? "Nothing to fill" : "Nothing to fill on \(plural(total))"
+                detail = total == 1
+                    ? "No cropped body edge was found. Try Auto-frame & center instead."
+                    : "No cropped body edges were found."
+            } else {
+                title = "Couldn't fill in the body"
+                detail = "Please try again."
+            }
+        } else if applied == total {
+            title = total == 1 ? "Body completed" : "Filled in body on \(plural(total))"
+            if total == 1 { detail = "Only the cropped edge was filled." }
+        } else {
+            title = "Filled in body on \(applied) of \(plural(total))"
+            var parts: [String] = []
+            if nothingToFill > 0 {
+                parts.append(nothingToFill == 1 ? "1 had nothing to fill." : "\(nothingToFill) had nothing to fill.")
+            }
+            if failed > 0 {
+                parts.append(failed == 1 ? "1 couldn't be filled." : "\(failed) couldn't be filled.")
+            }
+            if outOfCredits { parts.append("Ran out of credits for the rest.") }
+            detail = parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+        return SetActionReceipt(
+            title: title, detail: detail,
+            actionName: applied > 0 ? "Fill in body" : nil,
+            undoManager: undoManager
+        )
+    }
+
+    /// Synchrone toepassing (testbaar): pixels + transform per portret, één
+    /// undo-groep "Fill in body", `bumpRevision()` i.p.v. `touch()` (E50.3:
+    /// het raster herschudt niet). Geeft het aantal gewijzigde portretten terug.
+    @discardableResult
+    static func applyFilledBodies(
+        _ items: [(Portrait2, FillBodySnapshot, FillBodySnapshot)],
+        undoManager: UndoManager?,
+        reporter: SetActionReporter
+    ) -> Int {
+        let changes = items.filter { $0.1 != $0.2 }
+        guard !changes.isEmpty else { return 0 }
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName("Fill in body")
+        for (portrait, before, after) in changes {
+            applyFillBody(after, on: portrait, reporter: reporter)
+            ReversibleChange.register(
+                undoManager, target: portrait, from: before, to: after, actionName: "Fill in body"
+            ) { p, snapshot in
+                applyFillBody(snapshot, on: p, reporter: reporter)
+            }
+        }
+        undoManager?.endUndoGrouping()
+        return changes.count
+    }
+
+    private static func applyFillBody(_ snapshot: FillBodySnapshot, on portrait: Portrait2, reporter: SetActionReporter) {
+        portrait.cutoutData = snapshot.cutoutData
+        portrait.offsetX = snapshot.transform.offsetX
+        portrait.offsetY = snapshot.transform.offsetY
+        portrait.scale = snapshot.transform.scale
+        portrait.cutoutDerivesFromOriginal = snapshot.derivesFromOriginal
+        portrait.bumpRevision()
+        reporter.portraitDidChange(portrait)
+    }
+
     // MARK: - Boost resolution
 
     /// Wat een Boost aan een portret verandert — één undo-waarde per portret.

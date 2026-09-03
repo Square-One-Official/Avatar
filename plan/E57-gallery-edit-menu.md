@@ -179,9 +179,26 @@ Resolution"), (b) 3 geselecteerd → Edit ▸ Boost on 3 ▸ Online-label toont
 "9 credits". **Result:** —
 
 ## 57.3 — FEAT: Fill in body als set-actie (1…N) [FEAT]
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (Claude, 2026-09-03)
 - blockedBy: 57.2
+
+**Result:** `PortraitSetActions.fillBody(_:entitlement:undoManager:reporter:)` +
+rij **Fill in body[ on N]** (credits-totaal / "Cloud") onder Edit ▸. Gate met
+gratis server-preflight (`.restoreBody`), Vision-facebox off-main
+(`EditorView.normalizedFillBodyFaceBox` hergebruikt), sequentieel
+`fillBodyDetailed`, pure stap `fillBodySnapshots` (signature-guard + dezelfde
+geometrie als de editor via `ShellModel.compensatedFillBodyTransform`, zonder
+`selectedPortrait`-guard — ShellModel is niet aangeraakt), toepassing in één
+undo-groep "Fill in body" met `bumpRevision()` (geen raster-herschud), bon
+`fillBodyReceipt` (1 portret = editor-copy "Body completed"/"Nothing to fill";
+batch telt nothing-to-fill/failed/op-is-op). 402 stopt de batch, 403 Pro →
+upgrade-flow. Editor-canvas ververst via `reporter.portraitDidChange`. Tests:
+snapshots (compensatie, signature-/mapping-guard), apply/undo/redo in één
+groep zonder reshuffle, bon-copy — Avatar2Tests 336 groen, beide targets
+bouwen. **Niet gedaan:** annuleren tussen portretten (vraagt een cancel-hook
+op de set-actie-toast in ShellModel/ShellView, die in een andere sessie
+openstaan) → 57.5. Geen live-smoke met credits in deze sessie.
 
 - `PortraitSetActions.fillBody(_ targets:entitlement:undoManager:reporter:)` naar
   het model van `boostResolution`: gate vooraf via

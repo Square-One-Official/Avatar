@@ -162,7 +162,24 @@ struct PortraitDSContextMenu: View {
             DSMenuSubmenu("Boost resolution\(suffix)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
                 boostRows(targets: targets)
             }
+            // E57.3: zelfde contract als de editor-tegel (E56) — alleen echt
+            // afgesneden randen; zonder afgesneden rand een gratis no-op.
+            DSMenuRow("Fill in body\(suffix)", icon: "figure.arms.open", shortcut: fillBodyLabel(count: n)) {
+                onDismiss()
+                PortraitSetActions.fillBody(
+                    targets, entitlement: entitlement,
+                    undoManager: undoManager, reporter: model.setActionReporter
+                )
+            }
         }
+    }
+
+    /// Credits-totaal (2 per portret; alleen afgeschreven als er echt gevuld
+    /// wordt); zonder Cloud-tier de neutrale "Cloud"-hint, zoals bij Boost.
+    private func fillBodyLabel(count: Int) -> String {
+        guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Cloud" }
+        let total = CreditMeter.credits(for: .fillBody) * count
+        return total == 1 ? "1 credit" : "\(total) credits"
     }
 
     /// Boost-modus kiezen. Online toont het totaal aan credits (3 per

@@ -410,4 +410,132 @@ final class PortraitSetActionsTests: XCTestCase {
         let broke = PortraitSetActions.boostReceipt(applied: 0, total: 2, failed: 0, outOfCredits: true, undoManager: um)
         XCTAssertEqual(broke.title, "Out of credits — nothing boosted")
     }
+
+    // MARK: - Fill in body (E57.3)
+
+    private func fillMapping(canvasW: Int, canvasH: Int, x: Int, y: Int, w: Int, h: Int) -> BackendClient.FillBodyResult.Mapping {
+        BackendClient.FillBodyResult.Mapping(
+            canvasWidth: canvasW, canvasHeight: canvasH,
+            originalX: x, originalY: y, originalWidth: w, originalHeight: h
+        )
+    }
+
+    func testFillBodySnapshotsCompensateTransformAndKeepSignatureGuard() throws {
+        let context = try makeContext()
+        let ps = seed(context)
+        let old = png(w: 8, h: 8)
+        ps[0].cutoutData = old
+        ps[0].offsetX = 20
+        ps[0].offsetY = -5
+        ps[0].scale = 0.75
+        // Links 4 px aangevuld: het origineel zit op x = 4 in een 12×8-canvas.
+        let result = NSImage(data: png(w: 12, h: 8))!
+        let mapping = fillMapping(canvasW: 12, canvasH: 8, x: 4, y: 0, w: 8, h: 8)
+        let signature = Portrait2.cutoutSignature(old)
+
+        let snapshots = try XCTUnwrap(PortraitSetActions.fillBodySnapshots(
+            applying: result, mapping: mapping, to: ps[0], expectedCutoutSignature: signature
+        ))
+        XCTAssertEqual(snapshots.before.cutoutData, old)
+        XCTAssertEqual(snapshots.before.transform, TransformUndo.Snapshot(offsetX: 20, offsetY: -5, scale: 0.75))
+        XCTAssertTrue(snapshots.before.derivesFromOriginal)
+        XCTAssertFalse(snapshots.after.derivesFromOriginal, "een gevuld lichaam is geen schone isolatie meer")
+        XCTAssertEqual(PortraitSetActions.pngPixelWidth(snapshots.after.cutoutData), 12)
+        // Zelfde geometrie als de editor: bestaande pixels blijven op hun plek.
+        let expected = try XCTUnwrap(ShellModel.compensatedFillBodyTransform(
+            oldSize: CGSize(width: 8, height: 8), newSize: CGSize(width: 12, height: 8),
+            mapping: mapping, current: snapshots.before.transform
+        ))
+        XCTAssertEqual(snapshots.after.transform, expected)
+        XCTAssertEqual(ps[0].cutoutData, old, "de pure stap past niets toe")
+
+        // Tussentijds bewerkt portret (andere signature) → nil, niets gokken.
+        XCTAssertNil(PortraitSetActions.fillBodySnapshots(
+            applying: result, mapping: mapping, to: ps[0], expectedCutoutSignature: signature &+ 1
+        ))
+        // Mapping die niet op het resultaat past → nil.
+        XCTAssertNil(PortraitSetActions.fillBodySnapshots(
+            applying: result, mapping: fillMapping(canvasW: 20, canvasH: 8, x: 4, y: 0, w: 8, h: 8),
+            to: ps[0], expectedCutoutSignature: signature
+        ))
+    }
+
+    func testApplyFilledBodiesIsOneUndoGroupWithoutReshuffle() throws {
+        let context = try makeContext()
+        let ps = seed(context)
+        let old = png(w: 8, h: 8), filled = png(w: 12, h: 8)
+        for p in ps { p.cutoutData = old; p.scale = 0.75 }
+        let stamps = ps.map(\.updatedAt)
+        let um = UndoManager()
+        var changed: [String] = []
+        let reporter = SetActionReporter(busy: { _ in }, done: { _ in }, portraitDidChange: { changed.append($0.name) })
+        let before = PortraitSetActions.FillBodySnapshot(of: ps[0])
+        let after = PortraitSetActions.FillBodySnapshot(
+            cutoutData: filled,
+            transform: TransformUndo.Snapshot(offsetX: 1, offsetY: 2, scale: 0.5),
+            derivesFromOriginal: false
+        )
+
+        let n = PortraitSetActions.applyFilledBodies(
+            [(ps[0], before, after), (ps[2], before, after), (ps[1], before, before)],
+            undoManager: um, reporter: reporter
+        )
+        XCTAssertEqual(n, 2, "ongewijzigde snapshot telt niet")
+        XCTAssertEqual(ps[0].cutoutData, filled)
+        XCTAssertEqual(ps[0].scale, 0.5)
+        XCTAssertEqual(ps[0].offsetX, 1)
+        XCTAssertEqual(ps[2].offsetY, 2)
+        XCTAssertFalse(ps[0].cutoutDerivesFromOriginal)
+        XCTAssertEqual(ps[1].cutoutData, old)
+        XCTAssertEqual(ps.map(\.updatedAt), stamps, "Fill in body herschudt het raster niet")
+        XCTAssertEqual(order(ps), ["Anna", "Bob", "Cas"])
+        XCTAssertEqual(changed, ["Anna", "Cas"])
+        XCTAssertEqual(um.undoActionName, "Fill in body")
+
+        um.undo()
+        XCTAssertEqual(ps[0].cutoutData, old, "⌘Z draait de hele batch terug")
+        XCTAssertEqual(ps[2].cutoutData, old)
+        XCTAssertEqual(ps[0].scale, 0.75)
+        XCTAssertTrue(ps[0].cutoutDerivesFromOriginal)
+        XCTAssertEqual(ps.map(\.updatedAt), stamps)
+        um.redo()
+        XCTAssertEqual(ps[2].cutoutData, filled)
+        XCTAssertEqual(
+            PortraitSetActions.applyFilledBodies([], undoManager: um, reporter: .silent), 0
+        )
+    }
+
+    func testFillBodyReceiptCopy() {
+        let um = UndoManager()
+        let one = PortraitSetActions.fillBodyReceipt(applied: 1, total: 1, nothingToFill: 0, failed: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(one.title, "Body completed", "één portret: zelfde copy als de editor")
+        XCTAssertEqual(one.detail, "Only the cropped edge was filled.")
+        XCTAssertEqual(one.actionName, "Fill in body")
+
+        let all = PortraitSetActions.fillBodyReceipt(applied: 3, total: 3, nothingToFill: 0, failed: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(all.title, "Filled in body on 3 portraits")
+        XCTAssertNil(all.detail)
+
+        let partial = PortraitSetActions.fillBodyReceipt(applied: 1, total: 4, nothingToFill: 2, failed: 1, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(partial.title, "Filled in body on 1 of 4 portraits")
+        XCTAssertEqual(partial.detail, "2 had nothing to fill. 1 couldn't be filled.")
+        XCTAssertTrue(partial.canUndo)
+
+        let credits = PortraitSetActions.fillBodyReceipt(applied: 2, total: 3, nothingToFill: 0, failed: 0, outOfCredits: true, undoManager: um)
+        XCTAssertEqual(credits.detail, "Ran out of credits for the rest.")
+
+        let nothingOne = PortraitSetActions.fillBodyReceipt(applied: 0, total: 1, nothingToFill: 1, failed: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(nothingOne.title, "Nothing to fill")
+        XCTAssertEqual(nothingOne.detail, "No cropped body edge was found. Try Auto-frame & center instead.")
+        XCTAssertFalse(nothingOne.canUndo)
+        let nothingAll = PortraitSetActions.fillBodyReceipt(applied: 0, total: 3, nothingToFill: 3, failed: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(nothingAll.title, "Nothing to fill on 3 portraits")
+
+        let none = PortraitSetActions.fillBodyReceipt(applied: 0, total: 2, nothingToFill: 1, failed: 1, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(none.title, "Couldn't fill in the body")
+        XCTAssertEqual(none.detail, "Please try again.")
+        let broke = PortraitSetActions.fillBodyReceipt(applied: 0, total: 2, nothingToFill: 0, failed: 0, outOfCredits: true, undoManager: um)
+        XCTAssertEqual(broke.title, "Out of credits — nothing filled in")
+        XCTAssertFalse(broke.canUndo)
+    }
 }
