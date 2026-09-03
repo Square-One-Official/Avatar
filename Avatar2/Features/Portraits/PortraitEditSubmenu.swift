@@ -104,9 +104,9 @@ struct PortraitEditSubmenu: View {
         }
     }
 
-    /// Iets groter dan de icoon-slot (16) — de rij is 32 hoog, dus dit past
-    /// zonder de rij te laten groeien.
-    private static let thumbnailSide: CGFloat = 20
+    /// Groter dan de icoon-slot (16) — de rij is 32 hoog, dus dit past
+    /// zonder de rij te laten groeien (Thierry 2026-09-03: 24 i.p.v. 20).
+    private static let thumbnailSide: CGFloat = 24
 
     private func effectLabel(_ targets: [Portrait2], choice: PortraitSetActions.EffectChoice) -> String {
         let generating = PortraitSetActions.effectGenerationCount(targets, choice: choice)

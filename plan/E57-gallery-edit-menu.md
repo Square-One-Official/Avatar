@@ -325,11 +325,11 @@ framing-keuze per portret; beide targets groen; live-smoke 1 en 3 portretten met
 autonome sessies — Thierry kijkt live), tracking-events (geen tracking-plan
 in de repo). Hover-timing 150/250 ms staat vast (Thierry: "hover is ok").
 
-**Aanvulling (Thierry 2026-09-03):** effect-rijen tonen nu een 20×20-thumbnail
+**Aanvulling (Thierry 2026-09-03):** effect-rijen tonen nu een 24×24-thumbnail
 van de stijl — `DSMenuRow(_:leading:…)` (nieuwe DS-variant: eigen leading-view
 in de icoon-slot) + `RemoteThumbnail` uit dezelfde `ThumbnailCache` als de
 Effects-kaarten (memory-hit = geen flits); zonder URL/tijdens laden het icoon.
-**Figma-TODO:** radius/inset van de rij-thumbnail (nu `DSRadius.md`, 20 pt).
+**Figma-TODO:** radius/inset van de rij-thumbnail (nu `DSRadius.md`, 24 pt).
 
 - **Sneltoetsen**: de editor heeft alleen Fill in body `⇧⌘F` (`EnhanceCommands`);
   Boost en Apply effect hebben geen binding. In het tegelmenu géén shortcut-labels
