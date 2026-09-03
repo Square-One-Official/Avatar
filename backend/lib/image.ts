@@ -376,9 +376,21 @@ export interface FillBodyMapping {
 export interface FillBodyGeometry {
   shouldFill: boolean;
   edges: FillBodyEdges;
+  /** Canvas growth (px, source scale) beyond the existing image bounds. */
   leftPadding: number;
   rightPadding: number;
   bottomPadding: number;
+  /**
+   * Crop lines in source pixel coords: the outermost solid alpha column/row
+   * of the subject on each detected edge. -1 when that edge is not cropped.
+   */
+  cropLeftX: number;
+  cropRightX: number;
+  cropBottomY: number;
+  /** Fill strip width per edge (px, source scale), measured from the crop line. */
+  leftStrip: number;
+  rightStrip: number;
+  bottomStrip: number;
   seam: number;
 }
 
@@ -398,79 +410,169 @@ export type MinimalBodyFillPreparation =
       mapping: FillBodyMapping;
     };
 
+/** Alpha at/above this counts as solid subject for crop-line detection. */
+const SOLID_ALPHA = 128;
+/** Alpha at/above this counts as subject for the bbox (matches the client's trim). */
+const SUBJECT_ALPHA = 16;
+
 /**
- * Detect meaningful alpha contact with the three body-extension edges. Top is
- * deliberately excluded: Fill in body may complete shoulders, arms and torso,
- * but must never invent hair or facial pixels.
+ * Detect meaningful crop lines on the three body-extension edges of the
+ * *subject*, not of the canvas. Top is deliberately excluded: Fill in body
+ * may complete shoulders, arms and torso, but must never invent hair or
+ * facial pixels.
  *
- * Contact must occur on the outermost pixel row/column; an inward band alone
- * is not a crop. Requiring a contiguous run filters isolated antialiasing
- * specks. Side detection ignores the upper 30% so hair touching an image edge
- * does not turn into an unintended horizontal outpaint.
+ * A crop line is the outermost solid (alpha ≥ 128) column/row of the alpha
+ * bbox with a long contiguous run of solid pixels on it. A natural matte edge
+ * (rounded shoulder, soft BiRefNet/Vision boundary) only touches its extreme
+ * column for a few pixels; a crop is a long, straight line. Looking at the
+ * subject instead of the canvas means a transparent gutter — an import with
+ * padding, or the unfilled margin a previous Fill in body left behind — no
+ * longer hides the cut (E56.2). Side detection ignores the upper 30% of the
+ * subject so hair touching a side does not turn into a horizontal outpaint.
  */
 export function computeMinimalBodyFillGeometry(
   alpha: Uint8Array,
   width: number,
   height: number,
 ): FillBodyGeometry {
-  if (width <= 0 || height <= 0 || alpha.length < width * height) {
-    return {
-      shouldFill: false,
-      edges: { left: false, right: false, bottom: false },
-      leftPadding: 0,
-      rightPadding: 0,
-      bottomPadding: 0,
-      seam: 0,
-    };
-  }
+  const none: FillBodyGeometry = {
+    shouldFill: false,
+    edges: { left: false, right: false, bottom: false },
+    leftPadding: 0,
+    rightPadding: 0,
+    bottomPadding: 0,
+    cropLeftX: -1,
+    cropRightX: -1,
+    cropBottomY: -1,
+    leftStrip: 0,
+    rightStrip: 0,
+    bottomStrip: 0,
+    seam: 0,
+  };
+  if (width <= 0 || height <= 0 || alpha.length < width * height) return none;
 
-  const alphaThreshold = 16;
-  const sideStartY = Math.min(height - 1, Math.round(height * 0.3));
-
-  const sideTouches = (fromRight: boolean): boolean => {
-    const x = fromRight ? width - 1 : 0;
-    let currentRun = 0;
-    let longestRun = 0;
-    for (let y = sideStartY; y < height; y++) {
-      if (alpha[y * width + x]! >= alphaThreshold) {
-        currentRun++;
-        longestRun = Math.max(longestRun, currentRun);
-      } else {
-        currentRun = 0;
+  // Subject bbox (soft threshold) and solid bbox (hard threshold).
+  let top = height, bottom = -1;
+  let solidLeft = width, solidRight = -1, solidBottom = -1;
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      const a = alpha[row + x]!;
+      if (a < SUBJECT_ALPHA) continue;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (a >= SOLID_ALPHA) {
+        if (x < solidLeft) solidLeft = x;
+        if (x > solidRight) solidRight = x;
+        if (y > solidBottom) solidBottom = y;
       }
     }
-    const sampledRows = height - sideStartY;
-    return longestRun >= Math.max(3, Math.round(sampledRows * 0.025));
+  }
+  if (bottom < 0 || solidRight < 0) return none;
+
+  const subjectHeight = bottom - top + 1;
+  const sideStartY = Math.min(bottom, top + Math.round(subjectHeight * 0.3));
+  const sampledRows = bottom - sideStartY + 1;
+  // A natural silhouette touches its extreme column for ~sqrt(1/r) of its
+  // height (≈5–8% for a real shoulder); a cropped arm is a far longer line.
+  const sideNeed = Math.max(6, Math.round(sampledRows * 0.12));
+  const solidWidth = solidRight - solidLeft + 1;
+  // A cropped torso is cut over most of its width; an elliptical torso
+  // bottom is flat for ~15% at most.
+  const bottomNeed = Math.max(6, Math.round(solidWidth * 0.3));
+
+  const longestColumnRun = (x: number): number => {
+    let current = 0;
+    let longest = 0;
+    for (let y = sideStartY; y <= bottom; y++) {
+      if (alpha[y * width + x]! >= SOLID_ALPHA) {
+        current++;
+        if (current > longest) longest = current;
+      } else {
+        current = 0;
+      }
+    }
+    return longest;
+  };
+  const longestRowRun = (y: number): number => {
+    let current = 0;
+    let longest = 0;
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      if (alpha[row + x]! >= SOLID_ALPHA) {
+        current++;
+        if (current > longest) longest = current;
+      } else {
+        current = 0;
+      }
+    }
+    return longest;
   };
 
-  let currentBottomRun = 0;
-  let longestBottomRun = 0;
-  for (let x = 0; x < width; x++) {
-    if (alpha[(height - 1) * width + x]! >= alphaThreshold) {
-      currentBottomRun++;
-      longestBottomRun = Math.max(longestBottomRun, currentBottomRun);
-    } else {
-      currentBottomRun = 0;
+  // A crop line is a long solid run that ends abruptly: the line just outside
+  // it carries (almost) nothing. A natural curve grows its runs gradually
+  // inward, so the ratio test rejects it even when the extreme line itself
+  // is flat enough to pass the length test.
+  const searchDepthX = Math.max(3, Math.round(width * 0.02));
+  const searchDepthY = Math.max(3, Math.round(height * 0.02));
+  const ABRUPT_RATIO = 3;
+  const findCropColumn = (from: number, step: 1 | -1): number => {
+    for (let i = 0; i < searchDepthX; i++) {
+      const x = from + i * step;
+      if (x < 0 || x >= width) break;
+      const run = longestColumnRun(x);
+      if (run < sideNeed) continue;
+      const outerX = x - step;
+      const outer = outerX < 0 || outerX >= width ? 0 : longestColumnRun(outerX);
+      if (run >= outer * ABRUPT_RATIO) return x;
     }
-  }
+    return -1;
+  };
+  const findCropRow = (from: number): number => {
+    for (let i = 0; i < searchDepthY; i++) {
+      const y = from - i;
+      if (y < 0) break;
+      const run = longestRowRun(y);
+      if (run < bottomNeed) continue;
+      const outer = y + 1 >= height ? 0 : longestRowRun(y + 1);
+      if (run >= outer * ABRUPT_RATIO) return y;
+    }
+    return -1;
+  };
 
+  const cropLeftX = findCropColumn(solidLeft, 1);
+  const cropRightX = findCropColumn(solidRight, -1);
+  const cropBottomY = findCropRow(solidBottom);
   const edges: FillBodyEdges = {
-    left: sideTouches(false),
-    right: sideTouches(true),
-    bottom: longestBottomRun >= Math.max(3, Math.round(width * 0.025)),
+    left: cropLeftX >= 0,
+    right: cropRightX >= 0,
+    bottom: cropBottomY >= 0,
   };
   const shouldFill = edges.left || edges.right || edges.bottom;
+  if (!shouldFill) return none;
+
+  // Repair one clipped body segment rather than creating a full portrait.
+  // The strip is measured from the crop line; the canvas only grows where the
+  // existing transparent margin is too small to hold it.
+  const sideStrip = Math.max(12, Math.round(width * 0.12));
+  const bottomStrip = Math.max(16, Math.round(height * 0.14));
+  const leftStrip = edges.left ? sideStrip : 0;
+  const rightStrip = edges.right ? sideStrip : 0;
+  const bottomStripPx = edges.bottom ? bottomStrip : 0;
 
   return {
     shouldFill,
     edges,
-    // Repair one clipped body segment rather than creating a full portrait.
-    leftPadding: edges.left ? Math.max(12, Math.round(width * 0.12)) : 0,
-    rightPadding: edges.right ? Math.max(12, Math.round(width * 0.12)) : 0,
-    bottomPadding: edges.bottom ? Math.max(16, Math.round(height * 0.14)) : 0,
-    seam: shouldFill
-      ? Math.max(4, Math.min(10, Math.round(Math.min(width, height) * 0.008)))
-      : 0,
+    leftPadding: edges.left ? Math.max(0, leftStrip - cropLeftX) : 0,
+    rightPadding: edges.right ? Math.max(0, cropRightX + 1 + rightStrip - width) : 0,
+    bottomPadding: edges.bottom ? Math.max(0, cropBottomY + 1 + bottomStripPx - height) : 0,
+    cropLeftX,
+    cropRightX,
+    cropBottomY,
+    leftStrip,
+    rightStrip,
+    bottomStrip: bottomStripPx,
+    seam: Math.max(4, Math.min(10, Math.round(Math.min(width, height) * 0.008))),
   };
 }
 
@@ -579,27 +681,31 @@ export async function prepareMinimalBodyFill(
       },
     }).png().toBuffer();
 
+  // White = paint. Each strip starts a seam-width inside the crop line (so
+  // the model blends into the last real pixels) and runs one strip outward,
+  // no farther: a wide transparent gutter is not an invitation to paint a
+  // full body. Sides span the full height, bottom spans the full width —
+  // same footprint as the E56.1 canvas-edge strips.
+  const toModelX = (sourceX: number) => modelLeftPadding + Math.round(sourceX * sourceScale);
+  const toModelY = (sourceY: number) => Math.round(sourceY * sourceScale);
   const fillLayers: sharp.OverlayOptions[] = [];
   if (geometry.edges.left) {
-    fillLayers.push({
-      input: await whiteRect(modelLeftPadding + seam, modelCanvasHeight),
-      left: 0,
-      top: 0,
-    });
+    const lineX = toModelX(geometry.cropLeftX);
+    const from = Math.max(0, lineX - Math.round(geometry.leftStrip * sourceScale));
+    const to = Math.min(modelCanvasWidth, lineX + seam);
+    fillLayers.push({ input: await whiteRect(to - from, modelCanvasHeight), left: from, top: 0 });
   }
   if (geometry.edges.right) {
-    fillLayers.push({
-      input: await whiteRect(modelRightPadding + seam, modelCanvasHeight),
-      left: Math.max(0, modelLeftPadding + drawW - seam),
-      top: 0,
-    });
+    const lineX = toModelX(geometry.cropRightX + 1);
+    const from = Math.max(0, lineX - seam);
+    const to = Math.min(modelCanvasWidth, lineX + Math.round(geometry.rightStrip * sourceScale));
+    fillLayers.push({ input: await whiteRect(to - from, modelCanvasHeight), left: from, top: 0 });
   }
   if (geometry.edges.bottom) {
-    fillLayers.push({
-      input: await whiteRect(modelCanvasWidth, modelBottomPadding + seam),
-      left: 0,
-      top: Math.max(0, drawH - seam),
-    });
+    const lineY = toModelY(geometry.cropBottomY + 1);
+    const from = Math.max(0, lineY - seam);
+    const to = Math.min(modelCanvasHeight, lineY + Math.round(geometry.bottomStrip * sourceScale));
+    fillLayers.push({ input: await whiteRect(modelCanvasWidth, to - from), left: 0, top: from });
   }
 
   const featheredMask = await sharp({

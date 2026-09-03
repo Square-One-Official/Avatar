@@ -37,9 +37,12 @@ export const config = {
  *          429 rate_limited
  *
  * Pipeline (real outpainting, not instruction-edit):
- *   1. Detect which body edges actually touch the source boundary. If none
- *      touch, return the original cutout without invoking Replicate or charging.
- *   2. Add a small margin only at those edges and build a white-on-fill mask.
+ *   1. Detect straight crop lines on the subject's alpha bbox (left/right/
+ *      bottom) — a transparent gutter around the subject does not hide a cut
+ *      (E56.2). If nothing is cropped, return the original cutout without
+ *      invoking Replicate or charging.
+ *   2. Grow the canvas only where the existing margin can't hold the strip,
+ *      and build a white-on-fill mask covering one strip past each crop line.
  *   3. Check credits (402 if empty).
  *   4. Run FLUX.1 Fill Pro on (image, mask). It only paints into the
  *      masked region.
