@@ -67,7 +67,9 @@ public struct VisionCutoutEngine: CutoutEngine {
         // frame niet meeliften.
         var matte = fgMask
         if let personBuffer = personSeg.results?.first?.pixelBuffer {
-            let person = Self.scaled(CIImage(cvPixelBuffer: personBuffer), to: extent)
+            let person = PersonGate.confinedToOpaque(
+                Self.scaled(CIImage(cvPixelBuffer: personBuffer), to: extent), source: original, extent: extent
+            )
             let gate = fgMask.applyingFilter("CIMorphologyMaximum", parameters: [
                 kCIInputRadiusKey: 8.0
             ]).cropped(to: extent)

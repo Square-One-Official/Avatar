@@ -1,5 +1,6 @@
 import CoreGraphics
 import CoreImage
+import ImageIO
 import CoreML
 import CoreVideo
 import Foundation
@@ -81,6 +82,18 @@ public struct OrmbgEngine: CutoutEngine {
             "inputEpsilon": 0.01
         ]).cropped(to: extent)
 
+        #if DEBUG
+        if let dumpDir = ProcessInfo.processInfo.environment["AVATAR_CUTOUT_PROBE_DUMP"] {
+            for (name, img) in [("raw", mask), ("gated", gatedMask), ("guided", guided)] {
+                if let cg = EngineRendering.linearContext.createCGImage(img, from: extent),
+                   let dest = CGImageDestinationCreateWithURL(
+                    URL(fileURLWithPath: "\(dumpDir)/ormbg-\(name).png") as CFURL, "public.png" as CFString, 1, nil
+                   ) {
+                    CGImageDestinationAddImage(dest, cg, nil); CGImageDestinationFinalize(dest)
+                }
+            }
+        }
+        #endif
         let clearBackground = CIImage(color: CIColor(red: 0, green: 0, blue: 0, alpha: 0))
             .cropped(to: extent)
         let alphaMatte = guided.applyingFilter("CIMaskToAlpha")

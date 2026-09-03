@@ -181,6 +181,12 @@ omdat het matting-model de schijf vlak om de persoon volledig meeneemt. Probe-te
 Open: een 1–2 px kleurrand aan de haarkant bij ORMBG op dit soort bronnen — vraagt om
 kleur-decontaminatie aan de matte-rand (niet gedaan).
 
+**Vervolg 6 (2026-09-03):** dunne bogen van de schijfrand naast de schouders bleven staan —
+Vision's persoon-matte markeerde de zwarte (transparante) hoeken buiten de schijf als persoon,
+zodat de zone tot de rand reikte. `PersonGate.confinedToOpaque`: persoon-matte × bron-alpha
+(transparant kan geen persoon zijn), plus harde drempel vóór het verbreden. Beide engines.
+Debug-hooks (`AVATAR_CUTOUT_PROBE_DEBUG`/`_DUMP`, alleen DEBUG) dumpen raw/gated/guided matte.
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een
