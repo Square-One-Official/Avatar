@@ -21,4 +21,16 @@ final class AppleIntelligenceAvailabilityTests: XCTestCase {
         XCTAssertTrue(AppleIntelligenceSupportStatus.supported.footnote.isEmpty)
         XCTAssertTrue(AppleIntelligenceSupportStatus.appleIntelligenceUnavailable.offersSystemSettingsShortcut)
     }
+
+    /// Bug-fix 2026-09-03: de refresh bij app-activatie mag de view-tree niet
+    /// her-identificeren; de status leeft in een observable store die na
+    /// `refresh()` de live evaluatie spiegelt.
+    func testRefreshMirrorsLiveEvaluation() {
+        AppleIntelligenceAvailability.refresh()
+        XCTAssertEqual(AppleIntelligenceAvailability.status, AppleIntelligenceAvailability.evaluateSupport())
+        XCTAssertEqual(
+            AppleIntelligenceAvailability.supportsApplePrivateCloud,
+            AppleIntelligenceAvailability.evaluateSupport() == .supported
+        )
+    }
 }

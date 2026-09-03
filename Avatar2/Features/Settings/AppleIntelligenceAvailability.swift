@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import Observation
 
 enum AppleIntelligenceSupportStatus: Equatable, Sendable {
     case supported
@@ -40,8 +41,17 @@ enum AppleIntelligenceAvailability {
     }
 
     /// Volledige ondersteuningscheck — bron voor Tier 2 enabled/disabled.
+    /// Leest via de observable store: SwiftUI-body's die dit lezen hertekenen
+    /// vanzelf na `refresh()` (app terug in focus na System Settings).
     static var status: AppleIntelligenceSupportStatus {
-        evaluateSupport()
+        AppleIntelligenceAvailabilityStore.shared.status
+    }
+
+    /// Her-evalueer de runtime-status (Apple Intelligence aan/uit gezet in
+    /// System Settings). Alleen views die `status`/`supportsApplePrivateCloud`
+    /// lezen hertekenen — de rest van de view-tree (en z'n @State) blijft staan.
+    static func refresh() {
+        AppleIntelligenceAvailabilityStore.shared.refresh()
     }
 
     static var supportsApplePrivateCloud: Bool {
@@ -109,5 +119,25 @@ enum AppleIntelligenceAvailability {
         if let url = URL(string: "x-apple.systempreferences:") {
             NSWorkspace.shared.open(url)
         }
+    }
+}
+
+/// Observable cache van de support-status. Bug-fix 2026-09-03: de refresh bij
+/// app-activatie ging via `.id(tick)` op de hele ShellView, wat élke @State in
+/// de shell wiste (editor-camera sprong terug naar fit bij een venster-wissel).
+/// Nu is de status zelf observable, dus een refresh raakt alleen de lezers.
+@Observable
+final class AppleIntelligenceAvailabilityStore {
+    static let shared = AppleIntelligenceAvailabilityStore()
+
+    private(set) var status: AppleIntelligenceSupportStatus
+
+    private init() {
+        status = AppleIntelligenceAvailability.evaluateSupport()
+    }
+
+    func refresh() {
+        let fresh = AppleIntelligenceAvailability.evaluateSupport()
+        if fresh != status { status = fresh }
     }
 }
