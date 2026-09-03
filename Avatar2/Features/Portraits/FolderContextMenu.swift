@@ -26,7 +26,9 @@ struct FolderDSContextMenu: View {
         }
     }
 
-    @ViewBuilder private var rows: some View {
+    /// Ook los bruikbaar als submenu-inhoud (E57.1: het tegelmenu toont de
+    /// map-acties in een `DSMenuSubmenu`, dat zelf het paneel tekent).
+    @ViewBuilder var rows: some View {
         let folderID = folder.persistentModelID
         DSMenuRow("Select all in folder", icon: "checkmark.circle", disabled: items.isEmpty) {
             onDismiss()

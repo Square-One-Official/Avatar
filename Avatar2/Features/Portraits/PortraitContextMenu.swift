@@ -32,43 +32,16 @@ struct PortraitDSContextMenu: View {
     let onRequestNewFolder: ([Portrait2]) -> Void
     let onRequestSetBackground: ([Portrait2]) -> Void
 
-    @State private var moveFlyoutOpen = false
-    @State private var boostFlyoutOpen = false
-    @State private var folderFlyoutOpen = false
-
+    // E57.1: submenu's zijn `DSMenuSubmenu` (eigen child window naast de rij,
+    // hover-intent + keyboard via de DS-menuboom) — geen eigen flyout-state.
     var body: some View {
-        HStack(alignment: .top, spacing: DSSpacing.gap1) {
-            DSContextMenuPanel(minWidth: isBulk ? 270 : 200) {
-                if isBulk {
-                    bulkRows
-                } else {
-                    singleRows
-                }
-            }
-            if moveFlyoutOpen {
-                moveFlyout
-            } else if boostFlyoutOpen {
-                boostFlyout
-            } else if folderFlyoutOpen, let folder = portrait.folder {
-                folderFlyout(folder)
+        DSContextMenuPanel(minWidth: isBulk ? 270 : 200) {
+            if isBulk {
+                bulkRows
+            } else {
+                singleRows
             }
         }
-    }
-
-    /// Eén flyout tegelijk (Move ↔ Boost ↔ Folder).
-    private func toggleMoveFlyout() {
-        moveFlyoutOpen.toggle()
-        if moveFlyoutOpen { boostFlyoutOpen = false; folderFlyoutOpen = false }
-    }
-
-    private func toggleBoostFlyout() {
-        boostFlyoutOpen.toggle()
-        if boostFlyoutOpen { moveFlyoutOpen = false; folderFlyoutOpen = false }
-    }
-
-    private func toggleFolderFlyout() {
-        folderFlyoutOpen.toggle()
-        if folderFlyoutOpen { moveFlyoutOpen = false; boostFlyoutOpen = false }
     }
 
     private var isBulk: Bool {
@@ -80,15 +53,15 @@ struct PortraitDSContextMenu: View {
         DSMenuRow("Open", icon: "arrow.up.forward") {
             onDismiss(); model.openPortrait(portrait)
         }
-        DSMenuRow("Move to folder", icon: "folder", showsChevron: true) {
-            toggleMoveFlyout()
+        DSMenuSubmenu("Move to folder", icon: "folder", minWidth: 180) {
+            moveRows(targets: [portrait])
         }
         // E50.5: het map-menu van de map waarin dit portret staat — dezelfde
         // acties als de map-rij in de left-nav (incl. Duplicate), bereikbaar
         // vanaf Home en Portraits zonder naar de sidebar te hoeven.
         if let folder = portrait.folder {
-            DSMenuRow("Folder “\(folder.name)”", icon: "folder.fill", showsChevron: true) {
-                toggleFolderFlyout()
+            DSMenuSubmenu("Folder “\(folder.name)”", icon: "folder.fill", minWidth: 200) {
+                folderRows(folder)
             }
         }
         DSMenuRow("Export…", icon: "square.and.arrow.up") {
@@ -123,8 +96,8 @@ struct PortraitDSContextMenu: View {
             onDismiss()
             PortraitSetActions.export(targets, isPro: model.isPro, reporter: model.setActionReporter)
         }
-        DSMenuRow("Move \(n) to folder", icon: "folder", showsChevron: true) {
-            toggleMoveFlyout()
+        DSMenuSubmenu("Move \(n) to folder", icon: "folder", minWidth: 180) {
+            moveRows(targets: targets)
         }
         DSMenuRow("Match framing", icon: "square.resize", shortcut: "⌥⌘F") {
             onDismiss()
@@ -132,8 +105,8 @@ struct PortraitDSContextMenu: View {
         }
         // Aanvulling Thierry 2026-09-02: Boost ook op een map-selectie. Zelfde
         // twee modi als de editor-chip (E41.2/E41.5), via een flyout.
-        DSMenuRow("Boost resolution on \(n)", icon: "arrow.up.left.and.arrow.down.right", showsChevron: true) {
-            toggleBoostFlyout()
+        DSMenuSubmenu("Boost resolution on \(n)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
+            boostRows(targets: targets)
         }
         // E50.3: "Match lighting" kiest zelf het doel (het patroon van de set of
         // het best belichte portret); "…to this one" is de expliciete override
@@ -176,33 +149,31 @@ struct PortraitDSContextMenu: View {
     /// Boost-modus kiezen voor de hele selectie. Online toont het totaal aan
     /// credits (3 per portret); zonder Cloud-tier de neutrale "Cloud"-hint —
     /// de gate vraagt dan zelf om de tier te verhogen (zoals in de editor).
-    private var boostFlyout: some View {
-        let targets = selectedTargets()
+    @ViewBuilder private func boostRows(targets: [Portrait2]) -> some View {
         let onlineLabel: String = {
             guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Sharper · Cloud" }
             let total = CreditMeter.credits(for: .upscaleHigh) * targets.count
             return "Best · \(total == 1 ? "1 credit" : "\(total) credits")"
         }()
-        return DSContextMenuPanel(minWidth: 230) {
-            DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free") {
-                onDismiss()
-                PortraitSetActions.boostResolution(
-                    targets, mode: .local, entitlement: entitlement,
-                    undoManager: undoManager, reporter: model.setActionReporter
-                )
-            }
-            DSMenuRow("Online", icon: "cloud", shortcut: onlineLabel) {
-                onDismiss()
-                PortraitSetActions.boostResolution(
-                    targets, mode: .online, entitlement: entitlement,
-                    undoManager: undoManager, reporter: model.setActionReporter
-                )
-            }
+        DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free") {
+            onDismiss()
+            PortraitSetActions.boostResolution(
+                targets, mode: .local, entitlement: entitlement,
+                undoManager: undoManager, reporter: model.setActionReporter
+            )
+        }
+        DSMenuRow("Online", icon: "cloud", shortcut: onlineLabel) {
+            onDismiss()
+            PortraitSetActions.boostResolution(
+                targets, mode: .online, entitlement: entitlement,
+                undoManager: undoManager, reporter: model.setActionReporter
+            )
         }
     }
 
-    /// Map-acties van de map van dit portret (gedeeld `FolderDSContextMenu`).
-    private func folderFlyout(_ folder: Folder2) -> some View {
+    /// Map-acties van de map van dit portret (gedeeld `FolderDSContextMenu`);
+    /// alleen de rijen — het submenu tekent zelf het paneel.
+    private func folderRows(_ folder: Folder2) -> some View {
         FolderDSContextMenu(
             folder: folder,
             items: FolderSetScope.items(in: folder.portraits, folderID: nil),
@@ -211,33 +182,30 @@ struct PortraitDSContextMenu: View {
             modelContext: modelContext,
             undoManager: undoManager,
             onDismiss: onDismiss
-        )
+        ).rows
     }
 
-    private var moveFlyout: some View {
-        let targets = isBulk ? selectedTargets() : [portrait]
-        return DSContextMenuPanel(minWidth: 180) {
-            DSMenuRow("Unfiled", icon: "tray") {
-                onDismiss()
-                for p in targets { p.folder = nil }
-            }
-            if !folders.isEmpty {
-                Divider().padding(.vertical, 2)
-                ForEach(folders) { folder in
-                    DSMenuRow(folder.name, icon: "folder") {
-                        onDismiss()
-                        for p in targets { p.folder = folder }
-                    }
+    @ViewBuilder private func moveRows(targets: [Portrait2]) -> some View {
+        DSMenuRow("Unfiled", icon: "tray") {
+            onDismiss()
+            for p in targets { p.folder = nil }
+        }
+        if !folders.isEmpty {
+            Divider().padding(.vertical, 2)
+            ForEach(folders) { folder in
+                DSMenuRow(folder.name, icon: "folder") {
+                    onDismiss()
+                    for p in targets { p.folder = folder }
                 }
             }
-            Divider().padding(.vertical, 2)
-            // E36.5 (audit-B5): geen stille "Untitled folder N" meer — vraag
-            // altijd een naam (zelfde DSDialog als de left-nav-flow); de overlay
-            // toont de prompt en maakt de map pas na bevestiging.
-            DSMenuRow("New folder…", icon: "folder.badge.plus") {
-                onDismiss()
-                onRequestNewFolder(targets)
-            }
+        }
+        Divider().padding(.vertical, 2)
+        // E36.5 (audit-B5): geen stille "Untitled folder N" meer — vraag
+        // altijd een naam (zelfde DSDialog als de left-nav-flow); de overlay
+        // toont de prompt en maakt de map pas na bevestiging.
+        DSMenuRow("New folder…", icon: "folder.badge.plus") {
+            onDismiss()
+            onRequestNewFolder(targets)
         }
     }
 }

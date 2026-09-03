@@ -66,6 +66,11 @@ final class DSFloatingWindowRuntimeTests: XCTestCase {
                                 ForEach(0..<8, id: \.self) { i in
                                     DSMenuRow("Row \(i)", icon: "circle") {}
                                 }
+                                // E57.1: submenu als laatste rij (keyboard: ↑ → …).
+                                DSMenuSubmenu("More", icon: "ellipsis") {
+                                    DSMenuRow("Sub A", icon: "circle") {}
+                                    DSMenuRow("Sub B", icon: "circle") {}
+                                }
                             }
                         }
                     }
@@ -99,6 +104,53 @@ final class DSFloatingWindowRuntimeTests: XCTestCase {
     private func zIndex(of panel: NSWindow) -> Int? {
         let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
         return list.firstIndex { ($0[kCGWindowNumber as String] as? Int) == panel.windowNumber }
+    }
+
+    /// Toets in de event-queue: de lokale monitors (menu-navigatie, Esc)
+    /// zien 'm bij de volgende pump, net als een echte toetsaanslag.
+    private func press(keyCode: UInt16) {
+        let event = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
+            isARepeat: false, keyCode: keyCode
+        )!
+        NSApp.sendEvent(event)
+        pump()
+    }
+
+    /// E57.1: een submenu is een child window van het menu-panel, rechts
+    /// ervan, en gaat open/dicht via →/← en helemaal weg via Esc.
+    func testSubmenuOpensBesideMenuViaKeyboardAndClosesWithIt() {
+        let stage = Stage()
+        window.contentView = NSHostingView(rootView: Harness(stage: stage))
+        pump()
+        stage.menuAnchor = CGRect(x: 100, y: 60, width: 0, height: 0)
+        pump()
+        guard let menu = panels.first else { return XCTFail("geen menu-panel") }
+        XCTAssertTrue((menu.childWindows ?? []).isEmpty, "submenu dicht bij openen")
+
+        press(keyCode: 126) // ↑ → onderste rij = "More"
+        press(keyCode: 124) // → opent het submenu
+        let submenus = (menu.childWindows ?? []).compactMap { $0 as? DSFloatingPanel }
+        XCTAssertEqual(submenus.count, 1, "submenu hangt als child window onder het menu")
+        guard let submenu = submenus.first else { return }
+        XCTAssertTrue(submenu.isVisible)
+        XCTAssertTrue(submenu.parent === menu)
+        XCTAssertGreaterThan(submenu.frame.midX, menu.frame.midX, "rechts van het menu")
+        XCTAssertTrue(
+            DSFloatingPanelController.isInside(submenu, panelOrDescendantOf: menu),
+            "klik in het submenu telt als binnen het menu"
+        )
+
+        press(keyCode: 123) // ← sluit het submenu
+        XCTAssertTrue((menu.childWindows ?? []).isEmpty, "← sluit alleen het submenu")
+        XCTAssertNotNil(stage.menuAnchor, "…het menu zelf blijft open")
+
+        press(keyCode: 124) // → opnieuw open (trigger bleef gemarkeerd)
+        XCTAssertEqual((menu.childWindows ?? []).count, 1)
+        press(keyCode: 53) // Esc sluit alles
+        XCTAssertNil(stage.menuAnchor, "Esc sluit het hele menu")
+        XCTAssertTrue(panels.isEmpty)
     }
 
     func testMenuNearBottomEdgeExtendsBeyondHostWindow() {

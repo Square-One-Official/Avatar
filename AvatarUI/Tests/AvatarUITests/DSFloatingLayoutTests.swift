@@ -116,6 +116,70 @@ final class DSFloatingLayoutTests: XCTestCase {
         XCTAssertEqual(frame.maxY, screen.maxY - DSSpacing.gap2)
     }
 
+    // MARK: - Submenu (E57.1)
+
+    /// Hoofdpaneel midden in beeld (scherm-y omhoog); de trigger-rij is de
+    /// tweede rij (32 hoog, 8 inset, 4 spacing).
+    private let submenuPanel = CGRect(x: 500, y: 300, width: 220, height: 200)
+    private var triggerRow: CGRect {
+        CGRect(x: 508, y: 300 + 200 - 8 - 32 - 4 - 32, width: 204, height: 32)
+    }
+
+    func testSubmenuOpensRightOfPanelWithFirstRowOnTriggerHeight() {
+        let frame = DSFloatingLayout.contentFrame(
+            placement: .besideRow(row: triggerRow, panel: submenuPanel),
+            size: CGSize(width: 200, height: 120),
+            parent: parent, screen: screen
+        )
+        XCTAssertEqual(frame.minX, submenuPanel.maxX + DSFloatingLayout.submenuGap)
+        XCTAssertEqual(
+            frame.maxY, triggerRow.maxY + DSMenuLayout.listInset,
+            "paneel-top = rij-top + lijst-inset → eerste submenu-rij op de hoogte van de trigger"
+        )
+        XCTAssertEqual(
+            DSFloatingLayout.clipRect(placement: .besideRow(row: triggerRow, panel: submenuPanel), parent: parent, screen: screen),
+            screen, "submenu's klemmen op het scherm, zoals een menu"
+        )
+    }
+
+    func testSubmenuFlipsToTheLeftWhenItDoesNotFitOnTheRight() {
+        let panel = CGRect(x: 1200, y: 300, width: 220, height: 200)
+        let row = CGRect(x: 1208, y: 452, width: 204, height: 32)
+        let frame = DSFloatingLayout.contentFrame(
+            placement: .besideRow(row: row, panel: panel),
+            size: CGSize(width: 200, height: 120),
+            parent: parent, screen: screen
+        )
+        XCTAssertEqual(frame.maxX, panel.minX - DSFloatingLayout.submenuGap, "links van het paneel")
+        XCTAssertEqual(frame.maxY, row.maxY + DSMenuLayout.listInset, "verticaal ongewijzigd")
+    }
+
+    func testSubmenuClampsToTheScreenBottom() {
+        let panel = CGRect(x: 500, y: 0, width: 220, height: 200)
+        let row = CGRect(x: 508, y: 12, width: 204, height: 32) // onderste rij
+        let frame = DSFloatingLayout.contentFrame(
+            placement: .besideRow(row: row, panel: panel),
+            size: CGSize(width: 200, height: 300),
+            parent: parent, screen: screen
+        )
+        XCTAssertEqual(frame.minY, screen.minY + DSSpacing.gap2, "schuift omhoog i.p.v. van het scherm af")
+        XCTAssertEqual(frame.minX, panel.maxX + DSFloatingLayout.submenuGap)
+    }
+
+    func testSubmenuThatFitsNowhereHugsTheRightScreenEdge() {
+        // Scherm smaller dan paneel + submenu aan beide kanten: rechts
+        // uitlijnen (overlap) is beter dan buiten beeld.
+        let narrow = CGRect(x: 0, y: 0, width: 500, height: 860)
+        let panel = CGRect(x: 100, y: 300, width: 300, height: 200)
+        let row = CGRect(x: 108, y: 452, width: 284, height: 32)
+        let frame = DSFloatingLayout.contentFrame(
+            placement: .besideRow(row: row, panel: panel),
+            size: CGSize(width: 250, height: 120),
+            parent: parent, screen: narrow
+        )
+        XCTAssertEqual(frame.maxX, narrow.maxX - DSSpacing.gap2)
+    }
+
     func testToastSitsInBottomTrailingCornerOfParent() {
         let size = CGSize(width: 360, height: 80)
         let frame = DSFloatingLayout.contentFrame(

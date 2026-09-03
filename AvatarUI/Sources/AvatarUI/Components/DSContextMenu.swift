@@ -1,5 +1,7 @@
 // Zwevend DS-rechtermuis-menu (E24.22) — vervangt native `.contextMenu` op macOS.
-// `DSMenuRow` + `DSContextMenuPanel` + overlay/scrim; submenu via `DSMenuFlyout`.
+// `DSMenuRow` + `DSContextMenuPanel` + overlay/scrim; submenu via `DSMenuSubmenu`
+// (E57.1: eigen child window naast de rij, hover-intent + keyboard via
+// `DSMenuTree`/`DSMenuLevel` in DSMenuNavigation.swift).
 // Ankers zijn SwiftUI `.global`. Het menu zelf leeft in een child window
 // (`DSFloatingWindowAnchor`), zodat het — net als een native NSMenu — over de
 // vensterrand heen mag en altijd bovenop in-window content staat; de scrim
@@ -20,6 +22,7 @@ public struct DSMenuRow<Accessory: View>: View {
     private let disabled: Bool
     private let accessory: Accessory
     private let action: () -> Void
+    @State private var id = UUID()
 
     public init(
         _ title: String,
@@ -66,6 +69,60 @@ public struct DSMenuRow<Accessory: View>: View {
     }
 
     public var body: some View {
+        DSMenuRowContent(
+            id: id,
+            title: title,
+            icon: icon,
+            destructive: destructive,
+            showsChevron: showsChevron,
+            shortcut: shortcut,
+            disabled: disabled,
+            isSubmenu: false,
+            accessory: accessory,
+            action: action
+        )
+    }
+}
+
+/// De rij zelf (gedeeld door `DSMenuRow` en `DSMenuSubmenu`). Binnen een
+/// `DSMenuLevel` volgt de markering het niveau (hover én keyboard delen één
+/// `focusedID`; een open submenu-rij blijft gemarkeerd); daarbuiten — in-window
+/// dropdowns — is het de eigen hover, zoals voorheen.
+struct DSMenuRowContent<Accessory: View>: View {
+    let id: UUID
+    let title: String
+    let icon: Image
+    let destructive: Bool
+    let showsChevron: Bool
+    let shortcut: String?
+    let disabled: Bool
+    let isSubmenu: Bool
+    let accessory: Accessory
+    let action: () -> Void
+
+    @Environment(DSMenuLevel.self) private var level: DSMenuLevel?
+    @State private var localHover = false
+    @State private var actionBox = ActionBox()
+
+    /// Het niveau bewaart één activatie-closure per rij (Return/Space); die
+    /// wordt elke body-pass ververst zodat 'ie nooit een verouderde state
+    /// vasthoudt (de rij-closures vangen de menu-struct van dat moment).
+    @MainActor
+    private final class ActionBox {
+        var action: () -> Void = {}
+        func update(_ action: @escaping () -> Void) { self.action = action }
+    }
+
+    private var highlighted: Bool {
+        guard !disabled else { return false }
+        if let level {
+            return level.focusedID == id || (isSubmenu && level.openSubmenuID == id)
+        }
+        return localHover
+    }
+
+    var body: some View {
+        let _ = actionBox.update(action)
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
                 icon
@@ -81,7 +138,8 @@ public struct DSMenuRow<Accessory: View>: View {
                         .dsTextStyle(.labelSmall)
                         .foregroundStyle(DSColor.Foreground.muted)
                         .lineLimit(1)
-                } else if showsChevron {
+                }
+                if showsChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(DSColor.Foreground.muted)
@@ -94,12 +152,37 @@ public struct DSMenuRow<Accessory: View>: View {
             .frame(height: 32)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .dsHoverHighlight(cornerRadius: DSMenuLayout.rowRadius)
+            .background(
+                DSColor.neutralSurface(pressed: false, hovering: highlighted),
+                in: RoundedRectangle(cornerRadius: DSMenuLayout.rowRadius, style: .continuous)
+            )
+            .dsMotion(DSMotion.micro, value: highlighted)
         }
         .buttonStyle(.plain)
         .dsFocusEffectDisabled()
         .disabled(disabled)
         .opacity(disabled ? 0.4 : 1)
+        .onHover { hovering in
+            localHover = hovering
+            if hovering { level?.hoverEntered(id) } else { level?.hoverExited(id) }
+        }
+        .background {
+            if let level {
+                GeometryReader { geo in
+                    Color.clear
+                        .onChange(of: geo.frame(in: .global), initial: true) { _, frame in
+                            level.updateFrame(id, frame)
+                        }
+                }
+            }
+        }
+        .onAppear {
+            level?.register(id, isSubmenu: isSubmenu, isDisabled: disabled) { [actionBox] in
+                actionBox.action()
+            }
+        }
+        .onChange(of: disabled) { _, new in level?.setDisabled(id, new) }
+        .onDisappear { level?.unregister(id) }
     }
 }
 
@@ -153,18 +236,59 @@ public struct DSContextMenuPanel<Content: View>: View {
     private let minWidth: CGFloat
     private let content: Content
 
+    @Environment(DSMenuTree.self) private var tree: DSMenuTree?
+    @Environment(DSMenuLevel.self) private var parentLevel: DSMenuLevel?
+
     public init(minWidth: CGFloat = 190, @ViewBuilder content: () -> Content) {
         self.minWidth = minWidth
         self.content = content()
     }
 
     public var body: some View {
+        if let tree {
+            // Rechtermuis-menu (`DSContextMenuOverlay`): dit paneel is een
+            // niveau in de boom — het hoofdpaneel of een open submenu.
+            DSMenuLevelHost(tree: tree, parent: parentLevel) { list }
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         VStack(alignment: .leading, spacing: DSSpacing.gap1) {
             content
         }
         .padding(DSMenuLayout.listInset)
         .frame(minWidth: minWidth, alignment: .leading)
         .dsMenuSurface()
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct DSMenuLevelHost<Content: View>: View {
+    let tree: DSMenuTree
+    let content: Content
+    @State private var level: DSMenuLevel
+
+    init(tree: DSMenuTree, parent: DSMenuLevel?, @ViewBuilder content: () -> Content) {
+        self.tree = tree
+        self.content = content()
+        _level = State(initialValue: DSMenuLevel(parent: parent))
+    }
+
+    var body: some View {
+        content
+            .environment(level)
+            .onAppear {
+                tree.attach(level)
+                // Keyboard-open (→/Return op de trigger): eerste rij markeren
+                // zodra de rijen hun frames gemeld hebben (volgende tick).
+                if let parent = level.parent, parent.pendingChildFocus {
+                    parent.pendingChildFocus = false
+                    DispatchQueue.main.async { [level] in level.focusFirst() }
+                }
+            }
+            .onDisappear { tree.detach(level) }
     }
 }
 
@@ -241,6 +365,12 @@ public struct DSContextMenuOverlay<Menu: View>: View {
     private let onDismiss: () -> Void
     private let menu: Menu
 
+    /// E57.1: één boom per open menu — pijltjes/Return lopen via een lokale
+    /// toetsen-monitor (de panels worden nooit key) naar het diepste open
+    /// niveau; submenu's melden zich als kind-niveau.
+    @State private var tree = DSMenuTree()
+    @State private var keyMonitor = DSMenuKeyMonitor()
+
     /// `kind: .panel` voor een popover-achtig paneel dat een app-/venster-
     /// wissel overleeft en waarin tekstvelden werken (zie `DSFloatingMode`).
     public init(
@@ -272,9 +402,11 @@ public struct DSContextMenuOverlay<Menu: View>: View {
                 mode: DSFloatingMode(kind: kind, onDismiss: onDismiss),
                 identity: anchor
             ) {
-                menu
+                menu.environment(tree)
             }
         }
+        .onAppear { keyMonitor.install(tree: tree) }
+        .onDisappear { keyMonitor.remove() }
     }
 }
 

@@ -37,6 +37,11 @@ public enum DSFloatingPlacement: Equatable {
     case anchoredTopLeft(CGPoint, bounds: DSFloatingBounds = .screen)
     /// Toast: in een hoek van het hostvenster, `padding` van de rand.
     case corner(Alignment, padding: CGFloat)
+    /// Submenu (E57.1): rechts naast `panel` (het paneel van de trigger-rij),
+    /// met de bovenkant op `row` zodat de eerste submenu-rij op de hoogte
+    /// van de trigger staat; links van het paneel als het rechts niet past.
+    /// Beide rects in SwiftUI `.global` van het venster van de rij.
+    case besideRow(row: CGRect, panel: CGRect)
 }
 
 // MARK: - Layout (puur, testbaar; schermcoördinaten, y omhoog)
@@ -45,7 +50,11 @@ enum DSFloatingLayout {
     enum Placement: Equatable {
         case anchoredTopLeft(CGPoint, bounds: DSFloatingBounds)
         case corner(Alignment, padding: CGFloat)
+        case besideRow(row: CGRect, panel: CGRect)
     }
+
+    /// Kier tussen paneel en submenu.
+    static let submenuGap: CGFloat = DSSpacing.gap1
 
     struct Frames: Equatable {
         /// Vensterframe van de panel = zichtbare regio (clip).
@@ -102,6 +111,25 @@ enum DSFloatingLayout {
             default: y = parent.midY - size.height / 2
             }
             return CGRect(x: x, y: y, width: size.width, height: size.height)
+        case .besideRow(let row, let panel):
+            // Rechts van het paneel; past het niet (met `padding` tot de
+            // schermrand), dan links ervan; past ook dát niet, dan tegen de
+            // rechter schermrand — een overlap is beter dan buiten beeld.
+            var x = panel.maxX + submenuGap
+            if x + size.width + padding > screen.maxX {
+                x = panel.minX - submenuGap - size.width
+            }
+            if x < screen.minX + padding {
+                x = max(screen.minX + padding, screen.maxX - padding - size.width)
+            }
+            // Bovenkant van het submenu-paneel op de bovenkant van de rij
+            // min de lijst-inset: de eerste submenu-rij staat dan precies op
+            // de hoogte van de trigger-rij (y omhoog → rij-top = maxY).
+            let preferredTop = row.maxY + DSMenuLayout.listInset
+            let upper = screen.maxY - padding
+            let lower = screen.minY + padding + size.height
+            let top = max(min(preferredTop, upper), min(lower, upper))
+            return CGRect(x: x, y: top - size.height, width: size.width, height: size.height)
         }
     }
 
@@ -111,7 +139,7 @@ enum DSFloatingLayout {
     /// parent), net als de oude overlay.
     static func clipRect(placement: Placement, parent: CGRect, screen: CGRect) -> CGRect {
         switch placement {
-        case .anchoredTopLeft: return screen
+        case .anchoredTopLeft, .besideRow: return screen
         case .corner: return parent
         }
     }
@@ -457,23 +485,40 @@ final class DSFloatingPanelController {
             }) { monitors.append(monitor) }
         }
         // Klik buiten het menu/paneel, binnen de app — in een ander venster
-        // (het hostvenster zelf heeft óók de in-window scrim).
+        // (het hostvenster zelf heeft óók de in-window scrim). Een klik in
+        // een submenu (child window van deze panel, E57.1) is "binnen".
         let panel = self.panel
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: Self.mouseDown, handler: { event in
-            if event.window !== panel {
+            if !Self.isInside(event.window, panelOrDescendantOf: panel) {
                 MainActor.assumeIsolated { onDismiss() }
             }
             return event
         }) { monitors.append(monitor) }
         // Esc sluit het menu; de panel is nooit key, dus via een monitor.
+        // Een submenu (child van een andere DS-panel, E57.1) laat Esc door:
+        // het hoofdmenu sluit dan het geheel — de volgorde waarin AppKit
+        // lokale monitors aanroept is niet gegarandeerd, dus het submenu mag
+        // 'm niet als eerste opslokken.
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { event in
             guard event.keyCode == 53 else { return event }
+            if panel.parent is DSFloatingPanel { return event }
             MainActor.assumeIsolated { onDismiss() }
             return nil
         }) { monitors.append(monitor) }
     }
 
     private static let mouseDown: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+
+    /// `window` is de panel zelf of hangt (via `parent`) eronder — een
+    /// submenu-window telt als binnen z'n menu.
+    static func isInside(_ window: NSWindow?, panelOrDescendantOf panel: NSWindow) -> Bool {
+        var current = window
+        while let w = current {
+            if w === panel { return true }
+            current = w.parent
+        }
+        return false
+    }
 
     private func removeObservers() {
         observers.forEach(NotificationCenter.default.removeObserver)
@@ -590,7 +635,22 @@ struct DSFloatingWindowHost<Identity: Equatable>: NSViewRepresentable {
             guard let window = view.window else { return .anchoredTopLeft(local, bounds: bounds) }
             let inWindow = view.convert(local, to: nil)
             return .anchoredTopLeft(window.convertPoint(toScreen: inWindow), bounds: bounds)
+        case .besideRow(let row, let panel):
+            return .besideRow(row: screenRect(row, in: view), panel: screenRect(panel, in: view))
         }
+    }
+
+    /// SwiftUI `.global`-rect → scherm (y omhoog), via het venster van de
+    /// ankerview — voor een submenu is dat het child window van het menu.
+    private func screenRect(_ global: CGRect, in view: AnchorView) -> CGRect {
+        let local = CGRect(
+            x: global.minX - hostGlobalFrame.minX,
+            y: global.minY - hostGlobalFrame.minY,
+            width: global.width,
+            height: global.height
+        )
+        guard let window = view.window else { return local }
+        return window.convertToScreen(view.convert(local, to: nil))
     }
 }
 
