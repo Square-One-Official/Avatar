@@ -44,6 +44,10 @@ struct BoardView: View {
     // editen op de board). Dezelfde `EditorTool` als de single-editor zodat de
     // board exact dezelfde capsule-items/labels/iconen toont.
     @State private var editTool: EditorTool?
+    /// Perf (2026-09-03): decode-memo voor de single-edit-panelen. `NSImage(data:)`
+    /// in de body gaf bij élke pass een nieuwe bron-identiteit, waardoor de
+    /// preview-task van `EditColorPanel` (`.task(id:)`) op elke render herstartte.
+    @State private var singleEditImages = SingleEditImageMemo()
     /// Klik buiten batch-bar + open dropdown (waar dan ook) sluit de dropdown.
     @State private var batchMenuClickScope = DSOutsideClickScope()
     /// Idem voor het rechtermuis-menu op een node.
@@ -1215,14 +1219,15 @@ struct BoardView: View {
             // Actief paneel boven de balk.
             if let tool = editTool,
                tool.isEnabled(remote: entitlement.featureFlags),
-               let base = NSImage(data: node.cutoutData) {
+               let images = singleEditImages.images(for: node) {
+                let base = images.base
                 Group {
                     switch tool {
                     case .edit:
                         DSEditPanel(title: "Enhance", maxWidth: 420) {
                             EditColorPanel(
                                 source: base,
-                                previewBackdrop: node.originalData.flatMap { NSImage(data: $0) },
+                                previewBackdrop: images.backdrop,
                                 initial: node.adjust,
                                 onCommit: { _, after in applyAdjustToAll(after) },
                                 onRetouch: { retouchNode(node) },
@@ -1573,5 +1578,30 @@ enum BoardMoveUndo {
             target.boardX = point.x
             target.boardY = point.y
         }
+    }
+}
+
+/// Gedecodeerde cutout + origineel van de single-edit-node, gememoïseerd op
+/// (node, revision). Referentietype zodat de memo tijdens een body-pass mag
+/// vullen zonder @State-mutatie; `touch()` bumpt `revision` bij elke edit,
+/// dus een nieuwe stand decodeert vers (zelfde aanname als ThumbnailStore).
+final class SingleEditImageMemo {
+    private var key: (id: PersistentIdentifier, revision: Int)?
+    private var cached: (base: NSImage, backdrop: NSImage?)?
+
+    func images(for node: Portrait2) -> (base: NSImage, backdrop: NSImage?)? {
+        let id = node.persistentModelID
+        if let key, key.id == id, key.revision == node.revision, let cached {
+            return cached
+        }
+        guard let base = NSImage(data: node.cutoutData) else {
+            key = nil
+            cached = nil
+            return nil
+        }
+        let images = (base: base, backdrop: node.originalData.flatMap { NSImage(data: $0) })
+        key = (id, node.revision)
+        cached = images
+        return images
     }
 }
