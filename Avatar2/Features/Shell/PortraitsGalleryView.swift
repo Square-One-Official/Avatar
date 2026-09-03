@@ -109,7 +109,10 @@ struct PortraitsGalleryView: View {
                                 anchor: frame,
                                 scope: .portraitsGallery
                             )
-                        }
+                        },
+                        // Alleen in "All portraits": binnen een map is de
+                        // mapnaam al de paginatitel.
+                        showsFolderBadge: model.selectedFolderID == nil
                     )
                 }
             }
@@ -333,8 +336,20 @@ struct PortraitGridTile: View {
     /// Home-hero: dezelfde kaart op dubbele kolombreedte — grotere labels,
     /// ruimere inzet en een groter selectie-vinkje; verder identiek.
     var prominent: Bool = false
+    /// Map-badge linksboven ("Awareways") voor portretten die in een submap
+    /// staan — alleen zinvol in een map-overstijgende weergave (All portraits).
+    var showsFolderBadge: Bool = false
 
     @State private var hovering = false
+    /// Badge-frame in SwiftUI `.global` — een rechtsklik hierbinnen opent het
+    /// map-menu i.p.v. het portret-menu (zie `handleContextMenu`).
+    @State private var badgeFrame: CGRect = .zero
+
+    /// De submap waarin het portret staat, als die getoond moet worden.
+    private var badgeFolder: Folder2? {
+        guard showsFolderBadge, let folder = portrait.folder, !folder.name.isEmpty else { return nil }
+        return folder
+    }
 
     var body: some View {
         // Vierkante tegel via het canonieke Color.clear + aspectRatio(.fit) +
@@ -364,6 +379,24 @@ struct PortraitGridTile: View {
                         .padding(prominent ? DSSpacing.gap3 : DSSpacing.gap2)
                 }
             }
+            // Map-badge linksboven (DSBadge neutral + folder-icoon); laat de
+            // klik/drag van de tegel ongemoeid. Rechtsklik op de badge opent het
+            // map-menu (E50.5) — de tegel-trigger kijkt naar `badgeFrame`.
+            .overlay(alignment: .topLeading) {
+                if let folder = badgeFolder {
+                    DSBadge(folder.name, icon: Image(systemName: "folder"))
+                        .background {
+                            GeometryReader { geo in
+                                Color.clear.onChange(of: geo.frame(in: .global), initial: true) { _, new in
+                                    badgeFrame = new
+                                }
+                            }
+                        }
+                        .padding(prominent ? DSSpacing.gap3 : DSSpacing.gap2)
+                        .allowsHitTesting(false)
+                        .help("In folder \"\(folder.name)\" · right-click for folder actions")
+                }
+            }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .dsMotion(DSMotion.micro, value: hovering)
@@ -376,12 +409,24 @@ struct PortraitGridTile: View {
             // Sleep een portret naar een map in de left-nav (zie LeftNavView).
             // Een klik zonder beweging blijft 'open'; pas bij verslepen start de drag.
             .draggable(PortraitDragItem(id: portrait.persistentModelID))
-            .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace, onTrigger: onContextMenu)
+            .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace, onTrigger: handleContextMenu)
             // UXS-7 (UX28): de tegel als één AX-element met open/selecteer/menu.
             .portraitCardAccessibility(
                 portrait: portrait, model: model, isSelected: isSelected,
+                folderName: badgeFolder?.name,
                 ordered: ordered, onContextMenu: onContextMenu
             )
+    }
+
+    /// Rechtsklik op de map-badge → map-menu van die map (zelfde gedeelde
+    /// `FolderDSContextMenu` als de left-nav-rij en de Portraits-header);
+    /// elders op de tegel → het portret-menu.
+    private func handleContextMenu(_ frame: CGRect) {
+        if let folder = badgeFolder, badgeFrame.contains(frame.origin) {
+            model.presentation.openFolderContextMenu(folderID: folder.persistentModelID, anchor: frame)
+        } else {
+            onContextMenu(frame)
+        }
     }
 
     // De compositie binnen het vierkant: de gedeelde achtergrond+onderwerp-
@@ -425,6 +470,8 @@ struct PortraitCardAccessibility: ViewModifier {
     let portrait: Portrait2
     let model: ShellModel
     let isSelected: Bool
+    /// Naam van de submap als de kaart die als badge toont (All portraits).
+    var folderName: String? = nil
     let ordered: () -> [PersistentIdentifier]
     let onContextMenu: (CGRect) -> Void
 
@@ -457,7 +504,9 @@ struct PortraitCardAccessibility: ViewModifier {
 
     private var axLabel: String {
         let name = portrait.name.isEmpty ? "Untitled portrait" : portrait.name
-        return portrait.role.isEmpty ? name : "\(name), \(portrait.role)"
+        var label = portrait.role.isEmpty ? name : "\(name), \(portrait.role)"
+        if let folderName, !folderName.isEmpty { label += ", in folder \(folderName)" }
+        return label
     }
 }
 
@@ -466,11 +515,13 @@ extension View {
         portrait: Portrait2,
         model: ShellModel,
         isSelected: Bool,
+        folderName: String? = nil,
         ordered: @escaping () -> [PersistentIdentifier],
         onContextMenu: @escaping (CGRect) -> Void
     ) -> some View {
         modifier(PortraitCardAccessibility(
             portrait: portrait, model: model, isSelected: isSelected,
+            folderName: folderName,
             ordered: ordered, onContextMenu: onContextMenu
         ))
     }

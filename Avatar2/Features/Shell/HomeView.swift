@@ -133,7 +133,9 @@ struct HomeView: View {
                     scope: .home
                 )
             },
-            prominent: prominent
+            prominent: prominent,
+            // Home is map-overstijgend: toon in welke submap het portret staat.
+            showsFolderBadge: true
         )
     }
 

@@ -196,3 +196,7 @@ opent het menu onder de titel; (3) het tegel-contextmenu op Home én Portraits
 krijgt een rij "Folder “<naam>”" met flyout (zelfde patroon als Move/Boost)
 voor portretten die in een map staan. Duplicate zit dus overal waar een map
 een menu heeft.
+**Aanvulling 2026-09-03 (Thierry): rechtsklik op de map-badge** op een tegel
+(Home en "All portraits") opent ook het map-menu: de tegel-trigger vergelijkt
+het klikpunt met het badge-frame (`.global`) en kiest map-menu vs. portret-menu.
+De badge zelf blijft hit-test-vrij zodat klik/drag van de tegel ongemoeid blijft.
