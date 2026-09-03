@@ -13,7 +13,7 @@ import { proOverrideFor } from "../../lib/proAccess.js";
 import { activeSubscription, currentCredits, ensureCompedCredits, ensureUser, logCredit } from "../../lib/supabase.js";
 import { fetchActiveEffects, fetchActiveHairPresets, fetchActiveClothesPresets, fetchActiveFacePresets, thumbnailVariant } from "../../lib/payload.js";
 import { downloadReferenceBytes, getCustomEffect } from "../../lib/customEffects.js";
-import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE, DIE_CUT_COMPOSITION_CLAUSE, isDieCutStyle } from "../../lib/stylizePrompts.js";
+import { FRAMING_CLAUSE, STYLE_REFERENCE_CLAUSE, compositionClause, isDieCutStyle } from "../../lib/stylizePrompts.js";
 import {
   type AspectPad,
   capLongEdge,
@@ -394,12 +394,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prompt = `${prompt} ${STYLE_REFERENCE_CLAUSE}`;
       }
     }
-    // Die-cut-stijl (sticker): gesloten vorm, gecentreerd met marge — en
-    // hieronder GEEN framing-clausule (zie lib/stylizePrompts.ts). Volgorde
+    // Vrijstaande stijl (sticker/balloon): PER-STIJL compositie-clausule uit
+    // lib/stylizePrompts.ts — en hieronder GEEN framing-clausule. Volgorde
     // = composeEffectPrompt (bakeoff-driver); hier los uitgeschreven omdat
-    // de refs-fetch async tussen de clausules zit.
-    if (isDieCutStyle(styleKey)) {
-      prompt = `${prompt} ${DIE_CUT_COMPOSITION_CLAUSE}`;
+    // de refs-fetch async tussen de clausules zit. (Live gezien 2026-09-03:
+    // de sticker-clausule hardcoded voor elke die-cut-key gaf balloon een
+    // witte stickerrand — nooit meer een clausule-constante hier hardcoden.)
+    const composition = compositionClause(styleKey);
+    if (composition) {
+      prompt = `${prompt} ${composition}`;
     }
   } else if (hairPreset) {
     // CMS-first: try Payload, fall back to hardcoded HAIR_PRESETS.
