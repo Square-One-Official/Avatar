@@ -70,3 +70,40 @@ links/onder/gecombineerd/inset; 12/12 groen, `tsc --noEmit` schoon, visuele
 smoke draait. Geverifieerd op Loki's echte cutout (717×730 uit de app-store):
 oud = no-op, nieuw = rechts+onder gedetecteerd op x=639/y=709, canvas 726×812
 (rechts groeit alleen het tekort van 9 px, onder 82 px). Backend nog niet gedeployed (gated op Thierry).
+
+## 56.3 — Masker begrensd op het onderwerp: geen ondertitelbalk-hallucinaties
+- status: done
+- owner: INFRA (Claude, 2026-09-03)
+- blockedBy: —
+
+**Probleem (Thierry, 2026-09-03, Jaya Willis):** Fill in body leverde soms een
+donkere balk met wartaal ("Present body complets elll bobowriohd ourrent. wh…")
+onderaan het portret op. De onderstrook van het masker liep over de volle
+canvasbreedte (en de zijstroken over de volle hoogte), ook door de lege grijze
+gutter naast het onderwerp. Een brede, dunne witte band onderaan een portret is
+voor FLUX Fill precies de vorm van een ondertitel-/captionbalk; de prompt zei
+alleen "no text" tussen tien andere ontkenningen, en FLUX volgt ontkenningen
+slecht.
+
+**Contract:**
+- `computeMinimalBodyFillGeometry` geeft per snede het solide bereik op de
+  snedelijn terug (`leftRun*`, `rightRun*`, `bottomRun*`, bron-px, inclusief).
+- De maskerstrook langs een snede omsluit dat bereik plus één strookdiepte
+  marge aan weerszijden (ruimte voor een schouder/mouw die uitwaaiert); de
+  hoek van het canvas wordt alleen meegenomen als de aangrenzende rand óók
+  gesneden is. Diepte en seam van de strook ongewijzigd (56.2).
+- Prompt: eerst positief wat er wél moet komen (dezelfde stof/huid/schouders
+  kort doorgetrokken, egale grijze studio-achtergrond), daarna een eigen
+  nadrukkelijke clausule tegen tekst/letters/captions/subtitles/banners/
+  logo's/watermerken, dan de bestaande objecten- en gezichtsclausules.
+- Mapping-contract naar de client ongewijzigd.
+
+**Result:** `backend/lib/image.ts` (run-extent in de geometrie + begrensde
+stroken), `backend/lib/replicate.ts` (prompt). Twee nieuwe tests: onderstrook
+blijft zwart in de gutterhoeken en dekt wel de volle torsobreedte; zijstrook
+blijft zwart naast het hoofd bij een armsnede. 14/14 groen, `tsc --noEmit`
+schoon, visuele smoke (`build/fill-body-smoke/*-mask.png`) toont nu een
+lichaamsvormige stub i.p.v. een band. Backend nog niet gedeployed (gated op
+Thierry). Als het toch nog voorkomt: volgende laag is een OCR-poort
+(Vision op de client of tesseract server-side) met één gratis retry op een
+nieuwe seed.

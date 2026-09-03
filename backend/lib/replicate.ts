@@ -150,10 +150,15 @@ export async function outpaintPortrait(input: {
   maskDataUrl: string;
   model?: string | null;
 }): Promise<string> {
-  // Negative phrasing matters: without "no objects/props/hands/etc"
-  // the model will happily invent context to fill the margin (an
-  // earlier version produced a microphone-stick on one side). Repeat
-  // the empty-background directive — FLUX responds to emphasis.
+  // Say what SHOULD be there first (fabric/skin continuing, uniform grey),
+  // then what must not: FLUX follows a positive description far better
+  // than a list of negations, but the negations still matter — without
+  // "no objects/props/hands/etc" the model invents context to fill the
+  // margin (an earlier version produced a microphone-stick on one side).
+  // Text gets its own emphatic clause: a horizontal strip along the bottom
+  // of a portrait primes the model for a subtitle/caption bar, and it came
+  // back with gibberish captions (E56.3). The mask now hugs the body, and
+  // the prompt is the second safety net.
   //
   // The face-preservation clause is absolute: even if part of the face
   // is missing or cropped, the model must NOT invent or modify facial
@@ -161,16 +166,19 @@ export async function outpaintPortrait(input: {
   // black = preserve), but stating the rule in the prompt is a second
   // safety net for any feathered seam pixels near the face.
   const prompt =
-    "Minimally complete only the cropped body or clothing that continues into " +
-    "the small white masked edge. Preserve the current pose, scale, framing, " +
+    "Continue only the cropped clothing and body that runs into the small white " +
+    "masked edge: extend the same fabric, skin, and shoulders naturally for a " +
+    "short distance, then stop. Preserve the current pose, scale, framing, " +
     "and composition. Do not invent a full body or extend farther than the mask. " +
-    "Plain empty neutral grey background, completely empty, " +
-    "no objects, no props, no microphone, no instruments, no hands raised, " +
-    "no accessories, no other people, no text. Keep the face, hair, skin, " +
-    "and clothing untouched. Do not modify the face under any circumstances; " +
-    "if any part of the face appears missing or incomplete, leave it as is — " +
-    "do not invent, redraw, or extend facial features. " +
-    "Photographic, soft natural lighting, single subject.";
+    "Everything else in the masked area is a plain, uniform, empty neutral grey " +
+    "studio background. Absolutely no text, letters, words, captions, subtitles, " +
+    "banners, labels, logos, or watermarks anywhere — the bottom edge is empty " +
+    "grey background and fabric only. No objects, no props, no microphone, " +
+    "no instruments, no hands raised, no accessories, no other people. " +
+    "Keep the face, hair, skin, and clothing untouched. Do not modify the face " +
+    "under any circumstances; if any part of the face appears missing or " +
+    "incomplete, leave it as is — do not invent, redraw, or extend facial " +
+    "features. Photographic, soft natural lighting, single subject.";
 
   const output = (await runWithRetry(
     "outpaintPortrait",

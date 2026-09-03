@@ -392,6 +392,19 @@ export interface FillBodyGeometry {
   rightStrip: number;
   bottomStrip: number;
   seam: number;
+  /**
+   * Solid subject extent along each crop line (source px, inclusive): the
+   * first/last solid alpha row on a cropped side column, the first/last solid
+   * alpha column on the cropped bottom row. -1 when that edge is not cropped.
+   * Bounds the mask strip to the body (E56.3) — a strip over the full canvas
+   * width reads as a caption bar to the model and gets filled with text.
+   */
+  leftRunStart: number;
+  leftRunEnd: number;
+  rightRunStart: number;
+  rightRunEnd: number;
+  bottomRunStart: number;
+  bottomRunEnd: number;
 }
 
 export type MinimalBodyFillPreparation =
@@ -448,6 +461,12 @@ export function computeMinimalBodyFillGeometry(
     rightStrip: 0,
     bottomStrip: 0,
     seam: 0,
+    leftRunStart: -1,
+    leftRunEnd: -1,
+    rightRunStart: -1,
+    rightRunEnd: -1,
+    bottomRunStart: -1,
+    bottomRunEnd: -1,
   };
   if (width <= 0 || height <= 0 || alpha.length < width * height) return none;
 
@@ -560,6 +579,33 @@ export function computeMinimalBodyFillGeometry(
   const rightStrip = edges.right ? sideStrip : 0;
   const bottomStripPx = edges.bottom ? bottomStrip : 0;
 
+  // Solid extent along each crop line, so the strips hug the body instead of
+  // spanning the whole canvas edge (E56.3).
+  const columnExtent = (x: number): [number, number] => {
+    let start = -1, end = -1;
+    for (let y = 0; y < height; y++) {
+      if (alpha[y * width + x]! >= SOLID_ALPHA) {
+        if (start < 0) start = y;
+        end = y;
+      }
+    }
+    return [start, end];
+  };
+  const rowExtent = (y: number): [number, number] => {
+    let start = -1, end = -1;
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      if (alpha[row + x]! >= SOLID_ALPHA) {
+        if (start < 0) start = x;
+        end = x;
+      }
+    }
+    return [start, end];
+  };
+  const [leftRunStart, leftRunEnd] = edges.left ? columnExtent(cropLeftX) : [-1, -1];
+  const [rightRunStart, rightRunEnd] = edges.right ? columnExtent(cropRightX) : [-1, -1];
+  const [bottomRunStart, bottomRunEnd] = edges.bottom ? rowExtent(cropBottomY) : [-1, -1];
+
   return {
     shouldFill,
     edges,
@@ -573,6 +619,12 @@ export function computeMinimalBodyFillGeometry(
     rightStrip,
     bottomStrip: bottomStripPx,
     seam: Math.max(4, Math.min(10, Math.round(Math.min(width, height) * 0.008))),
+    leftRunStart,
+    leftRunEnd,
+    rightRunStart,
+    rightRunEnd,
+    bottomRunStart,
+    bottomRunEnd,
   };
 }
 
@@ -684,28 +736,48 @@ export async function prepareMinimalBodyFill(
   // White = paint. Each strip starts a seam-width inside the crop line (so
   // the model blends into the last real pixels) and runs one strip outward,
   // no farther: a wide transparent gutter is not an invitation to paint a
-  // full body. Sides span the full height, bottom spans the full width —
-  // same footprint as the E56.1 canvas-edge strips.
+  // full body. Along the crop line the strip hugs the solid subject plus one
+  // strip depth of margin on either end (room for a shoulder or sleeve to
+  // widen), and only runs into the canvas corner when the adjoining edge is
+  // cropped too (E56.3). A strip across the whole bottom of a portrait reads
+  // as a subtitle/caption bar to FLUX and came back with hallucinated text.
   const toModelX = (sourceX: number) => modelLeftPadding + Math.round(sourceX * sourceScale);
   const toModelY = (sourceY: number) => Math.round(sourceY * sourceScale);
   const fillLayers: sharp.OverlayOptions[] = [];
+  const sideSpan = (runStart: number, runEnd: number, strip: number): [number, number] => {
+    const margin = Math.round(strip * sourceScale);
+    const top = Math.max(0, toModelY(runStart) - margin);
+    const bottom = geometry.edges.bottom
+      ? modelCanvasHeight
+      : Math.min(modelCanvasHeight, toModelY(runEnd + 1) + margin);
+    return [top, bottom];
+  };
   if (geometry.edges.left) {
     const lineX = toModelX(geometry.cropLeftX);
     const from = Math.max(0, lineX - Math.round(geometry.leftStrip * sourceScale));
     const to = Math.min(modelCanvasWidth, lineX + seam);
-    fillLayers.push({ input: await whiteRect(to - from, modelCanvasHeight), left: from, top: 0 });
+    const [top, bottom] = sideSpan(geometry.leftRunStart, geometry.leftRunEnd, geometry.leftStrip);
+    fillLayers.push({ input: await whiteRect(to - from, bottom - top), left: from, top });
   }
   if (geometry.edges.right) {
     const lineX = toModelX(geometry.cropRightX + 1);
     const from = Math.max(0, lineX - seam);
     const to = Math.min(modelCanvasWidth, lineX + Math.round(geometry.rightStrip * sourceScale));
-    fillLayers.push({ input: await whiteRect(to - from, modelCanvasHeight), left: from, top: 0 });
+    const [top, bottom] = sideSpan(geometry.rightRunStart, geometry.rightRunEnd, geometry.rightStrip);
+    fillLayers.push({ input: await whiteRect(to - from, bottom - top), left: from, top });
   }
   if (geometry.edges.bottom) {
     const lineY = toModelY(geometry.cropBottomY + 1);
     const from = Math.max(0, lineY - seam);
     const to = Math.min(modelCanvasHeight, lineY + Math.round(geometry.bottomStrip * sourceScale));
-    fillLayers.push({ input: await whiteRect(modelCanvasWidth, to - from), left: 0, top: from });
+    const margin = Math.round(geometry.bottomStrip * sourceScale);
+    const left = geometry.edges.left
+      ? 0
+      : Math.max(0, toModelX(geometry.bottomRunStart) - margin);
+    const right = geometry.edges.right
+      ? modelCanvasWidth
+      : Math.min(modelCanvasWidth, toModelX(geometry.bottomRunEnd + 1) + margin);
+    fillLayers.push({ input: await whiteRect(right - left, to - from), left, top: from });
   }
 
   const featheredMask = await sharp({

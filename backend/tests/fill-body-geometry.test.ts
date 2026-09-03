@@ -193,6 +193,46 @@ test("gutter crop paints one strip past the crop line and keeps the canvas", asy
   assert.ok(sample(192, 140) < 16, "gutter beyond the strip is not painted");
 });
 
+test("bottom strip hugs the torso instead of spanning the canvas width (E56.3)", async () => {
+  // Torso ellipse (cx=100, rx=64) cut at y=170: solid run on the crop row is
+  // x≈44..156. The strip may widen by one strip depth (24 px) on each end but
+  // must leave the empty gutter in the bottom corners black — a full-width
+  // band reads as a caption bar to FLUX and came back with text.
+  const png = await subjectPng({ bottom: 170 });
+  const preparation = await prepareMinimalBodyFill(png);
+  assert.equal(preparation.shouldFill, true);
+  if (!preparation.shouldFill) return;
+  assert.deepEqual(preparation.edges, { left: false, right: false, bottom: true });
+
+  const mask = await sharp(preparation.mask).greyscale().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const sample = (x: number, y: number) => mask.data[y * mask.info.width + x]!;
+  const stripY = mask.info.height - 6;
+  assert.ok(sample(100, stripY) > 180, "strip below the torso is paintable");
+  assert.ok(sample(60, stripY) > 180, "strip covers the torso's full width");
+  assert.ok(sample(4, stripY) < 16, "bottom-left corner of the gutter stays locked");
+  assert.ok(sample(mask.info.width - 5, stripY) < 16, "bottom-right corner stays locked");
+});
+
+test("side strip hugs the cropped arm instead of spanning the canvas height (E56.3)", async () => {
+  // Right crop at x=140 cuts the torso only (rows ≈113..183); the head never
+  // reaches that column, so the strip must stay black beside the head.
+  const png = await subjectPng({ right: 140 });
+  const preparation = await prepareMinimalBodyFill(png);
+  assert.equal(preparation.shouldFill, true);
+  if (!preparation.shouldFill) return;
+
+  const mask = await sharp(preparation.mask).greyscale().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const sample = (x: number, y: number) => mask.data[y * mask.info.width + x]!;
+  const stripX = mask.info.width - 5;
+  assert.ok(sample(stripX, 140) > 180, "strip beside the torso is paintable");
+  assert.ok(sample(stripX, 30) < 16, "strip beside the head stays locked");
+  assert.ok(sample(stripX, 6) < 16, "top corner stays locked");
+});
+
 test("client face box hard-locks the matching outpaint pixels", async () => {
   const png = await pngFromAlpha(alphaWithRect(60, 30, 100, 85));
   const preparation = await prepareMinimalBodyFill(png, {
