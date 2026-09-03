@@ -356,13 +356,20 @@ in de repo). Hover-timing 150/250 ms staat vast (Thierry: "hover is ok").
 story; AX-check op het geneste menu. **Result:** —
 
 ## 57.6 — Board-tegelmenu: zelfde Edit-submenu [FEAT]
-- status: backlog
-- owner: —
+- status: done
+- owner: FEAT (Claude, 2026-09-03)
 - blockedBy: 57.5
 
-`BoardView.nodeContextMenu` (Rename/Export/Delete) krijgt dezelfde Edit ▸-tak via
-een gedeelde `PortraitEditSubmenu`-view uit 57.2 (targets = board-selectie). Pas
-oppakken als de gallery-variant live is en Thierry het board-menu wil uniformeren.
+**Result:** de Edit-tak is losgemaakt in `PortraitEditSubmenu` (eigen bestand,
+Avatar2/Features/Portraits) en zit nu in het tegelmenu (Home/Portraits) én in
+`BoardView.nodeContextMenu` (enkel: die node; bulk: de board-selectie), vóór
+de Delete-divider. Het board-menu is in-window (`dsDismissOnOutsideClick`):
+een klik in een genest submenu-window (kleinkind van het hostvenster) telt
+nu ook als "binnen" — `DSOutsideClickScope.isInside` loopt de parent-keten
+af. **Copy** (Thierry 2026-09-03): geen "…on N" meer in de Edit-rijen (Boost
+resolution / Fill in body / Apply effect); het aantal blijft zichtbaar in de
+credits-labels en de bon. DoD: beide targets bouwen, Avatar2Tests 344 en
+AvatarUI 109 groen, guards groen; pbxproj bijgewerkt voor het nieuwe bestand.
 
 ## Volgorde & inschatting
 

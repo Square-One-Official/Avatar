@@ -64,7 +64,10 @@ struct PortraitDSContextMenu: View {
                 folderRows(folder)
             }
         }
-        editSubmenu(targets: [portrait])
+        PortraitEditSubmenu(
+            targets: [portrait], model: model, entitlement: entitlement,
+            undoManager: undoManager, onDismiss: onDismiss
+        )
         DSMenuRow("Export…", icon: "square.and.arrow.up") {
             onDismiss(); model.select(portrait); model.exportCurrentPortrait()
         }
@@ -104,7 +107,10 @@ struct PortraitDSContextMenu: View {
             onDismiss()
             PortraitSetActions.matchFraming(targets, undoManager: undoManager, reporter: model.setActionReporter)
         }
-        editSubmenu(targets: targets)
+        PortraitEditSubmenu(
+            targets: targets, model: model, entitlement: entitlement,
+            undoManager: undoManager, onDismiss: onDismiss
+        )
         // E50.3: "Match lighting" kiest zelf het doel (het patroon van de set of
         // het best belichte portret); "…to this one" is de expliciete override
         // met de aangeklikte tegel als referentie. Geschrapt (flag) — zie
@@ -140,128 +146,6 @@ struct PortraitDSContextMenu: View {
         Divider().padding(.vertical, 2)
         DSMenuRow("Delete \(n)", icon: "trash", destructive: true) {
             onDismiss(); onRequestDelete(targets)
-        }
-    }
-
-    // MARK: - Edit ▸ (E57.2)
-
-    /// Eén lopende Edit-batch tegelijk: dezelfde bron als de editor-chips
-    /// (`workingContext.blocksOtherAIFeatures`) plus de set-actie-toast.
-    private var editIsBusy: Bool {
-        model.isSetActionBusy || entitlement.workingContext?.blocksOtherAIFeatures == true
-    }
-
-    /// Edit ▸ Boost resolution ▸ (On device / Online) — voor 1…N portretten.
-    /// Thierry 2026-09-03: Boost ontbrak bij enkel-select in een map; i.p.v.
-    /// een losse rij één Edit-tak waar Fill in body (57.3) en Apply effect
-    /// (57.4) ook onder komen. Labels tellen mee bij bulk ("…on N").
-    @ViewBuilder private func editSubmenu(targets: [Portrait2]) -> some View {
-        let n = targets.count
-        let suffix = n >= 2 ? " on \(n)" : ""
-        // E57.5: reden bij de disabled-staat (native tooltip; de rij zelf
-        // heeft geen DS-tooltip-slot).
-        DSMenuSubmenu("Edit", icon: "wand.and.stars", disabled: editIsBusy, minWidth: 230) {
-            DSMenuSubmenu("Boost resolution\(suffix)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
-                boostRows(targets: targets)
-            }
-            // E57.3: zelfde contract als de editor-tegel (E56) — alleen echt
-            // afgesneden randen; zonder afgesneden rand een gratis no-op.
-            DSMenuRow("Fill in body\(suffix)", icon: "figure.arms.open", shortcut: fillBodyLabel(count: n)) {
-                onDismiss()
-                PortraitSetActions.fillBody(
-                    targets, entitlement: entitlement,
-                    undoManager: undoManager, reporter: model.setActionReporter
-                )
-            }
-            // E57.4: stijlen uit dezelfde lijst als het Effects-paneel.
-            DSMenuSubmenu("Apply effect\(suffix)", icon: "sparkles", minWidth: 250) {
-                effectRows(targets: targets)
-            }
-        }
-        .help(editIsBusy ? "Wait for the current edit to finish" : "Boost resolution, fill in body or apply a style")
-    }
-
-    /// None · eigen effecten (Pro) · built-in stijlen. Label rechts: "Cached"
-    /// als geen enkel portret hoeft te genereren, anders het credits-totaal
-    /// voor de portretten die wél genereren (zonder Cloud-tier: "Cloud").
-    @ViewBuilder private func effectRows(targets: [Portrait2]) -> some View {
-        let list = EffectsModel.cachedEffectList(entitlement: entitlement)
-        if targets.contains(where: { $0.effectActiveRaw != nil }) {
-            DSMenuRow("None", icon: "circle.slash") {
-                runEffect(.none, on: targets, list: list.builtin)
-            }
-            Divider().padding(.vertical, 2)
-        }
-        if !list.custom.isEmpty {
-            ForEach(list.custom) { effect in
-                DSMenuRow(
-                    effect.label, icon: "sparkles",
-                    shortcut: effectLabel(targets, choice: .custom(effect)),
-                    accessory: { DSProChip() }
-                ) {
-                    runEffect(.custom(effect), on: targets, list: list.builtin)
-                }
-            }
-            Divider().padding(.vertical, 2)
-        }
-        ForEach(list.builtin) { effect in
-            DSMenuRow(
-                effect.label, icon: effect.isDieCut ? "seal" : "paintbrush",
-                shortcut: effectLabel(targets, choice: .builtin(effect))
-            ) {
-                runEffect(.builtin(effect), on: targets, list: list.builtin)
-            }
-        }
-    }
-
-    private func effectLabel(_ targets: [Portrait2], choice: PortraitSetActions.EffectChoice) -> String {
-        let generating = PortraitSetActions.effectGenerationCount(targets, choice: choice)
-        guard generating > 0 else { return "Cached" }
-        guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Cloud" }
-        let total = CreditMeter.credits(for: .generativeStandard) * generating
-        return total == 1 ? "1 credit" : "\(total) credits"
-    }
-
-    private func runEffect(_ choice: PortraitSetActions.EffectChoice, on targets: [Portrait2], list: [RemoteEffect]) {
-        onDismiss()
-        PortraitSetActions.applyEffect(
-            targets, choice: choice,
-            isDieCut: { key in list.first { $0.key == key }?.isDieCut ?? false },
-            model: model, entitlement: entitlement,
-            undoManager: undoManager, reporter: model.setActionReporter
-        )
-    }
-
-    /// Credits-totaal (2 per portret; alleen afgeschreven als er echt gevuld
-    /// wordt); zonder Cloud-tier de neutrale "Cloud"-hint, zoals bij Boost.
-    private func fillBodyLabel(count: Int) -> String {
-        guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Cloud" }
-        let total = CreditMeter.credits(for: .fillBody) * count
-        return total == 1 ? "1 credit" : "\(total) credits"
-    }
-
-    /// Boost-modus kiezen. Online toont het totaal aan credits (3 per
-    /// portret); zonder Cloud-tier de neutrale "Cloud"-hint — de gate vraagt
-    /// dan zelf om de tier te verhogen (zoals in de editor).
-    @ViewBuilder private func boostRows(targets: [Portrait2]) -> some View {
-        let onlineLabel: String = {
-            guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Sharper · Cloud" }
-            let total = CreditMeter.credits(for: .upscaleHigh) * targets.count
-            return "Best · \(total == 1 ? "1 credit" : "\(total) credits")"
-        }()
-        DSMenuRow("On device", icon: "desktopcomputer", shortcut: "Free") {
-            onDismiss()
-            PortraitSetActions.boostResolution(
-                targets, mode: .local, entitlement: entitlement,
-                undoManager: undoManager, reporter: model.setActionReporter
-            )
-        }
-        DSMenuRow("Online", icon: "cloud", shortcut: onlineLabel) {
-            onDismiss()
-            PortraitSetActions.boostResolution(
-                targets, mode: .online, entitlement: entitlement,
-                undoManager: undoManager, reporter: model.setActionReporter
-            )
         }
     }
 

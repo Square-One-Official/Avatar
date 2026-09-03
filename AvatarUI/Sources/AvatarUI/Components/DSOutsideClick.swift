@@ -102,7 +102,14 @@ public final class DSOutsideClickScope {
             return true
         }
         if eventWindow !== hostWindow {
-            return hostWindow.childWindows?.contains(eventWindow) ?? false
+            // Ook kleinkinderen (E57.6): een genest DS-submenu hangt onder het
+            // submenu-window, niet direct onder het hostvenster.
+            var current: NSWindow? = eventWindow.parent
+            while let window = current {
+                if window === hostWindow { return true }
+                current = window.parent
+            }
+            return false
         }
         return views.contains { view in
             guard view.window === hostWindow, !view.isHiddenOrHasHiddenAncestor else { return false }

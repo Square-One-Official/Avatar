@@ -542,6 +542,12 @@ struct BoardView: View {
                 DSMenuRow("Export \(n) portraits", icon: "square.and.arrow.up.on.square") {
                     dismissBoardMenu(); bulkExport()
                 }
+                // E57.6: dezelfde Edit-tak als het tegelmenu (Boost / Fill in
+                // body / Apply effect), op de hele selectie.
+                PortraitEditSubmenu(
+                    targets: selectedPortraits, model: model, entitlement: entitlement,
+                    undoManager: undoManager, onDismiss: dismissBoardMenu
+                )
                 Divider().padding(.vertical, 2)
                 DSMenuRow("Delete \(n) portraits", icon: "trash", destructive: true) {
                     dismissBoardMenu()
@@ -557,6 +563,10 @@ struct BoardView: View {
                 DSMenuRow("Export…", icon: "square.and.arrow.up") {
                     dismissBoardMenu(); model.select(portrait); model.exportCurrentPortrait()
                 }
+                PortraitEditSubmenu(
+                    targets: [portrait], model: model, entitlement: entitlement,
+                    undoManager: undoManager, onDismiss: dismissBoardMenu
+                )
                 Divider().padding(.vertical, 2)
                 DSMenuRow("Delete", icon: "trash", destructive: true) {
                     dismissBoardMenu()

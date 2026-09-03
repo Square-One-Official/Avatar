@@ -275,6 +275,7 @@
 		C005635E47437E8452CF8896 /* PrivacyPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0CA4AE0FA5C0F9AF5C098D /* PrivacyPreferences.swift */; };
 		C031AB9C95D7787794F50C81 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE640D635F259A76EC318FDB /* AppLinks.swift */; };
 		C18F5F04E05DCEF7809B154F /* BackgroundKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64E7BFDAE88BA68D5F2C1B92 /* BackgroundKit.swift */; };
+		C1B0066EFA844C5C3B4EA3FF /* PortraitEditSubmenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB72177A0C385EC6F3C58D8 /* PortraitEditSubmenu.swift */; };
 		C22548A2FAC00427F6EA6EC8 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 75CAB796EE9C9DA4BA109A82 /* AppIcon.icon */; };
 		C2ADA5A8CA288779EFED6189 /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9329E36279558288146B065 /* ExportSheet.swift */; };
 		C3C1BFFA2678EF53DC549A64 /* LibraryImportTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655F0CB176808F917B442483 /* LibraryImportTile.swift */; };
@@ -592,6 +593,7 @@
 		BA1DC6AADFD60EBD68B7A194 /* RenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameSheet.swift; sourceTree = "<group>"; };
 		BA61629BB768B6A77EF92F3A /* Folder2DefaultBackgroundTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Folder2DefaultBackgroundTests.swift; sourceTree = "<group>"; };
 		BA7CE79F84D49A18E137076C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BAB72177A0C385EC6F3C58D8 /* PortraitEditSubmenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitEditSubmenu.swift; sourceTree = "<group>"; };
 		BBCB0455D6E65138F7848400 /* BackgroundPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPreset.swift; sourceTree = "<group>"; };
 		BC28570953429FABB63D1572 /* PrivacyElevationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyElevationSheet.swift; sourceTree = "<group>"; };
 		BF5D10603D8C4CBCEBF63691 /* ExportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheet.swift; sourceTree = "<group>"; };
@@ -959,6 +961,7 @@
 				0EC19EA2F7D9A633C92A18F2 /* FolderSetScope.swift */,
 				41C70EB846E92A3FCDD00E5C /* LibraryBreadcrumb.swift */,
 				1B7B540F66BD781F0057B9CD /* PortraitContextMenu.swift */,
+				BAB72177A0C385EC6F3C58D8 /* PortraitEditSubmenu.swift */,
 				499AFD3440A49F0D511B668B /* PortraitSetActions.swift */,
 				93B33095D2BD0E9A83923DCC /* PortraitSetCommands.swift */,
 				171E8F4854B3405A78CBB4BD /* SetActionFeedback.swift */,
@@ -1585,6 +1588,7 @@
 				06D8524B3CC946C0C948A302 /* Portrait2.swift in Sources */,
 				F31E762F95DD3C336A3DE4B0 /* PortraitContextMenu.swift in Sources */,
 				9842DF7250CB0EA5FBCE4A53 /* PortraitDragItem.swift in Sources */,
+				C1B0066EFA844C5C3B4EA3FF /* PortraitEditSubmenu.swift in Sources */,
 				694150E70FB29237B3CA8316 /* PortraitExporter.swift in Sources */,
 				526698446F1F3AF3A17F7E61 /* PortraitNameGuess.swift in Sources */,
 				8CEF411072AB70A2BEA6981B /* PortraitNameResolver.swift in Sources */,
