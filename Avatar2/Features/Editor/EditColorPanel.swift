@@ -78,6 +78,14 @@ struct EditColorPanel: View {
     let source: NSImage
     /// Originele foto / achtergrond voor de Portrait-tegel-preview (lokale blur).
     var previewBackdrop: NSImage? = nil
+    /// Door de host (EditorView) alvast voorbereide previews: decode + downscale
+    /// + gezicht zijn dan al gedaan vóór het paneel opent. nil = nog bezig (bij
+    /// `hostPreparesPreviews`) of geen host-prep (Board): dan bereidt het
+    /// paneel zelf voor, off-main.
+    var previewPrep: EnhancePreviewPrep? = nil
+    /// True: wacht op `previewPrep` i.p.v. zelf voor te bereiden (voorkomt
+    /// dubbel werk wanneer het paneel al open is tijdens een edit).
+    var hostPreparesPreviews: Bool = false
     /// E24.14: de persisted Adjust-stand bij het openen — heropenen toont 'm.
     var initial: PortraitAdjust = .neutral
     var onPreview: (NSImage) -> Void = { _ in }
@@ -275,7 +283,9 @@ struct EditColorPanel: View {
             // Reflecteer of het High-quality-model al op schijf staat (bepaalt of
             // de chip simpel is of een Regular/High-keuze toont).
             hiFiModel.refreshInstalledState()
-            if sourceCG == nil,
+            // Alleen voor de sliders (live preview); zonder sliders zou dit een
+            // vol-res PNG-decode op de main-thread zijn bij elke paneel-open.
+            if showSliders, sourceCG == nil,
                let cg = source.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 sourceCG = SendableCGImage(cgImage: cg)
             }
@@ -287,7 +297,7 @@ struct EditColorPanel: View {
             temperature = initial.temperature
             seeded = true
         }
-        .task(id: ObjectIdentifier(source)) {
+        .task(id: TilePreviewKey(source: ObjectIdentifier(source), prep: previewPrep?.token)) {
             await loadTilePreviews()
         }
     }
@@ -664,18 +674,32 @@ struct EditColorPanel: View {
         onCommit(before, .neutral)
     }
 
+    /// Sleutel voor `.task(id:)`: nieuwe bron óf nieuwe host-prep → opnieuw renderen.
+    private struct TilePreviewKey: Equatable {
+        let source: ObjectIdentifier
+        let prep: UUID?
+    }
+
     /// E53.10: per tegel álle lagen (base/reveal/subject/focus) off-main.
     /// Backdrop: Portrait = gebundelde scène, Remove background = originele foto.
+    /// De zware voorbereiding (decode, downscale, Vision) gebeurt één keer per
+    /// bron — via de host (`previewPrep`) of anders hier — en de tegels delen
+    /// 'm; per tegel blijft alleen de compositie op ≤ 256 px over.
     @MainActor
     private func loadTilePreviews() async {
-        guard let subject = source.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        let boxedSubject = SendableCGImage(cgImage: subject)
-        let boxedOriginal = previewBackdrop
-            .flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
-            .map { SendableCGImage(cgImage: $0) }
-        let boxedScene = portraitScene
-            .flatMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
-            .map { SendableCGImage(cgImage: $0) }
+        let prep: EnhancePreviewPrep?
+        if let previewPrep {
+            prep = previewPrep
+        } else if hostPreparesPreviews {
+            // Host is nog bezig; de task herstart zodra `previewPrep` landt.
+            return
+        } else {
+            prep = await EnhancePreviewPrep.make(source: source, backdrop: previewBackdrop)
+        }
+        guard let prep, !Task.isCancelled else { return }
+        let prepared = prep.subject
+        let boxedOriginal = prep.backdrop.map { SendableCGImage(cgImage: $0) }
+        let boxedScene = await Self.prepareScene(portraitScene)
         let jobs: [(EnhanceActionID, EnhanceTilePreview.Action, SendableCGImage?)] =
             visibleActionIDs.map { id in
                 let backdrop: SendableCGImage? = switch id {
@@ -690,7 +714,7 @@ struct EditColorPanel: View {
                 group.addTask {
                     let layers = EnhanceTilePreview.renderLayers(
                         action: action,
-                        subject: boxedSubject.cgImage,
+                        prepared: prepared,
                         backdrop: backdrop?.cgImage
                     )
                     return (id, layers.map(EnhanceTileLayers.init))
@@ -700,5 +724,20 @@ struct EditColorPanel: View {
                 if let layers { previewLayers[id] = layers }
             }
         }
+    }
+
+    /// Scène-JPEG (klein, gebundeld) decoderen + downscalen off-main.
+    private nonisolated static func prepareScene(_ scene: NSImage?) async -> SendableCGImage? {
+        guard let scene else { return nil }
+        let boxed = SendableScene(image: scene)
+        return await Task.detached(priority: .userInitiated) {
+            boxed.image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                .flatMap(EnhanceTilePreview.prepareBackdrop)
+                .map { SendableCGImage(cgImage: $0) }
+        }.value
+    }
+
+    private struct SendableScene: @unchecked Sendable {
+        let image: NSImage
     }
 }

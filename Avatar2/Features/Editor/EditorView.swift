@@ -136,6 +136,10 @@ struct EditorView: View {
     /// Gestylede volle originele foto van het actieve effect → Original-achtergrond
     /// die bij het effect past. nil = geen actief effect (rauwe originele foto).
     @State private var decodedEffectBackground: NSImage?
+    /// Enhance-tegel-previews alvast voorbereid (decode + downscale + gezicht,
+    /// off-main) zodra het portret gedecodeerd is — zie `EnhancePreviewPrep`.
+    @State private var enhancePrep: EnhancePreviewPrep?
+    @State private var enhancePrepTask: Task<Void, Never>?
     /// E27.1: de canvas-camera (VIEW-zoom + pan over de HELE scène). Vervangt de
     /// per-onderwerp `canvasViewZoom` uit 24.8/24.17. Efemeer (geen persist) en
     /// hier zodat de transform BUITEN EditorCanvasView op de DSCanvasCard hangt.
@@ -233,6 +237,26 @@ struct EditorView: View {
         // mee, zodat de backdrop het actieve effect volgt.
         decodedEffectBackground = portraitModel?.effectBackgroundData.flatMap { NSImage(data: $0) }
         refreshColourHint()
+        prepareEnhancePreviews()
+    }
+
+    /// Start de Enhance-preview-voorbereiding voor de huidige cutout (off-main).
+    /// Een lopende prep voor een vorige stand wordt gecanceld; tot de nieuwe
+    /// klaar is toont het paneel de fallback (zelfde gedrag als voorheen, maar
+    /// nu meestal al klaar vóórdat Enhance opengaat).
+    private func prepareEnhancePreviews() {
+        enhancePrepTask?.cancel()
+        enhancePrep = nil
+        guard let cutout = decodedCutout else {
+            enhancePrepTask = nil
+            return
+        }
+        let backdrop = originalBackdropImage
+        enhancePrepTask = Task { @MainActor in
+            let prep = await EnhancePreviewPrep.make(source: cutout, backdrop: backdrop)
+            guard !Task.isCancelled, let prep else { return }
+            enhancePrep = prep
+        }
     }
 
     private func refreshColourHint() {
@@ -621,6 +645,8 @@ struct EditorView: View {
         EditColorPanel(
             source: rawCutout,
             previewBackdrop: originalBackdropImage ?? originalImage,
+            previewPrep: enhancePrep,
+            hostPreparesPreviews: true,
             initial: portraitModel?.adjust ?? .neutral,
             onPreview: onPreview,
             onCommit: { before, after in

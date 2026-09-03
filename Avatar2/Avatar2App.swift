@@ -133,6 +133,10 @@ struct Avatar2App: App {
             // bij launch zodat de eerste paneel-open van de sessie instant uit
             // memory/disk schildert. Fire-and-forget, anoniem-vriendelijk.
             .task { EffectsModel.prewarm(entitlement: entitlement) }
+            // Enhance-tegels: Vision-model, CIContext en CI-kernels alvast laden
+            // (koude start ~0,4 s+, feedback Thierry 2026-09-03) zodat de eerste
+            // Enhance-open van de sessie de previews meteen tekent.
+            .task { EnhanceTilePreview.warmUpInBackground() }
             // Update-kaart linksonder, bij de sidebar (besluit Thierry
             // 2026-09-02, Weeve-stijl): Install Update / Later → download met
             // voortgang + Cancel → Relaunch. Eigen zwevende toast, los van

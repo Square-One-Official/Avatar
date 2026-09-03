@@ -148,6 +148,53 @@ final class EnhanceTilePreviewTests: XCTestCase {
         return hi - lo
     }
 
+    /// Perf (2026-09-03): de tegels delen één voorbereiding (downscale +
+    /// gezicht); het resultaat moet gelijk zijn aan het compat-pad per tegel.
+    func testPrepareSharedAcrossActionsMatchesCompatPath() throws {
+        let input = opaqueCircle(width: 400, height: 400)
+        let prepared = try XCTUnwrap(EnhanceTilePreview.prepare(subject: input))
+        XCTAssertLessThanOrEqual(
+            max(prepared.small.width, prepared.small.height), Int(EnhanceTilePreview.maxDimension)
+        )
+        XCTAssertNil(prepared.face, "synthetische cirkel heeft geen gezicht")
+        for action in EnhanceTilePreview.Action.allCases {
+            let viaPrepared = try XCTUnwrap(EnhanceTilePreview.renderLayers(action: action, prepared: prepared))
+            let viaCompat = try XCTUnwrap(EnhanceTilePreview.renderLayers(action: action, subject: input))
+            XCTAssertEqual(viaPrepared.base.width, viaCompat.base.width, "\(action)")
+            XCTAssertEqual(viaPrepared.base.height, viaCompat.base.height, "\(action)")
+            XCTAssertEqual(viaPrepared.reveal == nil, viaCompat.reveal == nil, "\(action)")
+            XCTAssertEqual(viaPrepared.steps.count, viaCompat.steps.count, "\(action)")
+        }
+    }
+
+    func testRenderLayersCachesOnPreparedIdentity() throws {
+        let prepared = try XCTUnwrap(EnhanceTilePreview.prepare(subject: gradientImage(width: 48, height: 48)))
+        let a = try XCTUnwrap(EnhanceTilePreview.renderLayers(action: .boost, prepared: prepared))
+        let b = try XCTUnwrap(EnhanceTilePreview.renderLayers(action: .boost, prepared: prepared))
+        XCTAssertTrue(a.base === b.base, "zelfde voorbereiding → cache-hit")
+        // Nieuwe voorbereiding van dezelfde pixels = nieuwe identiteit → vers.
+        let again = try XCTUnwrap(EnhanceTilePreview.prepare(subject: gradientImage(width: 48, height: 48)))
+        let c = try XCTUnwrap(EnhanceTilePreview.renderLayers(action: .boost, prepared: again))
+        XCTAssertFalse(a.base === c.base)
+    }
+
+    func testRetouchPreviewWithKnownFaceKeepsSizeAndAlpha() throws {
+        let input = noisyCircle(width: 96, height: 96)
+        let face = CGRect(x: 24, y: 20, width: 48, height: 56)
+        let out = try XCTUnwrap(EnhanceTilePreview.retouchPreview(input, face: face))
+        XCTAssertEqual(out.width, 96)
+        XCTAssertEqual(out.height, 96)
+        XCTAssertEqual(rgba(out, x: 1, y: 1).a, 0, "transparante hoek blijft transparant")
+    }
+
+    func testWarmUpCoversAllActionsAndIsIdempotent() {
+        XCTAssertNotNil(EnhanceTilePreview.syntheticSubject(side: 128))
+        XCTAssertNotNil(EnhanceTilePreview.syntheticBackdrop(side: 128))
+        EnhanceTilePreview.warmUp()
+        EnhanceTilePreview.warmUpInBackground()
+        EnhanceTilePreview.warmUpInBackground()
+    }
+
     func testRenderCachesAndPreservesSizeForSmallInput() throws {
         let input = gradientImage(width: 48, height: 48)
         let a = try XCTUnwrap(EnhanceTilePreview.render(action: .boost, subject: input))

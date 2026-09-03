@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import Foundation
+import os
 import Vision
 
 /// Lokale demo-previews voor Enhance-tegels. Geen cloud, geen credits:
@@ -12,7 +13,7 @@ import Vision
 /// gezichts-rect. De beweging zelf (wipe/shimmer/dissolve) leeft in SwiftUI;
 /// hier worden alleen pixels gerenderd.
 public enum EnhanceTilePreview {
-    public enum Action: String, Sendable, Hashable {
+    public enum Action: String, Sendable, Hashable, CaseIterable {
         case retouch
         case studioLight
         case portrait
@@ -67,7 +68,49 @@ public enum EnhanceTilePreview {
     public static let portraitBlurFull: CGFloat = 0.07
 
     private static let context = CIContext(options: [.useSoftwareRenderer: false])
-    private static let cache = NSCache<NSString, CachedLayers>()
+    private static let cache: NSCache<NSString, CachedLayers> = {
+        let cache = NSCache<NSString, CachedLayers>()
+        cache.countLimit = 64
+        return cache
+    }()
+    /// Compat-pad (`renderLayers(action:subject:backdrop:)`): memo van de
+    /// voorbereiding per bron-identiteit, zodat 7 tegels van dezelfde bron
+    /// niet 7× downscalen + detecteren. Klein: elke entry houdt de vol-res
+    /// bron vast (identiteitscheck tegen adres-hergebruik).
+    private static let preparedCache: NSCache<NSString, CachedPrepared> = {
+        let cache = NSCache<NSString, CachedPrepared>()
+        cache.countLimit = 2
+        return cache
+    }()
+
+    /// Eén keer per bron: downscale + gezichtsdetectie. Alle tegels delen dit.
+    /// Vóór deze struct deed élke tegel bij paneel-open z'n eigen Lanczos op de
+    /// vol-res cutout plus een eigen Vision-pass (7× parallel, koud → >1 s;
+    /// feedback Thierry 2026-09-03).
+    public struct PreparedSubject: @unchecked Sendable {
+        /// Cutout op tegelformaat (langste zijde ≤ `maxDimension`), mét alpha.
+        public let small: CGImage
+        /// Grootste gezicht in `small`-pixels (top-left); nil zonder gezicht.
+        public let face: CGRect?
+
+        public init(small: CGImage, face: CGRect?) {
+            self.small = small
+            self.face = face
+        }
+    }
+
+    /// Downscale + gezichtsdetectie op de bron. Zwaar (vol-res Lanczos +
+    /// Vision) → off-main aanroepen; het resultaat is klein en herbruikbaar.
+    public static func prepare(subject: CGImage) -> PreparedSubject? {
+        guard let small = downscale(subject) else { return nil }
+        return PreparedSubject(small: small, face: largestFaceRect(in: small))
+    }
+
+    /// Backdrop (originele foto / scène) op tegelformaat, voor
+    /// `renderLayers(action:prepared:backdrop:)`.
+    public static func prepareBackdrop(_ image: CGImage) -> CGImage? {
+        downscale(image)
+    }
 
     /// Rendert alleen de ruststand (compat / smoke).
     public static func render(
@@ -78,25 +121,53 @@ public enum EnhanceTilePreview {
         renderLayers(action: action, subject: subject, backdrop: backdrop)?.base
     }
 
-    /// Rendert alle lagen voor een tegel. `backdrop`: Portrait = scène-foto
-    /// (geblurd), Remove background = originele foto (achter het subject in
-    /// rust). Ontbreekt die, dan stone (Remove background) of een blur van het
-    /// subject zelf (Portrait).
+    /// Compat-pad: bereidt de bron zelf voor (gememoïseerd op identiteit van
+    /// `subject`) en downscalet de backdrop. De app-paden gebruiken
+    /// `prepare` + `renderLayers(action:prepared:backdrop:)` zodat de
+    /// voorbereiding één keer per portret gebeurt, vóór het paneel opent.
     public static func renderLayers(
         action: Action,
         subject: CGImage,
         backdrop: CGImage? = nil
     ) -> Layers? {
-        let key = cacheKey(action: action, subject: subject, backdrop: backdrop)
-        if let hit = cache.object(forKey: key)?.layers { return hit }
-        guard let small = downscale(subject) else { return nil }
-        let face = largestFaceRect(in: small)
+        guard let prepared = memoizedPrepare(subject: subject) else { return nil }
+        return renderLayers(
+            action: action, prepared: prepared,
+            backdrop: backdrop.flatMap(prepareBackdrop)
+        )
+    }
+
+    /// Rendert alle lagen voor een tegel uit een voorbereide bron. `backdrop`
+    /// staat al op tegelformaat (`prepareBackdrop`): Portrait = scène-foto
+    /// (geblurd), Remove background = originele foto (achter het subject in
+    /// rust). Ontbreekt die, dan stone (Remove background) of een blur van het
+    /// subject zelf (Portrait). Goedkoop (alles ≤ 256 px): ms-werk per tegel.
+    public static func renderLayers(
+        action: Action,
+        prepared: PreparedSubject,
+        backdrop: CGImage? = nil
+    ) -> Layers? {
+        renderLayers(action: action, prepared: prepared, backdrop: backdrop, useCache: true)
+    }
+
+    static func renderLayers(
+        action: Action,
+        prepared: PreparedSubject,
+        backdrop smallBackdrop: CGImage?,
+        useCache: Bool
+    ) -> Layers? {
+        let small = prepared.small
+        let key = cacheKey(action: action, small: small, backdrop: smallBackdrop)
+        if useCache, let hit = cache.object(forKey: key),
+           hit.small === small, hit.backdrop === smallBackdrop {
+            return hit.layers
+        }
+        let face = prepared.face
         let focusRect = action == .fillBody
             ? bodyFocusRect(in: small, face: face)
             : headFocusRect(in: small, face: face)
         let head = zoomTo(small, source: focusRect)
         let focus = face.map { normalize($0, crop: focusRect, side: head.width) }
-        let smallBackdrop = backdrop.flatMap(downscale)
 
         var base: CGImage?
         var reveal: CGImage?
@@ -114,8 +185,14 @@ public enum EnhanceTilePreview {
         case .retouch:
             // Geen magicRetouch (overbelichtte de onderkant van het gezicht):
             // subtiele beauty-preview op landmarks — warme wangen, rodere
-            // lippen, kleurrijkere ogen.
-            let enhanced = retouchPreview(head) ?? head
+            // lippen, kleurrijkere ogen. Het gezicht is al bekend (uit
+            // `prepared`, omgerekend naar head-crop-pixels): geen tweede
+            // Vision-pass.
+            let side = CGFloat(head.width)
+            let faceInHead = focus.map {
+                CGRect(x: $0.minX * side, y: $0.minY * side, width: $0.width * side, height: $0.height * side)
+            }
+            let enhanced = retouchPreview(head, face: faceInHead) ?? head
             base = splitHorizontal(left: head, right: enhanced)
             reveal = enhanced
         case .portrait:
@@ -150,8 +227,75 @@ public enum EnhanceTilePreview {
             focus: focus,
             steps: steps.compactMap(compositeOverStone)
         )
-        cache.setObject(CachedLayers(layers), forKey: key)
+        if useCache {
+            cache.setObject(CachedLayers(layers, small: small, backdrop: smallBackdrop), forKey: key)
+        }
         return layers
+    }
+
+    private static func memoizedPrepare(subject: CGImage) -> PreparedSubject? {
+        let key = "\(Unmanaged.passUnretained(subject).toOpaque())|\(subject.width)x\(subject.height)" as NSString
+        if let hit = preparedCache.object(forKey: key), hit.subject === subject {
+            return hit.prepared
+        }
+        guard let prepared = prepare(subject: subject) else { return nil }
+        preparedCache.setObject(CachedPrepared(prepared, subject: subject), forKey: key)
+        return prepared
+    }
+
+    // MARK: - Warm-up
+
+    /// Laadt het Vision-gezichtsmodel, de CIContext en de Core Image-kernels
+    /// (Lanczos, gaussian, pixellate, morphology, …) op een synthetische
+    /// 128 px-bron, zodat de eerste échte paneel-open van een sessie de koude
+    /// start (gemeten ~0,4 s los, meer onder 7× parallelle druk) niet betaalt.
+    /// Synchroon en zwaar → vanaf een achtergrond-task aanroepen.
+    public static func warmUp() {
+        guard let subject = syntheticSubject(side: 128),
+              let prepared = prepare(subject: subject)
+        else { return }
+        let backdrop = syntheticBackdrop(side: 128)
+        for action in Action.allCases {
+            _ = renderLayers(action: action, prepared: prepared, backdrop: backdrop, useCache: false)
+        }
+    }
+
+    private static let warmUpState = OSAllocatedUnfairLock(initialState: false)
+
+    /// Eénmalig per proces, fire-and-forget op utility-prioriteit (app-launch).
+    public static func warmUpInBackground() {
+        let first = warmUpState.withLock { started -> Bool in
+            defer { started = true }
+            return !started
+        }
+        guard first else { return }
+        Task.detached(priority: .utility) { warmUp() }
+    }
+
+    /// Transparante plaat met een huidkleurige ellips (geen gezicht → ook het
+    /// `opaqueBounds`-pad wordt geraakt).
+    static func syntheticSubject(side: Int) -> CGImage? {
+        guard let ctx = makeContext(width: side, height: side) else { return nil }
+        ctx.clear(CGRect(x: 0, y: 0, width: side, height: side))
+        ctx.setFillColor(red: 0.85, green: 0.68, blue: 0.58, alpha: 1)
+        let s = CGFloat(side)
+        ctx.fillEllipse(in: CGRect(x: s * 0.25, y: s * 0.2, width: s * 0.5, height: s * 0.65))
+        return ctx.makeImage()
+    }
+
+    static func syntheticBackdrop(side: Int) -> CGImage? {
+        guard let ctx = makeContext(width: side, height: side) else { return nil }
+        let cs = CGColorSpace(name: CGColorSpace.sRGB)!
+        let colors = [
+            CGColor(colorSpace: cs, components: [0.35, 0.45, 0.6, 1])!,
+            CGColor(colorSpace: cs, components: [0.8, 0.7, 0.55, 1])!
+        ] as CFArray
+        if let gradient = CGGradient(colorsSpace: cs, colors: colors, locations: [0, 1]) {
+            ctx.drawLinearGradient(
+                gradient, start: .zero, end: CGPoint(x: side, y: side), options: []
+            )
+        }
+        return ctx.makeImage()
     }
 
     // MARK: - Effects
@@ -205,6 +349,11 @@ public enum EnhanceTilePreview {
     /// lift van de huid. Geen kleurtinten (die lazen als een clown, feedback
     /// Thierry 2026-09-02). Zonder gezicht: milde smoothing over het hele beeld.
     static func retouchPreview(_ image: CGImage) -> CGImage? {
+        retouchPreview(image, face: largestFaceRect(in: image))
+    }
+
+    /// `face`: gezichts-rect in `image`-pixels (top-left), nil = geen gezicht.
+    static func retouchPreview(_ image: CGImage, face: CGRect?) -> CGImage? {
         let w = image.width, h = image.height
         let extent = CGRect(x: 0, y: 0, width: w, height: h)
         let ci = CIImage(cgImage: image)
@@ -237,7 +386,6 @@ public enum EnhanceTilePreview {
 
         // Huidvlak: ellips op het gezicht (Vision-rect), zacht uitlopend, mét
         // ogen- en mondzone eruit — die blijven altijd scherp.
-        let face = largestFaceRect(in: image)
         let skin: CIImage? = face.flatMap { f in
             softMask(width: w, height: h, blur: f.width * 0.08) { ctx in
                 let cw = f.width * 1.0, ch = f.height * 1.22
@@ -551,10 +699,13 @@ public enum EnhanceTilePreview {
         )
     }
 
-    private static func cacheKey(action: Action, subject: CGImage, backdrop: CGImage?) -> NSString {
-        let s = Unmanaged.passUnretained(subject).toOpaque()
+    /// Sleutel op identiteit van de (kleine) bron + backdrop; de cache-entry
+    /// houdt beide vast en checkt `===`, zodat adres-hergebruik na een
+    /// portret-wissel geen verkeerde lagen teruggeeft.
+    private static func cacheKey(action: Action, small: CGImage, backdrop: CGImage?) -> NSString {
+        let s = Unmanaged.passUnretained(small).toOpaque()
         let b = backdrop.map { Unmanaged.passUnretained($0).toOpaque() }
-        return "\(action.rawValue)|v14|\(s)|\(String(describing: b))|\(subject.width)x\(subject.height)" as NSString
+        return "\(action.rawValue)|v15|\(s)|\(String(describing: b))|\(small.width)x\(small.height)" as NSString
     }
 
     // MARK: - Head / body crop
@@ -703,5 +854,21 @@ public enum EnhanceTilePreview {
 
 private final class CachedLayers: NSObject {
     let layers: EnhanceTilePreview.Layers
-    init(_ layers: EnhanceTilePreview.Layers) { self.layers = layers }
+    /// Identiteits-ankers (zie `cacheKey`).
+    let small: CGImage
+    let backdrop: CGImage?
+    init(_ layers: EnhanceTilePreview.Layers, small: CGImage, backdrop: CGImage?) {
+        self.layers = layers
+        self.small = small
+        self.backdrop = backdrop
+    }
+}
+
+private final class CachedPrepared: NSObject {
+    let prepared: EnhanceTilePreview.PreparedSubject
+    let subject: CGImage
+    init(_ prepared: EnhanceTilePreview.PreparedSubject, subject: CGImage) {
+        self.prepared = prepared
+        self.subject = subject
+    }
 }

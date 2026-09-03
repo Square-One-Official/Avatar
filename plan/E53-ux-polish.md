@@ -536,3 +536,23 @@ aangeraakt, wél te fixen vóór merge (build-v2.sh stopt erop). Open: label "Re
 background" trunceert op één regel (bestond al); light mode toont de stone-plaat
 donker (bestaand gedrag).
 
+**Perf-addendum (2026-09-03, Thierry: "verse app-start → Enhance-open duurt >1 s
+voordat de tegel-achtergronden laden"):** oorzaak was dat élke tegel bij
+paneel-open z'n eigen vol-res Lanczos-downscale + Vision-gezichtsdetectie deed
+(7× parallel, koud: CIContext ~55 ms, Lanczos-kernel ~150 ms, Vision-model
+~70 ms, gaussian ~70 ms — los gemeten, onder 7× druk veel meer), Retouch een
+tweede Vision-pass op de head-crop, en de PNG-decode van de cutout op de
+main-thread viel. Fix: (1) `EnhanceTilePreview.prepare` — downscale + gezicht
+één keer per bron, `renderLayers(action:prepared:backdrop:)` deelt 'm over
+alle tegels (compat-pad `renderLayers(action:subject:)` memoïseert op
+bron-identiteit); cache-entries ankeren de bron met `===` tegen
+adres-hergebruik; (2) `retouchPreview(_:face:)` krijgt het gezicht mee;
+(3) `EnhanceTilePreview.warmUpInBackground()` bij app-launch (Avatar2App)
+laadt Vision/CIContext/kernels op een synthetische bron; (4) EditorView
+bereidt per portret-decode de previews alvast voor (`EnhancePreviewPrep`,
+off-main, `.userInitiated`) en geeft ze aan `EditColorPanel`
+(`previewPrep`/`hostPreparesPreviews`); het paneel doet bij openen alleen nog
+ms-compositie op ≤ 256 px. `sourceCG`-decode in `onAppear` alleen nog bij
+sliders. +4 AvatarKit-tests (prepare ≡ compat-pad, identiteits-cache, retouch
+met bekend gezicht, warm-up idempotent).
+
