@@ -69,7 +69,7 @@ snede achter een gutter (padding 0 / alleen het tekort), haar-spike, specks,
 links/onder/gecombineerd/inset; 12/12 groen, `tsc --noEmit` schoon, visuele
 smoke draait. Geverifieerd op Loki's echte cutout (717×730 uit de app-store):
 oud = no-op, nieuw = rechts+onder gedetecteerd op x=639/y=709, canvas 726×812
-(rechts groeit alleen het tekort van 9 px, onder 82 px). Backend nog niet gedeployed (gated op Thierry).
+(rechts groeit alleen het tekort van 9 px, onder 82 px). Backend live op prod sinds 2026-09-03 23:01 (deploy `avatars-rom3zzyci`, samen met 56.3).
 
 ## 56.3 — Masker begrensd op het onderwerp: geen ondertitelbalk-hallucinaties
 - status: done
@@ -103,7 +103,8 @@ stroken), `backend/lib/replicate.ts` (prompt). Twee nieuwe tests: onderstrook
 blijft zwart in de gutterhoeken en dekt wel de volle torsobreedte; zijstrook
 blijft zwart naast het hoofd bij een armsnede. 14/14 groen, `tsc --noEmit`
 schoon, visuele smoke (`build/fill-body-smoke/*-mask.png`) toont nu een
-lichaamsvormige stub i.p.v. een band. Backend nog niet gedeployed (gated op
-Thierry). Als het toch nog voorkomt: volgende laag is een OCR-poort
+lichaamsvormige stub i.p.v. een band. Backend live op prod sinds 2026-09-03
+23:01 (`vercel --prod` vanaf repo-root, deploy `avatars-rom3zzyci`, alias
+api.aaavatar.nl geverifieerd). Als het toch nog voorkomt: volgende laag is een OCR-poort
 (Vision op de client of tesseract server-side) met één gratis retry op een
 nieuwe seed.
