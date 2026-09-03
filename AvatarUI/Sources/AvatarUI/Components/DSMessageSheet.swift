@@ -62,7 +62,7 @@ public struct DSMessageSheet: View {
         .frame(maxWidth: 420, alignment: .leading)
         .background(DSColor.Background.card)
         .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl4))
-        .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
+        .dsVectorSafeShadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 12)
     }
 
     private func hero(_ url: URL) -> some View {

@@ -22,6 +22,7 @@ public struct DSTextField: View {
     @Binding private var text: String
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(
         label: String? = nil,
@@ -55,6 +56,16 @@ public struct DSTextField: View {
                         .frame(width: 20, height: 20)
                         .foregroundStyle(DSColor.Foreground.muted)
                 }
+                if vectorExport {
+                    // Vector-export: NSTextField rendert niet in ImageRenderer.
+                    Text(text.isEmpty ? placeholder : text)
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(text.isEmpty ? DSColor.Foreground.muted : DSColor.Foreground.primary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .clipped()
+                } else {
                 TextField(
                     "",
                     text: $text,
@@ -65,6 +76,7 @@ public struct DSTextField: View {
                 .foregroundStyle(DSColor.Foreground.primary)
                 .focused($isFocused)
                 .dsFocusEffectDisabled()
+                }
             }
             .padding(.horizontal, DSSpacing.gap4)
             .padding(.vertical, DSSpacing.gap2_5)

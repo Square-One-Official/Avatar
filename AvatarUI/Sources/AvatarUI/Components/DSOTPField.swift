@@ -13,6 +13,7 @@ public struct DSOTPField: View {
     private let validation: DSValidationState
     @Binding private var code: String
     @FocusState private var isFocused: Bool
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(code: Binding<String>, length: Int = 6, validation: DSValidationState = .normal) {
         self._code = code
@@ -32,6 +33,7 @@ public struct DSOTPField: View {
             }
         }
         .background {
+            if vectorExport { EmptyView() } else {
             TextField("", text: $code)
                 .textFieldStyle(.plain)
                 .focused($isFocused)
@@ -40,6 +42,7 @@ public struct DSOTPField: View {
                 .onChange(of: code) { _, newValue in
                     code = String(newValue.filter(\.isNumber).prefix(length))
                 }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture { isFocused = true }

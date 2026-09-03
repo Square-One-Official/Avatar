@@ -15,6 +15,7 @@ public struct DSThumbnailCard<Icon: View>: View {
     private let isPro: Bool
     private let isSelected: Bool
     private let isWorking: Bool
+    @Environment(\.dsVectorExport) private var vectorExport
     private let tileSize: CGFloat
     private let tileHeight: CGFloat
     private let onRefresh: (() -> Void)?
@@ -80,7 +81,15 @@ public struct DSThumbnailCard<Icon: View>: View {
                 if isWorking {
                     ZStack {
                         Color.black.opacity(0.35)
-                        ProgressView().controlSize(.small)
+                        if vectorExport {
+                            // Vector-export: NSProgressIndicator rendert niet.
+                            Circle()
+                                .trim(from: 0.1, to: 0.85)
+                                .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .frame(width: 16, height: 16)
+                        } else {
+                            ProgressView().controlSize(.small)
+                        }
                     }
                 }
             }

@@ -12,6 +12,7 @@ public struct DSSearchField: View {
     @Binding private var text: String
     @FocusState private var isFocused: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(placeholder: String = "Search", text: Binding<String>) {
         self.placeholder = placeholder
@@ -25,6 +26,16 @@ public struct DSSearchField: View {
                 .scaledToFit()
                 .frame(width: 20, height: 20)
                 .foregroundStyle(DSColor.Foreground.muted)
+            if vectorExport {
+                // Vector-export: NSTextField rendert niet in ImageRenderer.
+                Text(text.isEmpty ? placeholder : text)
+                    .dsTextStyle(.bodyMedium)
+                    .foregroundStyle(text.isEmpty ? DSColor.Foreground.muted : DSColor.Foreground.primary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
+            } else {
             TextField(
                 "",
                 text: $text,
@@ -35,6 +46,7 @@ public struct DSSearchField: View {
             .foregroundStyle(DSColor.Foreground.primary)
             .focused($isFocused)
             .dsFocusEffectDisabled()
+            }
         }
         .padding(.horizontal, DSSpacing.gap4)
         .frame(height: 48)

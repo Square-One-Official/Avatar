@@ -1,5 +1,6 @@
 // Figma "Components" → Toast (State=Default).
-// Kaart: bg Card, border b-thin in divider, radius r-lg, breedte 360,
+// Kaart: bg Card, border b-thin in divider, radius r-2xl (Figma zegt r-lg;
+// op 16 pt gezet op verzoek van Thierry, 2026-09-03), breedte 360,
 // Shadows/Default. Body: padding gap-4, kolomgap gap-1; titel UI/Labels/Large
 // (primary), omschrijving Content/Body/Small (subtle), sluitknop = small
 // ghost Icon-Only Button (16pt X). Onderin 3pt timer-track: bg neutral,
@@ -44,6 +45,7 @@ public struct DSToast: View {
     /// Resterende fractie van `autoDismiss`, 1 → 0.
     @State private var remaining: Double = 1
     @State private var isHovering = false
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(
         title: String,
@@ -84,10 +86,19 @@ public struct DSToast: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                 HStack(alignment: .top, spacing: 0) {
                     if isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.trailing, DSSpacing.gap2)
-                            .padding(.top, 1)
+                        Group {
+                            if vectorExport {
+                                // Vector-export: NSProgressIndicator rendert niet.
+                                Circle()
+                                    .trim(from: 0.1, to: 0.85)
+                                    .stroke(DSColor.Foreground.primary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                                    .frame(width: 12, height: 12)
+                            } else {
+                                ProgressView().controlSize(.small)
+                            }
+                        }
+                        .padding(.trailing, DSSpacing.gap2)
+                        .padding(.top, 1)
                     }
                     Text(title)
                         .dsTextStyle(.labelLarge)
@@ -153,14 +164,14 @@ public struct DSToast: View {
         }
         .frame(width: 360)
         .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
         .overlay(
-            RoundedRectangle(cornerRadius: DSRadius.lg)
+            RoundedRectangle(cornerRadius: DSRadius.xl2)
                 .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
         )
         // Shadows/Default (0, 80, blur 80, spread -40): SwiftUI kent geen
         // spread; offset en blur gehalveerd als visuele benadering.
-        .shadow(
+        .dsVectorSafeShadow(
             color: DSShadow.default.color,
             radius: DSShadow.default.radius / 2,
             x: DSShadow.default.offset.width,

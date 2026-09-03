@@ -125,7 +125,7 @@ public extension View {
     /// Markeert deze view als "binnen" voor `scope`: een klik hierop sluit het
     /// menu niet. Zet op het anker (de toggle-knop) én op het menu zelf.
     func dsOutsideClickInside(_ scope: DSOutsideClickScope) -> some View {
-        background(DSOutsideClickProbe(scope: scope))
+        modifier(DSOutsideClickInsideModifier(scope: scope))
     }
 
     /// Activeert de klik-buiten-monitor van `scope` zolang `isActive` true is
@@ -203,5 +203,19 @@ private struct DSOutsideClickProbe: NSViewRepresentable {
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+}
+
+/// Vector-export: geen NSView-probe (zie DSVectorExport).
+private struct DSOutsideClickInsideModifier: ViewModifier {
+    let scope: DSOutsideClickScope
+    @Environment(\.dsVectorExport) private var vectorExport
+
+    func body(content: Content) -> some View {
+        if vectorExport {
+            content
+        } else {
+            content.background(DSOutsideClickProbe(scope: scope))
+        }
     }
 }

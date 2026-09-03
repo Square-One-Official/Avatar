@@ -15,7 +15,21 @@ public extension View {
 
     /// Roept `perform` aan met de klikpositie in de view-coördinaten van de overlay.
     func onRightClick(perform: @escaping (CGPoint) -> Void) -> some View {
-        overlay(RightClickCatcher(action: perform))
+        modifier(RightClickModifier(action: perform))
+    }
+}
+
+/// Vector-export: geen NSView-catcher (zie DSVectorExport).
+private struct RightClickModifier: ViewModifier {
+    let action: (CGPoint) -> Void
+    @Environment(\.dsVectorExport) private var vectorExport
+
+    func body(content: Content) -> some View {
+        if vectorExport {
+            content
+        } else {
+            content.overlay(RightClickCatcher(action: action))
+        }
     }
 }
 

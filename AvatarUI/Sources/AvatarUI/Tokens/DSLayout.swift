@@ -142,7 +142,7 @@ public extension View {
     /// Past een DS-schaduwtoken toe. `scale` schaalt radius én offset mee voor
     /// canvas-elementen die met de camera meeschalen (inverse zoom).
     func dsShadow(_ shadow: DSShadow, scale: CGFloat = 1) -> some View {
-        self.shadow(
+        dsVectorSafeShadow(
             color: shadow.color,
             radius: shadow.radius * scale,
             x: shadow.offset.width * scale,

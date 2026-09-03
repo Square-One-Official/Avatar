@@ -47,6 +47,8 @@ public struct DSCanvasZoomChip: View {
         return "\(max(percent, 1))%"
     }
 
+    @Environment(\.dsVectorExport) private var vectorExport
+
     public var body: some View {
         Button(action: action) {
             Text(title)
@@ -55,7 +57,14 @@ public struct DSCanvasZoomChip: View {
                 .foregroundStyle(DSColor.Foreground.primary)
                 .padding(.horizontal, DSSpacing.gap3)
                 .frame(height: 30)
-                .background(.ultraThinMaterial, in: Capsule())
+                .background {
+                    if vectorExport {
+                        // Vector-export: material rastert; kaartkleur als benadering.
+                        Capsule().fill(DSColor.Background.card.opacity(0.92))
+                    } else {
+                        Capsule().fill(.ultraThinMaterial)
+                    }
+                }
                 .overlay(Capsule().strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin))
         }
         .buttonStyle(.plain)

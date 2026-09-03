@@ -149,7 +149,7 @@ public struct DSColorPicker: View {
             .frame(width: 14, height: 14)
             .overlay(Circle().strokeBorder(.white, lineWidth: 2))
             .overlay(Circle().strokeBorder(.black.opacity(0.25), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
+            .dsVectorSafeShadow(color: .black.opacity(0.35), radius: 1.5, y: 1)
             .allowsHitTesting(false)
     }
 

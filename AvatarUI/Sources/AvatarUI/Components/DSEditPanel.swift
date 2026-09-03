@@ -27,6 +27,7 @@ public struct DSEditPanel<Content: View, Accessory: View>: View {
     private let headerAccessory: Accessory
     private let maxWidth: CGFloat
     private let maxContentHeight: CGFloat
+    @Environment(\.dsVectorExport) private var vectorExport
     @State private var contentHeight: CGFloat = 0
 
     /// E18.15: panelen waren overweldigend — volle vensterbreedte en hoog.
@@ -81,6 +82,11 @@ public struct DSEditPanel<Content: View, Accessory: View>: View {
             // E18.15/18.18: één scrollbare kolom die de inhoud hugt — de
             // ScrollView krijgt exact de inhoudshoogte (gemeten) tot de cap;
             // daarboven scrollt hij. Géén lege ruimte bij korte panelen.
+            // Vector-export: ScrollView meet z'n inhoud via een preference die
+            // ImageRenderer niet propageert → klapt dicht; toon de inhoud plat.
+            if vectorExport {
+                content.frame(maxWidth: .infinity, alignment: .leading)
+            } else {
             ScrollView(.vertical, showsIndicators: true) {
                 content
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -103,6 +109,7 @@ public struct DSEditPanel<Content: View, Accessory: View>: View {
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) { contentHeight = height }
+            }
             }
             // E24.18: GEEN content-fade meer — de 24.12-`dsEdgeFade` kapte
             // kaarten/chips/tekst af bovenin/onderin álle panelen. Inhoud is nu

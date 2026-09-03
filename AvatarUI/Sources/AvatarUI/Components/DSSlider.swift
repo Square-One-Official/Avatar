@@ -31,6 +31,7 @@ public struct DSSlider: View {
     private let onEditingChanged: (Bool) -> Void
 
     @State private var isEditing = false
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(
         value: Binding<Double>,
@@ -78,6 +79,7 @@ public struct DSSlider: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay {
+                if vectorExport { EmptyView() } else {
                 SliderPointerCatcher(
                     onStart: {
                         if !isEditing {
@@ -95,6 +97,7 @@ public struct DSSlider: View {
                         }
                     }
                 )
+                }
             }
         }
         .frame(height: Self.hitHeight)
@@ -175,7 +178,7 @@ public struct DSSlider: View {
                         lineWidth: isGradient ? 2.5 : 0.5
                     )
             )
-            .shadow(color: .black.opacity(isEditing ? 0.28 : 0.16), radius: isEditing ? 2 : 1, y: 1)
+            .dsVectorSafeShadow(color: .black.opacity(isEditing ? 0.28 : 0.16), radius: isEditing ? 2 : 1, y: 1)
             .allowsHitTesting(false)
     }
 

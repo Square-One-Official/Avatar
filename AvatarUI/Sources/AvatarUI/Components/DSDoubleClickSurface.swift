@@ -8,7 +8,21 @@ import SwiftUI
 public extension View {
     /// Roept `perform` alléén aan bij een dubbelklik; enkelklikken worden genegeerd.
     func onDoubleClick(perform: @escaping () -> Void) -> some View {
-        overlay(DoubleClickCatcher(action: perform))
+        modifier(DoubleClickModifier(action: perform))
+    }
+}
+
+/// Vector-export: geen NSView-catcher (zie DSVectorExport).
+private struct DoubleClickModifier: ViewModifier {
+    let action: () -> Void
+    @Environment(\.dsVectorExport) private var vectorExport
+
+    func body(content: Content) -> some View {
+        if vectorExport {
+            content
+        } else {
+            content.overlay(DoubleClickCatcher(action: action))
+        }
     }
 }
 

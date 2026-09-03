@@ -47,6 +47,7 @@ public extension View {
 private struct DSPanelSurface: ViewModifier {
     let cornerRadius: CGFloat
     let solid: Bool
+    @Environment(\.dsVectorExport) private var vectorExport
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -57,7 +58,7 @@ private struct DSPanelSurface: ViewModifier {
         content
             .background {
                 Group {
-                    if solid {
+                    if solid || vectorExport {
                         DSColor.Background.card
                     } else {
                         ZStack {
@@ -70,7 +71,7 @@ private struct DSPanelSurface: ViewModifier {
                 .overlay {
                     shape.strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
                 }
-                .shadow(
+                .dsVectorSafeShadow(
                     color: .black.opacity(DSPanelShadow.opacity),
                     radius: DSPanelShadow.radius,
                     x: 0,
