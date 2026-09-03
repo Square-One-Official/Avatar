@@ -139,9 +139,21 @@ hover-kleur van een rij wiens submenu open staat (voorstel: hover-highlight
 blijft staan zolang het submenu open is, zoals shadcn `data-state=open`).
 
 ## 57.2 — FEAT: "Edit ▸"-submenu in het tegelmenu + Boost bij enkel-select [FEAT]
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (Claude, 2026-09-03)
 - blockedBy: 57.1
+
+**Result:** `PortraitDSContextMenu.editSubmenu(targets:)` — rij **Edit ▸**
+(`wand.and.stars`) in `singleRows` (na Move to folder / Folder “…”) én in
+`bulkRows` (na Match framing); daaronder **Boost resolution[ on N] ▸** met
+On device · Free / Online · credits-totaal (bestaande `boostRows`). De losse
+bulk-Boost-rij is weg; enkel-select in een map heeft nu Boost (het gemelde
+gat). Edit is `disabled` zolang een set-actie loopt (`model.isSetActionBusy`)
+of een editor-AI-actie andere AI-acties blokkeert
+(`entitlement.workingContext.blocksOtherAIFeatures`). Fill in body / Apply
+effect-rijen komen erbij in 57.3/57.4 zodra hun set-actie bestaat. DoD: beide
+targets bouwen, Avatar2Tests groen; geen aparte smoke (menu-structuur is
+code-geverifieerd, de Boost-set-actie zelf is ongewijzigd en getest).
 
 - `singleRows` én `bulkRows` krijgen de rij **Edit ▸** (icoon `wand.and.stars`)
   op de plek uit het schema hierboven; de losse bulk-Boost-rij verdwijnt.

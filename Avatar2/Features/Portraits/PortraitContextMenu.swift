@@ -64,6 +64,7 @@ struct PortraitDSContextMenu: View {
                 folderRows(folder)
             }
         }
+        editSubmenu(targets: [portrait])
         DSMenuRow("Export…", icon: "square.and.arrow.up") {
             onDismiss(); model.select(portrait); model.exportCurrentPortrait()
         }
@@ -103,11 +104,7 @@ struct PortraitDSContextMenu: View {
             onDismiss()
             PortraitSetActions.matchFraming(targets, undoManager: undoManager, reporter: model.setActionReporter)
         }
-        // Aanvulling Thierry 2026-09-02: Boost ook op een map-selectie. Zelfde
-        // twee modi als de editor-chip (E41.2/E41.5), via een flyout.
-        DSMenuSubmenu("Boost resolution on \(n)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
-            boostRows(targets: targets)
-        }
+        editSubmenu(targets: targets)
         // E50.3: "Match lighting" kiest zelf het doel (het patroon van de set of
         // het best belichte portret); "…to this one" is de expliciete override
         // met de aangeklikte tegel als referentie. Geschrapt (flag) — zie
@@ -146,9 +143,31 @@ struct PortraitDSContextMenu: View {
         }
     }
 
-    /// Boost-modus kiezen voor de hele selectie. Online toont het totaal aan
-    /// credits (3 per portret); zonder Cloud-tier de neutrale "Cloud"-hint —
-    /// de gate vraagt dan zelf om de tier te verhogen (zoals in de editor).
+    // MARK: - Edit ▸ (E57.2)
+
+    /// Eén lopende Edit-batch tegelijk: dezelfde bron als de editor-chips
+    /// (`workingContext.blocksOtherAIFeatures`) plus de set-actie-toast.
+    private var editIsBusy: Bool {
+        model.isSetActionBusy || entitlement.workingContext?.blocksOtherAIFeatures == true
+    }
+
+    /// Edit ▸ Boost resolution ▸ (On device / Online) — voor 1…N portretten.
+    /// Thierry 2026-09-03: Boost ontbrak bij enkel-select in een map; i.p.v.
+    /// een losse rij één Edit-tak waar Fill in body (57.3) en Apply effect
+    /// (57.4) ook onder komen. Labels tellen mee bij bulk ("…on N").
+    @ViewBuilder private func editSubmenu(targets: [Portrait2]) -> some View {
+        let n = targets.count
+        let suffix = n >= 2 ? " on \(n)" : ""
+        DSMenuSubmenu("Edit", icon: "wand.and.stars", disabled: editIsBusy, minWidth: 230) {
+            DSMenuSubmenu("Boost resolution\(suffix)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
+                boostRows(targets: targets)
+            }
+        }
+    }
+
+    /// Boost-modus kiezen. Online toont het totaal aan credits (3 per
+    /// portret); zonder Cloud-tier de neutrale "Cloud"-hint — de gate vraagt
+    /// dan zelf om de tier te verhogen (zoals in de editor).
     @ViewBuilder private func boostRows(targets: [Portrait2]) -> some View {
         let onlineLabel: String = {
             guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Sharper · Cloud" }
