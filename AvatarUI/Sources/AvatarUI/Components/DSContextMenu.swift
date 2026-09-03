@@ -22,6 +22,8 @@ public struct DSMenuRow<Accessory: View>: View {
     private let disabled: Bool
     private let accessory: Accessory
     private let action: () -> Void
+    /// Vervangt het icoon (thumbnail-rijen); nil = `icon`.
+    private var leading: AnyView?
     @State private var id = UUID()
 
     public init(
@@ -68,11 +70,36 @@ public struct DSMenuRow<Accessory: View>: View {
         self.action = action
     }
 
+    /// E57: rij met een eigen leading-view i.p.v. een icoon (bv. een
+    /// effect-thumbnail). `leading` krijgt de icoonbreedte-slot; grotere
+    /// inhoud (thumbnail) mag er iets overheen — de rij is 32 pt hoog.
+    public init<Leading: View>(
+        _ title: String,
+        @ViewBuilder leading: () -> Leading,
+        destructive: Bool = false,
+        showsChevron: Bool = false,
+        shortcut: String? = nil,
+        disabled: Bool = false,
+        @ViewBuilder accessory: () -> Accessory,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.icon = Image(systemName: "circle")
+        self.leading = AnyView(leading())
+        self.destructive = destructive
+        self.showsChevron = showsChevron
+        self.shortcut = shortcut
+        self.disabled = disabled
+        self.accessory = accessory()
+        self.action = action
+    }
+
     public var body: some View {
         DSMenuRowContent(
             id: id,
             title: title,
             icon: icon,
+            leading: leading,
             destructive: destructive,
             showsChevron: showsChevron,
             shortcut: shortcut,
@@ -92,6 +119,7 @@ struct DSMenuRowContent<Accessory: View>: View {
     let id: UUID
     let title: String
     let icon: Image
+    var leading: AnyView? = nil
     let destructive: Bool
     let showsChevron: Bool
     let shortcut: String?
@@ -125,9 +153,14 @@ struct DSMenuRowContent<Accessory: View>: View {
         let _ = actionBox.update(action)
         Button(action: action) {
             HStack(spacing: DSSpacing.gap2) {
-                icon
-                    .font(.system(size: 12, weight: .medium))
-                    .frame(width: 16)
+                if let leading {
+                    leading
+                        .frame(width: 16)
+                } else {
+                    icon
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 16)
+                }
                 Text(title)
                     .dsTextStyle(.labelBase)
                     .lineLimit(1)
@@ -187,6 +220,27 @@ struct DSMenuRowContent<Accessory: View>: View {
 }
 
 extension DSMenuRow where Accessory == EmptyView {
+    public init<Leading: View>(
+        _ title: String,
+        @ViewBuilder leading: () -> Leading,
+        destructive: Bool = false,
+        showsChevron: Bool = false,
+        shortcut: String? = nil,
+        disabled: Bool = false,
+        action: @escaping () -> Void
+    ) {
+        self.init(
+            title,
+            leading: leading,
+            destructive: destructive,
+            showsChevron: showsChevron,
+            shortcut: shortcut,
+            disabled: disabled,
+            accessory: { EmptyView() },
+            action: action
+        )
+    }
+
     public init(
         _ title: String,
         icon: String,

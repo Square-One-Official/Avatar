@@ -68,7 +68,8 @@ struct PortraitEditSubmenu: View {
         if !list.custom.isEmpty {
             ForEach(list.custom) { effect in
                 DSMenuRow(
-                    effect.label, icon: "sparkles",
+                    effect.label,
+                    leading: { effectThumbnail(url: effect.thumbnailUrl, fallback: "sparkles") },
                     shortcut: effectLabel(targets, choice: .custom(effect)),
                     accessory: { DSProChip() }
                 ) {
@@ -79,13 +80,33 @@ struct PortraitEditSubmenu: View {
         }
         ForEach(list.builtin) { effect in
             DSMenuRow(
-                effect.label, icon: effect.isDieCut ? "seal" : "paintbrush",
+                effect.label,
+                leading: { effectThumbnail(url: effect.thumbnailUrl, fallback: effect.isDieCut ? "seal" : "paintbrush") },
                 shortcut: effectLabel(targets, choice: .builtin(effect))
             ) {
                 runEffect(.builtin(effect), on: targets, list: list.builtin)
             }
         }
     }
+
+    /// Kleine stijl-thumbnail in de rij (Thierry 2026-09-03), uit dezelfde
+    /// `ThumbnailCache` als de Effects-kaarten (memory-hit = geen flits).
+    /// Zonder URL, of zolang 'ie laadt: het icoon.
+    @ViewBuilder private func effectThumbnail(url: URL?, fallback icon: String) -> some View {
+        let placeholder = Image(systemName: icon)
+            .font(.system(size: DSIconSize.sm, weight: .medium))
+        if let url {
+            RemoteThumbnail(url: url) { placeholder }
+                .frame(width: Self.thumbnailSide, height: Self.thumbnailSide)
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
+        } else {
+            placeholder
+        }
+    }
+
+    /// Iets groter dan de icoon-slot (16) — de rij is 32 hoog, dus dit past
+    /// zonder de rij te laten groeien.
+    private static let thumbnailSide: CGFloat = 20
 
     private func effectLabel(_ targets: [Portrait2], choice: PortraitSetActions.EffectChoice) -> String {
         let generating = PortraitSetActions.effectGenerationCount(targets, choice: choice)
