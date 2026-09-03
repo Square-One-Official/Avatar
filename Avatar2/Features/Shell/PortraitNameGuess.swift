@@ -8,13 +8,16 @@
 // 2026-09-02: "volledig offline"): een gebundeld voornamen-lexicon
 // (FirstNameLexicon) als anker — wat vóór de voornaam staat is geen naam, wat
 // erna komt is de achternaam — en, als er géén voornaam in zit, een
-// woordenboek-check via NLTagger: bestaan alle overgebleven woorden gewoon
-// ("man beard", "square one"), dan is het geen naam; een onbekend woord
-// ("looijen") blijft als achternaam staan. Zonder overgebleven naamdelen → ""
-// (het veld toont dan "Add name", zoals bij naamloze Data-drops).
+// woordenboek-check via de systeem-spellingchecker (NSSpellChecker, Engels):
+// bestaan alle overgebleven woorden gewoon ("man beard", "square one"), dan is
+// het geen naam; een onbekend woord ("looijen", "farzam") blijft als
+// (achter)naam staan. NLTagger is hiervoor afgewezen: zijn name-tagging hangt
+// aan hoofdlettergebruik en noemt ook "Farzam"/"Madani" gewone woorden.
+// Zonder overgebleven naamdelen → "" (het veld toont dan "Add name", zoals bij
+// naamloze Data-drops).
 
+import AppKit
 import Foundation
-import NaturalLanguage
 
 enum PortraitNameGuess {
 
@@ -29,8 +32,12 @@ enum PortraitNameGuess {
         // Eerst het hele token tegen de ruislijst ("LinkedIn") en de
         // cijfer-check (CDN-hash "74ZFkSVk" valt als geheel af), pas daarna
         // camelCase-splitsen ("ThierryEmmery") — anders wordt "Linked" of
-        // "ZFk" een naam.
-        let tokens = tokenize(stem)
+        // "ZFk" een naam. Een punt-segment dat een hash bevat
+        // (`farzam-madani.CATT_2ZK_jTHvU`) valt in z'n geheel weg — ook de
+        // cijfervrije brokjes ("CATT") erin zijn geen naamdelen.
+        let tokens = stem.split(separator: ".")
+            .filter { !isHashSegment(String($0)) }
+            .flatMap { tokenize(String($0)) }
             .filter { !noiseWords.contains($0.lowercased()) }
             .compactMap(lettersOnly)
             .flatMap(splitCamelCase)
@@ -86,14 +93,19 @@ enum PortraitNameGuess {
         return trimParticles(result)
     }
 
-    /// Engels NLTagger-woordenboek: `.otherWord` = bekend gewoon woord ("beard",
-    /// "square"); namen en onbekende woorden ("looijen") krijgen een andere tag.
+    /// Engelse spellingchecker: correct gespeld = bekend gewoon woord ("beard",
+    /// "square", "winter"); onbekend ("looijen", "farzam", "emmery") = naam.
+    /// Kleine letters, anders geldt een hoofdletter als eigennaam. NSSpellChecker
+    /// hoort op de main thread; de resolver roept dit vanaf een detached Task.
     private static func isDictionaryWord(_ word: String) -> Bool {
-        let tagger = NLTagger(tagSchemes: [.nameType])
-        tagger.string = word
-        tagger.setLanguage(.english, range: word.startIndex..<word.endIndex)
-        let (tag, _) = tagger.tag(at: word.startIndex, unit: .word, scheme: .nameType)
-        return tag == .otherWord
+        let check = {
+            let range = NSSpellChecker.shared.checkSpelling(
+                of: word.lowercased(), startingAt: 0, language: "en", wrap: false,
+                inSpellDocumentWithTag: 0, wordCount: nil
+            )
+            return range.location == NSNotFound
+        }
+        return Thread.isMainThread ? check() : DispatchQueue.main.sync(execute: check)
     }
 
     /// Alleen de laatste extensie (`team.profile.jpeg` → `team.profile`); een
@@ -103,6 +115,17 @@ enum PortraitNameGuess {
         guard let dot = fileName.lastIndex(of: "."), dot != fileName.startIndex else { return fileName }
         let ext = fileName[fileName.index(after: dot)...].lowercased()
         return imageExtensions.contains(ext) ? String(fileName[..<dot]) : fileName
+    }
+
+    /// CDN-/export-hash tussen de punten (`name.CATT_2ZK_jTHvU.webp`): één of
+    /// meer delen met cijfers middenin of hash-achtig hoofdlettergebruik.
+    private static func isHashSegment(_ segment: String) -> Bool {
+        // `lettersOnly` = nil voor letters-met-cijfers-middenin ("Z1GiMhz") en
+        // hash-achtig hoofdlettergebruik ("74ZFkSVk" → "ZFkSVk", "jTHvU");
+        // "anna01"/"2024anna" blijven gewoon namen (randcijfers vallen af).
+        tokenize(segment).contains { part in
+            part.contains(where: \.isLetter) && lettersOnly(part) == nil
+        }
     }
 
     /// Splitst op `-`, `_`, spatie, punt, `+`, haakjes, komma.

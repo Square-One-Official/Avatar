@@ -24,6 +24,9 @@ import FoundationModels
 
 enum PortraitNameResolver {
 
+    /// Notice-niveau (niet .info): wordt persistent gelogd, zodat
+    /// `log show --predicate 'category == "PortraitName"'` achteraf laat zien
+    /// welke laag de naam bepaalde — .info is alleen live te streamen.
     private static let log = Logger(subsystem: "nl.squareone.aaavatar2", category: "PortraitName")
 
     /// Tests zetten dit uit zodat de uitkomst niet afhangt van Apple
@@ -50,20 +53,20 @@ enum PortraitNameResolver {
     static func resolve(fileName: String, hints: ImageNameHints) async -> String {
         if let answer = await onDeviceAnswer(fileName: fileName, hints: hints) {
             if let name = validated(answer, against: [fileName] + hints.all) {
-                log.info("model → \"\(name, privacy: .private)\" for \(fileName, privacy: .private)")
+                log.notice("model → \"\(name, privacy: .private)\" for \(fileName, privacy: .private)")
                 return name
             }
-            log.info("model answer rejected (\"\(answer, privacy: .private)\"), falling back to heuristic")
+            log.notice("model answer rejected (\"\(answer, privacy: .private)\"), falling back to heuristic")
         }
         for title in hints.titles {
             let name = PortraitNameGuess.name(fromFileName: title)
             if !name.isEmpty {
-                log.info("metadata title → \"\(name, privacy: .private)\"")
+                log.notice("metadata title → \"\(name, privacy: .private)\"")
                 return name
             }
         }
         let name = PortraitNameGuess.name(fromFileName: fileName)
-        log.info("heuristic → \"\(name, privacy: .private)\" for \(fileName, privacy: .private)")
+        log.notice("heuristic → \"\(name, privacy: .private)\" for \(fileName, privacy: .private)")
         return name
     }
 

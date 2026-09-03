@@ -49,6 +49,9 @@ final class ShellModelTests: XCTestCase {
         XCTAssertEqual(naam("JanJansen2.png"), "Jan Jansen")
         XCTAssertEqual(naam("2024_anna01.HEIC"), "Anna")
         XCTAssertEqual(naam("jelle-looijen.74ZFkSVk_Z1GiMhz.webp"), "Jelle Looijen", "CDN-hash valt als geheel af")
+        XCTAssertEqual(naam("farzam-madani.CATT_2ZK_jTHvU.webp"), "Farzam Madani", "ook cijfervrije brokjes in een hash-segment")
+        XCTAssertEqual(naam("bruna-da-silva-gerage.JYt8bK72_1RDQTt.webp"), "Bruna da Silva Gerage")
+        XCTAssertEqual(naam("anna.de.winter.jpg"), "Anna de Winter", "punt-segmenten zonder hash blijven")
     }
 
     func testDefaultNaamIsLeegZonderPersoonsnaam() {
