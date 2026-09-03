@@ -294,9 +294,37 @@ framing-keuze per portret; beide targets groen; live-smoke 1 en 3 portretten met
 één gecachte stijl (bon "…2 credits" bij 3 targets waarvan 1 gecacht). **Result:** —
 
 ## 57.5 — Polish-pass [FEAT+DS]
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (Claude, 2026-09-03)
 - blockedBy: 57.2, 57.3, 57.4
+
+**Result:**
+- **Stoppen tussen twee portretten** (de open post van 57.3/57.4):
+  `SetActionReporter.cancel` (default no-op, bestaande call sites ongewijzigd)
+  → `ShellModel.setActionCancel` → **Stop**-knop op de busy-toast (alleen als
+  er een haak is; Match framing e.d. houden geen knop). Boost/Fill in body/
+  Apply effect checken `Task.isCancelled` tussen portretten, een afgebroken
+  call telt niet als mislukt, wat klaar is blijft (met Undo); bon: "Stopped.
+  The rest is unchanged." / "Stopped — nothing … yet". Boost-first uit de
+  gate ketent niet door na een stop.
+- **Disabled-reden**: Edit ▸ krijgt een `.help`-tooltip ("Wait for the current
+  edit to finish" zolang een batch/editor-AI-actie loopt, anders de korte
+  uitleg).
+- **Sneltoetsen**: geen labels toegevoegd — Boost/Apply effect hebben geen
+  binding en de editor-⇧⌘F (Fill in body) werkt niet op een raster-selectie;
+  een label zonder werkende toets is erger dan geen label.
+- **Labels/credits**: "…on N", "1 credit"/"N credits", "Cached"/"Cloud" — al
+  in 57.2–57.4; menu-breedtes 200/270 (hoofd), 230 (Boost), 250 (effecten).
+- **AX**: submenu-rijen melden Expanded/Collapsed + hint (57.1), panelen zijn
+  containers met label; Esc sluit alles.
+- **Motion/iconen**: guards groen. Privacy-matrix ongewijzigd (zelfde features).
+- Tests: stop-bonnen voor de drie batches + reporter-default; Avatar2Tests
+  groen, beide targets bouwen.
+
+**Niet gedaan (bewust):** screenshots in de story (geen screencapture in
+autonome sessies — Thierry kijkt live), thumbnails in effect-rijen (DS heeft
+geen menu-rij-thumbnail; **Figma-TODO**), tracking-events (geen tracking-plan
+in de repo). Hover-timing 150/250 ms staat vast (Thierry: "hover is ok").
 
 - **Sneltoetsen**: de editor heeft alleen Fill in body `⇧⌘F` (`EnhanceCommands`);
   Boost en Apply effect hebben geen binding. In het tegelmenu géén shortcut-labels

@@ -443,6 +443,7 @@ enum PortraitSetActions {
         var failed = 0
         var outOfCredits = false
         var proRequired = false
+        var cancelled = false
     }
 
     /// "Fill in body" op de selectie (E57.3, Edit ▸ in het tegelmenu). Zelfde
@@ -464,10 +465,11 @@ enum PortraitSetActions {
         }) else { return }
         let total = targets.count
         reporter.busy("Filling in body…")
-        Task {
+        let batch = Task {
             defer { reporter.busy(nil) }
             var outcome = FillBodyOutcome()
             for (index, portrait) in targets.enumerated() {
+                if Task.isCancelled { outcome.cancelled = true; break }
                 if total > 1 { reporter.busy("Filling in body \(index + 1) of \(total)…") }
                 let source = portrait.cutoutData
                 let signature = Portrait2.cutoutSignature(source)
@@ -497,6 +499,8 @@ enum PortraitSetActions {
                     outcome.proRequired = true
                     break
                 } catch {
+                    // Stop (E57.5): een afgebroken call telt niet als mislukt.
+                    if Task.isCancelled { outcome.cancelled = true; break }
                     outcome.failed += 1
                 }
             }
@@ -507,9 +511,11 @@ enum PortraitSetActions {
             if outcome.proRequired { entitlement.requestUpgrade() }
             reporter.done(fillBodyReceipt(
                 applied: n, total: total, nothingToFill: outcome.nothingToFill,
-                failed: outcome.failed, outOfCredits: outcome.outOfCredits, undoManager: undoManager
+                failed: outcome.failed, outOfCredits: outcome.outOfCredits,
+                cancelled: outcome.cancelled, undoManager: undoManager
             ))
         }
+        reporter.cancel { batch.cancel() }
     }
 
     /// Vision-gezichtsbox (genormaliseerd) zoals de editor 'm meestuurt: het
@@ -529,12 +535,15 @@ enum PortraitSetActions {
     /// Bon voor de Fill in body-batch (testbaar). Eén portret krijgt dezelfde
     /// copy als de editor ("Body completed" / "Nothing to fill").
     static func fillBodyReceipt(
-        applied: Int, total: Int, nothingToFill: Int, failed: Int, outOfCredits: Bool, undoManager: UndoManager?
+        applied: Int, total: Int, nothingToFill: Int, failed: Int, outOfCredits: Bool,
+        cancelled: Bool = false, undoManager: UndoManager?
     ) -> SetActionReceipt {
         let title: String
         var detail: String?
         if applied == 0 {
-            if outOfCredits {
+            if cancelled, nothingToFill + failed == 0 {
+                title = "Stopped — nothing filled in yet"
+            } else if outOfCredits {
                 title = "Out of credits — nothing filled in"
             } else if nothingToFill == total {
                 title = total == 1 ? "Nothing to fill" : "Nothing to fill on \(plural(total))"
@@ -558,6 +567,7 @@ enum PortraitSetActions {
                 parts.append(failed == 1 ? "1 couldn't be filled." : "\(failed) couldn't be filled.")
             }
             if outOfCredits { parts.append("Ran out of credits for the rest.") }
+            if cancelled { parts.append("Stopped. The rest is unchanged.") }
             detail = parts.isEmpty ? nil : parts.joined(separator: " ")
         }
         return SetActionReceipt(
@@ -773,6 +783,7 @@ enum PortraitSetActions {
         var outOfCredits = false
         var proRequired = false
         var generatedAny = false
+        var cancelled = false
     }
 
     /// "Apply effect" op de selectie (E57.4, Edit ▸ Apply effect ▸ in het
@@ -806,7 +817,7 @@ enum PortraitSetActions {
         let verb = choice.key == nil ? "Removing effect" : "Applying \(choice.label)"
         let total = targets.count
         reporter.busy("\(verb)…")
-        Task {
+        let batch = Task {
             defer { reporter.busy(nil) }
             if !skipQualityGate {
                 let lowRes = toGenerate.filter(needsLowResolutionGate)
@@ -834,6 +845,7 @@ enum PortraitSetActions {
             }
             var outcome = EffectOutcome()
             for (index, portrait) in targets.enumerated() {
+                if Task.isCancelled { outcome.cancelled = true; break }
                 if total > 1 { reporter.busy("\(verb) \(index + 1) of \(total)…") }
                 guard effectStep(for: portrait, choice: choice) != .alreadyActive else {
                     outcome.skipped += 1
@@ -856,9 +868,10 @@ enum PortraitSetActions {
                 case .refused:
                     outcome.refused += 1
                 case .failed:
-                    outcome.failed += 1
+                    // Stop (E57.5): een afgebroken call telt niet als mislukt.
+                    if Task.isCancelled { outcome.cancelled = true } else { outcome.failed += 1 }
                 }
-                if outcome.outOfCredits || outcome.proRequired { break }
+                if outcome.outOfCredits || outcome.proRequired || outcome.cancelled { break }
             }
             let n = registerEffectUndo(outcome.changes, undoManager: undoManager, reporter: reporter)
             if outcome.generatedAny || outcome.outOfCredits { await entitlement.refresh() }
@@ -867,9 +880,10 @@ enum PortraitSetActions {
             reporter.done(effectReceipt(
                 choice: choice, applied: n, total: total, skipped: outcome.skipped,
                 failed: outcome.failed, refused: outcome.refused,
-                outOfCredits: outcome.outOfCredits, undoManager: undoManager
+                outOfCredits: outcome.outOfCredits, cancelled: outcome.cancelled, undoManager: undoManager
             ))
         }
+        reporter.cancel { batch.cancel() }
     }
 
     /// Toepassen zoals het paneel: basisbeeld eenmalig vastleggen, beeld via
@@ -933,14 +947,16 @@ enum PortraitSetActions {
     /// Bon voor de effect-batch (testbaar).
     static func effectReceipt(
         choice: EffectChoice, applied: Int, total: Int, skipped: Int, failed: Int, refused: Int,
-        outOfCredits: Bool, undoManager: UndoManager?
+        outOfCredits: Bool, cancelled: Bool = false, undoManager: UndoManager?
     ) -> SetActionReceipt {
         let isNone = choice.key == nil
         let label = choice.label
         let title: String
         var detail: String?
         if applied == 0 {
-            if outOfCredits {
+            if cancelled, skipped + failed + refused == 0 {
+                title = "Stopped — nothing applied yet"
+            } else if outOfCredits {
                 title = "Out of credits — nothing applied"
             } else if skipped == total {
                 title = isNone ? "No effect to remove" : "\(label) is already applied"
@@ -964,6 +980,7 @@ enum PortraitSetActions {
                 parts.append(refused == 1 ? "1 declined by the safety filter." : "\(refused) declined by the safety filter.")
             }
             if outOfCredits { parts.append("Ran out of credits for the rest.") }
+            if cancelled { parts.append("Stopped. The rest is unchanged.") }
             detail = parts.isEmpty ? nil : parts.joined(separator: " ")
         }
         return SetActionReceipt(
@@ -1002,6 +1019,7 @@ enum PortraitSetActions {
         var results: [(Portrait2, Data)] = []
         var failed = 0
         var outOfCredits = false
+        var cancelled = false
     }
 
     /// "Boost resolution" op de selectie (aanvulling Thierry 2026-09-02: ook via
@@ -1030,10 +1048,11 @@ enum PortraitSetActions {
         }
         let total = targets.count
         reporter.busy("Boosting resolution…")
-        Task {
+        let batch = Task {
             defer { reporter.busy(nil) }
             var outcome = BoostOutcome()
             for (index, portrait) in targets.enumerated() {
+                if Task.isCancelled { outcome.cancelled = true; break }
                 if total > 1 { reporter.busy("Boosting \(index + 1) of \(total)…") }
                 let source = portrait.cutoutData
                 var output: Data?
@@ -1056,6 +1075,9 @@ enum PortraitSetActions {
                         output = nil
                     }
                 }
+                // Stop tussen twee portretten (E57.5): een afgebroken call telt
+                // niet als mislukt.
+                if Task.isCancelled { outcome.cancelled = true; break }
                 if outcome.outOfCredits { break }
                 // Her-valideer: een tussentijds bewerkt portret slaan we over.
                 guard let output, portrait.cutoutData == source else {
@@ -1069,30 +1091,38 @@ enum PortraitSetActions {
             if outcome.outOfCredits { entitlement.handleOutOfCredits() }
             reporter.done(boostReceipt(
                 applied: n, total: total, failed: outcome.failed,
-                outOfCredits: outcome.outOfCredits, undoManager: undoManager
+                outOfCredits: outcome.outOfCredits, cancelled: outcome.cancelled, undoManager: undoManager
             ))
             // E57.4: "Boost first, then apply" uit de kwaliteitsgate — alleen
             // doorgaan als er ook echt iets geboost is (anders blijft de bron
-            // low-res en zou de gate meteen weer vragen).
-            if n > 0 { onFinished?() }
+            // low-res en zou de gate meteen weer vragen) en niet gestopt is.
+            if n > 0, !outcome.cancelled { onFinished?() }
         }
+        reporter.cancel { batch.cancel() }
     }
 
     /// Bon voor de Boost-batch (testbaar): wat is gelukt, wat niet, en waarom.
     static func boostReceipt(
-        applied: Int, total: Int, failed: Int, outOfCredits: Bool, undoManager: UndoManager?
+        applied: Int, total: Int, failed: Int, outOfCredits: Bool, cancelled: Bool = false,
+        undoManager: UndoManager?
     ) -> SetActionReceipt {
         let title: String
         var detail: String?
         if applied == 0 {
-            title = outOfCredits ? "Out of credits — nothing boosted" : "Couldn't boost the resolution"
-            if !outOfCredits { detail = "Please try again." }
+            if cancelled {
+                title = "Stopped — nothing boosted yet"
+            } else {
+                title = outOfCredits ? "Out of credits — nothing boosted" : "Couldn't boost the resolution"
+                if !outOfCredits { detail = "Please try again." }
+            }
         } else if applied == total {
             title = "Boosted resolution on \(plural(applied))"
         } else {
             title = "Boosted resolution on \(applied) of \(plural(total))"
             if outOfCredits {
                 detail = "Ran out of credits for the rest."
+            } else if cancelled {
+                detail = "Stopped. The rest is unchanged."
             } else if failed > 0 {
                 detail = failed == 1 ? "1 portrait couldn't be boosted." : "\(failed) portraits couldn't be boosted."
             }

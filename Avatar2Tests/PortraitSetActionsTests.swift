@@ -655,4 +655,35 @@ final class PortraitSetActionsTests: XCTestCase {
         let nothing = PortraitSetActions.effectReceipt(choice: .none, applied: 0, total: 2, skipped: 2, failed: 0, refused: 0, outOfCredits: false, undoManager: um)
         XCTAssertEqual(nothing.title, "No effect to remove")
     }
+
+    // MARK: - Stop tussen twee portretten (E57.5)
+
+    func testStoppedBatchesKeepWhatIsDoneAndSaySo() {
+        let um = UndoManager()
+        let boost = PortraitSetActions.boostReceipt(applied: 2, total: 5, failed: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(boost.title, "Boosted resolution on 2 of 5 portraits")
+        XCTAssertEqual(boost.detail, "Stopped. The rest is unchanged.")
+        XCTAssertTrue(boost.canUndo, "wat klaar is blijft — en is terug te draaien")
+        let boostNothing = PortraitSetActions.boostReceipt(applied: 0, total: 3, failed: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(boostNothing.title, "Stopped — nothing boosted yet")
+        XCTAssertFalse(boostNothing.canUndo)
+
+        let fill = PortraitSetActions.fillBodyReceipt(applied: 1, total: 4, nothingToFill: 1, failed: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(fill.detail, "1 had nothing to fill. Stopped. The rest is unchanged.")
+        let fillNothing = PortraitSetActions.fillBodyReceipt(applied: 0, total: 4, nothingToFill: 0, failed: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(fillNothing.title, "Stopped — nothing filled in yet")
+
+        let effect = PortraitSetActions.effectReceipt(choice: .builtin(watercolor), applied: 1, total: 3, skipped: 0, failed: 0, refused: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(effect.title, "Applied Watercolor to 1 of 3 portraits")
+        XCTAssertEqual(effect.detail, "Stopped. The rest is unchanged.")
+        let effectNothing = PortraitSetActions.effectReceipt(choice: .builtin(watercolor), applied: 0, total: 3, skipped: 0, failed: 0, refused: 0, outOfCredits: false, cancelled: true, undoManager: um)
+        XCTAssertEqual(effectNothing.title, "Stopped — nothing applied yet")
+    }
+
+    func testReporterCancelHookDefaultsToNoop() {
+        // Bestaande call sites zonder `cancel:` blijven compileren en werken.
+        let reporter = SetActionReporter(busy: { _ in }, done: { _ in }, portraitDidChange: { _ in })
+        reporter.cancel { }
+        reporter.cancel(nil)
+    }
 }

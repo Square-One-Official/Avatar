@@ -816,10 +816,15 @@ extension ShellView {
     fileprivate func setActionToast(_ toast: ShellModel.SetActionToast) -> some View {
         switch toast {
         case .busy(let message):
-            // UXS-2: geen sluitknop — deze set-actie loopt tot 'ie klaar is
-            // en heeft geen annuleer-pad. Een knop die niets doet is erger
+            // UXS-2: geen sluitknop — een set-actie loopt tot 'ie klaar is.
+            // E57.5: batches (Boost/Fill in body/Apply effect) zijn wél te
+            // stoppen tussen twee portretten (wat klaar is blijft); alleen
+            // dan staat er een Stop-knop — een knop die niets doet is erger
             // dan geen knop.
-            DSToast(title: message, isLoading: true)
+            DSToast(
+                title: message, isLoading: true,
+                action: model.setActionCancel.map { cancel in DSToastAction("Stop") { cancel() } }
+            )
         case .done(let receipt) where receipt.compact:
             // Set background: zelfde formaat als de "Removing background…"-pill,
             // geen kaart. Undo blijft inline; ⌘Z werkt sowieso. `.id` hertelt de

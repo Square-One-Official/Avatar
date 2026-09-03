@@ -302,6 +302,8 @@ final class ShellModel {
         case done(SetActionReceipt)
     }
     var setActionToast: SetActionToast?
+    /// E57.5: Stop-haak van de lopende batch (nil = niet te stoppen).
+    var setActionCancel: (() -> Void)?
 
     var isSetActionBusy: Bool {
         if case .busy = setActionToast { return true }
@@ -318,15 +320,17 @@ final class ShellModel {
                 guard let self else { return }
                 if let message {
                     setActionToast = .busy(message)
-                } else if case .busy = setActionToast {
-                    setActionToast = nil
+                } else {
+                    setActionCancel = nil
+                    if case .busy = setActionToast { setActionToast = nil }
                 }
             },
             done: { [weak self] receipt in self?.setActionToast = .done(receipt) },
             portraitDidChange: { [weak self] portrait in
                 guard let self, selectedPortrait === portrait else { return }
                 refreshCanvasFromSelection()
-            }
+            },
+            cancel: { [weak self] handler in self?.setActionCancel = handler }
         )
     }
 

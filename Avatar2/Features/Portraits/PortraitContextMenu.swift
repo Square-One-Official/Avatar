@@ -158,6 +158,8 @@ struct PortraitDSContextMenu: View {
     @ViewBuilder private func editSubmenu(targets: [Portrait2]) -> some View {
         let n = targets.count
         let suffix = n >= 2 ? " on \(n)" : ""
+        // E57.5: reden bij de disabled-staat (native tooltip; de rij zelf
+        // heeft geen DS-tooltip-slot).
         DSMenuSubmenu("Edit", icon: "wand.and.stars", disabled: editIsBusy, minWidth: 230) {
             DSMenuSubmenu("Boost resolution\(suffix)", icon: "arrow.up.left.and.arrow.down.right", minWidth: 230) {
                 boostRows(targets: targets)
@@ -176,6 +178,7 @@ struct PortraitDSContextMenu: View {
                 effectRows(targets: targets)
             }
         }
+        .help(editIsBusy ? "Wait for the current edit to finish" : "Boost resolution, fill in body or apply a style")
     }
 
     /// None · eigen effecten (Pro) · built-in stijlen. Label rechts: "Cached"

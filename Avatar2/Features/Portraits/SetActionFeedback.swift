@@ -15,6 +15,10 @@ struct SetActionReporter {
     /// Een batch of z'n undo/redo wijzigde dit portret (Adjust/transform/
     /// achtergrond) — de shell ververst het canvas als het 't geselecteerde is.
     var portraitDidChange: (Portrait2) -> Void
+    /// E57.5: annuleer-haak voor batches (Boost/Fill in body/Apply effect):
+    /// de shell toont dan een Stop-knop op de busy-toast; stoppen laat staan
+    /// wat al klaar is. nil = niet (meer) te stoppen; `busy(nil)` wist 'm ook.
+    var cancel: ((() -> Void)?) -> Void = { _ in }
 
     /// Voor smokes/tests die geen shell hebben.
     static let silent = SetActionReporter(busy: { _ in }, done: { _ in }, portraitDidChange: { _ in })
