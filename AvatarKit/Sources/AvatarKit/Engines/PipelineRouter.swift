@@ -26,10 +26,18 @@ public struct PipelineRouter: Sendable {
     public func cutout(_ image: CGImage, preferring kind: CutoutEngineKind? = nil) async throws -> CGImage {
         let ordered = await orderedAvailableEngines(preferring: kind)
         guard !ordered.isEmpty else { throw CutoutEngineError.noEngineAvailable }
+        // Transparante bron (Figma-export op een schijf): eerst de transparante
+        // pixels vullen met de doorgetrokken randkleur zodat de engine geen
+        // harde vorm op zwart ziet; het resultaat daarna weer op het bron-alpha
+        // begrenzen. Zie TransparentBackgroundFill.
+        let filled = TransparentBackgroundFill.filled(image)
+        let input = filled ?? image
         var lastError: Error?
         for engine in ordered {
             do {
-                return try await engine.cutout(image)
+                let cutout = try await engine.cutout(input)
+                guard filled != nil else { return cutout }
+                return TransparentBackgroundFill.confine(cutout, toAlphaOf: image) ?? cutout
             } catch {
                 lastError = error
             }

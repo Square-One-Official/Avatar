@@ -72,7 +72,7 @@ public struct OrmbgEngine: CutoutEngine {
         // persoon-matte telt mee (als die ≥30% van de matte dekt).
         let gatedMask: CIImage
         if let person = PersonGate.personMask(for: image, extent: extent) {
-            gatedMask = PersonGate.apply(matte: mask, person: person, extent: extent, zone: .tight)
+            gatedMask = PersonGate.apply(matte: mask, person: person, extent: extent)
         } else {
             gatedMask = mask
         }

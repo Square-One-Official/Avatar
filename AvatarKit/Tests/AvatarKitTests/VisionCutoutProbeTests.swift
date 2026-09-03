@@ -17,14 +17,14 @@ final class VisionCutoutProbeTests: XCTestCase {
         let source = try XCTUnwrap(CGImageSourceCreateWithURL(URL(fileURLWithPath: inPath) as CFURL, nil))
         let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
         let normalized = SRGBNormalizer.normalized(image)
-        let cutout: CGImage
-        if env["AVATAR_CUTOUT_PROBE_ENGINE"] == "ormbg" {
-            let engine = OrmbgEngine()
-            guard await engine.isAvailable else { throw XCTSkip("ORMBG-model niet geïnstalleerd voor dit proces") }
-            cutout = try await engine.cutout(normalized)
-        } else {
-            cutout = try await VisionCutoutEngine().cutout(normalized)
+        // Via de router, zodat de transparant-vulling (TransparentBackgroundFill)
+        // meedoet zoals in de app.
+        let router = PipelineRouter(engines: [VisionCutoutEngine(), OrmbgEngine()])
+        let preferred: CutoutEngineKind = env["AVATAR_CUTOUT_PROBE_ENGINE"] == "ormbg" ? .ormbg : .vision
+        if preferred == .ormbg {
+            guard await OrmbgEngine().isAvailable else { throw XCTSkip("ORMBG-model niet geïnstalleerd voor dit proces") }
         }
+        let cutout = try await router.cutout(normalized, preferring: preferred)
         let dest = try XCTUnwrap(CGImageDestinationCreateWithURL(URL(fileURLWithPath: outPath) as CFURL, "public.png" as CFString, 1, nil))
         CGImageDestinationAddImage(dest, cutout, nil)
         XCTAssertTrue(CGImageDestinationFinalize(dest))

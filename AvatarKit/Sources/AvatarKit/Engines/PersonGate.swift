@@ -33,49 +33,17 @@ enum PersonGate {
     /// de zone tot aan de schijfrand reikt en de anti-aliased randpixels
     /// als dunne boog overblijven.
     static func confinedToOpaque(_ person: CIImage, source: CIImage, extent: CGRect) -> CIImage {
-        let alphaAsGray = source.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-        ]).cropped(to: extent)
         return person.applyingFilter("CIMultiplyBlendMode", parameters: [
-            kCIInputBackgroundImageKey: alphaAsGray
+            kCIInputBackgroundImageKey: TransparentBackgroundFill.alphaAsGray(source, extent: extent)
         ]).cropped(to: extent)
-    }
-
-    /// Zonebreedte rond de persoon-matte. `.wide` (~2,5% van de lange zijde)
-    /// voor een matte die zelf al strak is (Apple's subject-lift: de zone
-    /// beslist alleen over losstaande objecten). `.tight` (~0,4%) voor een
-    /// matte die een schijf/kader vlak ómm de persoon volledig meeneemt
-    /// (ORMBG): elke pixel zone laat daar een gekleurde rand staan, dus zo
-    /// smal als de haarrand toelaat (~3 px op 800 px).
-    enum Zone {
-        case wide, tight
-
-        func radius(for extent: CGRect) -> Double {
-            let longEdge = Double(max(extent.width, extent.height))
-            switch self {
-            case .wide: return max(12, 0.025 * longEdge)
-            case .tight: return max(2, 0.004 * longEdge)
-            }
-        }
     }
 
     /// `matte` beperkt tot de zone rond `person` — of ongewijzigd als de
     /// persoon-matte de matte nauwelijks dekt.
-    static func apply(matte: CIImage, person: CIImage, extent: CGRect, zone: Zone = .wide) -> CIImage {
+    static func apply(matte: CIImage, person: CIImage, extent: CGRect) -> CIImage {
         guard personCovers(matte: matte, person: person, extent: extent) else { return matte }
-        // Harde drempel vóór het verbreden: Vision's persoon-matte is (opgeschaald
-        // uit lage resolutie) zacht en breed aan de rand, waardoor de rand van een
-        // schijf naast de schouders anders nét binnen de zone valt en als dunne
-        // boog overblijft.
-        let hardPerson = person.applyingFilter("CIColorThreshold", parameters: [
-            "inputThreshold": 0.5
-        ]).cropped(to: extent)
-        let zone = hardPerson.applyingFilter("CIMorphologyMaximum", parameters: [
-            kCIInputRadiusKey: zone.radius(for: extent)
+        let zone = person.applyingFilter("CIMorphologyMaximum", parameters: [
+            kCIInputRadiusKey: gateRadius(for: extent)
         ]).cropped(to: extent)
         #if DEBUG
         if let dumpDir = ProcessInfo.processInfo.environment["AVATAR_CUTOUT_PROBE_DUMP"] {
@@ -93,6 +61,15 @@ enum PersonGate {
         return matte.applyingFilter("CIDarkenBlendMode", parameters: [
             kCIInputBackgroundImageKey: zone
         ]).cropped(to: extent)
+    }
+
+    /// Zone rond de persoon-matte: ~2,5% van de langste zijde (800 px → 20 px),
+    /// minimaal 12 px. Ruim genoeg voor haarslierten en schouders; wat verder
+    /// weg ligt (losstaand object) valt af. Een schijf vlak om de persoon is
+    /// géén zaak van deze gate meer — die verdwijnt al via
+    /// TransparentBackgroundFill vóór het matten.
+    static func gateRadius(for extent: CGRect) -> Double {
+        max(12, 0.025 * Double(max(extent.width, extent.height)))
     }
 
     /// De persoon-matte dekt minstens ~30% van de matte.

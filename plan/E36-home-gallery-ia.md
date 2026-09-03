@@ -187,6 +187,17 @@ zodat de zone tot de rand reikte. `PersonGate.confinedToOpaque`: persoon-matte �
 (transparant kan geen persoon zijn), plus harde drempel vóór het verbreden. Beide engines.
 Debug-hooks (`AVATAR_CUTOUT_PROBE_DEBUG`/`_DUMP`, alleen DEBUG) dumpen raw/gated/guided matte.
 
+**Vervolg 7 (2026-09-03, Thierry: "waarom is een vierkante afbeelding wél goed?"):** de gate
+op Vision's grove persoon-matte gaf rafelige randen en een afgesneden schouder (Isabel). Betere
+aanpak vóór het matten: `TransparentBackgroundFill` (AvatarKit/Engines) vult transparante
+pixels met de lokaal doorgetrokken randkleur (meerlaagse genormaliseerde blur, grof → fijn, per
+laag harde dekkingsdrempel ≈ dichtstbijzijnde-randpixel), zodat de schijf geen harde vorm op
+zwart meer is en de engine gewoon een persoon op een gradient ziet — zoals bij een vierkante
+foto. `PipelineRouter.cutout` vult vóór de engine en begrenst het resultaat daarna op het
+bron-alpha. `PersonGate` blijft als vangnet met alleen de ruime zone (drempel + smalle zone
+weg). Probe loopt via de router. Resultaat op Isabel/Danielle/Ruslan: volledig haar en
+schouders, geen schijf, geen rand.
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een
