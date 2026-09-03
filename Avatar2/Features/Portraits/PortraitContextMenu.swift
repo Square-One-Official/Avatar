@@ -24,6 +24,8 @@ struct PortraitDSContextMenu: View {
     let entitlement: EntitlementModel
     let folders: [Folder2]
     let selectedTargets: () -> [Portrait2]
+    /// Voor Duplicate in de "Folder …"-flyout (nieuwe map + portretten invoegen).
+    let modelContext: ModelContext
     let undoManager: UndoManager?
     let onDismiss: () -> Void
     let onRequestDelete: ([Portrait2]) -> Void
@@ -32,6 +34,7 @@ struct PortraitDSContextMenu: View {
 
     @State private var moveFlyoutOpen = false
     @State private var boostFlyoutOpen = false
+    @State private var folderFlyoutOpen = false
 
     var body: some View {
         HStack(alignment: .top, spacing: DSSpacing.gap1) {
@@ -46,19 +49,26 @@ struct PortraitDSContextMenu: View {
                 moveFlyout
             } else if boostFlyoutOpen {
                 boostFlyout
+            } else if folderFlyoutOpen, let folder = portrait.folder {
+                folderFlyout(folder)
             }
         }
     }
 
-    /// Eén flyout tegelijk (Move ↔ Boost).
+    /// Eén flyout tegelijk (Move ↔ Boost ↔ Folder).
     private func toggleMoveFlyout() {
         moveFlyoutOpen.toggle()
-        if moveFlyoutOpen { boostFlyoutOpen = false }
+        if moveFlyoutOpen { boostFlyoutOpen = false; folderFlyoutOpen = false }
     }
 
     private func toggleBoostFlyout() {
         boostFlyoutOpen.toggle()
-        if boostFlyoutOpen { moveFlyoutOpen = false }
+        if boostFlyoutOpen { moveFlyoutOpen = false; folderFlyoutOpen = false }
+    }
+
+    private func toggleFolderFlyout() {
+        folderFlyoutOpen.toggle()
+        if folderFlyoutOpen { moveFlyoutOpen = false; boostFlyoutOpen = false }
     }
 
     private var isBulk: Bool {
@@ -72,6 +82,14 @@ struct PortraitDSContextMenu: View {
         }
         DSMenuRow("Move to folder", icon: "folder", showsChevron: true) {
             toggleMoveFlyout()
+        }
+        // E50.5: het map-menu van de map waarin dit portret staat — dezelfde
+        // acties als de map-rij in de left-nav (incl. Duplicate), bereikbaar
+        // vanaf Home en Portraits zonder naar de sidebar te hoeven.
+        if let folder = portrait.folder {
+            DSMenuRow("Folder “\(folder.name)”", icon: "folder.fill", showsChevron: true) {
+                toggleFolderFlyout()
+            }
         }
         DSMenuRow("Export…", icon: "square.and.arrow.up") {
             onDismiss(); model.select(portrait); model.exportCurrentPortrait()
@@ -181,6 +199,19 @@ struct PortraitDSContextMenu: View {
                 )
             }
         }
+    }
+
+    /// Map-acties van de map van dit portret (gedeeld `FolderDSContextMenu`).
+    private func folderFlyout(_ folder: Folder2) -> some View {
+        FolderDSContextMenu(
+            folder: folder,
+            items: FolderSetScope.items(in: folder.portraits, folderID: nil),
+            folders: folders,
+            model: model,
+            modelContext: modelContext,
+            undoManager: undoManager,
+            onDismiss: onDismiss
+        )
     }
 
     private var moveFlyout: some View {

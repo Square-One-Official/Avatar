@@ -122,9 +122,13 @@ struct PortraitsGalleryView: View {
         VStack(alignment: .leading, spacing: DSSpacing.gap5) {
             HStack(alignment: .center, spacing: DSSpacing.gap4) {
                 VStack(alignment: .leading, spacing: DSSpacing.gap1) {
-                    Text(selectedFolder?.name ?? "All portraits")
-                        .dsTextStyle(.h3)
-                        .foregroundStyle(DSColor.Foreground.primary)
+                    if let folder = selectedFolder {
+                        folderTitle(folder)
+                    } else {
+                        Text("All portraits")
+                            .dsTextStyle(.h3)
+                            .foregroundStyle(DSColor.Foreground.primary)
+                    }
                     Text(subtitle)
                         .dsTextStyle(.bodySmall)
                         .foregroundStyle(DSColor.Foreground.subtle)
@@ -150,6 +154,55 @@ struct PortraitsGalleryView: View {
         // Zonder deze z-index winnen de portret-Images de AppKit-laagstrijd
         // (menu onder de foto's) én vangt de dismiss-scrim de tegel-klikken.
         .zIndex(folderBackgroundPickerOpen.wrappedValue ? 1000 : 0)
+    }
+
+    /// Titel-frame in SwiftUI `.global` (zelfde space als `DSContextMenuOverlay`)
+    /// zodat een klik het map-menu onder de titel zet.
+    @State private var folderTitleFrame: CGRect = .zero
+
+    /// E50.5: de maptitel ís het map-menu — klik (chevron) of rechtsklik opent
+    /// hetzelfde `FolderDSContextMenu` als de map-rij in de left-nav (Select
+    /// all / Match framing / Export / Default background / Rename / Duplicate /
+    /// Delete).
+    private func folderTitle(_ folder: Folder2) -> some View {
+        Button {
+            model.presentation.openFolderContextMenu(
+                folderID: folder.persistentModelID,
+                anchor: CGRect(
+                    x: folderTitleFrame.minX, y: folderTitleFrame.maxY + DSSpacing.gap1,
+                    width: 0, height: 0
+                )
+            )
+        } label: {
+            HStack(spacing: DSSpacing.gap1_5) {
+                Text(folder.name)
+                    .dsTextStyle(.h3)
+                    .foregroundStyle(DSColor.Foreground.primary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: DSIconSize.xs, weight: .semibold))
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            .padding(.horizontal, DSSpacing.gap1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
+        .dsHoverHighlight(cornerRadius: DSRadius.md)
+        .padding(.horizontal, -DSSpacing.gap1)
+        .background {
+            GeometryReader { geo in
+                Color.clear.onChange(of: geo.frame(in: .global), initial: true) { _, new in
+                    folderTitleFrame = new
+                }
+            }
+        }
+        .contextMenuTrigger(in: PortraitContextMenuSpace.coordinateSpace) { frame in
+            model.presentation.openFolderContextMenu(folderID: folder.persistentModelID, anchor: frame)
+        }
+        .help("Folder actions")
+        .accessibilityLabel("\(folder.name), folder actions")
+        .accessibilityHint("Opens the folder menu")
     }
 
     /// "65 portraits" — in selectiemodus met de selectie erbij ("3 of 65 selected").

@@ -188,3 +188,11 @@ op de bron; redo dupliceert opnieuw), gemeld via de compacte set-action-pill met
 Undo. Dupliceren is géén import: de Starter-cap (server-side cutout-claims)
 wordt niet geraakt — bewust niet gegated. 4 nieuwe tests
 (`FolderDuplicatorTests`).
+**Aanvulling 2026-09-03 (Thierry: "ook op Home en in Portraits"):** het map-menu
+is nu één gedeelde view, `FolderDSContextMenu` (Portraits), met drie
+ingangen: (1) de map-rij in de left-nav (ongewijzigd, nu via de gedeelde view);
+(2) de maptitel in de Portraits-header — klik op de titel/chevron of rechtsklik
+opent het menu onder de titel; (3) het tegel-contextmenu op Home én Portraits
+krijgt een rij "Folder “<naam>”" met flyout (zelfde patroon als Move/Boost)
+voor portretten die in een map staan. Duplicate zit dus overal waar een map
+een menu heeft.

@@ -66,6 +66,7 @@ struct FloatingOverlayHost: View {
                     entitlement: entitlement,
                     folders: folders,
                     selectedTargets: { portraits.filter { model.isPortraitSelected($0) } },
+                    modelContext: modelContext,
                     undoManager: undoManager,
                     onDismiss: { model.presentation.dismissPortraitContextMenu() },
                     onRequestDelete: { targets in
@@ -178,64 +179,16 @@ struct FloatingOverlayHost: View {
             DSContextMenuOverlay(anchor: request.anchor, onDismiss: {
                 model.presentation.leftNavFolderMenu = nil
             }) {
-                DSContextMenuPanel(minWidth: 210) {
-                    DSMenuRow("Select all in folder", icon: "checkmark.circle", disabled: items.isEmpty) {
-                        model.presentation.leftNavFolderMenu = nil
-                        model.showPortraits(folderID: folderID)
-                        model.selectAllPortraits(items.map(\.persistentModelID))
-                    }
-                    DSMenuRow("Match framing", icon: "square.resize", shortcut: "⌥⌘F", disabled: items.isEmpty) {
-                        model.presentation.leftNavFolderMenu = nil
-                        PortraitSetActions.matchFraming(items, undoManager: undoManager, reporter: model.setActionReporter)
-                    }
-                    if AppFeatureFlags.matchLightingEnabled {
-                        DSMenuRow("Match lighting", icon: "sun.max", disabled: items.count < 2) {
-                            model.presentation.leftNavFolderMenu = nil
-                            PortraitSetActions.matchLighting(
-                                items, undoManager: undoManager, reporter: model.setActionReporter
-                            )
-                        }
-                    }
-                    DSMenuRow("Export set", icon: "square.and.arrow.up.on.square", disabled: items.isEmpty) {
-                        model.presentation.leftNavFolderMenu = nil
-                        PortraitSetActions.export(items, isPro: model.isPro, reporter: model.setActionReporter)
-                    }
-                    Divider().padding(.vertical, 2)
-                    DSMenuRow("Default background…", icon: "photo.on.rectangle") {
-                        model.presentation.leftNavFolderMenu = nil
-                        model.showFolderBackgroundPicker(folderID: folderID)
-                    }
-                    Divider().padding(.vertical, 2)
-                    DSMenuRow("Rename", icon: "pencil") {
-                        model.presentation.leftNavFolderMenu = nil
-                        model.presentation.alert = .renameFolder(folderID: folderID, draft: folder.name)
-                    }
-                    // E50.5: kopie van de map mét alle portretten — werk in de
-                    // kopie (bv. een effect op het hele team) zonder het
-                    // origineel te raken. Opent de nieuwe map; Undo in de pill.
-                    DSMenuRow("Duplicate", icon: "plus.square.on.square") {
-                        model.presentation.leftNavFolderMenu = nil
-                        let copy = FolderDuplicator.perform(
-                            folder,
-                            existingNames: folders.map(\.name),
-                            modelContext: modelContext,
-                            undoManager: undoManager,
-                            reporter: model.setActionReporter,
-                            onUndo: { removed in
-                                if model.selectedFolderID == removed.persistentModelID {
-                                    model.showPortraits(folderID: folderID)
-                                }
-                            }
-                        )
-                        model.isPortraitsExpanded = true
-                        model.showPortraits(folderID: copy.folder.persistentModelID)
-                    }
-                    Divider().padding(.vertical, 2)
-                    DSMenuRow("Delete", icon: "trash", destructive: true) {
-                        model.presentation.leftNavFolderMenu = nil
-                        model.presentation.confirm = .deleteFolder(folderID: folderID)
-                    }
-                }
+                // Gedeeld map-menu (ook in de Portraits-header en het tegel-menu).
+                FolderDSContextMenu(
+                    folder: folder,
+                    items: items,
+                    folders: folders,
+                    model: model,
+                    modelContext: modelContext,
+                    undoManager: undoManager,
+                    onDismiss: { model.presentation.leftNavFolderMenu = nil }
+                )
             }
         }
     }
