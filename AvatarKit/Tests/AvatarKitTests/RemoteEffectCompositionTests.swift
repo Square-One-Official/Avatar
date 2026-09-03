@@ -37,9 +37,12 @@ final class RemoteEffectCompositionTests: XCTestCase {
         XCTAssertEqual(back, original)
     }
 
-    func testFallbackMarksStickerAsDieCut() {
-        let sticker = RemoteEffect.fallback.first { $0.key == "sticker" }
-        XCTAssertEqual(sticker?.composition, .dieCut)
-        XCTAssertTrue(RemoteEffect.fallback.filter { $0.key != "sticker" }.allSatisfy { !$0.isDieCut })
+    func testFallbackMarksStickerAndBalloonAsDieCut() {
+        // Vrijstaande stijlen (server: DIE_CUT_STYLE_KEYS) — sticker + balloon.
+        let freestanding: Set<String> = ["sticker", "balloon"]
+        for key in freestanding {
+            XCTAssertEqual(RemoteEffect.fallback.first { $0.key == key }?.composition, .dieCut, key)
+        }
+        XCTAssertTrue(RemoteEffect.fallback.filter { !freestanding.contains($0.key) }.allSatisfy { !$0.isDieCut })
     }
 }

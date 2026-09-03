@@ -95,7 +95,7 @@ extension RemoteEffect {
     /// geladen is en het paneel nooit leeg opent (geen thumbnails — die komen
     /// uit de CMS).
     public static let fallback: [RemoteEffect] = [
-        RemoteEffect(key: "balloon", label: "Balloon", thumbnailUrl: nil, order: 10),
+        RemoteEffect(key: "balloon", label: "Balloon", thumbnailUrl: nil, order: 10, composition: .dieCut),
         RemoteEffect(key: "windy", label: "Windy", thumbnailUrl: nil, order: 11),
         RemoteEffect(key: "sticker", label: "Sticker", thumbnailUrl: nil, order: 12, composition: .dieCut),
         RemoteEffect(key: "flowers", label: "Flowers", thumbnailUrl: nil, order: 13),

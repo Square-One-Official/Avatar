@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  BALLOON_COMPOSITION_CLAUSE,
   DIE_CUT_COMPOSITION_CLAUSE,
   FRAMING_CLAUSE,
   STYLE_REFERENCE_CLAUSE,
   composeEffectPrompt,
+  compositionClause,
   isDieCutStyle,
 } from "../lib/stylizePrompts.js";
 
@@ -12,11 +14,25 @@ import {
 // krijgen (die maakt van de cutout-onderrand een rechte sticker-rand) en
 // krijgt de compositie-clausule (gesloten omtrek, gecentreerd met marge).
 
-test("sticker is a die-cut style, the others are not", () => {
+test("sticker and balloon are free-standing styles, the others are not", () => {
   assert.equal(isDieCutStyle("sticker"), true);
-  for (const key of ["balloon", "windy", "flowers", "3d-head", "hairy", "clay"]) {
+  assert.equal(isDieCutStyle("balloon"), true);
+  for (const key of ["windy", "flowers", "3d-head", "hairy", "clay"]) {
     assert.equal(isDieCutStyle(key), false, key);
+    assert.equal(compositionClause(key), null, key);
   }
+});
+
+test("balloon prompt drops the framing clause and adds the balloon composition clause", () => {
+  const prompt = composeEffectPrompt({
+    basePrompt: "BASE.",
+    styleKey: "balloon",
+    hasStyleReferences: true,
+    preserveFraming: true,
+  });
+  assert.equal(prompt, `BASE. ${STYLE_REFERENCE_CLAUSE} ${BALLOON_COMPOSITION_CLAUSE}`);
+  assert.equal(prompt.includes(FRAMING_CLAUSE), false);
+  assert.equal(prompt.includes(DIE_CUT_COMPOSITION_CLAUSE), false);
 });
 
 test("die-cut prompt drops the framing clause and adds the composition clause", () => {
