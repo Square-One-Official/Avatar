@@ -1062,6 +1062,28 @@ final class ShellModel {
         }
     }
 
+    /// E57.4: effect-resultaat op een wíllekeurig portret (batch vanuit het
+    /// raster) — zelfde her-isolatie- en opslagpad als `applyEffectResult`,
+    /// maar zonder canvas-koppeling aan `selectedPortrait` en zonder
+    /// raster-herschud (`bumpRevision`). Wacht de her-kadrering af zodat de
+    /// caller daarna een complete undo-snapshot kan nemen.
+    func applyEffectResult(_ image: NSImage, to portrait: Portrait2, framing: EffectFraming) async {
+        let framer: Task<Void, Never>?
+        if Self.isLikelyCutout(image) {
+            portrait.editSourceData = nil
+            portrait.editSourceCutoutSig = 0
+            framer = storeEffectResult(image, on: portrait, framing: framing, reshuffles: false)
+        } else {
+            portrait.editSourceData = image.pngData()
+            let restored = (try? await reIsolateSubject(image)) ?? image
+            framer = storeEffectResult(restored, on: portrait, framing: framing, reshuffles: false)
+            portrait.editSourceCutoutSig = portrait.editSourceData != nil
+                ? Portrait2.cutoutSignature(portrait.cutoutData)
+                : 0
+        }
+        await framer?.value
+    }
+
     /// Slaat een AL geïsoleerd beeld (Remove background / Restore body) direct op,
     /// mét de framing/resize-correctie van `storeEffectResult` maar ZONDER de
     /// her-isolatie-pass van `applyEffectResult`. Die pass mat een al-uitgesneden
@@ -1230,9 +1252,14 @@ final class ShellModel {
 
     /// E24.30: schrijf het bewerkte beeld weg als nieuwe rauwe cutout en
     /// her-render het canvas met de niet-destructieve Adjust-laag erbovenop.
+    /// `reshuffles`: false = set-actie (E57.4) → `bumpRevision()` i.p.v.
+    /// `touch()` zodat het raster niet herschudt. Geeft de asynchrone
+    /// her-kadrering terug (alleen na een reset), zodat een batch 'm kan
+    /// afwachten vóór z'n undo-snapshot.
+    @discardableResult
     private func storeEffectResult(
-        _ image: NSImage, on portrait: Portrait2, framing: EffectFraming = .keep
-    ) {
+        _ image: NSImage, on portrait: Portrait2, framing: EffectFraming = .keep, reshuffles: Bool = true
+    ) -> Task<Void, Never>? {
         // E24.36 + quality rev2: generatieve edits houden de ratio aan maar niet
         // de pixelmaat (~1 MP van nano-banana). Hybride correctie:
         //   • ratio drift ≥ 2% → reset + AutoFramer;
@@ -1340,9 +1367,13 @@ final class ShellModel {
             // isolatie van de originele foto (stuurt de bron-keuze van Remove
             // background). Re-isolaties vanuit het origineel zetten 'm zelf terug.
             portrait.cutoutDerivesFromOriginal = false
-            portrait.touch()
+            if reshuffles { portrait.touch() } else { portrait.bumpRevision() }
         }
-        setCanvas(.result(Self.adjustedImage(stored, portrait.adjust)))
+        // Batch op een niet-geselecteerd portret (E57.4): het canvas toont een
+        // ander (of geen) portret — niet overschrijven.
+        if selectedPortrait === portrait {
+            setCanvas(.result(Self.adjustedImage(stored, portrait.adjust)))
+        }
         // Alleen her-kadreren bij een echte ratio-wijziging (transform gereset);
         // het resize-pad behoudt bewust de handmatige positie. Stille correctie,
         // geen undo-stap. (Randgeval: een undo ná de reset-tak her-kadreert i.p.v.
@@ -1351,8 +1382,9 @@ final class ShellModel {
         if didReset, let cg = stored.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             let p = portrait
             let mode: AutoFramer.Mode = framing == .fitContent ? .freestanding : .portrait
-            Task { await AutoFramer.apply(to: p, image: cg, mode: mode) }
+            return Task { await AutoFramer.apply(to: p, image: cg, mode: mode) }
         }
+        return nil
     }
 
     /// Schaal een CGImage naar exacte pixelafmetingen (alpha behouden). Houdt een

@@ -171,7 +171,62 @@ struct PortraitDSContextMenu: View {
                     undoManager: undoManager, reporter: model.setActionReporter
                 )
             }
+            // E57.4: stijlen uit dezelfde lijst als het Effects-paneel.
+            DSMenuSubmenu("Apply effect\(suffix)", icon: "sparkles", minWidth: 250) {
+                effectRows(targets: targets)
+            }
         }
+    }
+
+    /// None · eigen effecten (Pro) · built-in stijlen. Label rechts: "Cached"
+    /// als geen enkel portret hoeft te genereren, anders het credits-totaal
+    /// voor de portretten die wél genereren (zonder Cloud-tier: "Cloud").
+    @ViewBuilder private func effectRows(targets: [Portrait2]) -> some View {
+        let list = EffectsModel.cachedEffectList(entitlement: entitlement)
+        if targets.contains(where: { $0.effectActiveRaw != nil }) {
+            DSMenuRow("None", icon: "circle.slash") {
+                runEffect(.none, on: targets, list: list.builtin)
+            }
+            Divider().padding(.vertical, 2)
+        }
+        if !list.custom.isEmpty {
+            ForEach(list.custom) { effect in
+                DSMenuRow(
+                    effect.label, icon: "sparkles",
+                    shortcut: effectLabel(targets, choice: .custom(effect)),
+                    accessory: { DSProChip() }
+                ) {
+                    runEffect(.custom(effect), on: targets, list: list.builtin)
+                }
+            }
+            Divider().padding(.vertical, 2)
+        }
+        ForEach(list.builtin) { effect in
+            DSMenuRow(
+                effect.label, icon: effect.isDieCut ? "seal" : "paintbrush",
+                shortcut: effectLabel(targets, choice: .builtin(effect))
+            ) {
+                runEffect(.builtin(effect), on: targets, list: list.builtin)
+            }
+        }
+    }
+
+    private func effectLabel(_ targets: [Portrait2], choice: PortraitSetActions.EffectChoice) -> String {
+        let generating = PortraitSetActions.effectGenerationCount(targets, choice: choice)
+        guard generating > 0 else { return "Cached" }
+        guard PrivacyPreferences2.shared.allowsThirdPartyCloud else { return "Cloud" }
+        let total = CreditMeter.credits(for: .generativeStandard) * generating
+        return total == 1 ? "1 credit" : "\(total) credits"
+    }
+
+    private func runEffect(_ choice: PortraitSetActions.EffectChoice, on targets: [Portrait2], list: [RemoteEffect]) {
+        onDismiss()
+        PortraitSetActions.applyEffect(
+            targets, choice: choice,
+            isDieCut: { key in list.first { $0.key == key }?.isDieCut ?? false },
+            model: model, entitlement: entitlement,
+            undoManager: undoManager, reporter: model.setActionReporter
+        )
     }
 
     /// Credits-totaal (2 per portret; alleen afgeschreven als er echt gevuld

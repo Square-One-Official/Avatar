@@ -110,6 +110,10 @@ enum PresentationConfirm: Equatable, Identifiable {
     /// eraf gaat. De continue-actie leeft op `pendingColorise` zodat de
     /// dialog een tab-wissel overleeft (E53.7).
     case coloriseAlreadyColour
+    /// E57.4: Apply effect vanuit het raster op `count` low-res foto's — de
+    /// kwaliteitsgate van de editor, één keer per batch. Het antwoord gaat
+    /// naar `PortraitSetActions.resolveStylizeGate`.
+    case stylizeLowResolution(count: Int)
 
     var id: String {
         switch self {
@@ -118,6 +122,7 @@ enum PresentationConfirm: Equatable, Identifiable {
         case .deleteFolder(let id): "deleteFolder-\(id)"
         case .deleteBanner(let id): "deleteBanner-\(id)"
         case .coloriseAlreadyColour: "coloriseAlreadyColour"
+        case .stylizeLowResolution(let count): "stylizeLowResolution-\(count)"
         }
     }
 }

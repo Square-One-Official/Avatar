@@ -538,4 +538,121 @@ final class PortraitSetActionsTests: XCTestCase {
         XCTAssertEqual(broke.title, "Out of credits — nothing filled in")
         XCTAssertFalse(broke.canUndo)
     }
+
+    // MARK: - Apply effect (E57.4)
+
+    private var watercolor: RemoteEffect {
+        RemoteEffect(key: "watercolor", label: "Watercolor", thumbnailUrl: nil, order: 1, composition: .portrait)
+    }
+
+    func testEffectStepDistinguishesActiveCachedAndGenerate() throws {
+        let context = try makeContext()
+        let ps = seed(context)
+        let choice = PortraitSetActions.EffectChoice.builtin(watercolor)
+        XCTAssertEqual(PortraitSetActions.effectStep(for: ps[0], choice: choice), .generate)
+        ps[1].effectCache = ["watercolor": Data([9])]
+        XCTAssertEqual(PortraitSetActions.effectStep(for: ps[1], choice: choice), .cached, "in de cache = gratis")
+        ps[2].effectActiveRaw = "watercolor"
+        XCTAssertEqual(PortraitSetActions.effectStep(for: ps[2], choice: choice), .alreadyActive)
+        XCTAssertEqual(PortraitSetActions.effectGenerationCount(ps, choice: choice), 1, "alleen wie écht genereert telt")
+        // None: altijd lokaal; al None = niets te doen.
+        XCTAssertEqual(PortraitSetActions.effectStep(for: ps[2], choice: .none), .cached)
+        XCTAssertEqual(PortraitSetActions.effectStep(for: ps[0], choice: .none), .alreadyActive)
+        XCTAssertEqual(PortraitSetActions.effectGenerationCount(ps, choice: .none), 0)
+    }
+
+    func testEffectChoiceKeyLabelAndDieCut() {
+        let sticker = RemoteEffect(key: "sticker", label: "Sticker", thumbnailUrl: nil, order: 2, composition: .dieCut)
+        let custom = RemoteCustomEffect(id: "abc", label: "My style", thumbnailUrl: nil, order: 0)
+        XCTAssertNil(PortraitSetActions.EffectChoice.none.key)
+        XCTAssertEqual(PortraitSetActions.EffectChoice.none.label, "None")
+        XCTAssertEqual(PortraitSetActions.EffectChoice.builtin(sticker).key, "sticker")
+        XCTAssertTrue(PortraitSetActions.EffectChoice.builtin(sticker).isDieCut)
+        XCTAssertFalse(PortraitSetActions.EffectChoice.builtin(watercolor).isDieCut)
+        XCTAssertEqual(PortraitSetActions.EffectChoice.custom(custom).key, "custom:abc")
+        XCTAssertFalse(PortraitSetActions.EffectChoice.custom(custom).isDieCut)
+    }
+
+    func testRegisterEffectUndoRestoresCompleteSnapshotInOneGroup() throws {
+        let context = try makeContext()
+        let ps = seed(context)
+        let base = png(w: 4, h: 4), styled = png(w: 8, h: 8)
+        ps[0].cutoutData = base
+        ps[0].scale = 1.2
+        let before = PortraitSetActions.EffectSnapshot(of: ps[0])
+        // Simuleer de toepassing (zoals applyEffectImage + ShellModel dat doen).
+        ps[0].effectBaseData = base
+        ps[0].cutoutData = styled
+        ps[0].scale = 0.6
+        ps[0].effectActiveRaw = "watercolor"
+        ps[0].effectCache = ["watercolor": styled]
+        ps[0].editSourceData = styled
+        ps[0].editSourceCutoutSig = Portrait2.cutoutSignature(styled)
+        ps[0].cutoutDerivesFromOriginal = false
+        let after = PortraitSetActions.EffectSnapshot(of: ps[0])
+        let stamp = ps[0].updatedAt
+        let um = UndoManager()
+        var changed: [String] = []
+        let reporter = SetActionReporter(busy: { _ in }, done: { _ in }, portraitDidChange: { changed.append($0.name) })
+
+        let n = PortraitSetActions.registerEffectUndo(
+            [(ps[0], before, after), (ps[1], before, before)], undoManager: um, reporter: reporter
+        )
+        XCTAssertEqual(n, 1, "ongewijzigde snapshot telt niet")
+        XCTAssertEqual(um.undoActionName, "Apply effect")
+        XCTAssertTrue(changed.isEmpty, "registratie past niets toe")
+
+        um.undo()
+        XCTAssertEqual(ps[0].cutoutData, base)
+        XCTAssertEqual(ps[0].scale, 1.2)
+        XCTAssertNil(ps[0].effectActiveRaw)
+        XCTAssertNil(ps[0].effectBaseData)
+        XCTAssertTrue(ps[0].effectCache.isEmpty)
+        XCTAssertNil(ps[0].editSourceData)
+        XCTAssertEqual(ps[0].editSourceCutoutSig, 0)
+        XCTAssertTrue(ps[0].cutoutDerivesFromOriginal)
+        XCTAssertEqual(ps[0].updatedAt, stamp, "undo herschudt het raster niet")
+        XCTAssertEqual(changed, ["Anna"])
+        um.redo()
+        XCTAssertEqual(ps[0].cutoutData, styled)
+        XCTAssertEqual(ps[0].effectActiveRaw, "watercolor")
+        XCTAssertEqual(ps[0].effectCache["watercolor"], styled)
+        XCTAssertEqual(order(ps), ["Anna", "Bob", "Cas"])
+        XCTAssertEqual(
+            PortraitSetActions.registerEffectUndo([], undoManager: um, reporter: .silent), 0
+        )
+    }
+
+    func testEffectReceiptCopy() {
+        let um = UndoManager()
+        let wc = PortraitSetActions.EffectChoice.builtin(watercolor)
+        let one = PortraitSetActions.effectReceipt(choice: wc, applied: 1, total: 1, skipped: 0, failed: 0, refused: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(one.title, "Applied Watercolor to 1 portrait")
+        XCTAssertNil(one.detail)
+        XCTAssertEqual(one.actionName, "Apply effect")
+
+        let partial = PortraitSetActions.effectReceipt(choice: wc, applied: 2, total: 5, skipped: 1, failed: 1, refused: 1, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(partial.title, "Applied Watercolor to 2 of 5 portraits")
+        XCTAssertEqual(partial.detail, "1 already had it. 1 couldn't be styled. 1 declined by the safety filter.")
+
+        let credits = PortraitSetActions.effectReceipt(choice: wc, applied: 1, total: 3, skipped: 0, failed: 0, refused: 0, outOfCredits: true, undoManager: um)
+        XCTAssertEqual(credits.detail, "Ran out of credits for the rest.")
+        XCTAssertTrue(credits.canUndo)
+
+        let already = PortraitSetActions.effectReceipt(choice: wc, applied: 0, total: 2, skipped: 2, failed: 0, refused: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(already.title, "Watercolor is already applied")
+        XCTAssertFalse(already.canUndo)
+        let refused = PortraitSetActions.effectReceipt(choice: wc, applied: 0, total: 2, skipped: 0, failed: 0, refused: 2, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(refused.title, "Declined by the safety filter")
+        XCTAssertEqual(refused.detail, "Try a different photo. No credits were used.")
+        let failed = PortraitSetActions.effectReceipt(choice: wc, applied: 0, total: 2, skipped: 0, failed: 2, refused: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(failed.title, "Couldn't apply Watercolor")
+        let broke = PortraitSetActions.effectReceipt(choice: wc, applied: 0, total: 2, skipped: 0, failed: 0, refused: 0, outOfCredits: true, undoManager: um)
+        XCTAssertEqual(broke.title, "Out of credits — nothing applied")
+
+        let removed = PortraitSetActions.effectReceipt(choice: .none, applied: 3, total: 3, skipped: 0, failed: 0, refused: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(removed.title, "Removed effect on 3 portraits")
+        let nothing = PortraitSetActions.effectReceipt(choice: .none, applied: 0, total: 2, skipped: 2, failed: 0, refused: 0, outOfCredits: false, undoManager: um)
+        XCTAssertEqual(nothing.title, "No effect to remove")
+    }
 }

@@ -2,6 +2,7 @@
 // preview-kiezers en store-gedreven alerts/confirms zodat ze open blijven
 // bij tab-/vensterwissel.
 
+import AvatarKit
 import AvatarUI
 import SwiftData
 import SwiftUI
@@ -32,8 +33,10 @@ struct FloatingOverlayHost: View {
         .focusedSceneValue(\.portraitSet, portraitSetAction)
         .background { escapeBackgroundPicker }
         .overlay { coloriseAlreadyColourDialog }
+        .overlay { stylizeLowResolutionDialog }
         .overlay { namePromptDialog }
         .dsMotion(DSMotion.fast, value: model.presentation.confirm == .coloriseAlreadyColour)
+        .dsMotion(DSMotion.fast, value: stylizeGateCount)
         .dsMotion(DSMotion.fast, value: model.presentation.alert)
         .confirmationDialog(
             confirmTitle,
@@ -337,6 +340,52 @@ struct FloatingOverlayHost: View {
         }
     }
 
+    // MARK: - Apply effect: low-res-kwaliteitsgate (E57.4)
+
+    private var stylizeGateCount: Int? {
+        if case .stylizeLowResolution(let count) = model.presentation.confirm { return count }
+        return nil
+    }
+
+    private func resolveStylizeGate(_ decision: PortraitSetActions.StylizeGateDecision) {
+        model.presentation.confirm = nil
+        PortraitSetActions.resolveStylizeGate(decision)
+    }
+
+    /// Zelfde keuze als de editor-gate (`PreStylizeQualitySheet`), één keer
+    /// voor de hele batch: Boost eerst (dan opnieuw toepassen) of doorgaan.
+    /// Scrim/Esc = annuleren — er is dan niets afgeschreven.
+    @ViewBuilder
+    private var stylizeLowResolutionDialog: some View {
+        if let count = stylizeGateCount {
+            let boostCredits = CreditMeter.credits(for: .upscaleHigh) * count
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { resolveStylizeGate(.cancel) }
+                DSDialog(
+                    title: count == 1 ? "Low resolution photo" : "\(count) low resolution photos",
+                    cancelLabel: "Cancel",
+                    confirmLabel: "Boost first (\(boostCredits == 1 ? "1 credit" : "\(boostCredits) credits"))",
+                    onConfirm: { resolveStylizeGate(.boostFirst) },
+                    onDismiss: { resolveStylizeGate(.cancel) }
+                ) {
+                    VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                        Text(
+                            count == 1
+                                ? "This photo is low resolution. Boosting may improve sharpness before styling. Results are not guaranteed."
+                                : "\(count) of the selected photos are low resolution. Boosting them first may improve sharpness before styling. Results are not guaranteed."
+                        )
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        DSNeutralButton("Apply anyway", fullWidth: true) { resolveStylizeGate(.proceed) }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Confirms
 
     /// Destructieve confirms (delete) gaan via confirmationDialog; Colorise
@@ -344,7 +393,7 @@ struct FloatingOverlayHost: View {
     private var showsDestructiveConfirm: Bool {
         switch model.presentation.confirm {
         case .deleteAccount, .deletePortraits, .deleteFolder, .deleteBanner: true
-        case .coloriseAlreadyColour, nil: false
+        case .coloriseAlreadyColour, .stylizeLowResolution, nil: false
         }
     }
 
@@ -355,7 +404,7 @@ struct FloatingOverlayHost: View {
             return ids.count >= 2 ? "Delete \(ids.count) portraits?" : "Delete this portrait?"
         case .deleteFolder: return "Delete this folder?"
         case .deleteBanner: return "Delete this banner?"
-        case .coloriseAlreadyColour, nil: return ""
+        case .coloriseAlreadyColour, .stylizeLowResolution, nil: return ""
         }
     }
 
@@ -369,7 +418,7 @@ struct FloatingOverlayHost: View {
             return "Portraits in this folder are kept. This can't be undone."
         case .deleteBanner:
             return "This can't be undone."
-        case .coloriseAlreadyColour, nil:
+        case .coloriseAlreadyColour, .stylizeLowResolution, nil:
             return ""
         }
     }
@@ -410,7 +459,7 @@ struct FloatingOverlayHost: View {
                 model.presentation.confirm = nil
             }
             Button("Cancel", role: .cancel) { model.presentation.confirm = nil }
-        case .coloriseAlreadyColour, nil:
+        case .coloriseAlreadyColour, .stylizeLowResolution, nil:
             EmptyView()
         }
     }

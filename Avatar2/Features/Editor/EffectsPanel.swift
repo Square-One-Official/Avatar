@@ -249,6 +249,27 @@ final class EffectsModel {
         ThumbnailCache.shared.prefetch(fetched.compactMap(\.thumbnailUrl))
     }
 
+    /// E57.4: de stijllijst zonder paneel (tegelmenu ▸ Apply effect) — zelfde
+    /// hydratie als `init` (sessie → disk → fallback); custom alleen voor Pro.
+    static func cachedEffectList(
+        entitlement: EntitlementModel
+    ) -> (builtin: [RemoteEffect], custom: [RemoteCustomEffect]) {
+        if sessionCache.isEmpty,
+           let disk = EffectsListCache.shared.loadEffects(), !disk.isEmpty {
+            sessionCache = disk
+        }
+        let builtin = sessionCache.isEmpty ? RemoteEffect.fallback : sessionCache
+        var custom: [RemoteCustomEffect] = []
+        if entitlement.isProActive || entitlement.isDevUnlimited {
+            if customSessionCache.isEmpty,
+               let disk = EffectsListCache.shared.loadCustomEffects(), !disk.isEmpty {
+                customSessionCache = disk
+            }
+            custom = customSessionCache
+        }
+        return (builtin, custom)
+    }
+
     // MARK: - Launch-prewarm (E55.6 = E52.2 voor effects)
 
     private static var didPrewarm = false

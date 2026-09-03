@@ -230,9 +230,35 @@ en 2 portretten met een afgesneden schouder (credits-afschrijving = 2 per gevuld
 portret, no-op gratis). **Result:** —
 
 ## 57.4 — FEAT: Apply effect als set-actie (1…N) met stijl-submenu [FEAT]
-- status: ready
-- owner: —
+- status: done
+- owner: FEAT (Claude, 2026-09-03)
 - blockedBy: 57.2
+
+**Result:** Edit ▸ **Apply effect[ on N] ▸** met None (alleen als een target een
+effect heeft) · eigen effecten (Pro-chip, alleen voor Pro) · built-in stijlen
+uit `EffectsModel.cachedEffectList` (sessie → disk → fallback, zelfde hydratie
+als het paneel). Rij-label: "Cached" als niemand hoeft te genereren, anders
+credits-totaal voor wie wél genereert ("Cloud" zonder tier).
+`PortraitSetActions.applyEffect`: per portret al-actief → overslaan, cache →
+gratis, anders `backend.stylize` (builtin op key / custom op id) met dezelfde
+bronkeuze als de editor ná de gate; toepassing via nieuw
+`ShellModel.applyEffectResult(_:to:framing:)` (her-isolatie + resize/kadrering
+van `storeEffectResult`, nu met `reshuffles: false` → `bumpRevision`, canvas
+alleen als het het geselecteerde portret is, en de her-kadrering wordt
+afgewacht); Effects-staat zoals `EffectsModel.persist` (basis eenmalig, actief,
+rauwe generatie in cache); framing per portret via `EffectFraming.forSwitch`;
+één undo-groep "Apply effect" met complete snapshots (pixels, transform,
+effect-staat, edit-bron). **Kwaliteitsgate één keer per batch** (besluit
+Thierry): `PresentationConfirm.stylizeLowResolution(count:)` → DSDialog in
+`FloatingOverlayHost` met "Boost first (N credits)" (boost online de low-res
+targets, daarna dezelfde actie zonder gate) / "Apply anyway" / Cancel;
+antwoord via continuation in `PortraitSetActions.resolveStylizeGate`. 402 →
+op-is-op, 403 → upgrade, safety-refusal geteld in de bon. Tests: step-
+classificatie (actief/cached/generate + None), EffectChoice, undo-snapshot
+in één groep zonder reshuffle, bon-copy. Beide targets bouwen, guards groen.
+**Niet gedaan:** annuleren tussen portretten (→ 57.5, zelfde reden als 57.3);
+geen live-smoke met credits in deze sessie — de backend-call is identiek aan
+het paneel, de rest is getest.
 
 - **Submenu-inhoud**: `None` · custom effecten (Pro-badge `DSProChip`, alleen als
   `customSessionCache` niet leeg is) · divider · builtin stijlen uit

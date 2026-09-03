@@ -602,6 +602,377 @@ enum PortraitSetActions {
         reporter.portraitDidChange(portrait)
     }
 
+    // MARK: - Apply effect (E57.4)
+
+    /// Welke stijl: None (terug naar het basisbeeld) of een kaart uit de lijst.
+    enum EffectChoice: Equatable {
+        case none
+        case builtin(RemoteEffect)
+        case custom(RemoteCustomEffect)
+
+        /// Cachekey op het portret (`effectActiveRaw`/`effectCache`); nil = None.
+        var key: String? {
+            switch self {
+            case .none: return nil
+            case .builtin(let effect): return effect.key
+            case .custom(let effect): return effect.cacheKey
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .none: return "None"
+            case .builtin(let effect): return effect.label
+            case .custom(let effect): return effect.label
+            }
+        }
+
+        /// Sticker-stijl (vrijstaande vorm → content-fit-kadrering).
+        var isDieCut: Bool {
+            if case .builtin(let effect) = self { return effect.isDieCut }
+            return false
+        }
+    }
+
+    /// Alles wat een effect aan een portret verandert — één undo-waarde per
+    /// portret: pixels, transform, Effects-staat (basis/actief/cache) en de
+    /// edit-bron voor Remove background.
+    struct EffectSnapshot: Equatable {
+        let cutoutData: Data
+        let transform: TransformUndo.Snapshot
+        let derivesFromOriginal: Bool
+        let effectActiveRaw: String?
+        let effectBaseData: Data?
+        let effectCacheData: Data?
+        let editSourceData: Data?
+        let editSourceCutoutSig: Int
+
+        init(of portrait: Portrait2) {
+            cutoutData = portrait.cutoutData
+            transform = TransformUndo.snapshot(of: portrait)
+            derivesFromOriginal = portrait.cutoutDerivesFromOriginal
+            effectActiveRaw = portrait.effectActiveRaw
+            effectBaseData = portrait.effectBaseData
+            effectCacheData = portrait.effectCacheData
+            editSourceData = portrait.editSourceData
+            editSourceCutoutSig = portrait.editSourceCutoutSig
+        }
+    }
+
+    /// Wat er per portret moet gebeuren: niets (stijl staat al), gratis uit
+    /// de cache, of genereren (credits).
+    enum EffectStep: Equatable {
+        case alreadyActive, cached, generate
+    }
+
+    static func effectStep(for portrait: Portrait2, choice: EffectChoice) -> EffectStep {
+        if portrait.effectActiveRaw == choice.key { return .alreadyActive }
+        guard let key = choice.key else { return .cached } // None: basis is lokaal
+        return portrait.effectCache[key] != nil ? .cached : .generate
+    }
+
+    /// Hoeveel portretten écht moeten genereren — voor het credits-label in
+    /// het menu (gecachte en al-actieve tellen niet).
+    static func effectGenerationCount(_ targets: [Portrait2], choice: EffectChoice) -> Int {
+        targets.filter { effectStep(for: $0, choice: choice) == .generate }.count
+    }
+
+    /// Besluit van de kwaliteitsgate (één keer per batch, Thierry 2026-09-03).
+    enum StylizeGateDecision: Equatable {
+        case proceed, boostFirst, cancel
+    }
+
+    private static var stylizeGateContinuation: CheckedContinuation<StylizeGateDecision, Never>?
+
+    /// Toont de gate via de shell (`PresentationConfirm.stylizeLowResolution`)
+    /// en wacht op het antwoord. De host roept `resolveStylizeGate` aan.
+    private static func presentStylizeGate(lowResCount: Int, model: ShellModel) async -> StylizeGateDecision {
+        resolveStylizeGate(.cancel) // een eventuele vorige (zou niet mogen) netjes afsluiten
+        return await withCheckedContinuation { continuation in
+            stylizeGateContinuation = continuation
+            model.presentation.confirm = .stylizeLowResolution(count: lowResCount)
+        }
+    }
+
+    static func resolveStylizeGate(_ decision: StylizeGateDecision) {
+        stylizeGateContinuation?.resume(returning: decision)
+        stylizeGateContinuation = nil
+    }
+
+    /// Zelfde bronkeuze als de editor ná de gate: het geboostte cutout als dat
+    /// het low-res origineel overtreft, anders het origineel (valt terug op het
+    /// cutout als er geen origineel is).
+    private static func stylizeSource(for portrait: Portrait2, cutout: NSImage) -> NSImage {
+        let choice: StylizeQuality.EffectsSourceChoice =
+            StylizeQuality.cutoutOutranksLowResOriginal(portrait: portrait, cutout: cutout) ? .cutout : .original
+        return StylizeQuality.effectsStylizeSource(portrait: portrait, cutout: cutout, choice: choice)
+    }
+
+    /// Zou de editor voor dit portret de low-res-gate tonen?
+    static func needsLowResolutionGate(_ portrait: Portrait2) -> Bool {
+        guard let cutout = NSImage(data: portrait.cutoutData) else { return false }
+        if StylizeQuality.cutoutOutranksLowResOriginal(portrait: portrait, cutout: cutout) { return false }
+        return StylizeQuality.isLowResolution(stylizeSource(for: portrait, cutout: cutout))
+    }
+
+    private enum EffectFetch {
+        case image(NSImage, generated: Bool)
+        case outOfCredits, proRequired, refused, failed
+    }
+
+    /// Beeld voor dit portret: basis (None), cache (gratis) of een nieuwe
+    /// generatie via de backend — builtin op `styleKey`, custom op id (Pro).
+    private static func fetchEffectImage(
+        _ choice: EffectChoice, for portrait: Portrait2, entitlement: EntitlementModel
+    ) async -> EffectFetch {
+        guard let key = choice.key else {
+            guard let base = NSImage(data: portrait.effectBaseData ?? portrait.cutoutData) else { return .failed }
+            return .image(base, generated: false)
+        }
+        if let cached = portrait.effectCache[key] {
+            guard let image = NSImage(data: cached) else { return .failed }
+            return .image(image, generated: false)
+        }
+        guard let cutout = NSImage(data: portrait.cutoutData) else { return .failed }
+        let source = stylizeSource(for: portrait, cutout: cutout)
+        guard let png = source.pngData() else { return .failed }
+        do {
+            let data: Data
+            switch choice {
+            case .builtin(let effect):
+                let (width, height) = StylizeQuality.cutoutDimensions(for: cutout)
+                data = try await entitlement.backend.stylize(
+                    imagePNG: png, styleKey: effect.key,
+                    cutoutWidth: width, cutoutHeight: height,
+                    softSource: StylizeQuality.requestsSoftSourcePrompt(for: source),
+                    preserveFraming: true
+                ).data
+            case .custom(let effect):
+                data = try await entitlement.backend.stylize(imagePNG: png, customEffectID: effect.id).data
+            case .none:
+                return .failed
+            }
+            guard let image = NSImage(data: data) else { return .failed }
+            return .image(image, generated: true)
+        } catch BackendError.noCredits {
+            return .outOfCredits
+        } catch BackendError.proRequired {
+            return .proRequired
+        } catch BackendError.generationRefused {
+            return .refused
+        } catch {
+            return .failed
+        }
+    }
+
+    private struct EffectOutcome {
+        var changes: [(Portrait2, EffectSnapshot, EffectSnapshot)] = []
+        var skipped = 0
+        var failed = 0
+        var refused = 0
+        var outOfCredits = false
+        var proRequired = false
+        var generatedAny = false
+    }
+
+    /// "Apply effect" op de selectie (E57.4, Edit ▸ Apply effect ▸ in het
+    /// tegelmenu). Per portret: al actief → overslaan; in `effectCache` →
+    /// gratis en instant; anders genereren (credits, sequentieel — geheugen
+    /// + Replicate-ratelimit). Resultaat via `ShellModel.applyEffectResult(_:to:)`
+    /// (her-isolatie, resize/kadrering zoals de editor), Effects-staat op het
+    /// portret bijgewerkt zoals `EffectsModel.persist`, één undo-groep
+    /// "Apply effect" met complete snapshots. De low-res-kwaliteitsgate komt
+    /// één keer per batch (Boost eerst → daarna dezelfde actie zonder gate).
+    static func applyEffect(
+        _ targets: [Portrait2],
+        choice: EffectChoice,
+        isDieCut: @escaping (String?) -> Bool,
+        model: ShellModel,
+        entitlement: EntitlementModel,
+        undoManager: UndoManager?,
+        reporter: SetActionReporter,
+        skipQualityGate: Bool = false
+    ) {
+        guard !targets.isEmpty else { return }
+        let toGenerate = targets.filter { effectStep(for: $0, choice: choice) == .generate }
+        if !toGenerate.isEmpty {
+            guard entitlement.allowAIFeature(.effectGenerate, retry: {
+                applyEffect(
+                    targets, choice: choice, isDieCut: isDieCut, model: model, entitlement: entitlement,
+                    undoManager: undoManager, reporter: reporter, skipQualityGate: skipQualityGate
+                )
+            }) else { return }
+        }
+        let verb = choice.key == nil ? "Removing effect" : "Applying \(choice.label)"
+        let total = targets.count
+        reporter.busy("\(verb)…")
+        Task {
+            defer { reporter.busy(nil) }
+            if !skipQualityGate {
+                let lowRes = toGenerate.filter(needsLowResolutionGate)
+                if !lowRes.isEmpty {
+                    reporter.busy(nil)
+                    switch await presentStylizeGate(lowResCount: lowRes.count, model: model) {
+                    case .cancel:
+                        return
+                    case .boostFirst:
+                        boostResolution(
+                            lowRes, mode: .online, entitlement: entitlement,
+                            undoManager: undoManager, reporter: reporter
+                        ) {
+                            applyEffect(
+                                targets, choice: choice, isDieCut: isDieCut, model: model,
+                                entitlement: entitlement, undoManager: undoManager,
+                                reporter: reporter, skipQualityGate: true
+                            )
+                        }
+                        return
+                    case .proceed:
+                        reporter.busy("\(verb)…")
+                    }
+                }
+            }
+            var outcome = EffectOutcome()
+            for (index, portrait) in targets.enumerated() {
+                if total > 1 { reporter.busy("\(verb) \(index + 1) of \(total)…") }
+                guard effectStep(for: portrait, choice: choice) != .alreadyActive else {
+                    outcome.skipped += 1
+                    continue
+                }
+                let before = EffectSnapshot(of: portrait)
+                let framing = EffectFraming.forSwitch(
+                    toDieCut: choice.isDieCut, fromDieCut: isDieCut(portrait.effectActiveRaw)
+                )
+                switch await fetchEffectImage(choice, for: portrait, entitlement: entitlement) {
+                case .image(let image, let generated):
+                    if generated { outcome.generatedAny = true }
+                    await applyEffectImage(image, choice: choice, framing: framing, generated: generated, on: portrait, model: model)
+                    reporter.portraitDidChange(portrait)
+                    outcome.changes.append((portrait, before, EffectSnapshot(of: portrait)))
+                case .outOfCredits:
+                    outcome.outOfCredits = true
+                case .proRequired:
+                    outcome.proRequired = true
+                case .refused:
+                    outcome.refused += 1
+                case .failed:
+                    outcome.failed += 1
+                }
+                if outcome.outOfCredits || outcome.proRequired { break }
+            }
+            let n = registerEffectUndo(outcome.changes, undoManager: undoManager, reporter: reporter)
+            if outcome.generatedAny || outcome.outOfCredits { await entitlement.refresh() }
+            if outcome.outOfCredits { entitlement.handleOutOfCredits() }
+            if outcome.proRequired { entitlement.requestUpgrade() }
+            reporter.done(effectReceipt(
+                choice: choice, applied: n, total: total, skipped: outcome.skipped,
+                failed: outcome.failed, refused: outcome.refused,
+                outOfCredits: outcome.outOfCredits, undoManager: undoManager
+            ))
+        }
+    }
+
+    /// Toepassen zoals het paneel: basisbeeld eenmalig vastleggen, beeld via
+    /// de ShellModel (her-isolatie + opslag + kadrering), actieve stijl en de
+    /// rauwe generatie in de cache (zodat wisselen daarna gratis is).
+    private static func applyEffectImage(
+        _ image: NSImage, choice: EffectChoice, framing: EffectFraming, generated: Bool,
+        on portrait: Portrait2, model: ShellModel
+    ) async {
+        if choice.key != nil, portrait.effectBaseData == nil {
+            portrait.effectBaseData = portrait.cutoutData
+        }
+        await model.applyEffectResult(image, to: portrait, framing: framing)
+        portrait.effectActiveRaw = choice.key
+        if let key = choice.key, generated, let png = image.pngData() {
+            var cache = portrait.effectCache
+            cache[key] = png
+            portrait.effectCache = cache
+        }
+    }
+
+    /// Eén undo-groep "Apply effect" over de hele batch (testbaar). De
+    /// beelden zijn al toegepast; hier alleen de registratie. Geeft het
+    /// aantal gewijzigde portretten terug.
+    @discardableResult
+    static func registerEffectUndo(
+        _ items: [(Portrait2, EffectSnapshot, EffectSnapshot)],
+        undoManager: UndoManager?,
+        reporter: SetActionReporter
+    ) -> Int {
+        let changes = items.filter { $0.1 != $0.2 }
+        guard !changes.isEmpty else { return 0 }
+        undoManager?.beginUndoGrouping()
+        undoManager?.setActionName("Apply effect")
+        for (portrait, before, after) in changes {
+            ReversibleChange.register(
+                undoManager, target: portrait, from: before, to: after, actionName: "Apply effect"
+            ) { p, snapshot in
+                applyEffectSnapshot(snapshot, on: p, reporter: reporter)
+            }
+        }
+        undoManager?.endUndoGrouping()
+        return changes.count
+    }
+
+    static func applyEffectSnapshot(_ s: EffectSnapshot, on portrait: Portrait2, reporter: SetActionReporter) {
+        portrait.cutoutData = s.cutoutData
+        portrait.offsetX = s.transform.offsetX
+        portrait.offsetY = s.transform.offsetY
+        portrait.scale = s.transform.scale
+        portrait.cutoutDerivesFromOriginal = s.derivesFromOriginal
+        portrait.effectActiveRaw = s.effectActiveRaw
+        portrait.effectBaseData = s.effectBaseData
+        portrait.effectCacheData = s.effectCacheData
+        portrait.editSourceData = s.editSourceData
+        portrait.editSourceCutoutSig = s.editSourceCutoutSig
+        portrait.bumpRevision()
+        reporter.portraitDidChange(portrait)
+    }
+
+    /// Bon voor de effect-batch (testbaar).
+    static func effectReceipt(
+        choice: EffectChoice, applied: Int, total: Int, skipped: Int, failed: Int, refused: Int,
+        outOfCredits: Bool, undoManager: UndoManager?
+    ) -> SetActionReceipt {
+        let isNone = choice.key == nil
+        let label = choice.label
+        let title: String
+        var detail: String?
+        if applied == 0 {
+            if outOfCredits {
+                title = "Out of credits — nothing applied"
+            } else if skipped == total {
+                title = isNone ? "No effect to remove" : "\(label) is already applied"
+            } else if refused > 0, refused + skipped == total {
+                title = "Declined by the safety filter"
+                detail = "Try a different photo. No credits were used."
+            } else {
+                title = isNone ? "Couldn't remove the effect" : "Couldn't apply \(label)"
+                detail = "Please try again."
+            }
+        } else if applied == total {
+            title = isNone ? "Removed effect on \(plural(total))" : "Applied \(label) to \(plural(total))"
+        } else {
+            title = isNone
+                ? "Removed effect on \(applied) of \(plural(total))"
+                : "Applied \(label) to \(applied) of \(plural(total))"
+            var parts: [String] = []
+            if skipped > 0 { parts.append(skipped == 1 ? "1 already had it." : "\(skipped) already had it.") }
+            if failed > 0 { parts.append(failed == 1 ? "1 couldn't be styled." : "\(failed) couldn't be styled.") }
+            if refused > 0 {
+                parts.append(refused == 1 ? "1 declined by the safety filter." : "\(refused) declined by the safety filter.")
+            }
+            if outOfCredits { parts.append("Ran out of credits for the rest.") }
+            detail = parts.isEmpty ? nil : parts.joined(separator: " ")
+        }
+        return SetActionReceipt(
+            title: title, detail: detail,
+            actionName: applied > 0 ? "Apply effect" : nil,
+            undoManager: undoManager
+        )
+    }
+
     // MARK: - Boost resolution
 
     /// Wat een Boost aan een portret verandert — één undo-waarde per portret.
@@ -645,14 +1016,15 @@ enum PortraitSetActions {
         mode: BoostMode,
         entitlement: EntitlementModel,
         undoManager: UndoManager?,
-        reporter: SetActionReporter
+        reporter: SetActionReporter,
+        onFinished: (() -> Void)? = nil
     ) {
         guard !targets.isEmpty else { return }
         if mode == .online {
             guard entitlement.allowAIFeature(.boostOnline, retry: {
                 boostResolution(
                     targets, mode: mode, entitlement: entitlement,
-                    undoManager: undoManager, reporter: reporter
+                    undoManager: undoManager, reporter: reporter, onFinished: onFinished
                 )
             }) else { return }
         }
@@ -699,6 +1071,10 @@ enum PortraitSetActions {
                 applied: n, total: total, failed: outcome.failed,
                 outOfCredits: outcome.outOfCredits, undoManager: undoManager
             ))
+            // E57.4: "Boost first, then apply" uit de kwaliteitsgate — alleen
+            // doorgaan als er ook echt iets geboost is (anders blijft de bron
+            // low-res en zou de gate meteen weer vragen).
+            if n > 0 { onFinished?() }
         }
     }
 
