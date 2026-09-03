@@ -1,0 +1,36 @@
+---
+description: Persistente modals — presentatiestate in modellen, stabiele hosts
+globs: Avatar2/**/*.swift,AvatarUI/**/*.swift
+alwaysApply: false
+---
+
+# Persistente presentatie (E53.7)
+
+Modals, sheets en zwevende overlays mogen **niet** sluiten bij tab-/vensterwissel.
+
+## Regels
+
+1. **Geen presentatiestate in view-`@State`** — gebruik `EntitlementModel`, `ShellModel`, `UIPresentationStore` of een dedicated presenter.
+2. **Sheets alleen op stabiele hosts** — [`Avatar2App.swift`](Avatar2/Avatar2App.swift) of [`ShellView.swift`](Avatar2/Features/Shell/ShellView.swift), niet op diepe child-views.
+3. **Taak-modals** — `dsPersistentSheet` (AvatarUI) i.p.v. ruwe `.sheet`; voorkomt focus-verlies dismiss.
+4. **Binding-setters** — nooit destructieve side effects bij incidental dismiss (bv. geen `dismissCloudGate()` of `resolvePreGate(.proceed)` in de `set` van `isPresented`).
+5. **DS-inhoud** — geen systeem-`.popover(arrowEdge:)`; gebruik `dsDropdownMenu`, `DSContextMenuOverlay` of `FloatingOverlayHost` (zie ook `ds-dropdown-menus.mdc`).
+6. **Sluiten** — alleen via expliciete gebruikersactie (×, Cancel, keuze in menu).
+
+## Voorbeeld (goed)
+
+```swift
+// ShellView — stabiele host
+.dsPersistentSheet(isPresented: $model.isShowingRename) { ... }
+
+// EntitlementModel — flow-state overleeft sheet-recreatie
+entitlement.presentSignIn()  // i.p.v. @State showSignIn op een settings-pagina
+```
+
+## Voorbeeld (fout)
+
+```swift
+// Kind-view — verdwijnt bij navigatie / app-wissel
+@State private var showSignIn = false
+.sheet(isPresented: $showSignIn) { SignInSheet(...) }
+```

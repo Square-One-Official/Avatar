@@ -6,16 +6,20 @@ import {
   optionalUser,
   readDeviceFingerprint,
 } from "../../lib/auth.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 import {
   activeSubscription,
   currentCredits,
+  ensureCompedCredits,
   ensureUser,
   freeCutoutsUsed,
+  freeImportsUsedForDevice,
   freeImportsUsedForUser,
   FREE_CUTOUTS_ALLOWANCE,
   FREE_IMPORTS_ALLOWANCE,
   supabase,
 } from "../../lib/supabase.js";
+import { freeImportCounters } from "../../lib/freeImports.js";
 import { creditsForTier, type Tier } from "../../lib/stripe.js";
 
 /**
@@ -37,6 +41,11 @@ import { creditsForTier, type Tier } from "../../lib/stripe.js";
  *   free_imports_used: int,                  // Lifetime imports spent (0..FREE_IMPORTS_ALLOWANCE)
  *   free_imports_remaining: int              // FREE_IMPORTS_ALLOWANCE - used, clamped at 0
  * }
+ *
+ * E14.11: the free-import pair is the EFFECTIVE counter, max(account, device
+ * via X-Device-Fingerprint) — the same rule `/v1/import-claim` denies on.
+ * Signed-out callers previously got a hardcoded "3 remaining" while the
+ * claim said no; the app rendered "3 left of 3 images" next to the paywall.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -57,16 +66,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userResult = await optionalUser(req, res);
   if (userResult === "rejected") return; // optionalUser already wrote 401
 
+  // Soft read: a missing/malformed fingerprint just means "no device
+  // counter to merge in" (readDeviceFingerprint never writes a 400).
+  const fingerprint = readDeviceFingerprint(req);
+
   try {
     if (userResult) {
       const user = userResult;
       await ensureUser(user.id);
 
-      // Dev-allowlisted users impersonate Pro state without an actual Stripe
-      // subscription. Mirrors the bypass in /v1/cutout so
-      // the client unlocks every Pro-gated UI path. Quota uses a high sentinel
-      // so the UI doesn't surface a paywall on the first cutout call.
-      if (isDevUnlimitedUser(user.email)) {
+      // E14.9 — the Pro list (CMS `pro-access`, plus the DEV_UNLIMITED_EMAILS
+      // break-glass env var). Two levels, two very different payloads.
+      const override = await proOverrideFor(user.email);
+
+      // "unlimited" (internal/dev): impersonate Pro state without an actual
+      // Stripe subscription. Mirrors the bypass in /v1/cutout so the client
+      // unlocks every Pro-gated UI path. Quota uses a high sentinel so the UI
+      // doesn't surface a paywall on the first cutout call.
+      if (override?.mode === "unlimited") {
         res.status(200).json({
           tier: "pro",
           credits_remaining: 999_999,
@@ -85,12 +102,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      const [sub, credits, freeCutouts, freeImports] = await Promise.all([
+      // "pro" (comped): a real Pro entitlement with a real credit balance.
+      // Top the month's allowance up BEFORE reading the balance below, so the
+      // number the client renders is the one it can actually spend.
+      if (override?.mode === "pro") {
+        await ensureCompedCredits(user.id, override.monthlyCredits);
+      }
+
+      const [sub, credits, freeCutouts, freeImportsUser, freeImportsDevice] = await Promise.all([
         activeSubscription(user.id),
         currentCredits(user.id),
         freeCutoutsUsed(user.id),
         freeImportsUsedForUser(user.id),
+        freeImportsUsedForDevice(fingerprint),
       ]);
+      // E14.11: effective counter = max(account, device), like the claim.
+      const freeImports = freeImportCounters(freeImportsUser, freeImportsDevice, FREE_IMPORTS_ALLOWANCE);
+
+      // A comp doesn't overwrite a real subscription — if the account also
+      // pays, the Stripe numbers win (they're the ones with a renewal date and
+      // a webhook keeping them fresh).
+      if (override?.mode === "pro" && !sub) {
+        res.status(200).json({
+          tier: "pro",
+          credits_remaining: credits,
+          monthly_quota: override.monthlyCredits,
+          monthly_reset_at: nextMonthlyResetAt(),
+          subscription_status: "active",
+          subscription_renews_at: nextMonthlyResetAt(),
+          free_cutouts_used: freeCutouts,
+          free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
+          ...freeImports,
+          needs_account_link: false,
+        });
+        return;
+      }
 
       const tier = mapTierForClient(sub?.tier);
       const monthlyQuota = sub ? quotaForRawTier(sub.tier) : 0;
@@ -106,8 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         subscription_renews_at: periodEnd,
         free_cutouts_used: freeCutouts,
         free_cutouts_remaining: Math.max(0, FREE_CUTOUTS_ALLOWANCE - freeCutouts),
-        free_imports_used: freeImports,
-        free_imports_remaining: Math.max(0, FREE_IMPORTS_ALLOWANCE - freeImports),
+        ...freeImports,
         needs_account_link: false,
       });
       return;
@@ -131,7 +176,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // is a low-entropy secret (UserDefaults plist, recoverable by anyone
     // with disk access), so the response must not turn into a fingerprint
     // → email oracle.
-    const fingerprint = readDeviceFingerprint(req);
     if (fingerprint) {
       const ipAllowed = await checkAnonAccountRateLimit(clientIp(req));
       if (!ipAllowed) {
@@ -179,6 +223,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Pure anonymous: no signed-in user and no device grant. Free tier.
+    // E14.11: the device counter is the only counter the claim consults for
+    // this caller — report it instead of a hardcoded full allowance.
+    const anonymousDeviceUsed = await freeImportsUsedForDevice(fingerprint);
     res.status(200).json({
       tier: null,
       credits_remaining: 0,
@@ -188,8 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subscription_renews_at: null,
       free_cutouts_used: 0,
       free_cutouts_remaining: FREE_CUTOUTS_ALLOWANCE,
-      free_imports_used: 0,
-      free_imports_remaining: FREE_IMPORTS_ALLOWANCE,
+      ...freeImportCounters(0, anonymousDeviceUsed, FREE_IMPORTS_ALLOWANCE),
       needs_account_link: false,
     });
   } catch (err) {
@@ -253,14 +299,12 @@ function mapSubscriptionStatus(
 }
 
 /**
- * True when the caller's e-mail is on the DEV_UNLIMITED_EMAILS allowlist.
- * Same comma-separated env var honored by /v1/cutout.
+ * First instant of next month, UTC — when a comped Pro's credits top back up
+ * to their allowance (`ensureCompedCredits`). Mirrors what
+ * `subscription_renews_at` means for a paying subscriber so the client's
+ * "Refills on …" copy needs no special case.
  */
-function isDevUnlimitedUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
+function nextMonthlyResetAt(): string {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
 }

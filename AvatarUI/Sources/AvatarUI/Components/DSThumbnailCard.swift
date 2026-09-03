@@ -1,0 +1,127 @@
+// Gedeelde thumbnail-kaart (E24.15) voor de subject-panelen (Effects/Face,
+// klaar voor Clothing/Hair). Eén vierkante preview-tile met: optionele
+// top-leading Pro-badge, optionele credit-kost onderin over een
+// donker-fade-gradient, een label eronder, selectie-ring en hover-scale.
+//
+// Icoon-agnostisch: de Phosphor-glyphs hangen aan het app-target (niet aan
+// AvatarUI — zie project.yml), dus de aanroeper levert het icoon als view.
+// Zo blijft de kaart in de DS-library en delen Effects + Face exact dezelfde
+// vorm.
+
+import SwiftUI
+
+public struct DSThumbnailCard<Icon: View>: View {
+    private let label: String
+    private let isPro: Bool
+    private let isSelected: Bool
+    private let isWorking: Bool
+    @Environment(\.dsVectorExport) private var vectorExport
+    private let tileSize: CGFloat
+    private let tileHeight: CGFloat
+    private let onRefresh: (() -> Void)?
+    private let icon: Icon
+
+    /// `tileHeight` defaults to `tileSize` (square). Pass an explicit height
+    /// for portrait-shaped cards (e.g. Face: 112 × 152). Effects is 1:1
+    /// (144 × 144), in de buurt van de Enhance-kaart (~147 × 128).
+    public init(
+        label: String,
+        isPro: Bool = false,
+        isSelected: Bool = false,
+        isWorking: Bool = false,
+        tileSize: CGFloat = 88,
+        tileHeight: CGFloat? = nil,
+        onRefresh: (() -> Void)? = nil,
+        @ViewBuilder icon: () -> Icon
+    ) {
+        self.label = label
+        self.isPro = isPro
+        self.isSelected = isSelected
+        self.isWorking = isWorking
+        self.tileSize = tileSize
+        self.tileHeight = tileHeight ?? tileSize
+        self.onRefresh = onRefresh
+        self.icon = icon()
+    }
+
+    public var body: some View {
+        tile
+            .dsHoverScale(1.03)
+    }
+
+    private var tile: some View {
+        RoundedRectangle(cornerRadius: DSRadius.lg)
+            .fill(DSColor.Background.neutral)
+            .overlay {
+                icon
+                    .foregroundStyle(DSColor.Foreground.muted)
+            }
+            // UXS-3: gedeelde scrim — dekking is klaar vóór de tekstzone, dus
+            // het label blijft leesbaar op élke tint (ook een witte cutout in
+            // light mode).
+            .overlay(alignment: .bottom) {
+                DSCardLabelScrim()
+                    .frame(height: tileHeight * 0.45)
+            }
+            .overlay(alignment: .bottomLeading) {
+                // UXS-13: één regel, netjes afgekapt. Zonder deze begrenzing
+                // liep een langer label ("Reduce wrinkles") over de kaartrand
+                // of wrapte 'ie over de scrim heen.
+                Text(label)
+                    .dsTextStyle(.labelSmall)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: tileSize - DSSpacing.gap2 * 2, alignment: .leading)
+                    .padding(.horizontal, DSSpacing.gap2)
+                    .padding(.bottom, DSSpacing.gap2)
+            }
+            // Werk-spinner (Effects-stijl genereren).
+            .overlay {
+                if isWorking {
+                    ZStack {
+                        Color.black.opacity(0.35)
+                        if vectorExport {
+                            // Vector-export: NSProgressIndicator rendert niet.
+                            Circle()
+                                .trim(from: 0.1, to: 0.85)
+                                .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .frame(width: 16, height: 16)
+                        } else {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+            }
+            .frame(width: tileSize, height: tileHeight)
+            .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+            // Pro-badge bovenin (boven de clip zodat 'm niet afsnijdt).
+            .overlay(alignment: .topLeading) {
+                if isPro {
+                    DSProChip()
+                        .padding(DSSpacing.gap1)
+                }
+            }
+            // Selectie-ring. Geen check-badge: de groene border is genoeg.
+            .overlay {
+                RoundedRectangle(cornerRadius: DSRadius.lg)
+                    .strokeBorder(DSColor.Action.primary, lineWidth: 2)
+                    .opacity(isSelected ? 1 : 0)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected, let onRefresh {
+                    Button(action: onRefresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(5)
+                            .background(Circle().fill(.black.opacity(0.55)))
+                    }
+                    .buttonStyle(.plain)
+                    .dsFocusEffectDisabled()
+                    .padding(DSSpacing.gap1)
+                    .help("Regenerate")
+                }
+            }
+    }
+}

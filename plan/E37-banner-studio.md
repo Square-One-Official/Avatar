@@ -1,0 +1,416 @@
+# E37 — Banner Studio (editor)
+
+Team: **FEAT** (canvas + panels) · **INFRA** (BannerDoc-model/container/render) · **DS** (nieuwe
+editor-chrome-componenten in AvatarUI)
+
+Voortgekomen uit feedback (Thierry, 2026-06-26): "make banner" leidt naar een echte **banner-
+editor** met een **onderste toolbar zoals bij Portraits**, maar simpeler en toegespitst op
+banners. De Studio is een eigen sectie/overlay met een canvas-kaart en een capsule-toolbar.
+
+## UX-onderzoek — welke tools heeft een banner-editor nodig?
+
+Onderzocht tegen de toonaangevende cover/banner-makers (GoDaddy Studio, Canva, Picsart,
+Photoroom, Unfold) — die delen allemaal een **onderste tool-toolbar**: Image · Text ·
+Graphic/Element · Shape · Effects · Theme/Brand
+([GoDaddy Studio](https://mobbin.com/screens/2f5ebbd6-3afb-4e70-b65a-2dd59582bda6),
+[Picsart](https://mobbin.com/screens/d94f36bc-8dc1-424d-b02e-99f85355b322),
+[Photoroom](https://mobbin.com/screens/deab17a7-1104-49f4-b8de-b6579effb29f),
+[Unfold](https://mobbin.com/screens/8a6283d2-5cbb-46b2-9845-12dfab3b5d3d),
+[Spotify cover-art Effects](https://mobbin.com/screens/b5b2282c-6f23-4145-9518-d9711dc5e31c)).
+
+**Besluit (toegespitst, géén bloat — de minimale set voor een mooie banner):**
+1. **Background / Fill** — solid (brand-kleuren + picker), mesh-gradient, **generate image** (AI,
+   gefaseerd), **upload image**, of **use a portrait** (E40 omgekeerd: een avatar als element).
+2. **Shaders** — procedurale Figma-stijl effecten als laag/effect (fractal noise, dithering,
+   mesh-gradient, lens distortion, warp, grain, halftone). Eigen engine = **E38**.
+3. **Text** — tekstblok toevoegen/bewerken: inhoud, font(-familie), grootte, gewicht, kleur,
+   uitlijning, letter-/regelafstand.
+4. **Logo / Brand** — een logo/merkbeeld plaatsen (upload, schalen/positioneren) + brand-
+   kleurenpalet (`BrandColorKit`).
+5. **Size / Layout** — platform-maatpresets (LinkedIn 1584×396, X 1500×500, generiek wijd) +
+   uitlijn-/positiehulp.
+
+Bewust **niet** in de MVP (om slop/bloat te vermijden): vrije vormen/stickers-bibliotheek,
+video, filters-op-foto's. Kunnen later als "Elements".
+
+**Design-uitgangspunt:** géén 1-op-1 Figma-ref (scherm bestaat niet in Figma). Bouw de toolbar
+**in de geest van de portret-editor** — `DSEditPanelContainer` + `DSToolbarItem`/capsule
+(`EditorView.toolbarItems`-patroon), `DSCanvasCard`, `DSEditPanel`, DS-tokens. Eenvoudiger dan de
+portret-toolbar (minder tools, geen Enhance/Face/Hair/Shirt).
+
+---
+
+## 37.1 — BannerDoc-model + container + render-pijplijn
+- status: done
+- owner: INFRA (2026-06-26)
+- team: INFRA
+
+**Result:** `BannerDoc` @Model ([BannerDoc.swift](Avatar2/Features/Banners/BannerDoc.swift)) —
+naast `Banner2`/`Portrait2`/`Folder2` in de container ([Avatar2App.swift](Avatar2/Avatar2App.swift)):
+canvas-maat (default 1500×500) + een Codable laag-stack `BannerLayers` (fill: solid/meshGradient/
+image · `[BannerTextLayer]` · `BannerLogoLayer?` · forward-compat `[BannerShaderLayer]` voor E38)
+als externalStorage-JSON, met zware beeld-bytes (`fillImageData`/`logoImageData`/`previewImageData`)
+als losse externalStorage-blobs. `BannerDoc.from(banner2:)` opent een platte E35-`Banner2` als één
+image-fill-laag (geen dataverlies). [BannerDocRenderer](Avatar2/Features/Banners/BannerDocRenderer.swift)
+componeert fill (via `BannerCompositor`, linear-sRGB) + logo + tekst (CoreText `CTLine`) tot een
+ondoorzichtige wijde CGImage; `size`-override voor exportmaten; shaders-haak gereserveerd voor E38.2.
+3 unit-tests (fill+tekst → opake 1500×500 PNG; export-maat-override 1584×396; Banner2-migratie
+behoudt bytes) groen; volledige DoD groen (Avatar + Avatar2 + AvatarKit + AvatarUI).
+
+Vervang het "platte beeld"-model door een **bewerkbaar, herbruikbaar document** (de editor moet
+heropenen):
+- `BannerDoc` @Model in `Avatar2/Features/Banners/` met: `name`, `createdAt`, `updatedAt`,
+  `touch()`, canvas-`size` (default 1500×500), en een serialiseerbare **laag-stack**:
+  - `fill` (solid-hex / mesh-gradient-stops / image-data / generated-image-ref),
+  - `[textLayer]` (string, font, size, weight, colorHex, align, x/y, rotation),
+  - `logoLayer?` (image-data, x/y, scale),
+  - `[shaderLayer]` (shader-key + params — zie E38),
+  - z-volgorde.
+  Lagen als `Codable` value-types in één `@Attribute(.externalStorage)` JSON-blob + losse
+  externalStorage voor zware image-bytes; plus een gecachte **`previewImageData`** (gerenderde
+  wijde PNG) voor thumbnails/social-preview-compat.
+- Registreer in de app-`modelContainer` ([Avatar2App.swift](Avatar2/Avatar2App.swift)) náást
+  Portrait2/Folder2/Banner2 (lichtgewicht migratie). **Migratiepad:** bestaande `Banner2`
+  (platte upload/gradient-banners) blijven leesbaar; bied "open in Studio" door ze als één
+  image-fill-laag in te laden (geen dataverlies).
+- `BannerDocRenderer.render(_:size:) -> CGImage` (off-main) die de laag-stack → wijde PNG
+  componeert via het bestaande `BannerCompositor`-pad (linear-sRGB, aspect-fill). Shaders worden
+  in 37.7/E38 in deze render gehaakt.
+- DoD: beide targets bouwen, unit-test op render (fill + tekstlaag → opake PNG van juiste maat),
+  tests groen, Result-regel.
+
+## 37.2 — Studio-shell: canvas-kaart + onderste capsule-toolbar
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT (+ DS voor nieuwe chrome)
+- blockedBy: 37.1
+
+**Result:** [BannerStudioView](Avatar2/Features/Banners/BannerStudioView.swift) — venster-niveau
+crossfade-overlay (zoals de social-preview) op één `BannerDoc`, gewired via
+`ShellModel.editingBanner`/`openBannerStudio`/`closeBannerStudio` + een `.overlay` in
+[ShellView](Avatar2/Features/Shell/ShellView.swift). Topbar = Close · gecentreerd naam-veld
+(rename) · Save (rendert preview-cache via `BannerDocRenderer`). Onderste capsule-toolbar via
+`DSEditPanelContainer` met `BannerTool` **Background · Shaders · Text · Logo · Size**; elk opent
+een `DSEditPanel`-plaatshouder (37.3–37.7 vullen ze). Live wijde canvas-kaart toont de
+`BannerDocRenderer`-render. [BannersGalleryView](Avatar2/Features/Banners/BannersGalleryView.swift)
+is nu `BannerDoc`-backed: "Make banner" → nieuw doc + Studio, tegel-klik opent het doc,
+Rename/Duplicate/Delete op `BannerDoc`. **Bewuste DS-afwijking:** `DSCanvasCard` is 1:1-
+vergrendeld → de wijde canvas is een DS-token-kaart (Background.card/xl4). **Compat-noot:** de
+social-preview `BannerChooser` leest nog `Banner2`; reconciliatie → 37.6. DoD groen (Avatar +
+Avatar2 + AvatarKit + AvatarUI), 3 BannerDocRenderTests groen.
+
+De editor-romp:
+- Nieuwe sectie/overlay (analoog aan `EditorView`/`SocialPreviewView` op shell-niveau):
+  `ShellModel.openBanner(_:)` / `showBannerStudio` + routing in `ShellView`.
+- **Canvas-kaart** (`DSCanvasCard`) toont de live `BannerDoc`-render op canvas-maat, met
+  selecteerbare lagen (tap-to-select, sleep om te verplaatsen) en zoom-to-fit.
+- **Onderste capsule-toolbar** in de geest van de portret-editor (`DSEditPanelContainer` +
+  capsule-items): **Background · Shaders · Text · Logo · Size**. Elk item opent een `DSEditPanel`
+  onderaan. Eenvoudiger gestyled dan de portret-toolbar.
+- Topbar: titel/naam (rename), Close (terug naar herkomst — gallery of home, breadcrumb-patroon),
+  en Save/Done (rendert preview-cache, schrijft `BannerDoc`).
+- Undo/redo via het bestaande `ReversibleChange`-patroon.
+- **Geen Figma-ref** — DS-tokens; toolbar-patroon = portret-editor, vereenvoudigd.
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 37.3 — Background/Fill-panel
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2
+
+**Result:** [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift) — zet `BannerDoc.fill`: Color-rij (`DSColorPicker` + `BackgroundKit.colorPresets` + `BrandColorKit`-kleuren, geselecteerde swatch krijgt een ring), Gradient-rij (`BackgroundKit.gradientPresets` → `.meshGradient`-stops), Image-rij (Upload via NSOpenPanel + `BackgroundKit.downscaledPNG` → `.image`; Generate = disabled stub "coming soon"). Mutaties via `doc.layers`/`fillImageData` → `touch()` → live canvas-her-render. Gewired in `BannerStudioView.panel(.background)`. DoD groen.
+
+`DSEditPanel` "Background": solid-kleur (brand-kleuren uit `BrandColorKit` + `DSColorPicker`),
+mesh-gradient (meerdere stops; deelt de mesh-shader uit E38 of een nette gradient-fallback),
+**Upload image** (NSOpenPanel, downscale/cache zoals `BackgroundImageKit`), en een **Generate
+image**-knop (gated; wired op de banner-generatie zodra E34.8/34.9 of een nieuwe AI-story
+landt — tot dan een nette disabled/Pro-stub). Schrijft `BannerDoc.fill`, undo'baar.
+- **Geen Figma-ref** — DS-tokens; patroon = `BackgroundPanel`.
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 37.4 — Text-panel
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerTextPanel](Avatar2/Features/Banners/BannerTextPanel.swift) — "Add text" + per-laag kaart: inhoud (TextField), grootte (slider 24–240), gewicht (Menu Regular/Medium/Semibold/Bold), kleur (`DSColorPicker`), verticale plaatsing (top/midden/onder → y), verwijderen. Mutaties via `doc.layers.texts` → `touch()` → live canvas (CoreText). Gewired in `BannerStudioView.panel(.text)`. Follow-up (wanneer de canvas laag-sleep + meerregelige render krijgt): font-familie, letter-/regelafstand, horizontale uitlijning. DoD groen.
+- team: FEAT (+ DS indien nieuw text-control-component)
+- blockedBy: 37.2
+
+Tekstlagen: toevoegen/bewerken/verwijderen; inhoud, font-familie (systeemfonts; brand-font
+later), grootte, gewicht, kleur (brand + picker), uitlijning, letter-/regelafstand. Live op
+canvas (sleep/positioneer), `DSTextField` voor invoer, undo'baar. Render via CoreText in
+`BannerDocRenderer` (spiegelt het watermerk-`CTLine`-pad in `PortraitExporter`).
+- **Geen Figma-ref** — DS-tokens; patroon = tekst-edit ([Photoroom text](https://mobbin.com/screens/aaad7e92-d1cb-49b0-a9d0-d3966e03d5b7)).
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 37.5 — Logo/Brand-panel
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerLogoPanel](Avatar2/Features/Banners/BannerLogoPanel.swift) — Logo: upload PNG (NSOpenPanel + downscale) → `doc.logoImageData` + `layers.logo`; schaal-slider (0.08–0.6), 3×3 plaatsings-grid (x/y), verwijderen. Brand colors: `BrandColorKit`-palet (swatches + `DSColorPicker` om toe te voegen). Live canvas-render via `BannerDocRenderer` (logo aspect-correct geschaald). Gewired in `BannerStudioView.panel(.logo)`. DoD groen.
+- team: FEAT
+- blockedBy: 37.2
+
+Een logo/merkbeeld plaatsen: upload (PNG met alpha), schalen/positioneren op canvas, verwijderen;
++ brand-kleurenpalet-beheer (`BrandColorKit`, eyedropper) gedeeld met Background/Text. Undo'baar.
+- **Geen Figma-ref** — DS-tokens; patroon = Brand Kit ([Unfold](https://mobbin.com/screens/c89383b7-fa06-4ae0-ac97-f728b7d9cba3)).
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 37.6 — Size/Layout-presets + export + social-preview-compat
+- status: done
+- owner: FEAT (2026-06-26)
+
+**Result:** [BannerSizePanel](Avatar2/Features/Banners/BannerSizePanel.swift) — platform-maatpresets (X 1500×500, LinkedIn 1584×396, Wide 1600×500) zetten `doc.canvasSize` non-destructief (genormaliseerde tekst/logo-posities overleven). Export-knop in de Studio-topbar → `BannerDocRenderer.render(watermark: !isPro)` → NSSavePanel-PNG (free-tier hoek-watermerk "Made with Aaavatar" via nieuwe `drawWatermark`). Social-preview-compat: [BannerChooser](Avatar2/Features/SocialPreview/BannerChooser.swift) leest nu `BannerDoc.previewImageData` i.p.v. `Banner2` — banners uit de Studio verschijnen in de preview-kiezer. DoD groen.
+- team: FEAT
+- blockedBy: 37.2, 37.3
+
+- "Size"-panel: platform-maatpresets (`SocialPlatform`: LinkedIn 1584×396, X 1500×500, generiek
+  wijd); wisselen herschaalt het canvas non-destructief.
+- Export: `BannerDocRenderer` → wijde PNG op exacte covermaat via `BannerCompositor`; NSSavePanel
+  met platform-bestandsnamen; free-tier hoek-watermerk (hergebruik `PortraitExporter`-pad).
+- Social-preview-compat: vul/ververs `BannerDoc.previewImageData` zodat `BannerChooser`
+  (E35.4) en `BannerResolver` opgeslagen banners onveranderd kunnen tonen/kiezen.
+- **Geen Figma-ref** — DS-tokens.
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+## 37.7 — Shaders-panel integratie (consumeert E38)
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2, 38.2, 38.3
+- Result: de "Shaders"-tool in `BannerStudioView.panel()` toont nu het echte `BannerShaderPanel`
+  (E38.3/38.4) i.p.v. de "coming soon"-kaart: kies/stapel procedurale effecten op de `BannerDoc`,
+  live op de canvas via de gebakken preview (E38.2), params via DS-sliders, stack-ordening via
+  omhoog/omlaag. Bij export worden de effecten via `BannerShaderRenderer` + `ImageRenderer`
+  gerasterd. DoD groen.
+
+"Shaders"-tool: kies/stapel procedurale effecten (E38) op de `BannerDoc`; live op canvas via de
+SwiftUI-`Shader`-render-haak; params via de DS-controls (38.3); stack-ordening (38.4). Effecten
+worden in `BannerDocRenderer` bij export gerasterd.
+- **Geen Figma-ref** — DS-tokens; patroon = Effects-rij + param-sheet (Figma-shaders, Spotify
+  Effects).
+- DoD: beide targets bouwen, tests groen, Result-regel.
+
+---
+
+## 37.8 — Canvas tap-select + drag (Apple-minimal)
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2
+
+**Result:** [BannerCanvasOverlay](Avatar2/Features/Banners/BannerCanvasOverlay.swift) +
+[BannerCanvasSelection](Avatar2/Features/Banners/BannerCanvasSelection.swift) +
+[BannerLayoutMetrics](Avatar2/Features/Banners/BannerLayoutMetrics.swift) — tap-select tekst/logo
+op de canvas-kaart, sleep om te verplaatsen, subtiele selectiering (geen handles/rotatie).
+Selectie sync't met Text/Logo-panelen; Text-tool opent met eerste laag geselecteerd. DoD groen.
+
+## 37.9 — Curated fonts + L/C/R alignment
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT (+ DS `DSSegmentedControl`)
+- blockedBy: 37.4, 37.8
+
+**Result:** [BannerFontCatalog](Avatar2/Features/Banners/BannerFontCatalog.swift) (~10 system
+fonts) + [BannerTextPanel](Avatar2/Features/Banners/BannerTextPanel.swift) font-menu,
+`DSSegmentedControl` voor links/midden/rechts, geselecteerde laag highlight.
+[BannerDocRenderer](Avatar2/Features/Banners/BannerDocRenderer.swift) respecteert `alignRaw`.
+Alignment unit-test in `BannerDocRenderTests`. DoD groen.
+
+## 37.10 — Undo/redo + Done + debounced preview bake
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.2
+
+**Result:** [BannerDocUndo](Avatar2/Features/Banners/BannerDocUndo.swift) — `ReversibleChange`
+voor laag-verplaatsingen + background-reframe. [BannerStudioView](Avatar2/Features/Banners/BannerStudioView.swift):
+Undo/Redo in topbar; Save → **Done**; debounced `previewImageData`-bake (800 ms). DoD groen.
+
+## 37.11 — Image background drag-to-reframe
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + INFRA
+- blockedBy: 37.3
+
+**Result:** [BannerDoc](Avatar2/Features/Banners/BannerDoc.swift) — `fillImageFocalX/Y` (default
+0.5). [BannerCompositor](AvatarKit/Sources/AvatarKit/Engines/BannerCompositor.swift) aspect-fill
+vanuit focal point. [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift):
+drag-to-reframe hint; Generate-stub verwijderd; actieve gradient/image-indicators. DoD groen.
+
+## 37.12 — Effects clarity + tool hints
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + DS
+- blockedBy: 37.7
+
+**Result:** Toolbar **Shaders → Effects**; paneltitel "Effects"; lege-staat copy "Applied to the
+whole banner". [DSEditPanel](AvatarUI/Sources/AvatarUI/Components/DSEditPanel.swift) optionele
+`subtitle` voor éénregelige first-open hints per tool. [BannerShaderPanel](Avatar2/Features/Banners/BannerShaderPanel.swift)
+gebruikt nieuwe [DSSlider](AvatarUI/Sources/AvatarUI/Components/DSSlider.swift). DoD groen.
+
+## 37.13 — Freeform text + native macOS panels
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + DS
+- blockedBy: 37.8, 37.9
+
+**Result:** [BannerCanvasTextChrome](Avatar2/Features/Banners/BannerCanvasTextChrome.swift) +
+[BannerTextFloatingToolbar](Avatar2/Features/Banners/BannerTextFloatingToolbar.swift) +
+[BannerInlineTextField](Avatar2/Features/Banners/BannerInlineTextField.swift) — tap-to-add op canvas,
+inline edit met select-all placeholder, floating pill (kleur · Aa · grootte). Native
+[NSFontPanel](Avatar2/Features/Banners/BannerNativePanels.swift) via **Fonts…** / dubbelklik Aa;
+[NSColorPanel] voor More Text Colours. Text-tool opent geen onderpaneel (`EmptyView`). DoD groen.
+
+## 37.14 — Freeform logo image on canvas
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT
+- blockedBy: 37.5, 37.8
+
+**Result:** [BannerCanvasImageChrome](Avatar2/Features/Banners/BannerCanvasImageChrome.swift) +
+[BannerImageFloatingToolbar](Avatar2/Features/Banners/BannerImageFloatingToolbar.swift) — tap canvas
+→ `NSOpenPanel` → logo op tap-positie; blauwe rand + 4 hoek-handles (scale); floating toolbar
+(info/replace/remove/preview). Logo-tool: geen onderpaneel. DoD groen.
+
+## 37.15 — Freeform background image on canvas
+- status: done
+- owner: FEAT (2026-06-26)
+- team: FEAT + INFRA
+- blockedBy: 37.3, 37.11
+
+**Result:** [BannerCanvasBackgroundChrome](Avatar2/Features/Banners/BannerCanvasBackgroundChrome.swift) —
+tap canvas (Background-tool) → image fill; volledige canvas-selectierand + floating toolbar;
+drag-to-reframe focal point. [BannerBackgroundPanel](Avatar2/Features/Banners/BannerBackgroundPanel.swift):
+alleen kleur/gradient; image via canvas. `BannerCanvasSelection.backgroundFill`. DoD groen.
+
+## 37.16 — PaperKit spike (backlog)
+- status: backlog
+- team: FEAT + INFRA
+- blockedBy: macOS 27 SDK on dev-Mac
+
+**Scope:** Evaluate [PaperKit](https://developer.apple.com/documentation/paperkit) (`PaperMarkupViewController`,
+`ImageMarkup`, `MarkupAdornment`) as optional canvas engine when deployment target ≥ macOS 27.
+Huidige implementatie blijft `BannerDoc` + Freeform-chrome op macOS 14+. Geen implementatie tot OS-besluit.
+
+## 37.17 — Type-to-edit: keystroke-verlies door async first-responder-handoff [FEAT]
+- status: done
+- owner: FEAT (2026-07-02)
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6). Blocker
+vóór `AppFeatureFlags.bannersEnabled` op `true` kan.
+**Wat:** de selectiebox vangt de eerste toetsaanslag via `onKeyPress`
+(`BannerCanvasTextChrome.swift:314-326`, `handleTypeToEdit`) en zet
+`draftString`/`isEditing = true` — die eerste toets overleeft. Maar
+`BannerInlineTextField.swift:36-46` doet `DispatchQueue.main.async { view.window?.
+makeFirstResponder(view) }` — minimaal één runloop-cyclus later. In dat gat is de
+box niet meer focusable (`guard !isEditing` → `.ignored`) en de NSTextView nog geen
+first responder: toets 2 en verder vallen in het niets. Empirisch: "One look for
+every team" getypt → canvas toont "O look for every team". Commit 5e91f28
+(E37.13-15) heeft `BannerInlineTextField` niet aangeraakt.
+**Voorstel:** blijf toetsen bufferen in de chrome zolang de editor nog geen first
+responder is (append aan `draftString` i.p.v. `.ignored`), óf maak de textview
+synchroon first responder (`viewDidMoveToWindow`-override, geen async-hop).
+**DoD:** beide targets bouwen; een keystroke-burst direct na het Text-tool-klikken
+verliest geen tekens; tests groen; Result-regel.
+
+**Result:** beide voorstel-sporen geïmplementeerd (belt-and-braces).
+(1) [BannerInlineTextField](Avatar2/Features/Banners/BannerInlineTextField.swift):
+async `makeFirstResponder`-hop vervangen door een synchrone claim in
+`PlaceholderTextView.viewDidMoveToWindow` (tijdens de render-commit, vóór het
+volgende key-event; caret achteraan of select-all). (2)
+[BannerCanvasTextChrome](Avatar2/Features/Banners/BannerCanvasTextChrome.swift):
+`handleTypeToEdit` buffert toetsen die tijdens de handoff nog in de chrome landen
+(`BannerTypeToEdit.appendToDraft` i.p.v. `.ignored`) en synct de draft direct naar
+de doc-laag (`syncDraftToDoc` — de editor-`onChange` hangt dan nog niet in de
+boom). Besluitlogica als testbaar `BannerTypeToEdit`-enum; 6 nieuwe tests
+([BannerTypeToEditTests](Avatar2Tests/BannerTypeToEditTests.swift)) incl.
+synchrone first-responder-claim zónder runloop-spin. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 97 groen; AvatarKit 86 + AvatarUI 37 groen).
+
+## 37.18 — Placeholder-tekstlagen: document-brede sweep + herbake [FEAT]
+- status: done
+- owner: FEAT (2026-07-02)
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6). Blocker
+vóór `AppFeatureFlags.bannersEnabled` op `true` kan.
+**Wat:** vóór commit d1ec4e7 werd de placeholder-string als échte `layer.string`
+opgeslagen en meegebakken in `previewImageData` — bestaande banners dragen die lagen
+nog. Bovendien zijn alle drie de huidige opruimroutines **selectie-gescoped**
+(`BannerStudioView.finalizeEmptyText:432`, `BannerCanvasOverlay.
+finalizeEmptyTexts:376` + `cleanupUnselectedEmptyTexts:392`) — wie de Studio verlaat
+via breadcrumb/venster-sluiten raakt geen enkele sweep (`onDisappear`,
+`BannerStudioView.swift:98-102`, bakt alleen de thumbnail). Lege lagen accumuleren
+dus over sessies en blijven hit-testbaar met placeholder-brede kaders
+(`BannerLayoutMetrics.textBoxWidth:75-84`) — nieuwste lege laag wint de hit-test
+vóór een echte tekstlaag, het banner voelt "bedekt". Preview-staleness: er is
+sowieso geen invalidatiepad buiten een open Studio-sessie (`previewBakedAt`
+ontbreekt) — gallery/chooser/E40-achtergrond kunnen een verouderde bake tonen.
+**Voorstel:** één document-brede `BannerDoc.dropEmptyTextLayers()` aanroepen bij
+Studio-open én in `onDisappear` (vóór `bakeThumbnail`), de drie bestaande routines
+daarop consolideren; eenmalige migratie die literal-placeholder-strings uit
+bestaande documenten leegt en de preview herbakt; overweeg een
+versie-stempel op `BannerDoc` zodat een stale preview lazy herbakt bij eerste
+weergave.
+**DoD:** beide targets bouwen; een banner zonder ingevulde tekst laat na
+Studio-verlaten geen lege lagen na; hit-testing selecteert nooit meer een lege
+placeholder-laag vóór echte content; tests groen; Result-regel.
+
+**Result:** `BannerDoc.dropEmptyTextLayers(keeping:)`
+([BannerDoc.swift](Avatar2/Features/Banners/BannerDoc.swift)) — één document-brede
+sweep met keep-uitzondering en (before, after)-return voor undo; de drie
+selectie-gescopede routines (`BannerStudioView.finalizeEmptyText`,
+`BannerCanvasOverlay.finalizeEmptyTexts`/`cleanupUnselectedEmptyTexts`) zijn
+erop geconsolideerd. Sweep draait nu ook bij Studio-open (`onAppear` +
+doc-switch) én in `onDisappear` vóór `bakeThumbnail` — breadcrumb/venster-sluiten
+laat geen lege lagen meer na (touch() → herbake). Hit-test
+([BannerLayoutMetrics](Avatar2/Features/Banners/BannerLayoutMetrics.swift)):
+échte tekst → logo → lege tekst, dus een placeholder-breed kader dekt content
+nooit meer af. Eenmalige migratie
+([BannerPlaceholderMigration](Avatar2/Features/Banners/BannerPlaceholderMigration.swift),
+UserDefaults-stempel `banners.placeholderLayerSweep.v1`, aangeroepen uit
+BannersGalleryView.task) leegt literal-placeholder-lagen uit ALLE bestaande
+documenten en herbakt hun stale previews. Versie-stempel/`previewBakedAt` op
+BannerDoc bewust overgeslagen (schema-wijziging; de open/close-sweeps + migratie
+dekken de staleness-paden). 8 nieuwe tests
+([BannerPlaceholderSweepTests](Avatar2Tests/BannerPlaceholderSweepTests.swift)).
+DoD groen (Avatar + Avatar2 bouwen; Avatar2Tests 105 groen; AvatarKit 86 +
+AvatarUI 37 groen).
+
+## 37.19 — Halftone-shader: blend/intensity-parameter [FEAT]
+- status: done
+- owner: FEAT (2026-07-02)
+- team: FEAT
+- blockedBy: —
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B6).
+**Wat:** `BannerShaders.metal:96-103` (`bannerHalftone`) gebruikt de bronkleur
+alleen voor de stipradius (`luma`) en schrijft daarna `mix(half3(1.0h), half3(0.0h),
+ink)` — de gradient/fill wordt 100% weggegooid, tekst wordt onleesbaar. Er is geen
+blend-parameter; de catalogus (`ShaderEffect.swift:73-75`) kent alleen `scale`
+(Dot size). Default-aanzetten = een wit banner met stippen.
+**Voorstel:** een `intensity`-param toevoegen (default ±0,6) en `mix(color.rgb,
+halftoneRGB, intensity)` blenden, of de stippen in de bronkleur op de bron-
+achtergrond houden ("ink op source", zoals Figma's halftone). Arg-volgorde in de
+catalogus en de Metal-kernel synchroon houden.
+**DoD:** beide targets bouwen; Halftone op default-instellingen laat de
+achtergrond/tekst herkenbaar; tests groen; Result-regel.
+
+**Result:** `bannerHalftone` ([BannerShaders.metal](Avatar2/Features/Banners/BannerShaders.metal))
+kreeg een `intensity`-arg: het zwart/wit-stippenpatroon wordt met
+`mix(color.rgb, halftone, clamp(intensity, 0, 1))` over de bron geblend — 0 =
+bron ongemoeid, 1 = puur zwart/wit. Catalogus
+([ShaderEffect.swift](Avatar2/Features/Banners/ShaderEffect.swift)): param
+`intensity` ("Amount", 0…1, default 0.6) ná `scale` — arg-volgorde spiegelt de
+Metal-signatuur; oudere persistente lagen (alleen `scale`) vallen via
+`shader(values:)` op de default terug. Slider verschijnt automatisch in
+BannerShaderPanel (params-gedreven). 3 nieuwe tests in
+[ShaderEffectTests](Avatar2Tests/ShaderEffectTests.swift): param-contract,
+pixel-blend (intensity 0 = bron; default houdt bronkleur dominant; 1 =
+kanaal-neutraal zwart/wit) en legacy-laag-compat. DoD groen (Avatar + Avatar2
+bouwen; Avatar2Tests 108 groen; AvatarKit 86 + AvatarUI 37 groen).

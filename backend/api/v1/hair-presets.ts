@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { fetchActiveHairPresets } from "../../lib/payload.js";
+import { CMS_LIST_CACHE_CONTROL, fetchActiveHairPresets, thumbnailVariant } from "../../lib/payload.js";
 
 /**
  * GET /v1/hair-presets — CMS-gestuurde kapsel-presets (E33+).
@@ -10,9 +10,9 @@ import { fetchActiveHairPresets } from "../../lib/payload.js";
  * Soft-fail: als de CMS onbereikbaar is, geeft dit endpoint `{ presets: [] }`
  * terug zodat het iOS-paneel zijn eigen hardgecodeerde fallback toont.
  *
- * Response: { presets: [{ key, label, order }] }
- * Cache:   60s in-process (zie fetchActiveHairPresets); client mag zelf
- *          nog eens 60s cachen (Cache-Control: max-age=60).
+ * Response: { presets: [{ key, label, thumbnail_url, order }] }
+ * Cache:   60s in-process (zie fetchActiveHairPresets) + CDN-cache via
+ *          CMS_LIST_CACHE_CONTROL (E52.1).
  */
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   if (_req.method !== "GET") {
@@ -21,9 +21,16 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   }
   try {
     const presets = await fetchActiveHairPresets();
-    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+    res.setHeader("Cache-Control", CMS_LIST_CACHE_CONTROL);
     res.status(200).json({
-      presets: presets.map(({ key, label, order }) => ({ key, label, order })),
+      // E52.1: optionele CMS-thumbnail als verkleinde variant; null als de
+      // collectie (nog) geen thumbnail-veld/waarde heeft.
+      presets: presets.map(({ key, label, thumbnailUrl, order }) => ({
+        key,
+        label,
+        thumbnail_url: thumbnailVariant(thumbnailUrl, 320),
+        order,
+      })),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

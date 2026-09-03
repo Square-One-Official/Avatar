@@ -1,0 +1,85 @@
+// Canvas-camera (E27.1) — de viewport-transform over de HELE canvas-scène
+// (kaart + achtergrond + onderwerp), zoals Framer/Figma. Eén `scale` + `offset`
+// die in `EditorView` als `.scaleEffect(anchor: .center).offset()` op de
+// DSCanvasCard hangt. Dit is VIEW-zoom (wat je ziet), NIET het ONDERWERP
+// schalen — dat blijft de selectie-handle-math in EditorCanvasView (E24).
+//
+// Vervangt de mislukte per-onderwerp `viewZoom` uit E24.8/24.17.
+
+import CoreGraphics
+
+/// De viewport-transform. `scale` is geclampt op 0.25×–4×; `offset` verschuift
+/// de scène (in viewport-punten, top-left origin = SwiftUI-conventie).
+struct CanvasCamera: Equatable {
+    var scale: CGFloat = 1
+    var offset: CGSize = .zero
+    /// Zoomgrenzen — instance zodat de editor (0.25–4×) en de board (E27.4, mag
+    /// verder uitzoomen om de hele set te tonen) hun eigen band kunnen kiezen.
+    var minScale: CGFloat = 0.25
+    var maxScale: CGFloat = 4
+
+    func clampScale(_ s: CGFloat) -> CGFloat {
+        min(maxScale, max(minScale, s))
+    }
+
+    /// ⌘0 (fit): terug naar de basislayout (scène vult de kaart, geen pan).
+    mutating func reset() {
+        scale = 1
+        offset = .zero
+    }
+
+    /// E27.4: fit-to-content — past de zoom zo aan dat een gecentreerde inhoud
+    /// van `contentSize` binnen `viewport` past (met marge), en centreert (offset
+    /// 0, want de board-grid is al door `.frame(maxWidth/Height:.infinity)`
+    /// gecentreerd). Geclampt aan de zoomband.
+    mutating func fitToContent(contentSize: CGSize, in viewport: CGSize, padding: CGFloat = 0.9) {
+        guard contentSize.width > 0, contentSize.height > 0,
+              viewport.width > 0, viewport.height > 0 else { reset(); return }
+        let raw = min(viewport.width / contentSize.width, viewport.height / contentSize.height) * padding
+        scale = clampScale(raw)
+        offset = .zero
+    }
+
+    /// Editor-open (en ⌘0): toon de HÉLE kaart (frame) gecentreerd in het venster.
+    /// De kaart is "cover"-gemaakt (zijde = de LANGSTE venster-as), dus op 1× loopt
+    /// hij buiten beeld; deze fit zoomt 'm terug tot `coverage` van de KORTSTE
+    /// venster-as. Daardoor staat het frame altijd volledig in beeld met marge —
+    /// de zwevende naam-chip-rij (boven) en toolbar (onder) vallen er niet overheen.
+    /// Puur camera-zoom: geen layout-padding/insets die de scène verschuiven.
+    mutating func fitEditorCard(cardSide: CGFloat, in viewport: CGSize, coverage: CGFloat = 0.7) {
+        // Vierkante kaart contain-fitten = `coverage`·min(venster-as) / kaartzijde,
+        // gecentreerd (offset 0). Hergebruikt `fitToContent` zodat de clamp/guard/
+        // centreer-logica op één plek leeft.
+        fitToContent(contentSize: CGSize(width: cardSide, height: cardSide),
+                     in: viewport, padding: coverage)
+    }
+
+    /// Zoom rond een vast PUNT (cursorlocatie in viewport-punten) zodat het punt
+    /// onder de cursor stil blijft staan. Gebruikt door ⌘-scroll/magnify in de
+    /// NSEvent-catcher. Afleiding: met scherm = midden + scale·(p−midden) + offset
+    /// volgt offset₁ = v·(1−r) + r·offset₀ met v = punt − midden, r = scale₁/scale₀.
+    mutating func zoom(by factor: CGFloat, around point: CGPoint, in size: CGSize) {
+        let newScale = clampScale(scale * factor)
+        guard size.width > 0, size.height > 0, newScale != scale else {
+            scale = newScale
+            return
+        }
+        let r = newScale / scale
+        let vx = point.x - size.width / 2
+        let vy = point.y - size.height / 2
+        offset.width = vx * (1 - r) + r * offset.width
+        offset.height = vy * (1 - r) + r * offset.height
+        scale = newScale
+    }
+
+    /// Zoom rond het MIDDEN van de viewport (pinch, ⌘+/⌘−, en ⌘1 → 100%). Het
+    /// middenpunt blijft vast: offset schaalt mee met de zoomverhouding.
+    mutating func zoomCentered(by factor: CGFloat) {
+        let newScale = clampScale(scale * factor)
+        guard newScale != scale else { return }
+        let r = newScale / scale
+        offset.width *= r
+        offset.height *= r
+        scale = newScale
+    }
+}

@@ -8,17 +8,20 @@ import { s3Storage } from "@payloadcms/storage-s3";
 import { Users } from "./collections/Users";
 import { Media } from "./collections/Media";
 import { Announcements } from "./collections/Announcements";
+import { Messages } from "./collections/Messages";
 import { BadgeComponents } from "./collections/BadgeComponents";
-import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
 import { Effects } from "./collections/Effects";
+import { BannerPresets } from "./collections/BannerPresets";
+import { NewsletterUnsubscribes } from "./collections/NewsletterUnsubscribes";
+import { ProAccess } from "./collections/ProAccess";
+import { AuditLog } from "./collections/AuditLog";
 import { Backgrounds } from "./collections/Backgrounds";
 import { Hair } from "./collections/Hair";
 import { Clothes } from "./collections/Clothes";
 import { Face } from "./collections/Face";
-import { AuditLog } from "./collections/AuditLog";
-import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 import { AppConfig } from "./globals/AppConfig";
 import { FeatureFlags } from "./globals/FeatureFlags";
+import { sendNewsletterEndpoint } from "./endpoints/sendNewsletter";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,7 +34,7 @@ export default buildConfig({
     },
   },
   editor: lexicalEditor(),
-  collections: [Users, Media, Announcements, BadgeComponents, Effects, Backgrounds, Hair, Clothes, Face, NewsletterUnsubscribes, AuditLog],
+  collections: [Users, Media, Announcements, Messages, BadgeComponents, Effects, Backgrounds, Hair, Clothes, Face, BannerPresets, NewsletterUnsubscribes, ProAccess, AuditLog],
   globals: [AppConfig, FeatureFlags],
   endpoints: [sendNewsletterEndpoint],
   secret: process.env.PAYLOAD_SECRET ?? "",
@@ -84,10 +87,13 @@ export default buildConfig({
       collections: {
         media: {
           prefix: "media",
-          // Generate a direct Supabase Storage public URL instead of routing
-          // through Payload's proxy (/api/media/file/…). Direct URL is faster
-          // and doesn't depend on Payload being healthy to serve thumbnails.
-          // Transforms S3_ENDPOINT (…/storage/v1/s3) → …/storage/v1/object/public/{bucket}/{prefix}/{filename}
+          // E55.5 — port van 837498f (stond alleen op main): geef een directe
+          // Supabase Storage public-URL uit i.p.v. Payload's proxy-pad
+          // (/api/media/file/…). De proxy zit achter de MFA-middleware (401
+          // voor anonieme app-loads) en mist de CDN-verkleining
+          // (thumbnailVariant matcht alleen de directe vorm). Transformeert
+          // S3_ENDPOINT (…/storage/v1/s3) →
+          // …/storage/v1/object/public/{bucket}/{prefix}/{filename}.
           generateFileURL: ({ filename, prefix: p }) => {
             const base = (process.env.S3_ENDPOINT ?? "").replace(/\/s3\/?$/, "");
             const bucket = process.env.S3_BUCKET ?? "announcement-media";

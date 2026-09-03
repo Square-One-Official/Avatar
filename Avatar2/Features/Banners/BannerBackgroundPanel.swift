@@ -1,0 +1,357 @@
+// E37.3 — Background/Fill-paneel van de Banner Studio.
+
+import AppKit
+import AvatarUI
+import SwiftUI
+
+struct BannerBackgroundPanel: View {
+    @Bindable var doc: BannerDoc
+    var entitlement: EntitlementModel?
+    var presentation: UIPresentationStore
+    var subtitle: String?
+
+    @State private var brand = BrandColorKit.shared
+    @State private var customImages = BackgroundImageKit.shared
+    @State private var pickerColor: Color = .white
+    /// Klik buiten "+"-swatch + picker (waar dan ook) sluit de kleurpicker.
+    @State private var colorPickerClickScope = DSOutsideClickScope()
+
+    private let swatch: CGFloat = 30
+
+    var body: some View {
+        DSEditPanel(title: "Background", subtitle: subtitle) {
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                    section("Color") { colorRow }
+                    section("Gradient") { gradientRow }
+                    section("Image") { imageRow }
+                    if isImageFillActive {
+                        zoomRow
+                    }
+                    Text("Click the canvas to add a photo — drag to reframe when selected.")
+                        .dsTextStyle(.bodySmall)
+                        .foregroundStyle(DSColor.Foreground.subtle)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if presentation.colorPicker == .bannerBackground {
+                    colorPickerOverlay
+                }
+            }
+        }
+    }
+
+    /// Picker buiten de scroll-rij: de edge-fade-masker op `scrollRow` kapte
+    /// de overlay op de "+"-swatch af.
+    private var colorPickerOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture { presentation.colorPicker = nil }
+            DSColorPicker(
+                color: $pickerColor,
+                supportsAlpha: false,
+                commitTitle: "Add colour",
+                onCommit: {
+                    if let hex = pickerColor.hexRGB { brand.add(hex) }
+                    presentation.colorPicker = nil
+                }
+            )
+                .dsDismissOnOutsideClick(colorPickerClickScope, isActive: true) {
+                    presentation.colorPicker = nil
+                }
+                .appliedAppearancePreference()
+                .padding(.top, 24)
+                .padding(.leading, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder private func section<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+            Text(title).dsTextStyle(.labelSmall).foregroundStyle(DSColor.Foreground.subtle)
+            content()
+        }
+    }
+
+    private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DSSpacing.gap2) { content() }
+                .padding(.vertical, DSSpacing.gap2)
+                .padding(.leading, DSSpacing.gap1)
+                .scrollRowTrailingInset()
+        }
+        .horizontalScrollEdgeFade()
+    }
+
+    // MARK: Color
+
+    private var colorRow: some View {
+        scrollRow {
+            Button {
+                if presentation.colorPicker == .bannerBackground {
+                    presentation.colorPicker = nil
+                    return
+                }
+                if let c = currentSolidColor { pickerColor = c }
+                presentation.colorPicker = .bannerBackground
+            } label: {
+                Circle()
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: DSIconSize.base, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+                    .overlay {
+                        Circle().strokeBorder(
+                            presentation.colorPicker == .bannerBackground
+                                ? DSColor.Action.primaryForeground
+                                : DSColor.Foreground.divider,
+                            lineWidth: DSBorderWidth.medium
+                        )
+                    }
+            }
+            .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
+            .dsHoverScale(1.02)
+            .dsOutsideClickInside(colorPickerClickScope)
+            .help("Pick a color")
+
+            ForEach(brand.hexColors.reversed(), id: \.self) { hex in
+                if let color = Color(hexRGB: hex) {
+                    swatchButton(color) {
+                        presentation.colorPicker = nil
+                        applySolid(color)
+                    }
+                }
+            }
+            ForEach(Array(BackgroundKit.colorPresets.enumerated()), id: \.offset) { _, color in
+                swatchButton(color) {
+                    presentation.colorPicker = nil
+                    applySolid(color)
+                }
+            }
+        }
+        .onChange(of: pickerColor) { _, c in
+            guard presentation.colorPicker == .bannerBackground else { return }
+            applySolid(c)
+        }
+        .onChange(of: presentation.colorPicker) { _, picker in
+            guard picker != .bannerBackground, let hex = pickerColor.hexRGB else { return }
+            brand.add(hex)
+        }
+    }
+
+    // MARK: Gradient
+
+    private var gradientRow: some View {
+        scrollRow {
+            ForEach(BackgroundKit.gradientPresets) { preset in
+                Button {
+                    presentation.colorPicker = nil
+                    applyGradient(preset)
+                } label: {
+                    RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
+                        .fill(DSColor.Background.neutral)
+                        .frame(width: 96, height: swatch)
+                        .overlay { BackgroundKit.meshFill(preset) }
+                        .clipShape(RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
+                                .strokeBorder(
+                                    isSelectedGradient(preset) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
+                                    lineWidth: isSelectedGradient(preset) ? DSBorderWidth.medium : DSBorderWidth.thin
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .dsFocusEffectDisabled()
+                .dsHoverScale(1.02)
+                .help(preset.name)
+            }
+        }
+    }
+
+    // MARK: Image
+
+    private var imageRow: some View {
+        scrollRow {
+            Button(action: uploadCustom) {
+                RoundedRectangle(cornerRadius: DSRadius.lg)
+                    .fill(DSColor.Background.neutral)
+                    .frame(width: swatch, height: swatch)
+                    .overlay {
+                        Image(systemName: "plus")
+                            .font(.system(size: DSIconSize.base, weight: .semibold))
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                    }
+            }
+            .buttonStyle(.plain)
+            .dsFocusEffectDisabled()
+            .dsHoverScale(1.02)
+            .help("Upload image")
+
+            GenerateBackgroundSwatch(
+                context: .banner(
+                    width: Int(doc.canvasWidth.rounded()),
+                    height: Int(doc.canvasHeight.rounded())
+                ),
+                entitlement: entitlement,
+                swatchSize: swatch,
+                onSaved: { data in
+                    let stored = customImages.add(data) ?? data
+                    doc.applyFillImage(stored, resetFraming: true)
+                }
+            )
+
+            if let data = doc.fillImageData,
+               isImageFillActive,
+               kitIDMatchingCurrentFill() == nil,
+               let image = NSImage(data: data) {
+                imageSwatchButton(image: image, selected: true) {
+                    doc.applyFillImage(data, resetFraming: false)
+                }
+            }
+
+            ForEach(customImages.imageIDs, id: \.self) { id in
+                if let image = customImages.image(for: id) {
+                    let selected = isImageFillActive && kitIDMatchingCurrentFill() == id
+                    imageSwatchButton(image: image, selected: selected) {
+                        selectCustomImage(id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var zoomRow: some View {
+        HStack(spacing: DSSpacing.gap2) {
+            Image(systemName: "plus.magnifyingglass")
+                .font(.system(size: DSIconSize.xs))
+                .foregroundStyle(DSColor.Foreground.muted)
+            DSSlider(value: zoomBinding, in: 1...3)
+                .frame(maxWidth: 180)
+        }
+    }
+
+    private var zoomBinding: Binding<Double> {
+        Binding(
+            get: { doc.fillImageZoom },
+            set: { newValue in
+                doc.fillImageZoom = newValue
+                doc.touch()
+            }
+        )
+    }
+
+    private func imageSwatchButton(image: NSImage, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            RoundedRectangle(cornerRadius: DSRadius.lg)
+                .fill(DSColor.Background.neutral)
+                .frame(width: swatch, height: swatch)
+                .overlay {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DSRadius.lg)
+                        .strokeBorder(
+                            selected ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
+                            lineWidth: selected ? DSBorderWidth.medium : DSBorderWidth.thin
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
+        .dsHoverScale(1.02)
+    }
+
+    // MARK: Swatch
+
+    private func swatchButton(_ color: Color, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Circle()
+                .fill(color)
+                .frame(width: swatch, height: swatch)
+                .overlay(
+                    Circle().strokeBorder(
+                        isSelectedSolid(color) ? DSColor.Action.primaryForeground : DSColor.Foreground.divider,
+                        lineWidth: isSelectedSolid(color) ? DSBorderWidth.medium : DSBorderWidth.thin
+                    )
+                )
+        }
+        .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
+        .dsHoverScale(1.02)
+    }
+
+    // MARK: State + apply
+
+    private var isImageFillActive: Bool {
+        if case .image = doc.layers.fill, doc.fillImageData != nil { return true }
+        return false
+    }
+
+    private func kitIDMatchingCurrentFill() -> String? {
+        guard let data = doc.fillImageData else { return nil }
+        return customImages.imageIDs.first { customImages.data(for: $0) == data }
+    }
+
+    private var currentSolidColor: Color? {
+        if case let .solid(hex) = doc.layers.fill { return Color(hexRGB: hex) }
+        return nil
+    }
+
+    private func isSelectedSolid(_ color: Color) -> Bool {
+        guard case let .solid(hex) = doc.layers.fill else { return false }
+        return color.hexRGB?.caseInsensitiveCompare(hex) == .orderedSame
+    }
+
+    private func isSelectedGradient(_ preset: BackgroundGradientPreset) -> Bool {
+        guard case let .meshGradient(stops) = doc.layers.fill else { return false }
+        let hexes = preset.blobs.map(\.hex)
+        guard stops.count == hexes.count else { return false }
+        return zip(stops, hexes).allSatisfy {
+            $0.hex.caseInsensitiveCompare($1) == .orderedSame
+        }
+    }
+
+    private func applySolid(_ color: Color, remember: Bool = false) {
+        guard let hex = color.hexRGB else { return }
+        var layers = doc.layers
+        layers.fill = .solid(hex: hex)
+        doc.layers = layers
+        if remember { brand.add(hex) }
+    }
+
+    private func applyGradient(_ preset: BackgroundGradientPreset) {
+        let stops = preset.blobs.map {
+            MeshStop(hex: $0.hex, x: Double($0.x), y: Double($0.y))
+        }
+        guard stops.count >= 2 else { return }
+        var layers = doc.layers
+        layers.fill = .meshGradient(stops: stops)
+        doc.layers = layers
+    }
+
+    private func uploadCustom() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url,
+              let raw = try? Data(contentsOf: url) else { return }
+        let stored = customImages.add(raw) ?? raw
+        doc.applyFillImage(stored)
+    }
+
+    private func selectCustomImage(_ id: String) {
+        guard let data = customImages.data(for: id) else { return }
+        doc.applyFillImage(data, resetFraming: false)
+    }
+}

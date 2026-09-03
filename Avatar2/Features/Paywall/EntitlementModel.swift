@@ -1,0 +1,804 @@
+// Paywall/credit-states barebones (E08.3) — entitlementstate + presentatie.
+// De checkout-logica is de v1 ProUpgradeSheet-flow via AvatarKit
+// (BackendClient.subscribeAnonymous/topup/me); v1's Loc en AppState zijn
+// verboden terrein, dus copy is hier Engelstalig hardcoded en de state
+// leeft in dit model.
+
+import AppKit
+import AvatarKit
+import AvatarUI
+import Foundation
+import Observation
+
+/// E53.7: multi-step sign-in state (e-mail → OTP) buiten de sheet-view.
+@MainActor
+struct SignInFlowState: Equatable {
+    enum Phase: Equatable { case email, otp }
+    var phase: Phase = .email
+    var email = ""
+    var code = ""
+    var emailValidation: DSValidationState = .normal
+    var otpValidation: DSValidationState = .normal
+
+    static let otpLength = 6
+
+    mutating func reset() {
+        phase = .email
+        email = ""
+        code = ""
+        emailValidation = .normal
+        otpValidation = .normal
+    }
+}
+
+@MainActor
+@Observable
+final class EntitlementModel {
+    private(set) var account: AccountPayload?
+
+    /// Remote feature flags (E33+). Default = allEnabled zodat de app nooit
+    /// kapot gaat als de CMS onbereikbaar is bij startup.
+    private(set) var featureFlags: RemoteFeatureFlags = .allEnabled
+
+    var isPaywallPresented = false {
+        didSet {
+            // E14.10: de reden hoort bij één presentatie — een latere "Upgrade"-
+            // chip toont weer de schone plan-kiezer.
+            if !isPaywallPresented { upgradeReason = nil }
+        }
+    }
+
+    /// E14.10: waarom de paywall open ging, voor een contextregel in de
+    /// plan-kiezer. nil = generieke opening (Upgrade-chip, Settings, gates).
+    enum UpgradeReason: Equatable {
+        /// Een drop van `dropped` beelden paste niet (meer) in de Starter-cap
+        /// van `capacity` afbeeldingen.
+        case importCapReached(dropped: Int, capacity: Int)
+    }
+    private(set) var upgradeReason: UpgradeReason?
+
+    /// Copy voor de contextregel onder "Choose your plan" (bewuste afwijking
+    /// van Figma-frame 4019:953, besluit Thierry 2026-09-02 — zie E14.10).
+    var upgradeReasonCopy: String? {
+        switch upgradeReason {
+        case nil:
+            return nil
+        case .importCapReached(let dropped, let capacity) where dropped >= 2:
+            return "You dropped \(dropped) images, but your \(capacity) free images are used up. Upgrade to Pro to import them."
+        case .importCapReached(_, let capacity):
+            return "Your \(capacity) free images are used up. Upgrade to Pro to keep importing."
+        }
+    }
+
+    /// E14.10: de paywall sloot omdat Stripe Checkout in de browser opende —
+    /// niet omdat de gebruiker afzag van upgraden. De shell laat een
+    /// wachtende drop-import dan staan tot het account Pro wordt.
+    private(set) var paywallClosedForCheckout = false
+
+    /// Op=op-toast (HTTP 402 / credits op): toast eerst, paywall op tik.
+    private(set) var isShowingOutOfCreditsToast = false
+
+    /// E18.3: generieke fout-toast voor cloud-acties (Effects/Hair/Clothing/
+    /// Boost) i.p.v. inline tekst onder de menutitel.
+    private(set) var errorToast: String?
+    /// E14.10: optionele actie in een info-toast ("Upgrade to Pro"). De
+    /// handler sluit de toast niet zelf; `presentInfo` regelt dat.
+    struct InfoToastAction {
+        let label: String
+        let handler: () -> Void
+    }
+    struct InfoToast: Equatable {
+        let title: String
+        let description: String?
+        var action: InfoToastAction? = nil
+
+        static func == (lhs: InfoToast, rhs: InfoToast) -> Bool {
+            lhs.title == rhs.title && lhs.description == rhs.description
+                && lhs.action?.label == rhs.action?.label
+        }
+    }
+    private(set) var infoToast: InfoToast?
+
+    /// Lopende cloud-actie-toast — statische titel + cycling copy per feature.
+    /// E55.9: plus verstreken-tijd (startedAt) en een verwachte duur zodat de
+    /// toast bij lange generaties (gpt-image high, 40–70s) een eerlijke
+    /// voortgangsindicatie toont i.p.v. alleen een spinner.
+    struct WorkingContext: Equatable {
+        let id: UUID
+        let title: String
+        let messages: [String]
+        var startedAt: Date = Date()
+        var expectedSeconds: Int? = nil
+        var isDismissible = true
+        var blocksOtherAIFeatures = false
+        /// Hover-hint bij de Cancel-knop — wat annuleren voor déze flow
+        /// betekent (Effects: detachen, Fill in body: afbreken). nil = geen
+        /// hint. Copy hoort bij de flow, niet bij de toast-view.
+        var cancelHint: String? = nil
+
+        init(
+            id: UUID = UUID(),
+            title: String,
+            messages: [String],
+            startedAt: Date = Date(),
+            expectedSeconds: Int? = nil,
+            isDismissible: Bool = true,
+            blocksOtherAIFeatures: Bool = false,
+            cancelHint: String? = nil
+        ) {
+            self.id = id
+            self.title = title
+            self.messages = messages
+            self.startedAt = startedAt
+            self.expectedSeconds = expectedSeconds
+            self.isDismissible = isDismissible
+            self.blocksOtherAIFeatures = blocksOtherAIFeatures
+            self.cancelHint = cancelHint
+        }
+
+        /// `startedAt` is presentatie-metadata, geen toast-identiteit: twee
+        /// keer dezelfde actie presenteren is dezelfde toast (en mag de
+        /// dsMotion-transitie niet hertriggeren), en de bestaande
+        /// gelijkheids-tests horen niet op sub-seconde `Date()`-verschillen
+        /// te breken.
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.title == rhs.title
+                && lhs.messages == rhs.messages
+                && lhs.expectedSeconds == rhs.expectedSeconds
+                && lhs.isDismissible == rhs.isDismissible
+                && lhs.blocksOtherAIFeatures == rhs.blocksOtherAIFeatures
+                && lhs.cancelHint == rhs.cancelHint
+        }
+    }
+    private(set) var workingContext: WorkingContext?
+    /// E55.9: cancel-actie bij de working-toast. Los van de Equatable-context
+    /// (closures vergelijken niet); gezet door de flow die kan detachen
+    /// (Effects), nil = geen Cancel-knop.
+    private(set) var workingCancelHandler: (() -> Void)?
+
+    /// E18.2: contextuele cloud-feature-gate. nil = niets te tonen.
+    enum CloudGate: Equatable { case signIn }
+    var cloudGate: CloudGate?
+
+    /// E53.7: sign-in flow-state op het model — overleeft sheet-recreatie bij
+    /// tab-/vensterwissel (OTP + e-mail blijven staan).
+    var signInFlow = SignInFlowState()
+
+    /// Privacy elevation modal wanneer een feature Cloud vereist.
+    var privacyElevation: PrivacyElevationRequest?
+    /// Actie om te herhalen nadat de gebruiker Cloud aanzet.
+    var privacyElevationRetry: (() -> Void)?
+    /// Deep-link naar Settings (ShellView opent deze pagina).
+    var openSettingsPage: SettingsPage?
+
+    /// Jaar als default-anker ("2 months free") — zelfde besluit als v1:
+    /// het betere-waardepad is het pad zonder kliks.
+    var selectedInterval: SubscriptionInterval = .year
+    /// Default op het best-value-pack, zodat één klik op Buy het anker koopt.
+    var selectedPack: CreditPack = .credits750
+
+    private(set) var isCheckoutBusy = false
+    private(set) var checkoutError: String?
+
+    /// Designbesluit (E05.1): geen quota-druk vóór waarde — de quota-badge
+    /// verschijnt pas ná de eerste geslaagde cutout. De import-flow (E05.2+)
+    /// roept markFirstCutoutCompleted() aan.
+    private static let firstCutoutKey = "shell.firstCutoutDone"
+    private(set) var hasCompletedFirstCutout =
+        UserDefaults.standard.bool(forKey: firstCutoutKey)
+
+    func markFirstCutoutCompleted() {
+        hasCompletedFirstCutout = true
+        UserDefaults.standard.set(true, forKey: Self.firstCutoutKey)
+    }
+
+    let backend: BackendClient
+
+    /// BackendClient houdt `auth` unowned vast; dit model borgt de levensduur.
+    private let auth: AuthService
+
+    /// `backendSession` is de E47.1-testseam: tests injecteren een
+    /// URLProtocol-stub-sessie zodat elke backend-call stubbaar is. De
+    /// default is exact wat `BackendClient` zelf zou kiezen — geen
+    /// gedragsverandering voor bestaande call sites.
+    init(auth: AuthService, backendSession: URLSession = TLSPinning.pinnedShared) {
+        self.auth = auth
+        self.backend = BackendClient(auth: auth, session: backendSession)
+        auth.onSignedIn = { [weak self] in
+            Task { await self?.refresh() }
+        }
+        #if DEBUG
+        // Smoke-run-haak (E15.5): zet de dev-vlag vóór de first render i.p.v.
+        // in een .task — twee post-render state-writes in hetzelfde frame
+        // (deze + ShellView's --show-settings) wedgen het hiddenTitleBar-
+        // venster. Een echt dev-account heeft de vlag óók al bij first render.
+        if ProcessInfo.processInfo.arguments.contains("--dev-advanced") {
+            debugForceDevUnlimited = true
+        }
+        #endif
+    }
+
+    var isProActive: Bool {
+        // Spiegelt v1 `ProEntitlement.isPro` (tier != nil) én de server-
+        // short-circuit in /v1/import-claim (`if (sub)` — past_due telt mee).
+        // Alleen `.active` eisen maakte grace-period (`.lapsed`) onterecht Starter.
+        account?.tier == .pro
+    }
+
+    /// Top-up-ladder in de paywall: alleen bij actief betaald abonnement.
+    var showsTopupRoute: Bool {
+        isProActive && account?.subscriptionStatus == .active
+    }
+
+    /// E15.5: dev-allowlisted account → unlimited credits, geen credit-gate.
+    var isDevUnlimited: Bool {
+        #if DEBUG
+        if debugForceDevUnlimited { return true }
+        #endif
+        return account?.isDevUnlimited ?? false
+    }
+
+    #if DEBUG
+    /// Smoke-run-haak (E15.5): forceer de dev-unlimited-vlag.
+    var debugForceDevUnlimited = false
+    #endif
+
+    /// Routekeuze in de paywall (v1 `showsTopup`): actieve Pro zonder
+    /// credits krijgt de top-up-ladder, ieder ander de subscribe-flow.
+    var showsTopup: Bool {
+        #if DEBUG
+        if debugForceTopup { return true }
+        #endif
+        return showsTopupRoute
+    }
+
+    #if DEBUG
+    /// Smoke-run-haak (E14.5): forceer de top-up-variant van de paywall.
+    var debugForceTopup = false
+    #endif
+
+    var creditsRemaining: Int { account?.creditsRemaining ?? 0 }
+    /// Maand-grant van het Pro-plan — het totaal voor de "X left of Y"-teller
+    /// in de topbar. Backend is bron; valt terug op de plan-default (200)
+    /// zowel vóór het laden als wanneer de backend 0 stuurt (anders zou de
+    /// teller terugvallen op de kale balans).
+    var monthlyQuota: Int {
+        let q = account?.monthlyQuota ?? 0
+        return q > 0 ? q : ProTier.pro.monthlyCredits
+    }
+    var freeImportsRemaining: Int? { account?.freeImportsRemaining }
+    var monthlyResetAt: Date? { account?.monthlyResetAt }
+
+    /// 14.7 (audit B8): de refill-datum, maar alléén als hij in de toekomst
+    /// ligt. `subscriptions.current_period_end` kan server-side stale raken
+    /// (gemiste Stripe-webhook-delivery) — een datum in het verleden is dan
+    /// een leugen ("Refills on 4 Jun 2026"). De UI valt in dat geval terug
+    /// op periodloze copy ("Refills monthly with your plan").
+    var upcomingMonthlyResetAt: Date? {
+        guard let reset = monthlyResetAt, reset > .now else { return nil }
+        return reset
+    }
+
+    /// Aftellende quota-tekst ("X left of Y" / "N credits") — één bron voor de
+    /// topbar én de left-nav (PoC). Pro: resterende credits over de maand-grant;
+    /// top-ups stapelen erbovenop (geen vaste noemer) → kale balans. Free: rest
+    /// van de lifetime-cap.
+    var quotaSummary: String {
+        if isProActive {
+            let quota = monthlyQuota
+            if quota > 0, creditsRemaining <= quota {
+                return "\(creditsRemaining) left of \(quota)"
+            }
+            return "\(creditsRemaining) credits"
+        }
+        if let free = freeImportsRemaining {
+            let remaining = max(0, min(FreeTier.maxPortraits, free))
+            return "\(remaining) left of \(FreeTier.maxPortraits)"
+        }
+        return ""
+    }
+
+    /// Verbruikt aandeel van het budget (0…1) voor de usage-bar in de left-nav.
+    /// Pro: verbruik van de maand-grant; top-ups boven de grant tellen als
+    /// 0% verbruikt (de balans ligt boven de noemer). Free: verbruik van de
+    /// lifetime-cap. nil zolang er geen account-data is.
+    var usedFraction: Double? {
+        if isProActive {
+            let quota = monthlyQuota
+            guard quota > 0 else { return nil }
+            let used = Double(quota - creditsRemaining) / Double(quota)
+            return min(1, max(0, used))
+        }
+        if let free = freeImportsRemaining {
+            let remaining = max(0, min(FreeTier.maxPortraits, free))
+            return 1 - Double(remaining) / Double(FreeTier.maxPortraits)
+        }
+        return nil
+    }
+
+    /// "19% used" — het enige getal dat de left-nav nog toont.
+    var usedPercentLabel: String {
+        guard let fraction = usedFraction else { return "" }
+        return "\(Int((fraction * 100).rounded()))% used"
+    }
+
+    // MARK: - Account-pagina (E15.3)
+
+    var accountEmail: String? { auth.email }
+    var isSignedIn: Bool { auth.isSignedIn }
+    var planLabel: String { isProActive ? "Pro" : "Starter" }
+
+    func signOutAccount() {
+        auth.signOut()
+        account = nil
+        billing = nil
+        billingError = nil
+    }
+
+    // MARK: - Billing & Invoices (Settings)
+
+    /// `GET /v1/billing`: plan + facturen uit Stripe. nil tot de eerste
+    /// geslaagde load (en na uitloggen); een refresh houdt de vorige payload
+    /// staan zodat de pagina niet flitst als je terugkomt uit de portal.
+    private(set) var billing: BillingPayload?
+    private(set) var isLoadingBilling = false
+    private(set) var billingError: String?
+
+    func refreshBilling() async {
+        guard auth.isSignedIn else {
+            billing = nil
+            billingError = nil
+            return
+        }
+        guard !isLoadingBilling else { return }
+        isLoadingBilling = true
+        defer { isLoadingBilling = false }
+        do {
+            billing = try await backend.billing()
+            billingError = nil
+        } catch {
+            billingError = "Couldn't load your billing details. Check your connection and try again."
+        }
+    }
+
+    /// Factuur openen in de browser: PDF als Stripe die heeft, anders de
+    /// gehoste factuurpagina. Zelfde scheme-guard als checkout/portal.
+    func openInvoice(_ invoice: BillingPayload.Invoice) {
+        if let url = Self.invoiceURL(for: invoice) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Pure keuze (testbaar): PDF > hosted, alleen web-schemes.
+    static func invoiceURL(for invoice: BillingPayload.Invoice) -> URL? {
+        [invoice.pdfUrl, invoice.hostedUrl]
+            .compactMap { $0 }
+            .compactMap(URL.init(string:))
+            .first { $0.isAllowedExternalScheme }
+    }
+
+    // MARK: - Delete account (E15.7, audit C7 — GDPR art. 17)
+
+    /// Loopt zolang de server-side wipe bezig is (disable de rij-knop).
+    private(set) var isDeletingAccount = false
+
+    /// Verwijdert het account definitief via `/v1/account/delete` (cancelt
+    /// Stripe-subs, wist de Supabase-user) en logt bij succes lokaal uit.
+    /// De lokale bibliotheek (portretten/banners op deze Mac) blijft bewust
+    /// staan — die is van de gebruiker, niet van het account.
+    /// Faalt de wipe, dan blijft de sessie intact en meldt de fout-toast dat
+    /// een retry veilig is (het endpoint is idempotent).
+    @discardableResult
+    func deleteAccount() async -> Bool {
+        guard !isDeletingAccount else { return false }
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+        do {
+            try await backend.deleteAccount()
+            signOutAccount()
+            return true
+        } catch {
+            presentError("Couldn't delete your account. Please try again — nothing was left half-deleted.")
+            return false
+        }
+    }
+
+    // MARK: - Sign-in (E18.1) — e-mail + OTP vanuit Account/gate
+    var authBusy: Bool { auth.isBusy }
+    var authError: String? { auth.lastError }
+
+    /// E18.21: wis de auth-fout (nadat de toast 'm getoond heeft / bij stap-wissel).
+    func dismissAuthError() {
+        auth.clearError()
+    }
+
+    /// Stap 1: Supabase mailt een OTP-code naar dit adres.
+    func sendSignInCode(_ email: String) async {
+        try? await auth.requestCode(email: email)
+    }
+
+    /// Stap 2: verifieer de code; bij succes ververst het account (plan/credits).
+    @discardableResult
+    func verifySignInCode(_ email: String, code: String) async -> Bool {
+        do {
+            try await auth.verifyCode(email: email, code: code)
+        } catch {
+            return false
+        }
+        await refresh()
+        return true
+    }
+
+    /// Stripe Customer Portal in de browser ("Manage subscription").
+    func openManageSubscription() {
+        Task {
+            if let url = try? await backend.openPortal(), url.isAllowedExternalScheme {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    /// Volgnummer van de laatst gestarte `refresh()` en van de fetch waarvan
+    /// het account-payload als laatste is toegepast. Samen maken ze de
+    /// account-refresh monotoon: een oudere fetch mag een nieuwere nooit
+    /// overschrijven.
+    private var refreshSequence = 0
+    private var appliedAccountSequence = 0
+
+    /// Anoniem-vriendelijk: zonder token valt /v1/account terug op de
+    /// device-grant-lookup. Offline of fout → state blijft staan.
+    ///
+    /// Race-guard (bug Thierry 2026-09-03): bij launch lopen meerdere
+    /// refreshes tegelijk — LeftNav/prewarm vóór de async sessie-restore
+    /// (anoniem → free-tier, 0 credits) en `onSignedIn` erna (Pro). Landde
+    /// het anonieme antwoord als laatste, dan overschreef het het Pro-account:
+    /// ingelogd, maar "0 credits" → de credit-gate opende de paywall op een
+    /// account met credits genoeg, en de sheet sprong van "Upgrade" naar
+    /// "Top up" zodra zijn eigen refresh het echte account binnenhaalde.
+    /// Daarom: (1) een fetch die gestart is in een andere sign-in-staat dan
+    /// de huidige wordt genegeerd, (2) een fetch die ouder is dan de laatst
+    /// toegepaste wordt genegeerd.
+    func refresh() async {
+        refreshSequence += 1
+        let sequence = refreshSequence
+        let requestedSignedIn = auth.isSignedIn
+        async let accountFetch = backend.me()
+        async let flagsFetch = backend.featureFlags()
+        let payload = try? await accountFetch
+        let flags = try? await flagsFetch
+        if let payload,
+           sequence > appliedAccountSequence,
+           requestedSignedIn == auth.isSignedIn {
+            account = payload
+            appliedAccountSequence = sequence
+        }
+        if let flags {
+            featureFlags = flags
+        }
+    }
+
+    /// Eén opstap voor alle gating: DSGated.onUpgradeRequested en 402-paden.
+    /// E14.10: optioneel mét reden → contextregel in de plan-kiezer.
+    func requestUpgrade(reason: UpgradeReason? = nil) {
+        checkoutError = nil
+        isShowingOutOfCreditsToast = false
+        paywallClosedForCheckout = false
+        upgradeReason = reason
+        isPaywallPresented = true
+    }
+
+    func handleOutOfCredits() {
+        isShowingOutOfCreditsToast = true
+    }
+
+    // MARK: - E18.3 fout-toast
+
+    /// E44.1 (audit B2/B3): auto-dismiss-duur van de fout-toast. 4s was
+    /// makkelijk te missen — een gemiste colorise-fout oogde live als "er
+    /// gebeurt niets". Een échte fout moet minimaal 8s leesbaar blijven
+    /// (plan-DoD). Constante hier (niet inline in `Avatar2App`) zodat de
+    /// ondergrens testbaar is.
+    static let errorToastDuration: Duration = .seconds(8)
+
+    /// UXS-2: duur voor niet-kritieke meldingen (sign-in-fout, op-is-op). Eén
+    /// bron i.p.v. losse literals per call site.
+    static let infoToastDuration: Duration = .seconds(5)
+
+    // MARK: - UXS-2 toast-prioriteit
+
+    /// Welke toast er op enig moment rechtsonder hoort te staan. Er is één slot,
+    /// dus de keuze is een prioriteitsvraag — niet de volgorde van een if/else-
+    /// keten. Een FOUT wint altijd: die zegt dat de operatie is mislukt, dus de
+    /// bijbehorende spinner is per definitie achterhaald.
+    enum ActiveToast: Equatable {
+        case error(String)
+        case outOfCredits
+        case working(WorkingContext)
+        case info(InfoToast)
+    }
+
+    /// Pure reducer — los van de view zodat de prioriteit testbaar is.
+    static func resolveToast(
+        error: String?,
+        outOfCredits: Bool,
+        working: WorkingContext?,
+        info: InfoToast? = nil
+    ) -> ActiveToast? {
+        if let error { return .error(error) }
+        if outOfCredits { return .outOfCredits }
+        if let working { return .working(working) }
+        if let info { return .info(info) }
+        return nil
+    }
+
+    var activeToast: ActiveToast? {
+        Self.resolveToast(
+            error: errorToast,
+            outOfCredits: isShowingOutOfCreditsToast,
+            working: workingContext,
+            info: infoToast
+        )
+    }
+
+    func presentError(_ message: String) {
+        infoToast = nil
+        errorToast = message
+    }
+
+    func dismissErrorToast() {
+        errorToast = nil
+    }
+
+    func presentInfo(title: String, description: String? = nil, action: InfoToastAction? = nil) {
+        // De actie sluit de toast vanzelf — een "Upgrade"-knop die blijft
+        // staan naast de paywall zou dubbelop zijn.
+        let wrapped = action.map { action in
+            InfoToastAction(label: action.label) { [weak self] in
+                self?.infoToast = nil
+                action.handler()
+            }
+        }
+        infoToast = InfoToast(title: title, description: description, action: wrapped)
+    }
+
+    func dismissInfoToast() {
+        infoToast = nil
+    }
+
+    /// E44.2 (audit B2): zichtbaar faalpad voor een geslaagde server-call
+    /// (HTTP 200) waarvan de bytes niet tot een afbeelding decoderen. De
+    /// server kan op dat pad al een credit hebben afgeschreven, dus naast de
+    /// fout-toast hoort er een `refresh()` zodat het saldo in de QuotaBadge
+    /// klopt — het stille `guard … else { return }`-pad produceerde alle
+    /// Colorise-symptomen tegelijk (geen resultaat, geen zichtbare fout,
+    /// saldo lijkt onveranderd terwijl er wél afgeschreven kan zijn).
+    func presentCloudResultFailure(_ message: String) async {
+        presentError(message)
+        await refresh()
+    }
+
+    @discardableResult
+    func presentWorking(
+        title: String,
+        messages: [String],
+        startedAt: Date = Date(),
+        expectedSeconds: Int? = nil,
+        isDismissible: Bool = true,
+        blocksOtherAIFeatures: Bool = false,
+        cancelHint: String? = nil,
+        onCancel: (() -> Void)? = nil
+    ) -> UUID {
+        infoToast = nil
+        let id = UUID()
+        workingContext = WorkingContext(
+            id: id, title: title, messages: messages,
+            startedAt: startedAt, expectedSeconds: expectedSeconds,
+            isDismissible: isDismissible,
+            blocksOtherAIFeatures: blocksOtherAIFeatures,
+            cancelHint: cancelHint
+        )
+        workingCancelHandler = onCancel
+        return id
+    }
+
+    func dismissWorkingToast(id expectedID: UUID? = nil) {
+        if let expectedID, workingContext?.id != expectedID { return }
+        workingContext = nil
+        workingCancelHandler = nil
+    }
+
+    // MARK: - Privacy Tier Picker gate
+
+    /// Mag een AI-feature draaien? Zo niet: elevation modal, sign-in of paywall.
+    @discardableResult
+    func allowAIFeature(_ feature: AIFeature, retry: (() -> Void)? = nil) -> Bool {
+        guard workingContext?.blocksOtherAIFeatures != true else { return false }
+        switch PrivacyGate.evaluate(feature, entitlement: self) {
+        case .allowed:
+            return true
+        case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevationRetry = retry
+            privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
+            return false
+        case .needsSignIn:
+            cloudGate = .signIn
+            return false
+        case .needsCredits:
+            requestUpgrade()
+            return false
+        }
+    }
+
+    /// Fill in body has a free server-side no-op when no body edge is cropped.
+    /// Keep privacy and sign-in gates, but let a zero-credit request reach that
+    /// geometry check. If generation is needed the backend still returns 402
+    /// and the normal out-of-credits flow takes over.
+    @discardableResult
+    func allowAIFeatureWithFreeServerPreflight(_ feature: AIFeature, retry: (() -> Void)? = nil) -> Bool {
+        guard workingContext?.blocksOtherAIFeatures != true else { return false }
+        switch PrivacyGate.evaluate(feature, entitlement: self) {
+        case .allowed, .needsCredits:
+            return true
+        case .needsElevation(requiredTier: let tier, feature: let feature):
+            privacyElevationRetry = retry
+            privacyElevation = PrivacyElevationRequest(feature: feature, requiredTier: tier)
+            return false
+        case .needsSignIn:
+            cloudGate = .signIn
+            return false
+        }
+    }
+
+    func dismissPrivacyElevation() {
+        privacyElevation = nil
+        privacyElevationRetry = nil
+    }
+
+    func enableCloudFromElevation() {
+        PrivacyPreferences2.shared.tier = .thirdParty
+        let retry = privacyElevationRetry
+        privacyElevation = nil
+        privacyElevationRetry = nil
+        retry?()
+    }
+
+    func dismissCloudGate() {
+        cloudGate = nil
+    }
+
+    /// E53.7: open de gedeelde sign-in sheet (Account + cloud-gate).
+    func presentSignIn() {
+        cloudGate = .signIn
+    }
+
+    /// Expliciet sluiten — wis ook flow-state.
+    func closeSignIn() {
+        cloudGate = nil
+        signInFlow.reset()
+    }
+
+    /// E14.2: free-tier importgate (3 lifetime-afbeeldingen, source-agnostic).
+    /// Roept de atomic server-claim aan vóór elke import; Pro short-circuit
+    /// `allowed`. Niet toegestaan (cap bereikt / 402) → paywall + false.
+    /// Een netwerk-/transportfout blokkeert niet (de gebruiker mag offline
+    /// niet vastlopen; de cloud-cutout dwingt server-side alsnog af) → true.
+    ///
+    /// E14.10: `presentPaywall: false` laat de weigering aan de caller (de
+    /// batch-import beslist zelf tussen paywall en "X of N imported"-toast);
+    /// `reason` reist mee naar de contextregel in de plan-kiezer.
+    func claimImport(presentPaywall: Bool = true, reason: UpgradeReason? = nil) async -> Bool {
+        #if DEBUG
+        // Smoke-runs (`--smoke-store` e.d.) draaien op een geïsoleerde store maar
+        // delen het echte account; deze bypass houdt de gate uit de flow-smokes
+        // zonder server-claims te verbruiken.
+        if Self.bypassesImportGate { return true }
+        #endif
+        do {
+            let resp = try await backend.claimImport()
+            if !resp.allowed {
+                if presentPaywall { requestUpgrade(reason: reason) }
+                return false
+            }
+            // Bijgewerkte teller meteen zichtbaar in de QuotaBadge.
+            await refresh()
+            return true
+        } catch BackendError.noCredits {
+            if presentPaywall { requestUpgrade(reason: reason) }
+            return false
+        } catch {
+            return true
+        }
+    }
+
+    #if DEBUG
+    private static var bypassesImportGate: Bool {
+        ProcessInfo.processInfo.arguments.contains("--bypass-import-gate")
+    }
+    #endif
+
+    /// E14.10: pre-flight vóór een batch-import — hoeveel beelden passen er
+    /// nog in de Starter-cap? `nil` = onbeperkt óf onbekend (Pro, account niet
+    /// te laden): de server blijft per beeld de autoriteit via `claimImport`.
+    /// Laadt het account één keer na als het er nog niet is, zodat een drop
+    /// direct na launch niet blind 14 tegels neerzet.
+    func remainingImportCapacity() async -> Int? {
+        #if DEBUG
+        if Self.bypassesImportGate { return nil }
+        #endif
+        if isProActive { return nil }
+        if account == nil { await refresh() }
+        if isProActive { return nil }
+        return freeImportsRemaining.map { max(0, $0) }
+    }
+
+    func dismissOutOfCreditsToast() {
+        isShowingOutOfCreditsToast = false
+    }
+
+    // MARK: - Checkout (v1 ProUpgradeSheet-logica via AvatarKit)
+
+    func startSubscribe() async {
+        await startCheckout {
+            // E14.6: ingelogd → authed flow (gekoppeld aan Supabase user-id,
+            // hergebruikt de Stripe-customer; geen dubbele customer). Anoniem
+            // → de e-mail-gebaseerde flow.
+            if self.auth.isSignedIn {
+                return try await self.backend.subscribe(interval: self.selectedInterval)
+            }
+            return try await self.backend.subscribeAnonymous(interval: self.selectedInterval)
+        }
+    }
+
+    func startTopup() async {
+        await startCheckout {
+            try await self.backend.topup(pack: self.selectedPack)
+        }
+    }
+
+    private func startCheckout(_ request: () async throws -> CheckoutResult) async {
+        guard !isCheckoutBusy else { return }
+        checkoutError = nil
+        isCheckoutBusy = true
+        defer { isCheckoutBusy = false }
+        do {
+            try openCheckout(try await request())
+        } catch BackendError.notSignedIn {
+            checkoutError = "Sign in first so we can top up the right account."
+        } catch let error as BackendError {
+            checkoutError = userFacingMessage(for: error)
+        } catch {
+            checkoutError = "Something went wrong starting checkout. Please try again."
+        }
+    }
+
+    /// Korte, vriendelijke copy — rauwe servercodes zijn voor het request-log.
+    private func userFacingMessage(for error: BackendError) -> String {
+        switch error {
+        case .server(_, "stripe_unavailable"):    return "Payments are briefly unavailable. Try again in a minute."
+        case .server(_, "checkout_init_failed"):  return "Couldn't start checkout. Please try again."
+        case .server(_, "pricing_misconfigured"): return "Pricing is being updated. Try again shortly."
+        case .rateLimited:                        return "Too many attempts. Give it a moment."
+        case .transport:                          return "You appear to be offline. Check your connection."
+        default:                                  return "Something went wrong starting checkout. Please try again."
+        }
+    }
+
+    private func openCheckout(_ result: CheckoutResult) throws {
+        switch result {
+        case .web(let url):
+            // Stripe Checkout in de browser; terugkeer via aaavatar://
+            // stripe-return (URL-scheme staat al op het Avatar2-target). Guard
+            // het scheme zodat alleen web-/eigen-scheme-URL's geopend worden.
+            guard url.isAllowedExternalScheme else { throw BackendError.decode }
+            NSWorkspace.shared.open(url)
+            // E14.10: sluiten-voor-checkout ≠ afzien van upgraden (zie
+            // `paywallClosedForCheckout`); de vlag vóór de toewijzing zodat
+            // een `onChange(of: isPaywallPresented)` 'm al ziet.
+            paywallClosedForCheckout = true
+            isPaywallPresented = false
+        case .storeKit:
+            // DMG-pad. Het StoreKit-pad hoort bij een latere MAS-story.
+            throw BackendError.decode
+        }
+    }
+}

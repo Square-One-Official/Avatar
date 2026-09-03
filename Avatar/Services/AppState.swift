@@ -1,3 +1,4 @@
+import AvatarKit
 import Foundation
 import SwiftUI
 import SwiftData
@@ -71,6 +72,16 @@ struct BatchConfirmRequest {
 
     let count: Int
     let credits: Int
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+}
+
+/// A pending Colorise confirmation, surfaced when the chosen photo already
+/// looks like colour. Colorise always costs 1 credit, so we ask before
+/// burning one on a near-no-op. No `count`/`credits` fields — the cost is
+/// fixed and spelled out in the dialog copy.
+@MainActor
+struct ColorizeConfirmRequest {
     let onConfirm: () -> Void
     let onCancel: () -> Void
 }
@@ -271,6 +282,12 @@ final class AppState {
             // Recoverable: try again later or check connection.
             warn(error.errorDescription ?? Loc.somethingWentWrong)
             return true
+        case .generationRefused:
+            // E55 (SHARED-touch: nieuwe AvatarKit-case, v1 switcht exhaustief):
+            // v1 heeft geen stylize-flow, dus dit hoort hier nooit te vuren —
+            // maar de copy ("try a different photo") is ook hier de juiste.
+            warn(error.errorDescription ?? Loc.somethingWentWrong)
+            return true
         case .server, .decode, .proRequired:
             // Either broken or a permission state the chip is the right
             // surface for. `proRequired` is rare (gate should have caught
@@ -341,6 +358,11 @@ final class AppState {
     /// Cutout (which would each cost 1 credit). Set by `PortraitDropHandler`
     /// when the drop count exceeds `BatchConfirmRequest.threshold`.
     var batchConfirm: BatchConfirmRequest?
+    /// Pending Colorise confirmation. Non-nil → MainWindow shows a confirm
+    /// dialog warning the photo already looks like colour and that colorising
+    /// will still cost 1 credit. Set by `ImportFlow.colorize` when the cutout
+    /// passes `ImageProcessor.isLikelyColour`.
+    var colorizeConfirm: ColorizeConfirmRequest?
     /// Transient Pro toast. Distinct from `lastError` so it can be styled
     /// as a soft upsell (with an Upgrade CTA) or a Pro-only info notice
     /// (no CTA), instead of a destructive error chip. Auto-dismisses a few
@@ -380,10 +402,13 @@ final class AppState {
     /// Backend REST client. Bound to the shared `AuthManager` so calls and
     /// sign-in flow see the same token storage.
     @ObservationIgnored
-    private(set) lazy var backend: BackendClient = BackendClient(
-        auth: auth,
-        privacyPrefs: privacyPrefs
-    )
+    private(set) lazy var backend: BackendClient = {
+        let client = BackendClient(auth: auth)
+        // Privacy-modus Local-only: fail closed vóór elke foto-upload
+        // (gate leeft sinds de v2-merge in AvatarKit's BackendClient).
+        client.cloudAllowed = { [privacyPrefs] in privacyPrefs.cloudAllowed }
+        return client
+    }()
 
     /// Feature-announcement + NEW-badge pipeline. Owns the in-memory
     /// model of "what announcement should the modal show" and "which

@@ -111,7 +111,7 @@ def main() -> None:
     print(f"       {zip_path} \\")
     print(f"       --title 'Matting model v1 (ORMBG)' \\")
     print(f"       --notes 'ORMBG (DIS-family), CoreML fp16, 1024x1024, Apache 2.0' \\")
-    print(f"       --repo thierrzz/Avatar")
+    print(f"       --repo Square-One-Official/Avatar")
 
 
 def convert_to_mlpackage(out: Path) -> None:

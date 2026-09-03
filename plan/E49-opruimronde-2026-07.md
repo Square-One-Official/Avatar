@@ -1,0 +1,106 @@
+# E49 — Opruimronde 2026-07
+
+Team: **FEAT + AI + DS**
+
+Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevindingen D4-D7).
+Spiegelt het patroon van `plan/AUDIT-2026-06-23-cleanup.md`: kleine, laag-risico
+opruim-items per team, gebundeld zodat ze in één keer opgepakt kunnen worden zonder
+een aparte story per regel te hoeven claimen.
+
+---
+
+## 49.1 — Dode code opruimen [FEAT]
+- status: done
+- team: FEAT
+- blockedBy: —
+
+**Wat (alle geverifieerd nul-call-sites, tenzij anders vermeld):**
+- `Avatar2/Features/Shell/PortraitHeader.swift` — vervangen door CanvasFrameChip +
+  RenameSheet, alleen nog in comments genoemd.
+- `EditorTool.dsSymbol` — de E20.1/21.2-omschakeling naar DSIcon is nooit afgemaakt.
+- `EditorTool.pendingStory` + bijbehorende stub-copy — toont eindgebruikers
+  story-nummers ("tools land here (E09.2)") in de entitlement==nil-fallback; de
+  stories zijn allang done.
+- `EditorView`'s onbereikbare `canvasPanel(.background)`-tak — `.background` zit niet
+  in `toolbarItems`; Background opent via de `CanvasActionToolbar`-dropdown.
+- Stale comment `EditorView.swift:641-642` (verwijst naar verborgen ⌘=-knoppen die
+  niet meer bestaan).
+- `Folder2.order` / `Folder2.colorHex` — nergens gerenderd/gesorteerd op; alleen
+  `SmokeSeed` schrijft `colorHex`.
+- `ImagePlaygroundEntryButton` — 0 call sites buiten de eigen file.
+- `OnboardingModel.finishSignedIn()` — 0 call sites (zie ook E04.8, die lost het
+  gebruik ván op; deze story ruimt 'm op als hij na E04.8 alsnog overbodig blijkt).
+- `ThumbnailStore.invalidate()` — gedocumenteerde no-op.
+**Voorstel:** verwijderen resp. corrigeren per punt.
+**DoD:** beide targets bouwen, tests groen, Result-regel met de lijst afgevinkt.
+**Result:** ✅ `PortraitHeader.swift` verwijderd + gederegistreerd (xcodegen, scheme-/Package.resolved-churn teruggedraaid); ✅ `EditorTool.dsSymbol` weg; ✅ `EditorTool.pendingStory` weg + stub-copy zonder story-nummers ("… tools are unavailable right now.", `EditorToolTests` mee); ✅ onbereikbare `canvasPanel(.background)`-tak weg (Background blijft via de `CanvasActionToolbar`-dropdown); ✅ stale ⌘=-comment bij `zoomCamera` herschreven naar de huidige View-menu/CanvasZoomEqualsShortcut-route (E27.10 had de verborgen knoppen al geschrapt); ✅ `Folder2.order`/`colorHex` weg (schrijf-sites LeftNavView/PortraitContextMenu/SmokeSeed mee-opgeschoond; lichte migratie, velden werden nergens gelezen); ✅ `ImagePlaygroundEntryButton` (+ private Available-struct, ongebruikte imports) weg — `ImagePlaygroundEntry.pngData` blijft (3 call-sites); ✅ `ThumbnailStore.invalidate()` no-op weg incl. alle 10 call-sites/cache-captures in BoardView; ☑︎ `OnboardingModel.finishSignedIn()` — reeds gedaan door E04.8 (0 hits). build-v2.sh volledig groen (Avatar + Avatar2 build, Avatar2-testsuite, AvatarKit- en AvatarUI-packagetests).
+
+## 49.2 — Kleine UX-consistentie [FEAT]
+- status: done
+- team: FEAT
+- blockedBy: —
+
+**Wat:**
+- `ExportSheet.swift:182,193` — export-/share-bestandsnaam hardcoded
+  "Aaavatar-portrait.png" i.p.v. `portrait.name`.
+- `PortraitSetActions.swift:82-100` — bulk-export op de main thread
+  (`makePNGAsync` bestaat al, wordt niet gebruikt) + stille naamcollisies
+  (overschrijft zonder melding) — dedupliceer bestandsnamen (`-2`, `-3`).
+- Privacy-policy-URL inconsistent: `SettingsAboutPage.swift:88` linkt `/privacy`,
+  `OnboardingEmailView.swift:88`/`PaywallSheet.swift:314` linken `/privacy-policy` —
+  één op één constante trekken.
+- ⌘U (Upload portrait) is view-scoped aan de Home-knop
+  (`HomeView.swift:347`) — registreer als app-brede `CommandGroup` (File-menu) naast
+  het bestaande `CanvasZoomCommands`-patroon; Home-knop mag het ⌘U-badge houden.
+- `GenerateBackgroundSwatch.openSheet` mist een `return` in de `.onDevice`-tak
+  (`GenerateBackgroundSheet.swift:618-633`) → elevation-modal én sheet tegelijk;
+  `ManageBackgroundsSheet.openGenerate` doet het wél goed — zelfde gedrag toepassen.
+- Onboarding-fouten (`auth.lastError`) renderen in dezelfde subtiele stijl als een
+  succesbevestiging (`OnboardingOTPView.swift:36-44`, `OnboardingEmailView.swift:40-44`)
+  — naar `DSColor.Signal.error` + `DSValidationState.error`, in lijn met SignInSheet.
+**DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ export-/share-naam volgt `portrait.name` (sanitized, lege naam → oude "Aaavatar-portrait"-fallback) in ExportSheet; ✅ bulk-export op `makePNGAsync` (render off-main) + batch-dedupe `-2`/`-3` (case-insensitive) i.p.v. stil overschrijven; ✅ privacy-/terms-URL's naar één `AppLinks`-constante (`/privacy-policy` is live, `/privacy` was 404 — Settings/About gefixt; PaywallSheet + OnboardingEmailView mee); ✅ ⌘U app-breed als File-menu-command (`UploadPortraitCommands` + focused-scene-value uit ShellView, zelfde patroon als SettingsCommands/CanvasZoomCommands; view-scoped shortcut van de Home-knop af, ⌘U-badge blijft); ✅ `GenerateBackgroundSwatch.openSheet` `.onDevice`-tak kreeg de missende `return` (geen elevation-modal + sheet tegelijk meer, gelijk aan `ManageBackgroundsSheet.openGenerate`); ✅ onboarding-fouten in `DSColor.Signal.error` + veld-validation `.error` (OnboardingEmailView/OnboardingOTPView, in lijn met SignInSheet; resend-bevestiging blijft subtle); ✅ follow-ups: "Restore body"→"Fill in body" (AIFeatureRegistry.uiLabel + PrivacyFeatureMatrix) en dev-label "Fill body"→"Fill in body" (DevModelOverrides). build-v2.sh volledig groen.
+
+## 49.3 — Perf-restjes [AI]
+- status: done
+- owner: AI (2026-07-12)
+- team: AI
+- blockedBy: —
+
+**Wat:**
+- `OrmbgModelStore.swift:164-186` — downloadprogress itereert per byte over ~45MB
+  (`for try await byte in bytes`); naar `download(from:)` + delegate/KVO-progress of
+  chunked `AsyncBytes`-reads.
+- `ShellModel.swift:570` (`applyAlphaMask`) — ad-hoc verse `CIContext` per aanroep op
+  het face-edit-hot-path, terwijl engines al gedeelde contexts gebruiken
+  (`EngineRendering`); hergebruik een gedeelde context.
+- Undo-history onbegrensd: `levelsOfUndo` wordt nergens gezet op de window-
+  `UndoManager`, terwijl `CutoutDataUndo` volledige PNG-`Data` in de closures houdt —
+  zet een redelijke cap (bv. 20).
+- `Portrait2.effectCache` is een base64-JSON-`Data`-blob (+33% opslag, hele blob
+  herschreven per nieuwe entry) — overweeg losse `externalStorage`-velden per entry
+  via een kind-entiteit, of minimaal binaire plist i.p.v. JSON.
+**DoD:** beide targets bouwen, tests groen, Result-regel per punt.
+**Result:** ✅ OrmbgModelStore-downloadprogress via `URLSessionDownloadDelegate` (`didWriteData`-fractie per chunk, geen per-byte-`AsyncBytes`-lus meer; SHA-256-gate erná onveranderd); ✅ `ShellModel.applyAlphaMask` op gedeelde `AlphaMaskRendering.context` i.p.v. verse `CIContext` per aanroep; ✅ undo-cap: `.undoHistoryCap()` (default 20) op de WindowGroup-root in Avatar2App — `levelsOfUndo` was NSUndoManager-default onbegrensd met volle PNG-payloads in de closures; ✅ `Portrait2.effectCache` → binaire plist (Data rauw i.p.v. base64-JSON, −33% opslag; leesfallback voor oude JSON-blobs, `effectBackgroundData` pakt de actieve entry via PropertyListSerialization) + 2 nieuwe tests (roundtrip + JSON-fallback) in Portrait2Tests. build-v2.sh volledig groen.
+
+## 49.4 — Phosphor vs. SF Symbols-besluit afronden [DS]
+- status: done
+- owner: DS (2026-07-12)
+- team: DS
+- blockedBy: —
+
+**Wat:** `plan/DECISIONS-PENDING.md` heeft een open item sinds 2026-06-14:
+PhosphorSwift's asset-catalog breekt `swift test --package-path AvatarUI` (geen
+`actool` in de CLI-toolchain). Interim: `DSIcon` draait op SF Symbols met de
+bedoelde Phosphor-naam in commentaar. Vandaag blijkt PhosphorSwift wél gelinkt aan
+het Avatar2-target, maar in exact 2 files gebruikt
+(`CanvasActionToolbar.swift:29`, `FaceActionsPanel.swift:15`) — twee icoonsystemen
+door elkaar.
+**Voorstel:** kies één van de drie opties uit DECISIONS-PENDING.md (AvatarUI-tests via
+xcodebuild i.p.v. `swift test`; font-gebaseerde Phosphor-bron; Phosphor-SVG's als
+eigen resources zonder asset-catalog) en voer 'm door, of besluit bewust bij
+SF Symbols te blijven en verwijder de PhosphorSwift-dependency + de 2 losse
+call-sites.
+**DoD:** `swift test --package-path AvatarUI` blijft groen; DECISIONS-PENDING.md
+bijgewerkt naar "Beslist"; Result-regel.
+**Result:** ✅ besluit: bewust bij SF Symbols; PhosphorSwift uit project.yml (package-def + Avatar2-dependency) en beide imports weg. ✅ LET OP — dit wijzigt wél zichtbare glyphs: CanvasActionToolbar rendert 9 Phosphor-iconen (Frame-pil `frameCorners`, Background-pil `image`, grid-chip `gridNine`, dropdown-rijen `cornersOut`/`crop`/`perspective`/`flipHorizontal`, shape-rijen `circle`/`square`) en FaceActionsPanel 3 preset-fallbacks (`tooth`/`palette`/`smiley`) — alle 12 nu via de DSIcon-seam op SF-equivalenten (nieuwe Symbol-cases: frame/grid/shapeCircle/shapeSquare + whitenTeeth/applyMakeup/reduceWrinkles); Phosphor-naam per case in commentaar. ✅ Nieuw `DSIcon.image(_:)` (kaal SF-Image, erft omgevings-tint) zodat active-lime op capsule-pillen blijft werken — de DSIcon-víew zet een vaste primary-tint; pill-maatvoering via gedeelde `_DSFontSizedIcon` (zelfde gewicht als de onderste toolbar). ✅ DECISIONS-PENDING.md → "BESLIST 2026-07-12 (E49.4)" incl. terugdraai-route (font-optie). build-v2.sh volledig groen; `swift test --package-path AvatarUI` groen.

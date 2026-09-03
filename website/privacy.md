@@ -99,7 +99,7 @@ To revoke Avatar's access to your Google account at any time, visit [https://mya
 
 ## 6. Third parties and subprocessors
 
-Avatar uses the following third-party services. We disclose them as **subprocessors** under GDPR Art. 28; the live list is also maintained at [`docs/legal/subprocessors.md`](https://github.com/thierrzz/Avatar/blob/main/docs/legal/subprocessors.md) in the source repository.
+Avatar uses the following third-party services. We disclose them as **subprocessors** under GDPR Art. 28; the live list is also maintained at [`docs/legal/subprocessors.md`](https://github.com/Square-One-Official/Avatar/blob/main/docs/legal/subprocessors.md) in the source repository.
 
 | Service | Purpose | What it sees | Hosting region |
 |---|---|---|---|

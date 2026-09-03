@@ -35,6 +35,61 @@ function payloadBase(): string | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+// E52.1 — thumbnail-varianten via Supabase image-transformatie.
+//
+// Media wordt (sinds 837498f) als ORIGINEEL via directe Supabase Storage-URL's
+// geserveerd; panels decodeerden dus full-size bronnen voor ~100–200 pt
+// grid-cellen. Supabase's image-transformation-API levert een verkleinde,
+// CDN-gecachete variant door `/object/public/…` te herschrijven naar
+// `/render/image/public/…?width=…&quality=…` — geen re-upload nodig.
+// Geverifieerd op het productie-project (2026-07-02): 200 OK, geldige JPEG,
+// cf-cache-status HIT op de tweede hit.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rewrite a Supabase Storage public-object URL into its image-transformation
+ * (thumbnail) variant. Non-Supabase URLs are returned unchanged so a future
+ * CDN swap degrades gracefully. Een eventuele querystring op de object-URL
+ * (Payload's S3-plugin hangt er sinds de E54-admin-deploy `?prefix=media`
+ * aan) wordt genegeerd: het pad identificeert het object volledig.
+ *
+ * `width` is een MAX-EDGE, geen breedte: we vragen een vierkante box
+ * (`width`×`width`) op met `resize=contain`, wat proportioneel binnenin past
+ * zonder te padden (geverifieerd 2026-08-03: 800×800 → 320×320, en een
+ * 320×160-box → 160×160). Zónder `height`/`resize` valt Supabase terug op
+ * cover mét de originele hoogte: een 800×800-bron kwam er als 320×800 uit —
+ * een center-crop die de linker- en rechterhelft weggooide. Dat trof elke
+ * CMS-thumbnail én de stijl-referenties die naar het model gaan.
+ */
+export function thumbnailVariant(
+  url: string | null,
+  width = 320,
+  quality = 75,
+): string | null {
+  if (!url) return null;
+  const m = url.match(/^(https?:\/\/[^/]+\/storage\/v1)\/object\/public\/([^?]+)/);
+  if (!m) {
+    // E55.5: luid falen i.p.v. stil doorlaten. Een niet-matchende URL betekent
+    // meestal een admin-deploy zonder de generateFileURL-fix (837498f) — de
+    // app krijgt dan een full-size origineel (traag) of een MFA-geblokkeerde
+    // proxy-URL (kapot). De passthrough blijft (graceful degradation), maar
+    // nooit meer onzichtbaar.
+    console.warn(`[payload] thumbnailVariant: URL matcht de Supabase-objectvorm niet, passthrough full-size: ${url}`);
+    return url;
+  }
+  return `${m[1]}/render/image/public/${m[2]}?width=${width}&height=${width}&resize=contain&quality=${quality}`;
+}
+
+/**
+ * Shared Cache-Control for the anonymous CMS-list endpoints (E52.1). The
+ * lists change rarely (Thierry seeds content); a 60s browser-cache plus a
+ * 5-minute CDN-cache with stale-while-revalidate keeps panel-opens off the
+ * Payload round-trip without making CMS edits feel laggy.
+ */
+export const CMS_LIST_CACHE_CONTROL =
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
+
 /** What the backend needs from one Payload announcement document. */
 export type PayloadAnnouncement = {
   slug: string;
@@ -77,16 +132,17 @@ export async function fetchPublishedAnnouncements(): Promise<PayloadAnnouncement
     return cache.payload;
   }
 
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    // Misconfigured → return empty so the macOS app never sees a 500 on a
-    // path that's only loosely critical.
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — announcements disabled");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    // Misconfigured (missing/invalid URL or key) → return empty so the macOS
+    // app never sees a 500 on a path that's only loosely critical.
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — announcements disabled");
     return [];
   }
 
   // Fetch published, non-expired announcements. Payload uses the `where`
   // querystring with bracketed operators.
-  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/announcements`);
+  const url = new URL(`${base}/announcements`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("depth", "1");
   url.searchParams.set("where[publishedAt][exists]", "true");
@@ -222,6 +278,27 @@ function lexicalToMarkdown(raw: unknown): string {
   return children.map(renderNode).join("\n\n").trim();
 }
 
+// Schemes a link in the in-app Markdown body may use. The macOS client renders
+// this body via `AttributedString(markdown:)` and taps go through SwiftUI's
+// default openURL with no scheme guard, so a `file:`/other hostile scheme in an
+// author-supplied link must not survive into a navigable link. Mirrors the
+// email renderer's `safeUrl` (admin/src/lib/lexical.ts). The WHATWG URL parser
+// also neutralises control-char scheme smuggling (`java&#9;script:`).
+const ALLOWED_LINK_SCHEMES = new Set(["http:", "https:", "mailto:", "aaavatar:"]);
+
+function safeLinkUrl(url: string | undefined): string | null {
+  if (typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  let scheme: string;
+  try {
+    scheme = new URL(trimmed, "https://aaavatar.invalid/").protocol;
+  } catch {
+    return null;
+  }
+  return ALLOWED_LINK_SCHEMES.has(scheme) ? trimmed : null;
+}
+
 function renderNode(node: unknown): string {
   if (typeof node !== "object" || node === null) return "";
   const n = node as { type?: string; tag?: string; text?: string; format?: number; url?: string; children?: unknown[]; listType?: string };
@@ -240,7 +317,10 @@ function renderNode(node: unknown): string {
   switch (n.type) {
     case "paragraph": return inner;
     case "heading":   return `${"#".repeat(headingLevel(n.tag))} ${inner}`;
-    case "link":      return `[${inner}](${n.url ?? ""})`;
+    case "link": {
+      const href = safeLinkUrl(n.url);
+      return href ? `[${inner}](${href})` : inner;
+    }
     case "list":      return inner;
     case "listitem": {
       const bullet = n.listType === "number" ? "1." : "-";
@@ -268,12 +348,13 @@ export async function recordNewsletterUnsubscribe(
   email: string,
   source: "one_click" | "list_unsubscribe_post" | "manual" = "one_click",
 ): Promise<boolean> {
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — unsubscribe NOT recorded");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — unsubscribe NOT recorded");
     return false;
   }
 
-  const url = `${PAYLOAD_API_URL.replace(/\/$/, "")}/newsletter-unsubscribes`;
+  const url = `${base}/newsletter-unsubscribes`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -312,7 +393,8 @@ export type PayloadEffect = {
   label: string;
   prompt: string;
   thumbnailUrl: string | null;
-  styleReferenceUrl: string | null;
+  /** E54: server-only stijlvoorbeelden, in CMS-volgorde (max 4 rijen). */
+  styleReferenceUrls: string[];
   order: number;
 };
 
@@ -359,10 +441,84 @@ function normalizeEffect(raw: unknown): PayloadEffect | null {
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
   const thumb = r.thumbnail as { url?: string } | null | undefined;
   const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
-  const styleRef = r.styleReference as { url?: string } | null | undefined;
-  const styleReferenceUrl = styleRef && typeof styleRef.url === "string" ? styleRef.url : null;
+  // E54: `styleReferences` is een Payload-array van { image: upload }; depth=1
+  // resolvet elke upload naar { url }. Rijen zonder bruikbare url slaan we over.
+  const refRows = Array.isArray(r.styleReferences) ? r.styleReferences : [];
+  const styleReferenceUrls = refRows
+    .map((row) => {
+      if (typeof row !== "object" || row === null) return null;
+      const image = (row as Record<string, unknown>).image as { url?: string } | null | undefined;
+      return image && typeof image.url === "string" ? image.url : null;
+    })
+    .filter((u): u is string => u !== null);
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, thumbnailUrl, styleReferenceUrl, order };
+  return { key, label, prompt, thumbnailUrl, styleReferenceUrls, order };
+}
+
+// ---------------------------------------------------------------------------
+// E39 — Banner-presets (CMS-gestuurde startpunten, slug "banner-presets").
+// Spiegelt admin/src/collections/BannerPresets.ts: key + label + category +
+// thumbnail + config (JSON-string van de app's BannerLayers) + order. Een nieuw
+// banner-startpunt kan zo zonder app- of backend-deploy worden toegevoegd. De
+// `config` is een ondoorzichtige JSON-string die alléén de app decodeert; de
+// backend reikt 'm onbewerkt door.
+// ---------------------------------------------------------------------------
+
+export type PayloadBannerPreset = {
+  key: string;
+  label: string;
+  category: string;
+  thumbnailUrl: string | null;
+  config: string;
+  order: number;
+};
+
+let bannerPresetCache: { expiresAt: number; payload: PayloadBannerPreset[] } | null = null;
+
+export async function fetchActiveBannerPresets(): Promise<PayloadBannerPreset[]> {
+  const now = Date.now();
+  if (bannerPresetCache && bannerPresetCache.expiresAt > now) {
+    return bannerPresetCache.payload;
+  }
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — banner presets disabled");
+    return [];
+  }
+
+  const url = new URL(`${base}/banner-presets`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("depth", "1"); // resolve the thumbnail upload → { url }
+  url.searchParams.set("where[active][equals]", "true");
+  url.searchParams.set("sort", "order");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `users API-Key ${PAYLOAD_API_KEY}`, Accept: "application/json" },
+  });
+  if (!res.ok) {
+    console.error("Payload banner-presets fetch failed", res.status, await res.text().catch(() => ""));
+    return [];
+  }
+  const json = (await res.json()) as { docs?: unknown[] };
+  const docs = Array.isArray(json.docs) ? json.docs : [];
+  const presets = docs.map(normalizeBannerPreset).filter((p): p is PayloadBannerPreset => p !== null);
+  bannerPresetCache = { expiresAt: now + CACHE_TTL_MS, payload: presets };
+  return presets;
+}
+
+function normalizeBannerPreset(raw: unknown): PayloadBannerPreset | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const key = typeof r.key === "string" ? r.key.trim() : null;
+  const config = typeof r.config === "string" ? r.config.trim() : null;
+  // Onbruikbaar zonder key + config (de preset kan dan geen laagstack vormen) → skip.
+  if (!key || !config) return null;
+  const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  const category = typeof r.category === "string" && r.category.trim() ? r.category.trim() : "default";
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
+  const order = typeof r.order === "number" ? r.order : 99;
+  return { key, label, category, thumbnailUrl, config, order };
 }
 
 // ---------------------------------------------------------------------------
@@ -527,33 +683,39 @@ export async function fetchAppConfig(): Promise<PayloadAppConfig> {
 // wordt NIET geëxporteerd naar de client — alleen /v1/stylize gebruikt hem.
 // ---------------------------------------------------------------------------
 
-export type PayloadHairPreset = { key: string; label: string; prompt: string; order: number };
-export type PayloadClothesPreset = { key: string; label: string; prompt: string; order: number };
-export type PayloadFacePreset = { key: string; label: string; prompt: string; order: number };
+export type PayloadHairPreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+export type PayloadClothesPreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+export type PayloadFacePreset = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
+
+type PresetDoc = { key: string; label: string; prompt: string; thumbnailUrl: string | null; order: number };
 
 let hairCache: { expiresAt: number; payload: PayloadHairPreset[] } | null = null;
 let clothesCache: { expiresAt: number; payload: PayloadClothesPreset[] } | null = null;
 let faceCache: { expiresAt: number; payload: PayloadFacePreset[] } | null = null;
 
-function normalizePreset(raw: unknown): { key: string; label: string; prompt: string; order: number } | null {
+function normalizePreset(raw: unknown): PresetDoc | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const key = typeof r.key === "string" ? r.key.trim() : null;
   const prompt = typeof r.prompt === "string" ? r.prompt.trim() : null;
   if (!key || !prompt) return null;
   const label = typeof r.label === "string" && r.label.trim() ? r.label.trim() : key;
+  // E52.1: optionele CMS-thumbnail (upload-referentie, resolved via depth=1).
+  // Collecties zonder thumbnail-veld leveren gewoon `null` — geen schema-eis.
+  const thumb = r.thumbnail as { url?: string } | null | undefined;
+  const thumbnailUrl = thumb && typeof thumb.url === "string" ? thumb.url : null;
   const order = typeof r.order === "number" ? r.order : 99;
-  return { key, label, prompt, order };
+  return { key, label, prompt, thumbnailUrl, order };
 }
 
 async function fetchPresets(
   slug: string,
   cache: { expiresAt: number; payload: unknown[] } | null,
   setCache: (c: { expiresAt: number; payload: unknown[] }) => void,
-): Promise<Array<{ key: string; label: string; prompt: string; order: number }>> {
+): Promise<PresetDoc[]> {
   const now = Date.now();
   if (cache && cache.expiresAt > now) {
-    return cache.payload as Array<{ key: string; label: string; prompt: string; order: number }>;
+    return cache.payload as PresetDoc[];
   }
   const base = payloadBase();
   if (!base || !PAYLOAD_API_KEY) {
@@ -562,7 +724,8 @@ async function fetchPresets(
   }
   const url = new URL(`${base}/${slug}`);
   url.searchParams.set("limit", "100");
-  url.searchParams.set("depth", "0");
+  // depth=1 (E52.1): resolve een eventuele thumbnail-upload → { url }.
+  url.searchParams.set("depth", "1");
   url.searchParams.set("where[active][equals]", "true");
   url.searchParams.set("sort", "order");
   const res = await fetch(url, {
@@ -574,7 +737,7 @@ async function fetchPresets(
   }
   const json = (await res.json()) as { docs?: unknown[] };
   const docs = Array.isArray(json.docs) ? json.docs : [];
-  const presets = docs.map(normalizePreset).filter((p): p is { key: string; label: string; prompt: string; order: number } => p !== null);
+  const presets = docs.map(normalizePreset).filter((p): p is PresetDoc => p !== null);
   setCache({ expiresAt: now + CACHE_TTL_MS, payload: presets });
   return presets;
 }
@@ -687,12 +850,13 @@ export async function fetchPublishedMessages(): Promise<PayloadMessage[]> {
   if (messageCache && messageCache.expiresAt > now) {
     return messageCache.payload;
   }
-  if (!PAYLOAD_API_URL || !PAYLOAD_API_KEY) {
-    console.warn("PAYLOAD_API_URL / PAYLOAD_API_KEY missing — messages disabled");
+  const base = payloadBase();
+  if (!base || !PAYLOAD_API_KEY) {
+    console.warn("PAYLOAD_API_URL invalid / PAYLOAD_API_KEY missing — messages disabled");
     return [];
   }
 
-  const url = new URL(`${PAYLOAD_API_URL.replace(/\/$/, "")}/messages`);
+  const url = new URL(`${base}/messages`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("depth", "1");
   // publishedAt leeft onder de schedule-group → dot-notation in de where.

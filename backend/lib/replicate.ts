@@ -1,23 +1,32 @@
 import Replicate from "replicate";
-import { defaultModelRef } from "./models.js";
+import { GPT_IMAGE_ASPECTS } from "./aspects.js";
+import { nearestFixedAspect } from "./image.js";
+import { defaultModelRef, modelFixedAspects } from "./models.js";
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! });
 
 /**
  * Hard timeout for any single `replicate.run()` call (audit MEDIUM #17).
  * The SDK has no built-in client-side timeout; a hung Replicate prediction
- * would otherwise let the Vercel function run to its 60s `maxDuration`,
+ * would otherwise let the Vercel function run to its `maxDuration`,
  * costing the user a full timeout instead of a clean 504.
  *
- * 50s leaves ~10s of headroom under Vercel's default function ceiling so
- * the handler can still finalise (free-trial counter, response write)
- * after we surface the timeout.
+ * 50s is the DEFAULT budget, sized for the endpoints on a 60s `maxDuration`
+ * (vercel.json: cutout) — ~10s headroom so the handler can still finalise
+ * (free-trial counter, response write) after we surface the timeout.
+ * Features whose model legitimately runs longer get a per-feature budget
+ * instead: `STYLIZE_TIMEOUT_MS`, `BACKGROUND_TIMEOUT_MS` and
+ * `COLORIZE_TIMEOUT_MS` (80s, under their 90s `maxDuration`). E44.1: don't
+ * reuse this default for a slow model — DeOldify cold starts sat right at
+ * the 50s edge and died as silent 504s.
  */
 const REPLICATE_TIMEOUT_MS = 50_000;
 
 export class ReplicateTimeoutError extends Error {
-  constructor(public readonly model: string) {
-    super(`replicate.run(${model}) timed out after ${REPLICATE_TIMEOUT_MS}ms`);
+  // E55.7-fix: meld de ÉCHTE gebruikte timeout — de message hardcodede de
+  // 50s-default en loog dus bij features met een eigen budget (stylize 80s).
+  constructor(public readonly model: string, timeoutMs: number = REPLICATE_TIMEOUT_MS) {
+    super(`replicate.run(${model}) timed out after ${timeoutMs}ms`);
     this.name = "ReplicateTimeoutError";
   }
 }
@@ -32,7 +41,7 @@ async function runWithTimeout<T>(
     return await Promise.race([
       p,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new ReplicateTimeoutError(model)), timeoutMs);
+        timer = setTimeout(() => reject(new ReplicateTimeoutError(model, timeoutMs)), timeoutMs);
       }),
     ]);
   } finally {
@@ -141,10 +150,15 @@ export async function outpaintPortrait(input: {
   maskDataUrl: string;
   model?: string | null;
 }): Promise<string> {
-  // Negative phrasing matters: without "no objects/props/hands/etc"
-  // the model will happily invent context to fill the margin (an
-  // earlier version produced a microphone-stick on one side). Repeat
-  // the empty-background directive — FLUX responds to emphasis.
+  // Say what SHOULD be there first (fabric/skin continuing, uniform grey),
+  // then what must not: FLUX follows a positive description far better
+  // than a list of negations, but the negations still matter — without
+  // "no objects/props/hands/etc" the model invents context to fill the
+  // margin (an earlier version produced a microphone-stick on one side).
+  // Text gets its own emphatic clause: a horizontal strip along the bottom
+  // of a portrait primes the model for a subtitle/caption bar, and it came
+  // back with gibberish captions (E56.3). The mask now hugs the body, and
+  // the prompt is the second safety net.
   //
   // The face-preservation clause is absolute: even if part of the face
   // is missing or cropped, the model must NOT invent or modify facial
@@ -152,14 +166,19 @@ export async function outpaintPortrait(input: {
   // black = preserve), but stating the rule in the prompt is a second
   // safety net for any feathered seam pixels near the face.
   const prompt =
-    "A studio portrait of one person, head and upper chest only, " +
-    "centered. Plain empty neutral grey background, completely empty, " +
-    "no objects, no props, no microphone, no instruments, no hands raised, " +
-    "no accessories, no other people, no text. Keep the face, hair, skin, " +
-    "and clothing untouched. Do not modify the face under any circumstances; " +
-    "if any part of the face appears missing or incomplete, leave it as is — " +
-    "do not invent, redraw, or extend facial features. " +
-    "Photographic, soft natural lighting, single subject.";
+    "Continue only the cropped clothing and body that runs into the small white " +
+    "masked edge: extend the same fabric, skin, and shoulders naturally for a " +
+    "short distance, then stop. Preserve the current pose, scale, framing, " +
+    "and composition. Do not invent a full body or extend farther than the mask. " +
+    "Everything else in the masked area is a plain, uniform, empty neutral grey " +
+    "studio background. Absolutely no text, letters, words, captions, subtitles, " +
+    "banners, labels, logos, or watermarks anywhere — the bottom edge is empty " +
+    "grey background and fabric only. No objects, no props, no microphone, " +
+    "no instruments, no hands raised, no accessories, no other people. " +
+    "Keep the face, hair, skin, and clothing untouched. Do not modify the face " +
+    "under any circumstances; if any part of the face appears missing or " +
+    "incomplete, leave it as is — do not invent, redraw, or extend facial " +
+    "features. Photographic, soft natural lighting, single subject.";
 
   const output = (await runWithRetry(
     "outpaintPortrait",
@@ -197,7 +216,16 @@ export async function outpaintPortrait(input: {
  * The ref (incl. pinned version) lives in MODEL_REGISTRY (lib/models.ts);
  * `model` accepts a whitelisted override ref from `resolveModelOverride`
  * (E01.10) with the same input contract.
+ *
+ * Ruimere timeout dan de 50s-default (E44.1, audit B2): DeOldify op
+ * `render_factor: 35` + een cold start zit geregeld tegen/over de 50s,
+ * waardoor legitieme runs als 504 stierven — geen resultaat, geen credit,
+ * maar ook geen zichtbare fout. vercel.json geeft colorize 90s
+ * `maxDuration`; 80s laat 10s marge voor het afronden van de response
+ * (zelfde verhouding als STYLIZE_TIMEOUT_MS).
  */
+const COLORIZE_TIMEOUT_MS = 80_000;
+
 export async function colorize(input: {
   imageDataUrl: string;
   model?: string | null;
@@ -211,6 +239,7 @@ export async function colorize(input: {
         render_factor: 35,
       },
     }),
+    COLORIZE_TIMEOUT_MS,
   )) as unknown;
 
   return extractUrl(output, "colorize");
@@ -226,18 +255,48 @@ export async function upscale(input: {
   imageDataUrl: string;
   model?: string | null;
 }): Promise<string> {
+  const ref = input.model ?? defaultModelRef("upscale");
   const output = (await runWithRetry(
     "upscale",
-    () => replicate.run((input.model ?? defaultModelRef("upscale")) as `${string}/${string}`, {
-      input: {
-        image: input.imageDataUrl,
-        scale: 2,
-        face_enhance: false,
-      },
+    () => replicate.run(ref as `${string}/${string}`, {
+      input: upscaleInputFor(ref, input.imageDataUrl),
     }),
   )) as unknown;
 
   return extractUrl(output, "upscale");
+}
+
+/**
+ * Per-model input-vertaling voor de upscaler (E41.1 + E41.4; spiegelt
+ * stylizeInputFor). Identiteit gaat vóór scherpte: geen generatieve
+ * gezichts-"verbetering" — GFPGAN-achtige reconstructie maakt huid glad en
+ * gumt sproeten/sieraden weg (kwaliteitsklacht 2026-07-03). Onbekende refs
+ * vallen op de Real-ESRGAN-vorm terug.
+ */
+function upscaleInputFor(ref: string, imageDataUrl: string): Record<string, unknown> {
+  if (ref.startsWith("topazlabs/image-upscale")) {
+    // High Fidelity V2 = de detail-behoudende Gigapixel-variant;
+    // face_enhancement bewust uit. PNG voorkomt JPEG-randartefacten vlak
+    // vóór de alpha-reapply.
+    return {
+      image: imageDataUrl,
+      enhance_model: "High Fidelity V2",
+      upscale_factor: "2x",
+      face_enhancement: false,
+      output_format: "png",
+    };
+  }
+  if (ref.startsWith("google/upscaler")) {
+    // Output is JPEG; default compression_quality 80 bakt compressieruis in
+    // de haarranden → maximaal.
+    return { image: imageDataUrl, upscale_factor: "x2", compression_quality: 100 };
+  }
+  if (ref.startsWith("philz1337x/crystal-upscaler")) {
+    return { image: imageDataUrl, scale_factor: 2 };
+  }
+  // Real-ESRGAN (huidige default) & onbekend: face_enhance UIT — de E41.1-
+  // stand (aan) bleek de gladde-huid/weg-oorbellen-oorzaak.
+  return { image: imageDataUrl, scale: 2, face_enhance: false };
 }
 
 /**
@@ -252,11 +311,12 @@ export async function upscale(input: {
  * alternatief registreren = eerst hier een tak toevoegen (zie de NOTE in
  * lib/models.ts).
  *
- * Ruimere timeout dan de 50s-default: gpt-image op hoge kwaliteit zit
- * geregeld boven de 50s. De endpoint-maxDuration (90s, vercel.json) houdt
- * 10s marge voor afronden van de response.
+ * Ruimere timeout dan de 50s-default, gedimensioneerd op de E55.7-meting
+ * (2026-08-03): gpt-image-2 medium p50 65s / p95 75s met één 149s-
+ * uitschieter → 160s dekt de staart. De endpoint-maxDuration (180s,
+ * vercel.json) houdt 20s marge voor refs-fetch, pad/crop en de response.
  */
-const STYLIZE_TIMEOUT_MS = 80_000;
+const STYLIZE_TIMEOUT_MS = 160_000;
 
 export async function stylizeEdit(input: {
   imageDataUrl: string;
@@ -265,16 +325,26 @@ export async function stylizeEdit(input: {
   width: number;
   height: number;
   model?: string | null;
-  /** Optioneel: data-URL van een voorbeeld-output die het model als visuele
-   *  stijlreferentie meekrijgt naast de prompt. Alleen voor Effects (E33). */
-  styleReferenceDataUrl?: string | null;
+  /** Optioneel: data-URLs van voorbeeld-outputs die het model als visuele
+   *  stijlreferenties meekrijgt naast de prompt. Gebruikt door Effects (E54)
+   *  én door user-created custom effects (E34 — precies één referentie); de
+   *  prompt bevat dan de rolclausule (eerste image = persoon, rest = stijl). */
+  styleReferenceDataUrls?: string[] | null;
+  /** E55.7-bakeoff-hendel: gpt-image-kwaliteitstier. Productie laat dit weg
+   *  (→ "high"); alleen de bakeoff-driver zet "medium" om de latency/kosten-
+   *  arm te meten. Wordt het ooit de default, dan hier het vaste veld flippen. */
+  gptQuality?: "high" | "medium";
+  /** E55.7-bakeoff-hendel: timeout-override zodat de driver échte p50/p95
+   *  kan meten voorbij het prod-budget (gpt-image-2 bleek >80s te kunnen).
+   *  Productie laat dit weg (→ STYLIZE_TIMEOUT_MS). */
+  timeoutMs?: number;
 }): Promise<string> {
   const ref = input.model ?? defaultModelRef("stylize");
   const payload = stylizeInputFor(ref, input);
   const output = (await runWithRetry(
     "stylizeEdit",
     () => replicate.run(ref as `${string}/${string}`, { input: payload }),
-    STYLIZE_TIMEOUT_MS,
+    input.timeoutMs ?? STYLIZE_TIMEOUT_MS,
   )) as unknown;
 
   return extractUrl(output, "stylizeEdit");
@@ -287,12 +357,16 @@ function stylizeInputFor(
     prompt: string;
     width: number;
     height: number;
-    styleReferenceDataUrl?: string | null;
+    styleReferenceDataUrls?: string[] | null;
+    gptQuality?: "high" | "medium";
   },
 ): Record<string, unknown> {
+  // Het portret eerst (dat is het te bewerken beeld), stijlreferenties daarna.
+  // Alle vier armen nemen een image-array, dus extra beelden zijn een append;
+  // de prompt vertelt het model welke rol elk beeld speelt (E54-rolclausule,
+  // resp. CUSTOM_STYLE_TEMPLATE voor user-created effects).
   if (ref.startsWith("google/nano-banana")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -306,8 +380,7 @@ function stylizeInputFor(
     // `aspect_ratio: "match_input_image"` zodat het kader niet herkadert.
     // Schema controleren vóór de eerste bakeoff-run (replicate.com/bytedance/
     // seedream-4); bij een veld-mismatch faalt de dev-only call zichtbaar.
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       image_input: images,
@@ -316,8 +389,7 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("black-forest-labs/flux-2")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
     return {
       prompt: input.prompt,
       input_images: images,
@@ -330,36 +402,65 @@ function stylizeInputFor(
     };
   }
   if (ref.startsWith("openai/gpt-image")) {
-    const images = [input.imageDataUrl];
-    if (input.styleReferenceDataUrl) images.push(input.styleReferenceDataUrl);
-    return {
+    const images = [input.imageDataUrl, ...(input.styleReferenceDataUrls ?? [])];
+    const payload: Record<string, unknown> = {
       prompt: input.prompt,
       input_images: images,
-      // Identity-behoud staat of valt met input_fidelity=high; quality=high
-      // is de eerlijke vergelijking met de andere pro-armen (en de reden
-      // voor STYLIZE_TIMEOUT_MS).
-      input_fidelity: "high",
-      quality: "high",
+      // Besluit Thierry 2026-08-03 (E55.7-bakeoff): MEDIUM als default —
+      // visueel ≈ high op profielfoto-formaat (avatars worden klein getoond),
+      // maar 65s p50 i.p.v. 169s en kosten ≈ nano ($0.047 vs $0.128).
+      // `gptQuality` blijft de hendel voor bakeoffs/een latere premium-arm.
+      quality: input.gptQuality ?? "medium",
       output_format: "png",
       moderation: "low",
-      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde
-      // van de drie ondersteunde ratio's.
-      aspect_ratio: nearestGptAspect(input.width, input.height),
+      // gpt-image kent geen match_input_image; kies de dichtstbijzijnde uit
+      // de ratio-set van dít model (2.0 kent er meer dan 1.5 — registry-
+      // capability). Bij het E55.1-aspect-contract is de input al naar
+      // precies zo'n ratio gepad, dus dit is dan een exacte hit.
+      aspect_ratio: nearestFixedAspect(
+        input.width,
+        input.height,
+        modelFixedAspects(ref) ?? GPT_IMAGE_ASPECTS,
+      ).key,
     };
+    // Alleen 1.5 kent de expliciete identity-hendel; 2.0 dropte de parameter
+    // (schema 2026-08-02) en Replicate weigert onbekende input-velden.
+    if (ref.startsWith("openai/gpt-image-1.5")) {
+      payload.input_fidelity = "high";
+    }
+    return payload;
   }
   throw new Error(`stylizeEdit: no input adapter for model ref "${ref}"`);
 }
 
-function nearestGptAspect(width: number, height: number): "1:1" | "3:2" | "2:3" {
-  if (width <= 0 || height <= 0) return "1:1";
-  const ratio = width / height;
-  const options: Array<["1:1" | "3:2" | "2:3", number]> = [
-    ["1:1", 1],
-    ["3:2", 1.5],
-    ["2:3", 2 / 3],
-  ];
-  options.sort((a, b) => Math.abs(a[1] - ratio) - Math.abs(b[1] - ratio));
-  return options[0][0];
+const BACKGROUND_TIMEOUT_MS = 80_000;
+
+/**
+ * Text-to-background via neutral canvas + instruction-edit models
+ * (E42). Caller supplies the composed prompt and a grey canvas data URL
+ * at the target aspect ratio.
+ */
+export async function generateBackgroundImage(input: {
+  prompt: string;
+  imageDataUrl: string;
+  width: number;
+  height: number;
+  model?: string | null;
+}): Promise<string> {
+  const ref = input.model ?? defaultModelRef("generate_background");
+  const payload = stylizeInputFor(ref, {
+    imageDataUrl: input.imageDataUrl,
+    prompt: input.prompt,
+    width: input.width,
+    height: input.height,
+  });
+  const output = (await runWithRetry(
+    "generateBackgroundImage",
+    () => replicate.run(ref as `${string}/${string}`, { input: payload }),
+    BACKGROUND_TIMEOUT_MS,
+  )) as unknown;
+
+  return extractUrl(output, "generateBackgroundImage");
 }
 
 /**

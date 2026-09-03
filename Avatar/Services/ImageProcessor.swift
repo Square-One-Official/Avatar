@@ -1,3 +1,4 @@
+import AvatarKit
 import Foundation
 import Vision
 import CoreImage
@@ -80,6 +81,36 @@ enum ImageProcessor {
             return try subjectLiftV2(image: image)
         }
         return try subjectLiftV1(image: image)
+    }
+
+    /// RAW baseline — what Apple gives you for free, zero refinement.
+    /// `VNGenerateForegroundInstanceMaskRequest` → `generateMaskedImage`,
+    /// nothing else: no person-seg union, no guided filter, no hair zone,
+    /// no decontamination, default colour management.
+    ///
+    /// Exists for the 2.0 bakeoff (EdgeBenchmark): every refinement stage in
+    /// V1/V2 must justify itself against THIS output. If raw looks close
+    /// enough on real fixtures, the 2.0 pipeline can shrink accordingly.
+    static func subjectLiftRaw(image: CGImage) throws -> CGImage {
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        let handler = VNImageRequestHandler(cgImage: image, options: [:])
+        try handler.perform([request])
+        guard let observation = request.results?.first else {
+            throw ImageProcessorError.noSubjectFound
+        }
+        let buffer = try observation.generateMaskedImage(
+            ofInstances: observation.allInstances,
+            from: handler,
+            croppedToInstancesExtent: false
+        )
+        let ci = CIImage(cvPixelBuffer: buffer)
+        let outputCS = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let cg = ciContext.createCGImage(ci, from: ci.extent,
+                                               format: .RGBA8,
+                                               colorSpace: outputCS) else {
+            throw ImageProcessorError.maskGenerationFailed
+        }
+        return cg
     }
 
     /// V1 — original Apple Vision pipeline, **bit-for-bit identical** to the
@@ -1002,6 +1033,62 @@ enum ImageProcessor {
             }
         }
         return nil
+    }
+
+    // MARK: - Colour Detection
+
+    /// Heuristic: does this cutout already look like a colour photo (vs B&W /
+    /// greyscale)? Samples opaque pixels and measures chroma (the max-min
+    /// channel spread). Deliberately biased toward requiring *strong* colour
+    /// evidence so genuinely black-and-white photos — including slightly
+    /// sepia/tinted scans — never trip the "are you sure?" prompt. A missed
+    /// colour photo simply behaves as before (no prompt), so the cost of a
+    /// false negative is just the status quo.
+    static func isLikelyColour(pngData: Data) -> Bool {
+        // A pixel counts as "coloured" once its channel spread exceeds this
+        // (out of 255). ~25 clears JPEG noise and faint sepia tints.
+        let chromaThreshold: UInt8 = 25
+        // The image is treated as colour once this fraction of opaque samples
+        // are coloured. 0.15 keeps mostly-grey photos with a stray colour
+        // speck from being flagged.
+        let colourFraction = 0.15
+
+        guard let cg = NSBitmapImageRep(data: pngData)?.cgImage else { return false }
+        let w = cg.width
+        let h = cg.height
+        guard w > 0, h > 0 else { return false }
+
+        // Render into a known RGBA8 layout so channel indexing is reliable
+        // (mirrors `contentBottomFromAlpha`).
+        let bpr = w * 4
+        var pixels = [UInt8](repeating: 0, count: h * bpr)
+        guard let ctx = CGContext(
+            data: &pixels, width: w, height: h,
+            bitsPerComponent: 8, bytesPerRow: bpr,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+        let step = max(1, w / 64)
+        var opaque = 0
+        var coloured = 0
+        for row in stride(from: 0, to: h, by: step) {
+            for col in stride(from: 0, to: w, by: step) {
+                let offset = row * bpr + col * 4
+                let a = pixels[offset + 3]
+                guard a > 20 else { continue } // skip transparent background
+                opaque += 1
+                let r = pixels[offset]
+                let g = pixels[offset + 1]
+                let b = pixels[offset + 2]
+                let chroma = max(r, g, b) - min(r, g, b)
+                if chroma > chromaThreshold { coloured += 1 }
+            }
+        }
+
+        guard opaque > 0 else { return false }
+        return Double(coloured) / Double(opaque) > colourFraction
     }
 
     // MARK: - Face + Eye Landmark Detection

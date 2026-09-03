@@ -3,9 +3,11 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 import * as React from "react";
 import AnnouncementEmail from "../emails/AnnouncementEmail";
+import MessageEmail from "../emails/MessageEmail";
 import { lexicalToHtml } from "../lib/lexical";
 import { resolveRecipients } from "../lib/recipients";
 import { unsubscribeUrlFor } from "../lib/unsubscribe-token";
+import type { Announcement, Message } from "../payload-types";
 
 /**
  * POST /api/send-newsletter
@@ -31,6 +33,10 @@ const handler: PayloadHandler = async (req) => {
   const announcementId = typeof body.announcementId === "string" ? body.announcementId : "";
   const testMode = body.testMode === true;
   const testEmail = typeof body.testEmail === "string" ? body.testEmail : "";
+  // E17.6: hetzelfde endpoint dient nu ook het verenigde Message-model.
+  // Default blijft "announcements" zodat de bestaande knop ongewijzigd werkt.
+  const collection: "announcements" | "messages" =
+    body.collection === "messages" ? "messages" : "announcements";
 
   if (!announcementId) {
     return Response.json({ error: "announcementId required" }, { status: 400 });
@@ -45,18 +51,32 @@ const handler: PayloadHandler = async (req) => {
   }
 
   const ann = await req.payload.findByID({
-    collection: "announcements",
+    collection,
     id: announcementId,
     depth: 2,
   });
   if (!ann) {
-    return Response.json({ error: "Announcement not found" }, { status: 404 });
+    return Response.json({ error: "Record not found" }, { status: 404 });
   }
-  const newsletter = (ann as Record<string, unknown>).newsletter as
-    | { send?: boolean; subject?: string; fromName?: string; customBody?: unknown; sentAt?: string }
-    | undefined;
-  if (!newsletter?.send && !testMode) {
-    return Response.json({ error: "newsletter.send is false" }, { status: 400 });
+  // Beide collecties hebben de gegenereerde `newsletter`-group; via de union
+  // uit payload-types blijft de shape (incl. het lexical-customBody-type)
+  // gesynchroniseerd met het CMS — de oude Record-cast botste daarmee.
+  const record: Announcement | Message = ann;
+  const newsletter = record.newsletter ?? undefined;
+  // Send-gate: announcements op newsletter.send; messages op channel email/both.
+  // `send` bestaat alleen op de Announcement-group — in de announcements-tak
+  // ís record er een (collection stuurt de findByID), maar TS kan die twee
+  // variabelen niet aan elkaar knopen, vandaar de smalle cast.
+  const channel = (ann as { channel?: string }).channel;
+  const sendEnabled =
+    collection === "messages"
+      ? channel === "email" || channel === "both"
+      : (record as Announcement).newsletter?.send === true;
+  if (!sendEnabled && !testMode) {
+    return Response.json(
+      { error: collection === "messages" ? "channel is not email/both" : "newsletter.send is false" },
+      { status: 400 },
+    );
   }
   if (newsletter?.sentAt && !testMode) {
     return Response.json({ error: "Already sent at " + newsletter.sentAt }, { status: 409 });
@@ -79,9 +99,11 @@ const handler: PayloadHandler = async (req) => {
   // bound to the specific address — Resend's `batch.send` accepts an
   // array of distinct messages, so the per-recipient cost is just an HMAC
   // + a `render()` call (both cheap; the JSX tree is tiny).
+  // E17.6: messages krijgen het v2-merk-template; announcements het oude.
+  const EmailTemplate = collection === "messages" ? MessageEmail : AnnouncementEmail;
   const renderForRecipient = async (recipient: string): Promise<string> =>
     render(
-      React.createElement(AnnouncementEmail, {
+      React.createElement(EmailTemplate, {
         title,
         bodyHtml,
         imageUrl,
@@ -113,14 +135,19 @@ const handler: PayloadHandler = async (req) => {
     return Response.json({ ok: true, testMessageId: data?.id });
   }
 
-  // Resolve audience.
-  const audience = ((ann as { audience?: string }).audience ?? "all") as
-    | "all"
-    | "freeUsers"
-    | "proUsers"
-    | "specificEmails";
+  // Resolve audience. Announcements dragen `audience` top-level; messages
+  // dragen het onder `targeting.cohort` (zelfde waarden).
+  const targeting = (ann as { targeting?: { cohort?: string; audienceEmails?: { email?: string }[] } }).targeting;
+  const audience = (
+    collection === "messages"
+      ? targeting?.cohort ?? "all"
+      : (ann as { audience?: string }).audience ?? "all"
+  ) as "all" | "freeUsers" | "proUsers" | "specificEmails";
   const audienceEmails = (() => {
-    const arr = (ann as { audienceEmails?: { email?: string }[] }).audienceEmails ?? [];
+    const arr =
+      collection === "messages"
+        ? targeting?.audienceEmails ?? []
+        : (ann as { audienceEmails?: { email?: string }[] }).audienceEmails ?? [];
     return arr.map((e) => e.email ?? "").filter(Boolean);
   })();
   const cohort = await resolveRecipients(audience, audienceEmails);
@@ -147,14 +174,17 @@ const handler: PayloadHandler = async (req) => {
   // Batch through Resend's bulk-send API. Each call accepts up to 100
   // emails; we use 50 to leave headroom for retries.
   const BATCH = 50;
-  type Message = {
+  // Heette `Message`, maar dat schaduwde het gegenereerde CMS-type Message
+  // (payload-types) in de hele handler-body — de bron van de vier
+  // tsc-fouten. Dit is de Resend-batch-payload, dus die naam draagt 'ie nu.
+  type BatchEmail = {
     from: string;
     to: string;
     subject: string;
     html: string;
     headers: Record<string, string>;
   };
-  const batches: Message[][] = [];
+  const batches: BatchEmail[][] = [];
   for (let i = 0; i < recipients.length; i += BATCH) {
     const slice = recipients.slice(i, i + BATCH);
     const rendered = await Promise.all(slice.map(async (to) => {
@@ -188,7 +218,7 @@ const handler: PayloadHandler = async (req) => {
 
   // Stamp sentAt so the endpoint can't double-fire.
   await req.payload.update({
-    collection: "announcements",
+    collection,
     id: announcementId,
     data: {
       newsletter: {

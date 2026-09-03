@@ -2,10 +2,14 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { readFile } from "node:fs/promises";
 
 /**
- * Shared Sparkle-feed handler for `/appcast.xml` (v1) and `/appcast-v2.xml`
- * (Aaavatar 2). Caching, ETag and 304 behaviour stay identical so the two
- * channels cannot drift.
+ * Gedeelde Sparkle-feed-server (E13.1). Twee kanalen delen exact dezelfde
+ * mechaniek — `/appcast.xml` (v1) en `/appcast-v2.xml` (Aaavatar 2) — dus de
+ * loader/cache/etag-logica leeft hier één keer en de route-bestanden zijn
+ * dunne wrappers. Zie api/appcast.ts voor de trust-root-rationale
+ * (self-hosted i.p.v. GitHub raw, audit HIGH #10).
  */
+
+type Cached = { body: string; etag: string };
 
 function djb2(s: string): number {
   let h = 5381;
@@ -14,11 +18,14 @@ function djb2(s: string): number {
 }
 
 export function makeAppcastHandler(filePath: string) {
-  let cached: { body: string; etag: string } | null = null;
+  // Eén cache per route-module; Fluid Compute hergebruikt instanties dus de
+  // disk-read is geamortiseerd.
+  let cached: Cached | null = null;
 
-  async function load(): Promise<{ body: string; etag: string }> {
+  async function load(): Promise<Cached> {
     if (cached) return cached;
     const body = await readFile(filePath, "utf8");
+    // Zwakke etag — content-afgeleid, deterministisch over cold starts.
     const etag = `W/"${body.length.toString(36)}-${djb2(body).toString(36)}"`;
     cached = { body, etag };
     return cached;
@@ -29,7 +36,6 @@ export function makeAppcastHandler(filePath: string) {
       res.status(405).setHeader("Allow", "GET, HEAD").end();
       return;
     }
-
     try {
       const { body, etag } = await load();
       res.setHeader("Content-Type", "application/xml; charset=utf-8");
@@ -45,8 +51,8 @@ export function makeAppcastHandler(filePath: string) {
       }
       res.status(200).send(body);
     } catch (err) {
-      console.error("appcast handler error", err);
-      res.status(500).send("appcast unavailable");
+      console.error("appcast read failed:", err instanceof Error ? err.message : String(err));
+      res.status(500).json({ error: "appcast_unavailable" });
     }
   };
 }

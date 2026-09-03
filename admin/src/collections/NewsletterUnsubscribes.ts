@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * Record of email addresses that have opted out of the announcement
@@ -27,10 +28,10 @@ export const NewsletterUnsubscribes: CollectionConfig = {
       "Users who clicked the unsubscribe link in a newsletter email. Filtered out of every audience before send.",
   },
   access: {
-    read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {

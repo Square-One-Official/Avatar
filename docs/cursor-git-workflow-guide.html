@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Van idee naar productie — Cursor, GitHub en Vercel zonder chaos</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --app: #0c0b0a;
+      --card: #1c1917;
+      --card-2: #292524;
+      --line: rgba(255, 255, 255, .12);
+      --muted: rgba(255, 255, 255, .68);
+      --subtle: rgba(255, 255, 255, .46);
+      --text: #fff;
+      --lime: #d5f466;
+      --lime-ink: #18310d;
+      --blue: #9cc8ff;
+      --orange: #ffc889;
+      --red: #ffaaaa;
+      --green: #a8efc0;
+      --radius: 22px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, .32);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(213, 244, 102, .08), transparent 27rem),
+        radial-gradient(circle at 88% 16%, rgba(156, 200, 255, .07), transparent 30rem),
+        var(--app);
+      color: var(--text);
+      font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--lime); }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code {
+      padding: .12rem .38rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .055);
+      font-size: .9em;
+    }
+    pre {
+      margin: 0;
+      padding: 18px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #11100f;
+      color: #f7f7f4;
+      white-space: pre-wrap;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      max-width: 1480px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 32px 22px;
+      border-right: 1px solid var(--line);
+      background: rgba(12, 11, 10, .78);
+      backdrop-filter: blur(18px);
+    }
+    nav .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      font-weight: 750;
+    }
+    .brand-mark {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--lime);
+      color: var(--lime-ink);
+      font-weight: 900;
+    }
+    nav a {
+      display: block;
+      margin: 4px 0;
+      padding: 8px 10px;
+      border-radius: 9px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    nav a:hover { background: var(--card); color: var(--text); }
+
+    main { min-width: 0; padding: 56px clamp(24px, 5vw, 76px) 100px; }
+    section { scroll-margin-top: 30px; margin: 78px 0; }
+    section:first-child { margin-top: 0; }
+    h1 {
+      max-width: 940px;
+      margin: 14px 0 20px;
+      font-size: clamp(42px, 6vw, 78px);
+      line-height: 1.02;
+      letter-spacing: -.05em;
+    }
+    h2 { margin: 0 0 18px; font-size: clamp(28px, 3vw, 42px); line-height: 1.1; letter-spacing: -.025em; }
+    h3 { margin: 0 0 10px; font-size: 19px; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    .lead { max-width: 820px; font-size: 21px; color: rgba(255, 255, 255, .8); }
+    .eyebrow {
+      display: inline-flex;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(213, 244, 102, .11);
+      color: var(--lime);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .hero-rule {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: center;
+      max-width: 800px;
+      margin-top: 34px;
+      padding: 18px;
+      border: 1px solid rgba(213, 244, 102, .26);
+      border-radius: 16px;
+      background: rgba(213, 244, 102, .07);
+    }
+    .hero-rule .number {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--lime);
+      color: var(--lime-ink);
+      font-size: 22px;
+      font-weight: 900;
+    }
+    .hero-rule strong { display: block; }
+    .hero-rule span { color: var(--muted); }
+
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(28, 25, 23, .9);
+      box-shadow: var(--shadow);
+    }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card-number {
+      display: inline-grid;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 20px;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--card-2);
+      color: var(--lime);
+      font-weight: 800;
+    }
+    .tag {
+      display: inline-block;
+      margin: 0 5px 7px 0;
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .tag.good { border-color: rgba(168, 239, 192, .3); color: var(--green); }
+    .tag.warn { border-color: rgba(255, 200, 137, .3); color: var(--orange); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(9, auto);
+      gap: 10px;
+      align-items: center;
+      margin: 28px 0;
+      overflow-x: auto;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(28, 25, 23, .72);
+    }
+    .flow .node {
+      min-width: 132px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card-2);
+      text-align: center;
+    }
+    .flow .node strong, .flow .node small { display: block; }
+    .flow .node small { margin-top: 4px; color: var(--subtle); }
+    .flow .arrow { color: var(--lime); font-size: 22px; }
+
+    .where {
+      display: grid;
+      grid-template-columns: 132px 1fr 1fr;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    .where > div { padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    .where > div:nth-last-child(-n+3) { border-bottom: 0; }
+    .where .head { background: var(--card-2); color: var(--text); font-weight: 750; }
+    .where .place { color: var(--lime); font-weight: 750; }
+    .where .muted { color: var(--muted); }
+
+    .branch-visual {
+      position: relative;
+      min-height: 300px;
+      padding: 32px;
+      overflow: hidden;
+    }
+    .branch-line {
+      position: absolute;
+      left: 58px;
+      top: 54px;
+      bottom: 54px;
+      width: 4px;
+      border-radius: 4px;
+      background: var(--lime);
+    }
+    .commit-row {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+      margin: 0 0 25px;
+    }
+    .dot {
+      width: 18px;
+      height: 18px;
+      margin-left: 18px;
+      border: 4px solid var(--card);
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 0 2px var(--lime);
+    }
+    .commit {
+      padding: 13px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--card-2);
+    }
+    .commit small { color: var(--subtle); }
+    .side-branch {
+      margin-left: 74px;
+      padding-left: 24px;
+      border-left: 3px solid var(--blue);
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 18px 20px;
+      border-left: 4px solid var(--orange);
+      border-radius: 0 14px 14px 0;
+      background: rgba(255, 200, 137, .08);
+      color: var(--muted);
+    }
+    .callout strong { color: var(--text); }
+    .callout.good { border-color: var(--green); background: rgba(168, 239, 192, .07); }
+    .callout.bad { border-color: var(--red); background: rgba(255, 170, 170, .07); }
+
+    .steps { counter-reset: step; display: grid; gap: 12px; }
+    .step {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card);
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--lime);
+      color: var(--lime-ink);
+      font-weight: 900;
+    }
+    .step p { margin: 4px 0 0; }
+
+    .prompt { position: relative; }
+    .prompt::before {
+      content: "KOPIEERBARE PROMPT";
+      display: block;
+      margin-bottom: 8px;
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .09em;
+    }
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 18px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .checklist li {
+      position: relative;
+      padding: 9px 10px 9px 34px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.035);
+      color: var(--muted);
+    }
+    .checklist li::before {
+      content: "✓";
+      position: absolute;
+      left: 11px;
+      color: var(--lime);
+      font-weight: 900;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    .decision .or { align-self: center; color: var(--subtle); font-weight: 800; }
+    .decision .choice { padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+
+    footer { margin-top: 90px; padding-top: 26px; border-top: 1px solid var(--line); color: var(--subtle); }
+
+    @media (max-width: 950px) {
+      .shell { display: block; }
+      nav { position: static; width: auto; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      nav .links { display: flex; flex-wrap: wrap; }
+      nav a { display: inline-block; }
+      .grid.two, .grid.three, .checklist, .decision { grid-template-columns: 1fr; }
+      .decision .or { text-align: center; }
+      .where { grid-template-columns: 1fr; }
+      .where > div { border-bottom: 1px solid var(--line) !important; }
+      .where > div:last-child { border-bottom: 0 !important; }
+    }
+
+    @media print {
+      nav { display: none; }
+      .shell { display: block; }
+      main { padding: 24px; }
+      .card, .flow { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav aria-label="Inhoudsopgave">
+      <div class="brand"><span class="brand-mark">A</span> Workflowgids</div>
+      <div class="links">
+        <a href="#waarom">Waarom het verwarrend wordt</a>
+        <a href="#model">Het simpele model</a>
+        <a href="#waarom-pr">Waarom alles een PR wordt</a>
+        <a href="#xcode">Xcode en branches</a>
+        <a href="#woorden">De belangrijkste woorden</a>
+        <a href="#regels">De zes werkregels</a>
+        <a href="#fix">Werkwijze voor een fix</a>
+        <a href="#feature">Werkwijze voor een feature</a>
+        <a href="#parallel">Meerdere Cursor-sessies</a>
+        <a href="#prompts">Prompttechnieken</a>
+        <a href="#repo">Advies voor Aaavatar</a>
+        <a href="#checklist">Korte checklist</a>
+      </div>
+    </nav>
+
+    <main>
+      <section id="top">
+        <span class="eyebrow">Cursor · Git · GitHub · Vercel</span>
+        <h1>Van idee naar productie, zonder het overzicht te verliezen.</h1>
+        <p class="lead">
+          Je werkt niet in één “versie”, maar in meerdere kopieën van dezelfde code.
+          Zodra je weet welke kopie waarvoor dient, wordt de rest voorspelbaar.
+        </p>
+        <div class="hero-rule">
+          <div class="number">1</div>
+          <div>
+            <strong>De hoofdregel: één taak, één branch, één pull request.</strong>
+            <span>En pas na samenvoegen is het onderdeel van de gedeelde nieuwste versie.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="waarom">
+        <h2>Waarom je nu steeds het overzicht verliest</h2>
+        <p>Dat is geen persoonlijk probleem. De huidige werkwijze maakt verwarring bijna onvermijdelijk.</p>
+        <div class="grid three">
+          <article class="card">
+            <span class="card-number">1</span>
+            <h3>Elke Cursor-sessie heeft een eigen kopie</h3>
+            <p>Een Cloud Agent ziet wijzigingen uit een andere sessie pas nadat die zijn gecommit, gepusht en opgehaald.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">2</span>
+            <h3>Een commit reist niet vanzelf</h3>
+            <p>Een commit zit op één branch. Andere branches blijven op hun eigen versie staan totdat je merge’t of rebase’t.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">3</span>
+            <h3>Een groene preview is niet altijd de app</h3>
+            <p>Vercel controleert web- en backendonderdelen. Het bewijst niet dat de Swift/macOS-interface is gebouwd.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">4</span>
+            <h3><code>main</code> en <code>v2-main</code> lopen naast elkaar</h3>
+            <p>Daardoor kan “de nieuwste versie” twee betekenissen hebben: de algemene hoofdbranch of de v2-appbranch.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">5</span>
+            <h3>Parallel werk raakt dezelfde bestanden</h3>
+            <p>Twee agents die tegelijk <code>EditorView.swift</code> aanpassen, maken allebei geldige maar onderling botsende versies.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">6</span>
+            <h3>Screenshots hebben geen herkomstlabel</h3>
+            <p>Zonder branch, commit en buildnummer weet je niet of een screenshot lokaal, uit Figma of uit een gedeelde build komt.</p>
+          </article>
+        </div>
+        <div class="callout bad">
+          <strong>De klassieke valkuil:</strong> “Cursor heeft het gefixt” betekent alleen dat één werkkopie is aangepast.
+          Het betekent nog niet dat GitHub, je Mac, een andere Cloud Agent of productie die fix al bevat.
+        </div>
+      </section>
+
+      <section id="model">
+        <h2>Het simpele model: vijf haltes</h2>
+        <div class="flow" aria-label="Van idee naar productie">
+          <div class="node"><strong>1. Idee</strong><small>vraag of issue</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>2. Branch</strong><small>werkkopie</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>3. Commit</strong><small>opgeslagen versie</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>4. Pull request</strong><small>controle + samenvoegen</small></div>
+          <div class="arrow">→</div>
+          <div class="node"><strong>5. Productie</strong><small>Vercel of apprelease</small></div>
+        </div>
+        <div class="where">
+          <div class="head">Plek</div><div class="head">Wat staat daar?</div><div class="head">Is dit de gedeelde waarheid?</div>
+          <div class="place">Lokaal</div><div class="muted">Jouw bestanden, mogelijk nog niet opgeslagen in Git.</div><div class="muted">Nee.</div>
+          <div class="place">Cursor Cloud</div><div class="muted">Een aparte machine en branch per sessie.</div><div class="muted">Nee.</div>
+          <div class="place">Commit</div><div class="muted">Een exacte momentopname met een uniek nummer.</div><div class="muted">Alleen binnen die branch.</div>
+          <div class="place">GitHub PR</div><div class="muted">Voorgestelde wijzigingen, checks en review.</div><div class="muted">Nog niet; pas na merge.</div>
+          <div class="place">Hoofdbranch</div><div class="muted">Alles wat officieel is samengevoegd.</div><div class="muted">Ja, voor ontwikkeling.</div>
+          <div class="place">Productie</div><div class="muted">De daadwerkelijk uitgerolde website, backend of appbuild.</div><div class="muted">Ja, voor gebruikers.</div>
+        </div>
+      </section>
+
+      <section id="waarom-pr">
+        <h2>Waarom lijkt alles een pull request te worden?</h2>
+        <p class="lead">
+          Dat is geen toeval en geen fout van jou. Cursor Cloud Agents zijn zo ingericht dat
+          elke taak eindigt als een <strong>aparte branch + pull request</strong>.
+        </p>
+        <div class="grid two">
+          <article class="card">
+            <span class="card-number">?</span>
+            <h3>Wat een Cloud Agent standaard doet</h3>
+            <ol>
+              <li>Start vanaf een basisbranch (bij jullie vaak <code>v2-main</code>).</li>
+              <li>Maakt een <strong>nieuwe featurebranch</strong> aan.</li>
+              <li>Schrijft code, commit en pusht naar GitHub.</li>
+              <li>Opent of werkt een <strong>pull request</strong> bij.</li>
+            </ol>
+            <p>Daardoor zie je na elke sessie weer een nieuwe PR, ook bij een “kleine” vraag.</p>
+          </article>
+          <article class="card">
+            <span class="card-number">!</span>
+            <h3>Waarom dat zo is ontworpen</h3>
+            <ul>
+              <li><strong>Veiligheid:</strong> de agent mag niet zomaar direct op <code>main</code> of <code>v2-main</code> schrijven.</li>
+              <li><strong>Review:</strong> jij (of een collega) beslist wat er echt in de gedeelde basis komt.</li>
+              <li><strong>Isolatie:</strong> parallelle sessies raken elkaar niet meteen.</li>
+              <li><strong>Terugdraaien:</strong> een mislukte taak gooi je weg door de PR te sluiten.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="callout">
+          <strong>Belangrijk onderscheid:</strong> een PR is een <em>voorstel</em>.
+          Pas na <strong>merge</strong> zit het werk in de gedeelde nieuwste versie.
+          “De agent heeft een PR gemaakt” betekent dus nog niet “dit staat al in mijn Xcode-project”.
+        </div>
+        <div class="grid three" style="margin-top:18px">
+          <div class="card">
+            <span class="tag warn">Veel PRs</span>
+            <h3>Normaal effect</h3>
+            <p>Elke Cloud-sessie = vaak één PR. Tien sessies kunnen tien open PRs geven, ook als het om overlappend werk gaat.</p>
+          </div>
+          <div class="card">
+            <span class="tag warn">Niet automatisch gemerged</span>
+            <h3>Jij blijft de poortwachter</h3>
+            <p>Cloud Agents mergen meestal niet zelf naar <code>v2-main</code>. Zonder jouw merge blijft Xcode op de oude basis staan.</p>
+          </div>
+          <div class="card">
+            <span class="tag good">Oplossing</span>
+            <h3>Eén canonieke PR</h3>
+            <p>Bij overlappende sessies: wijs één integratie-PR aan, merge die, en sluit of supersede de rest. Haal daarna lokaal de hoofdbranch opnieuw op.</p>
+          </div>
+        </div>
+        <div class="card prompt" style="margin-top:18px">
+<pre>Als je wilt dat Cursor minder “PR-chaos” veroorzaakt, zeg dit expliciet:
+
+- Werk verder op bestaande branch/PR [nummer of naam], open geen nieuwe PR.
+- Of: alleen onderzoeken, geen commits/PR.
+- Of: integreer open PRs A/B/C in één canonieke PR naar v2-main.
+
+Zonder die instructie maakt een Cloud Agent vaak een nieuwe branch + PR.</pre>
+        </div>
+      </section>
+
+      <section id="xcode">
+        <h2>Waarom Xcode “nog niet werkt” terwijl Cursor al iets heeft gedaan</h2>
+        <p class="lead">
+          Xcode toont alleen de bestanden van de <strong>branch die jij lokaal hebt uitgecheckt</strong>.
+          Een Cloud Agent werkt op een andere machine en een andere branch. Die wereld is niet automatisch jouw Xcode.
+        </p>
+        <div class="callout bad">
+          <strong>Typische situatie (zoals op jouw screenshot):</strong>
+          Cursor/Xcode staat op <code>cursor/enhance-adjust-split-74d1</code>,
+          terwijl de geïntegreerde, nieuwste combinatie op
+          <code>cursor/unify-menu-containers-7e40</code> (PR #37) staat, en de gedeelde basis <code>v2-main</code> is.
+          Dan mis je bestanden, gidsen en fixes — of zie je rode fouten zoals
+          “Failed to open document… BannerCanvasDrop.swift”.
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <h3>Wat Xcode wél ziet</h3>
+            <ul>
+              <li>De lokale checkout van één gekozen branch.</li>
+              <li>Alleen bestanden die op die branch bestaan.</li>
+              <li>Alleen commits die je lokaal hebt opgehaald (<code>git fetch</code> / pull / checkout).</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Wat Xcode níet automatisch ziet</h3>
+            <ul>
+              <li>Commits van een Cloud Agent op een andere branch.</li>
+              <li>Open PRs die nog niet gemerged zijn.</li>
+              <li>Een HTML-gids of Swift-fix die alleen op een featurebranch staat.</li>
+            </ul>
+          </article>
+        </div>
+        <div class="steps" style="margin-top:18px">
+          <div class="step"><div><strong>Bepaal welke versie je wilt bouwen.</strong><p>Voor dagelijks v2-werk: <code>v2-main</code>. Om een open agent-PR te testen: die specifieke featurebranch. Voor de huidige integratie: <code>cursor/unify-menu-containers-7e40</code>.</p></div></div>
+          <div class="step"><div><strong>Haal remote branches op en check die branch uit.</strong><p>In Terminal in de repo: <code>git fetch origin</code> en daarna <code>git checkout cursor/unify-menu-containers-7e40</code> (of <code>v2-main</code> na merge). In Cursor/Xcode moet de branchkiezer precies die naam tonen.</p></div></div>
+          <div class="step"><div><strong>Regenereer het Xcode-project als paden of targets zijn veranderd.</strong><p>In de juiste appmap (vaak <code>Avatar2/</code>): <code>xcodegen generate</code>, daarna het <code>.xcodeproj</code> opnieuw openen. Verouderde open tabs naar verdwenen bestanden geven “Failed to open document”.</p></div></div>
+          <div class="step"><div><strong>Bouw opnieuw en negeer rode issues van een oude branch.</strong><p>Issues in de sidebar horen bij de huidige checkout. Wissel van branch → project opnieuw openen → clean build. Anders diagnoseer je gisteren’s code.</p></div></div>
+        </div>
+        <div class="grid two" style="margin-top:18px">
+          <div class="card">
+            <h3>Als een bestand “niet gevonden” is</h3>
+            <p>Controleer eerst:</p>
+            <ol>
+              <li>Welke branch staat in de branchkiezer?</li>
+              <li>Bestaat het bestand op die branch? (<code>git ls-files | grep Bestandsnaam</code>)</li>
+              <li>Staat het alleen in een andere PR/branch?</li>
+              <li>Is er een stale tab open naar een oud pad?</li>
+            </ol>
+          </div>
+          <div class="card prompt">
+<pre>Lokale herstelstappen (macOS):
+
+# 1) Ga naar de REPO-ROOT (niet per se de map Avatar2/)
+#    Repo-root = map waarin je o.a. ziet: docs/  Avatar2/  backend/  README.md
+cd "/pad/naar/Avatar"          # jouw lokale clone-root
+
+git fetch origin
+git checkout v2-main
+git pull origin v2-main
+
+# 2) De gids staat in docs/ op de repo-root — NIET in Avatar2/docs/
+open docs/cursor-git-workflow-guide.html
+# Alternatief: open docs/cursor-git-workflow-guide.md
+
+# 3) Xcode-project zit wél in Avatar2/
+cd Avatar2
+xcodegen generate
+open *.xcodeproj
+
+Daarna: Product → Clean Build Folder, opnieuw bouwen.
+
+Veelvoorkomende vergissing:
+- Je zit al in .../Avatar2 en typt opnieuw "cd Avatar2" → "no such file"
+- Je zoekt docs/cursor-git-workflow-guide.html IN Avatar2/ → bestaat niet
+  Juist vanuit Avatar2: open ../docs/cursor-git-workflow-guide.html</pre>
+          </div>
+        </div>
+        <div class="callout bad">
+          <strong>Valkuil: lokale <code>v2-main</code> ≠ GitHub <code>v2-main</code>.</strong>
+          Alleen de branchnaam zien in Xcode is niet genoeg. Als
+          <code>git log -1</code> een lokale checkpoint toont
+          (bijv. “checkpoint before checking out…”) terwijl
+          <code>origin/v2-main</code> op een nieuwere merge staat, bouw je nog oude menu’s.
+          Fix: <code>git fetch origin && git checkout v2-main && git reset --hard origin/v2-main</code>,
+          daarna <code>xcodegen generate</code>, DerivedData wissen, Clean Build, Run.
+        </div>
+        <div class="callout good">
+          <strong>Onthoud:</strong> Cloud Agent → GitHub PR → jij merget → jij checkt lokaal uit → Xcode bouwt die code.
+          Stap 2–4 overslaan voelt alsof “Xcode niet werkt”, terwijl je gewoon een andere kopie bekijkt.
+        </div>
+      </section>
+
+      <section id="woorden">
+        <h2>Branch, commit en PR visueel uitgelegd</h2>
+        <div class="grid two">
+          <div class="card branch-visual">
+            <div class="branch-line"></div>
+            <div class="commit-row"><span class="dot"></span><div class="commit"><strong>v2-main</strong><br><small>Gedeelde basis</small></div></div>
+            <div class="side-branch">
+              <div class="commit-row"><span class="dot" style="background:var(--blue);box-shadow:0 0 0 2px var(--blue)"></span><div class="commit"><strong>feature/background-menu</strong><br><small>Eigen werklijn</small></div></div>
+              <div class="commit-row"><span class="dot" style="background:var(--blue);box-shadow:0 0 0 2px var(--blue)"></span><div class="commit"><strong>Commit A</strong><br><small>Fix kleur en radius</small></div></div>
+            </div>
+            <div class="commit-row"><span class="dot"></span><div class="commit"><strong>Merge</strong><br><small>Nu pas zit Commit A in v2-main</small></div></div>
+          </div>
+          <div class="card">
+            <h3>Onthoud deze vertaling</h3>
+            <p><span class="tag">Branch</span> Een tijdelijke kopie/werklijn voor één taak.</p>
+            <p><span class="tag">Commit</span> Een opgeslagen foto van de code op dat moment.</p>
+            <p><span class="tag">Push</span> Zet lokale commits op GitHub.</p>
+            <p><span class="tag">Pull request</span> Verzoek om een branch in de hoofdbranch op te nemen.</p>
+            <p><span class="tag">Merge</span> Maakt de wijziging onderdeel van de gedeelde versie.</p>
+            <p><span class="tag">Deploy</span> Zet een specifieke commit daadwerkelijk online.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="regels">
+        <h2>De zes regels die 90% van de chaos voorkomen</h2>
+        <div class="steps">
+          <div class="step"><div><strong>Wijs één hoofdbranch aan.</strong><p>Voor de huidige v2-interface is dat <code>v2-main</code>. Start elke nieuwe v2-taak vanaf de nieuwste remote versie daarvan.</p></div></div>
+          <div class="step"><div><strong>Eén taak = één branch = één PR.</strong><p>Stop geen losstaande feature, bugfix en refactor in dezelfde branch.</p></div></div>
+          <div class="step"><div><strong>Controleer bestaand werk vóór je een agent start.</strong><p>Laat Cursor eerst open PR’s, actieve Cloud-sessies en overlappende bestanden inventariseren.</p></div></div>
+          <div class="step"><div><strong>Werk niet parallel in dezelfde kernbestanden.</strong><p>Als twee taken allebei <code>EditorView.swift</code> raken: na elkaar uitvoeren of één integratie-eigenaar aanwijzen.</p></div></div>
+          <div class="step"><div><strong>Label ieder bewijs met branch + commit.</strong><p>Bij elke screenshot of build: vermeld branch, korte commit-SHA en omgeving. Bijvoorbeeld <code>v2-main @ 7fcc346 · lokale macOS-build</code>.</p></div></div>
+          <div class="step"><div><strong>Een taak is pas klaar na merge én verificatie.</strong><p>“PR gemaakt” is niet hetzelfde als “staat in de nieuwste versie”.</p></div></div>
+        </div>
+      </section>
+
+      <section id="fix">
+        <h2>Beste werkwijze voor een bugfix</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>Het proces</h3>
+            <ol>
+              <li>Leg huidig en gewenst gedrag vast.</li>
+              <li>Noteer hoe je de fout reproduceert.</li>
+              <li>Controleer of er al een branch of PR voor bestaat.</li>
+              <li>Start vanaf de nieuwste hoofdbranch.</li>
+              <li>Maak de kleinst mogelijke fix.</li>
+              <li>Test de relevante route en regressies.</li>
+              <li>Commit, push en open één PR.</li>
+              <li>Merge; haal daarna lokaal de hoofdbranch opnieuw op.</li>
+            </ol>
+          </div>
+          <div class="card prompt">
+<pre>Werk aan de macOS v2-app in repository Avatar.
+
+Startpunt:
+- Fetch eerst de nieuwste origin/v2-main.
+- Controleer open PR's en actieve Cursor-sessies.
+- Hergebruik bestaand werk als dezelfde bestanden al worden aangepast.
+
+Bug:
+- Huidig gedrag: [wat gaat fout]
+- Gewenst gedrag: [wat moet gebeuren]
+- Reproductie: [stappen]
+- Bewijs: [screenshot + branch/commit/build]
+
+Scope:
+- Los alleen deze bug op.
+- Behoud bestaande fixes.
+- Test [concrete routes].
+- Commit en push op één featurebranch.
+- Meld branch, commit, PR, tests en resterende beperkingen.</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="feature">
+        <h2>Beste werkwijze voor een nieuwe feature</h2>
+        <div class="decision">
+          <div class="choice">
+            <span class="tag good">Kleine feature</span>
+            <h3>Direct bouwen</h3>
+            <p>Gebruik dit als gedrag, ontwerp en acceptatiecriteria duidelijk zijn en hooguit een paar samenhangende bestanden wijzigen.</p>
+          </div>
+          <div class="or">OF</div>
+          <div class="choice">
+            <span class="tag warn">Grote of onduidelijke feature</span>
+            <h3>Eerst plannen</h3>
+            <p>Laat één sessie architectuur, dataflow, UX-states, risico’s en teststrategie uitwerken. Laat een volgende sessie dat goedgekeurde plan implementeren.</p>
+          </div>
+        </div>
+        <div class="grid two" style="margin-top:18px">
+          <div class="card">
+            <h3>Goede acceptatiecriteria</h3>
+            <ul>
+              <li>Beschrijf zichtbaar gedrag, niet alleen “maak feature X”.</li>
+              <li>Noem loading-, lege-, fout- en success-states.</li>
+              <li>Leg vast welke bestaande flow niet mag veranderen.</li>
+              <li>Noem platform en doelbranch expliciet.</li>
+              <li>Beschrijf hoe je kunt bewijzen dat het werkt.</li>
+            </ul>
+          </div>
+          <div class="card prompt">
+<pre>Ontwerp en implementeer [feature] voor Avatar2.
+
+Bron van waarheid:
+- Repository: Square-One-Official/Avatar
+- Doelbranch: v2-main
+- Begin vanaf de nieuwste origin/v2-main
+
+Gebruikersdoel:
+[één zin]
+
+Acceptatiecriteria:
+1. [zichtbaar resultaat]
+2. [interactie]
+3. [fout/lege state]
+4. [bestaand gedrag dat behouden moet blijven]
+
+Voor je code wijzigt:
+- Zoek overlappende branches, PR's en Cursor-sessies.
+- Meld conflicterend werk.
+- Maak bij grote keuzes eerst een kort plan.
+
+Afronding:
+- Relevante tests
+- Screenshot/video uit de juiste build
+- Commit + push + één PR
+- Exacte branch en commit in de samenvatting</pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="parallel">
+        <h2>Zo gebruik je meerdere Cursor-sessies veilig</h2>
+        <div class="grid three">
+          <div class="card">
+            <span class="tag good">Veilig parallel</span>
+            <h3>Gescheiden gebieden</h3>
+            <p>Agent A werkt aan backend-auth. Agent B werkt aan documentatie. Ze raken geen gedeelde kernbestanden.</p>
+          </div>
+          <div class="card">
+            <span class="tag warn">Voorzichtig</span>
+            <h3>Zelfde feature, andere lagen</h3>
+            <p>Spreek interfaces vooraf af. Laat één integratie-agent beide branches combineren en testen.</p>
+          </div>
+          <div class="card">
+            <span class="tag" style="color:var(--red)">Niet parallel</span>
+            <h3>Zelfde view of model</h3>
+            <p>Twee agents die tegelijk EditorView, BoardView of dezelfde migratie wijzigen. Voer deze taken na elkaar uit.</p>
+          </div>
+        </div>
+        <div class="callout good">
+          <strong>Praktische limiet:</strong> maximaal één actieve implementatiesessie per featuregebied,
+          plus eventueel één aparte onderzoek- of reviewsessie die geen bestanden wijzigt.
+        </div>
+        <div class="card prompt">
+<pre>Voordat je begint:
+1. Inventariseer alle actieve Cursor Cloud-sessies voor deze repository.
+2. Inventariseer alle open PR's met doelbranch v2-main.
+3. Vergelijk de gewijzigde bestanden met deze taak.
+4. Als een bestaande branch hetzelfde werk bevat: ga daarop verder of maak een integratieplan.
+5. Start pas een nieuwe branch als er geen overlappende eigenaar is.
+
+Geef eerst een tabel:
+sessie | branch | PR | gewijzigde bestanden | status | overlap</pre>
+        </div>
+      </section>
+
+      <section id="prompts">
+        <h2>Prompttechnieken die veel verschil maken</h2>
+        <div class="grid two">
+          <article class="card">
+            <h3>1. Geef context die een computer kan controleren</h3>
+            <p>Niet: “werk aan de nieuwste versie”.</p>
+            <p>Wel: “fetch <code>origin/v2-main</code>, meld de startcommit en controleer open PR’s”.</p>
+          </article>
+          <article class="card">
+            <h3>2. Scheid huidig en gewenst gedrag</h3>
+            <p>Gebruik altijd <strong>AR</strong> (actual result) en <strong>ER</strong> (expected result). Dat voorkomt interpretatieverschillen.</p>
+          </article>
+          <article class="card">
+            <h3>3. Noem wat niet mag veranderen</h3>
+            <p>Een scherpe “non-goal” voorkomt dat een kleine fix onbedoeld een hele UI-flow herschrijft.</p>
+          </article>
+          <article class="card">
+            <h3>4. Vraag om bewijs, niet om vertrouwen</h3>
+            <p>Vraag om tests, branch, commit, PR, screenshot-herkomst en bekende beperkingen.</p>
+          </article>
+          <article class="card">
+            <h3>5. Laat onzekerheid expliciet melden</h3>
+            <p>“Als de screenshot niet bij de broncode past, stop en rapporteer het verschil vóór implementatie.”</p>
+          </article>
+          <article class="card">
+            <h3>6. Geef één eindtoestand</h3>
+            <p>Bijvoorbeeld: “klaar wanneer de PR mergebaar is, checks groen zijn en de macOS-flow handmatig is bevestigd”.</p>
+          </article>
+        </div>
+        <div class="card prompt" style="margin-top:18px">
+<pre>Controleprompt na afloop:
+
+Bewijs dat deze wijziging echt in de bedoelde versie zit:
+- Wat was de exacte startcommit?
+- Wat is de featurebranch?
+- Welke commits zijn toegevoegd?
+- Is de branch gebaseerd op de nieuwste origin/v2-main?
+- Welke andere branches/PR's overlappen?
+- Welke tests zijn uitgevoerd?
+- Test Vercel hier alleen web/backend, of ook de macOS-app?
+- Uit welke branch + commit kwam de screenshot?
+- Wat moet nog gemerged of lokaal opgehaald worden?</pre>
+        </div>
+      </section>
+
+      <section id="repo">
+        <h2>Concreet advies voor deze Aaavatar-repository</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>Tijdens de v2-overgang</h3>
+            <ul>
+              <li>Gebruik <code>v2-main</code> als enige integratiebasis voor werk in <code>Avatar2/</code>.</li>
+              <li>Laat elke v2-feature-PR uitsluitend naar <code>v2-main</code> wijzen.</li>
+              <li>Start afhankelijke taken pas nadat de vorige PR is gemerged.</li>
+              <li>Wijs bij parallel werk één integratiebranch en één eigenaar aan.</li>
+              <li>Behandel Vercel-checks niet als bewijs voor de macOS-UI.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Na de v2-release</h3>
+            <ul>
+              <li>Kies één permanente hoofdbranch, bij voorkeur <code>main</code>.</li>
+              <li>Merge de volledige v2-lijn gecontroleerd naar die branch.</li>
+              <li>Archiveer of hernoem de oude appbron zodat “main” en “v2” niet blijven concurreren.</li>
+              <li>Documenteer apart: web deploy, backend deploy en macOS release.</li>
+              <li>Gebruik release-tags voor exacte productieversies.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Belangrijk:</strong> zet niet zomaar <code>v2-main</code> over <code>main</code>.
+          Backend-, admin-, release- en appwijzigingen moeten eerst als één integratieverschil worden beoordeeld.
+        </div>
+      </section>
+
+      <section id="checklist">
+        <h2>De korte checklist</h2>
+        <div class="card">
+          <ul class="checklist">
+            <li>Ik weet welke hoofdbranch geldt.</li>
+            <li>Ik heb eerst remote updates opgehaald.</li>
+            <li>Ik heb open PR’s en sessies gecontroleerd.</li>
+            <li>Mijn taak heeft één branch en één PR.</li>
+            <li>Ik snap dat een Cloud Agent-PR nog niet in Xcode zit.</li>
+            <li>Mijn Xcode-branchkiezer toont precies de branch die ik wil bouwen.</li>
+            <li>Mijn branch raakt geen parallel beheerde kernbestanden.</li>
+            <li>Elke screenshot noemt branch en commit.</li>
+            <li>Ik weet wat Vercel wel en niet test.</li>
+            <li>Ik heb relevant gedrag getest.</li>
+            <li>De PR is mergebaar en beoordeeld.</li>
+            <li>Na merge heb ik de hoofdbranch opnieuw opgehaald en Xcode heropend.</li>
+          </ul>
+        </div>
+        <div class="hero-rule">
+          <div class="number">✓</div>
+          <div>
+            <strong>Klaar betekent: gemerged, opgehaald en geverifieerd.</strong>
+            <span>Niet alleen: “de agent heeft een commit gemaakt”.</span>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Aaavatar workflowgids · zelfstandig HTML-document · printbaar via de browser.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

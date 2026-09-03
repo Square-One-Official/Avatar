@@ -1,3 +1,4 @@
+import AvatarKit
 import Foundation
 import SwiftData
 import AppKit
@@ -715,6 +716,40 @@ enum ImportFlow {
             return
         }
 
+        // Already-colour guard: colorising a photo that's already in colour is
+        // a near-no-op that still costs 1 credit, so confirm before spending
+        // one. Genuinely B&W photos fall through and run immediately.
+        if ImageProcessor.isLikelyColour(pngData: cutoutData) {
+            appState.colorizeConfirm = ColorizeConfirmRequest(
+                onConfirm: {
+                    // Nil first so the alert's dismiss-set onCancel no-ops.
+                    appState.colorizeConfirm = nil
+                    performColorize(portrait: portrait, context: context,
+                                    appState: appState, undoManager: undoManager)
+                },
+                onCancel: { appState.colorizeConfirm = nil }
+            )
+            return
+        }
+
+        performColorize(portrait: portrait, context: context,
+                        appState: appState, undoManager: undoManager)
+    }
+
+    /// Runs the actual `/v1/colorize` call. Split out from `colorize(...)` so
+    /// the already-colour confirmation path can defer it behind a dialog.
+    /// Costs 1 credit on success; failures don't deduct.
+    private static func performColorize(
+        portrait: Portrait,
+        context: ModelContext,
+        appState: AppState,
+        undoManager: UndoManager? = nil
+    ) {
+        guard let cutoutData = portrait.cutoutPNG else {
+            appState.note(Loc.noCutoutAvailable)
+            return
+        }
+
         appState.processingKind = .colorize
         appState.isProcessing = true
         appState.dismissBanner()
@@ -894,6 +929,10 @@ enum ImportFlow {
                 case .transport, .rateLimited:
                     // Recoverable: Wi-Fi blip or rate limit. Try again.
                     appState.warn(Loc.magicCutoutOfflineToast)
+                case .generationRefused:
+                    // E55 (SHARED-touch: nieuwe AvatarKit-case, deze switch is
+                    // exhaustief): vuurt in de cutout-flow nooit — stylize-only.
+                    appState.warn(err.errorDescription ?? Loc.somethingWentWrong)
                 case .server(let code, let message):
                     // Log the raw status/detail for devs; show friendly copy.
                     dlog("[Magic Cutout] server error \(code) \(message ?? "")")

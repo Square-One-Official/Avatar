@@ -38,7 +38,7 @@ export function auditHooks<T = Record<string, unknown>>(
             collection,
             docId: stringifyDocId((doc as { id?: unknown }).id),
             summary: clip(summary(doc as T)),
-            actor: (req.user as { id?: string | number } | null | undefined)?.id ?? null,
+            actor: numericActorId(req.user),
             actorEmail: (req.user as { email?: string } | null | undefined)?.email ?? null,
           },
         });
@@ -58,7 +58,7 @@ export function auditHooks<T = Record<string, unknown>>(
             collection,
             docId: stringifyDocId((doc as { id?: unknown }).id),
             summary: clip(summary(doc as T)),
-            actor: (req.user as { id?: string | number } | null | undefined)?.id ?? null,
+            actor: numericActorId(req.user),
             actorEmail: (req.user as { email?: string } | null | undefined)?.email ?? null,
           },
         });
@@ -74,6 +74,17 @@ function stringifyDocId(id: unknown): string {
   if (typeof id === "string") return id;
   if (typeof id === "number") return String(id);
   return "";
+}
+
+/**
+ * De `actor`-relatie in de audit-log-collectie is een users-relationship —
+ * in de gegenereerde types (postgres) een numeriek id. Alles wat geen number
+ * is wordt null: een string-id had de integer-FK-insert toch al laten falen,
+ * dus dit verandert geen werkend runtime-gedrag.
+ */
+function numericActorId(user: unknown): number | null {
+  const id = (user as { id?: unknown } | null | undefined)?.id;
+  return typeof id === "number" ? id : null;
 }
 
 /**

@@ -9,7 +9,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 // key published at /auth/v1/.well-known/jwks.json. Legacy HS256 JWT shared
 // secret is intentionally not supported — project must have legacy JWT-based
 // API keys disabled in Settings → API Keys.
-const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+// Single normalized auth base (trailing slash stripped) so the JWKS fetch URL
+// and the asserted issuer can never disagree on trailing-slash handling — a
+// trailing slash in SUPABASE_URL would otherwise give the JWKS path a double
+// slash (`…co//auth/v1/.well-known/…`) while the issuer stayed canonical.
+const SUPABASE_AUTH_BASE = `${SUPABASE_URL.replace(/\/+$/, "")}/auth/v1`;
+
+const JWKS = createRemoteJWKSet(new URL(`${SUPABASE_AUTH_BASE}/.well-known/jwks.json`));
+
+// Pinning the JWKS URL to this project already prevents cross-project token
+// reuse, so asserting `iss` is defense-in-depth — it rejects a token whose
+// issuer doesn't match even if it somehow verified against the key set.
+// (Audience is intentionally not asserted: the project's `aud` value isn't
+// verified here, and a wrong guess would reject every valid token.)
 
 export type AuthedUser = {
   id: string;
@@ -77,7 +89,7 @@ export async function optionalUser(
 
 async function verifyToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, JWKS);
+    const { payload } = await jwtVerify(token, JWKS, { issuer: SUPABASE_AUTH_BASE });
     return payload;
   } catch {
     return null;
@@ -244,21 +256,11 @@ export async function checkAnonCheckoutRateLimit(ip: string): Promise<boolean> {
   return tryLimit(anonCheckoutLimiter, ip);
 }
 
-/**
- * True when the caller's e-mail is on the DEV_UNLIMITED_EMAILS allowlist
- * (comma-separated env var). Dev-allowlisted users skip credit/trial gates
- * and may use the `model_override` parameter (E01.10). Canonical home of
- * the gate — /v1/account and /v1/checkout/topup still carry local copies
- * from before E01.10; route new callers here.
- */
-export function isDevUnlimitedUser(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const list = (process.env.DEV_UNLIMITED_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return list.includes(email.toLowerCase());
-}
+// The dev-unlimited allowlist used to live here as a synchronous env-var
+// lookup. E14.9 moved it to `lib/proAccess.ts`, which resolves the CMS
+// `pro-access` list first and keeps DEV_UNLIMITED_EMAILS as the break-glass
+// fallback — see `proOverrideFor` / `isUnlimitedUser` there. The three
+// copy-pasted local variants (/v1/account, /v1/checkout/topup) went with it.
 
 /**
  * Extract the originating client IP. Vercel terminates TLS at the edge and

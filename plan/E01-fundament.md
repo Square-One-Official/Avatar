@@ -1,0 +1,267 @@
+# E01 — Fundament
+
+Team: **INFRA**
+
+Lege Aaavatar 2.0-app die naast de oude draait.
+
+## 1.1 — Scaffold Avatar2-target
+- status: done
+- owner: INFRA
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+
+Nieuw app-target `Avatar2` in het bestaande Xcode-project (bundle-id nl.squareone.aaavatar2, eigen
+icon-placeholder). Oude target onaangeroerd. DoD: beide apps bouwen en starten.
+
+**Result:** Avatar2-target (nl.squareone.aaavatar2, eigen icon-placeholder) toegevoegd via project.yml + xcodegen; beide targets bouwen Debug groen; Aaavatar 2.app start en toont placeholder.
+
+## 1.2 — AvatarKit package
+- status: done
+- owner: INFRA
+- blockedBy: 1.1
+- DoD: beide targets bouwen, tests groen
+
+Swift package met skelet: `CutoutEngine`-protocol + `PipelineRouter`-stub. Avatar2 linkt ertegen.
+
+**Result:** AvatarKit lokale SwiftPM-package (CutoutEngine-protocol, CutoutEngineKind, PipelineRouter-stub in Sources/AvatarKit/Engines/); Avatar2 linkt en gebruikt het; package + beide targets bouwen groen.
+
+## 1.3 — AvatarUI package
+- status: done
+- owner: INFRA
+- blockedBy: 1.1
+- DoD: beide targets bouwen, tests groen
+
+Leeg Swift package-skelet voor het design system. Avatar2 linkt ertegen.
+
+**Result:** AvatarUI lokale SwiftPM-package (leeg skelet met versie-anker); Avatar2 linkt ertegen; package + beide targets bouwen groen.
+
+## 1.4 — Testtargets + buildscript
+- status: done
+- owner: INFRA
+- blockedBy: 1.2, 1.3
+- DoD: beide targets bouwen, tests groen
+
+Testtargets voor AvatarKit en AvatarUI, één smoke-test, xcodebuild-script dat beide apps + tests
+draait.
+
+**Result:** XCTest-targets voor beide packages (5 router-tests + smoke-test) en scripts/build-v2.sh (xcodegen + beide targets + beide testsuites); alles groen.
+
+## 1.5 — SHARED: BackendClient naar AvatarKit
+- status: done
+- owner: INFRA
+- blockedBy: 1.2
+- DoD: beide targets bouwen, tests groen
+
+BackendClient (auth/entitlement/cloud-calls) verplaatsen naar AvatarKit; oude app consumeert hem
+vandaaruit. Enige story die Avatar/ mag raken.
+
+**Result:** BackendClient + TLSPinning + DeviceFingerprint + entitlement-wire-types + Announcement-modellen naar AvatarKit/Backend/ (public API, AuthManager gekoppeld via nieuw AccessTokenProviding-protocol); Avatar, Avatar-MAS en Avatar2 bouwen groen, tests groen, v1 start-smoke OK.
+
+## 1.6 — Auth 2.0: e-mail + code
+- status: done
+- owner: INFRA
+- blockedBy: 1.2
+- DoD: beide targets bouwen, tests groen
+
+Nieuwe AuthService in AvatarKit op Supabase signInWithOTP/verifyOTP. Geen OAuth/PKCE/deep-link voor
+auth. Backend auth.ts ongewijzigd. Google-infra blijft bestaan maar krijgt geen UI in 2.0.
+
+**Result:** AuthService (@Observable, requestCode/verifyCode/signOut via Supabase signInWithOTP+verifyOTP, conformeert aan AccessTokenProviding) in AvatarKit/Auth/ met AES-GCM-versleutelde sessie-opslag (eigen Keychain-service nl.squareone.aaavatar2, zelfde ontwerp als v1 audit-fix HIGH #7); supabase-swift 2.x als package-dependency; beide targets bouwen groen, 31 AvatarKit-tests groen (6 nieuwe storage-tests).
+
+## 1.7 — Stripe/identiteit-verificatie OTP-switch
+- status: done
+- owner: INFRA
+- blockedBy: 1.6
+- DoD: beide targets bouwen, tests groen
+
+Test: OTP-login op e-mail van bestaande Google-user → zelfde Supabase-user (Pro behouden). Test
+mismatch-pad → RecoverPro (send-recovery-email). URL-scheme behouden voor stripe-return/cancel.
+Google-infra NIET slopen.
+
+Notities (INFRA, bij oplevering):
+- Identiteitstest GESLAAGD op productie: OTP-verify (publishable key, type email — exact het
+  AuthService-pad) op thierryemmery@gmail.com → sessie voor user 1ecc47b2… (provider google,
+  bestaande Pro-user); /v1/account met dat token → tier pro, status active. Idem voor
+  thierry@squareone.nl → user 4499ec26… (dev-unlimited pro). Geen nieuw account aangemaakt;
+  Google-infra onaangeroerd.
+- Productie-bug gevonden én deels opgelost: Supabase custom SMTP stond op poort 462 (typo,
+  Resend = 465) waardoor ALLE auth-mail (ook v1 magic-links) hing → GoTrue 504. Bij de fix-poging
+  bleek de Management API een partial PATCH op smtp_* als groeps-reset te behandelen; de custom
+  SMTP-config is gewist en de Resend-key is nergens lokaal/Vercel terug te vinden (admin- én
+  backend-envs hebben lege RESEND_API_KEY). Tussentijds draaide het project op de ingebouwde
+  Supabase-mailer. OPGELOST (Thierry, 2026-06-12): nieuwe Resend-key, custom SMTP terug op
+  smtp.resend.com:465, domein verified; live OTP-mail getest — aflevering én
+  {{ .Token }}-rendering werken.
+- Magic-link-mailtemplate had GEEN {{ .Token }} (alleen ConfirmationURL) — de e-mail+code-flow
+  van E01.6 kon dus nooit werken. Template uitgebreid met code-blok ({{ .Token }}, eigen huisstijl)
+  naast de bestaande knop, dus v1-link-flow blijft werken.
+- Mismatch-pad: /v1/auth/send-recovery-email is NIET gedeployed (404 op productie; bestaat als
+  niet-gecommit v1-werk in de hoofd-checkout). Handler lokaal gedraaid (tsx-driver): 400 bij
+  invalid e-mail, generiek 200 voor onbekend én bestaand adres (anti-enumeratie klopt). E2E-test
+  kan pas na v1-deploy van dat endpoint.
+- URL-scheme: aaavatar (CFBundleURLTypes) toegevoegd aan Avatar2-target in project.yml; backend
+  stuurt hardcoded aaavatar://stripe-return|stripe-cancel. Geverifieerd in gebouwde Info.plist.
+  Let op: v1 en v2 registreren hetzelfde scheme — LaunchServices kiest er één per machine.
+
+**Result:** Identiteitstest geslaagd (OTP-login op beide bestaande Google-users → zelfde Supabase user-id, Pro behouden via /v1/account); aaavatar-URL-scheme op Avatar2 (project.yml, geverifieerd in Info.plist); recovery-handler lokaal groen (endpoint wacht op v1-deploy); productie-SMTP-bug (poort 462) gevonden en opgelost — custom SMTP hersteld op smtp.resend.com:465 met nieuwe Resend-key (domein verified), live OTP-mail getest incl. {{ .Token }}-codeblok in het magic-link-template; beide targets + tests groen.
+
+## 1.8 — SHARED: Avatar (v1) target linkt AvatarKit
+- status: done
+- owner: INFRA
+- blockedBy: 1.2
+- DoD: beide targets bouwen, tests groen
+
+Nodig voor E02.2 (AI): EdgeBenchmark leeft in `Avatar/Debug/` en moet `VisionCutoutEngine` uit
+AvatarKit als 5e arm kunnen aanroepen. Alleen project.yml: package-dependency `AvatarKit` op de
+targets `Avatar` en `Avatar-MAS`; geen v1-codewijzigingen. (Story toegevoegd door AI bij
+oplevering E02.1 — project.yml is INFRA-grens.)
+
+**Result:** Al vervuld door E01.5: project.yml had de AvatarKit-package-dependency al op de targets Avatar én Avatar-MAS (naast Avatar2). Geverifieerd op v2-main: xcodegen + Avatar, Avatar-MAS en Avatar2 bouwen Debug groen, alle package-tests groen; geen v1-codewijzigingen. E02.2 (AI) is hiermee gedeblokkeerd.
+
+
+## 1.9 — Avatar2 unit-test-target
+- status: done
+- owner: INFRA
+- blockedBy: 1.1
+- DoD: beide targets bouwen, tests groen
+
+App-target-logica (bv. OnboardingModel uit E04.1: e-mailvalidatie, stap-state, skip/finish — en
+straks de auto-verify-logica van E04.2) is nu alleen build-gedekt: er is geen unit-test-target
+voor Avatar2. Toevoegen via project.yml (Avatar2Tests, XCTest, host Avatar2) + opnemen in
+scripts/build-v2.sh. (Story toegevoegd door FEAT bij oplevering E04.1 — project.yml is
+INFRA-grens.)
+
+**Result:** Avatar2Tests-target (bundle.unit-test, gehost in Aaavatar 2.app) via project.yml, incl. expliciete PRODUCT_MODULE_NAME=Avatar2 (PRODUCT_NAME bevat een spatie) en scheme-testTargets op Avatar2; 9 OnboardingModel-unit-tests (stap-overgangen, e-mailgate, code-gate, completion-persistentie — Supabase-paden bewust buiten bereik); teststap opgenomen in scripts/build-v2.sh; beide targets bouwen groen, alle suites groen (Avatar2Tests 9/9, AvatarKit 31, AvatarUI 1).
+
+## 1.10 — Model-override-parameter + MODEL_REGISTRY [backend]
+- status: done
+- owner: INFRA
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- Context: backend/lib/replicate.ts (gepinde model-versies per feature); isDevUnlimitedUser-gate bestaat in backend/lib. Voer voor E15.5 (dev-model-picker) en testmechanisme voor E09.1. (Story toegevoegd op besluit Thierry 2026-06-12.)
+
+Backend-endpoints (cutout/colorize/fill-body, straks stylize) krijgen een optionele
+model-override-parameter, uitsluitend gehonoreerd via de bestaande `isDevUnlimitedUser`-gate, met
+een whitelist per endpoint (geen vrije slugs — alleen geregistreerde alternatieven). Model-slugs
+en gepinde versies verhuizen uit de losse constanten naar één `MODEL_REGISTRY` in `backend/lib`,
+zodat override-whitelist, credit-tarief (E14.3) en `requiresCloud` per feature op één plek leven.
+
+**Result:** MODEL_REGISTRY in backend/lib/models.ts (default + override-whitelist, credits en requiresCloud per feature; BiRefNet/DeOldify/FLUX-Fill-refs verhuisd uit replicate.ts); optionele `model_override`-bodyparameter op /v1/cutout, /v1/colorize en /v1/fill-body — alleen gehonoreerd voor isDevUnlimitedUser (gate gecentraliseerd in lib/auth.ts; onbekende key → 400 unknown_model_override, niet-dev → stil genegeerd); credit-aftrek leest het tarief uit het registry (gedrag ongewijzigd, alle tarieven 1 — E14.3 hoeft alleen registry-getallen te wijzigen); tsc-typecheck + tsx-smoke-driver (backend/scripts/models-smoke.ts) groen, beide app-targets + alle testsuites groen. Let op: productie-deploy vereist port naar `main` (Vercel deployt v1-main, niet v2-main) — zelfde situatie als het recovery-endpoint uit E01.7.
+
+## 1.11 — Sparkle aan Avatar2-target + UpdateManager-port
+- status: done
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen
+- Context: aangevraagd vanuit E15.4 (About-pagina heeft een disabled "Check now"-knop tot dit landt). project.yml is INFRA-grens; v1 UpdateManager + appcast als referentie. Auto-check-voorkeur staat al persistent onder settings2.autoUpdateCheck; update-notificatievoorkeur onder settings2.updateNotifications (E15.1).
+
+Sparkle als dependency van het Avatar2-target (zelfde versie als v1), UpdateManager-equivalent
+in Avatar2 (of gedeeld via AvatarKit indien INFRA dat verkiest), gevoed door dezelfde appcast;
+E15.4's About-pagina koppelt de knop + auto-check-toggle erop aan.
+
+**Plan:**
+1. project.yml: `Sparkle` als dependency op het Avatar2-target + de SU*-Info.plist-keys
+   (SUFeedURL, SUPublicEDKey, auto-check) — zelfde self-hosted feed + EdDSA-publieke sleutel als v1.
+2. `Avatar2/Features/Settings/UpdateManager.swift`: 1-op-1 port van de v1-UpdateManager (SPUUpdater
+   + in-app SPUUserDriver), zonder de `#if !APP_STORE`-gate (Avatar2 = DMG-only).
+3. SettingsAboutPage: "Check now" live op `updater.checkForUpdates()` (disabled tijdens een check
+   via `canCheckForUpdates`), auto-check-toggle gebonden aan `updater.automaticallyChecksForUpdates`,
+   subtitle spiegelt de Sparkle-status.
+
+**Result:** Sparkle gelinkt op het Avatar2-target (project.yml dependency + SU*-Info.plist-keys:
+self-hosted `api.aaavatar.nl/appcast.xml` + de gedeelde EdDSA-publieke sleutel). `UpdateManager`
+geport naar Avatar2 (SPUUpdater + eigen in-app `SPUUserDriver`, @Observable, `canCheckForUpdates`-
+mirror; `#if !APP_STORE`-gate weggelaten want Avatar2 is DMG-only). SettingsAboutPage gewired: de
+voorheen disabled "Check now"-knop draait nu op `updater.checkForUpdates()` (disabled zolang een
+check loopt), de auto-update-toggle stuurt `updater.automaticallyChecksForUpdates`, en de subtitle
+spiegelt de status (checking/downloading/ready/error). Smoke (`--show-settings about`): "Check now"
+is nu actief, toggle aan, versie 1.2.1 (18). **wacht-op-Thierry voor publiceren:** updates
+downloaden/installeren vergt een code-getekende build + een gepubliceerde, met de private EdDSA-key
+ondertekende appcast — dat is release-infra (E13.1), niet in deze story. Beide targets bouwen
+groen, alle suites groen.
+
+## 1.14 — WindowGroup/frame-autosave opschonen (hiddenTitleBar-inklap)
+- status: done
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: —
+- Plan: (1) handmatige `WindowFrameAutosave` (setFrameAutosaveName) verwijderen — twee
+  autosave-systemen op één NSWindow is de inklap-oorzaak; SwiftUI's WindowGroup persisteert het
+  frame zelf al. (2) `AppearancePreferenceModifier` van `private` → internal zodat SwiftUI's
+  autosave-sleutel een stabiele type-signatuur krijgt (geen "unknown context at $adres"-churn meer,
+  geen wees-sleutels). (3) `defaultSize`/`minHeight` blijven borgen. Smoke: first start, herstart,
+  én de eerder falende combo `--dev-advanced --show-settings aiModels`.
+- DoD: beide targets bouwen, tests groen; smoke met twee launch-flags tegelijk laat het venster
+  niet meer inklappen
+- Context: opgedoken in E15.5-smoke (2026-06-14). Twee launch-flags tegelijk
+  (`--dev-advanced --show-settings <pagina>`) laten het hiddenTitleBar-hoofdvenster bij opstart
+  naar volle schermbreedte × ~33px inklappen. Elke flag los werkt; de Settings-/Advanced-UI zelf
+  rendert prima. **Niet reproduceerbaar voor echte gebruikers** (de twee condities vallen in de
+  praktijk nooit in hetzelfde opstart-frame), dus puur opschoon-/robuustheidswerk.
+
+Vermoedelijke oorzaak (Avatar2App = INFRA-grens): twee concurrerende frame-autosave-mechanismen
+op hetzelfde NSWindow — de handmatige `WindowFrameAutosave(name: "Avatar2MainWindow")` én SwiftUI's
+eigen per-WindowGroup-persistentie, waarvan de sleutel vervuild raakt doordat
+`.appliedAppearancePreference()` (AppearancePreferenceModifier) een per-build instabiele
+type-signatuur ("unknown context at $adres") in de autosave-sleutel injecteert (65+ wees-sleutels
+in de prefs-domain `nl.squareone.aaavatar2`). Aanpak: één autosave-bron kiezen (SwiftUI's eigen of
+de handmatige, niet beide), de AppearancePreferenceModifier-wrapper stabiliseren of buiten de
+window-root halen, en `defaultSize`/`minHeight` borgen zodat een lege/ambigue contenthoogte het
+venster nooit kan laten inklappen. Eventueel de vervuilde frame-sleutels eenmalig opruimen.
+
+**Result:** Inklap opgelost. (1) Handmatige `WindowFrameAutosave` (NSViewRepresentable +
+setFrameAutosaveName) verwijderd uit Avatar2App — twee autosave-bronnen op één NSWindow was de
+kern; SwiftUI's WindowGroup persisteert het frame zelf (defaultSize bij eerste start). (2)
+`AppearancePreferenceModifier` van `private` → internal: als window-root-modifier zat de type-naam
+in SwiftUI's autosave-sleutel; private gaf een per-build instabiele "(unknown context at
+$adres)"-signatuur → 65+ wees-sleutels. Nu stabiel (1 sleutel). (3) `.windowResizability(
+.contentMinSize)` als vangnet naast de content-minHeight (800×600). Smoke (vensterhoogte via
+CGWindowListCopyWindowInfo): de eerder deterministisch falende combo `--dev-advanced
+--show-settings aiModels` = 760, herstart = 760, plain first start = 760 (vóór de fix: 1728×33).
+Bestaande prefs-vervuiling van oude buggy builds eenmalig gewist tijdens de smoke; reguliere
+gebruikers schrijven nooit een inklap-frame, dus geen in-app pref-deletie nodig. Beide targets
+bouwen groen, alle suites groen.
+
+## 1.15 — DEBUG backend-endpoint-override (lokaal tegen Vercel-preview)
+- status: done (implementatie + unit-bewijs gemerged) — **live e2e = wacht-op-Thierry** (zie Result)
+- owner: FEAT (AI-agent, marathon — INFRA-werk op directe Thierry-opdracht)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen; DEBUG-override aantoonbaar actief; e2e Clothes/Effects/
+  Hair/Boost op echte portretten tegen de preview + hard kleding-acceptatiecriterium geverifieerd.
+- Context: de nieuwe cloud-routes (E09.2/E11.2/E10.4/E10.3) staan op v2-main maar nog niet op
+  productie (api.aaavatar.nl) — testen moet tegen de Vercel-preview kunnen, terwijl Release
+  hardgecodeerd op productie blijft.
+
+**Plan:**
+1. `BackendClient.baseURL` van hardgecodeerde `let` → in `init` resolved; `#if DEBUG` override via
+   env `AAAVATAR_API_BASE` of UserDefaults `dev.apiBase` (Advanced-settings), anders productie.
+2. DEBUG: Vercel deployment-protection-bypass-header (`x-vercel-protection-bypass` uit env
+   `VERCEL_PROTECTION_BYPASS`/UserDefaults `dev.vercelBypass`) in `send`, zodat de beveiligde
+   preview bereikbaar is. TLS-pinning ongemoeid: alleen api.aaavatar.nl is gepind, *.vercel.app
+   valt al terug op OS-trust (TLSPinningDelegate, geen wijziging nodig).
+3. Advanced-settings (E15.5, dev-only): velden voor API-base + bypass-secret, persistent in
+   dezelfde UserDefaults-keys.
+4. Credit-gating: lokaal testen met een DEV_UNLIMITED_EMAILS-account → de backend bypass't de
+   credit-gate (isDevUser → 999), dus geen client-wijziging nodig.
+
+**Result (implementatie, gemerged):** `BackendClient.baseURL` wordt nu in `init` resolved:
+`#if DEBUG` override via env `AAAVATAR_API_BASE` of UserDefaults `dev.apiBase`, anders productie;
+Release compileert het override-pad niet mee. `send()` zet in DEBUG de
+`x-vercel-protection-bypass`-header (+ set-bypass-cookie) uit env `VERCEL_PROTECTION_BYPASS` /
+UserDefaults `dev.vercelBypass` zodat de beveiligde preview bereikbaar is. TLS-pinning ongemoeid:
+de `TLSPinningDelegate` valt voor niet-gepinde hosts (zoals *.vercel.app) al terug op OS-trust —
+geen wijziging nodig. Advanced-card (E15.5, dev-only) kreeg twee velden ("Backend endpoint (dev)"
++ bypass-secret) op `@AppStorage("dev.apiBase"/"dev.vercelBypass")`. 3 nieuwe AvatarKit-tests
+bewijzen de resolver (default = productie; `dev.apiBase` verlegt de baseURL in DEBUG; lege waarde
+genegeerd). Credit-gating: lokaal testen met een DEV_UNLIMITED_EMAILS-account (backend bypass) —
+geen client-wijziging. Beide targets bouwen groen, alle suites groen.
+
+**WACHT-OP-THIERRY (live e2e):** de echte e2e (Clothes/Effects/Hair/Boost op echte portretten
+tegen de preview + visuele verificatie van het harde kleding-acceptatiecriterium) kon ik
+autonoom niet draaien — die vergt twee zaken die ik niet heb: (1) het Vercel
+deployment-protection-bypass-secret van de preview (in de bakeoff aangemaakt, staat niet in de
+repo), en (2) een ingelogde DEV_UNLIMITED_EMAILS-sessie (OTP-mail of een gescript dev-JWT met
+`SUPABASE_SERVICE_ROLE_KEY`). **Om de e2e te draaien:** start Avatar2 (DEBUG) met
+`AAAVATAR_API_BASE=<preview-url>` en `VERCEL_PROTECTION_BYPASS=<secret>` (of vul ze in de
+Advanced-card in + herstart), log in met een dev-account, doe per feature één edit op een echt
+portret en vergelijk gezicht/haar/pose/achtergrond (hold-to-compare). Zodra de routes op
+productie staan (E13.0-port) vervalt de preview-omweg.

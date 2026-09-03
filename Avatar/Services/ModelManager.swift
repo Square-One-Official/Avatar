@@ -117,7 +117,7 @@ final class ModelManager {
     /// model name stays generic (`matting-model.mlmodelc`) so future
     /// swaps don't touch this constant.
     static let modelURL = URL(string:
-        "https://github.com/thierrzz/Avatar/releases/download/" +
+        "https://github.com/Square-One-Official/Avatar/releases/download/" +
         "models/matting-v1/matting-model.mlmodelc.zip"
     )!
 

@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 
 /// "Restore Pro on this Mac" sheet — wires the welcome surface to

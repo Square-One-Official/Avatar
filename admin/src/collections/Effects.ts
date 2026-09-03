@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * CMS-driven Effects styles (E33). Each row is one card in the macOS Editor's
@@ -9,7 +10,9 @@ import { auditHooks } from "../lib/audit-hooks";
  * Three things make an effect: a stable `key` (sent to the image model and
  * used as the on-device cache key), a `thumbnail` (the card preview), and a
  * `prompt` (the full instruction the model runs). The prompt never leaves the
- * server — `/v1/effects` omits it; only `/v1/stylize` reads it.
+ * server — `/v1/effects` omits it; only `/v1/stylize` reads it. Optional
+ * `styleReferences` (E54) are example images sent to the model alongside the
+ * prompt; like the prompt they stay server-side.
  *
  * Seed the four launch effects on first deploy (copy the prompts from
  * `backend/api/v1/stylize.ts` → STYLE_PROMPTS):
@@ -24,13 +27,16 @@ export const Effects: CollectionConfig = {
       "Styles shown in the macOS Editor's Effects panel. Add a row to ship a new effect without an app update — the app reads this list at runtime.",
   },
   access: {
-    // Authed admin OR any request carrying an Authorization header — the
-    // backend reads with `Authorization: users API-Key <key>`. Mirrors
-    // BadgeComponents so the macOS-app read path works.
-    read: ({ req }) => Boolean(req.user) || Boolean(req.headers.get("authorization")),
-    create: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    // Authenticated principals only. The backend reads with a valid Payload
+    // API key (`Authorization: users API-Key <key>`), which Payload resolves
+    // to `req.user` after validating the key — so `Boolean(req.user)` covers
+    // the macOS-app read path. Do NOT also allow on mere header presence: an
+    // unvalidated `Authorization: ...` header would have leaked the
+    // server-only `prompt` field to any anonymous caller.
+    read: authed,
+    create: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [
     {
@@ -60,17 +66,6 @@ export const Effects: CollectionConfig = {
       },
     },
     {
-      name: "styleReference",
-      type: "upload",
-      relationTo: "media",
-      required: false,
-      admin: {
-        description:
-          "Optional example output sent to the AI model as a visual style guide alongside the prompt. Use a full-face portrait with this effect already applied — the model will match its style. Leave empty to rely on the prompt alone.",
-        position: "sidebar",
-      },
-    },
-    {
       name: "prompt",
       type: "textarea",
       required: true,
@@ -81,6 +76,26 @@ export const Effects: CollectionConfig = {
           '"Transform this portrait into a claymation-style clay sculpture: smooth modelling-clay skin, hand-sculpted texture, soft studio lighting. Keep the person\'s facial features, expression, hairstyle and clothing clearly recognizable so the person remains identifiable."\n\n' +
           "Tips: start with “Transform this portrait into…”, describe the material / texture / lighting, then ALWAYS end with the identity sentence above so the result still looks like the same person.",
       },
+    },
+    {
+      name: "styleReferences",
+      type: "array",
+      required: false,
+      maxRows: 4,
+      admin: {
+        description:
+          "Example images of the target style (E54). They are sent to the image model together with the prompt, so the result matches these examples much more closely than a text prompt alone.\n\n" +
+          "What makes a good reference: a finished output in exactly the style you want (material, brushwork, palette, lighting). Prefer images WITHOUT a prominent recognizable face — the model can borrow facial features from reference people (identity bleed). If a face is unavoidable, keep it small or turned away.\n\n" +
+          "1–3 images is the sweet spot; the backend sends at most 3. Like the prompt, references never leave the server.",
+      },
+      fields: [
+        {
+          name: "image",
+          type: "upload",
+          relationTo: "media",
+          required: true,
+        },
+      ],
     },
     {
       name: "order",

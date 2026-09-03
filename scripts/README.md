@@ -2,6 +2,21 @@
 
 One-shot dev tooling that doesn't ship in the app bundle.
 
+## GTM go-live
+
+```bash
+# Unauthenticated production smokes (no Stripe sessions, no credits)
+./scripts/prod-gtm-smoke.sh
+
+# Structuur-check voor het v2-releasekanaal (geen Xcode)
+./scripts/release-v2.sh --check
+
+# Eerste signed beta — alleen op de Mac, als GitHub PRERELEASE
+./scripts/release-v2.sh 2.0.0 101
+```
+
+v1 blijft `./scripts/release.sh`. Die bumpt alleen het root-versieblok; Avatar2 heeft eigen 2.0.0/100-overrides.
+
 ## TL;DR — get the downloadable matting model live
 
 ```bash
@@ -17,7 +32,7 @@ gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
   --title "Matting model v1 (ORMBG)" \
   --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
-  --repo thierrzz/Avatar
+  --repo Square-One-Official/Avatar
 
 # 4. Tell me the SHA-256 (printed by the script + saved in
 #    build/matting/matting-model.mlmodelc.zip.sha256), and I'll plumb it
@@ -127,7 +142,7 @@ gh release create models/matting-v1 \
   build/matting/matting-model.mlmodelc.zip \
   --title "Matting model v1 (ORMBG)" \
   --notes "ORMBG, CoreML fp16, 1024x1024, Apache 2.0" \
-  --repo thierrzz/Avatar
+  --repo Square-One-Official/Avatar
 ```
 
 Tags follow `models/matting-vN` and act as permanent version pins —

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
-    "vercel-build": "payload generate:importmap && next build",
+    "vercel-build": "payload generate:importmap && payload migrate && next build",
     "start": "next start",
     "generate:types": "payload generate:types",
     "payload": "payload"
@@ -48,9 +48,6 @@
     "uuid": "^11.1.0",
     "prismjs": "^1.30.0",
     "esbuild": "^0.25.0",
-    "postcss": "^8.5.10",
-    "undici": "^7.28.0",
-    "ws": "^8.21.0",
-    "js-yaml": "^4.2.0"
+    "postcss": "^8.5.10"
   }
 }

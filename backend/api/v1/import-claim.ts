@@ -6,6 +6,7 @@ import {
   FREE_IMPORTS_ALLOWANCE,
   tryConsumeFreeImport,
 } from "../../lib/supabase.js";
+import { proOverrideFor } from "../../lib/proAccess.js";
 
 /**
  * POST /v1/import-claim
@@ -47,9 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await ensureUser(user.id);
       // Pro users skip the gate entirely. We still report a sentinel
       // counter pair so the client can render "unlimited" without a
-      // separate code path.
+      // separate code path. E14.9: the CMS Pro list counts here too —
+      // otherwise a comped account shows as Pro and still hits the
+      // three-image import cap.
       const sub = await activeSubscription(user.id);
-      if (sub) {
+      if (sub || (await proOverrideFor(user.email)) !== null) {
         res.status(200).json({
           allowed: true,
           imports_used: 0,

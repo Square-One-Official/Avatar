@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 import { auditHooks } from "../lib/audit-hooks";
+import { authed } from "../lib/access";
 
 /**
  * Admin operators. Just one user (you) at first. API-key auth is enabled
@@ -21,11 +22,11 @@ export const Users: CollectionConfig = {
     // access.create when the users table is empty, so we can keep
     // this strict. Once a user exists, only signed-in users can
     // create more admins.
-    admin: ({ req }) => Boolean(req.user),
-    create: ({ req }) => Boolean(req.user),
-    read: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => Boolean(req.user),
+    admin: authed,
+    create: authed,
+    read: authed,
+    update: authed,
+    delete: authed,
   },
   fields: [],
   hooks: (() => {

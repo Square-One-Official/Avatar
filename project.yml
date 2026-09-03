@@ -14,6 +14,10 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation
     from: "0.9.20"
+  AvatarKit:
+    path: AvatarKit
+  AvatarUI:
+    path: AvatarUI
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -59,6 +63,7 @@ targets:
       - package: Sparkle
       - package: Supabase
       - package: ZIPFoundation
+      - package: AvatarKit
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
@@ -95,7 +100,7 @@ targets:
           NSAllowsArbitraryLoadsInWebContent: false
           NSAllowsLocalNetworking: false
         # Self-hosted Sparkle feed (audit HIGH #10). Old builds still
-        # point at https://raw.githubusercontent.com/thierrzz/Avatar/main/appcast.xml,
+        # point at https://raw.githubusercontent.com/Square-One-Official/Avatar/main/appcast.xml,
         # which release.sh keeps in lockstep, so existing installs keep
         # updating during the transition window.
         SUFeedURL: "https://api.aaavatar.nl/appcast.xml"
@@ -133,6 +138,7 @@ targets:
     dependencies:
       - package: Supabase
       - package: ZIPFoundation
+      - package: AvatarKit
     resources:
       - path: Avatar/Assets.xcassets
       - path: Avatar/Resources
@@ -176,3 +182,106 @@ targets:
       configs:
         Release:
           CODE_SIGN_IDENTITY: "Apple Distribution"
+
+  Avatar2:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Avatar2
+        excludes:
+          - "Avatar2.entitlements"
+    dependencies:
+      - package: AvatarKit
+      - package: AvatarUI
+      - package: Sparkle
+    resources:
+      - path: Avatar2/Assets.xcassets
+    info:
+      path: Avatar2/Info.plist
+      properties:
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: Aaavatar 2
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Aaavatar"
+        NSPrincipalClass: NSApplication
+        LSApplicationCategoryType: public.app-category.photography
+        ITSAppUsesNonExemptEncryption: false
+        # E13.1: EIGEN Sparkle-kanaal — v1-installs pollen appcast.xml en
+        # zien 2.0-releases dus nooit; release-v2.sh voedt dit feed. Zelfde
+        # EdDSA-publieke sleutel als v1: updates getekend met dezelfde
+        # private key (release-infra). Bouwen vergt geen signing; publiceren wel.
+        SUFeedURL: "https://api.aaavatar.nl/appcast-v2.xml"
+        SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUEnableInstallerLauncherService: true
+        # Geen SUEnableDownloaderService: Avatar2 heeft network.client, dus de
+        # appcast/downloads lopen in-process. De Downloader-XPC is dan overbodig
+        # én hangt onder Xcode (debugger spawnt 'm suspended, kan niet attachen
+        # → check blijft eeuwig "Checking…"). v1 blijft ongewijzigd.
+        SUAllowsAutomaticUpdates: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+          NSAllowsArbitraryLoadsForMedia: false
+          NSAllowsArbitraryLoadsInWebContent: false
+          NSAllowsLocalNetworking: false
+        # Stripe-checkout keert terug via aaavatar://stripe-return|stripe-cancel
+        # (hardcoded in backend/api/v1/checkout/*). Auth 2.0 gebruikt geen
+        # deep-links meer; dit scheme blijft puur voor de Stripe-roundtrip.
+        # Let op: v1 registreert hetzelfde scheme — met beide apps op één
+        # machine kiest LaunchServices er één (acceptabel tijdens de transitie).
+        CFBundleURLTypes:
+          - CFBundleURLName: nl.squareone.aaavatar2.scheme
+            CFBundleURLSchemes:
+              - aaavatar
+        # PoC (left-nav): eigen sleep-type voor het verplaatsen van een portret
+        # naar een map (PortraitDragItem). Geëxporteerd zodat de interne drag
+        # niet matcht op de venster-brede foto-import (.fileURL/.image).
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: nl.squareone.aaavatar2.portrait-ref
+            UTTypeDescription: Aaavatar portrait reference
+            UTTypeConformsTo:
+              - public.data
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2
+        PRODUCT_NAME: Aaavatar 2
+        # Expliciete modulenaam: PRODUCT_NAME bevat een spatie en zou anders
+        # "Aaavatar_2" worden — Avatar2Tests doet `@testable import Avatar2`.
+        PRODUCT_MODULE_NAME: Avatar2
+        # E13.1: eigen versielijn, los van de root-settings (die zijn van v1).
+        # Zonder deze overrides erfde Aaavatar 2 v1's 1.2.1/18 en zou een
+        # v1-release-bump het v2-kanaal stil hernummeren. Build start op 100:
+        # ruim boven élk v1-buildnummer, zodat een dev-binary die ooit op het
+        # gedeelde feed stond nooit een "downgrade" ziet.
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "100"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        COMBINE_HIDPI_IMAGES: YES
+        CODE_SIGN_ENTITLEMENTS: Avatar2/Avatar2.entitlements
+        OTHER_LDFLAGS: "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels"
+    scheme:
+      testTargets:
+        - Avatar2Tests
+
+  # E01.9 — unit-tests voor app-target-logica (modellen in Avatar2/Features/).
+  # Draait gehost in Aaavatar 2.app; scripts/build-v2.sh neemt dit mee.
+  Avatar2Tests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Avatar2Tests
+    dependencies:
+      - target: Avatar2
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2"
+        BUNDLE_LOADER: "$(TEST_HOST)"

@@ -1,0 +1,7 @@
+# The avatars-api project builds only backend/ (project rootDirectory=backend).
+# When deploying from the repo root via the Vercel CLI the whole monorepo would
+# otherwise be uploaded and blow the request-size limit. Exclude everything
+# except backend/ so the CLI upload stays small. (GitHub auto-deploys are
+# unaffected — they use the project's rootDirectory setting server-side.)
+/*
+!/backend

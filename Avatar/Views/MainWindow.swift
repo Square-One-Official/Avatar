@@ -1,3 +1,4 @@
+import AvatarKit
 import SwiftUI
 import SwiftData
 import CoreSpotlight
@@ -147,6 +148,19 @@ struct MainWindow: View {
             Button(Loc.magicCutoutUseCredits(request.credits)) { request.onConfirm() }
         } message: { request in
             Text(Loc.magicCutoutBatchConfirm(request.count, credits: request.credits))
+        }
+        .alert(
+            Loc.colorizeAlreadyColourTitle,
+            isPresented: Binding(
+                get: { state.colorizeConfirm != nil },
+                set: { if !$0 { state.colorizeConfirm?.onCancel() } }
+            ),
+            presenting: state.colorizeConfirm
+        ) { request in
+            Button(Loc.cancel, role: .cancel) { request.onCancel() }
+            Button(Loc.colorizeUseOneCredit) { request.onConfirm() }
+        } message: { _ in
+            Text(Loc.colorizeAlreadyColourMessage)
         }
         .onOpenURL { url in
             URLSchemeHandler.handle(url, appState: appState)
