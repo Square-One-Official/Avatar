@@ -196,7 +196,11 @@ enum PortraitNameGuess {
 
     // MARK: - Woordenlijsten
 
-    private static let separators: Set<Character> = ["-", "_", " ", ".", "+", "(", ")", "[", "]", ",", "&", "@", "#"]
+    /// Ook `=`, `:`, `;`, `/`, `~`, `!`, `|`: Figma exporteert varianten als
+    /// `Name=Ruslan.png` of `Type=Photo, Name=Ruslan.png`.
+    private static let separators: Set<Character> = [
+        "-", "_", " ", ".", "+", "(", ")", "[", "]", ",", "&", "@", "#", "=", ":", ";", "/", "~", "!", "|", "{", "}",
+    ]
 
     private static let imageExtensions: Set<String> = [
         "jpg", "jpeg", "jpe", "png", "heic", "heif", "tif", "tiff", "gif", "bmp", "webp", "avif",
@@ -219,7 +223,7 @@ enum PortraitNameGuess {
         // camera/bestand
         "img", "image", "images", "dsc", "dscn", "dcim", "pxl", "mvimg", "pano", "scan", "screenshot", "screen",
         "shot", "capture", "snapshot", "file", "untitled", "unnamed", "unknown", "temp", "tmp", "test", "sample",
-        "download", "downloads", "export", "exported", "import", "imported", "attachment",
+        "download", "downloads", "exported", "import", "imported", "attachment",
         // fototermen
         "photo", "photos", "foto", "fotos", "pic", "pics", "picture", "pictures", "portrait", "portraits", "portret",
         "portretten", "headshot", "headshots", "profile", "profiel", "profilepic", "profilepicture", "avatar",
@@ -243,11 +247,15 @@ enum PortraitNameGuess {
         "white", "wit", "black", "zwart", "grey", "gray", "grijs", "blue", "blauw", "green", "groen",
         "background", "achtergrond", "bg", "transparent", "transparant", "nobg", "removed",
         // bijwoorden/lidwoorden die als bestandsnaamvulling voorkomen
-        "the", "a", "an", "and", "of", "for", "with", "met", "en", "een", "voor", "bij", "zonder", "without",
-        "at", "om", "on", "am", "pm", "uur",
+        "the", "a", "an", "and", "of", "for", "with", "met", "en", "voor", "bij", "zonder", "without",
+        "at", "om", "am", "pm", "uur",
         // telwoorden als bestandsnaamvulling ("Square One", "photo two")
         "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
         "een", "twee", "drie", "vier", "vijf", "zes", "zeven", "acht", "negen", "tien",
+        // Figma-/design-export-eigenschappen ("Name=Ruslan", "State=Default", "Size=Large")
+        "name", "naam", "state", "default", "variant", "property", "type", "size", "frame", "group", "component",
+        "instance", "layer", "rectangle", "ellipse", "mask", "style", "theme", "light", "dark", "mode", "hover",
+        "active", "selected", "true", "false", "yes", "no", "on", "off", "export", "asset", "assets", "icon", "logo",
         // bekende afbeeldingsextensies als token (bv. "anna.png.jpg")
         "jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "gif", "bmp", "webp", "avif", "psd",
     ]

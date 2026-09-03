@@ -159,6 +159,19 @@ het eerste gewone woord); zónder voornaam beslist een NLTagger-woordenboekcheck
 achternaam. Telwoorden zijn ruis. Gedragswijziging: `p1-man-beard.png` → "" (was "Man Beard").
 Laag 2 (on-device model) blijft bestaan voor Macs mét Apple Intelligence. 33/33 + 8/8 tests groen.
 
+**Vervolg 4 (2026-09-03, live-debug met Thierry — "werkt nog niet"):** de echte oorzaak zat
+niet in de herkenning maar vóór de pipeline: een Finder-drop van meerdere bestanden komt bij
+SwiftUI's `.onDrop` op macOS 26 binnen als kale beeld-providers (`public.png`, geen file-URL),
+waardoor de import het naamloze `.data`-pad nam. Fix in `ShellView.handleDrop`: eerst de
+drag-pasteboard zelf uitlezen op file-URL's (`DroppedImageSources.dragPasteboardFileURLs`),
+anders de `suggestedName` van de provider via een tijdelijk bestand. Persistente
+notice-logging (`Import`-categorie) laat per drop zien wat er binnenkomt. Daarnaast: Figma-
+exports heten `Name=Ruslan.png` — `=`/`:`/`;`/`/` zijn nu separators en `name`/`state`/`type`…
+ruis. Los daarvan bleek de subject-lift (`VNGenerateForegroundInstanceMask`) een decoratieve
+schijf achter de persoon mee te liften; `VisionCutoutEngine` gate de foreground nu ook op een
+zone rond de persoon-matte (alleen als die ≥30% van de foreground dekt). Env-gated probe-test
+`VisionCutoutProbeTests` voor visuele checks op een los bestand.
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een

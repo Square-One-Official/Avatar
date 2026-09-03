@@ -519,7 +519,9 @@ final class ShellModel {
             setCanvas(.result(cutout))
             // Eerste geslaagde cutout → quota mag zichtbaar worden (E05.1).
             entitlement.markFirstCutoutCompleted()
-            persist(cutout: cutout, original: original, name: await nameTask?.value ?? "")
+            let resolvedName = await nameTask?.value ?? ""
+            ImportTrace.log.notice("single persist: resolved=\"\(resolvedName, privacy: .public)\" hadTask=\(nameTask != nil)")
+            persist(cutout: cutout, original: original, name: resolvedName)
             // E05.6: eenmalige nudge als de Vision-rand rafelig oogt en het
             // hifi-model nog niet binnen is.
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
@@ -709,6 +711,7 @@ final class ShellModel {
                 name = ""
                 nameTask = Task.detached(priority: .utility) { await PortraitNameResolver.resolve(data: data) }
             }
+            ImportTrace.log.notice("batch job: placeholder=\"\(name, privacy: .public)\" source=\({ if case .file(let u) = source { return u.lastPathComponent } else { return "data" } }(), privacy: .public)")
             jobs.append(LibraryImportJob(
                 source: source, cgImage: decoded.cgImage, original: nsImage(from: decoded.cgImage),
                 name: name, nameTask: nameTask, folderID: folderID
@@ -826,6 +829,7 @@ final class ShellModel {
             entitlement.markFirstCutoutCompleted()
             if let modelContext {
                 let resolvedName = await job.nameTask?.value ?? job.name
+                ImportTrace.log.notice("batch persist: resolved=\"\(resolvedName, privacy: .public)\" placeholder=\"\(job.name, privacy: .public)\" hadTask=\(job.nameTask != nil)")
                 updateLibraryImport(job.id) { $0.name = resolvedName }
                 let portrait = Portrait2(
                     name: resolvedName, cutoutData: encoded.cutoutPNG, originalData: encoded.originalPNG

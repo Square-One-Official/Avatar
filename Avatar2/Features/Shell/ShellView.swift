@@ -7,6 +7,7 @@
 
 import AppKit
 import AvatarUI
+import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -680,9 +681,18 @@ struct ShellView: View {
         let images = files.isEmpty
             ? providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
             : []
-        guard !files.isEmpty || !images.isEmpty else { return false }
+        // Finder-drops komen op macOS 26 bij SwiftUI soms binnen als kale
+        // beeld-providers (`public.png`) zónder bestands-URL — dan is de
+        // bestandsnaam (en dus de portretnaam) weg. De drag-pasteboard zelf
+        // heeft de file-URL's wél: die winnen als ze er zijn.
+        let pasteboardURLs = DroppedImageSources.dragPasteboardFileURLs()
+        ImportTrace.log.notice("drop: \(providers.count) providers, \(files.count) file, \(images.count) image, \(pasteboardURLs.count) pasteboard-urls; types[0]=\(providers.first?.registeredTypeIdentifiers.joined(separator: ",") ?? "-", privacy: .public)")
+        guard !files.isEmpty || !images.isEmpty || !pasteboardURLs.isEmpty else { return false }
         Task { @MainActor in
-            let sources = await DroppedImageSources.load(files: files, images: images)
+            let sources = pasteboardURLs.isEmpty
+                ? await DroppedImageSources.load(files: files, images: images)
+                : DroppedImageSources.sources(fromFileURLs: pasteboardURLs)
+            ImportTrace.log.notice("drop: \(sources.count) sources geladen")
             guard !sources.isEmpty else { return }
             await model.importImages(sources)
         }
@@ -698,14 +708,69 @@ private enum DroppedImageSources {
     static func load(files: [NSItemProvider], images: [NSItemProvider]) async -> [ShellModel.ImportSource] {
         var sources: [ShellModel.ImportSource] = []
         for provider in files {
-            guard let url = await fileURL(from: provider) else { continue }
+            guard let url = await fileURL(from: provider) else {
+                ImportTrace.log.notice("loader: fileURL nil voor provider types=\(provider.registeredTypeIdentifiers.joined(separator: ","), privacy: .public)")
+                continue
+            }
+            ImportTrace.log.notice("loader: file \(url.lastPathComponent, privacy: .public)")
             if files.count > 1, !isLikelyImageFile(url) { continue }
             sources.append(.file(url))
         }
         for provider in images {
-            if let data = await imageData(from: provider) { sources.append(.data(data)) }
+            guard let data = await imageData(from: provider) else { continue }
+            // Beeld-provider zonder URL: de `suggestedName` draagt bij Finder-
+            // drops meestal nog de bestandsnaam. Via een tijdelijk bestand
+            // blijft het hele `.file`-pad (naam + metadata) werken.
+            if let name = provider.suggestedName, !name.isEmpty, let url = stash(data, named: name, provider: provider) {
+                ImportTrace.log.notice("loader: data \(data.count) bytes → \(url.lastPathComponent, privacy: .public)")
+                sources.append(.file(url))
+            } else {
+                ImportTrace.log.notice("loader: data \(data.count) bytes zonder naam; types=\(provider.registeredTypeIdentifiers.joined(separator: ","), privacy: .public)")
+                sources.append(.data(data))
+            }
         }
         return sources
+    }
+
+    /// File-URL's rechtstreeks van de drag-pasteboard (Finder zet ze er altijd
+    /// op, ook als SwiftUI alleen beeld-providers doorgeeft).
+    static func dragPasteboardFileURLs() -> [URL] {
+        let pasteboard = NSPasteboard(name: .drag)
+        let urls = pasteboard.readObjects(
+            forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL] ?? []
+        return urls
+    }
+
+    /// Zelfde filterregels als `load(files:)`: bij meerdere bestanden vallen
+    /// niet-beelden stil af; één bestand gaat ongefilterd door.
+    static func sources(fromFileURLs urls: [URL]) -> [ShellModel.ImportSource] {
+        urls.compactMap { url in
+            if urls.count > 1, !isLikelyImageFile(url) { return nil }
+            return .file(url)
+        }
+    }
+
+    /// Schrijft gedropte beelddata weg onder z'n oorspronkelijke naam (met
+    /// extensie op basis van het providertype als die ontbreekt).
+    private static func stash(_ data: Data, named name: String, provider: NSItemProvider) -> URL? {
+        var fileName = name
+        if URL(fileURLWithPath: name).pathExtension.isEmpty,
+           let type = provider.registeredTypeIdentifiers.compactMap({ UTType($0) }).first(where: { $0.conforms(to: .image) }),
+           let ext = type.preferredFilenameExtension {
+            fileName += ".\(ext)"
+        }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DroppedImages", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let url = dir.appendingPathComponent(fileName)
+            try data.write(to: url)
+            return url
+        } catch {
+            return nil
+        }
     }
 
     static func isLikelyImageFile(_ url: URL) -> Bool {
@@ -855,4 +920,10 @@ extension ShellView {
             )
         }
     }
+}
+
+/// Tijdelijke diagnose-logging voor de drop-import (Thierry, 2026-09-03:
+/// namen komen niet door bij Finder-drops). Notice-niveau = persistent.
+enum ImportTrace {
+    static let log = Logger(subsystem: "nl.squareone.aaavatar2", category: "Import")
 }

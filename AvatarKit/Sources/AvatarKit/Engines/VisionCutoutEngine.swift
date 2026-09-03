@@ -74,7 +74,23 @@ public struct VisionCutoutEngine: CutoutEngine {
             let gatedPerson = person.applyingFilter("CIDarkenBlendMode", parameters: [
                 kCIInputBackgroundImageKey: gate
             ]).cropped(to: extent)
-            matte = matte.applyingFilter("CILightenBlendMode", parameters: [
+            // Omgekeerde gate (2026-09-03, Thierry: Figma-avatars op een
+            // gekleurde schijf): de subject-lift ziet schijf + persoon als één
+            // onderwerp en de schijf bleef staan. De foreground telt daarom
+            // alleen mee binnen een ruime zone rond de persoon-matte —
+            // haarslierten, schouders en een bril blijven, een decoratieve
+            // schijf of kader ver buiten het silhouet niet. Zonder bruikbare
+            // persoon-matte (geen persoon gevonden) blijft de subject-lift
+            // ongewijzigd leidend.
+            let personZone = person.applyingFilter("CIMorphologyMaximum", parameters: [
+                kCIInputRadiusKey: Self.personGateRadius(for: extent)
+            ]).cropped(to: extent)
+            let gatedForeground = fgMask.applyingFilter("CIDarkenBlendMode", parameters: [
+                kCIInputBackgroundImageKey: personZone
+            ]).cropped(to: extent)
+            let foregroundBase = Self.personCoversForeground(person: person, foreground: fgMask, extent: extent)
+                ? gatedForeground : fgMask
+            matte = foregroundBase.applyingFilter("CILightenBlendMode", parameters: [
                 kCIInputBackgroundImageKey: gatedPerson
             ]).cropped(to: extent)
         }
@@ -152,6 +168,35 @@ public struct VisionCutoutEngine: CutoutEngine {
             return image
         }
         return cg
+    }
+
+    /// Zone rond de persoon-matte waarbinnen de subject-lift nog meetelt:
+    /// ~2,5% van de langste zijde (800 px → 20 px), minimaal 12 px.
+    static func personGateRadius(for extent: CGRect) -> Double {
+        max(12, 0.025 * Double(max(extent.width, extent.height)))
+    }
+
+    /// De persoon-matte dekt minstens ~30% van de gelifte foreground — dan
+    /// is de foreground echt "persoon + iets" en mag de rest (schijf, kader)
+    /// weg. Dekt de persoon-matte de foreground nauwelijks (geen persoon
+    /// herkend, synthetisch beeld), dan blijft de subject-lift leidend.
+    static func personCoversForeground(person: CIImage, foreground: CIImage, extent: CGRect) -> Bool {
+        let overlap = person.applyingFilter("CIDarkenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: foreground
+        ]).cropped(to: extent)
+        let fgMean = areaMean(foreground, extent: extent)
+        guard fgMean > 0.001 else { return false }
+        return areaMean(overlap, extent: extent) / fgMean >= 0.3
+    }
+
+    private static func areaMean(_ mask: CIImage, extent: CGRect) -> Float {
+        let avg = mask.applyingFilter("CIAreaAverage", parameters: [
+            kCIInputExtentKey: CIVector(cgRect: extent)
+        ])
+        var pixel = [Float](repeating: 0, count: 4)
+        context.render(avg, toBitmap: &pixel, rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                       format: .RGBAf, colorSpace: nil)
+        return pixel[0]
     }
 
     private static func scaled(_ mask: CIImage, to extent: CGRect) -> CIImage {
