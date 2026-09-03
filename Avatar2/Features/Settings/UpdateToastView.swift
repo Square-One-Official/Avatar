@@ -5,7 +5,7 @@
 //   downloading→ voortgangspil (+ %) / "Cancel"
 //   extracting → spinner
 //   ready      → "Relaunch" / "Later" (Sparkle installeert dan bij afsluiten)
-// Zelfde kaartchrome als DSToast (bg Card, divider-rand, r-lg, Shadows/Default);
+// Zelfde kaartchrome als DSToast (bg Card, divider-rand, r-2xl, Shadows/Default);
 // smaller (300) zodat 'ie in de sidebar-kolom past. Fouten horen hier niet:
 // die staan in Settings → About.
 
@@ -33,9 +33,9 @@ struct UpdateToastView: View {
         .padding(DSSpacing.gap4)
         .frame(width: 300, alignment: .leading)
         .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
         .overlay(
-            RoundedRectangle(cornerRadius: DSRadius.lg)
+            RoundedRectangle(cornerRadius: DSRadius.xl2)
                 .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
         )
         .shadow(
@@ -91,7 +91,7 @@ struct UpdateToastView: View {
             }
         case .extracting:
             HStack(spacing: DSSpacing.gap2) {
-                ProgressView().controlSize(.small)
+                DSProgressView().controlSize(.small)
                 Text("Preparing…")
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.subtle)
@@ -129,7 +129,7 @@ struct UpdateToastView: View {
                     .foregroundStyle(DSColor.Foreground.primary)
                     .monospacedDigit()
             } else {
-                ProgressView().controlSize(.small)
+                DSProgressView().controlSize(.small)
                 Text("Starting…")
                     .dsTextStyle(.labelBase)
                     .foregroundStyle(DSColor.Foreground.subtle)

@@ -371,7 +371,7 @@ final class EffectsModel {
 
     /// Verwachte duur voor de toast-voortgang, geijkt op de E55.7-meting
     /// (2026-08-03): gpt-image-2 medium p50 65s + her-isolatie/apply — 85s
-    /// belooft bewust ruim ("usually ~1 min") zonder in "~2 min" te kantelen.
+    /// belooft bewust ruim ("About 1 minute left") zonder in "2 minutes" te kantelen.
     static let expectedGenerationSeconds = 85
 
     private func detachCurrentGeneration() {
@@ -628,7 +628,7 @@ struct EffectsPanel: View {
             credits: CreditMeter.chipLabel(for: .generativeStandard),
             headerAccessory: { createHeaderButton }
         ) {
-            ScrollView(.horizontal, showsIndicators: false) {
+            DSScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DSSpacing.gap2) {
                     noneCard
                     ForEach(model.cards) { card in

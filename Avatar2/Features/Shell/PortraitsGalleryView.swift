@@ -88,7 +88,7 @@ struct PortraitsGalleryView: View {
     }
 
     private var gridBody: some View {
-        ScrollView {
+        DSScrollView {
             LazyVGrid(columns: columns, spacing: DSSpacing.gap4) {
                 // Lopende imports vóór het echte grid (omgekeerde drop-volgorde:
                 // de tegel die nú verwerkt wordt grenst aan de jongste portretten
@@ -221,18 +221,17 @@ struct PortraitsGalleryView: View {
         items.filter { model.isPortraitSelected($0) }.count
     }
 
-    private var allSelected: Bool {
-        !items.isEmpty && selectedCount == items.count
-    }
+    /// Eén of meer portretten geselecteerd (selectiemodus, ⌘-klik of ⌘A).
+    private var hasSelection: Bool { selectedCount > 0 }
 
     /// Rechts van de titel (Weeve-stijl neutrale pillen): Select images ⇄ Done
-    /// en Export. Staat álles geselecteerd (⌘A of handmatig), dan wordt de
-    /// eerste knop "Deselect" en wist een klik de selectie + de modus.
+    /// en Export. Zodra er iets geselecteerd is (selectiemodus, ⌘-klik of ⌘A)
+    /// wordt de eerste knop "Deselect" en wist een klik de selectie + de modus.
     /// Export werkt op de selectie; zonder selectie op de hele lens.
     private var headerActions: some View {
         HStack(spacing: DSSpacing.gap2) {
             DSNeutralButton(selectButtonTitle) {
-                if allSelected {
+                if hasSelection {
                     model.clearPortraitSelection()
                 } else {
                     model.togglePortraitSelectionMode()
@@ -252,16 +251,16 @@ struct PortraitsGalleryView: View {
             }
         }
         .dsMotion(DSMotion.micro, value: model.isSelectingPortraits)
-        .dsMotion(DSMotion.micro, value: allSelected)
+        .dsMotion(DSMotion.micro, value: hasSelection)
     }
 
     private var selectButtonTitle: String {
-        if allSelected { return "Deselect" }
+        if hasSelection { return "Deselect" }
         return model.isSelectingPortraits ? "Done" : "Select images"
     }
 
     private var selectButtonHelp: String {
-        if allSelected { return "Deselect all portraits" }
+        if hasSelection { return "Deselect \(selectedCount == 1 ? "this portrait" : "these portraits")" }
         return model.isSelectingPortraits ? "Leave selection mode" : "Click portraits to select them"
     }
 
@@ -535,6 +534,9 @@ struct PortraitCompositeMeasured: View {
     var placeholder: NSImage? = nil
 
     @Environment(\.displayScale) private var displayScale
+    /// Vector-export: preferences propageren niet in ImageRenderer → de maat
+    /// komt dan rechtstreeks uit een GeometryReader.
+    @Environment(\.dsVectorExport) private var vectorExport
     @State private var sidePoints: CGFloat = 0
 
     private var pixelSide: CGFloat {
@@ -543,7 +545,12 @@ struct PortraitCompositeMeasured: View {
 
     var body: some View {
         Group {
-            if sidePoints > 0 {
+            if vectorExport {
+                GeometryReader { geo in
+                    let side = ceil(max(geo.size.width, geo.size.height) * max(displayScale, 1))
+                    PortraitComposite(portrait: portrait, maxDimension: max(side, 64), placeholder: placeholder)
+                }
+            } else if sidePoints > 0 {
                 PortraitComposite(portrait: portrait, maxDimension: pixelSide, placeholder: placeholder)
             } else {
                 DSColor.Background.inset
@@ -579,6 +586,10 @@ struct PortraitComposite: View {
     var placeholder: NSImage? = nil
 
     @State private var image: NSImage?
+    /// Vector-export: de async tegel-render haalt de snapshot niet (LazyVGrid
+    /// herbouwt tegels zodra de eerste thumbnail landt en cancelt de rest) →
+    /// synchroon renderen, met dezelfde cache.
+    @Environment(\.dsVectorExport) private var vectorExport
 
     private static let cache = NSCache<NSString, NSImage>()
 
@@ -587,12 +598,38 @@ struct PortraitComposite: View {
             DSColor.Background.inset
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
+            } else if vectorExport, let sync = syncImage() {
+                Image(nsImage: sync).resizable().scaledToFill()
             } else if let placeholder {
                 Image(nsImage: placeholder).resizable().scaledToFill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: cacheKey) { await load() }
+    }
+
+    private func syncImage() -> NSImage? {
+        let key = cacheKey as NSString
+        if let cached = Self.cache.object(forKey: key) { return cached }
+        guard let cg = PortraitThumbnailRenderer.render(renderSpec) else { return nil }
+        let img = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        Self.cache.setObject(img, forKey: key)
+        return img
+    }
+
+    private var renderSpec: PortraitThumbnailRenderer.Spec {
+        PortraitThumbnailRenderer.Spec(
+            cutoutData: portrait.cutoutData,
+            originalData: portrait.effectBackgroundData ?? portrait.originalData,
+            backgroundImageData: portrait.backgroundImageData,
+            backgroundColorHex: portrait.backgroundColorHex,
+            useOriginalBackground: portrait.useOriginalBackground,
+            portraitBlur: portrait.portraitBlur,
+            offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale,
+            exposure: portrait.adjustExposure, contrast: portrait.adjustContrast,
+            saturation: portrait.adjustSaturation, temperature: portrait.adjustTemperature,
+            side: Int(maxDimension)
+        )
     }
 
     private var cacheKey: String {
@@ -617,7 +654,7 @@ struct PortraitComposite: View {
             useOriginalBackground: portrait.useOriginalBackground,
             portraitBlur: portrait.portraitBlur,
             offsetX: portrait.offsetX, offsetY: portrait.offsetY, scale: portrait.scale,
-            brightness: portrait.adjustBrightness, contrast: portrait.adjustContrast,
+            exposure: portrait.adjustExposure, contrast: portrait.adjustContrast,
             saturation: portrait.adjustSaturation, temperature: portrait.adjustTemperature,
             side: Int(maxDimension)
         )
@@ -649,7 +686,7 @@ enum PortraitThumbnailRenderer {
         let useOriginalBackground: Bool
         let portraitBlur: Bool
         let offsetX: Double, offsetY: Double, scale: Double
-        let brightness: Double, contrast: Double, saturation: Double, temperature: Double
+        let exposure: Double, contrast: Double, saturation: Double, temperature: Double
         let side: Int
     }
 
@@ -657,9 +694,9 @@ enum PortraitThumbnailRenderer {
         guard var cutout = cgImage(from: s.cutoutData) else { return nil }
 
         // Niet-destructieve Adjust-laag (alleen als hij niet neutraal is).
-        let neutral = s.brightness == 0 && s.contrast == 1 && s.saturation == 1 && s.temperature == 0
+        let neutral = s.exposure == 0 && s.contrast == 1 && s.saturation == 1 && s.temperature == 0
         if !neutral, let adjusted = PortraitEnhancer.colorAdjust(
-            cutout, brightness: s.brightness, contrast: s.contrast,
+            cutout, exposure: s.exposure, contrast: s.contrast,
             saturation: s.saturation, temperatureShift: s.temperature
         ) { cutout = adjusted }
 

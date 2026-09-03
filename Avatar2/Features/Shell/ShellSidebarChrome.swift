@@ -44,7 +44,14 @@ struct ShellSidebarChrome: View {
 
 /// Houdt de OS-traffic-lights op een vaste vensterpositie — onafhankelijk
 /// van sidebar-animaties of content-layout shifts.
-struct WindowTrafficLightStabilizer: NSViewRepresentable {
+struct WindowTrafficLightStabilizer: View {
+    @Environment(\.dsVectorExport) private var vectorExport
+    var body: some View {
+        if vectorExport { Color.clear } else { WindowTrafficLightStabilizerRepresentable() }
+    }
+}
+
+struct WindowTrafficLightStabilizerRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         TrafficLightAnchorView()
     }

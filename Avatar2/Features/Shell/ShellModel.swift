@@ -449,7 +449,7 @@ final class ShellModel {
         // álles "Untitled". De resolutie (metadata → on-device model →
         // heuristiek, PortraitNameResolver) loopt parallel aan de cutout.
         let nameTask = Task.detached(priority: .userInitiated) { await PortraitNameResolver.resolve(url: url) }
-        await runCutout(on: cgImage, name: nameTask)
+        await runCutout(on: cgImage, source: .file(url), name: nameTask)
     }
 
     func importImage(data: Data) async {
@@ -461,7 +461,7 @@ final class ShellModel {
         // Dropped Data zonder bron-URL: alleen beeld-metadata kan nog een naam
         // opleveren (PortraitNameResolver); anders leeg → "Add name".
         let nameTask = Task.detached(priority: .userInitiated) { await PortraitNameResolver.resolve(data: data) }
-        await runCutout(on: cgImage, name: nameTask)
+        await runCutout(on: cgImage, source: .data(data), name: nameTask)
     }
 
     /// E36.5 (audit-B5) + naam-extractie: synchrone heuristiek-naam uit de
@@ -481,18 +481,22 @@ final class ShellModel {
 
     /// `name`: de asynchrone naamresolutie; wordt pas bij `persist` afgewacht
     /// (begrensd door PortraitNameResolver.modelTimeout).
-    private func runCutout(on importedImage: CGImage, name nameTask: Task<String, Never>? = nil) async {
+    private func runCutout(
+        on importedImage: CGImage, source: ImportSource, name nameTask: Task<String, Never>? = nil
+    ) async {
         let previous = activeSingleImport
         let task = Task { [weak self] in
             await previous?.value
-            await self?.performSingleImport(on: importedImage, name: nameTask)
+            await self?.performSingleImport(on: importedImage, source: source, name: nameTask)
         }
         activeSingleImport = task
         await task.value
         if activeSingleImport == task { activeSingleImport = nil }
     }
 
-    private func performSingleImport(on importedImage: CGImage, name nameTask: Task<String, Never>?) async {
+    private func performSingleImport(
+        on importedImage: CGImage, source: ImportSource, name nameTask: Task<String, Never>?
+    ) async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport(
@@ -523,14 +527,38 @@ final class ShellModel {
         let cgImage = SRGBNormalizer.normalized(importedImage)
         let original = nsImage(from: cgImage)
         setCanvas(.processing(original))
+        // De bibliotheek krijgt METEEN een tegel op de plek waar het portret
+        // straks landt (zelfde `LibraryImportTile` als de batch). Voorheen
+        // bestond het beeld tot `persist` alleen op het studio-canvas: wie
+        // tijdens de cutout terugging naar de map zag een lege map met alleen
+        // de "Removing background…"-pill, en het portret popte pas na afloop
+        // in beeld (Thierry, 2026-09-03). Bestemming = `openOrigin`, dat
+        // hierboven vóór de section-switch is vastgelegd.
+        let folderID = FolderImportSupport.folderID(from: openOrigin)
+        let placeholderName: String
+        if case .file(let url) = source { placeholderName = Self.defaultPortraitName(from: url) } else { placeholderName = "" }
+        let job = LibraryImportJob(
+            source: source, cgImage: cgImage, original: original,
+            name: placeholderName, nameTask: nameTask, folderID: folderID, phase: .isolating
+        )
+        libraryImportJobs.append(job)
         do {
             let preferred: CutoutEngineKind =
                 PrivacyPreferences2.shared.engine == .downloadedModel ? .ormbg : .vision
             let cutoutCG = try await performCutout(cgImage, preferring: preferred)
             let cutout = nsImage(from: cutoutCG)
+            // PNG's + tegel-compositie off-main (zelfde encoder als de batch); de
+            // compositie is het eindbeeld van de tegel-reveal én de placeholder
+            // van de echte tegel tot z'n eigen render klaar is.
+            let encoded = await Self.encodeLibraryImport(
+                cutout: cutoutCG, original: cgImage,
+                background: folderDefaultBackground(for: folderID)
+            )
             // Reveal-fase (E05.3): achtergrond fadet naar donker; de view
-            // animeert, het model wacht dezelfde duur en stapt dan door.
+            // animeert, het model wacht dezelfde duur en stapt dan door. De
+            // bibliotheek-tegel speelt dezelfde crossfade.
             setCanvas(.revealing(original: original, cutout: cutout))
+            updateLibraryImport(job.id) { $0.phase = .revealing(encoded?.preview ?? cutout) }
             try? await Task.sleep(
                 for: .seconds(IsolatingTiming.backgroundFade + IsolatingTiming.settle)
             )
@@ -539,12 +567,31 @@ final class ShellModel {
             entitlement.markFirstCutoutCompleted()
             let resolvedName = await nameTask?.value ?? ""
             ImportTrace.log.notice("single persist: resolved=\"\(resolvedName, privacy: .public)\" hadTask=\(nameTask != nil)")
-            persist(cutout: cutout, original: original, name: resolvedName)
+            updateLibraryImport(job.id) { $0.name = resolvedName }
+            // Encoder gefaald (zou niet mogen) → de oude main-thread PNG als vangnet.
+            if let cutoutPNG = encoded?.cutoutPNG ?? cutout.pngData(),
+               let portrait = persist(
+                   cutoutPNG: cutoutPNG,
+                   originalPNG: encoded?.originalPNG ?? original.pngData(),
+                   name: resolvedName
+               ), let preview = encoded?.preview {
+                freshImportPreviews.append((portrait, preview))
+                if freshImportPreviews.count > 32 { freshImportPreviews.removeFirst() }
+            }
+            // Tegel weg + portret erin in dezelfde main-actor-beurt → één layout-pass.
+            libraryImportJobs.removeAll { $0.id == job.id }
             // E05.6: eenmalige nudge als de Vision-rand rafelig oogt en het
             // hifi-model nog niet binnen is.
             evaluateHairNudge(cutout: cutoutCG, usedEngine: preferred)
         } catch {
             setCanvas(.failed("Couldn't find a person in that photo. Try another portrait."))
+            // Zelfde afhandeling als de batch: de tegel blijft even leesbaar
+            // staan ("Couldn't find a person") en ruimt zichzelf op.
+            updateLibraryImport(job.id) { $0.phase = .failed }
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2.5))
+                self?.libraryImportJobs.removeAll { $0.id == job.id }
+            }
         }
     }
 
@@ -577,8 +624,9 @@ final class ShellModel {
         case data(Data)
     }
 
-    /// Eén beeld uit een batch-drop, zolang het nog niet als `Portrait2` in de
-    /// store staat. De bibliotheek toont er een tijdelijke tegel voor
+    /// Eén geïmporteerd beeld (batch-drop óf single-import via de studio),
+    /// zolang het nog niet als `Portrait2` in de store staat. De bibliotheek
+    /// toont er een tijdelijke tegel voor
     /// (`LibraryImportTile`) op de plek waar het portret straks landt; die
     /// speelt dezelfde isolating-crossfade als de studio (`IsolatingTiming`),
     /// waarna de tegel verdwijnt en het échte portret z'n plek inneemt.
@@ -616,7 +664,9 @@ final class ShellModel {
         var phase: Phase = .queued
     }
 
-    /// Lopende batch-imports in drop-volgorde (de kop wordt verwerkt).
+    /// Lopende imports in drop-volgorde (de kop wordt verwerkt). Batch-jobs
+    /// starten `.queued`; de single-import zet z'n tegel direct op `.isolating`
+    /// (de studio doet het werk) en valt zo buiten de batch-wachtrij.
     private(set) var libraryImportJobs: [LibraryImportJob] = []
     /// Voortgang van de lopende batch voor de status-pill; nil = geen batch.
     private(set) var libraryImportProgress: (done: Int, total: Int)?
@@ -645,7 +695,7 @@ final class ShellModel {
     /// placeholder van de verse tegel dient. Retina-tegel op de 3-koloms-grid.
     private static let libraryImportPreviewSide = 640
 
-    /// Tegel-composities van zojuist gepersisteerde batch-imports. De echte
+    /// Tegel-composities van zojuist gepersisteerde imports (batch én single). De echte
     /// tegel toont 'm als placeholder tot z'n eigen (async, off-main) render
     /// klaar is — anders flitst de tegel even leeg op het moment dat de
     /// import-tegel door het portret wordt vervangen. Op instantie gematcht
@@ -943,7 +993,7 @@ final class ShellModel {
                 backgroundImageData: imageData, backgroundColorHex: colorHex,
                 useOriginalBackground: false, portraitBlur: false,
                 offsetX: 0, offsetY: 0, scale: 0,
-                brightness: 0, contrast: 1, saturation: 1, temperature: 0,
+                exposure: 0, contrast: 1, saturation: 1, temperature: 0,
                 side: side
             )
             let previewCG = PortraitThumbnailRenderer.render(spec) ?? cutoutBox.cgImage
@@ -968,9 +1018,10 @@ final class ShellModel {
     /// Geslaagde cutout → nieuw portret in de set; wordt meteen de selectie.
     /// De originele importfoto gaat mee voor hold-to-compare (E06.2); de
     /// bron-bestandsnaam (E36.5) als default-naam — leeg bij naamloze drops.
-    private func persist(cutout: NSImage, original: NSImage, name: String = "") {
-        guard let modelContext, let png = cutout.pngData() else { return }
-        let portrait = Portrait2(name: name, cutoutData: png, originalData: original.pngData())
+    @discardableResult
+    private func persist(cutoutPNG: Data, originalPNG: Data?, name: String = "") -> Portrait2? {
+        guard let modelContext else { return nil }
+        let portrait = Portrait2(name: name, cutoutData: cutoutPNG, originalData: originalPNG)
         modelContext.insert(portrait)
         // `section` is hier al `.editor` (runCutout opent de studio vóór de
         // cutout klaar is). De map-bestemming zit in `openOrigin`, dat wél
@@ -984,6 +1035,7 @@ final class ShellModel {
         select(portrait)
         // De editor + openOrigin zijn al bij de import-start gezet (runCutout);
         // een vervangende import in de editor houdt z'n bestaande herkomst.
+        return portrait
     }
 
     /// Selectie uit de sidebar: portret op canvas, naam/rol in de header.
@@ -1572,7 +1624,7 @@ final class ShellModel {
         guard !adjust.isNeutral,
               let cg = raw.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let out = PortraitEnhancer.colorAdjust(
-                cg, brightness: adjust.brightness, contrast: adjust.contrast,
+                cg, exposure: adjust.exposure, contrast: adjust.contrast,
                 saturation: adjust.saturation, temperatureShift: adjust.temperature
               ) else { return raw }
         return NSImage(cgImage: out, size: raw.size)
@@ -1611,7 +1663,7 @@ final class ShellModel {
     /// het geselecteerde portret (warm + helder) en hercomputeer het canvas.
     /// Bewijst dat cutoutData rauw blijft terwijl canvas/export de laag tonen.
     func debugSeedAdjust() {
-        commitAdjust(PortraitAdjust(brightness: 0.18, contrast: 1.15, saturation: 1.4, temperature: 0.6))
+        commitAdjust(PortraitAdjust(exposure: 0.35, contrast: 1.15, saturation: 1.4, temperature: 0.6))
     }
 
     /// E24.14 smoke-haak: zet de Adjust-laag terug op neutraal (inverse van

@@ -1,6 +1,6 @@
 // Edit-paneel (E22.3) — Enhance: één-tik-acties als vast tegel-raster
 // (naast én onder elkaar, geen horizontale scroll). Adjust gebruikt
-// `AdjustPanel` voor brightness/contrast/saturation/temperature.
+// `AdjustPanel` voor exposure/contrast/saturation/temperature.
 // One-click retouch verhuisde hierheen uit het Face-paneel (Thierry, 2026-06-23).
 
 import AvatarKit
@@ -171,7 +171,7 @@ struct EditColorPanel: View {
     /// Eigen instance per paneel; deelt de onderliggende `OrmbgModelStore.shared`.
     @State private var hiFiModel = HighFidelityModelState()
     @State private var seeded = false
-    @State private var brightness = 0.0
+    @State private var exposure = 0.0
     @State private var contrast = 1.0
     @State private var saturation = 1.0
     @State private var temperature = 0.0
@@ -193,7 +193,7 @@ struct EditColorPanel: View {
     }
 
     private var current: PortraitAdjust {
-        PortraitAdjust(brightness: brightness, contrast: contrast,
+        PortraitAdjust(exposure: exposure, contrast: contrast,
                        saturation: saturation, temperature: temperature)
     }
 
@@ -227,7 +227,7 @@ struct EditColorPanel: View {
         _ boxed: SendableCGImage, _ adj: PortraitAdjust
     ) async -> SendableCGImage? {
         PortraitEnhancer.colorAdjust(
-            boxed.cgImage, brightness: adj.brightness, contrast: adj.contrast,
+            boxed.cgImage, exposure: adj.exposure, contrast: adj.contrast,
             saturation: adj.saturation, temperatureShift: adj.temperature
         ).map(SendableCGImage.init)
     }
@@ -259,7 +259,7 @@ struct EditColorPanel: View {
             }
 
             if showSliders {
-                slider("Brightness", value: $brightness, range: -0.4...0.4)
+                slider("Exposure", value: $exposure, range: -2...2)
                 slider("Contrast", value: $contrast, range: 0.6...1.4)
                 slider("Saturation", value: $saturation, range: 0...2)
                 slider("Temperature", value: $temperature, range: -1...1)
@@ -291,7 +291,7 @@ struct EditColorPanel: View {
             }
             // Seed de sliders eenmalig op de persisted stand (heropenen toont 'm).
             guard !seeded else { return }
-            brightness = initial.brightness
+            exposure = initial.exposure
             contrast = initial.contrast
             saturation = initial.saturation
             temperature = initial.temperature
@@ -669,7 +669,7 @@ struct EditColorPanel: View {
     private func reset() {
         let before = current
         previewTask?.cancel()
-        brightness = 0; contrast = 1; saturation = 1; temperature = 0
+        exposure = 0; contrast = 1; saturation = 1; temperature = 0
         onPreview(source)
         onCommit(before, .neutral)
     }

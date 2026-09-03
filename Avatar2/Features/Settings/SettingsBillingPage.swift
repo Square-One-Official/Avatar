@@ -203,7 +203,7 @@ struct SettingsBillingPage: View {
                     .foregroundStyle(DSColor.Foreground.muted)
                 Spacer(minLength: DSSpacing.gap4)
                 if entitlement.isCheckoutBusy {
-                    ProgressView().controlSize(.small)
+                    DSProgressView().controlSize(.small)
                 }
                 DSPrimaryButton("Pay \(total) now") {
                     Task { await entitlement.startTopup() }
@@ -250,7 +250,7 @@ struct SettingsBillingPage: View {
 
     private func loadingRow(_ text: String) -> some View {
         HStack(spacing: DSSpacing.gap2) {
-            ProgressView()
+            DSProgressView()
                 .controlSize(.small)
             Text(text)
                 .dsTextStyle(.bodySmall)

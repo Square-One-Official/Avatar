@@ -20,6 +20,15 @@ struct ShellView: View {
         _model = State(initialValue: ShellModel(entitlement: entitlement))
     }
 
+    #if DEBUG
+    /// Vector-export (ScreenVectorExportTests): shell met een vooraf in de
+    /// juiste staat gezet model, zodat elk scherm deterministisch rendert.
+    init(entitlement: EntitlementModel, model: ShellModel) {
+        self.entitlement = entitlement
+        _model = State(initialValue: model)
+    }
+    #endif
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
@@ -350,7 +359,7 @@ struct ShellView: View {
         .refreshAppleIntelligenceAvailability {
             PrivacyPreferences2.shared.reapplyFingerprintPolicy()
         }
-        .onDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
+        .dsVectorSafeOnDrop(of: [.fileURL, .image], isTargeted: $model.isDropTargeted) { providers in
             handleDrop(providers)
         }
         .overlay(alignment: .bottomTrailing) {

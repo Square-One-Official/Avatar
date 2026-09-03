@@ -668,6 +668,9 @@ public struct DSFloatingWindowAnchor<Identity: Equatable, Content: View>: View {
     private let content: Content
 
     @Environment(\.self) private var environment
+    /// Vector-export: een child window bestaat niet in ImageRenderer en de
+    /// NSView-host wordt als placeholder-vlak getekend → weglaten.
+    @Environment(\.dsVectorExport) private var vectorExport
 
     public init(
         placement: DSFloatingPlacement,
@@ -682,6 +685,14 @@ public struct DSFloatingWindowAnchor<Identity: Equatable, Content: View>: View {
     }
 
     public var body: some View {
+        if vectorExport {
+            Color.clear.frame(width: 0, height: 0)
+        } else {
+            anchorHost
+        }
+    }
+
+    private var anchorHost: some View {
         GeometryReader { geo in
             DSFloatingWindowHost(
                 placement: placement,

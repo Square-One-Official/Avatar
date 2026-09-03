@@ -110,7 +110,7 @@ enum PortraitExporter {
         let adjust = input.adjust
         if !adjust.isNeutral,
            let adjusted = PortraitEnhancer.colorAdjust(
-            cutout, brightness: adjust.brightness, contrast: adjust.contrast,
+            cutout, exposure: adjust.exposure, contrast: adjust.contrast,
             saturation: adjust.saturation, temperatureShift: adjust.temperature
            ) {
             cutout = adjusted

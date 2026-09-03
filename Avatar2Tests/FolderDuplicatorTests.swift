@@ -77,7 +77,7 @@ final class FolderDuplicatorTests: XCTestCase {
         let original = Portrait2(name: "Anna", role: "CEO", cutoutData: Data([1, 2, 3]), originalData: Data([9]))
         context.insert(original)
         original.setBackground(.image(Data([7, 7])))
-        original.adjust = PortraitAdjust(brightness: 0.2, contrast: 1.1, saturation: 0.9, temperature: -0.1)
+        original.adjust = PortraitAdjust(exposure: 0.2, contrast: 1.1, saturation: 0.9, temperature: -0.1)
         original.frameShape = .square
         original.offsetX = 10; original.offsetY = 20; original.scale = 1.5
         original.effectActiveRaw = "sketch"

@@ -70,6 +70,69 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertFalse(model.showsTopup, "top-up alleen bij actief abonnement")
     }
 
+    /// Launch-race (bug Thierry 2026-09-03): een anonieme account-fetch die
+    /// vóór de sessie-restore vertrok maar ná de ingelogde fetch landt, mag
+    /// het Pro-account niet overschrijven met free-tier/0 credits — anders
+    /// opent de credit-gate de paywall op een account met credits genoeg.
+    func testLateAnonymousAccountFetchDoesNotOverwriteSignedInAccount() async {
+        let anonymous = accountJSON(tier: "free", credits: 0)
+        let unlimited = accountJSON(tier: "pro", credits: 999_999, devUnlimited: true)
+        let anonymousRequested = expectation(description: "anonieme account-fetch vertrokken")
+        anonymousRequested.assertForOverFulfill = false
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        EntitlementStubURLProtocol.setResolver { request in
+            guard request.url?.path == "/v1/account" else { return nil }
+            if request.value(forHTTPHeaderField: "Authorization") != nil {
+                return .json(200, unlimited)
+            }
+            anonymousRequested.fulfill()
+            return .delayed(seconds: 0.3, .json(200, anonymous))
+        }
+        let auth = AuthService.isolated()
+        let model = EntitlementModel(auth: auth, backendSession: EntitlementStubURLProtocol.makeSession())
+
+        // 1. anonieme refresh vertrekt (traag) → 2. sessie hersteld → 3. de
+        // ingelogde refresh landt eerst → 4. het anonieme antwoord komt laatst.
+        async let early: Void = model.refresh()
+        await fulfillment(of: [anonymousRequested], timeout: 2)
+        auth.debugSetSession(accessToken: "restored-token", email: "t@example.test")
+        await model.refresh()
+        XCTAssertTrue(model.isProActive)
+        await early
+
+        XCTAssertTrue(model.isProActive, "late anoniem antwoord mag het Pro-account niet overschrijven")
+        XCTAssertTrue(model.isDevUnlimited)
+        XCTAssertEqual(model.creditsRemaining, 999_999)
+    }
+
+    /// Spiegelbeeld: een ingelogde fetch die nog loopt tijdens het uitloggen
+    /// mag het account daarna niet terugzetten.
+    func testInFlightSignedInFetchDoesNotResurrectAccountAfterSignOut() async {
+        let unlimited = accountJSON(tier: "pro", credits: 999_999, devUnlimited: true)
+        let signedInRequested = expectation(description: "ingelogde account-fetch vertrokken")
+        signedInRequested.assertForOverFulfill = false
+        EntitlementStubURLProtocol.setStub(.json(200, allFlagsOnJSON), forPath: "/v1/feature-flags")
+        EntitlementStubURLProtocol.setResolver { request in
+            guard request.url?.path == "/v1/account" else { return nil }
+            guard request.value(forHTTPHeaderField: "Authorization") != nil else {
+                return .json(200, self.accountJSON(tier: "free", credits: 0))
+            }
+            signedInRequested.fulfill()
+            return .delayed(seconds: 0.2, .json(200, unlimited))
+        }
+        let auth = AuthService.isolated()
+        auth.debugSetSession(accessToken: "token", email: "t@example.test")
+        let model = EntitlementModel(auth: auth, backendSession: EntitlementStubURLProtocol.makeSession())
+
+        async let inFlight: Void = model.refresh()
+        await fulfillment(of: [signedInRequested], timeout: 2)
+        model.signOutAccount()
+        await inFlight
+
+        XCTAssertFalse(model.isProActive)
+        XCTAssertEqual(model.creditsRemaining, 0)
+    }
+
     private let allFlagsOnJSON = """
         {
           "effects_enabled": true,
@@ -208,6 +271,9 @@ final class EntitlementModelTests: XCTestCase {
         XCTAssertFalse(model.isPaywallPresented)
         XCTAssertEqual(model.freeImportsRemaining, 2)
         XCTAssertEqual(model.quotaSummary, "2 left of \(FreeTier.maxPortraits)")
+        let expectedUsed = 1 - 2.0 / Double(FreeTier.maxPortraits)
+        XCTAssertEqual(model.usedFraction ?? -1, expectedUsed, accuracy: 0.001)
+        XCTAssertEqual(model.usedPercentLabel, "\(Int((expectedUsed * 100).rounded()))% used")
     }
 
     /// Offline/transportfout mag een import nooit blokkeren — de cloud-kant
@@ -576,6 +642,9 @@ final class EntitlementStubURLProtocol: URLProtocol {
     enum Stub {
         case http(status: Int, body: Data)
         case failure(Error)
+        /// Antwoord pas na `seconds` afleveren — voor race-tests die de
+        /// aankomstvolgorde van concurrente requests willen sturen.
+        indirect case delayed(seconds: TimeInterval, Stub)
 
         static func json(_ status: Int, _ json: String) -> Stub {
             .http(status: status, body: Data(json.utf8))
@@ -583,7 +652,15 @@ final class EntitlementStubURLProtocol: URLProtocol {
     }
 
     nonisolated(unsafe) private static var routes: [String: Stub] = [:]
+    /// Optionele per-request keuze (bv. op de Authorization-header); wint van
+    /// de padtabel als hij een stub teruggeeft.
+    nonisolated(unsafe) private static var resolver: ((URLRequest) -> Stub?)?
     private static let lock = NSLock()
+
+    static func setResolver(_ resolver: @escaping (URLRequest) -> Stub?) {
+        lock.lock(); defer { lock.unlock() }
+        Self.resolver = resolver
+    }
 
     static func setStub(_ stub: Stub, forPath path: String) {
         lock.lock(); defer { lock.unlock() }
@@ -593,10 +670,13 @@ final class EntitlementStubURLProtocol: URLProtocol {
     static func reset() {
         lock.lock(); defer { lock.unlock() }
         routes = [:]
+        resolver = nil
     }
 
-    private static func stub(forPath path: String) -> Stub? {
+    private static func stub(for request: URLRequest) -> Stub? {
         lock.lock(); defer { lock.unlock() }
+        if let resolver, let stub = resolver(request) { return stub }
+        guard let path = request.url?.path else { return nil }
         return routes[path]
     }
 
@@ -610,10 +690,14 @@ final class EntitlementStubURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard let url = request.url, let stub = Self.stub(forPath: url.path) else {
+        guard let url = request.url, let stub = Self.stub(for: request) else {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
         }
+        deliver(stub, url: url)
+    }
+
+    private func deliver(_ stub: Stub, url: URL) {
         switch stub {
         case .failure(let error):
             client?.urlProtocol(self, didFailWithError: error)
@@ -625,6 +709,10 @@ final class EntitlementStubURLProtocol: URLProtocol {
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: body)
             client?.urlProtocolDidFinishLoading(self)
+        case .delayed(let seconds, let inner):
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { [self] in
+                deliver(inner, url: url)
+            }
         }
     }
 

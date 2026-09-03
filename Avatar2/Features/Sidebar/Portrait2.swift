@@ -80,9 +80,12 @@ final class Portrait2 {
     /// Adjust-laag (E24.14): NIET-destructieve color-correctie als bovenste
     /// filterlaag op de rauwe cutout. `cutoutData` blijft ongewijzigd; canvas
     /// én export passen deze params live toe (WYSIWYG). Neutraal = identiteit
-    /// (brightness 0, contrast 1, saturation 1, temperature 0). Lichtgewicht
+    /// (exposure 0, contrast 1, saturation 1, temperature 0). Lichtgewicht
     /// migratie via de defaults. Heropenen van Adjust toont de stand terug.
-    var adjustBrightness: Double = 0
+    /// Exposure (EV) verving brightness: de kolom is hernoemd (lichtgewicht
+    /// rename via `originalName`); een oude brightness-stand leest als EV —
+    /// zelfde richting, iets milder, neutraal blijft neutraal.
+    @Attribute(originalName: "adjustBrightness") var adjustExposure: Double = 0
     var adjustContrast: Double = 1
     var adjustSaturation: Double = 1
     var adjustTemperature: Double = 0
@@ -253,12 +256,12 @@ final class Portrait2 {
     var adjust: PortraitAdjust {
         get {
             PortraitAdjust(
-                brightness: adjustBrightness, contrast: adjustContrast,
+                exposure: adjustExposure, contrast: adjustContrast,
                 saturation: adjustSaturation, temperature: adjustTemperature
             )
         }
         set {
-            adjustBrightness = newValue.brightness
+            adjustExposure = newValue.exposure
             adjustContrast = newValue.contrast
             adjustSaturation = newValue.saturation
             adjustTemperature = newValue.temperature
@@ -369,10 +372,11 @@ enum BannerBackground: Equatable {
     case image(Data)
 }
 
-/// E24.14: niet-destructieve Adjust-laag (brightness/contrast/saturation/
-/// temperature) als waarde-object. Neutraal = identiteit.
+/// E24.14: niet-destructieve Adjust-laag (exposure/contrast/saturation/
+/// temperature) als waarde-object. Neutraal = identiteit. `exposure` is in EV
+/// (stops): +1 = dubbel zoveel licht, −1 = de helft.
 struct PortraitAdjust: Equatable, Sendable {
-    var brightness: Double = 0
+    var exposure: Double = 0
     var contrast: Double = 1
     var saturation: Double = 1
     var temperature: Double = 0
@@ -383,16 +387,27 @@ struct PortraitAdjust: Equatable, Sendable {
 
 extension PortraitAdjust {
     /// E50.3: een belichtings-match (`SetLightingNormalizer.AdjustSuggestion`)
-    /// als Adjust-stand. Brightness/contrast/temperature VERVANGEN de huidige
+    /// als Adjust-stand. Exposure/contrast/temperature VERVANGEN de huidige
     /// waarden (herhaald matchen stapelt niet); saturation is het handmatige
     /// spoor van de gebruiker en blijft staan. In een extension zodat de
     /// memberwise/default init van de struct blijven bestaan.
+    /// De suggestie rekent nog in additieve lineaire brightness (het model van
+    /// de normalizer); die wordt hier vertaald naar EV (zie `exposure(forLinearBrightness:)`).
     init(applying suggestion: SetLightingNormalizer.AdjustSuggestion, keepingSaturationOf current: PortraitAdjust) {
         self.init(
-            brightness: suggestion.brightness,
+            exposure: Self.exposure(forLinearBrightness: suggestion.brightness),
             contrast: suggestion.contrast,
             saturation: current.saturation,
             temperature: suggestion.temperature
         )
+    }
+
+    /// Additieve lineaire brightness (CIColorControls) → EV, gelijkgesteld op
+    /// lineair midgrijs 0.5: `2^ev · 0.5 = 0.5 + b` ⇒ `ev = log2(1 + 2b)`.
+    /// Alleen een benadering (een gain kan een offset niet exact nabootsen);
+    /// de match-feature is geshelved, dus goed genoeg als brug.
+    static func exposure(forLinearBrightness b: Double) -> Double {
+        let gain = max(1 + 2 * b, 0.01)
+        return log2(gain)
     }
 }

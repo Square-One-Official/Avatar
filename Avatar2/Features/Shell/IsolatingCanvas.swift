@@ -96,7 +96,7 @@ struct IsolatingStatusPill: View {
                 Circle()
                     .fill(DSColor.Background.neutral)
                     .frame(width: 32, height: 32)
-                ProgressView()
+                DSProgressView()
                     .controlSize(.small)
             }
             Text(label)

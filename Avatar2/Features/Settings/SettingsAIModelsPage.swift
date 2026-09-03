@@ -131,7 +131,7 @@ struct SettingsAIModelsPage: View {
                     .dsTextStyle(.bodySmall)
                     .foregroundStyle(DSColor.Foreground.muted)
                 HStack(spacing: DSSpacing.gap2) {
-                    ProgressView(value: fraction)
+                    DSProgressView(value: fraction)
                         .progressViewStyle(.linear)
                         .tint(DSColor.Action.primary)
                         .frame(width: 160)
@@ -177,7 +177,7 @@ struct SettingsAIModelsPage: View {
                 }
             }
         case .downloading:
-            ProgressView()
+            DSProgressView()
                 .controlSize(.small)
         case .idle, .failed:
             DSIconButton(Image(systemName: "arrow.down.circle"), label: "Download model") {

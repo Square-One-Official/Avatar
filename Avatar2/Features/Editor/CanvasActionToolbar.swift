@@ -132,7 +132,7 @@ struct CanvasActionToolbar<Background: View>: View {
             action: { activeMenu = (activeMenu == menu) ? nil : menu }
         ) {
             if menu == .frame && isAutoFraming {
-                ProgressView()
+                DSProgressView()
                     .controlSize(.small)
                     .frame(width: buttonSize.iconPointSize,
                            height: buttonSize.iconPointSize)

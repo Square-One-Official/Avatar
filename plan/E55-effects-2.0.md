@@ -540,6 +540,48 @@ plek + bakeoff-parity); geen extra grijze marge-pad rond de input — de
 prompt alleen bleek in de live-check voldoende. Wordt een tweede die-cut-
 stijl toegevoegd: key aan `DIE_CUT_STYLE_KEYS` toevoegen, klaar.
 
+## 55.12 — Effect-versiehistorie: history-icoon naast Refresh met dropdown van eerdere generaties
+- status: backlog (besluit Thierry 2026-09-03: niet in deze versie, wél in de toekomst)
+- team: FEAT+DS
+- blockedBy: —
+
+**Waarom.** Vandaag bewaart `Portrait2.effectCache` precies één resultaat per
+effect-key. Het refresh-icoon op de actieve kaart overschrijft dat resultaat
+(`EffectsPanel.generate` → `cache[card.key] = image` + `persist()`); de vorige
+generatie is daarna alleen nog via Cmd+Z op het canvas terug te halen, en de
+cache-entry zelf blijft de nieuwe versie. Betaalde generaties die de gebruiker
+misschien mooier vond, zijn zo kwijt.
+
+**Wat.** Naast het refresh-icoon op de actieve effect-kaart komt een
+history-icoon dat een dropdown opent met de eerder gegenereerde versies van dát
+effect (nieuwste bovenaan, mini-thumbnail + tijdstip). Kiezen = instant en
+gratis toepassen (zelfde pad als een kaart-tik), incl. undo-registratie
+(`registerSelectionUndo` + `ImageEnhanceUndo`). Het icoon verschijnt pas als er
+≥ 2 versies zijn.
+
+**Scope / ontwerp-richting.**
+- Model: `effectCache` van `[key: Data]` naar een versie-lijst per key
+  (bv. `[key: [EffectVersion]]` met `png`, `createdAt`, `id`; de actieve
+  versie = `effectActiveVersionID` of index 0). Lezen blijft backwards-
+  compatible: een enkele `Data` per key wordt bij hydratie gepromoveerd tot
+  een lijst met één versie (zelfde patroon als de JSON→plist-fallback, E49.3).
+- Cap per key (voorstel: 5, oudste valt af) om `externalStorage`-groei te
+  begrenzen; per portret max ≈ 9 stijlen × 5 × ~2 MB — meet vóór besluit.
+- `effectBackgroundData`, `ThumbnailStore`-cachesleutel (`effectActiveRaw`)
+  en `FolderDuplicator` (kopieert `effectCacheData`) moeten de actieve
+  versie kennen, niet alleen de key.
+- Gedetachte generaties (55.9) landen als nieuwe versie, niet als overschrijving.
+- DS: dropdown in de geest van het bestaande kaart-menu (E57-submenu-stijl);
+  geen Figma-frame — interpreteren in de geest van het hoofddesign, placeholder
+  in plan/ASSETS.md als er een icoon nodig is dat het DS nog niet heeft.
+- Buiten scope: server-side historie (backend bewaart geen stylize-output),
+  historie voor Face/Boost/Fill-edits (los voorstel als dat gewenst is).
+
+**DoD.** Beide targets bouwen; tests voor de cache-migratie (oude `[key: Data]`
+→ versie-lijst), cap-gedrag en undo van een versie-wissel; smoke: A genereren →
+refresh → history toont beide → oude kiezen → Cmd+Z/⇧Cmd+Z werkt → herstart app
+→ beide versies er nog.
+
 ## Risico's
 - **Latency**: gpt-image quality=high geregeld >50s; 80s-timeout / 90s
   Vercel-cap — timing-logs (55.1) + p95 (55.7) beslissen high vs medium.

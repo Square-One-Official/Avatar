@@ -79,7 +79,8 @@ enum AutoFramer {
             anchorY = eyeCenter.y
             targetCX = canvas.width * FramingConstants.targetEyeCenterX
             targetCY = canvas.height * FramingConstants.targetEyeCenterY
-            scale = (canvas.height * FramingConstants.targetInterEyeRatio) / ied
+            let effectiveIED = effectiveInterEyeDistance(ied, faceRect: faceRect)
+            scale = (canvas.height * FramingConstants.targetInterEyeRatio) / effectiveIED
         } else {
             // Fallback: face-rect-centrum.
             anchorX = faceRect.midX
@@ -121,6 +122,16 @@ enum AutoFramer {
             }
         }
         return preferred
+    }
+
+    /// Interoogafstand voor de schaal, met de face-box-hoogte als ondergrens.
+    /// Een gedraaid hoofd (driekwart-profiel) meet in 2D een kleinere
+    /// pupilafstand (× cos(yaw)) terwijl de boxhoogte gelijk blijft; zonder
+    /// deze grens zoomt de eye-based schaal zo'n portret ver in — zichtbaar in
+    /// Match framing als één "te groot" hoofd naast frontale collega's.
+    /// Frontale gezichten zitten boven de grens en houden hun echte IPD.
+    static func effectiveInterEyeDistance(_ interEyeDistance: CGFloat, faceRect: CGRect) -> CGFloat {
+        max(interEyeDistance, faceRect.height * FramingConstants.minInterEyeToFaceHeight)
     }
 
     /// Padded fit van een onderwerp-bbox (niet het volledige PNG). De
@@ -226,7 +237,8 @@ enum AutoFramer {
                 anchorY = eyeCenter.y
                 targetCX = canvas.width * FramingConstants.targetEyeCenterX
                 targetCY = canvas.height * FramingConstants.targetEyeCenterY
-                canonicalScale = (canvas.height * FramingConstants.targetInterEyeRatio) / ied
+                let effectiveIED = effectiveInterEyeDistance(ied, faceRect: faceRect)
+                canonicalScale = (canvas.height * FramingConstants.targetInterEyeRatio) / effectiveIED
             } else {
                 anchorX = faceRect.midX
                 anchorY = faceRect.midY

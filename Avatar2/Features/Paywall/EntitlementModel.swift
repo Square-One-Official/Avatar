@@ -298,6 +298,30 @@ final class EntitlementModel {
         return ""
     }
 
+    /// Verbruikt aandeel van het budget (0…1) voor de usage-bar in de left-nav.
+    /// Pro: verbruik van de maand-grant; top-ups boven de grant tellen als
+    /// 0% verbruikt (de balans ligt boven de noemer). Free: verbruik van de
+    /// lifetime-cap. nil zolang er geen account-data is.
+    var usedFraction: Double? {
+        if isProActive {
+            let quota = monthlyQuota
+            guard quota > 0 else { return nil }
+            let used = Double(quota - creditsRemaining) / Double(quota)
+            return min(1, max(0, used))
+        }
+        if let free = freeImportsRemaining {
+            let remaining = max(0, min(FreeTier.maxPortraits, free))
+            return 1 - Double(remaining) / Double(FreeTier.maxPortraits)
+        }
+        return nil
+    }
+
+    /// "19% used" — het enige getal dat de left-nav nog toont.
+    var usedPercentLabel: String {
+        guard let fraction = usedFraction else { return "" }
+        return "\(Int((fraction * 100).rounded()))% used"
+    }
+
     // MARK: - Account-pagina (E15.3)
 
     var accountEmail: String? { auth.email }
@@ -414,15 +438,41 @@ final class EntitlementModel {
         }
     }
 
+    /// Volgnummer van de laatst gestarte `refresh()` en van de fetch waarvan
+    /// het account-payload als laatste is toegepast. Samen maken ze de
+    /// account-refresh monotoon: een oudere fetch mag een nieuwere nooit
+    /// overschrijven.
+    private var refreshSequence = 0
+    private var appliedAccountSequence = 0
+
     /// Anoniem-vriendelijk: zonder token valt /v1/account terug op de
     /// device-grant-lookup. Offline of fout → state blijft staan.
+    ///
+    /// Race-guard (bug Thierry 2026-09-03): bij launch lopen meerdere
+    /// refreshes tegelijk — LeftNav/prewarm vóór de async sessie-restore
+    /// (anoniem → free-tier, 0 credits) en `onSignedIn` erna (Pro). Landde
+    /// het anonieme antwoord als laatste, dan overschreef het het Pro-account:
+    /// ingelogd, maar "0 credits" → de credit-gate opende de paywall op een
+    /// account met credits genoeg, en de sheet sprong van "Upgrade" naar
+    /// "Top up" zodra zijn eigen refresh het echte account binnenhaalde.
+    /// Daarom: (1) een fetch die gestart is in een andere sign-in-staat dan
+    /// de huidige wordt genegeerd, (2) een fetch die ouder is dan de laatst
+    /// toegepaste wordt genegeerd.
     func refresh() async {
+        refreshSequence += 1
+        let sequence = refreshSequence
+        let requestedSignedIn = auth.isSignedIn
         async let accountFetch = backend.me()
         async let flagsFetch = backend.featureFlags()
-        if let payload = try? await accountFetch {
+        let payload = try? await accountFetch
+        let flags = try? await flagsFetch
+        if let payload,
+           sequence > appliedAccountSequence,
+           requestedSignedIn == auth.isSignedIn {
             account = payload
+            appliedAccountSequence = sequence
         }
-        if let flags = try? await flagsFetch {
+        if let flags {
             featureFlags = flags
         }
     }

@@ -237,6 +237,11 @@ final class ShellModelTests: XCTestCase {
         let folder = Folder2(name: "Team")
         context.insert(folder)
         folder.setDefaultBackground(.color("#112233"))
+        // Permanent id vóór de import: met een temporary identifier viel de
+        // map-lookup in `folderDefaultBackground` één keer om (SwiftData-fatal
+        // "backing data could no longer be found", 2026-09-03) — zie ook
+        // testBatchImportTegelsVolgenDeLens.
+        try context.save()
         model.showPortraits(folderID: folder.persistentModelID)
         model.debugCutoutOverride = { $0 }
 
@@ -564,6 +569,54 @@ final class ShellModelTests: XCTestCase {
         XCTAssertNotNil(model.selectedPortrait)
         XCTAssertTrue(model.libraryImportJobs.isEmpty)
         XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 1)
+    }
+
+    /// Eén foto in een map droppen opent de studio; wie tijdens de cutout
+    /// teruggaat naar de map moet het beeld daar al zien staan (tijdelijke
+    /// tegel in de map-lens, ook zichtbaar op Home) — niet een lege map met
+    /// alleen de "Removing background…"-pill (Thierry, 2026-09-03). Na afloop
+    /// is de tegel weg, staat het portret in de map en heeft het z'n
+    /// tegel-compositie als placeholder.
+    func testEnkelBeeldToontTegelInDeMapTijdensDeCutout() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        let model = ShellModel(entitlement: makeAllowedEntitlement())
+        let context = try makeLibraryContext()
+        model.modelContext = context
+        let folder = Folder2(name: "Acme")
+        let other = Folder2(name: "Other")
+        context.insert(folder)
+        context.insert(other)
+        try context.save()
+        model.showPortraits(folderID: folder.persistentModelID)
+        var observedJobs: [ShellModel.LibraryImportJob] = []
+        var studioOpenDuringCutout = false
+        model.debugCutoutOverride = { image in
+            observedJobs = await model.libraryImportJobs
+            studioOpenDuringCutout = await model.section == .editor
+            return image
+        }
+
+        await model.importImage(data: try png(opaqueImage(shade: 90)))
+
+        XCTAssertTrue(studioOpenDuringCutout, "de studio staat open tijdens de cutout")
+        XCTAssertEqual(observedJobs.count, 1, "de map heeft tijdens de cutout al een tegel")
+        XCTAssertEqual(observedJobs.first?.folderID, folder.persistentModelID)
+        if case .isolating = observedJobs.first?.phase {} else { XCTFail("tegel toont 'Removing background…'") }
+        model.libraryImportJobsForTesting = observedJobs
+        XCTAssertEqual(model.visibleLibraryImportJobs(folderID: folder.persistentModelID).count, 1)
+        XCTAssertEqual(model.visibleLibraryImportJobs(folderID: nil).count, 1, "Home / All portraits")
+        XCTAssertEqual(model.visibleLibraryImportJobs(folderID: other.persistentModelID).count, 0)
+        model.libraryImportJobsForTesting = []
+
+        let stored = try context.fetch(FetchDescriptor<Portrait2>())
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.folder?.persistentModelID, folder.persistentModelID, "landt in de map")
+        XCTAssertTrue(model.libraryImportJobs.isEmpty, "tegel is vervangen door het portret")
+        XCTAssertNil(model.libraryImportProgress, "single-import telt niet als batch")
+        XCTAssertNotNil(stored.first.flatMap { model.freshImportPreview(for: $0) },
+                        "verse tegel krijgt de compositie als placeholder")
+        XCTAssertNotNil(model.selectedPortrait)
     }
 
     // MARK: - E47.3: selectie (direct + async canvas-decode, E27.7)

@@ -188,7 +188,7 @@ struct BackgroundPanel: View {
         return Button { tab = value } label: {
             HStack(spacing: DSSpacing.gap1) {
                 if showsProgress {
-                    ProgressView().controlSize(.mini)
+                    DSProgressView().controlSize(.mini)
                 }
                 Text(title)
                     .dsTextStyle(.labelBase)
@@ -251,7 +251,7 @@ struct BackgroundPanel: View {
     /// rij (besluit Thierry: opzij-scrollen behouden, nieuwste uploads links).
     private var galleryTab: some View {
         ZStack(alignment: .topLeading) {
-            ScrollView(.vertical) {
+            DSScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                     rowSection("Color") { colorTiles }
                     rowSection("Gradient") { gradientTiles }
@@ -474,7 +474,7 @@ struct BackgroundPanel: View {
                     unsplashHint("Unsplash is not configured yet — add an UNSPLASH_ACCESS_KEY to the backend.")
                 } else if unsplashResults.isEmpty {
                     if unsplashLoading {
-                        ProgressView().controlSize(.small)
+                        DSProgressView().controlSize(.small)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         unsplashHint(unsplashQuery.isEmpty
@@ -482,7 +482,7 @@ struct BackgroundPanel: View {
                                      : "No results for “\(unsplashQuery)”.")
                     }
                 } else {
-                    ScrollView(.vertical) {
+                    DSScrollView(.vertical) {
                         LazyVGrid(columns: gridColumns, spacing: DSSpacing.gap2) {
                             ForEach(unsplashResults) { photo in
                                 captioned(photo.authorName.map { "by \($0)" }) {
@@ -564,7 +564,7 @@ struct BackgroundPanel: View {
                 composer
                 if generateSession.isGenerating {
                     HStack(spacing: DSSpacing.gap2) {
-                        ProgressView().controlSize(.small)
+                        DSProgressView().controlSize(.small)
                         Text("Generating background…")
                             .dsTextStyle(.labelSmall)
                             .foregroundStyle(DSColor.Foreground.muted)
@@ -738,7 +738,7 @@ struct BackgroundPanel: View {
     /// leading-padding zodat de hover-scale niet wordt afgekapt door de
     /// scroll-/mask-grens.
     private func scrollRow<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        DSScrollView(.horizontal, showsIndicators: false) {
             HStack(alignment: .top, spacing: DSSpacing.gap2) { content() }
                 .padding(.vertical, DSSpacing.gap2)
                 .padding(.leading, DSSpacing.gap1)

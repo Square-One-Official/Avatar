@@ -1,5 +1,6 @@
-// Tijdelijke bibliotheek-tegel voor een batch-import (drop van meerdere
-// bestanden, zie `ShellModel.importImages`). Staat in het grid op de plek
+// Tijdelijke bibliotheek-tegel voor een lopende import — batch (drop van
+// meerdere bestanden, `ShellModel.importImages`) én single (de studio maakt
+// vrijstaand, `performSingleImport`). Staat in het grid op de plek
 // waar het portret straks landt en speelt dezelfde isolating-crossfade als
 // de studio (`IsolatingTiming`): het origineel vult de tegel en fadet, zodra
 // de cutout klaar is, weg naar de uiteindelijke compositie (cutout op de

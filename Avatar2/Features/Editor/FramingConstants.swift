@@ -19,6 +19,15 @@ enum FramingConstants {
     /// vanaf de canvastop.
     static let targetEyeCenterY: CGFloat = 0.37
 
+    /// Ondergrens voor de interoogafstand als fractie van de Vision-face-box-
+    /// hoogte. Frontaal meet Vision ~0.40 (pupil-tot-pupil / wenkbrauw-tot-kin);
+    /// bij een gedraaid hoofd (driekwart-profiel) krimpt de 2D-interoogafstand
+    /// met cos(yaw) terwijl de boxhoogte gelijk blijft, en zou de eye-based
+    /// schaal het portret ver inzoomen (Match framing 2026-09-03: 33° yaw →
+    /// 25% te groot hoofd). De boxhoogte vangt dat op; frontale gezichten
+    /// blijven ongemoeid omdat ze boven de grens zitten.
+    static let minInterEyeToFaceHeight: CGFloat = 0.38
+
     /// Horizontale positie van het oogmidden (gecentreerd).
     static let targetEyeCenterX: CGFloat = 0.50
 

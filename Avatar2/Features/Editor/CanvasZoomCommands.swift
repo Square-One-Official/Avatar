@@ -5,6 +5,7 @@
 // leest ze terug. Geen editor in beeld → `canvasZoom == nil` → de items
 // grijzen vanzelf uit.
 
+import AvatarUI
 import SwiftUI
 
 /// De zoom-acties die de editor aanbiedt aan het View-menu. Puur closures —
@@ -70,12 +71,19 @@ struct CanvasZoomCommands: View {
 /// zoom-mechanisme; de losse verborgen +/=/−/0-knoppen van de board zijn weg.
 struct CanvasZoomEqualsShortcut: View {
     var zoomIn: () -> Void
+    /// Vector-export: de verborgen knop wordt door ImageRenderer als
+    /// paginagroot placeholder-vlak getekend (AppKit-backed) → weglaten.
+    @Environment(\.dsVectorExport) private var vectorExport
 
     var body: some View {
-        Button("") { zoomIn() }
-            .keyboardShortcut("=", modifiers: .command)
-            .opacity(0)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        if vectorExport {
+            Color.clear
+        } else {
+            Button("") { zoomIn() }
+                .keyboardShortcut("=", modifiers: .command)
+                .opacity(0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }

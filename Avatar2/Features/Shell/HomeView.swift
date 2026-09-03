@@ -198,7 +198,7 @@ struct HomeView: View {
 
     private var overviewBody: some View {
         ZStack(alignment: .bottom) {
-            ScrollView {
+            DSScrollView {
                 VStack(alignment: .leading, spacing: DSSpacing.gap6) {
                     if let hero = heroPortrait {
                         heroSection(hero)
@@ -259,7 +259,7 @@ struct HomeView: View {
             if savedBanners.isEmpty {
                 // Nog geen banners → de "start from preset"-rij (E39.2): een
                 // maak-tegel gevolgd door CMS-presets (soft-fail → fallback).
-                ScrollView(.horizontal, showsIndicators: false) {
+                DSScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap4) {
                         makeBannerTile
                         ForEach(presetsModel.presets) { preset in
@@ -271,7 +271,7 @@ struct HomeView: View {
                 }
                 .horizontalScrollEdgeFade()
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
+                DSScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap4) {
                         ForEach(savedBanners.prefix(8)) { doc in
                             homeBannerCard(doc)

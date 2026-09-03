@@ -393,7 +393,7 @@ struct EditorView: View {
                             y: (t.offsetY + layout.height * t.scale / 2) * factor
                         )
                         .frame(width: side, height: side)
-                        .blur(radius: portraitBlurOn ? BackgroundBlur.canvasRadius(side: side) : 0)
+                        .dsVectorSafeBlur(radius: portraitBlurOn ? BackgroundBlur.canvasRadius(side: side) : 0)
                 }
             } else {
                 // E24.23-fix: custom upload/gradient als echte backdrop — aspect-fill via
@@ -408,7 +408,7 @@ struct EditorView: View {
                     Color.clear
                         .overlay { Image(nsImage: image).resizable().scaledToFill() }
                         .clipped()
-                        .blur(radius: portraitBlurOn
+                        .dsVectorSafeBlur(radius: portraitBlurOn
                               ? BackgroundBlur.canvasRadius(side: min(geo.size.width, geo.size.height))
                               : 0)
                 }
@@ -1644,6 +1644,6 @@ private struct BlurFadeModifier: ViewModifier {
     let radius: CGFloat
     let opacity: Double
     func body(content: Content) -> some View {
-        content.blur(radius: radius).opacity(opacity)
+        content.dsVectorSafeBlur(radius: radius).opacity(opacity)
     }
 }

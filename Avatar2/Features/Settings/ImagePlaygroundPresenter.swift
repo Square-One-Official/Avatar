@@ -14,6 +14,7 @@
 // callback, en die combinatie was hier al opgelost.
 
 import AppKit
+import AvatarUI
 import SwiftUI
 
 @MainActor
@@ -66,8 +67,20 @@ extension View {
 
 private struct ImagePlaygroundHostModifier: ViewModifier {
     @State private var presenter = ImagePlaygroundPresenter.shared
+    /// Vector-export: de Image Playground-host is AppKit-backed en wordt door
+    /// ImageRenderer als paginagroot placeholder-vlak getekend → overslaan.
+    @Environment(\.dsVectorExport) private var vectorExport
 
     func body(content: Content) -> some View {
+        if vectorExport {
+            content
+        } else {
+            host(content: content)
+        }
+    }
+
+    @ViewBuilder
+    private func host(content: Content) -> some View {
         #if canImport(ImagePlayground)
         if #available(macOS 15.1, *) {
             content.imagePlaygroundGenerationSheet(

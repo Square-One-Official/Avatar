@@ -265,7 +265,7 @@ struct FaceActionsPanel: View {
 
     var body: some View {
         let workingTitle = model.workingTitle
-        ScrollView(.horizontal, showsIndicators: false) {
+        DSScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DSSpacing.gap2) {
                 ForEach(presets) { preset in
                     let isWorking = workingTitle == preset.label

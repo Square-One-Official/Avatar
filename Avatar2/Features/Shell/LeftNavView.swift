@@ -39,6 +39,7 @@ struct LeftNavView: View {
     @State private var userMenuClickScope = DSOutsideClickScope()
     @FocusState private var userRowFocused: Bool
     @State private var userRowHovering = false
+    @State private var upgradeBannerHovering = false
 
     private static let contextMenuSpace = "leftNavContextMenu"
 
@@ -213,40 +214,68 @@ struct LeftNavView: View {
         model.section == .portraits && model.selectedFolderID == nil && !model.isShowingSettings
     }
 
-    // MARK: - Upgrade-banner + quota
+    // MARK: - Usage-tile (credits)
 
+    /// Claude-stijl usage-tile: alleen een balk + "X% used", geen tellers.
+    /// Klik opent Settings › Billing voor de details; Free houdt de Upgrade-chip
+    /// als conversiepad (de chip vangt zijn eigen klik).
     private var upgradeBanner: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.gap2) {
-            HStack(spacing: DSSpacing.gap2) {
-                Text(entitlement.isProActive ? "Credits" : "Starter plan")
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.primary)
-                Spacer(minLength: 0)
-                if entitlement.isProActive {
-                    DSChip("Add credits", type: .brand) { entitlement.requestUpgrade() }
-                } else {
-                    DSChip("Upgrade", type: .brand) { entitlement.requestUpgrade() }
+        Button {
+            model.openSettings(page: .billing)
+        } label: {
+            VStack(alignment: .leading, spacing: DSSpacing.gap2) {
+                HStack(spacing: DSSpacing.gap2) {
+                    Text(entitlement.isProActive ? "Credits" : "Starter plan")
+                        .dsTextStyle(.labelSmall)
+                        .foregroundStyle(DSColor.Foreground.primary)
+                    Spacer(minLength: 0)
+                    if !entitlement.isProActive {
+                        DSChip("Upgrade", type: .brand) { entitlement.requestUpgrade() }
+                    }
+                }
+                if let fraction = entitlement.usedFraction {
+                    HStack(spacing: DSSpacing.gap2) {
+                        usageBar(fraction: fraction)
+                        Text(entitlement.usedPercentLabel)
+                            .dsTextStyle(.labelSmall)
+                            .foregroundStyle(DSColor.Foreground.subtle)
+                            .fixedSize()
+                    }
                 }
             }
-            if !upgradeBannerQuotaText.isEmpty {
-                Text(upgradeBannerQuotaText)
-                    .dsTextStyle(.labelSmall)
-                    .foregroundStyle(DSColor.Foreground.subtle)
-            }
+            .padding(DSSpacing.gap3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DSColor.Background.inset, in: RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous)
+                    .fill(upgradeBannerHovering ? DSColor.Background.neutral : .clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
         }
-        .padding(DSSpacing.gap3)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DSColor.Background.inset, in: RoundedRectangle(cornerRadius: DSRadius.xl, style: .continuous))
+        .buttonStyle(.plain)
+        .dsFocusEffectDisabled()
+        .onHover { upgradeBannerHovering = $0 }
+        .dsMotion(DSMotion.micro, value: upgradeBannerHovering)
+        .help("Usage & billing")
+        .accessibilityLabel(entitlement.isProActive ? "Credits" : "Starter plan")
+        .accessibilityValue(entitlement.usedPercentLabel)
+        .accessibilityHint("Opens billing settings")
     }
 
-    /// Pro: credit-balans (niet "images"). Free: portrait-imports over lifetime-cap.
-    private var upgradeBannerQuotaText: String {
-        let summary = entitlement.quotaSummary
-        guard !summary.isEmpty else { return "" }
-        if entitlement.isProActive {
-            return summary.hasSuffix("credits") ? summary : "\(summary) credits"
+    private static let usageBarHeight: CGFloat = 6
+
+    private func usageBar(fraction: Double) -> some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(DSColor.Background.neutralStronger)
+                Capsule()
+                    .fill(DSColor.Background.action)
+                    .frame(width: max(Self.usageBarHeight, proxy.size.width * fraction))
+            }
         }
-        return "\(summary) images"
+        .frame(height: Self.usageBarHeight)
+        .dsMotion(DSMotion.micro, value: fraction)
     }
 
     // MARK: - Gebruikersrij + menu

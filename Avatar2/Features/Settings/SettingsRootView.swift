@@ -60,7 +60,7 @@ struct SettingsRootView: View {
 
     @ViewBuilder
     private var content: some View {
-        ScrollView {
+        DSScrollView {
             Group {
                 switch page {
                 case .preferences:

@@ -31,7 +31,7 @@ final class PortraitSetActionsTests: XCTestCase {
         return [a, b, c]
     }
 
-    private let sample = PortraitAdjust(brightness: 0.2, contrast: 1.1, saturation: 1, temperature: -0.3)
+    private let sample = PortraitAdjust(exposure: 0.2, contrast: 1.1, saturation: 1, temperature: -0.3)
 
     private func order(_ ps: [Portrait2]) -> [String] {
         FolderSetScope.items(in: ps, folderID: nil).map(\.name)
@@ -59,10 +59,22 @@ final class PortraitSetActionsTests: XCTestCase {
     }
 
     func testAdjustApplyingSuggestionKeepsSaturation() {
-        let current = PortraitAdjust(brightness: 0, contrast: 1, saturation: 1.4, temperature: 0)
+        let current = PortraitAdjust(exposure: 0, contrast: 1, saturation: 1.4, temperature: 0)
         let suggestion = SetLightingNormalizer.AdjustSuggestion(brightness: 0.1, contrast: 1.2, temperature: 0.3)
         let next = PortraitAdjust(applying: suggestion, keepingSaturationOf: current)
-        XCTAssertEqual(next, PortraitAdjust(brightness: 0.1, contrast: 1.2, saturation: 1.4, temperature: 0.3))
+        XCTAssertEqual(next.exposure, PortraitAdjust.exposure(forLinearBrightness: 0.1), accuracy: 1e-9)
+        XCTAssertEqual(next.exposure, log2(1.2), accuracy: 1e-9, "additief +0.1 rond midgrijs 0.5 ≈ +0.26 EV")
+        XCTAssertEqual(next.contrast, 1.2)
+        XCTAssertEqual(next.saturation, 1.4)
+        XCTAssertEqual(next.temperature, 0.3)
+    }
+
+    func testExposureConversionIsNeutralAtZeroAndMonotonic() {
+        XCTAssertEqual(PortraitAdjust.exposure(forLinearBrightness: 0), 0)
+        XCTAssertGreaterThan(PortraitAdjust.exposure(forLinearBrightness: 0.2), 0)
+        XCTAssertLessThan(PortraitAdjust.exposure(forLinearBrightness: -0.2), 0)
+        // Extreem negatieve brightness klemt de gain i.p.v. −∞ te leveren.
+        XCTAssertTrue(PortraitAdjust.exposure(forLinearBrightness: -1).isFinite)
     }
 
     // MARK: - Match lighting (Adjust-laag)

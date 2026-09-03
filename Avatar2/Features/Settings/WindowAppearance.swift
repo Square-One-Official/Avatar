@@ -4,6 +4,7 @@
 // en native controls de juiste light/dark-variant kiezen.
 
 import AppKit
+import AvatarUI
 import SwiftUI
 
 extension NSAppearance {
@@ -59,7 +60,15 @@ extension AppearancePreference {
 
 /// Zet `NSWindow.appearance` + achtergrond zodat sheet- en hoofdvensters de
 /// theme-voorkeur volgen. Gebaseerd op v1 `WindowBackgroundPainter`.
-struct WindowBackgroundPainter: NSViewRepresentable {
+struct WindowBackgroundPainter: View {
+    let colorScheme: ColorScheme
+    @Environment(\.dsVectorExport) private var vectorExport
+    var body: some View {
+        if vectorExport { Color.clear } else { WindowBackgroundPainterRepresentable(colorScheme: colorScheme) }
+    }
+}
+
+struct WindowBackgroundPainterRepresentable: NSViewRepresentable {
     let colorScheme: ColorScheme
 
     final class Coordinator: NSObject {

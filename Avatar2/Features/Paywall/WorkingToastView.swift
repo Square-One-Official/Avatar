@@ -37,7 +37,7 @@ struct WorkingToastView: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap1) {
                 // Titel-rij: spinner + statische titel + sluitknop.
                 HStack(alignment: .top, spacing: 0) {
-                    ProgressView()
+                    DSProgressView()
                         .controlSize(.small)
                         .padding(.trailing, DSSpacing.gap2)
                         .padding(.top, 1)
@@ -68,17 +68,20 @@ struct WorkingToastView: View {
                     .transition(.opacity)
 
                 // E55.9: bij lange generaties (expectedSeconds gezet) een
-                // eerlijke tijdsindicatie — verstreken tijd + een balk richting
-                // de verwachte duur (cap 92%: nooit "vol" beloven terwijl het
-                // model nog rekent) — plus optioneel Cancel. Besluit Thierry
-                // 2026-08-03: kwaliteit blijft high; de wachttijd wordt
-                // draaglijk via feedback, niet via een lager kwaliteitstier.
+                // eerlijke tijdsindicatie — resterende tijd in gewone taal
+                // ("About 30 seconds left") + een balk richting de verwachte
+                // duur (cap 92%: nooit "vol" beloven terwijl het model nog
+                // rekent) — plus optioneel Cancel. Besluit Thierry 2026-08-03:
+                // kwaliteit blijft high; de wachttijd wordt draaglijk via
+                // feedback, niet via een lager kwaliteitstier. Besluit Thierry
+                // 2026-09-03: geen "0:53 · usually ~1 min" meer — de klok
+                // blijft alleen zonder verwachting (Cancel-only acties).
                 if context.expectedSeconds != nil || onCancel != nil {
                     TimelineView(.periodic(from: context.startedAt, by: 1)) { timeline in
                         let elapsed = max(0, Int(timeline.date.timeIntervalSince(context.startedAt)))
                         VStack(alignment: .leading, spacing: DSSpacing.gap2) {
                             if let expected = context.expectedSeconds {
-                                ProgressView(value: min(Double(elapsed) / Double(expected), 0.92))
+                                DSProgressView(value: min(Double(elapsed) / Double(expected), 0.92))
                                     .progressViewStyle(.linear)
                                     .controlSize(.small)
                                     .tint(DSColor.Foreground.subtle)
@@ -103,9 +106,9 @@ struct WorkingToastView: View {
         }
         .frame(width: 360)
         .background(DSColor.Background.card)
-        .clipShape(RoundedRectangle(cornerRadius: DSRadius.lg))
+        .clipShape(RoundedRectangle(cornerRadius: DSRadius.xl2))
         .overlay(
-            RoundedRectangle(cornerRadius: DSRadius.lg)
+            RoundedRectangle(cornerRadius: DSRadius.xl2)
                 .strokeBorder(DSColor.Foreground.divider, lineWidth: DSBorderWidth.thin)
         )
         .shadow(
@@ -122,21 +125,24 @@ struct WorkingToastView: View {
         }
     }
 
-    /// "0:12" en, mét verwachting, "0:12 · usually ~1 min". Intern (geen
-    /// private) zodat de unit test de randen (0s, >expected, minuut-afronding)
-    /// kan dekken zonder de view te hosten.
+    /// Zonder verwachting een kale klok ("0:12"); mét verwachting de
+    /// resterende tijd in gewone taal ("About 30 seconds left", "About 1
+    /// minute left") en voorbij de verwachting "Taking a bit longer than
+    /// usual…". Seconden ronden op 5 af (omhoog) zodat het niet zenuwachtig
+    /// aftelt; vanaf een minuut op hele minuten. Intern (geen private) zodat
+    /// de unit test de randen (0s, >expected, afronding) kan dekken zonder
+    /// de view te hosten.
     static func elapsedLabel(_ elapsed: Int, expected: Int?) -> String {
-        let stamp = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
-        guard let expected else { return stamp }
-        let hint: String
-        if expected >= 60 {
-            let minutes = Int((Double(expected) / 60).rounded())
-            hint = minutes <= 1 ? "usually ~1 min" : "usually ~\(minutes) min"
-        } else {
-            hint = "usually ~\(expected)s"
+        guard let expected else {
+            return String(format: "%d:%02d", elapsed / 60, elapsed % 60)
         }
-        // Voorbij de verwachting geen "usually" meer beloven — dan is
-        // "nog bezig" het eerlijke verhaal.
-        return elapsed <= expected ? "\(stamp) · \(hint)" : "\(stamp) · still working…"
+        let remaining = expected - elapsed
+        guard remaining > 0 else { return "Taking a bit longer than usual…" }
+        let seconds = Int((Double(remaining) / 5).rounded(.up)) * 5
+        if seconds >= 60 {
+            let minutes = max(1, Int((Double(seconds) / 60).rounded()))
+            return minutes == 1 ? "About 1 minute left" : "About \(minutes) minutes left"
+        }
+        return "About \(seconds) seconds left"
     }
 }

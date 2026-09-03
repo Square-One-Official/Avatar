@@ -62,7 +62,7 @@ struct OnboardingDownloadView: View {
                         .font(.system(size: DSIconSize.lg, weight: .semibold))
                         .foregroundStyle(DSColor.Action.onAction)
                 }
-            ProgressView(value: fraction)
+            DSProgressView(value: fraction)
                 .progressViewStyle(.linear)
                 .tint(DSColor.Action.primary)
             Text(statusLabel)

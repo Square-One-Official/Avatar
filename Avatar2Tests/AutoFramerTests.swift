@@ -123,8 +123,9 @@ struct AutoFramerTests {
             bodyBottomY: 220,
             cutoutSize: CGSize(width: 400, height: 300)
         )
+        // Frontale verhouding IPD/face-box ≈ 0.40 (boven de IED-ondergrens).
         let medium = AutoFramer.FramingSubject(
-            faceRect: CGRect(x: 0, y: 0, width: 200, height: 200),
+            faceRect: CGRect(x: 0, y: 0, width: 150, height: 150),
             eyeCenter: CGPoint(x: 100, y: 100),
             interEyeDistance: 60,
             bodyBottomY: 800,
@@ -147,6 +148,67 @@ struct AutoFramerTests {
         let mediumEyeY = medium.eyeCenter!.y * transforms[1].scale + transforms[1].offset.height
         #expect(abs(closeEyeY - 1024 * FramingConstants.targetEyeCenterY) < 0.001)
         #expect(abs(mediumEyeY - 1024 * FramingConstants.targetEyeCenterY) < 0.001)
+    }
+
+    // MARK: Gedraaid hoofd (driekwart-profiel)
+
+    // Bug 2026-09-03: bij 33° yaw meet Vision een 2D-IPD van ~0.33× de
+    // face-box-hoogte i.p.v. ~0.40 frontaal; puur eye-based werd zo'n portret
+    // 25% verder ingezoomd dan de frontale rest van de set. De boxhoogte
+    // (draai-onafhankelijk) begrenst de schaal.
+    @Test func turnedHeadUsesFaceBoxFloorForScale() {
+        let face = CGRect(x: 326, y: 147, width: 263, height: 263)
+        let eye = CGPoint(x: 469, y: 218)
+        let t = AutoFramer.computeTransform(
+            faceRect: face,
+            eyeCenter: eye,
+            interEyeDistance: 87.6,
+            cutoutSize: CGSize(width: 794, height: 730)
+        )
+        let floorIED = face.height * FramingConstants.minInterEyeToFaceHeight
+        #expect(floorIED > 87.6)
+        #expect(abs(t.scale - (1024 * FramingConstants.targetInterEyeRatio) / floorIED) < 0.0001)
+        // Ooglijn-anker blijft de echte oogpositie.
+        let projectedX = eye.x * t.scale + t.offset.width
+        let projectedY = eye.y * t.scale + t.offset.height
+        #expect(abs(projectedX - 1024 * FramingConstants.targetEyeCenterX) < 0.001)
+        #expect(abs(projectedY - 1024 * FramingConstants.targetEyeCenterY) < 0.001)
+    }
+
+    @Test func frontalHeadKeepsMeasuredIPD() {
+        // Liam-achtig: IPD 110 op een box van 278 (0.397) → boven de grens.
+        let face = CGRect(x: 183, y: 149, width: 278, height: 278)
+        let t = AutoFramer.computeTransform(
+            faceRect: face,
+            eyeCenter: CGPoint(x: 316, y: 225),
+            interEyeDistance: 110.3,
+            cutoutSize: CGSize(width: 640, height: 640)
+        )
+        #expect(abs(t.scale - (1024 * FramingConstants.targetInterEyeRatio) / 110.3) < 0.0001)
+    }
+
+    @Test func sharedFramingGivesTurnedHeadSameHeadSizeAsFrontal() {
+        // Echte Acme-metingen: Liam (frontaal) + Rhianna (33° yaw).
+        let liam = AutoFramer.FramingSubject(
+            faceRect: CGRect(x: 183, y: 149, width: 278, height: 278),
+            eyeCenter: CGPoint(x: 316, y: 225),
+            interEyeDistance: 110.3,
+            bodyBottomY: 640,
+            cutoutSize: CGSize(width: 640, height: 640)
+        )
+        let rhianna = AutoFramer.FramingSubject(
+            faceRect: CGRect(x: 326, y: 147, width: 263, height: 263),
+            eyeCenter: CGPoint(x: 469, y: 218),
+            interEyeDistance: 87.6,
+            bodyBottomY: 730,
+            cutoutSize: CGSize(width: 794, height: 730)
+        )
+        let transforms = AutoFramer.computeSharedTransforms([liam, rhianna])
+        let liamHead = liam.faceRect!.height * transforms[0].scale
+        let rhiannaHead = rhianna.faceRect!.height * transforms[1].scale
+        // Hoofden binnen 6% van elkaar (was 19% te groot vóór de ondergrens).
+        #expect(abs(rhiannaHead - liamHead) / liamHead < 0.06)
+        #expect(transforms[1].scale < transforms[0].scale * 1.15)
     }
 
     @Test func doublingCutoutHalvesScaleAndKeepsEyeProjection() {

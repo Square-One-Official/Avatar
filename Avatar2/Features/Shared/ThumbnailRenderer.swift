@@ -29,7 +29,7 @@ enum ThumbnailRenderer {
         guard !adjust.isNeutral else { return thumb }
         return PortraitEnhancer.colorAdjust(
             thumb,
-            brightness: adjust.brightness, contrast: adjust.contrast,
+            exposure: adjust.exposure, contrast: adjust.contrast,
             saturation: adjust.saturation, temperatureShift: adjust.temperature
         ) ?? thumb
     }

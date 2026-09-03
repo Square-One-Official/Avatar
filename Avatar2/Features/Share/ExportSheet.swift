@@ -137,7 +137,7 @@ struct ExportSheet: View {
                     .scaledToFit()
                     .dsShadow(.card, scale: 1.35)
             } else {
-                ProgressView()
+                DSProgressView()
             }
         }
         .frame(maxWidth: .infinity)
@@ -224,7 +224,15 @@ struct ExportSheet: View {
 
 /// Verankert de native macOS share-picker aan zijn eigen (knop-grote) NSView.
 /// Zodra `shareURL` wordt gezet, toont hij de picker en reset de binding.
-private struct SharePresenter: NSViewRepresentable {
+private struct SharePresenter: View {
+    @Binding var shareURL: URL?
+    @Environment(\.dsVectorExport) private var vectorExport
+    var body: some View {
+        if vectorExport { Color.clear } else { SharePresenterRepresentable(shareURL: $shareURL) }
+    }
+}
+
+private struct SharePresenterRepresentable: NSViewRepresentable {
     @Binding var shareURL: URL?
 
     func makeNSView(context: Context) -> NSView { NSView() }

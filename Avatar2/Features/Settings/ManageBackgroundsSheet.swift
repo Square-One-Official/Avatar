@@ -30,7 +30,7 @@ struct ManageBackgroundsSheet: View {
                 .padding(.horizontal, DSSpacing.gap5)
                 .padding(.bottom, DSSpacing.gap4)
             Divider().overlay(DSColor.Foreground.divider)
-            ScrollView {
+            DSScrollView {
                 switch tab {
                 case .backgrounds: backgroundsTab
                 case .effects: effectsTab

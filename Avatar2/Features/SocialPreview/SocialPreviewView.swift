@@ -46,7 +46,7 @@ struct SocialPreviewView: View {
     // MARK: Preview — skeleton chrome per platform
 
     private var previewArea: some View {
-        ScrollView {
+        DSScrollView {
             VStack(spacing: DSSpacing.gap8) {
                 ForEach(SocialPlatform.allCases) { platform in
                     PlatformChrome(

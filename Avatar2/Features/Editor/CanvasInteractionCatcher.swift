@@ -11,9 +11,26 @@
 // is — zonder spatie valt 'ie door naar de SwiftUI-gestures.
 
 import AppKit
+import AvatarUI
 import SwiftUI
 
-struct CanvasInteractionCatcher: NSViewRepresentable {
+/// Vector-export (dsVectorExport): ImageRenderer tekent NSViewRepresentables
+/// als geel "verboden"-vlak — dan geen catcher (die is toch onzichtbaar).
+struct CanvasInteractionCatcher: View {
+    @Binding var camera: CanvasCamera
+    var chromeHovered: Bool = false
+    @Environment(\.dsVectorExport) private var vectorExport
+
+    var body: some View {
+        if vectorExport {
+            Color.clear
+        } else {
+            CanvasInteractionCatcherRepresentable(camera: $camera, chromeHovered: chromeHovered)
+        }
+    }
+}
+
+struct CanvasInteractionCatcherRepresentable: NSViewRepresentable {
     @Binding var camera: CanvasCamera
     /// True wanneer de cursor boven open chrome (menu/paneel) staat dat zelf moet
     /// scrollen — dan laat de catcher scroll/pinch/spatie-drag dóór i.p.v. de
@@ -169,5 +186,18 @@ struct CanvasInteractionCatcher: NSViewRepresentable {
         private func viewBoundsSize() -> CGSize {
             view?.bounds.size ?? .zero
         }
+    }
+}
+
+// De scroll-schalingshelpers blijven onder de publieke naam bereikbaar
+// (call sites + CanvasScrollScalingTests).
+extension CanvasInteractionCatcher {
+    static var mouseWheelLineHeight: CGFloat { CanvasInteractionCatcherRepresentable.mouseWheelLineHeight }
+    static var zoomPerScrollUnit: CGFloat { CanvasInteractionCatcherRepresentable.zoomPerScrollUnit }
+    static func scrollPanDelta(_ delta: CGFloat, precise: Bool) -> CGFloat {
+        CanvasInteractionCatcherRepresentable.scrollPanDelta(delta, precise: precise)
+    }
+    static func scrollZoomFactor(deltaY: CGFloat, precise: Bool) -> CGFloat {
+        CanvasInteractionCatcherRepresentable.scrollZoomFactor(deltaY: deltaY, precise: precise)
     }
 }

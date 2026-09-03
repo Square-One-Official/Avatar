@@ -1,5 +1,5 @@
 // Adjust-paneel — handmatige color-correctie als compacte toolbar-tool.
-// Icoonrij (Brightness/Contrast/Saturation/Temperature) + één actieve slider,
+// Icoonrij (Exposure/Contrast/Saturation/Temperature) + één actieve slider,
 // geïnspireerd op iOS Photos Adjust, passend in DSEditPanel-chrome.
 // Live preview via onPreview; loslaten van de slider commit een undo-bare
 // stap (onCommit before→after). Reset (header, rechtsboven) zet alles neutraal.
@@ -21,13 +21,13 @@ struct AdjustPanel: View {
     var maxContentHeight: CGFloat = 220
 
     private enum Property: String, CaseIterable, Identifiable {
-        case brightness, contrast, saturation, temperature
+        case exposure, contrast, saturation, temperature
 
         var id: String { rawValue }
 
         var label: String {
             switch self {
-            case .brightness: "Brightness"
+            case .exposure: "Exposure"
             case .contrast: "Contrast"
             case .saturation: "Saturation"
             case .temperature: "Temperature"
@@ -36,16 +36,18 @@ struct AdjustPanel: View {
 
         var icon: String {
             switch self {
-            case .brightness: "sun.max"
+            case .exposure: "sun.max"
             case .contrast: "circle.lefthalf.filled"
             case .saturation: "drop"
             case .temperature: "thermometer.medium"
             }
         }
 
+        /// Exposure in EV (stops): ±2 = 4× meer/minder licht — ruim voor een
+        /// portret, en fijn genoeg rond 0 voor huidtint-correcties.
         var range: ClosedRange<Double> {
             switch self {
-            case .brightness: -0.4...0.4
+            case .exposure: -2...2
             case .contrast: 0.6...1.4
             case .saturation: 0...2
             case .temperature: -1...1
@@ -54,17 +56,32 @@ struct AdjustPanel: View {
 
         var neutral: Double {
             switch self {
-            case .brightness, .temperature: 0
+            case .exposure, .temperature: 0
             case .contrast, .saturation: 1
             }
         }
 
-        /// Display-eenheden van 10 (Brightness −40…40, Saturation −100…100).
-        var step: Double { 0.1 }
+        /// Ticks op display-eenheden van 10 (Exposure −100…100 = 0.2 EV per
+        /// tick, Saturation −100…100).
+        var step: Double {
+            switch self {
+            case .exposure: 0.2
+            case .contrast, .saturation, .temperature: 0.1
+            }
+        }
+
+        /// Raw → display-getal in het numerieke veld (en terug). Exposure toont
+        /// ±100 voor ±2 EV (à la iOS Photos), de rest ×100 rond neutraal.
+        var displayScale: Double {
+            switch self {
+            case .exposure: 50
+            case .contrast, .saturation, .temperature: 100
+            }
+        }
 
         var track: DSSlider.Track {
             switch self {
-            case .brightness:
+            case .exposure:
                 .gradient([
                     Color(red: 0.08, green: 0.08, blue: 0.08),
                     Color(red: 0.96, green: 0.96, blue: 0.94),
@@ -93,8 +110,8 @@ struct AdjustPanel: View {
     }
 
     @State private var seeded = false
-    @State private var selected: Property = .brightness
-    @State private var brightness = 0.0
+    @State private var selected: Property = .exposure
+    @State private var exposure = 0.0
     @State private var contrast = 1.0
     @State private var saturation = 1.0
     @State private var temperature = 0.0
@@ -109,7 +126,7 @@ struct AdjustPanel: View {
     @FocusState private var numericFocused: Bool
 
     private var current: PortraitAdjust {
-        PortraitAdjust(brightness: brightness, contrast: contrast,
+        PortraitAdjust(exposure: exposure, contrast: contrast,
                        saturation: saturation, temperature: temperature)
     }
 
@@ -117,7 +134,7 @@ struct AdjustPanel: View {
 
     private var activeBinding: Binding<Double> {
         switch selected {
-        case .brightness: $brightness
+        case .exposure: $exposure
         case .contrast: $contrast
         case .saturation: $saturation
         case .temperature: $temperature
@@ -125,16 +142,7 @@ struct AdjustPanel: View {
     }
 
     private var displayValue: Int {
-        switch selected {
-        case .brightness:
-            return Int((brightness * 100).rounded())
-        case .contrast:
-            return Int(((contrast - 1) * 100).rounded())
-        case .saturation:
-            return Int(((saturation - 1) * 100).rounded())
-        case .temperature:
-            return Int((temperature * 100).rounded())
-        }
+        Int(((activeBinding.wrappedValue - selected.neutral) * selected.displayScale).rounded())
     }
 
     private var formattedDisplay: String {
@@ -142,22 +150,14 @@ struct AdjustPanel: View {
     }
 
     private var displayRange: ClosedRange<Int> {
-        switch selected {
-        case .brightness:
-            return Int((selected.range.lowerBound * 100).rounded())
-                ... Int((selected.range.upperBound * 100).rounded())
-        case .contrast, .saturation:
-            return Int(((selected.range.lowerBound - 1) * 100).rounded())
-                ... Int(((selected.range.upperBound - 1) * 100).rounded())
-        case .temperature:
-            return Int((selected.range.lowerBound * 100).rounded())
-                ... Int((selected.range.upperBound * 100).rounded())
-        }
+        let scale = selected.displayScale, neutral = selected.neutral
+        return Int(((selected.range.lowerBound - neutral) * scale).rounded())
+            ... Int(((selected.range.upperBound - neutral) * scale).rounded())
     }
 
     private func isDirty(_ property: Property) -> Bool {
         switch property {
-        case .brightness: brightness != property.neutral
+        case .exposure: exposure != property.neutral
         case .contrast: contrast != property.neutral
         case .saturation: saturation != property.neutral
         case .temperature: temperature != property.neutral
@@ -206,7 +206,7 @@ struct AdjustPanel: View {
                         in: Capsule()
                     )
                 }
-                .onChange(of: brightness) { _, _ in schedulePreview() }
+                .onChange(of: exposure) { _, _ in schedulePreview() }
                 .onChange(of: contrast) { _, _ in schedulePreview() }
                 .onChange(of: saturation) { _, _ in schedulePreview() }
                 .onChange(of: temperature) { _, _ in schedulePreview() }
@@ -229,7 +229,7 @@ struct AdjustPanel: View {
                 sourceCG = SendableCGImage(cgImage: cg)
             }
             guard !seeded else { return }
-            brightness = initial.brightness
+            exposure = initial.exposure
             contrast = initial.contrast
             saturation = initial.saturation
             temperature = initial.temperature
@@ -241,7 +241,7 @@ struct AdjustPanel: View {
         // tijdens het typen in het numerieke veld).
         .onChange(of: initial) { _, updated in
             guard dragStart == nil, !numericFocused else { return }
-            brightness = updated.brightness
+            exposure = updated.exposure
             contrast = updated.contrast
             saturation = updated.saturation
             temperature = updated.temperature
@@ -259,7 +259,18 @@ struct AdjustPanel: View {
             .help("Reset all adjustments")
     }
 
+    @Environment(\.dsVectorExport) private var vectorExport
+
+    @ViewBuilder
     private var numericField: some View {
+        if vectorExport {
+            // Vector-export: NSTextField rendert niet in ImageRenderer.
+            Text(numericText)
+                .dsTextStyle(.labelBase)
+                .foregroundStyle(DSColor.Foreground.primary)
+                .monospacedDigit()
+                .frame(width: 44)
+        } else {
         TextField("", text: $numericText)
             .textFieldStyle(.plain)
             .dsTextStyle(.labelBase)
@@ -278,6 +289,7 @@ struct AdjustPanel: View {
                 }
             }
             .accessibilityLabel(selected.label)
+        }
     }
 
     private var propertyIconRow: some View {
@@ -318,7 +330,7 @@ struct AdjustPanel: View {
         _ boxed: SendableCGImage, _ adj: PortraitAdjust
     ) async -> SendableCGImage? {
         PortraitEnhancer.colorAdjust(
-            boxed.cgImage, brightness: adj.brightness, contrast: adj.contrast,
+            boxed.cgImage, exposure: adj.exposure, contrast: adj.contrast,
             saturation: adj.saturation, temperatureShift: adj.temperature
         ).map(SendableCGImage.init)
     }
@@ -326,7 +338,7 @@ struct AdjustPanel: View {
     private func reset() {
         let before = current
         previewTask?.cancel()
-        brightness = 0; contrast = 1; saturation = 1; temperature = 0
+        exposure = 0; contrast = 1; saturation = 1; temperature = 0
         numericText = formattedDisplay
         onPreview(source)
         onCommit(before, .neutral)
@@ -345,13 +357,7 @@ struct AdjustPanel: View {
     }
 
     private func applyDisplay(_ display: Int) {
-        let raw = Double(display) / 100
-        switch selected {
-        case .brightness: brightness = raw
-        case .contrast: contrast = 1 + raw
-        case .saturation: saturation = 1 + raw
-        case .temperature: temperature = raw
-        }
+        activeBinding.wrappedValue = selected.neutral + Double(display) / selected.displayScale
     }
 
     static func parseDisplay(_ text: String) -> Int? {

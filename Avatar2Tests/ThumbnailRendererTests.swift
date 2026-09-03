@@ -67,7 +67,7 @@ final class ThumbnailRendererTests: XCTestCase {
     }
 
     func testNonNeutralAdjustStillRenders() {
-        let adjust = PortraitAdjust(brightness: 0.2, contrast: 1.1, saturation: 1.2, temperature: 0.3)
+        let adjust = PortraitAdjust(exposure: 0.2, contrast: 1.1, saturation: 1.2, temperature: 0.3)
         let out = ThumbnailRenderer.render(data: pngData(alpha: 255), maxPixelSize: 40, adjust: adjust)
         XCTAssertNotNil(out)
         XCTAssertEqual(max(out!.width, out!.height), 40)

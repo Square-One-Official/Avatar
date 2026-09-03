@@ -613,7 +613,9 @@ referenties leggen; cirkel-watermerk-positie (10%-van-onder) visueel finetunen.
 - owner: FEAT (AI-agent, marathon 2)
 
 **Result:** `Portrait2` kreeg `adjustBrightness/Contrast/Saturation/Temperature` (defaults
-0/1/1/0) + waarde-object `PortraitAdjust` (+ `adjust`-accessor). De Adjust-laag is ORTHOGONAAL:
+0/1/1/0) — *2026-09-03: Brightness vervangen door Exposure (EV, `CIExposureAdjust`, ±2 EV,
+display ±100); kolom hernoemd `adjustExposure` via `@Attribute(originalName:)`, besluit Thierry:
+additieve brightness maakte portretten vlak.* + waarde-object `PortraitAdjust` (+ `adjust`-accessor). De Adjust-laag is ORTHOGONAAL:
 `cutoutData` blijft rauw; destructieve ops (Effects/Clothing/Hair/Flip/Retouch/Boost) werken op
 `rawCutout`; de params zijn altijd de bovenste niet-destructieve filterlaag. Canvas
 (`ShellModel.select/applyEffectResult/commitAdjust/refreshCanvasFromSelection` → `adjustedImage`)

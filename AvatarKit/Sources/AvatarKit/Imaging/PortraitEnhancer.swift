@@ -75,23 +75,32 @@ public enum PortraitEnhancer {
         return render(current, like: image)
     }
 
-    /// E22.3: handmatige live color-correctie (Edit-paneel). Brightness/
-    /// contrast/saturation via CIColorControls, temperature via
-    /// temperatureAndTint. Neutrale defaults: brightness 0, contrast 1,
-    /// saturation 1, temperatureShift 0 (−1…1 ≈ ±1500K). nil bij renderfout.
-    /// Let op (E50.3-meting): CIColorControls rekent in LINEAIR licht —
-    /// brightness telt op (tilt zwart mee), contrast draait om 0.5 lineair
-    /// (≈ sRGB 0.735). Een belichtings-gain (CIExposureAdjust) is hier bewust
-    /// NIET ingevoerd: de Match-lighting-feature is geschrapt en de slider
-    /// houdt z'n uitgeleverde gedrag.
+    /// E22.3: handmatige live color-correctie (Adjust-paneel). Exposure (EV,
+    /// CIExposureAdjust: lineaire gain 2^ev — zwart blijft zwart, huid en
+    /// hooglichten schalen mee zoals bij een camera-belichting) → contrast/
+    /// saturation via CIColorControls → temperature via temperatureAndTint.
+    /// Neutrale defaults: exposure 0, brightness 0, contrast 1, saturation 1,
+    /// temperatureShift 0 (−1…1 ≈ ±1500K). nil bij renderfout.
+    /// `brightness` (CIColorControls, LINEAIR additief — tilt zwart mee, daarom
+    /// als slider vervangen door exposure) blijft alleen bestaan voor
+    /// `SetLightingNormalizer.refine` (Match lighting, geshelved achter
+    /// `matchLightingEnabled`); de app-paden geven 'm niet meer door.
     public static func colorAdjust(
         _ image: CGImage,
-        brightness: Double,
+        exposure: Double = 0,
+        brightness: Double = 0,
         contrast: Double,
         saturation: Double,
         temperatureShift: Double
     ) -> CGImage? {
         var current = CIImage(cgImage: image)
+
+        if exposure != 0 {
+            let ev = CIFilter.exposureAdjust()
+            ev.inputImage = current
+            ev.ev = Float(exposure)
+            if let out = ev.outputImage { current = out }
+        }
 
         let controls = CIFilter.colorControls()
         controls.inputImage = current

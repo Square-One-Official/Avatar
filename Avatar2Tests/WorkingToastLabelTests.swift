@@ -1,6 +1,7 @@
-// E55.9 — de verstreken-tijd-regel van de working-toast: eerlijk doortellen,
-// minuut-afronding in de verwachting, en voorbij de verwachting geen
-// "usually" meer beloven.
+// E55.9 — de tijdsregel van de working-toast: zonder verwachting een kale
+// klok, mét verwachting de resterende tijd in gewone taal (op 5 s / hele
+// minuten afgerond) en voorbij de verwachting een eerlijk "langer dan
+// gewoonlijk" i.p.v. een belofte.
 
 import XCTest
 @testable import Avatar2
@@ -12,15 +13,23 @@ final class WorkingToastLabelTests: XCTestCase {
         XCTAssertEqual(WorkingToastView.elapsedLabel(72, expected: nil), "1:12")
     }
 
-    func testExpectationHintRoundsToMinutes() {
-        XCTAssertEqual(WorkingToastView.elapsedLabel(12, expected: 75), "0:12 · usually ~1 min")
-        XCTAssertEqual(WorkingToastView.elapsedLabel(5, expected: 110), "0:05 · usually ~2 min")
-        XCTAssertEqual(WorkingToastView.elapsedLabel(5, expected: 45), "0:05 · usually ~45s")
+    func testRemainingMinutesRoundToWholeMinutes() {
+        XCTAssertEqual(WorkingToastView.elapsedLabel(0, expected: 85), "About 1 minute left")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(5, expected: 110), "About 2 minutes left")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(0, expected: 60), "About 1 minute left")
+        // 58 s rest → omhoog naar 60 → een minuut, geen "About 60 seconds".
+        XCTAssertEqual(WorkingToastView.elapsedLabel(27, expected: 85), "About 1 minute left")
     }
 
-    func testPastExpectationSwitchesToStillWorking() {
-        XCTAssertEqual(WorkingToastView.elapsedLabel(76, expected: 75), "1:16 · still working…")
-        // Exact op de grens nog gewoon de verwachting tonen.
-        XCTAssertEqual(WorkingToastView.elapsedLabel(75, expected: 75), "1:15 · usually ~1 min")
+    func testRemainingSecondsRoundUpToFive() {
+        XCTAssertEqual(WorkingToastView.elapsedLabel(32, expected: 85), "About 55 seconds left")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(40, expected: 85), "About 45 seconds left")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(84, expected: 85), "About 5 seconds left")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(5, expected: 45), "About 40 seconds left")
+    }
+
+    func testPastExpectationSwitchesToLongerThanUsual() {
+        XCTAssertEqual(WorkingToastView.elapsedLabel(85, expected: 85), "Taking a bit longer than usual…")
+        XCTAssertEqual(WorkingToastView.elapsedLabel(120, expected: 85), "Taking a bit longer than usual…")
     }
 }

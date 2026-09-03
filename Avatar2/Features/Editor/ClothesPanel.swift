@@ -161,7 +161,7 @@ struct ClothesPanel: View {
             VStack(alignment: .leading, spacing: DSSpacing.gap4) {
 
                 // Outfit-presets (CMS-gestuurd; fallback: ClothesStyle.allCases).
-                ScrollView(.horizontal, showsIndicators: false) {
+                DSScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DSSpacing.gap2) {
                         ForEach(presets) { preset in
                             DSChip(preset.label, type: .neutral) {

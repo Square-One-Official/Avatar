@@ -192,7 +192,7 @@ enum PortraitSetActions {
             var renderedStats = rawStats
             if !input.adjust.isNeutral,
                let rendered = PortraitEnhancer.colorAdjust(
-                   scaled.image, brightness: input.adjust.brightness, contrast: input.adjust.contrast,
+                   scaled.image, exposure: input.adjust.exposure, contrast: input.adjust.contrast,
                    saturation: input.adjust.saturation, temperatureShift: input.adjust.temperature
                ),
                let stats = SetLightingNormalizer.referenceStats(of: rendered, in: region) {
