@@ -55,6 +55,8 @@ final class ShellModelTests: XCTestCase {
         XCTAssertEqual(naam("Name=Ruslan.png"), "Ruslan", "Figma-export: eigenschap=waarde")
         XCTAssertEqual(naam("Type=Photo, Name=Anna de Winter.png"), "Anna de Winter")
         XCTAssertEqual(naam("State=Default, Name=Jelle Looijen.png"), "Jelle Looijen")
+        XCTAssertEqual(naam("Name=Fren.png"), "Fren", "waarde van een naamveld wordt vertrouwd, ook buiten lexicon")
+        XCTAssertEqual(naam("Name=Fren, Size=Large.png"), "Fren")
     }
 
     func testDefaultNaamIsLeegZonderPersoonsnaam() {

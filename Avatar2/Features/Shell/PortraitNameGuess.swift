@@ -29,6 +29,32 @@ enum PortraitNameGuess {
     /// `fileName` (met of zonder extensie) → persoonsnaam of "".
     static func name(fromFileName fileName: String) -> String {
         let stem = stripExtension(fileName)
+        // Figma-/design-export met een expliciet naamveld (`Name=Fren`,
+        // `Type=Photo, Name=Anna de Winter`): de waarde ís de naam — ook als
+        // die niet in het lexicon staat of toevallig een woord is.
+        if let value = namedPropertyValue(in: stem) {
+            let trusted = derive(stem: value, trusted: true)
+            if !trusted.isEmpty { return trusted }
+        }
+        return derive(stem: stem, trusted: false)
+    }
+
+    /// Waarde achter `name=`/`naam=` tot de volgende eigenschap (`,` `;` `/`).
+    private static func namedPropertyValue(in stem: String) -> String? {
+        let lower = stem.lowercased()
+        for key in ["name=", "naam="] {
+            guard let range = lower.range(of: key) else { continue }
+            let rest = stem[range.upperBound...]
+            let value = rest.prefix { !",;/|".contains($0) }.trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : String(value)
+        }
+        return nil
+    }
+
+    /// Kern van de heuristiek. `trusted`: de tokens komen uit een expliciet
+    /// naamveld — de woordenboek-afwijzing (geen voornaam + gewone woorden)
+    /// blijft dan uit; ruis en cijfers vallen wél af.
+    private static func derive(stem: String, trusted: Bool) -> String {
         // Eerst het hele token tegen de ruislijst ("LinkedIn") en de
         // cijfer-check (CDN-hash "74ZFkSVk" valt als geheel af), pas daarna
         // camelCase-splitsen ("ThierryEmmery") — anders wordt "Linked" of
@@ -42,7 +68,7 @@ enum PortraitNameGuess {
             .compactMap(lettersOnly)
             .flatMap(splitCamelCase)
         let kept = tokens.compactMap(classify)
-        let refined = refine(trimParticles(kept))
+        let refined = refine(trimParticles(kept), trusted: trusted)
         guard refined.contains(where: \.isName) else { return "" }
         return refined.map(\.rendered).joined(separator: " ")
     }
@@ -71,10 +97,11 @@ enum PortraitNameGuess {
     /// — en ná de achternaam stopt de naam bij het eerste gewone woord
     /// (`sanne-jansen-presentation` → "Sanne Jansen"). Zónder voornaam: alleen
     /// een naam als minstens één woord géén woordenboekwoord is.
-    private static func refine(_ tokens: [Token]) -> [Token] {
+    private static func refine(_ tokens: [Token], trusted: Bool = false) -> [Token] {
         let names = tokens.filter(\.isName)
         guard !names.isEmpty else { return [] }
         guard let anchor = tokens.firstIndex(where: \.isFirstName) else {
+            if trusted { return tokens }
             let words = names.map(\.rendered)
             return words.allSatisfy(isDictionaryWord) ? [] : tokens
         }
