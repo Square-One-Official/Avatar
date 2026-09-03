@@ -111,11 +111,20 @@ final class PersistentPresentationTests: XCTestCase {
         store.openSelectionBackgroundPicker(anchor: CGRect(x: 8, y: 12, width: 40, height: 40))
         XCTAssertTrue(store.selectionBackgroundPickerOpen)
         XCTAssertEqual(store.selectionBackgroundPickerAnchor, CGRect(x: 8, y: 12, width: 40, height: 40))
+        // Set-background-fix (da786ea): de selectie-picker deelt de type-/kleur-
+        // picker-flags met het BackgroundPanel en begint altijd zonder open
+        // subpaneel — een hangende flag toonde de kleurpicker meteen.
+        XCTAssertFalse(store.editorBackgroundTypeMenuOpen)
+        XCTAssertFalse(store.editorBackgroundColorPickerOpen)
+        // Onafhankelijke slots blijven staan.
+        XCTAssertEqual(store.editorChipMenu, .boost)
+        XCTAssertTrue(store.folderBackgroundPickerOpen)
 
         // Eén tegelijk: een ander chip-menu vervangt het vorige, sluit niet alles.
         store.editorChipMenu = .removeBackground
         XCTAssertEqual(store.editorChipMenu, .removeBackground)
-        XCTAssertTrue(store.editorBackgroundTypeMenuOpen)
+        XCTAssertTrue(store.folderBackgroundPickerOpen)
+        XCTAssertTrue(store.selectionBackgroundPickerOpen)
     }
 
     /// `dismissAllEphemeral` moet élk vluchtig menu opruimen — een vergeten slot
