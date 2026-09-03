@@ -66,7 +66,16 @@ public struct OrmbgEngine: CutoutEngine {
         //    de matte is al edge-aware, dit ruimt alleen sub-pixel
         //    schaal-artefacten op) en composite over transparant.
         let mask = EngineRendering.scaled(rawMask, to: extent)
-        let guided = mask.applyingFilter("CIGuidedFilter", parameters: [
+        // Persoon-gate (PersonGate): het matting-model houdt een decoratieve
+        // schijf/kader achter de persoon; alleen de zone rond Vision's
+        // persoon-matte telt mee (als die ≥30% van de matte dekt).
+        let gatedMask: CIImage
+        if let person = PersonGate.personMask(for: image, extent: extent) {
+            gatedMask = PersonGate.apply(matte: mask, person: person, extent: extent, zone: .tight)
+        } else {
+            gatedMask = mask
+        }
+        let guided = gatedMask.applyingFilter("CIGuidedFilter", parameters: [
             "inputGuideImage": original,
             kCIInputRadiusKey: 2.0,
             "inputEpsilon": 0.01

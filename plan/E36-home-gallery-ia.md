@@ -172,6 +172,15 @@ schijf achter de persoon mee te liften; `VisionCutoutEngine` gate de foreground 
 zone rond de persoon-matte (alleen als die ≥30% van de foreground dekt). Env-gated probe-test
 `VisionCutoutProbeTests` voor visuele checks op een los bestand.
 
+**Vervolg 5 (2026-09-03):** de app draaide via het gedownloade ORMBG-model, niet via Vision —
+de schijf-gate zit nu in een gedeelde `PersonGate` (AvatarKit/Engines) en geldt voor beide
+engines: Vision met een ruime zone (~2,5% lange zijde), ORMBG met een smalle (~0,4%, min. 2 px)
+omdat het matting-model de schijf vlak om de persoon volledig meeneemt. Probe-test kent
+`AVATAR_CUTOUT_PROBE_ENGINE=ormbg` (vereist het model in
+`~/Library/Application Support/AvatarKit/Models/ormbg`, bv. via symlink naar de app-container).
+Open: een 1–2 px kleurrand aan de haarkant bij ORMBG op dit soort bronnen — vraagt om
+kleur-decontaminatie aan de matte-rand (niet gedaan).
+
 Voortgekomen uit de CTO-audit (`plan/AUDIT-CTO-2026-07-01.md`, bevinding B5).
 **Wat:** import gooit de bron-bestandsnaam weg — `ShellModel`'s import-pad geeft
 alleen het gedecodeerde `CGImage` door aan `persist(cutout:original:)`, die een
