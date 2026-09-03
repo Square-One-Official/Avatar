@@ -161,3 +161,30 @@ via `.dsFloatingToast`. `DSMotion.Duration` + `easeOutControlPoints` gedeeld met
 AppKit. Tests: +7 AvatarUI (`DSFloatingLayoutTests`, puur) en 2 env-gated
 venster-tests (`DS_FLOATING_WINDOW_TESTS=1`, `DSFloatingWindowRuntimeTests`:
 menu steekt onder de vensterrand uit; z-volgorde toast↔menu).
+
+## 50.5 — Map dupliceren mét inhoud
+- status: done
+- team: FEAT
+- blockedBy: —
+- note: verzoek Thierry 2026-09-03 — "een effect op alle mensen toepassen, maar
+  niet bij het origineel"
+
+**Wat:** een set-brede actie (effect, achtergrond, framing) werkte altijd op de
+bronmap zelf; er was geen manier om een variant van het hele team te maken
+zonder het origineel te raken.
+**Voorstel:** "Duplicate" in het map-contextmenu (left-nav, tussen Rename en
+Delete — zelfde plek als bij banners): kopieert de map + alle portretten en
+opent de kopie.
+**DoD:** map-kopie met identieke portretten (pixels, achtergrond, Adjust, frame,
+effect-cache) en de map-default-achtergrond; origineel onaangeraakt; één
+undo-stap; tests groen; Result-regel.
+**Result (2026-09-03):** `FolderDuplicator` (Portraits) + `Portrait2.duplicate()`
+(diepe kopie; `lastOpenedAt`/`v1ImportID`/board-positie bewust niet mee —
+de board-lens van de kopie doet z'n eigen layout). Kopienaam Finder-stijl
+("Team copy", "Team copy 2", …). Kopieën krijgen oplopende `updatedAt`-stempels
+vanaf nu → bovenaan in elke lens, onderlinge volgorde van de bron intact. Eén
+undo-groep "Duplicate Folder" (undo wist kopie + portretten en zet de lens terug
+op de bron; redo dupliceert opnieuw), gemeld via de compacte set-action-pill met
+Undo. Dupliceren is géén import: de Starter-cap (server-side cutout-claims)
+wordt niet geraakt — bewust niet gegated. 4 nieuwe tests
+(`FolderDuplicatorTests`).

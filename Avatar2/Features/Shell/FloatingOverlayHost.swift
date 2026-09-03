@@ -210,6 +210,26 @@ struct FloatingOverlayHost: View {
                         model.presentation.leftNavFolderMenu = nil
                         model.presentation.alert = .renameFolder(folderID: folderID, draft: folder.name)
                     }
+                    // E50.5: kopie van de map mét alle portretten — werk in de
+                    // kopie (bv. een effect op het hele team) zonder het
+                    // origineel te raken. Opent de nieuwe map; Undo in de pill.
+                    DSMenuRow("Duplicate", icon: "plus.square.on.square") {
+                        model.presentation.leftNavFolderMenu = nil
+                        let copy = FolderDuplicator.perform(
+                            folder,
+                            existingNames: folders.map(\.name),
+                            modelContext: modelContext,
+                            undoManager: undoManager,
+                            reporter: model.setActionReporter,
+                            onUndo: { removed in
+                                if model.selectedFolderID == removed.persistentModelID {
+                                    model.showPortraits(folderID: folderID)
+                                }
+                            }
+                        )
+                        model.isPortraitsExpanded = true
+                        model.showPortraits(folderID: copy.folder.persistentModelID)
+                    }
                     Divider().padding(.vertical, 2)
                     DSMenuRow("Delete", icon: "trash", destructive: true) {
                         model.presentation.leftNavFolderMenu = nil

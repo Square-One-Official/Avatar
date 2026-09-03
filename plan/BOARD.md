@@ -54,7 +54,7 @@ Bronnen: `~/Documents/Claude/Projects/Aaavatar/aaavatar-2.0-bouwplan.md` (volled
 | [E47 Testfundament kritieke paden](E47-testfundament.md) | INFRA+FEAT | **done** (47.1–47.3, incl. RemoteFeatureFlags-decode-fix) |
 | [E48 Swift 6-concurrency-pad](E48-swift6-concurrency.md) | INFRA | backlog (48.1–48.3) |
 | [E49 Opruimronde 2026-07](E49-opruimronde-2026-07.md) | FEAT+AI+DS | **done** (49.1–49.4, gemerged naar v2-main 2026-07-12) |
-| [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView) |
+| [E50 Team-sets verdiepen](E50-team-sets.md) | FEAT | **50.1 done** (map-acties + ⌘A per lens); 50.2 backlog (wacht op E52-merge — HomeView); **50.5 done** (Duplicate folder mét inhoud, 2026-09-03) |
 | [E51 macOS 26-kansen](E51-macos26-kansen.md) | AI+FEAT | backlog (51.1–51.4) |
 | [E52 CMS-media-performance](E52-cms-media-performance.md) | INFRA+FEAT | **52.1 done** (2026-07-02, live op prod); 52.2 backlog |
 | [E53 UX-polish](E53-ux-polish.md) | FEAT+DS | **53.1 done** (polish-sprint P0's, 2026-08-01) · **53.3 done** (live AX-geverifieerd) · **53.6 done** (shell-chrome; was al gebouwd, nu geverifieerd + gesloten) · **53.7 done** (persistente presentatie) — **53.2 done** (UX1 + UX2: fit-to-window, userZoomed-guard en gedeelde zoom-chip); **53.4 done** (reduce-motion-sweep + guard in build-v2.sh); **53.5 done** (P1/P2-restlijst, 15 stories); **53.8 done** (Playground-sheet op ShellView-host); **53.9 done** (icoongrootte-tokens + guard) — **E53 compleet**; **53.10 done** (Enhance-tegels: contrast, hover-previews, badges — 2026-09-02, gemerged naar v2-main 2026-09-02) |
