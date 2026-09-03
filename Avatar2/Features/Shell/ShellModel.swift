@@ -472,9 +472,27 @@ final class ShellModel {
         PortraitNameGuess.name(from: url)
     }
 
+    /// De lopende single-import (drop/open-panel). Een tweede drop tijdens de
+    /// cutout wacht hierop: twee imports door elkaar (crash-flow 2026-09-03 —
+    /// effect bezig, drop, nóg een drop tijdens het vrijstaand maken) vochten om
+    /// het canvas, de selectie en `persist`, en draaiden twee Vision-cutouts
+    /// naast de her-isolatie van het effect. Sequentieel, net als de batch.
+    @ObservationIgnored private var activeSingleImport: Task<Void, Never>?
+
     /// `name`: de asynchrone naamresolutie; wordt pas bij `persist` afgewacht
     /// (begrensd door PortraitNameResolver.modelTimeout).
     private func runCutout(on importedImage: CGImage, name nameTask: Task<String, Never>? = nil) async {
+        let previous = activeSingleImport
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.performSingleImport(on: importedImage, name: nameTask)
+        }
+        activeSingleImport = task
+        await task.value
+        if activeSingleImport == task { activeSingleImport = nil }
+    }
+
+    private func performSingleImport(on importedImage: CGImage, name nameTask: Task<String, Never>?) async {
         // E14.2: free-tier importgate (3 lifetime, source-agnostic) vóór elke
         // import. Cap bereikt → paywall is getoond, geen canvas-wijziging.
         guard await entitlement.claimImport(
@@ -1017,10 +1035,16 @@ final class ShellModel {
     /// orthogonaal en wordt opnieuw bovenop gerenderd (canvas = adjust(raw)).
     /// `framing` (Sticker-fix): kadrering van de wissel — `.keep` (default)
     /// behoudt de transform; die-cut-resultaten komen als `.fitContent`.
+    /// `target`: het portret waarvoor de bewerking gestart is. Een generatieve
+    /// job (~1 min) overleeft navigatie: is de gebruiker intussen naar de
+    /// bibliotheek gegaan en heeft 'ie een foto gedropt, dan is `selectedPortrait`
+    /// nil of de verse import — het resultaat hoort dan nog steeds op het
+    /// oorspronkelijke portret (crash-flow 2026-09-03). nil = de selectie.
     func applyEffectResult(
-        _ image: NSImage, preserveSourceAlpha: Bool = false, framing: EffectFraming = .keep
+        _ image: NSImage, to target: Portrait2? = nil,
+        preserveSourceAlpha: Bool = false, framing: EffectFraming = .keep
     ) async {
-        guard let portrait = selectedPortrait else {
+        guard let portrait = target ?? selectedPortrait else {
             setCanvas(.result(image))
             return
         }
@@ -1099,8 +1123,8 @@ final class ShellModel {
     /// loopt) → de zachte haarranden worden opaak en de achtergrond komt terug in
     /// het haar. De import slaat de cutout ook direct op (`persist`); dit is het
     /// equivalent voor het updaten van een bestaand portret.
-    func applyIsolatedResult(_ image: NSImage) async {
-        guard let portrait = selectedPortrait else {
+    func applyIsolatedResult(_ image: NSImage, to target: Portrait2? = nil) async {
+        guard let portrait = target ?? selectedPortrait else {
             setCanvas(.result(image))
             return
         }

@@ -990,3 +990,101 @@ final class ShellModelTests: XCTestCase {
         XCTAssertNil(model.presentation.editorChipMenu)
     }
 }
+
+// MARK: - Crash-flow 2026-09-03: effect bezig → bibliotheek → drop in een
+// verse map → nóg een drop tijdens het vrijstaand maken → crash.
+
+extension ShellModelTests {
+    /// Teller voor de cutout-haak: hoeveel cutouts er tegelijk lopen.
+    @MainActor private final class CutoutGauge {
+        var inFlight = 0
+        var peak = 0
+    }
+
+    /// Een tweede losse drop tijdens een lopende cutout wacht op de eerste:
+    /// nooit twee single-imports door elkaar (canvas, selectie, persist).
+    func testTweedeDropTijdensCutoutWachtOpDeEerste() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        let model = ShellModel(entitlement: makeAllowedEntitlement())
+        let context = try makeContext()
+        model.modelContext = context
+        let gauge = CutoutGauge()
+        model.debugCutoutOverride = { image in
+            gauge.inFlight += 1
+            gauge.peak = max(gauge.peak, gauge.inFlight)
+            try? await Task.sleep(for: .milliseconds(200))
+            gauge.inFlight -= 1
+            return image
+        }
+        let png1 = try png(opaqueImage(shade: 90))
+        let png2 = try png(opaqueImage(shade: 160))
+        async let first: () = model.importImage(data: png1)
+        try await Task.sleep(for: .milliseconds(50))
+        async let second: () = model.importImage(data: png2)
+        _ = await (first, second)
+
+        XCTAssertEqual(gauge.peak, 1, "single-imports lopen sequentieel")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 2, "beide drops zijn geland")
+        XCTAssertNotNil(model.selectedPortrait, "de laatste import is de selectie")
+        if case .result = model.canvas {} else { XCTFail("canvas eindigt op het resultaat van de laatste import") }
+    }
+
+    /// De map komt uit de naam-prompt (`insert` + `save` → permanent id in de
+    /// lens). Het effect is gestart voor het geopende portret; het resultaat
+    /// komt binnen terwijl er (na navigatie) al twee drops in de map lopen en
+    /// hoort op dát portret te landen — niet op de verse import, niet op het
+    /// canvas van de import.
+    func testEffectLandtOpHetOorspronkelijkePortretNaNavigatieEnDrops() async throws {
+        EntitlementStubURLProtocol.reset()
+        defer { EntitlementStubURLProtocol.reset() }
+        let model = ShellModel(entitlement: makeAllowedEntitlement())
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Portrait2.self, Folder2.self, configurations: config)
+        let context = container.mainContext // autosave aan, zoals de app
+        model.modelContext = context
+
+        let existingPNG = try png(opaqueImage(shade: 40))
+        let existing = Portrait2(name: "Thierry", cutoutData: existingPNG)
+        context.insert(existing)
+        try context.save()
+        model.openPortrait(existing)
+        // Zoals ShellView: het doel reist mee in de closure bij het openen.
+        let target = model.selectedPortrait
+        XCTAssertTrue(target === existing)
+
+        let folder = Folder2(name: "Acme")
+        context.insert(folder)
+        try context.save()
+        model.showPortraits(folderID: folder.persistentModelID)
+
+        model.debugCutoutOverride = { image in
+            try? await Task.sleep(for: .milliseconds(200))
+            return image
+        }
+        let styled = opaqueImage(shade: 220)
+        let png1 = try png(opaqueImage(shade: 90))
+        let png2 = try png(opaqueImage(shade: 160))
+        async let first: () = model.importImage(data: png1)
+        try await Task.sleep(for: .milliseconds(60))
+        async let second: () = model.importImage(data: png2)
+        try await Task.sleep(for: .milliseconds(60))
+        // Effect landt terwijl de cutouts lopen (selectie = nil) …
+        await model.applyEffectResult(styled, to: target, framing: .keep)
+        _ = await (first, second)
+        // … en nog eens nadat de imports gepersisteerd zijn (selectie = verse import).
+        await model.applyEffectResult(styled, to: target, framing: .keep)
+
+        let stored = try context.fetch(FetchDescriptor<Portrait2>())
+        XCTAssertEqual(stored.count, 3, "bestaand portret + twee imports")
+        XCTAssertNotEqual(existing.cutoutData, existingPNG, "het effect is op het oorspronkelijke portret toegepast")
+        XCTAssertNotNil(existing.editSourceData, "vol AI-resultaat bewaard voor Remove background")
+        let imported = stored.filter { $0.persistentModelID != existing.persistentModelID }
+        XCTAssertEqual(imported.count, 2)
+        XCTAssertTrue(imported.allSatisfy { $0.editSourceData == nil && $0.cutoutDerivesFromOriginal },
+                      "de verse imports zijn onaangeraakt door het effect")
+        XCTAssertTrue(imported.allSatisfy { $0.folder?.persistentModelID == folder.persistentModelID },
+                      "beide drops landen in de verse map")
+        XCTAssertTrue(model.selectedPortrait !== existing, "de studio toont de laatste import")
+    }
+}

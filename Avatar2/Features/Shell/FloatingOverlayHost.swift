@@ -298,6 +298,11 @@ struct FloatingOverlayHost: View {
         case .createFolder:
             let folder = Folder2(name: name)
             modelContext.insert(folder)
+            // Eerst opslaan: de lens (en straks `openOrigin` van een drop)
+            // houdt `persistentModelID` vast, en een tijdelijk id is voor
+            // `model(for:)` niet altijd oplosbaar (SwiftData-fatal, zie
+            // ShellModelTests 2026-09-02). Ná save is het id permanent.
+            try? modelContext.save()
             model.isPortraitsExpanded = true
             model.showPortraits(folderID: folder.persistentModelID)
         case .renameBanner(let bannerID, _):
@@ -314,6 +319,7 @@ struct FloatingOverlayHost: View {
                     p.folder = folder
                 }
             }
+            try? modelContext.save()
             model.isPortraitsExpanded = true
             model.showPortraits(folderID: folder.persistentModelID)
         }

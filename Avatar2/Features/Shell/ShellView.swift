@@ -553,10 +553,22 @@ struct ShellView: View {
                 model: model,
                 portraitModel: model.selectedPortrait,
                 entitlement: entitlement,
-                onApplyResult: { await model.applyEffectResult($0) },
-                onApplyEffect: { await model.applyEffectResult($0, framing: $1) },
-                onApplyAlphaPreserving: { await model.applyEffectResult($0, preserveSourceAlpha: true) },
-                onApplyIsolated: { await model.applyIsolatedResult($0) },
+                // Het doel reist mee in de closure: de panelen (EffectsModel e.d.)
+                // houden 'm vast bij het openen, dus een resultaat dat ná
+                // navigatie + een nieuwe import binnenkomt landt nog op het
+                // juiste portret i.p.v. op de selectie van dat moment.
+                onApplyResult: { [target = model.selectedPortrait] in
+                    await model.applyEffectResult($0, to: target)
+                },
+                onApplyEffect: { [target = model.selectedPortrait] in
+                    await model.applyEffectResult($0, to: target, framing: $1)
+                },
+                onApplyAlphaPreserving: { [target = model.selectedPortrait] in
+                    await model.applyEffectResult($0, to: target, preserveSourceAlpha: true)
+                },
+                onApplyIsolated: { [target = model.selectedPortrait] in
+                    await model.applyIsolatedResult($0, to: target)
+                },
                 onIsolateSubject: { try await model.isolateSubject($0, preferring: $1) },
                 onPreview: { model.previewCanvas($0) },
                 onCommitAdjust: { model.commitAdjust($0) },
