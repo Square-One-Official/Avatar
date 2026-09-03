@@ -62,13 +62,13 @@ final class PersistentPresentationTests: XCTestCase {
 
     func testPreGateDoesNotAutoProceedOnNilWithoutResolve() {
         let coordinator = StylizeQualityCoordinator()
-        coordinator.preGate = PreStylizeGate(kind: .effectsLowResOriginal)
+        coordinator.preGate = PreStylizeGate(kind: .lowResolution)
 
         // Alleen de gate clearen (zoals een oude binding zou doen) zonder resolve —
         // de coordinator houdt de gate vast tot resolvePreGate.
         let gateBefore = coordinator.preGate
         XCTAssertNotNil(gateBefore)
-        XCTAssertEqual(gateBefore?.kind, .effectsLowResOriginal)
+        XCTAssertEqual(gateBefore?.kind, .lowResolution)
     }
 
     // MARK: - UIPresentationStore

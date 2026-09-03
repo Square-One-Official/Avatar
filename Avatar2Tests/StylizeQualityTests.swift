@@ -58,6 +58,143 @@ final class StylizeQualityTests: XCTestCase {
         XCTAssertEqual(StylizeQuality.defaultEffectsSourceChoice(portrait: portrait), .original)
     }
 
+    // MARK: - Al geboost → Effects vraagt niet nóg eens (repro: Boost → effect)
+
+    private func portrait(originalW: Int, originalH: Int) -> Portrait2 {
+        let p = Portrait2(cutoutData: Data([1]))
+        p.originalData = solidImage(w: originalW, h: originalH).pngData()
+        return p
+    }
+
+    func testBoostedCutoutOutranksLowResOriginal() {
+        let p = portrait(originalW: 700, originalH: 900)
+        XCTAssertTrue(StylizeQuality.cutoutOutranksLowResOriginal(
+            portrait: p, cutout: solidImage(w: 2800, h: 3600)
+        ))
+    }
+
+    func testUnboostedLowResCutoutDoesNotOutrankOriginal() {
+        let p = portrait(originalW: 700, originalH: 900)
+        XCTAssertFalse(StylizeQuality.cutoutOutranksLowResOriginal(
+            portrait: p, cutout: solidImage(w: 700, h: 900)
+        ))
+    }
+
+    func testSharpOriginalNeverCountsAsBoosted() {
+        // Origineel is al scherp: geen low-res-vraag, dus ook geen boost-bypass.
+        let p = portrait(originalW: 1600, originalH: 2000)
+        XCTAssertFalse(StylizeQuality.cutoutOutranksLowResOriginal(
+            portrait: p, cutout: solidImage(w: 3200, h: 4000)
+        ))
+    }
+
+    func testWithoutOriginalNothingOutranks() {
+        XCTAssertFalse(StylizeQuality.cutoutOutranksLowResOriginal(
+            portrait: Portrait2(cutoutData: Data([1])), cutout: solidImage(w: 2800, h: 3600)
+        ))
+    }
+
+    @MainActor
+    func testEffectsGateSkipsSheetAfterBoostAndUsesCutout() async {
+        let coordinator = StylizeQualityCoordinator()
+        let p = portrait(originalW: 700, originalH: 900)
+        let boosted = solidImage(w: 2800, h: 3600)
+        let result = await coordinator.gateBeforeStylize(
+            source: boosted, portrait: p, cutout: boosted, isEffects: true
+        )
+        XCTAssertEqual(result.decision, .proceed)
+        XCTAssertEqual(result.effectsSource, .cutout)
+        XCTAssertNil(coordinator.preGate, "na een Boost mag er geen kwaliteitssheet meer komen")
+    }
+
+    @MainActor
+    func testEffectsGateStillAsksWhenNotBoosted() async {
+        let coordinator = StylizeQualityCoordinator()
+        let p = portrait(originalW: 700, originalH: 900)
+        let small = solidImage(w: 700, h: 900)
+        async let result = coordinator.gateBeforeStylize(
+            source: small, portrait: p, cutout: small, isEffects: true
+        )
+        // De sheet staat open tot de gebruiker beslist.
+        while coordinator.preGate == nil { await Task.yield() }
+        XCTAssertEqual(coordinator.preGate?.kind, .lowResolution)
+        coordinator.resolvePreGate(.proceed)
+        let r = await result
+        XCTAssertEqual(r.decision, .proceed)
+        XCTAssertEqual(r.effectsSource, .original)
+    }
+
+    // MARK: - Boost vanuit de sheet → Effects gebruikt het verse cutout
+
+    func testFreshlyBoostedCutoutReturnedWhenBoostLanded() {
+        let p = portrait(originalW: 700, originalH: 900)
+        p.cutoutData = solidImage(w: 2800, h: 3600).pngData()!
+        XCTAssertNotNil(StylizeQuality.freshlyBoostedCutout(portrait: p))
+    }
+
+    func testFreshlyBoostedCutoutNilWhenBoostDidNotLand() {
+        let p = portrait(originalW: 700, originalH: 900)
+        p.cutoutData = solidImage(w: 700, h: 900).pngData()!
+        XCTAssertNil(StylizeQuality.freshlyBoostedCutout(portrait: p))
+    }
+
+    func testFreshlyBoostedCutoutNilWithActiveEffect() {
+        // Met een actief effect boostte Boost het gestylede beeld; de basis bleef klein.
+        let p = portrait(originalW: 700, originalH: 900)
+        p.cutoutData = solidImage(w: 2800, h: 3600).pngData()!
+        p.effectActiveRaw = "windy"
+        XCTAssertNil(StylizeQuality.freshlyBoostedCutout(portrait: p))
+    }
+
+    func testEffectsStylizeSourceUsesFreshCutout() {
+        let fresh = solidImage(w: 1600, h: 2000)
+        let source = StylizeQuality.effectsStylizeSource(
+            portrait: portrait(originalW: 700, originalH: 900),
+            cutout: solidImage(w: 700, h: 900),
+            choice: .freshCutout(fresh)
+        )
+        XCTAssertTrue(source === fresh)
+    }
+
+    @MainActor
+    func testEffectsGateBoostFirstProceedsWithFreshCutout() async {
+        let coordinator = StylizeQualityCoordinator()
+        let p = portrait(originalW: 700, originalH: 900)
+        let small = solidImage(w: 700, h: 900)
+        p.cutoutData = small.pngData()!
+        let boosted = solidImage(w: 2800, h: 3600).pngData()!
+        coordinator.onBoostCutout = { p.cutoutData = boosted }
+
+        async let result = coordinator.gateBeforeStylize(
+            source: small, portrait: p, cutout: small, isEffects: true
+        )
+        while coordinator.preGate == nil { await Task.yield() }
+        coordinator.resolvePreGate(.boostFirst)
+        let r = await result
+        XCTAssertEqual(r.decision, .proceed)
+        guard case .freshCutout(let fresh) = r.effectsSource else {
+            return XCTFail("verwacht het verse cutout als bron, kreeg \(r.effectsSource)")
+        }
+        XCTAssertEqual(StylizeQuality.pixelSize(of: fresh)?.longEdge, 3600)
+    }
+
+    @MainActor
+    func testEffectsGateBoostFirstFallsBackToOriginalWhenBoostFailed() async {
+        let coordinator = StylizeQualityCoordinator()
+        let p = portrait(originalW: 700, originalH: 900)
+        let small = solidImage(w: 700, h: 900)
+        p.cutoutData = small.pngData()!
+        coordinator.onBoostCutout = { /* credits op: cutout blijft klein */ }
+
+        async let result = coordinator.gateBeforeStylize(
+            source: small, portrait: p, cutout: small, isEffects: true
+        )
+        while coordinator.preGate == nil { await Task.yield() }
+        coordinator.resolvePreGate(.boostFirst)
+        let r = await result
+        XCTAssertEqual(r.effectsSource, .original)
+    }
+
     func testBlurDetectionDisabledByDefault() {
         XCTAssertFalse(StylizeQuality.blurDetectionEnabled)
     }

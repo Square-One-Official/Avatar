@@ -45,6 +45,9 @@ enum StylizeQuality {
     enum EffectsSourceChoice: Equatable {
         case original
         case cutout
+        /// Het zojuist in de gate geboostte cutout, vers uit het portret — het
+        /// Effects-model houdt het cutout van vóór de boost vast.
+        case freshCutout(NSImage)
     }
 
     /// Prefer cutout for placement-stable styling; use original only when the
@@ -65,6 +68,8 @@ enum StylizeQuality {
         switch choice {
         case .cutout:
             return cappedForUpload(cutout)
+        case .freshCutout(let fresh):
+            return cappedForUpload(fresh)
         case .original:
             if let data = portrait?.originalData, let img = NSImage(data: data) {
                 return cappedForUpload(img)
@@ -101,12 +106,30 @@ enum StylizeQuality {
     /// Hair / Clothes / Face: the current cutout on the canvas.
     static func editStylizeSource(cutout: NSImage) -> NSImage { cutout }
 
-    /// Original is low-res but cutout may be higher (e.g. after Boost).
-    static func shouldOfferEffectsCutoutChoice(portrait: Portrait2?, cutout: NSImage) -> Bool {
+    /// Het origineel is low-res, maar het cutout is al scherper (Boost, lokale
+    /// boost of een generatief resultaat met meer pixels). Dan is de
+    /// kwaliteitsbeslissing al genomen: Effects vraagt NIET nog eens om te
+    /// boosten en styleert het (geboostte) cutout i.p.v. het kleine origineel.
+    /// Zonder origineel valt dit weg (de gewone low-res-gate op de bron blijft).
+    static func cutoutOutranksLowResOriginal(portrait: Portrait2?, cutout: NSImage) -> Bool {
         guard let data = portrait?.originalData, let original = NSImage(data: data) else { return false }
         guard isLowResolution(original) else { return false }
         guard let o = pixelSize(of: original), let c = pixelSize(of: cutout) else { return false }
         return c.longEdge > o.longEdge || !isLowResolution(cutout)
+    }
+
+    /// Na "Boost resolution" vanuit de low-res-sheet: het verse cutout uit het
+    /// portret, zodat Effects de geboostte pixels styleert i.p.v. het kleine
+    /// origineel. nil (→ bron blijft het origineel) als:
+    /// - er een effect actief is: Boost boostte dan het gestylede beeld, de
+    ///   effect-basis bleef klein en op een effect-uitvoer stapelen mag niet (E55.3);
+    /// - de boost niet is geland (credits op, fout, afgebroken): het cutout is dan
+    ///   nog steeds low-res.
+    static func freshlyBoostedCutout(portrait: Portrait2?) -> NSImage? {
+        guard let portrait, portrait.effectActiveRaw == nil,
+              let fresh = NSImage(data: portrait.cutoutData),
+              !isLowResolution(fresh) else { return nil }
+        return fresh
     }
 
     // MARK: - Instrumentation

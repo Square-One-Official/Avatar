@@ -10,13 +10,10 @@ import SwiftUI
 enum PreStylizeDecision: Equatable {
     case proceed
     case boostFirst
-    /// Effects only: stylize the cutout instead of the low-res original (no scene styling).
-    case useCutoutSource
 }
 
 enum PreStylizeGateKind: Equatable {
     case lowResolution
-    case effectsLowResOriginal
 }
 
 struct PreStylizeGate: Identifiable {
@@ -54,24 +51,24 @@ final class StylizeQualityCoordinator {
         cutout: NSImage,
         isEffects: Bool
     ) async -> (decision: PreStylizeDecision, effectsSource: StylizeQuality.EffectsSourceChoice) {
-        if isEffects, StylizeQuality.shouldOfferEffectsCutoutChoice(portrait: portrait, cutout: cutout) {
-            let decision = await presentPreGate(.effectsLowResOriginal)
-            switch decision {
-            case .useCutoutSource:
-                return (.proceed, .cutout)
-            case .boostFirst:
-                await onBoostCutout?()
-                return (.proceed, .original)
-            case .proceed:
-                return (.proceed, .original)
-            }
+        // Al geboost (cutout scherper dan een low-res origineel): de gebruiker
+        // heeft de kwaliteitskeuze al gemaakt — niet nóg een keer om Boost
+        // vragen, en het geboostte cutout is de bron (het origineel is nog
+        // steeds klein). Repro: low-res foto → Boost → effect kiezen.
+        if isEffects, StylizeQuality.cutoutOutranksLowResOriginal(portrait: portrait, cutout: cutout) {
+            return (.proceed, .cutout)
         }
         if StylizeQuality.isLowResolution(source) {
             let decision = await presentPreGate(.lowResolution)
             if decision == .boostFirst {
                 await onBoostCutout?()
+                // Effects: de boost is net betaald — styleer het geboostte
+                // cutout, niet het (nog steeds kleine) origineel.
+                if isEffects, let fresh = StylizeQuality.freshlyBoostedCutout(portrait: portrait) {
+                    return (.proceed, .freshCutout(fresh))
+                }
             }
-            return (decision == .useCutoutSource ? .proceed : decision, .original)
+            return (decision, .original)
         }
         return (.proceed, .original)
     }
@@ -94,9 +91,6 @@ struct PreStylizeQualitySheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: DSSpacing.gap3) {
-                if gate.kind == .effectsLowResOriginal {
-                    DSGhostButton("Use cutout instead", fullWidth: true) { onDecision(.useCutoutSource) }
-                }
                 DSNeutralButton("Continue anyway", fullWidth: true) { onDecision(.proceed) }
                 DSPrimaryButton(boostLabel, fullWidth: true) { onDecision(.boostFirst) }
             }
@@ -110,7 +104,6 @@ struct PreStylizeQualitySheet: View {
     private var title: String {
         switch gate.kind {
         case .lowResolution: return "Low resolution photo"
-        case .effectsLowResOriginal: return "Low resolution original"
         }
     }
 
@@ -118,8 +111,6 @@ struct PreStylizeQualitySheet: View {
         switch gate.kind {
         case .lowResolution:
             return "This photo is low resolution. Boosting may improve sharpness before editing (\(CreditMeter.chipLabel(for: .upscaleHigh))). Results are not guaranteed."
-        case .effectsLowResOriginal:
-            return "Your original photo is low resolution. You can boost it first (\(CreditMeter.chipLabel(for: .upscaleHigh))), continue with the original (background will be styled), or stylize the cutout instead — the background and scene will not be restyled."
         }
     }
 
