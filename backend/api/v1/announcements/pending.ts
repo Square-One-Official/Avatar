@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireUser } from "../../../lib/auth.js";
 import { proOverrideFor } from "../../../lib/proAccess.js";
 import { activeSubscription, supabase } from "../../../lib/supabase.js";
-import { fetchPublishedAnnouncements, meetsMinVersion } from "../../../lib/payload.js";
+import { fetchPublishedAnnouncements, meetsMinVersion, withinMaxVersion } from "../../../lib/payload.js";
 
 /**
  * GET /v1/announcements/pending
@@ -16,7 +16,9 @@ import { fetchPublishedAnnouncements, meetsMinVersion } from "../../../lib/paylo
  *
  * Headers:
  *   - Authorization: Bearer <token>   required
- *   - X-App-Version: 1.1.4            optional, used for minAppVersion filter
+ *   - X-App-Version: 1.1.4            optional, used for min/maxAppVersion
+ *                                     filters (absent = treated as a 1.x
+ *                                     install: passes max, fails min)
  *
  * The endpoint never errors loudly to the client on Payload outages —
  * announcements are non-critical and a sign-in shouldn't fail because the
@@ -69,8 +71,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!a.audienceEmails.includes(email)) continue;
       }
 
-      // App-version gate.
+      // App-version gates (min for "needs feature X", max for "1.x only",
+      // e.g. the Aaavatar 2 launch notice).
       if (!meetsMinVersion(appVersion, a.minAppVersion)) continue;
+      if (!withinMaxVersion(appVersion, a.maxAppVersion)) continue;
 
       // Already dismissed → only `everySignInUntilDismissed` would re-show,
       // and even that respects the dismissed action; once a slug is seen we

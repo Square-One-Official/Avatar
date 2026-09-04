@@ -282,6 +282,12 @@ enum EffectFraming: Equatable, Sendable {
         return fromDieCut ? .autoFrame : .keep
     }
 
+    /// Die-cut-resultaat (sticker)? `.fitContent` is per `forSwitch` de
+    /// kadrering van élke wissel náár een die-cut-stijl (ook refresh op de
+    /// actieve kaart), dus tegelijk de vlag "rand + hoofd-clip renderen" na
+    /// de her-isolatie (E55.13, DieCutRenderer).
+    var isDieCutResult: Bool { self == .fitContent }
+
     /// Kadrering van de omgekeerde wissel (undo van deze stap).
     var inverse: EffectFraming {
         switch self {

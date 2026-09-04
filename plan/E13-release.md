@@ -45,11 +45,14 @@ Eigen appcast voor 2.0-beta; v1-gebruikers merken niets.
 - **[release-v2.sh](../scripts/release-v2.sh):** volledige v2-flow (scheme
   Avatar2, "Aaavatar 2.app", `Aaavatar-2-<v>.dmg`, tag `v<v>`), bumpt alléén
   het Avatar2-blok (assert op precies 2 matches — faalt hard bij een derde),
-  en publiceert als GitHub-**prerelease**. Dat laatste is verplicht: de
-  website linkt `releases/latest/download/Aaavatar.dmg`, en GitHub's "latest"
-  is de nieuwste niet-prerelease — een gewone 2.0-release zou die link kapen
-  en v1-downloaders een 404 geven. Zelfde EdDSA-sleutelpaar als v1 (besluit
-  E01.11), dus geen nieuw key-beheer.
+  en publiceerde als GitHub-**prerelease** — verplicht zolang de website-link
+  `releases/latest/download/Aaavatar.dmg` v1 moest blijven serveren.
+  **Bijstelling 2026-09-04 (besluit Thierry):** 2.0 is de publieke release;
+  het script publiceert nu `--latest` mét een stabiele kopie `Aaavatar.dmg`,
+  zodat de website-link zonder Framer-edit 2.0 serveert. `PRERELEASE=1`
+  staged een build (Sparkle-e2e eerst), `gh release edit --prerelease=false
+  --latest` zet 'm live. Zelfde EdDSA-sleutelpaar als v1 (besluit E01.11),
+  dus geen nieuw key-beheer.
 - **Gated (Thierry):** de backend-port/deploy (prod geeft op `/appcast-v2.xml`
   nu 404) en de eerste beta-release (signing/notarisatie). Stappen in
   GO-NO-GO-2.0.md §4.

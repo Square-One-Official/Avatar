@@ -1136,7 +1136,11 @@ final class ShellModel {
             // de nu-geïsoleerde versie; stempel met die bytegrootte zodat een undo
             // het edit-bronbeeld als stale herkent.
             portrait.editSourceData = image.pngData()
-            let restored = (try? await reIsolateSubject(image)) ?? image
+            var restored = (try? await reIsolateSubject(image)) ?? image
+            // E55.13: die-cut (sticker) — de witte rand en de hoofd-alleen-snede
+            // komen deterministisch van de client (DieCutRenderer), niet van
+            // het model + de her-isolatie (die kent de model-rand niet).
+            if framing.isDieCutResult { restored = await DieCutRenderer.finish(restored) }
             storeEffectResult(restored, on: portrait, framing: framing)
             // Stempel op de nu-opgeslagen cutout; 0 als de PNG-encode faalde (dan is
             // editSourceData ook nil → sowieso genegeerd door Remove background).
@@ -1159,7 +1163,8 @@ final class ShellModel {
             framer = storeEffectResult(image, on: portrait, framing: framing, reshuffles: false)
         } else {
             portrait.editSourceData = image.pngData()
-            let restored = (try? await reIsolateSubject(image)) ?? image
+            var restored = (try? await reIsolateSubject(image)) ?? image
+            if framing.isDieCutResult { restored = await DieCutRenderer.finish(restored) } // E55.13
             framer = storeEffectResult(restored, on: portrait, framing: framing, reshuffles: false)
             portrait.editSourceCutoutSig = portrait.editSourceData != nil
                 ? Portrait2.cutoutSignature(portrait.cutoutData)

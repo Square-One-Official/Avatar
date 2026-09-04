@@ -2,19 +2,26 @@
 #
 # release-v2.sh — Build, sign, notarize en publiceer een Aaavatar 2-release
 # (E13.1). Eigen kanaal naast scripts/release.sh (v1): eigen appcast
-# (appcast-v2.xml), eigen tag-reeks en GitHub-PRERELEASES.
+# (appcast-v2.xml) en eigen tag-reeks (v2.x.y).
 #
-# Waarom prerelease verplicht is: de website linkt naar
-#   https://github.com/Square-One-Official/Avatar/releases/download/latest/… —
-# GitHub's "latest" is de nieuwste NIET-prerelease. Een gewone v2-release zou
-# die link dus kapen terwijl het asset (Aaavatar-2-*.dmg) er niet onder de
-# oude naam in zit → 404 voor v1-downloaders. Zodra 2.0 stabiel gaat en de
-# website de v2-DMG linkt, kan de vlag eraf — bewust besluit, niet hier fixen.
+# Download-link: de website linkt naar
+#   …/Avatar/releases/latest/download/Aaavatar.dmg
+# en GitHub's "latest" is de nieuwste NIET-prerelease. Sinds 2.0 de
+# publieke release is (besluit Thierry 2026-09-04) publiceert dit script
+# daarom (a) een stabiele kopie onder exact die naam, `Aaavatar.dmg`, en
+# (b) standaard als gewone release met `--latest`. Wil je een build eerst
+# staged hebben (Sparkle-e2e vóór de site 'm serveert): PRERELEASE=1 —
+# daarna `gh release edit v<ver> --prerelease=false --latest` om live te gaan.
 #
 # Usage:
 #   ./scripts/release-v2.sh 2.0.0 101
+#   PRERELEASE=1 ./scripts/release-v2.sh 2.0.0 101      # staged
 #   (MARKETING_VERSION=2.0.0, CURRENT_PROJECT_VERSION=101 — buildnummers voor
 #    dit kanaal starten op 100, zie project.yml.)
+#
+# Release-notes: het script leest docs/releases/RELEASE-NOTES-<ver>.md
+# (verplicht, gecommit). `--generate-notes` zou v1.2.1..v2.0.0 = honderden
+# commits opsommen.
 #
 # Vereisten: identiek aan release.sh (create-dmg, gh, notarytool-profiel
 # "AC_PASSWORD", Sparkle sign_update met dezelfde private key als v1 — de
@@ -24,9 +31,15 @@ set -euo pipefail
 
 VERSION="${1:?Usage: release-v2.sh <version> <build>  (bv. release-v2.sh 2.0.0 101)}"
 BUILD="${2:?Usage: release-v2.sh <version> <build>  (bv. release-v2.sh 2.0.0 101)}"
+PRERELEASE="${PRERELEASE:-0}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
+NOTES_FILE="$PROJECT_DIR/docs/releases/RELEASE-NOTES-${VERSION}.md"
+if [[ ! -s "$NOTES_FILE" ]]; then
+  echo "❌ Release-notes ontbreken: $NOTES_FILE (schrijf ze vóór je archiveert)."
+  exit 1
+fi
 ARCHIVE_PATH="$BUILD_DIR/Avatar2.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export-v2"
 DMG_NAME="Aaavatar-2-${VERSION}.dmg"
@@ -197,26 +210,40 @@ PYEOF
 # Spiegel naar de backend-deploy (api.aaavatar.nl/appcast-v2.xml).
 cp "$PROJECT_DIR/appcast-v2.xml" "$PROJECT_DIR/backend/api/_appcast-v2.xml"
 
-# 10. GitHub-PRERELEASE (zie header waarom dit verplicht is zolang de website
-#     naar releases/latest linkt). Idempotent bij herhaalde runs.
-echo "→ Creating GitHub prerelease..."
-STABLE_DMG_PATH="$BUILD_DIR/Aaavatar-2.dmg"
+# 10. GitHub-release. Stabiele kopie heet exact `Aaavatar.dmg` — dat is wat
+#     releases/latest/download/Aaavatar.dmg (website) oplost. Idempotent bij
+#     herhaalde runs (assets overschrijven, vlag niet aanraken).
+STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"
 cp "$DMG_PATH" "$STABLE_DMG_PATH"
 
 if gh release view "$TAG" >/dev/null 2>&1; then
-  echo "   release $TAG bestaat al — DMG-assets overschrijven"
+  echo "→ release $TAG bestaat al — DMG-assets overschrijven"
   gh release upload "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" --clobber
-else
+elif [[ "$PRERELEASE" == "1" ]]; then
+  echo "→ Creating GitHub prerelease (staged; site blijft op de vorige 'latest')..."
   gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
     --title "Aaavatar 2 v${VERSION}" \
     --prerelease \
-    --generate-notes
+    --notes-file "$NOTES_FILE"
+else
+  echo "→ Creating GitHub release (latest)..."
+  gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
+    --title "Aaavatar 2 v${VERSION}" \
+    --latest \
+    --notes-file "$NOTES_FILE"
 fi
 
 echo ""
-echo "✅ Aaavatar 2 v${VERSION} gepubliceerd (prerelease)!"
+if [[ "$PRERELEASE" == "1" ]]; then
+  echo "✅ Aaavatar 2 v${VERSION} gepubliceerd als PRERELEASE (staged)."
+else
+  echo "✅ Aaavatar 2 v${VERSION} gepubliceerd (latest)."
+fi
 echo ""
 echo "Niet vergeten:"
 echo "  1. appcast-v2.xml + backend/api/_appcast-v2.xml verifiëren en committen"
-echo "  2. Backend deployen zodat api.aaavatar.nl/appcast-v2.xml het nieuwe item serveert"
+echo "  2. Backend deployen (main pushen) zodat api.aaavatar.nl/appcast-v2.xml het nieuwe item serveert"
 echo "  3. Smoke: curl -s https://api.aaavatar.nl/appcast-v2.xml | grep ${VERSION}"
+if [[ "$PRERELEASE" == "1" ]]; then
+  echo "  4. Live: gh release edit ${TAG} --prerelease=false --latest"
+fi

@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { checkAnonUnsplashRateLimit, clientIp, optionalUser } from "../../lib/auth.js";
 
 /**
  * POST /v1/unsplash (UX-audit background-paneel, 2026-07-03)
@@ -32,6 +33,17 @@ interface UnsplashApiPhoto {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
+    return;
+  }
+
+  // Anonymous is fine (the background panel works pre-sign-in), but a
+  // token that is present and invalid is still a 401 — same contract as
+  // /v1/account — and every caller shares a per-IP budget so one host can't
+  // exhaust the Unsplash key quota for everyone (release-review 2026-09-04).
+  const userResult = await optionalUser(req, res);
+  if (userResult === "rejected") return; // optionalUser already wrote 401
+  if (!(await checkAnonUnsplashRateLimit(clientIp(req)))) {
+    res.status(429).json({ error: "rate_limited" });
     return;
   }
 

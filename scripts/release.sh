@@ -203,6 +203,9 @@ echo "→ Creating GitHub Release..."
 # Stable-named copy so https://github.com/Square-One-Official/Avatar/releases/latest/download/Aaavatar.dmg
 # always resolves to the newest release. The website (Framer) links to that URL,
 # so it never has to be updated per release.
+# Since 2026-09-04 release-v2.sh publishes the same stable name for Aaavatar 2,
+# which is now "latest"; v1 is frozen — running this script again would put a
+# 1.x build back under that URL. Don't, unless that is the intent.
 STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"
 cp "$DMG_PATH" "$STABLE_DMG_PATH"
 
