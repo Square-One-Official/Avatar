@@ -56,12 +56,21 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - run: npm ci
         working-directory: admin
+      # payload-types.ts is gitignored (generated); without it tsc fails on
+      # every import of '../payload-types'. Generation only evaluates the
+      # config — it never connects to DATABASE_URL.
+      - run: npm run generate:types
+        working-directory: admin
       - run: npx tsc --noEmit
         working-directory: admin
       - run: npx next build
         working-directory: admin
       - name: npm audit (production deps, high+ severity)
-        run: npm audit --production --audit-level=high
+        # Advisory for admin until sharp can move to 0.35 (breaking under
+        # Payload's peer range) — see plan/GO-NO-GO-2.0.md "Dag-2" (2026-09-04).
+        # The backend gate above stays hard.
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
         working-directory: admin
 
   appcast-lint:

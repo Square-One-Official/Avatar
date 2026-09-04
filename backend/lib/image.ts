@@ -1,5 +1,9 @@
 import sharp from "sharp";
 
+// sharp 0.35 stopte met het `sharp.X`-namespace-type onder ESM-import;
+// afleiden uit de API zelf houdt dit los van hoe de typings verpakt zijn.
+type SharpOverlayOptions = Parameters<ReturnType<typeof sharp>["composite"]>[0][number];
+
 /**
  * Post-decode payload cap for `/v1/colorize` and `/v1/fill-body`. The
  * Vercel `bodyParser.sizeLimit` on those endpoints is 15 MB, which is
@@ -743,7 +747,7 @@ export async function prepareMinimalBodyFill(
   // as a subtitle/caption bar to FLUX and came back with hallucinated text.
   const toModelX = (sourceX: number) => modelLeftPadding + Math.round(sourceX * sourceScale);
   const toModelY = (sourceY: number) => Math.round(sourceY * sourceScale);
-  const fillLayers: sharp.OverlayOptions[] = [];
+  const fillLayers: SharpOverlayOptions[] = [];
   const sideSpan = (runStart: number, runEnd: number, strip: number): [number, number] => {
     const margin = Math.round(strip * sourceScale);
     const top = Math.max(0, toModelY(runStart) - margin);
