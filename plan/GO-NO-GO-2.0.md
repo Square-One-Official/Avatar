@@ -116,6 +116,20 @@ deze release; wat rest is gated (signing, live e2e, assets).
   (`continue-on-error`); oplossen = Payload-familie in lockstep bumpen
   (payload + alle @payloadcms/* op één versie) en dan sharp 0.35. Backend
   draait al op sharp 0.35.4.
+- **Incident 2026-09-04 22:49–22:58 (agent):** de eerste main-push met de
+  root-`.vercelignore` (`/*` + `!/backend`) liet Vercel's git-build van
+  avatar-admin de map `admin/` weggooien → lege Next-app op admin.aaavatar.nl
+  (404) en `/v1/effects` + `/v1/backgrounds` leeg (backend leest via de
+  admin-API). Fix-forward: `!/admin` in `.vercelignore` (8470571), nieuwe
+  git-deploy, hersteld 22:58. Les staat in het bestand zelf en in het
+  runbook-geheugen; rollback moest via Thierry/dashboard (agent geblokkeerd).
+- **Globals 500 (pre-existing):** de backend logt `Payload feature-flags fetch
+  failed 500` en `app-config fetch failed 500` (`{"message":"Something went
+  wrong."}`) — al vóór de push (22:28, oude admin) én met de nieuwe admin.
+  Backend faalt open (flags allEnabled, app-config-defaults), dus geen
+  gebruikersimpact, maar de CMS-globals werken dus niet; waarschijnlijk
+  schema-drift op `payload.app_config`/`feature_flags` (v1-tijdperk-tabellen).
+  Onderzoek: admin-log of offline DDL-snapshot vs. prod-kolommen.
 - BackendClient: 401 → token-refresh → retry (nu "Session expired"-pad);
   `fatalError` bij ModelContainer-creatie → herstel-UI; TLS-pin-rotatie
   vóór 2027-03 (LE R13); `backend/.env.example` bijwerken;
