@@ -151,8 +151,11 @@ nog niet bestaat.
    ```
 6. Deploy de backend zodat prod het nieuwe item serveert. Sinds 2.0 = `main`
    is dat: `main` fast-forwarden naar de release-commit en pushen (Vercel
-   deployt avatars-api én avatar-admin van `main`). Let op: admin's
-   `vercel-build` draait `payload migrate` tegen de prod-DB.
+   deployt avatars-api én avatar-admin van `main`). Let op: het
+   Payload-schema is handmatig (`push:false`) — nieuwe CMS-velden staan als
+   SQL in `backend/sql/` en moeten **vóór de push** door Thierry in de
+   Supabase SQL-editor zijn toegepast, anders breekt de admin-detailpagina
+   van die collectie. Voor 2.0.0: `backend/sql/021_announcements_max_app_version.sql`.
 7. Smoke:
    ```bash
    curl -s https://api.aaavatar.nl/appcast-v2.xml | grep 2.0.0

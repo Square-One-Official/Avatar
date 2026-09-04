@@ -72,6 +72,9 @@ deze release; wat rest is gated (signing, live e2e, assets).
   v1-only gemarkeerd (Avatar2 heeft geen call site, v1's ImageProcessor wel —
   weg zodra het v1-target weg is); CI groen gemaakt (backend `ws`+`sharp` gebumpt; admin `payload
   generate:types` in CI). Geverifieerd via build-v2.sh + npm test.
+- ⬜ **sql/021 toepassen** (Thierry, Supabase SQL-editor) — `max_app_version`
+  op `payload.announcements`; **vóór de main-push** (admin-deploy), anders
+  gaat de Announcements-detailpagina zwart en soft-failt `/v1/announcements/pending`.
 - ⬜ **v1-gebruikers informeren**: Payload-Announcement "Aaavatar 2 is uit"
   met `maxAppVersion` = `1.99`, CTA naar de download; publiceren ná stap
   9 van het runbook (Thierry).
