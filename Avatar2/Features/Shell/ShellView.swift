@@ -168,30 +168,6 @@ struct ShellView: View {
         .overlay(alignment: .bottomTrailing) { setActionToastLayer }
         // E53.7: contextmenu's + store-gedreven alerts/confirms.
         .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
-        // E19.1: Share/export-popup (DS). Overlay i.p.v. `.sheet` — SwiftUI
-        // breekt een sheet-venster af bij app-/vensterwissel en presenteert
-        // 'm opnieuw bij terugkeer (sluit-open-animatie). Overlay blijft in
-        // de view tree; `exportSession` op ShellModel is de bron. Boven
-        // FloatingOverlayHost zodat een lege overlay-ZStack clicks niet eet.
-        .overlay {
-            if let session = model.exportSession {
-                ZStack {
-                    Color.black.opacity(0.45)
-                        .ignoresSafeArea()
-                    ExportSheet(
-                        portraitID: session.id,
-                        isPro: entitlement.isProActive,
-                        onClose: { model.exportSession = nil }
-                    )
-                    Button("Close") { model.exportSession = nil }
-                        .keyboardShortcut(.escape, modifiers: [])
-                        .opacity(0)
-                        .frame(width: 0, height: 0)
-                        .accessibilityHidden(true)
-                }
-                .accessibilityAddTraits(.isModal)
-            }
-        }
         // E25.1 smoke-haak: standalone DSColorPicker.
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
@@ -383,6 +359,32 @@ struct ShellView: View {
         .overlay(alignment: .top) {
             if showsEditorTopChrome {
                 editorTopChromeBand
+            }
+        }
+        // E19.1: Share/export-popup (DS). Overlay i.p.v. `.sheet` — SwiftUI
+        // breekt een sheet-venster af bij app-/vensterwissel en presenteert
+        // 'm opnieuw bij terugkeer (sluit-open-animatie). Overlay blijft in
+        // de view tree; `exportSession` op ShellModel is de bron. Boven
+        // FloatingOverlayHost zodat een lege overlay-ZStack clicks niet eet,
+        // en ná de top-chrome-band zodat breadcrumb + Share/Edit/Preview óók
+        // onder de scrim vallen (anders lichtte de breadcrumb op boven de modal).
+        .overlay {
+            if let session = model.exportSession {
+                ZStack {
+                    Color.black.opacity(0.45)
+                        .ignoresSafeArea()
+                    ExportSheet(
+                        portraitID: session.id,
+                        isPro: entitlement.isProActive,
+                        onClose: { model.exportSession = nil }
+                    )
+                    Button("Close") { model.exportSession = nil }
+                        .keyboardShortcut(.escape, modifiers: [])
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
+                }
+                .accessibilityAddTraits(.isModal)
             }
         }
     }
