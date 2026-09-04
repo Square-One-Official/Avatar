@@ -1,4 +1,8 @@
-# Aaavatar 2 — release & auto-updates (runbook)
+# Aaavatar 2.x — release & auto-updates (runbook)
+
+Het product heet voor gebruikers gewoon **Aaavatar** (`Aaavatar.app`, bundle-id
+`nl.squareone.aaavatar2`; besluit Thierry 2026-09-04). Een drag-install vervangt
+daarmee Aaavatar 1 in /Applications — de v1-bibliotheek blijft in v1's container.
 
 Hoe een 2.0-release gebouwd, getekend, genotariseerd en gepubliceerd wordt, en
 waarom het kanaal zo in elkaar zit. Bron van waarheid voor de stappen is
@@ -11,7 +15,7 @@ die het script nog nooit gedraaid heeft. v1 (`Avatar`-target, `release.sh`,
 
 | Artefact | Gemaakt door | Doel | Waar |
 |---|---|---|---|
-| `Aaavatar-2-<ver>.dmg` | `create-dmg` in `release-v2.sh` (stap 5), genotariseerd + gestapled | Download én Sparkle-enclosure | GitHub-release `v<ver>` (asset) |
+| `Aaavatar-<ver>.dmg` | `create-dmg` in `release-v2.sh` (stap 5), genotariseerd + gestapled | Download én Sparkle-enclosure | GitHub-release `v<ver>` (asset) |
 | `Aaavatar.dmg` | Kopie van bovenstaande (stap 10) | Stabiele bestandsnaam — dít lost `releases/latest/download/Aaavatar.dmg` (website) op | Zelfde GitHub-release |
 | `docs/releases/RELEASE-NOTES-<ver>.md` | Mens, vóór de run | GitHub-release-body (`--notes-file`) | Repo, gecommit |
 | `appcast-v2.xml` | `release-v2.sh` (stap 9), nieuwste item bovenaan | Canon van het Sparkle-feed | Repo-root, gecommit |
@@ -36,7 +40,7 @@ project.yml (Avatar2-blok) ─bump─► xcodegen ─► xcodebuild archive ─�
                             │
                      (staged) gh release edit v<ver> --prerelease=false --latest
 
- bestaande 2.0-installs:  Sparkle → api.aaavatar.nl/appcast-v2.xml → GitHub-asset Aaavatar-2-<ver>.dmg
+ bestaande 2.x-installs:  Sparkle → api.aaavatar.nl/appcast-v2.xml → GitHub-asset Aaavatar-<ver>.dmg
  website-downloads:       releases/latest/download/Aaavatar.dmg → nieuwste niet-prerelease
  v1-installs:             pollen /appcast.xml en zien 2.0 nooit (andere bundle-id);
                           horen van 2.0 via een CMS-announcement met maxAppVersion
@@ -147,7 +151,7 @@ nog niet bestaat.
    ```bash
    git add project.yml Avatar.xcodeproj/project.pbxproj Avatar2/Info.plist \
      appcast-v2.xml backend/api/_appcast-v2.xml
-   git commit -m "release: Aaavatar 2 v2.0.0 (build 101)"
+   git commit -m "release: Aaavatar v2.0.0 (build 102)"
    ```
 6. Deploy de backend zodat prod het nieuwe item serveert. Sinds 2.0 = `main`
    is dat: `main` fast-forwarden naar de release-commit en pushen (Vercel

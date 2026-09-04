@@ -1862,7 +1862,7 @@
 				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;
-				PRODUCT_NAME = "Aaavatar 2";
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -1881,7 +1881,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.Avatar2Tests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar.app/Contents/MacOS/Aaavatar";
 			};
 			name = Release;
 		};
@@ -2005,7 +2005,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.avatar.Avatar2Tests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Aaavatar.app/Contents/MacOS/Aaavatar";
 			};
 			name = Debug;
 		};
@@ -2028,7 +2028,7 @@
 				OTHER_LDFLAGS = "$(inherited) -weak_framework ImagePlayground -weak_framework FoundationModels";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.squareone.aaavatar2;
 				PRODUCT_MODULE_NAME = Avatar2;
-				PRODUCT_NAME = "Aaavatar 2";
+				PRODUCT_NAME = Aaavatar;
 				SDKROOT = macosx;
 			};
 			name = Debug;

@@ -64,7 +64,7 @@ struct SettingsAboutPage: View {
                     VStack(alignment: .leading, spacing: DSSpacing.gap4) {
                         SettingsRow(
                             title: "Version",
-                            subtitle: "Aaavatar 2"
+                            subtitle: "Aaavatar"
                         ) {
                             Text(versionLabel)
                                 .dsTextStyle(.labelBase)

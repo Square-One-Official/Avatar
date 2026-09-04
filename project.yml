@@ -201,7 +201,7 @@ targets:
       path: Avatar2/Info.plist
       properties:
         CFBundleName: $(PRODUCT_NAME)
-        CFBundleDisplayName: Aaavatar 2
+        CFBundleDisplayName: Aaavatar
         CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -249,9 +249,15 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nl.squareone.aaavatar2
-        PRODUCT_NAME: Aaavatar 2
-        # Expliciete modulenaam: PRODUCT_NAME bevat een spatie en zou anders
-        # "Aaavatar_2" worden — Avatar2Tests doet `@testable import Avatar2`.
+        # Productnaam = gewoon "Aaavatar" (besluit Thierry 2026-09-04): dezelfde
+        # bestandsnaam als v1, dus een drag-install vervangt Aaavatar 1 in
+        # /Applications. Bundle-id blijft nl.squareone.aaavatar2 (Keychain,
+        # container, Sparkle-feed hangen eraan). "Aaavatar 2" is alleen nog de
+        # naam van deze codebase-generatie. Let op: v1 heet óók Aaavatar.app —
+        # build-v2.sh bouwt v1 daarom in een eigen DerivedData.
+        PRODUCT_NAME: Aaavatar
+        # Expliciete modulenaam: Avatar2Tests doet `@testable import Avatar2`;
+        # zonder override zou de module "Aaavatar" heten.
         PRODUCT_MODULE_NAME: Avatar2
         # E13.1: eigen versielijn, los van de root-settings (die zijn van v1).
         # Zonder deze overrides erfde Aaavatar 2 v1's 1.2.1/18 en zou een
@@ -271,7 +277,7 @@ targets:
         - Avatar2Tests
 
   # E01.9 — unit-tests voor app-target-logica (modellen in Avatar2/Features/).
-  # Draait gehost in Aaavatar 2.app; scripts/build-v2.sh neemt dit mee.
+  # Draait gehost in Aaavatar.app (het Avatar2-product); scripts/build-v2.sh neemt dit mee.
   Avatar2Tests:
     type: bundle.unit-test
     platform: macOS
@@ -283,5 +289,5 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Aaavatar 2.app/Contents/MacOS/Aaavatar 2"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Aaavatar.app/Contents/MacOS/Aaavatar"
         BUNDLE_LOADER: "$(TEST_HOST)"
