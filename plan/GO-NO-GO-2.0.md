@@ -47,7 +47,7 @@ deze release; wat rest is gated (signing, live e2e, assets).
   `v2.0.0/Aaavatar.dmg` (200, 11 146 016 B). main = v2-main sindsdien.
   Product heet "Aaavatar" (Aaavatar.app); v1 blijft bereikbaar onder tag v1.2.1.
 
-## 5. Migratiepad (13.2 + 13.7) — ✅ code / ⬜ echte-data-test
+## 5. Migratiepad (13.2 + 13.7) — ✅ code / ✅ echte-data-test (direct pad)
 
 - ✅ `V1LibraryArchive` + `V1LibraryImporter` + Settings “Import backup…”.
 - ✅ **13.7 (2026-09-05): directe import van de v1-store op dezelfde Mac** —
@@ -143,3 +143,18 @@ deze release; wat rest is gated (signing, live e2e, assets).
   `fatalError` bij ModelContainer-creatie → herstel-UI; TLS-pin-rotatie
   vóór 2027-03 (LE R13); `backend/.env.example` bijwerken;
   `website/terms.md` "free of charge" → credits/Stripe.
+
+## Dag 2 — 2.0.1 (build 103), 2026-09-05 00:36
+
+- ✅ E13.7 (directe import van de Aaavatar 1-bibliotheek) uitgerold: `release-v2.sh 2.0.1 103`
+  — archive/export, DMG genotariseerd (Accepted) + gestapled, EdDSA-item bovenaan
+  `appcast-v2.xml` (mirror byte-gelijk), tag `v2.0.1` op d65c4e8, GitHub-release
+  **latest** met `Aaavatar-2.0.1.dmg` + `Aaavatar.dmg` (11 180 248 B).
+- ✅ Prod: avatars-api via `vercel --prod` (deployment avatars-lx0g4qtrb, Ready) —
+  `api.aaavatar.nl/appcast-v2.xml` serveert 2.0.1/103 bovenaan, identiek aan de canon;
+  website-link `releases/latest/download/Aaavatar.dmg` → 2.0.1 (content-length klopt).
+  main ff'ed naar d65c4e8 + gepusht (admin git-deploy, geen admin-wijzigingen).
+- ⬜ Sparkle-e2e (runbook stap 8) op Thierry's 2.0.0-install: Settings → About →
+  Check now → "Aaavatar 2.0.1 is available" → Install → Relaunch → 2.0.1.
+- ⬜ Eerste échte v1-migratie via "Import from this Mac" op een Mac met een grote
+  v1-bibliotheek (de dev-store hier heeft één testportret).

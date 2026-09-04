@@ -274,4 +274,8 @@ op. ⚠ Die v1-store is een dev-bibliotheek met één testportret — een grote 
 bibliotheek is nog niet gezien. ✅ build-v2.sh volledig groen (EXIT=0). Niet in
 scope (zelfde besluit als 13.2): v1-achtergronden en transforms. Announcement
 (GO-NO-GO §7): sql/021 op prod geverifieerd; concept in avatar-admin gevuld
-(titel/slug/body), Max App Version + CTA + Published At + Save nog door Thierry.
+(titel/slug/body), Max App Version + CTA + Published At + Save door Thierry gedaan
+(2026-09-05). **Uitgerold in Aaavatar 2.0.1 (build 103), 2026-09-05 00:36** via
+`release-v2.sh` (genotariseerd + gestapled, EdDSA-item bovenaan appcast-v2, GitHub
+`latest`, website-link serveert de 2.0.1-DMG, prod-appcast byte-gelijk aan de canon,
+main = v2-main = d65c4e8). Sparkle-e2e op een 2.0.0-install: Thierry.
