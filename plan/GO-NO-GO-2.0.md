@@ -84,7 +84,7 @@ deze release; wat rest is gated (signing, live e2e, assets).
 - ✅ **sql/021 toegepast** — geverifieerd op prod 2026-09-05 via de Supabase
   SQL-editor: `payload.announcements` heeft `min_app_version` én
   `max_app_version` (character varying).
-- ⬜ **v1-gebruikers informeren** (enige open go-live-stap; 2026-09-05: concept staat in avatar-admin — titel/slug/body ingevuld, nog Max App Version `1.99` + CTA + Published At + Save): Payload-Announcement "Aaavatar 2.0 is here"
+- ✅ **v1-gebruikers informeren** — Announcement `aaavatar-2-0-launch` door Thierry opgeslagen in avatar-admin op 2026-09-05 (concept via Claude-in-Chrome, laatste velden + Save handmatig). Nog te zien: de sheet op een 1.x-install (één keer) en `null` op 2.0. Spec: Payload-Announcement "Aaavatar 2.0 is here"
   met `maxAppVersion` = `1.99`, eerst-backup-exporteren-instructie (2.0 heet
   óók Aaavatar.app en vervangt v1 bij drag-install), CTA naar de download;
   publiceren ná stap 9 van het runbook.
