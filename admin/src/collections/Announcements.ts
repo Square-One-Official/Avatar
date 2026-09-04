@@ -126,6 +126,14 @@ export const Announcements: CollectionConfig = {
       },
     },
     {
+      name: "maxAppVersion",
+      type: "text",
+      admin: {
+        description:
+          "Upper semver bound (inclusive), e.g. '1.99'. Use it to reach Aaavatar 1.x installs only — e.g. the '2.0 is out' notice. Clients above it never see this announcement.",
+      },
+    },
+    {
       name: "publishedAt",
       type: "date",
       admin: {

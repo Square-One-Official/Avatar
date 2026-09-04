@@ -103,6 +103,9 @@ export type PayloadAnnouncement = {
   audience: "all" | "freeUsers" | "proUsers" | "specificEmails";
   audienceEmails: string[];
   minAppVersion: string | null;
+  /** Upper bound (inclusive) — lets a "2.0 is out" notice target 1.x
+   *  installs only. Clients that send no X-App-Version are treated as old. */
+  maxAppVersion: string | null;
   publishedAt: string | null;
   expiresAt: string | null;
   badgeTargets: { componentId: string; durationDays: number }[];
@@ -256,6 +259,7 @@ function normalize(raw: unknown): PayloadAnnouncement | null {
     audience,
     audienceEmails,
     minAppVersion: typeof r.minAppVersion === "string" ? r.minAppVersion : null,
+    maxAppVersion: typeof r.maxAppVersion === "string" && r.maxAppVersion.trim() ? r.maxAppVersion.trim() : null,
     publishedAt: typeof r.publishedAt === "string" ? r.publishedAt : null,
     expiresAt: typeof r.expiresAt === "string" ? r.expiresAt : null,
     badgeTargets,
@@ -948,6 +952,26 @@ function normalizeMessage(raw: unknown): PayloadMessage | null {
  * back to "true" on anything unparseable so a typo in `minAppVersion`
  * never blocks an announcement entirely.
  */
+/**
+ * Counterpart of `meetsMinVersion` — true if `version <= max`. A client
+ * without a version header passes: the only clients that omit it are 1.x
+ * installs, which is exactly who a max-gated announcement is for.
+ */
+export function withinMaxVersion(version: string | null, max: string | null): boolean {
+  if (!max) return true;
+  if (!version) return true;
+  const parse = (s: string) => s.split(".").map((p) => parseInt(p, 10) || 0);
+  const v = parse(version);
+  const m = parse(max);
+  for (let i = 0; i < Math.max(v.length, m.length); i++) {
+    const a = v[i] ?? 0;
+    const b = m[i] ?? 0;
+    if (a < b) return true;
+    if (a > b) return false;
+  }
+  return true;
+}
+
 export function meetsMinVersion(version: string | null, min: string | null): boolean {
   if (!min) return true;
   if (!version) return false;
