@@ -596,7 +596,11 @@ struct ShellView: View {
             switch model.canvas {
             case .empty:
                 if model.showsFirstUseEmptyState {
-                    FirstUseEmptyState(onChooseFile: { model.presentOpenPanel() }, entitlement: entitlement)
+                    FirstUseEmptyState(
+                        onChooseFile: { model.presentOpenPanel() },
+                        onImportFromV1: { model.importFromV1Store() },
+                        entitlement: entitlement
+                    )
                 } else {
                     // E27.7-fix: launch-restore loopt nog, of een herstelde selectie
                     // decodeert off-main (~1s) → neutrale canvas-achtergrond i.p.v. de

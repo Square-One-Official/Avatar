@@ -47,10 +47,20 @@ deze release; wat rest is gated (signing, live e2e, assets).
   `v2.0.0/Aaavatar.dmg` (200, 11 146 016 B). main = v2-main sindsdien.
   Product heet "Aaavatar" (Aaavatar.app); v1 blijft bereikbaar onder tag v1.2.1.
 
-## 5. Migratiepad (13.2) — ✅ code / ⬜ echte-data-test
+## 5. Migratiepad (13.2 + 13.7) — ✅ code / ⬜ echte-data-test
 
 - ✅ `V1LibraryArchive` + `V1LibraryImporter` + Settings “Import backup…”.
-- ⬜ **E2E met een échte v1-bibliotheek** (Thierry).
+- ✅ **13.7 (2026-09-05): directe import van de v1-store op dezelfde Mac** —
+  `V1StoreReader` (AvatarKit, read-only via kopie) + sandbox-uitzondering +
+  Settings “Import from this Mac” + first-use-link. Vangnet voor wie de
+  back-up-stap oversloeg; neemt ook de originele foto's mee (zit niet in de zip).
+- ✅ **E2E met een échte v1-bibliotheek** (2026-09-05, direct pad) — env-gated
+  test `Avatar2Tests/V1StoreRealDataTests` (`TEST_RUNNER_V1_REAL_STORE=1`) las de
+  echte container op Thierry's Mac door de gesandboxte test-host: 1 portret incl.
+  origineel, her-import idempotent (13.7-Result). Kanttekening: die store is een
+  dev-bibliotheek met één testportret. Het zip-pad (13.2) is nog niet met een
+  échte v1-export gedraaid; met 13.7 als default-route is dat niet langer
+  go-live-blokkerend.
 
 ## 6. Stripe-identiteit (E01.7) — ⬜ Thierry
 
@@ -71,10 +81,10 @@ deze release; wat rest is gated (signing, live e2e, assets).
   v1-only gemarkeerd (Avatar2 heeft geen call site, v1's ImageProcessor wel —
   weg zodra het v1-target weg is); CI groen gemaakt (backend `ws`+`sharp` gebumpt; admin `payload
   generate:types` in CI). Geverifieerd via build-v2.sh + npm test.
-- ⬜ **sql/021 toepassen** (Thierry, Supabase SQL-editor) — `max_app_version`
-  op `payload.announcements`; **vóór de main-push** (admin-deploy), anders
-  gaat de Announcements-detailpagina zwart en soft-failt `/v1/announcements/pending`.
-- ⬜ **v1-gebruikers informeren** (enige open go-live-stap): Payload-Announcement "Aaavatar 2.0 is here"
+- ✅ **sql/021 toegepast** — geverifieerd op prod 2026-09-05 via de Supabase
+  SQL-editor: `payload.announcements` heeft `min_app_version` én
+  `max_app_version` (character varying).
+- ⬜ **v1-gebruikers informeren** (enige open go-live-stap; 2026-09-05: concept staat in avatar-admin — titel/slug/body ingevuld, nog Max App Version `1.99` + CTA + Published At + Save): Payload-Announcement "Aaavatar 2.0 is here"
   met `maxAppVersion` = `1.99`, eerst-backup-exporteren-instructie (2.0 heet
   óók Aaavatar.app en vervangt v1 bij drag-install), CTA naar de download;
   publiceren ná stap 9 van het runbook.

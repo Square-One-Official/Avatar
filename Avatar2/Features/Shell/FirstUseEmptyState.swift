@@ -13,6 +13,11 @@ import SwiftUI
 struct FirstUseEmptyState: View {
     /// E05.2 (Import) hangt hier de bestandskiezer aan.
     let onChooseFile: () -> Void
+    /// E13.7: "Coming from Aaavatar 1?" — directe import van de v1-bibliotheek
+    /// op deze Mac. Niet in Figma (4008:7050 kent geen v1-gebruikers); bewust
+    /// als één subtiele regel onder de bestaande copy, in de geest van
+    /// "or choose a file". nil = regel verborgen.
+    var onImportFromV1: (() -> Void)? = nil
     /// CMS-avatars (E33+); optioneel zodat de view ook zonder backend werkt.
     var entitlement: EntitlementModel? = nil
 
@@ -105,6 +110,21 @@ struct FirstUseEmptyState: View {
                         .dsFocusEffectDisabled()
                         .dsTextStyle(.labelBase)
                         .foregroundStyle(DSColor.Action.primaryForeground)
+                    }
+                    if let onImportFromV1 {
+                        HStack(spacing: 0) {
+                            Text("Coming from Aaavatar 1? ")
+                                .dsTextStyle(.labelBase)
+                                .foregroundStyle(DSColor.Foreground.subtle)
+                            Button("Import your library") {
+                                onImportFromV1()
+                            }
+                            .buttonStyle(.plain)
+                            .dsFocusEffectDisabled()
+                            .dsTextStyle(.labelBase)
+                            .foregroundStyle(DSColor.Action.primaryForeground)
+                        }
+                        .padding(.top, DSSpacing.gap3)
                     }
                 }
             }

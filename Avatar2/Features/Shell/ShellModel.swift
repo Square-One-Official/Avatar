@@ -430,6 +430,49 @@ final class ShellModel {
         #endif
     }
 
+    // MARK: - E13.7: Aaavatar 1-bibliotheek op deze Mac (first-use-instap)
+
+    @ObservationIgnored private var isImportingFromV1 = false
+
+    /// "Coming from Aaavatar 1? Import your library" in de first-use-state:
+    /// leest v1's store read-only (V1StoreReader, off-main) en importeert via
+    /// dezelfde importer als Settings → Migration. Succes → nieuwste
+    /// geïmporteerde portret op canvas + bon-toast; fout → de canvas-melding
+    /// die ook een mislukte drop gebruikt (bv. "No Aaavatar 1 library was
+    /// found on this Mac.").
+    func importFromV1Store() {
+        guard let modelContext, !isImportingFromV1 else { return }
+        isImportingFromV1 = true
+        setActionToast = .busy("Importing your Aaavatar 1 library…")
+        Task { @MainActor [weak self] in
+            let result = await V1LibraryImporter.importFromLocalStore(modelContext: modelContext)
+            guard let self else { return }
+            isImportingFromV1 = false
+            if case .busy = setActionToast { setActionToast = nil }
+            switch result {
+            case .success(let summary):
+                if summary.imported > 0 {
+                    var newest = FetchDescriptor<Portrait2>(
+                        predicate: #Predicate { $0.v1ImportID != nil },
+                        sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+                    )
+                    newest.fetchLimit = 1
+                    if let portrait = try? modelContext.fetch(newest).first { select(portrait) }
+                }
+                setActionToast = .done(SetActionReceipt(
+                    title: summary.userMessage,
+                    detail: summary.imported > 0
+                        ? "Find them in the “\(V1LibraryImporter.importFolderName)” folder."
+                        : nil,
+                    actionName: nil,
+                    undoManager: nil
+                ))
+            case .failure(let error):
+                setCanvas(.failed(error.localizedDescription))
+            }
+        }
+    }
+
     func presentOpenPanel() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]

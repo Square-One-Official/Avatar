@@ -37,6 +37,8 @@
 	<string>public.app-category.photography</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAppDataUsageDescription</key>
+	<string>Aaavatar reads the library that Aaavatar 1 left on this Mac so it can import your portraits.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

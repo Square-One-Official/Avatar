@@ -126,4 +126,22 @@ final class V1LibraryImporterTests: XCTestCase {
         XCTAssertEqual(summary.imported, 1)
         XCTAssertEqual(try context.fetch(FetchDescriptor<Portrait2>()).count, 2)
     }
+
+    // E13.7: de live v1-store levert het origineel mee (de zip niet).
+    func testOriginalImageLandsInOriginalData() throws {
+        let context = try makeContext()
+        let original = Data([9, 9, 9])
+        let p = V1LibraryArchive.PortraitPayload(
+            id: UUID(), name: "Ava", tags: "",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            updatedAt: Date(timeIntervalSince1970: 1_750_000_000),
+            cutoutPNG: Data([1, 2, 3]), originalImage: original
+        )
+
+        let summary = try V1LibraryImporter.importLibrary(library([p]), into: context)
+
+        XCTAssertEqual(summary.imported, 1)
+        let stored = try XCTUnwrap(try context.fetch(FetchDescriptor<Portrait2>()).first)
+        XCTAssertEqual(stored.originalData, original)
+    }
 }

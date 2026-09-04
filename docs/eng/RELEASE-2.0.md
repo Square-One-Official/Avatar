@@ -70,7 +70,11 @@ project.yml (Avatar2-blok) ─bump─► xcodegen ─► xcodebuild archive ─�
   installeert nooit een bundle met een andere id. Bestaande v1-gebruikers
   krijgen een CMS-announcement (veld `maxAppVersion`, bv. `1.99`) met de
   download-link en de Import-backup-route; 2.0-installs zien dat bericht
-  niet.
+  niet. Sinds E13.7 hoeft de back-up niet meer vóór de install: 2.0 leest
+  de achtergebleven v1-container read-only (Settings → Migration → "Import
+  from this Mac", of de link in de first-use-state) via een read-only
+  sandbox-uitzondering in `Avatar2.entitlements`; macOS 15+ vraagt daarbij
+  eenmalig om toegang tot "data from other apps".
 - **Eigen versielijn, buildnummers vanaf 100.** Het Avatar2-target overschrijft
   `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in zijn eigen blok in
   `project.yml`; de root-settings zijn van v1. Build 100 ligt ruim boven elk

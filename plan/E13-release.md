@@ -219,3 +219,59 @@ documenteer dat in de test of maak de write-optie injecteerbaar.
 **DoD:** beide targets bouwen; AuthSessionStorageTests groen mét en zonder
 vergrendeld scherm (of expliciet gedocumenteerde lock-gate); Result-regel.
 **Result:** ✅ `.completeFileProtection` uit `AuthSessionFileStorage.store` (alleen nog `.atomic` + de bestaande 0600/0700-permissies) — confidentialiteit komt al van de AES-GCM-envelop met Keychain-sleutel, de protection-class voegde niets toe en blokkeerde writes bij dichte keybag; rationale als comment op de write. ✅ Geverifieerd ónder vergrendeld scherm (`CGSSessionScreenIsLocked=true`): AuthSessionStorageTests 6/6 groen waar vóór de fix 5/6 faalden met EPERM — de lock-conditie zelf was het bewijs. ✅ build-v2.sh volledig groen (idem vergrendeld). ⚠ v1 heeft dezelfde bug (`Avatar/Services/FileAuthStorage.swift:56`) — niet aangeraakt (v1 bevroren, geen SHARED-story); apart besluit Thierry of dit een SHARED-fix waard is.
+
+## 13.7 — Directe import van de Aaavatar 1-bibliotheek op dezelfde Mac [INFRA+FEAT]
+- status: done
+- owner: INFRA+FEAT (2026-09-04, branch v2/e13-13.7)
+- team: INFRA (AvatarKit-reader + entitlement) · FEAT (Settings / first-launch)
+- blockedBy: —
+- DoD: beide targets bouwen, tests groen, Result-regel
+
+**Waarom.** 13.2 werkt alleen als de gebruiker in v1 een back-up exporteert vóór
+de drag-install; wie dat overslaat ziet in 2.0 een lege bibliotheek. De
+v1-container blijft echter intact op schijf
+(`~/Library/Containers/nl.avatar.app/Data/Library/Application Support/default.store`
++ `.default_SUPPORT/_EXTERNAL_DATA/`). Deze story leest die store **read-only**
+vanuit 2.0 en voedt de bestaande importer (dedup via `Portrait2.v1ImportID`
+blijft gelden). Bonus: de live store bevat óók de originele foto's — v1 slaat
+de bytes op (`ImportFlow.swift:1031`), ondanks de "bookmark"-comment in
+`Portrait.swift` — die de zip-back-up níét bevat.
+
+**Scope.**
+- AvatarKit: `V1StoreReader` — kopieert store + `-wal` + `-shm` naar tmp,
+  opent de kopie via SQLite3, leest `ZPORTRAIT` (ZID = 16 uuid-bytes, ZNAME,
+  ZTAGS, ZCREATEDAT/ZUPDATEDAT = Core Data-referentiedatums, blobs met de
+  external-storage-codering: `0x01`+inline of `0x02`+UUID-bestandsnaam in
+  `_EXTERNAL_DATA`; gewone Data-kolommen zonder prefix — empirisch geverifieerd
+  met een SwiftData-fixture op 2026-09-04). Levert `V1LibraryArchive.Library`
+  met `PortraitPayload.originalImage` als nieuw optioneel veld.
+- Avatar2: sandbox-uitzondering (read-only, home-relative
+  `/Library/Containers/nl.avatar.app/`) + `NSAppDataUsageDescription`
+  (macOS 15+ vraagt eenmalig "would like to access data from other apps");
+  Settings → Migration krijgt "Import from this Mac"; eerste-startpad: hint
+  wanneer een v1-bibliotheek gevonden is en er nog niets geïmporteerd is.
+- 13.2 (zip) blijft de fallback voor een andere Mac.
+
+**Result (2026-09-05):** ✅ `V1StoreReader` (AvatarKit): kopie van store + `-wal` +
+`-shm` naar tmp → SQLite-lees van `ZPORTRAIT` (`SELECT *`, mapping op kolomnaam);
+external-storage-codering (0x01 inline / 0x02 + UUID-bestandsnaam in
+`_EXTERNAL_DATA`) empirisch vastgesteld met een SwiftData-fixture en zo ook getest —
+7 tests, incl. byte-gelijkheid van de v1-bestanden vóór/ná lezen en een
+path-traversal-guard. ✅ `PortraitPayload.originalImage` (nieuw, optioneel) →
+`Portrait2.originalData`; importer-test erbij (Avatar2Tests 7/7). ✅ Avatar2:
+read-only temporary-exception op `~/Library/Containers/nl.avatar.app/Data/Library/
+Application Support/` + `NSAppDataUsageDescription`; Settings → Migration: "Import
+from this Mac" (bestaande back-up-rij heet nu "Import from a backup file");
+first-use-state: regel "Coming from Aaavatar 1? Import your library" — **niet in
+Figma 4008:7050**, bewuste toevoeging als één regel in de stijl van "or choose a
+file" (Thierry kan 'm schrappen) → import, nieuwste portret op canvas, bon-toast;
+fout → de canvas-melding van een mislukte drop. ✅ **Échte-data-test (GO-NO-GO §5):**
+`TEST_RUNNER_V1_REAL_STORE=1 xcodebuild … test -only-testing:Avatar2Tests/V1StoreRealDataTests`
+las Thierry's echte v1-container door de gesandboxte test-host: 1 portret
+("Imported", cutout 8186 B, origineel 4259 B), import 1, her-import 0 + "1 already
+present" → de entitlement werkt; op deze Mac (macOS 26) hield geen TCC-prompt de run
+op. ⚠ Die v1-store is een dev-bibliotheek met één testportret — een grote échte
+bibliotheek is nog niet gezien. ✅ build-v2.sh volledig groen (EXIT=0). Niet in
+scope (zelfde besluit als 13.2): v1-achtergronden en transforms. Announcement
+(GO-NO-GO §7): sql/021 op prod geverifieerd; concept in avatar-admin gevuld
+(titel/slug/body), Max App Version + CTA + Published At + Save nog door Thierry.

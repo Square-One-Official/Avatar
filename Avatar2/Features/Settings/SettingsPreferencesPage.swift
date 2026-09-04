@@ -23,6 +23,9 @@ struct SettingsPreferencesPage: View {
     var entitlement: EntitlementModel? = nil
     @Bindable var presentation: UIPresentationStore
     @State private var importResult: String?
+    // E13.7: directe import van de v1-store op deze Mac.
+    @State private var localImportResult: String?
+    @State private var isImportingLocal = false
 
     private var appearance: AppearancePreference {
         AppearancePreference(rawValue: appearanceRaw) ?? .dark
@@ -47,16 +50,29 @@ struct SettingsPreferencesPage: View {
                 // zIndex van de knop zelf reikt niet buiten deze kaart.
                 .zIndex(presentation.settingsThemeMenuOpen ? 1 : 0)
 
-                // E13.2: migratiepad vanuit Aaavatar 1. Bewust hier en niet in
-                // onboarding: de back-up-export moet eerst in v1 gebeuren, dus
-                // dit is een bewuste handeling, geen eerste-startpad.
+                // E13.2 + E13.7: migratiepad vanuit Aaavatar 1. Bewust hier en
+                // niet in onboarding: het is een bewuste handeling, en op
+                // macOS 15+ vraagt de directe import eenmalig systeemtoegang —
+                // dat hoort bij een klik, niet bij de eerste start.
                 SettingsSectionCard(title: "Migration") {
-                    SettingsRow(
-                        title: "Import from Aaavatar 1",
-                        subtitle: importResult
-                            ?? "Bring over your v1 library from a backup file (in Aaavatar 1: Settings → Export library)"
-                    ) {
-                        DSNeutralButton("Import backup…") { runImport() }
+                    VStack(alignment: .leading, spacing: DSSpacing.gap4) {
+                        SettingsRow(
+                            title: "Import from Aaavatar 1 on this Mac",
+                            subtitle: localImportResult
+                                ?? "Finds the library the previous version left on this Mac and brings over your portraits, originals included"
+                        ) {
+                            DSNeutralButton(isImportingLocal ? "Importing…" : "Import from this Mac") {
+                                runLocalImport()
+                            }
+                            .disabled(isImportingLocal)
+                        }
+                        SettingsRow(
+                            title: "Import from a backup file",
+                            subtitle: importResult
+                                ?? "Bring over your v1 library from a backup made in Aaavatar 1 (Settings → Export library)"
+                        ) {
+                            DSNeutralButton("Import backup…") { runImport() }
+                        }
                     }
                 }
             }
@@ -75,6 +91,22 @@ struct SettingsPreferencesPage: View {
             label: appearance.label,
             isPresented: $presentation.settingsThemeMenuOpen
         )
+    }
+
+    private func runLocalImport() {
+        guard !isImportingLocal else { return }
+        isImportingLocal = true
+        localImportResult = "Looking for your Aaavatar 1 library…"
+        Task { @MainActor in
+            let result = await V1LibraryImporter.importFromLocalStore(modelContext: modelContext)
+            isImportingLocal = false
+            switch result {
+            case .success(let summary):
+                localImportResult = summary.userMessage
+            case .failure(let error):
+                localImportResult = error.localizedDescription
+            }
+        }
     }
 
     private func runImport() {

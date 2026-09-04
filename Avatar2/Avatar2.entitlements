@@ -10,5 +10,14 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- E13.7: read-only inkijk in de Aaavatar 1-container (andere bundle-id,
+	     dus buiten onze sandbox) voor de directe migratie. Developer ID-
+	     distributie staat temporary-exceptions toe; macOS 15+ vraagt de
+	     gebruiker daarbovenop eenmalig om toegang tot "data from other apps"
+	     (NSAppDataUsageDescription in project.yml). Nooit read-write. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>/Library/Containers/nl.avatar.app/Data/Library/Application Support/</string>
+	</array>
 </dict>
 </plist>

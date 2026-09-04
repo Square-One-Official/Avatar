@@ -32,14 +32,18 @@ public enum V1LibraryArchive {
         /// De vrijstaande cutout (PNG met alpha) — het enige beeld dat de
         /// back-up van het portret bevat; v1 archiveert de originele foto niet.
         public let cutoutPNG: Data
+        /// E13.7: de originele foto. Alleen gevuld door `V1StoreReader` (de
+        /// live v1-store bewaart de bytes wél); uit een zip-back-up altijd nil.
+        public let originalImage: Data?
 
-        public init(id: UUID, name: String, tags: String, createdAt: Date, updatedAt: Date, cutoutPNG: Data) {
+        public init(id: UUID, name: String, tags: String, createdAt: Date, updatedAt: Date, cutoutPNG: Data, originalImage: Data? = nil) {
             self.id = id
             self.name = name
             self.tags = tags
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.cutoutPNG = cutoutPNG
+            self.originalImage = originalImage
         }
     }
 

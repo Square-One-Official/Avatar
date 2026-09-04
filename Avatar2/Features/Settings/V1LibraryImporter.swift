@@ -1,16 +1,20 @@
 // E13.2 — migratiepad: Aaavatar 1-back-up → Portrait2-store.
+// E13.7 — tweede instap: de live v1-bibliotheek op deze Mac (`V1StoreReader`).
 //
-// De gebruiker exporteert in v1 (Settings → bibliotheek-back-up, een .zip) en
-// kiest dat bestand hier. Read-only aan de v1-kant: we lezen alleen het
-// archief; v1's eigen store wordt nooit aangeraakt (kan ook niet — andere
-// sandbox). Idempotent aan de v2-kant: elk portret onthoudt zijn v1-UUID
-// (`Portrait2.v1ImportID`), dus nogmaals importeren maakt geen duplicaten.
+// Zip-pad (13.2): de gebruiker exporteert in v1 (Settings → bibliotheek-
+// back-up, een .zip) en kiest dat bestand hier. Direct pad (13.7): we lezen
+// v1's container read-only via de sandbox-uitzondering in
+// Avatar2.entitlements. Beide voeden dezelfde `importLibrary`, dus dezelfde
+// regels gelden. Idempotent aan de v2-kant: elk portret onthoudt zijn v1-UUID
+// (`Portrait2.v1ImportID`), dus nogmaals importeren — via welk pad ook —
+// maakt geen duplicaten.
 //
 // Wat er meekomt en wat niet — en waarom:
 // - cutout + naam + datums: mee. De cutout is het werkstuk.
-// - originele foto: v1's back-up bevat 'm niet (alleen een bookmark op de
-//   bronmachine), dus `originalData` blijft nil — v2 verbergt dan zelf de
-//   Original-achtergrondkeuze (bestaand legacy-pad).
+// - originele foto: de zip bevat 'm niet, de live store wél (v1 bewaart de
+//   bytes). Aanwezig → `originalData`, zodat de Original-achtergrondkeuze en
+//   re-cutout in v2 werken; afwezig → nil en v2 verbergt die keuze zelf
+//   (bestaand legacy-pad).
 // - v1-tags: v2 heeft geen tags-veld. Ze lijken in de praktijk op rollen
 //   ("CEO", "Marketing") → we zetten ze in `role`, het veld dat v2 op de
 //   kaart toont. Fout gegokt = één klik hernoemen; weggooien = onherstelbaar.
@@ -79,7 +83,8 @@ enum V1LibraryImporter {
                 name: payload.name,
                 role: payload.tags,
                 createdAt: payload.createdAt,
-                cutoutData: payload.cutoutPNG
+                cutoutData: payload.cutoutPNG,
+                originalData: payload.originalImage
             )
             portrait.updatedAt = payload.updatedAt
             portrait.v1ImportID = payload.id.uuidString
@@ -101,6 +106,23 @@ enum V1LibraryImporter {
         let folder = Folder2(name: name)
         context.insert(folder)
         return folder
+    }
+
+    // MARK: - E13.7: directe import van de v1-store op deze Mac
+
+    /// Leest de live v1-bibliotheek (kopie + SQLite, off-main) en importeert
+    /// op de main actor. Fouten zijn `V1StoreReader.ReadError` — incl.
+    /// `.accessDenied` wanneer macOS 15+ de "data from other apps"-prompt
+    /// geweigerd kreeg, met een tekst die naar het zip-pad wijst.
+    static func importFromLocalStore(modelContext: ModelContext) async -> Result<Summary, Error> {
+        do {
+            let library = try await Task.detached(priority: .userInitiated) {
+                try V1StoreReader.read()
+            }.value
+            return .success(try importLibrary(library, into: modelContext))
+        } catch {
+            return .failure(error)
+        }
     }
 
     // MARK: - UI-instap (file-picker)

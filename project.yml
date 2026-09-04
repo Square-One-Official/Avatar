@@ -216,6 +216,9 @@ targets:
         # private key (release-infra). Bouwen vergt geen signing; publiceren wel.
         SUFeedURL: "https://api.aaavatar.nl/appcast-v2.xml"
         SUPublicEDKey: "iSKu+XIaNe3MhrEGij3zPVOqKvDuU+U1cz+NA2tJ4eU="
+        # E13.7: macOS 15+ toont deze tekst wanneer de app voor het eerst de
+        # Aaavatar 1-container leest (directe migratie, Settings → Migration).
+        NSAppDataUsageDescription: "Aaavatar reads the library that Aaavatar 1 left on this Mac so it can import your portraits."
         SUEnableAutomaticChecks: true
         SUScheduledCheckInterval: 86400
         SUEnableInstallerLauncherService: true
