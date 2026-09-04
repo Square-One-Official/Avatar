@@ -540,6 +540,44 @@ plek + bakeoff-parity); geen extra grijze marge-pad rond de input — de
 prompt alleen bleek in de live-check voldoende. Wordt een tweede die-cut-
 stijl toegevoegd: key aan `DIE_CUT_STYLE_KEYS` toevoegen, klaar.
 
+## 55.13 — Sticker: harde, ronde rand + hoofd-alleen deterministisch op de client
+- status: done (2026-09-04)
+- team: FEAT+INFRA
+- blockedBy: —
+- Result: **Client**: `DieCutRenderer` (Avatar2/Features/Editor) rendert na de
+  her-isolatie van een die-cut-resultaat de rand zélf — alpha hard op 0,5
+  gedrempeld, cirkelvormig gedilateerd (4,5 % van de hoofdbreedte, min 8 px)
+  → harde, overal even brede, rondom gesloten plaat; hoofd-alleen via een
+  U-snede onder de kin (Vision-face op het resultaat, kin + 0,45 × gezichts-
+  hoogte, onderhoeken 0,6 × gezichtshoogte) alléén als er nog iets onder de
+  snede zit; plaatkleur = mediaan van de papierachtige model-randrest in de
+  matte-band (anders wit) zodat het één band wordt. Hook: `ShellModel.
+  applyEffectResult` (beide varianten) op `EffectFraming.isDieCutResult`
+  (= `.fitContent`, elke wissel náár die-cut incl. refresh); editor, board en
+  set-acties delen 'm. `Avatar2Tests/DieCutRendererTests` (9, pixel-niveau)
+  + env-gated `DieCutRendererDumpTests` (contactsheet op de e55-bakeoff-
+  stickers: `TEST_RUNNER_DIECUT_DUMP_INPUTS=a.png:b.png`). **Server**:
+  `DIE_CUT_COMPOSITION_CLAUSE` vraagt nu een zuiver witte, vlakke, harde
+  rand zonder schaduw/textuur en herhaalt "geen schouders/shirt ondanks de
+  kledingclausule" (`tests/stylize-prompts.test.ts` groen) — **prod-deploy
+  avatars-api nog te doen** (client-fix werkt ook zonder).
+
+**Repro (Thierry, 2026-09-04, Jane Loise):** sticker-rand wazig, hobbelig,
+niet rondom gesloten; schouders + shirt blijven staan; "in andere situaties
+gaat het soms wél goed". **Oorzaak:** het model tekent sticker + witte rand
+op gekleurd papier; de client her-isoleert dat met de cutout-engine (Vision
+foreground-instance ∪ person-seg). Die kent de model-rand niet: soms zit 'ie
+(deels) in de foreground-instantie, meestal niet → de rand overleeft als
+gefeatherde halve zoom. HEAD ONLY in de prompt is niet-deterministisch; de
+CMS-basisprompt vraagt bovendien "clothing recognizable".
+
+**Bewust niet gedaan:** geen erosie/"papier-pixels weghalen" uit de matte
+(grijs/wit haar aan de rand zou mee-opgegeten worden) — daarom kleur-
+adoptie i.p.v. verwijdering. Remove background op een sticker her-isoleert
+nog steeds het ruwe model-beeld (`editSourceData`) zónder rand — bestaand
+gedrag, buiten scope. Randbreedte/U-vorm zijn constanten in `DieCutRenderer`
+(afstemming = één plek).
+
 ## 55.12 — Effect-versiehistorie: history-icoon naast Refresh met dropdown van eerdere generaties
 - status: backlog (besluit Thierry 2026-09-03: niet in deze versie, wél in de toekomst)
 - team: FEAT+DS

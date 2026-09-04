@@ -32,9 +32,15 @@ export const STYLE_REFERENCE_CLAUSE =
  *
  * Bewust een server-constante, geen CMS-veld: één plek, geen admin-DDL, en
  * de bakeoff-driver deelt 'm 1-op-1.
+ *
+ * E55.13 (2026-09-04): de zichtbare rand komt sinds de client-fix van
+ * `DieCutRenderer` (alpha-dilatie na de her-isolatie, hoofd-alleen-clip
+ * onder de kin) — de model-rand is nog slechts een compositie-hint. Daarom
+ * vraagt de clausule om een zuiver witte, harde rand: wat er van de model-
+ * rand in de matte overblijft, valt dan wit-op-wit weg.
  */
 export const DIE_CUT_COMPOSITION_CLAUSE =
-  "Compose it as one complete die-cut sticker of the HEAD ONLY: the cut follows the outline of the hair and face and closes through the neck just below the chin with a smoothly rounded bottom edge, so the white border runs unbroken around the entire head, including underneath. Do not include the shoulders, shirt or torso. The sticker must not touch or run off any edge of the image: place it in the centre with clear paper margin on every side, scaling it down if needed so the complete sticker, border included, fits inside the frame.";
+  "Compose it as one complete die-cut sticker of the HEAD ONLY: the cut follows the outline of the hair and face and closes through the neck just below the chin with a smoothly rounded bottom edge, so the white border runs unbroken around the entire head, including underneath. The border must be solid pure white (#FFFFFF), flat and evenly thick, with a crisp hard edge: no shadow, glow, blur or texture on the border itself. Do not include the shoulders, shirt or torso, even though the clothing is mentioned above. The sticker must not touch or run off any edge of the image: place it in the centre with clear paper margin on every side, scaling it down if needed so the complete sticker, border included, fits inside the frame.";
 
 /**
  * Balloon (2026-09-03): de bakeoff-runs hielden romp, shirt en handen en
