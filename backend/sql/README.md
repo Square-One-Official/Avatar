@@ -26,6 +26,9 @@ do not branch or skip numbers.
 | 016 | `016_refund_e43_generate_background_outage.sql` | **One-off ops script, not schema**: credit-refund for the E43/A2 generate-background outage. Dry-run first; refund block is commented out — run only after sign-off | 001 |
 | 017 | `017_payload_effects_style_references.sql` | `payload.effects_style_references` array table for CMS style references on Effects (E54.1) — apply BEFORE the admin deploy that ships the field | 008 |
 | 018 | `018_pro_access.sql` | `payload.pro_access` (CMS-managed Pro list, E14.9) + `credit_ledger` idempotency index for the monthly comp grant — apply BEFORE the admin/backend deploy | 001, 002, 008 |
+| 019 | `019_payload_messages_banner_presets_catchup.sql` | Catch-up DDL for `payload.messages` + `payload.banner_presets` (E17/E39) that never reached prod in the push:true era — applied 2026-08-03 (E55 roll-out) | 008 |
+| 020 | `020_atomic_credit_spend.sql` | Race-safe credit spend for paid generation endpoints (E56) | 001, 002 |
+| 021 | `021_announcements_max_app_version.sql` | `payload.announcements.max_app_version` for 1.x-only announcements (the "Aaavatar 2 is out" notice) — apply BEFORE the admin deploy that ships the field (the 2.0.0 `main` push) | 008 |
 
 ## Data classification
 
