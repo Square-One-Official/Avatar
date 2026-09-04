@@ -16,15 +16,18 @@ bash scripts/check-icon-sizes.sh
 echo "==> xcodegen"
 xcodegen generate
 
+# v1 en Avatar2 heten sinds 2026-09-04 allebei Aaavatar.app; in één
+# products-dir zou de laatste build de andere overschrijven (en de Avatar2-
+# tests hun TEST_HOST). v1 krijgt daarom een eigen DerivedData.
 echo "==> build Avatar (v1)"
 xcodebuild -project Avatar.xcodeproj -scheme Avatar \
-  -configuration Debug -derivedDataPath "$DERIVED" build | tail -1
+  -configuration Debug -derivedDataPath "$DERIVED-v1" build | tail -1
 
 echo "==> build Avatar2"
 xcodebuild -project Avatar.xcodeproj -scheme Avatar2 \
   -configuration Debug -derivedDataPath "$DERIVED" build | tail -1
 
-echo "==> tests Avatar2 (unit, gehost in Aaavatar 2.app)"
+echo "==> tests Avatar2 (unit, gehost in Aaavatar.app)"
 xcodebuild -project Avatar.xcodeproj -scheme Avatar2 \
   -configuration Debug -derivedDataPath "$DERIVED" test | tail -1
 

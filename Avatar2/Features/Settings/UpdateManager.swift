@@ -91,7 +91,7 @@ private final class SparkleUpdaterEngine: UpdaterEngine {
 }
 
 /// No-op-engine voor de unit-test-host: Avatar2Tests draait gehost in
-/// Aaavatar 2.app, dus `Avatar2App.init` (en dus `UpdateManager()`) draait
+/// Aaavatar.app (Avatar2-product), dus `Avatar2App.init` (en dus `UpdateManager()`) draait
 /// óók tijdens `xcodebuild test`. Daar mag nooit een echte SPUUpdater
 /// starten (netwerk-check tegen de appcast midden in een testrun).
 @MainActor

@@ -1,6 +1,6 @@
 # Aaavatar 2.0
 
-Aaavatar 2 is a new app, built from the ground up: a new design, a real editor, and every AI edit routed through your account and credits instead of a single "magic cutout".
+Aaavatar 2.0 is a new app, built from the ground up: a new design, a real editor, and every AI edit routed through your account and credits instead of a single "magic cutout".
 
 ## What's new
 
@@ -14,7 +14,7 @@ Aaavatar 2 is a new app, built from the ground up: a new design, a real editor, 
 
 ## Coming from Aaavatar 1?
 
-Aaavatar 2 installs next to Aaavatar 1 and keeps its own library. To bring your portraits over: in Aaavatar 1 export a backup, then in Aaavatar 2 open **Settings → Preferences → Import from Aaavatar 1**. Your cutouts, names and dates come along; nothing in Aaavatar 1 is changed.
+**Export a backup in Aaavatar 1 first.** Aaavatar 2.0 has the same app name, so dragging it into Applications replaces the old version. Your old library stays on disk, but the app that can export it is gone once replaced. Then in the new Aaavatar open **Settings → Preferences → Import from Aaavatar 1** and pick the backup: cutouts, names and dates come along. Need the old version back? It stays available as [v1.2.1](https://github.com/Square-One-Official/Avatar/releases/tag/v1.2.1).
 
 ## Requirements
 

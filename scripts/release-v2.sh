@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# release-v2.sh — Build, sign, notarize en publiceer een Aaavatar 2-release
+# release-v2.sh — Build, sign, notarize en publiceer een Aaavatar 2.x-release
+# (product heet voor gebruikers gewoon "Aaavatar": Aaavatar.app, Aaavatar-<ver>.dmg)
 # (E13.1). Eigen kanaal naast scripts/release.sh (v1): eigen appcast
 # (appcast-v2.xml) en eigen tag-reeks (v2.x.y).
 #
@@ -9,7 +10,8 @@
 # en GitHub's "latest" is de nieuwste NIET-prerelease. Sinds 2.0 de
 # publieke release is (besluit Thierry 2026-09-04) publiceert dit script
 # daarom (a) een stabiele kopie onder exact die naam, `Aaavatar.dmg`, en
-# (b) standaard als gewone release met `--latest`. Wil je een build eerst
+# (b) standaard als gewone release met `--latest`. Het versie-asset heet
+# Aaavatar-<ver>.dmg (zelfde conventie als v1). Wil je een build eerst
 # staged hebben (Sparkle-e2e vóór de site 'm serveert): PRERELEASE=1 —
 # daarna `gh release edit v<ver> --prerelease=false --latest` om live te gaan.
 #
@@ -42,10 +44,10 @@ if [[ ! -s "$NOTES_FILE" ]]; then
 fi
 ARCHIVE_PATH="$BUILD_DIR/Avatar2.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export-v2"
-DMG_NAME="Aaavatar-2-${VERSION}.dmg"
+DMG_NAME="Aaavatar-${VERSION}.dmg"
 DMG_PATH="$BUILD_DIR/$DMG_NAME"
 SCHEME="Avatar2"
-APP_NAME="Aaavatar 2.app"
+APP_NAME="Aaavatar.app"
 # Tag-reeks: gewoon v<versie> — v1 is bevroren op 1.x, dus v2.x.y kan nooit
 # botsen, en een tag zónder slash houdt de download-URL's encoding-vrij.
 TAG="v${VERSION}"
@@ -65,7 +67,7 @@ if [[ ! -x "$SIGN_UPDATE" || -n "${SIGN_UPDATE_PATH:-}" ]]; then
   chmod +x "$SIGN_UPDATE"
 fi
 
-echo "📦 Releasing Aaavatar 2 v${VERSION} (build ${BUILD})"
+echo "📦 Releasing Aaavatar v${VERSION} (build ${BUILD})"
 
 # 1. Versie-bump: alléén de Avatar2-target-overrides (E13.1) — de root-settings
 #    zijn van v1 en blijven staan. We herkennen het v2-blok aan de tweede
@@ -139,7 +141,7 @@ fi
 
 rm -f "$DMG_PATH"
 create-dmg \
-  --volname "Aaavatar 2" \
+  --volname "Aaavatar" \
   --background "$DMG_BACKGROUND" \
   --window-size 660 420 \
   --icon-size 128 \
@@ -215,6 +217,9 @@ cp "$PROJECT_DIR/appcast-v2.xml" "$PROJECT_DIR/backend/api/_appcast-v2.xml"
 #     herhaalde runs (assets overschrijven, vlag niet aanraken).
 STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"
 cp "$DMG_PATH" "$STABLE_DMG_PATH"
+# Tag op de commit die gebouwd is — zonder --target zet gh de tag op de HEAD
+# van de default branch (main = v1 zolang 2.0 nog niet gemerged is).
+RELEASE_SHA="$(git -C "$PROJECT_DIR" rev-parse HEAD)"
 
 if gh release view "$TAG" >/dev/null 2>&1; then
   echo "→ release $TAG bestaat al — DMG-assets overschrijven"
@@ -222,22 +227,24 @@ if gh release view "$TAG" >/dev/null 2>&1; then
 elif [[ "$PRERELEASE" == "1" ]]; then
   echo "→ Creating GitHub prerelease (staged; site blijft op de vorige 'latest')..."
   gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
-    --title "Aaavatar 2 v${VERSION}" \
+    --target "$RELEASE_SHA" \
+    --title "Aaavatar v${VERSION}" \
     --prerelease \
     --notes-file "$NOTES_FILE"
 else
   echo "→ Creating GitHub release (latest)..."
   gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
-    --title "Aaavatar 2 v${VERSION}" \
+    --target "$RELEASE_SHA" \
+    --title "Aaavatar v${VERSION}" \
     --latest \
     --notes-file "$NOTES_FILE"
 fi
 
 echo ""
 if [[ "$PRERELEASE" == "1" ]]; then
-  echo "✅ Aaavatar 2 v${VERSION} gepubliceerd als PRERELEASE (staged)."
+  echo "✅ Aaavatar v${VERSION} gepubliceerd als PRERELEASE (staged)."
 else
-  echo "✅ Aaavatar 2 v${VERSION} gepubliceerd (latest)."
+  echo "✅ Aaavatar v${VERSION} gepubliceerd (latest)."
 fi
 echo ""
 echo "Niet vergeten:"

@@ -120,7 +120,7 @@ struct Avatar2App: App {
                 if args.contains("--show-message") {
                     messaging.debugInject(Message(
                         slug: "smoke-welcome",
-                        title: "Welcome to Aaavatar 2",
+                        title: "Welcome to Aaavatar",
                         body: "**New:** styles, hair and clothing edits — all in one place.",
                         cta: .init(label: "Explore effects", url: URL(string: "aaavatar://effects")!)
                     ))

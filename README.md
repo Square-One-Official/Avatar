@@ -5,7 +5,8 @@ verwijderen, automatisch uitlijnen op het gezicht, verbeteren, stijlen en met
 één klik exporteren naar LinkedIn / Slack / e-mail / banners.
 
 Deze repo bevat **twee apps**. **Aaavatar 2** (`Avatar2/`) is het actieve
-project; **Aaavatar 1** (`Avatar/`) is sinds 2026-06-15 bevroren en moet
+project — voor gebruikers heet het product gewoon **Aaavatar** (`Aaavatar.app`,
+bundle-id `nl.squareone.aaavatar2`; "Aaavatar 2" is de codebase-generatie); **Aaavatar 1** (`Avatar/`) is sinds 2026-06-15 bevroren en moet
 alleen blijven bouwen. Werk je met een agent: lees eerst
 [`CLAUDE.md`](CLAUDE.md) en [`plan/BOARD.md`](plan/BOARD.md).
 

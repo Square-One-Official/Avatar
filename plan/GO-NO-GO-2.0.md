@@ -75,9 +75,10 @@ deze release; wat rest is gated (signing, live e2e, assets).
 - ⬜ **sql/021 toepassen** (Thierry, Supabase SQL-editor) — `max_app_version`
   op `payload.announcements`; **vóór de main-push** (admin-deploy), anders
   gaat de Announcements-detailpagina zwart en soft-failt `/v1/announcements/pending`.
-- ⬜ **v1-gebruikers informeren**: Payload-Announcement "Aaavatar 2 is uit"
-  met `maxAppVersion` = `1.99`, CTA naar de download; publiceren ná stap
-  9 van het runbook (Thierry).
+- ⬜ **v1-gebruikers informeren**: Payload-Announcement "Aaavatar 2.0 is here"
+  met `maxAppVersion` = `1.99`, eerst-backup-exporteren-instructie (2.0 heet
+  óók Aaavatar.app en vervangt v1 bij drag-install), CTA naar de download;
+  publiceren ná stap 9 van het runbook.
 
 ## 8. Feature-flags & vangnetten — ✅
 
