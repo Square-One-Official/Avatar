@@ -217,9 +217,29 @@ cp "$PROJECT_DIR/appcast-v2.xml" "$PROJECT_DIR/backend/api/_appcast-v2.xml"
 #     herhaalde runs (assets overschrijven, vlag niet aanraken).
 STABLE_DMG_PATH="$BUILD_DIR/Aaavatar.dmg"
 cp "$DMG_PATH" "$STABLE_DMG_PATH"
-# Tag op de commit die gebouwd is — zonder --target zet gh de tag op de HEAD
-# van de default branch (main = v1 zolang 2.0 nog niet gemerged is).
+# 9b. Release-commit + tag. De tag moet op de commit staan die gebouwd is —
+#     zonder --target zet gh 'm op de HEAD van de default branch (main = v1
+#     zolang 2.0 niet gemerged is), en --target met een sha die niet op origin
+#     staat geeft HTTP 422 (2026-09-04, eerste 2.0-run). Daarom: eerst de
+#     release-paden committen, dan de tag zélf pushen op die commit, en gh de
+#     bestaande tag laten gebruiken. Idempotent: niets te committen = skip;
+#     bestaande tag op een andere sha = harde fout (nooit stil verplaatsen).
+echo "→ Release-commit + tag ${TAG}..."
+git -C "$PROJECT_DIR" add project.yml Avatar.xcodeproj/project.pbxproj Avatar2/Info.plist \
+  appcast-v2.xml backend/api/_appcast-v2.xml
+if git -C "$PROJECT_DIR" diff --cached --quiet; then
+  echo "   niets te committen (herhaalde run)"
+else
+  git -C "$PROJECT_DIR" commit -q -m "release: Aaavatar v${VERSION} (build ${BUILD})"
+fi
 RELEASE_SHA="$(git -C "$PROJECT_DIR" rev-parse HEAD)"
+REMOTE_TAG_SHA="$(git -C "$PROJECT_DIR" ls-remote origin "refs/tags/${TAG}" | cut -f1)"
+if [[ -z "$REMOTE_TAG_SHA" ]]; then
+  git -C "$PROJECT_DIR" push origin "${RELEASE_SHA}:refs/tags/${TAG}"
+elif [[ "$REMOTE_TAG_SHA" != "$RELEASE_SHA" ]]; then
+  echo "❌ tag ${TAG} staat op origin al op ${REMOTE_TAG_SHA:0:7}, gebouwd is ${RELEASE_SHA:0:7} — eerst opruimen (gh release delete ${TAG} --cleanup-tag)."
+  exit 1
+fi
 
 if gh release view "$TAG" >/dev/null 2>&1; then
   echo "→ release $TAG bestaat al — DMG-assets overschrijven"
@@ -227,14 +247,12 @@ if gh release view "$TAG" >/dev/null 2>&1; then
 elif [[ "$PRERELEASE" == "1" ]]; then
   echo "→ Creating GitHub prerelease (staged; site blijft op de vorige 'latest')..."
   gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
-    --target "$RELEASE_SHA" \
     --title "Aaavatar v${VERSION}" \
     --prerelease \
     --notes-file "$NOTES_FILE"
 else
   echo "→ Creating GitHub release (latest)..."
   gh release create "$TAG" "$DMG_PATH" "$STABLE_DMG_PATH" \
-    --target "$RELEASE_SHA" \
     --title "Aaavatar v${VERSION}" \
     --latest \
     --notes-file "$NOTES_FILE"
@@ -248,9 +266,8 @@ else
 fi
 echo ""
 echo "Niet vergeten:"
-echo "  1. appcast-v2.xml + backend/api/_appcast-v2.xml verifiëren en committen"
-echo "  2. Backend deployen (main pushen) zodat api.aaavatar.nl/appcast-v2.xml het nieuwe item serveert"
-echo "  3. Smoke: curl -s https://api.aaavatar.nl/appcast-v2.xml | grep ${VERSION}"
+echo "  1. Release-commit ${RELEASE_SHA:0:7} is lokaal gemaakt — main ff'en + pushen (= backend-deploy)"
+echo "  2. Smoke: curl -s https://api.aaavatar.nl/appcast-v2.xml | grep ${VERSION}"
 if [[ "$PRERELEASE" == "1" ]]; then
-  echo "  4. Live: gh release edit ${TAG} --prerelease=false --latest"
+  echo "  3. Live: gh release edit ${TAG} --prerelease=false --latest"
 fi

@@ -146,13 +146,11 @@ nog niet bestaat.
    ```bash
    cmp appcast-v2.xml backend/api/_appcast-v2.xml && echo mirror ok
    ```
-5. Commit de release-wijzigingen — alleen deze paden, de werkboom bevat vaak
-   ander werk:
-   ```bash
-   git add project.yml Avatar.xcodeproj/project.pbxproj Avatar2/Info.plist \
-     appcast-v2.xml backend/api/_appcast-v2.xml
-   git commit -m "release: Aaavatar v2.0.0 (build 102)"
-   ```
+5. De release-commit maakt het script zelf (alleen project.yml, pbxproj,
+   Info.plist en beide appcasts) en pusht de tag `v<ver>` op precies die
+   commit vóór `gh release create` — een tag op een sha die niet op origin
+   staat gaf HTTP 422, en zonder target belandde de tag op main's HEAD (v1).
+   Controleer `git log -1` en de tag: `git ls-remote origin refs/tags/v<ver>`.
 6. Deploy de backend zodat prod het nieuwe item serveert. Sinds 2.0 = `main`
    is dat: `main` fast-forwarden naar de release-commit en pushen (Vercel
    deployt avatars-api én avatar-admin van `main`). Let op: het
@@ -201,8 +199,6 @@ nog niet bestaat.
   archiveren. Geen verificatiestap na export (`codesign --verify --strict`,
   `spctl`, `stapler validate`) en niet hervatbaar na een halverwege gefaalde
   notarisatie.
-- Het script laat het committen van beide appcasts aan een mens over (stap
-  4–5 hierboven); de canon en de mirror kunnen dus uit elkaar lopen.
 - `scripts/build-v2.sh` pipet de xcodebuild-stappen door `tail -1`, waardoor
   de foutmelding bij een rode build niet zichtbaar is (de exit-code wél).
 
