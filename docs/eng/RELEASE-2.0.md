@@ -12,11 +12,12 @@ die het script nog nooit gedraaid heeft. v1 (`Avatar`-target, `release.sh`,
 | Artefact | Gemaakt door | Doel | Waar |
 |---|---|---|---|
 | `Aaavatar-2-<ver>.dmg` | `create-dmg` in `release-v2.sh` (stap 5), genotariseerd + gestapled | Download én Sparkle-enclosure | GitHub-release `v<ver>` (asset) |
-| `Aaavatar-2.dmg` | Kopie van bovenstaande (stap 10) | Stabiele bestandsnaam voor de website | Zelfde GitHub-release |
+| `Aaavatar.dmg` | Kopie van bovenstaande (stap 10) | Stabiele bestandsnaam — dít lost `releases/latest/download/Aaavatar.dmg` (website) op | Zelfde GitHub-release |
+| `docs/releases/RELEASE-NOTES-<ver>.md` | Mens, vóór de run | GitHub-release-body (`--notes-file`) | Repo, gecommit |
 | `appcast-v2.xml` | `release-v2.sh` (stap 9), nieuwste item bovenaan | Canon van het Sparkle-feed | Repo-root, gecommit |
 | `backend/api/_appcast-v2.xml` | `cp` van de canon (stap 9) | Wat prod serveert | Repo, gecommit, gedeployd met avatars-api |
 | Feed-URL | [`backend/api/appcast-v2.ts`](../../backend/api/appcast-v2.ts) + rewrite in [`backend/vercel.json`](../../backend/vercel.json) | `SUFeedURL` in de app | `https://api.aaavatar.nl/appcast-v2.xml` |
-| Tag `v<ver>` | `gh release create` (stap 10) | Download-URL in het appcast-item | GitHub, als **prerelease** |
+| Tag `v<ver>` | `gh release create` (stap 10) | Download-URL in het appcast-item | GitHub, als **latest** (of staged als prerelease met `PRERELEASE=1`) |
 
 ```
 project.yml (Avatar2-blok) ─bump─► xcodegen ─► xcodebuild archive ─► export (Developer ID)
@@ -27,14 +28,18 @@ project.yml (Avatar2-blok) ─bump─► xcodegen ─► xcodebuild archive ─�
                             │
                             ├─cp─► backend/api/_appcast-v2.xml
                             │
-                     gh release create v<ver> --prerelease  (DMG + stabiele kopie)
+                     gh release create v<ver> --latest  (DMG + Aaavatar.dmg; PRERELEASE=1 = staged)
                             │
                      git commit (project.yml, pbxproj, Info.plist, beide appcasts)
                             │
-                     backend deployen ─► curl api.aaavatar.nl/appcast-v2.xml | grep <ver>
+                     main ff'en + pushen (= Vercel-deploy) ─► curl api.aaavatar.nl/appcast-v2.xml | grep <ver>
+                            │
+                     (staged) gh release edit v<ver> --prerelease=false --latest
 
  bestaande 2.0-installs:  Sparkle → api.aaavatar.nl/appcast-v2.xml → GitHub-asset Aaavatar-2-<ver>.dmg
- v1-installs:             pollen /appcast.xml en zien 2.0 nooit
+ website-downloads:       releases/latest/download/Aaavatar.dmg → nieuwste niet-prerelease
+ v1-installs:             pollen /appcast.xml en zien 2.0 nooit (andere bundle-id);
+                          horen van 2.0 via een CMS-announcement met maxAppVersion
 ```
 
 ## Waarom deze vorm
@@ -47,12 +52,21 @@ project.yml (Avatar2-blok) ─bump─► xcodegen ─► xcodebuild archive ─�
   TLS-gepind in de app; het appcast is daarmee onderdeel van dezelfde
   trust-root als de rest van de backend. De DMG-assets zelf staan wél op
   GitHub Releases.
-- **GitHub-prerelease is verplicht, geen keuze.** De website linkt naar
-  `releases/download/latest/…` en GitHub's "latest" is de nieuwste
-  níet-prerelease. Een gewone 2.0-release zou die link kapen terwijl de v1-DMG
-  er niet onder de oude naam in zit → 404 voor v1-downloaders. De vlag gaat
-  er pas af als 2.0 stabiel is en de website naar de v2-DMG linkt (bewust
-  besluit, staat in de header van `release-v2.sh`).
+- **2.0 ís de publieke release; de website-link verandert niet.** De website
+  linkt `releases/latest/download/Aaavatar.dmg`; GitHub's "latest" is de
+  nieuwste níet-prerelease. Sinds 2026-09-04 (besluit Thierry) publiceert
+  `release-v2.sh` daarom een stabiele kopie onder exact die naam en de
+  release als `--latest`. Tot die datum waren 2.0-releases verplicht
+  prerelease om de v1-link te beschermen; dat is voorbij. `PRERELEASE=1`
+  bestaat nog om een build eerst te stagen (Sparkle-e2e vóór de site 'm
+  serveert) en daarna met `gh release edit v<ver> --prerelease=false
+  --latest` live te zetten.
+- **v1 → 2.0 is geen Sparkle-update.** Andere bundle-id
+  (`nl.avatar.app` vs `nl.squareone.aaavatar2`) én gepinde feed: Sparkle
+  installeert nooit een bundle met een andere id. Bestaande v1-gebruikers
+  krijgen een CMS-announcement (veld `maxAppVersion`, bv. `1.99`) met de
+  download-link en de Import-backup-route; 2.0-installs zien dat bericht
+  niet.
 - **Eigen versielijn, buildnummers vanaf 100.** Het Avatar2-target overschrijft
   `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in zijn eigen blok in
   `project.yml`; de root-settings zijn van v1. Build 100 ligt ruim boven elk
@@ -112,10 +126,12 @@ nog niet bestaat.
    `scripts/build-v2.sh`.
 2. Kies versie + build: build is het vorige `<sparkle:version>` in
    `appcast-v2.xml` + 1 (eerste beta: `2.0.0` / `101`).
-3. Draai het script (bumpt, archiveert, exporteert, bouwt DMG, notariseert,
-   staplet, tekent, werkt beide appcasts bij en publiceert de prerelease):
+3. Schrijf `docs/releases/RELEASE-NOTES-<ver>.md` (release-body; het script
+   weigert zonder) en draai het script (bumpt, archiveert, exporteert, bouwt
+   DMG, notariseert, staplet, tekent, werkt beide appcasts bij en publiceert):
    ```bash
-   ./scripts/release-v2.sh 2.0.0 101
+   PRERELEASE=1 ./scripts/release-v2.sh 2.0.0 101   # staged: site blijft op de vorige latest
+   ./scripts/release-v2.sh 2.0.1 102                # direct latest (patch-releases)
    ```
    Bij een bestaande release met dezelfde tag overschrijft het script de
    DMG-assets (`--clobber`); dat is bedoeld voor een herhaalde run, niet
@@ -133,21 +149,29 @@ nog niet bestaat.
      appcast-v2.xml backend/api/_appcast-v2.xml
    git commit -m "release: Aaavatar 2 v2.0.0 (build 101)"
    ```
-6. Deploy de backend (avatars-api) zodat prod het nieuwe item serveert; zie de
-   deploy-mechanics in het geheugen/plan (prod-deploys vanaf de repo-root).
+6. Deploy de backend zodat prod het nieuwe item serveert. Sinds 2.0 = `main`
+   is dat: `main` fast-forwarden naar de release-commit en pushen (Vercel
+   deployt avatars-api én avatar-admin van `main`). Let op: admin's
+   `vercel-build` draait `payload migrate` tegen de prod-DB.
 7. Smoke:
    ```bash
    curl -s https://api.aaavatar.nl/appcast-v2.xml | grep 2.0.0
    ```
 8. Update-e2e: een geïnstalleerde oudere 2.0-build → Settings → About →
    "Check now" → kaart linksonder "Aaavatar <ver> is available" → Install
-   Update → voortgang → Relaunch → nieuwe versie draait. Een verse
-   download-test via de release-pagina (Gatekeeper "verified") hoort er bij
-   de eerste beta ook bij.
+   Update → voortgang → Relaunch → nieuwe versie draait. Plus een verse
+   download-test via de release-pagina (Gatekeeper "verified").
+9. Staged gepubliceerd (`PRERELEASE=1`)? Dan nu live:
+   ```bash
+   gh release edit v<ver> --prerelease=false --latest
+   curl -sIL https://github.com/Square-One-Official/Avatar/releases/latest/download/Aaavatar.dmg | grep -i location
+   ```
 
 ## Rollback
 
-1. `gh release delete v<ver> --yes` (haalt de assets weg).
+1. `gh release delete v<ver> --yes` (haalt de assets weg). Was de release al
+   `latest`: `gh release edit <vorige tag> --latest`, anders wijst de
+   website-link naar niets.
 2. Revert de release-commit (appcasts + versiebump) en deploy de backend
    opnieuw, zodat het feed het item niet meer aanbiedt.
 3. Installs die de update al hebben, blijven erop staan; een hotfix is dan
@@ -172,7 +196,6 @@ nog niet bestaat.
   notarisatie.
 - Het script laat het committen van beide appcasts aan een mens over (stap
   4–5 hierboven); de canon en de mirror kunnen dus uit elkaar lopen.
-- CI lint alleen het v1-`appcast.xml`; `appcast-v2.xml` en de mirror niet.
 - `scripts/build-v2.sh` pipet de xcodebuild-stappen door `tail -1`, waardoor
   de foutmelding bij een rode build niet zichtbaar is (de exit-code wél).
 

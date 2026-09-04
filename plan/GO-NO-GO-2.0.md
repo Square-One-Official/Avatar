@@ -35,9 +35,16 @@ deze release; wat rest is gated (signing, live e2e, assets).
 
 - ✅ Eigen feed op prod: `https://api.aaavatar.nl/appcast-v2.xml` → **200**
   (lege channel — geldig tot de eerste beta).
-- ✅ `release-v2.sh` + versielijn 2.0.0 / build 100; prerelease-beleid intact.
-- ⬜ **Eerste beta-release** (Thierry: signing / notarisatie / Sparkle-key):
-  `./scripts/release-v2.sh 2.0.0 101`, daarna appcast-commit + update-e2e.
+- ✅ `release-v2.sh` + versielijn 2.0.0 / build 100. **2026-09-04:** script
+  publiceert nu als `--latest` mét `Aaavatar.dmg` (website-link serveert 2.0
+  zonder Framer-edit); `PRERELEASE=1` = staged. Release-notes:
+  `docs/releases/RELEASE-NOTES-2.0.0.md` (concept staat klaar).
+- ⬜ **Eerste publieke release** (Thierry: signing / notarisatie / Sparkle-key),
+  vanuit de merge-worktree (`.claude/worktrees/merge-main`, AvatarKit wijkt
+  daar af van v2-main): `PRERELEASE=1 ./scripts/release-v2.sh 2.0.0 101` →
+  appcast-commit → `main` ff + push (= backend-deploy) → Sparkle-e2e →
+  `gh release edit v2.0.0 --prerelease=false --latest`. Volledige volgorde in
+  het runbook (§Per release).
   *Agent 2026-08-21: Keychain `AC_PASSWORD` ontbreekt op deze Mac → kan de
   release-script niet autonoom afronden.*
 
@@ -58,6 +65,16 @@ deze release; wat rest is gated (signing, live e2e, assets).
 - ✅ **Custom effects / sql/015** — uitgevoerd in E55.8 (2026-08-03); GO-NO-GO
   was stale. Optioneel: Thierry nog één Create-effect smoke in de app.
 - ⬜ Nieuwsbrief double-opt-in (E17.6) — niet blokkerend voor app-launch.
+- ✅ **Release-review 2026-09-04** (agent): Avatar2 schoon (alle smoke-haken
+  DEBUG-gated, flags default uit, geen keys/hosts), AvatarKit schoon
+  (prod-URL hardcoded, preview-override DEBUG-only), backend: `/v1/unsplash`
+  kreeg optionalUser + per-IP-limiter; cloud-cutout in BackendClient is
+  v1-only gemarkeerd (Avatar2 heeft geen call site, v1's ImageProcessor wel —
+  weg zodra het v1-target weg is); CI groen gemaakt (backend `ws`+`sharp` gebumpt; admin `payload
+  generate:types` in CI). Geverifieerd via build-v2.sh + npm test.
+- ⬜ **v1-gebruikers informeren**: Payload-Announcement "Aaavatar 2 is uit"
+  met `maxAppVersion` = `1.99`, CTA naar de download; publiceren ná stap
+  9 van het runbook (Thierry).
 
 ## 8. Feature-flags & vangnetten — ✅
 
@@ -88,5 +105,14 @@ deze release; wat rest is gated (signing, live e2e, assets).
 
 - Nieuwsbrief double-opt-in (E17.6).
 - Definitieve asset-batch (ASSETS.md).
-- Scripthardening release-v2 (preflight/verify/hervatbaar), CI-lint op
-  `appcast-v2.xml` — zie "Bekende gaten" in het runbook.
+- Scripthardening release-v2 (preflight/verify/hervatbaar) — zie "Bekende
+  gaten" in het runbook.
+- admin: `sharp` <0.35 (libvips-CVE's, high) en `payload` ≤3.88 (moderate,
+  geen fix) — de admin-audit-stap in CI is sinds 2026-09-04 advisory
+  (`continue-on-error`); oplossen = Payload-familie in lockstep bumpen
+  (payload + alle @payloadcms/* op één versie) en dan sharp 0.35. Backend
+  draait al op sharp 0.35.4.
+- BackendClient: 401 → token-refresh → retry (nu "Session expired"-pad);
+  `fatalError` bij ModelContainer-creatie → herstel-UI; TLS-pin-rotatie
+  vóór 2027-03 (LE R13); `backend/.env.example` bijwerken;
+  `website/terms.md` "free of charge" → credits/Stripe.

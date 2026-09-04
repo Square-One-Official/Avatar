@@ -76,10 +76,11 @@ via `DSMotion`, reduce-motion-bewust) en `scripts/check-icon-sizes.sh`
 ## Releasen
 
 Zie [`docs/eng/RELEASE-2.0.md`](docs/eng/RELEASE-2.0.md): artefacten,
-pipeline, waarom het kanaal zo in elkaar zit (eigen appcast, verplichte
-prerelease), eenmalige setup, stappen per release, rollback en sleutels.
-Script: `scripts/release-v2.sh <versie> <build>`. Status van de eerste
-beta: [`plan/GO-NO-GO-2.0.md`](plan/GO-NO-GO-2.0.md).
+pipeline, waarom het kanaal zo in elkaar zit (eigen appcast, `Aaavatar.dmg`
+als stabiele download-naam, staged via `PRERELEASE=1`), eenmalige setup,
+stappen per release, rollback en sleutels. Script:
+`scripts/release-v2.sh <versie> <build>`; release-notes in
+`docs/releases/`. Go/no-go van 2.0: [`plan/GO-NO-GO-2.0.md`](plan/GO-NO-GO-2.0.md).
 
 ## Verder lezen
 
