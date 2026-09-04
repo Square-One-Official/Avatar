@@ -417,7 +417,9 @@ in de scratchpad, 001→002→009→020→022): maandklant met top-up 50 vóór 
 → 500; comped 200 → 200; `try_spend_credits` trekt maand-eerst (210 van 190+50 → 0/30), weigert
 overspend, refund idempotent; onbekende user → 0; pre-flight-query syntactisch ok. `tsc --noEmit`
 schoon, `npm test` groen. Client-copy hoeft niet te wijzigen (beloofde al (a)). Optie (a)
-bevestigd door Thierry 2026-09-04; v2-main gepusht. **Open voor Thierry:** (1) sql/022 draaien
-(sectie 1 → pre-flight → sectie 2), (2) daarna de website-FAQ-regel "Credits at renewal — fix
-pending" herschrijven naar "top-ups never expire, monthly credits refill". Geen backend-deploy
-nodig: de functie leeft in Postgres.
+bevestigd door Thierry 2026-09-04; v2-main gepusht. **sql/022 op prod gedraaid door Thierry
+2026-09-04** (drie pastes: sectie 1 → pre-flight → sectie 2; gemeld als geslaagd, niet vanuit de
+agent-sessie geverifieerd — geen Supabase-credentials lokaal). Geen backend-deploy nodig: de
+functie leeft in Postgres. **Nog open (Thierry):** de interne checklistregel "Credits at renewal
+… a fix is pending" in `aaavatar-website-faq-EN.md` (ongetrackt, repo-root) is nu achterhaald —
+de pricing-antwoorden mogen "top-ups never expire, monthly credits refill" zeggen.

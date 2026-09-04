@@ -29,7 +29,7 @@ do not branch or skip numbers.
 | 019 | `019_payload_messages_banner_presets_catchup.sql` | Catch-up DDL for `payload.messages` + `payload.banner_presets` (E17/E39) that never reached prod in the push:true era — applied 2026-08-03 (E55 roll-out) | 008 |
 | 020 | `020_atomic_credit_spend.sql` | Race-safe credit spend for paid generation endpoints (E56) | 001, 002 |
 | 021 | `021_announcements_max_app_version.sql` | `payload.announcements.max_app_version` for 1.x-only announcements (the "Aaavatar 2 is out" notice) — apply BEFORE the admin deploy that ships the field (the 2.0.0 `main` push) | 008 |
-| 022 | `022_credit_buckets.sql` | Two-bucket `current_credits()` (E14.12): the monthly grant refills at renewal, `topup_pack` credits never expire; ledger-only, no `subscriptions` window. Built-in self-check + pre-flight diff query (run section 1 → pre-flight → section 2) | 001, 002, 020 |
+| 022 | `022_credit_buckets.sql` | Two-bucket `current_credits()` (E14.12): the monthly grant refills at renewal, `topup_pack` credits never expire; ledger-only, no `subscriptions` window. Built-in self-check + pre-flight diff query (run section 1 → pre-flight → section 2) — applied 2026-09-04 | 001, 002, 020 |
 
 ## Data classification
 
