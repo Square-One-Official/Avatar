@@ -155,6 +155,12 @@ async function grantPeriodCredits(opts: {
 }) {
   // Idempotent: the ref column has a unique index in SQL, so a retry on the
   // same invoice will violate and be ignored.
+  //
+  // Balance semantics (sql/022): a `period_renewal` row whose ref has no
+  // `:N` suffix (N ≥ 1) starts a new billing period — the monthly bucket is
+  // SET to this delta, unspent monthly credits drop, top-ups carry over. The
+  // yearly cron's `:1`..`:11` tranches add within the year instead.
+  // Changing the ref format here changes when balances reset.
   const { error } = await supabase.from("credit_ledger").insert({
     user_id: opts.userId,
     delta: creditsForTier(opts.tier),

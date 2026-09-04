@@ -21,6 +21,12 @@ import { supabase } from "../../lib/supabase.js";
  * twice in the same month, or backfills a previously-missed month, the
  * second insert is a no-op.
  *
+ * The `:<monthIndex>` suffix is also load-bearing for the balance:
+ * `current_credits()` (sql/022) treats a `period_renewal` row with a `:N`
+ * suffix (N ≥ 1) as an ADDITIVE tranche — the yearly monthly bucket
+ * accumulates within the year — while a row without it (monthly invoice,
+ * or the `:0` up-front tranche) resets the monthly bucket. Keep the format.
+ *
  * Auth: protected by CRON_SECRET via Authorization header
  *       (Vercel sets this automatically for cron requests; manual hits
  *       must include `Authorization: Bearer <CRON_SECRET>`).

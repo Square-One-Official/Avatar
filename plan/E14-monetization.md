@@ -372,3 +372,51 @@ billing-tests ongewijzigd groen. **Prod-deploy gedaan (2026-09-02 22:14):** avat
 `vercel --prod` vanaf de repo-root (dpl_DzqMkM2AELghisbGH7JUpmt8PRJf), alias `api.aaavatar.nl`
 verwijst ernaar; anonieme `/v1/account` levert de device-teller live.
 
+
+## 14.12 — Top-up-credits overleven de maandelijkse renewal (two-bucket `current_credits`) [INFRA]
+- status: done
+- owner: INFRA (AI-agent, audit 2026-09-04)
+- blockedBy: —
+- DoD: migratie met ingebouwde self-check, `tsc --noEmit` schoon, backend-tests groen, Result-regel; **sql/022 draait Thierry zelf** in de Supabase SQL-editor
+- branch: `v2/e14-14.12`
+
+**Wat:** `public.current_credits()` (001, herschreven in 009) telde alleen ledger-rijen met
+`created_at >= subscriptions.current_period_start` van de laatste actieve subscription.
+Gevolgen: (1) onbestede maandcredits vervallen bij renewal — bedoeld ("refills to 200");
+(2) een **top-up-pack gekocht vóór de renewal verviel ook**, want dat is gewoon een oudere
+ledger-rij — in tegenspraak met de client-copy ("Credits never expire and stack with your
+monthly credits", `SettingsBillingPage`/`BillingCopy`/`CreditPack`-doc-comment); (3) jaar-
+abonnees hadden een 12-maands-venster, dus daar stapelden cron-tranches en top-ups wél;
+(4) gebruikers zónder actieve sub telden hun hele historie, inclusief élke oude maandgrant.
+
+**Besluit (optie a, aanname van de agent — Thierry bevestigt vóór het draaien van sql/022):**
+de maandgrant refillt (onbestede maandcredits vervallen bij de volgende `period_renewal`),
+top-ups vervallen nooit, spends trekken eerst van de maandbucket en dan van de top-up-bucket.
+Optie (b) alles rolt over en (c) huidige gedrag + copy aanpassen zijn afgewezen omdat de
+website-FAQ-notitie (2026-09-04) het huidige gedrag al als "fix pending" bestempelt en de
+Settings-copy/`CreditPack` al (a) beloven. Jaar-abonnees: ongewijzigd — `:0`-tranche reset,
+`:1`..`:11` stapelen binnen het jaar, de volgende `:0` reset (bewuste keuze, geen gedrags-
+wijziging voor bestaande jaarklanten; "maandelijks vervallen ook voor jaar" is een apart besluit).
+
+**Result (2026-09-04):** `backend/sql/022_credit_buckets.sql`: pure fold
+`credit_bucket_fold(int[], text[], text[]) → (monthly, topup)` + `credit_buckets(uuid)` +
+`current_credits(uuid) = monthly + topup`; ledger-only (leest `subscriptions` niet meer, dus
+audit MEDIUM #18 en het dunning-gat verdwijnen als klasse); `topup_pack` → top-up-bucket,
+`period_renewal` zonder `:N`-suffix → maandbucket **=** delta (reset), overige positieve rijen
+(`:N`-tranches, `comped_pro`, `*_refund`, `initial_grant`) → maandbucket **+=** delta, spends
+eerst maand dan top-up (top-up gefloord op 0, zodat legacy-overspends van lapsed users onder het
+oude venster vergeven worden i.p.v. als schuld meegenomen). `search_path = ''` op alle drie.
+`try_spend_credits`/`refund_credit_spend` (020) en `ensureCompedCredits` roepen alleen
+`current_credits()` aan → geen TypeScript-logica gewijzigd (alleen doc-comments in
+`lib/supabase.ts`, `stripe-webhook.ts`, `cron/grant-yearly-credits.ts` die de ref-conventie
+`:N` nu als contract markeren). Ingebouwde `do $$`-self-check (9 scenario's) breekt de migratie
+af bij afwijkende semantiek; sectie 3 = pre-flight-diff-query (oud vs nieuw saldo per user)
+om **tussen** sectie 1 en 2 te draaien. Geverifieerd op een echte Postgres 18 (embedded-postgres
+in de scratchpad, 001→002→009→020→022): maandklant met top-up 50 vóór renewal oud 190 → nieuw
+240; lapsed klant oud 380 (opgeblazen) → nieuw 230 (restant laatste periode + top-up); jaar 500
+→ 500; comped 200 → 200; `try_spend_credits` trekt maand-eerst (210 van 190+50 → 0/30), weigert
+overspend, refund idempotent; onbekende user → 0; pre-flight-query syntactisch ok. `tsc --noEmit`
+schoon, `npm test` groen. Client-copy hoeft niet te wijzigen (beloofde al (a)). **Open voor
+Thierry:** (1) optie (a) bevestigen, (2) sql/022 draaien (sectie 1 → pre-flight → sectie 2),
+(3) daarna de website-FAQ-regel "Credits at renewal — fix pending" herschrijven naar "top-ups
+never expire, monthly credits refill". Geen backend-deploy nodig: de functie leeft in Postgres.

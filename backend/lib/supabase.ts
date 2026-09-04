@@ -41,7 +41,13 @@ export async function activeSubscription(userId: string): Promise<SubscriptionRo
   return (data as SubscriptionRow | null) ?? null;
 }
 
-/** Returns remaining credits for the user's current period (0 if none). */
+/**
+ * Returns the user's spendable credits (0 if none): monthly bucket + top-up
+ * bucket, see `sql/022_credit_buckets.sql`. The monthly grant refills on each
+ * `period_renewal` row (unspent monthly credits drop), `topup_pack` credits
+ * never expire, and spends drain the monthly bucket first. Ledger-only — the
+ * `subscriptions` mirror no longer influences the balance.
+ */
 export async function currentCredits(userId: string): Promise<number> {
   const { data, error } = await supabase.rpc("current_credits", { p_user: userId });
   if (error) throw error;
