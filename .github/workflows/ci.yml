@@ -58,9 +58,19 @@ jobs:
         working-directory: admin
       # payload-types.ts is gitignored (generated); without it tsc fails on
       # every import of '../payload-types'. Generation only evaluates the
-      # config — it never connects to DATABASE_URL.
-      - run: npm run generate:types
+      # config — it never connects to DATABASE_URL. The Payload CLI now and
+      # then exits 0 without writing anything (run 33916184338, 2026-09-04),
+      # so assert the file and retry instead of trusting the exit code.
+      - name: Generate Payload types (asserted, retried)
         working-directory: admin
+        run: |
+          for attempt in 1 2 3; do
+            npm run generate:types
+            if [ -s src/payload-types.ts ]; then break; fi
+            echo "payload-types.ts missing after attempt $attempt — retrying"
+            sleep 5
+          done
+          test -s src/payload-types.ts
       - run: npx tsc --noEmit
         working-directory: admin
       - run: npx next build
