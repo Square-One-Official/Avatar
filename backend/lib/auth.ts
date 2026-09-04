@@ -164,6 +164,16 @@ const anonCheckoutLimiter = makeLimiter(
   Ratelimit.slidingWindow(5, "1 h"),
 );
 
+// Unsplash proxy (/v1/unsplash). Anonymous-friendly by design (the
+// background panel works before sign-in), so the only budget we can key on
+// is the IP. Unsplash's own demo/production quota is per access key — an
+// unthrottled proxy would let a single host burn it for everyone.
+// 30/min per IP: a human paging through search results stays well under.
+const anonUnsplashLimiter = makeLimiter(
+  "ratelimit:anon-unsplash",
+  Ratelimit.slidingWindow(30, "60 s"),
+);
+
 // Circuit-breaker state (audit MEDIUM #20). The limiters fail OPEN on
 // Upstash errors so an outage doesn't lock everyone out — but a steady
 // stream of Upstash errors then means EVERY request bypasses the limit,
@@ -254,6 +264,10 @@ export async function checkAnonAccountRateLimit(ip: string): Promise<boolean> {
 
 export async function checkAnonCheckoutRateLimit(ip: string): Promise<boolean> {
   return tryLimit(anonCheckoutLimiter, ip);
+}
+
+export async function checkAnonUnsplashRateLimit(ip: string): Promise<boolean> {
+  return tryLimit(anonUnsplashLimiter, ip);
 }
 
 // The dev-unlimited allowlist used to live here as a synchronous env-var
