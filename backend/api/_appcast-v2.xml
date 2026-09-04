@@ -6,5 +6,17 @@
      Een leeg channel is geldig: Sparkle meldt dan "geen update". -->
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
+    <item>
+      <title>Version 2.0.0</title>
+      <pubDate>Fri, 04 Sep 2026 22:42:48 +0200</pubDate>
+      <sparkle:version>102</sparkle:version>
+      <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/Square-One-Official/Avatar/releases/download/v2.0.0/Aaavatar-2.0.0.dmg"
+        length="11146016"
+        type="application/x-apple-diskimage"
+        sparkle:edSignature="+1zonVQr27+IbUwWdKMQPv5I4TwX0Jgc+maKCeffjcXXJQtAMIoJ75xXMdxbPPhKaYi3pTHwYVCOc/JzZhImBg==" />
+    </item>
   </channel>
 </rss>
