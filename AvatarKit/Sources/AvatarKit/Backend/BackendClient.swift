@@ -133,6 +133,13 @@ public final class BackendClient {
     /// success. Returns the cutout PNG (foreground over transparent alpha)
     /// plus the user's updated credit balance.
     ///
+    /// **v1-only.** Aaavatar 2 does Remove background on-device (Vision /
+    /// ORMBG, `PipelineRouter`) and has no call site for `cutout(imagePNG:)`;
+    /// the frozen v1 app (`Avatar/Services/ImageProcessor.swift`) still links
+    /// it, and `Avatar/` is out of bounds outside SHARED stories. Remove this
+    /// together with the v1 target, not before (release-review 2026-09-04).
+    /// `uploadInputPNG` below is shared by every cloud edit and stays.
+    ///
     /// The PNG is uploaded directly to Supabase Storage (private bucket,
     /// short-lived signed PUT URL) so the request body to `/v1/cutout` is
     /// just the resulting key — Vercel's 4.5 MB serverless body cap never

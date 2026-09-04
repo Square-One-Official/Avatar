@@ -31,9 +31,11 @@ struct ShellView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if DEBUG
     /// E25.1 smoke-haak: standalone DSColorPicker tonen voor de screenshot.
     @State private var debugShowColorPicker = false
     @State private var debugPickerColor: Color = Color(hue: 0.55, saturation: 0.7, brightness: 0.9)
+    #endif
 
     /// Portrait- + banner-editor: canvas full-bleed; sidebar/chrome als overlay.
     private var studioFullBleed: Bool {
@@ -168,13 +170,16 @@ struct ShellView: View {
         .overlay(alignment: .bottomTrailing) { setActionToastLayer }
         // E53.7: contextmenu's + store-gedreven alerts/confirms.
         .overlay { FloatingOverlayHost(model: model, entitlement: entitlement) }
-        // E25.1 smoke-haak: standalone DSColorPicker.
+        #if DEBUG
+        // E25.1 smoke-haak: standalone DSColorPicker (alleen DEBUG — Release
+        // heeft geen sheet-slot voor een haak die daar nooit gezet kan worden).
         .sheet(isPresented: $debugShowColorPicker) {
             DSColorPicker(color: $debugPickerColor)
                 .padding(DSSpacing.gap8)
                 .background(DSColor.Background.app)
                 .appliedAppearancePreference()
         }
+        #endif
         .onChange(of: entitlement.openSettingsPage) { _, page in
             if let page {
                 model.openSettings(page: page)
