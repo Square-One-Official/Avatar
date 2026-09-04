@@ -39,14 +39,13 @@ deze release; wat rest is gated (signing, live e2e, assets).
   publiceert nu als `--latest` mét `Aaavatar.dmg` (website-link serveert 2.0
   zonder Framer-edit); `PRERELEASE=1` = staged. Release-notes:
   `docs/releases/RELEASE-NOTES-2.0.0.md` (concept staat klaar).
-- ⬜ **Eerste publieke release** (Thierry: signing / notarisatie / Sparkle-key),
-  vanuit de merge-worktree (`.claude/worktrees/merge-main`, AvatarKit wijkt
-  daar af van v2-main): `PRERELEASE=1 ./scripts/release-v2.sh 2.0.0 101` →
-  appcast-commit → `main` ff + push (= backend-deploy) → Sparkle-e2e →
-  `gh release edit v2.0.0 --prerelease=false --latest`. Volledige volgorde in
-  het runbook (§Per release).
-  *Agent 2026-08-21: Keychain `AC_PASSWORD` ontbreekt op deze Mac → kan de
-  release-script niet autonoom afronden.*
+- ✅ **Aaavatar v2.0.0 (build 102) is LIVE — 2026-09-04 23:47.** Gebouwd uit de
+  merge-branch (release-commit 7fc4448), genotariseerd + gestapled, staged als
+  prerelease, backend (CLI) + admin (git) + appcast-item op prod gesmoked, daarna
+  `gh release edit v2.0.0 --prerelease=false --latest` op go van Thierry. De
+  website-link `…/releases/latest/download/Aaavatar.dmg` lost op naar
+  `v2.0.0/Aaavatar.dmg` (200, 11 146 016 B). main = v2-main sindsdien.
+  Product heet "Aaavatar" (Aaavatar.app); v1 blijft bereikbaar onder tag v1.2.1.
 
 ## 5. Migratiepad (13.2) — ✅ code / ⬜ echte-data-test
 
@@ -75,7 +74,7 @@ deze release; wat rest is gated (signing, live e2e, assets).
 - ⬜ **sql/021 toepassen** (Thierry, Supabase SQL-editor) — `max_app_version`
   op `payload.announcements`; **vóór de main-push** (admin-deploy), anders
   gaat de Announcements-detailpagina zwart en soft-failt `/v1/announcements/pending`.
-- ⬜ **v1-gebruikers informeren**: Payload-Announcement "Aaavatar 2.0 is here"
+- ⬜ **v1-gebruikers informeren** (enige open go-live-stap): Payload-Announcement "Aaavatar 2.0 is here"
   met `maxAppVersion` = `1.99`, eerst-backup-exporteren-instructie (2.0 heet
   óók Aaavatar.app en vervangt v1 bij drag-install), CTA naar de download;
   publiceren ná stap 9 van het runbook.
