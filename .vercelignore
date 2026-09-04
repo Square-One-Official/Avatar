@@ -1,7 +1,13 @@
-# The avatars-api project builds only backend/ (project rootDirectory=backend).
-# When deploying from the repo root via the Vercel CLI the whole monorepo would
-# otherwise be uploaded and blow the request-size limit. Exclude everything
-# except backend/ so the CLI upload stays small. (GitHub auto-deploys are
-# unaffected — they use the project's rootDirectory setting server-side.)
+# Two Vercel projects deploy from this repo: avatars-api (rootDirectory=backend)
+# and avatar-admin (rootDirectory=admin). This file is applied to BOTH the CLI
+# upload from the repo root AND to GitHub-triggered builds — Vercel reads the
+# repository-root .vercelignore before honouring rootDirectory ("Found
+# .vercelignore (repository root) … Removed 701 ignored files", 2026-09-04),
+# so anything excluded here is simply gone for git deploys too. On 2026-09-04
+# `/*` + `!/backend` made the avatar-admin git deploy of `main` ship an empty
+# Next app (admin.aaavatar.nl → 404, /v1/effects → 0 items) until a rollback.
+# Keep both project roots; exclude the macOS sources so the CLI upload from
+# the repo root stays small.
 /*
 !/backend
+!/admin
