@@ -389,7 +389,7 @@ monthly credits", `SettingsBillingPage`/`BillingCopy`/`CreditPack`-doc-comment);
 abonnees hadden een 12-maands-venster, dus daar stapelden cron-tranches en top-ups wél;
 (4) gebruikers zónder actieve sub telden hun hele historie, inclusief élke oude maandgrant.
 
-**Besluit (optie a, aanname van de agent — Thierry bevestigt vóór het draaien van sql/022):**
+**Besluit (optie a — bevestigd door Thierry 2026-09-04):**
 de maandgrant refillt (onbestede maandcredits vervallen bij de volgende `period_renewal`),
 top-ups vervallen nooit, spends trekken eerst van de maandbucket en dan van de top-up-bucket.
 Optie (b) alles rolt over en (c) huidige gedrag + copy aanpassen zijn afgewezen omdat de
@@ -416,7 +416,8 @@ in de scratchpad, 001→002→009→020→022): maandklant met top-up 50 vóór 
 240; lapsed klant oud 380 (opgeblazen) → nieuw 230 (restant laatste periode + top-up); jaar 500
 → 500; comped 200 → 200; `try_spend_credits` trekt maand-eerst (210 van 190+50 → 0/30), weigert
 overspend, refund idempotent; onbekende user → 0; pre-flight-query syntactisch ok. `tsc --noEmit`
-schoon, `npm test` groen. Client-copy hoeft niet te wijzigen (beloofde al (a)). **Open voor
-Thierry:** (1) optie (a) bevestigen, (2) sql/022 draaien (sectie 1 → pre-flight → sectie 2),
-(3) daarna de website-FAQ-regel "Credits at renewal — fix pending" herschrijven naar "top-ups
-never expire, monthly credits refill". Geen backend-deploy nodig: de functie leeft in Postgres.
+schoon, `npm test` groen. Client-copy hoeft niet te wijzigen (beloofde al (a)). Optie (a)
+bevestigd door Thierry 2026-09-04; v2-main gepusht. **Open voor Thierry:** (1) sql/022 draaien
+(sectie 1 → pre-flight → sectie 2), (2) daarna de website-FAQ-regel "Credits at renewal — fix
+pending" herschrijven naar "top-ups never expire, monthly credits refill". Geen backend-deploy
+nodig: de functie leeft in Postgres.
